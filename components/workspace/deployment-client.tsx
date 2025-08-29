@@ -140,8 +140,12 @@ export default function DeploymentClient() {
   // Handle GitHub OAuth callback
   useEffect(() => {
     const handleGitHubCallback = async () => {
-      const urlParams = new URLSearchParams(window.location.search)
-      const code = urlParams.get('code')
+      // Check for code in URL hash (new approach) or search params (fallback)
+      const hashParams = new URLSearchParams(window.location.hash.substring(1))
+      const hashCode = hashParams.get('github_code')
+      const searchParams = new URLSearchParams(window.location.search)
+      const searchCode = searchParams.get('code')
+      const code = hashCode || searchCode
 
       if (code) {
         try {
@@ -192,8 +196,12 @@ export default function DeploymentClient() {
               description: "Successfully connected to GitHub",
             })
 
-            // Clean up URL
-            window.history.replaceState({}, document.title, window.location.pathname)
+            // Clean up URL - remove hash if it contains the code
+            if (hashCode) {
+              window.history.replaceState({}, document.title, window.location.pathname + window.location.search)
+            } else {
+              window.history.replaceState({}, document.title, window.location.pathname)
+            }
           }
         } catch (error) {
           console.error('GitHub callback error:', error)
@@ -305,20 +313,13 @@ export default function DeploymentClient() {
     setDeploymentState(prev => ({ ...prev, isDeploying: true, currentStep: 'connecting' }))
 
     try {
-      const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID
-      if (!clientId) {
-        toast({
-          title: "Configuration Error",
-          description: "GitHub client ID not configured",
-          variant: "destructive"
-        })
-        setDeploymentState(prev => ({ ...prev, isDeploying: false }))
-        return
-      }
+      // GitHub OAuth App configuration - Fallback credentials
+      const GITHUB_CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID || 'Ov23lihgU0dNPk4ct1Au'
+      const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_URL || 'https://dev.pixelways.co'
 
-      const redirectUri = encodeURIComponent(`${window.location.origin}/workspace/deployment`)
+      const redirectUri = encodeURIComponent(`${APP_DOMAIN}/workspace/deployment`)
       const scope = encodeURIComponent('repo,user')
-      const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`
+      const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`
 
       // Store current state in sessionStorage
       sessionStorage.setItem('github_oauth_return_url', window.location.href)
