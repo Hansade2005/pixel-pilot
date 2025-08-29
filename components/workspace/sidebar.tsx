@@ -265,13 +265,13 @@ export function Sidebar({
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="w-8 h-8 p-0">
                 <Avatar className="h-6 w-6">
-                  <AvatarImage src={user.user_metadata?.avatar_url || "/placeholder.svg"} />
+                  <AvatarImage src={user.user_metadata?.avatar_url || "https://randomuser.me/api/portraits/men/62.jpg"} />
                   <AvatarFallback className="text-xs">{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem>
+            <DropdownMenuContent align="end" className={`${isMobile ? 'z-[70]' : 'z-50'}`}>
+              <DropdownMenuItem onClick={() => router.push('/workspace/account')}>
                 <Settings className="mr-2 h-4 w-4" />
                 Settings
               </DropdownMenuItem>
@@ -432,7 +432,7 @@ export function Sidebar({
                           <MoreHorizontal className="h-3 w-3" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuContent align="end" className={`w-48 ${isMobile ? 'z-[70]' : 'z-50'}`}>
                         <DropdownMenuItem onClick={() => handleTogglePin(project)}>
                           {project.isPinned ? (
                             <><PinOff className="mr-2 h-4 w-4" />Unpin Project</>
@@ -518,7 +518,7 @@ export function Sidebar({
                           <MoreHorizontal className="h-3 w-3" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuContent align="end" className={`w-48 ${isMobile ? 'z-[70]' : 'z-50'}`}>
                         <DropdownMenuItem onClick={() => handleTogglePin(project)}>
                           {project.isPinned ? (
                             <><PinOff className="mr-2 h-4 w-4" />Unpin Project</>
@@ -576,7 +576,7 @@ export function Sidebar({
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="w-full justify-start p-2">
                 <Avatar className="h-6 w-6 mr-3">
-                  <AvatarImage src={user.user_metadata?.avatar_url || "/placeholder.svg"} />
+                  <AvatarImage src={user.user_metadata?.avatar_url || "https://randomuser.me/api/portraits/men/62.jpg"} />
                   <AvatarFallback className="text-xs">{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div className="text-left min-w-0 flex-1">
@@ -585,10 +585,10 @@ export function Sidebar({
                 </div>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 z-50">
-              <DropdownMenuItem onClick={() => window.open('/workspace/management', '_blank')}>
+            <DropdownMenuContent align="end" className={`w-56 ${isMobile ? 'z-[70]' : 'z-50'}`}>
+              <DropdownMenuItem onClick={() => router.push('/workspace/account')}>
                 <Settings className="mr-2 h-4 w-4" />
-                Project Management
+                Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut}>
