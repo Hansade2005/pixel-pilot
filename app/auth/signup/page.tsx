@@ -32,7 +32,7 @@ export default function SignupPage() {
         email,
         password,
         options: {
-          emailRedirectTo: `https://dev.pixelways.co/api/auth/github/callback`,
+          emailRedirectTo: `${window.location.origin}/workspace`,
           data: {
             full_name: fullName,
           },
@@ -57,7 +57,7 @@ export default function SignupPage() {
         provider: 'github',
         options: {
           scopes: 'repo read:user workflow',
-          redirectTo: `https://dev.pixelways.co/api/auth/github/callback`,
+          redirectTo: `${window.location.origin}/workspace`,
         },
       })
       if (error) throw error
@@ -141,7 +141,7 @@ export default function SignupPage() {
             </form>
             <div className="mt-6 text-center text-sm">
               Already have an account?{" "}
-              <Link href="/auth/login" className="text-accent hover:underline">
+              <Link href="/auth/login" className="text-sm text-destructive hover:underline">
                 Sign in
               </Link>
             </div>

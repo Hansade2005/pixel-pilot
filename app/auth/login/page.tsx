@@ -50,7 +50,7 @@ export default function LoginPage() {
         provider: 'github',
         options: {
           scopes: 'repo read:user workflow',
-          redirectTo: `https://dev.pixelways.co/api/auth/github/callback`,
+          redirectTo: `${window.location.origin}/workspace`,
         },
       })
       if (error) throw error
@@ -122,7 +122,7 @@ export default function LoginPage() {
             </form>
             <div className="mt-6 text-center text-sm">
               Don't have an account?{" "}
-              <Link href="/auth/signup" className="text-accent hover:underline">
+              <Link href="/auth/signup" className="text-sm text-destructive hover:underline">
                 Sign up
               </Link>
             </div>

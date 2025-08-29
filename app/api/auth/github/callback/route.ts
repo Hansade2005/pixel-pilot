@@ -1,27 +1,43 @@
+import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 
 export async function GET(request: NextRequest) {
+  // This route is not needed when using Supabase's built-in OAuth
+  // Supabase handles the callback directly
+  // Just redirect to workspace if someone lands here
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/workspace'
-  const error = searchParams.get('error')
-  const errorDescription = searchParams.get('error_description')
-
-  // Handle OAuth errors from GitHub
-  if (error) {
-    console.error('GitHub OAuth error:', error, errorDescription)
-    return NextResponse.redirect(`${origin}/auth/login?error=${error}&description=${errorDescription || 'OAuth error occurred'}`)
-  }
 
   if (code) {
-    // Instead of handling session exchange server-side via Supabase,
-    // redirect to a client-side handler that will exchange the code
-    // and persist tokens into the client's storageManager (IndexedDB).
-    // This keeps the server callback minimal and defers token handling to client.
-    // We append the code and next to the hash fragment to avoid it being sent to server logs.
-    const redirectUrl = `${origin}/auth/oauth-redirect#provider=github&code=${encodeURIComponent(code)}&next=${encodeURIComponent(next)}`
-    return NextResponse.redirect(redirectUrl)
+    // If there's a code, it means Supabase processed it but something went wrong
+    // Try to establish the session
+    const cookieStore = await cookies()
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll()
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options)
+            })
+          },
+        },
+      }
+    )
+
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+
+    if (!error && data.user) {
+      return NextResponse.redirect(`${origin}/workspace`)
+    }
   }
 
-  return NextResponse.redirect(`${origin}/auth/login?error=no_code&description=No authorization code received`)
+  // If no code or error, redirect to login
+  return NextResponse.redirect(`${origin}/auth/login`)
 }
