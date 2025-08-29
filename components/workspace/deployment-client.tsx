@@ -400,7 +400,7 @@ export default function DeploymentClient() {
         provider: 'github'
       })
 
-      toast({ title: 'Deployment Ready', description: 'Repository created and code deployed' })
+      toast({ title: 'Deployment Ready', description: `Successfully deployed ${deployData.filesUploaded || 'all'} files to ${repoData.html_url}` })
       setDeploymentState(prev => ({ ...prev, isDeploying: false, currentStep: 'complete' }))
 
     } catch (error) {

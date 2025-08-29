@@ -75,35 +75,52 @@ export async function POST(request: NextRequest) {
     for (const file of files) {
       if (file.isDirectory) continue; // Skip directories
 
-      const content = file.content || '';
-      const blobResponse = await fetch(`https://api.github.com/repos/${actualRepoOwner}/${repoName}/git/blobs`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content: Buffer.from(content).toString('base64'),
-          encoding: 'base64',
-        }),
-      });
+      try {
+        const content = file.content || '';
+        console.log(`Processing file: ${file.path}, size: ${content.length} characters`);
 
-      if (!blobResponse.ok) {
-        console.error(`Failed to create blob for ${file.path}`);
-        continue;
+        const blobResponse = await fetch(`https://api.github.com/repos/${actualRepoOwner}/${repoName}/git/blobs`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            content: Buffer.from(content).toString('base64'),
+            encoding: 'base64',
+          }),
+        });
+
+        if (!blobResponse.ok) {
+          const errorData = await blobResponse.json();
+          console.error(`Failed to create blob for ${file.path}:`, errorData);
+          continue; // Skip this file but continue with others
+        }
+
+        const blobData = await blobResponse.json();
+        blobs.push({
+          path: file.path,
+          mode: '100644', // Regular file
+          type: 'blob',
+          sha: blobData.sha,
+        });
+
+        console.log(`Successfully created blob for ${file.path}`);
+      } catch (error) {
+        console.error(`Error processing file ${file.path}:`, error);
+        continue; // Skip this file but continue with others
       }
+    }
 
-      const blobData = await blobResponse.json();
-      blobs.push({
-        path: file.path,
-        mode: '100644',
-        type: 'blob',
-        sha: blobData.sha,
-      });
+    console.log(`Created ${blobs.length} blobs out of ${files.filter(f => !f.isDirectory).length} files`);
+
+    if (blobs.length === 0) {
+      return NextResponse.json({ error: 'No valid files to upload' }, { status: 400 });
     }
 
     // Create a new tree
+    console.log('Creating new Git tree...');
     const treeResponse = await fetch(`https://api.github.com/repos/${actualRepoOwner}/${repoName}/git/trees`, {
       method: 'POST',
       headers: {
@@ -119,12 +136,16 @@ export async function POST(request: NextRequest) {
 
     if (!treeResponse.ok) {
       const errorData = await treeResponse.json();
+      console.error('Tree creation error:', errorData);
       return NextResponse.json({ error: 'Failed to create tree: ' + errorData.message }, { status: 400 });
     }
 
     const treeData = await treeResponse.json();
+    console.log('Tree created successfully:', treeData.sha);
 
     // Create a new commit
+    console.log('Creating new commit...');
+    const commitMessage = `Deploy project files - ${new Date().toISOString()}`;
     const newCommitResponse = await fetch(`https://api.github.com/repos/${actualRepoOwner}/${repoName}/git/commits`, {
       method: 'POST',
       headers: {
@@ -133,7 +154,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        message: `Deploy project files - ${new Date().toISOString()}`,
+        message: commitMessage,
         tree: treeData.sha,
         parents: [latestCommitSha],
       }),
@@ -141,12 +162,15 @@ export async function POST(request: NextRequest) {
 
     if (!newCommitResponse.ok) {
       const errorData = await newCommitResponse.json();
+      console.error('Commit creation error:', errorData);
       return NextResponse.json({ error: 'Failed to create commit: ' + errorData.message }, { status: 400 });
     }
 
     const newCommitData = await newCommitResponse.json();
+    console.log('Commit created successfully:', newCommitData.sha);
 
     // Update the branch reference
+    console.log('Updating branch reference...');
     const refResponse = await fetch(`https://api.github.com/repos/${actualRepoOwner}/${repoName}/git/refs/heads/main`, {
       method: 'PATCH',
       headers: {
@@ -161,13 +185,17 @@ export async function POST(request: NextRequest) {
 
     if (!refResponse.ok) {
       const errorData = await refResponse.json();
+      console.error('Branch update error:', errorData);
       return NextResponse.json({ error: 'Failed to update branch: ' + errorData.message }, { status: 400 });
     }
+
+    console.log('Branch updated successfully');
+    console.log(`Deployment complete! ${blobs.length} files uploaded to ${actualRepoOwner}/${repoName}`);
 
     return NextResponse.json({
       success: true,
       commitSha: newCommitData.sha,
-      commitMessage: `Deploy project files - ${new Date().toISOString()}`,
+      commitMessage: commitMessage,
       filesUploaded: blobs.length,
     });
 
