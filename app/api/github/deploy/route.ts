@@ -21,8 +21,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No files found in workspace' }, { status: 400 });
     }
 
+    // Get authenticated user info first
+    const userResponse = await fetch('https://api.github.com/user', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github.v3+json',
+      },
+    });
+
+    if (!userResponse.ok) {
+      return NextResponse.json({ error: 'Invalid GitHub token' }, { status: 401 });
+    }
+
+    const userData = await userResponse.json();
+    const actualRepoOwner = userData.login;
+
     // Get the latest commit SHA from the repository
-    const commitsResponse = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/commits`, {
+    const commitsResponse = await fetch(`https://api.github.com/repos/${actualRepoOwner}/${repoName}/commits`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/vnd.github.v3+json',
@@ -41,12 +56,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the tree SHA for the latest commit
-    const commitResponse = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/commits/${latestCommitSha}`, {
+    const commitResponse = await fetch(`https://api.github.com/repos/${actualRepoOwner}/${repoName}/commits/${latestCommitSha}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/vnd.github.v3+json',
       },
     });
+
+    if (!commitResponse.ok) {
+      return NextResponse.json({ error: 'Failed to fetch commit data' }, { status: 400 });
+    }
 
     const commitData = await commitResponse.json();
     const treeSha = commitData.commit.tree.sha;
@@ -57,7 +76,7 @@ export async function POST(request: NextRequest) {
       if (file.isDirectory) continue; // Skip directories
 
       const content = file.content || '';
-      const blobResponse = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/git/blobs`, {
+      const blobResponse = await fetch(`https://api.github.com/repos/${actualRepoOwner}/${repoName}/git/blobs`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -85,7 +104,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create a new tree
-    const treeResponse = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/git/trees`, {
+    const treeResponse = await fetch(`https://api.github.com/repos/${actualRepoOwner}/${repoName}/git/trees`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -106,7 +125,7 @@ export async function POST(request: NextRequest) {
     const treeData = await treeResponse.json();
 
     // Create a new commit
-    const newCommitResponse = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/git/commits`, {
+    const newCommitResponse = await fetch(`https://api.github.com/repos/${actualRepoOwner}/${repoName}/git/commits`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -124,8 +143,11 @@ export async function POST(request: NextRequest) {
       const errorData = await newCommitResponse.json();
       return NextResponse.json({ error: 'Failed to create commit: ' + errorData.message }, { status: 400 });
     }
+
+    const newCommitData = await newCommitResponse.json();
+
     // Update the branch reference
-    const refResponse = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/git/refs/heads/main`, {
+    const refResponse = await fetch(`https://api.github.com/repos/${actualRepoOwner}/${repoName}/git/refs/heads/main`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -133,7 +155,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        sha: commitData.sha,
+        sha: newCommitData.sha,
       }),
     });
 
@@ -144,8 +166,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      commitSha: commitData.sha,
-      commitMessage: commitData.message,
+      commitSha: newCommitData.sha,
+      commitMessage: `Deploy project files - ${new Date().toISOString()}`,
       filesUploaded: blobs.length,
     });
 
