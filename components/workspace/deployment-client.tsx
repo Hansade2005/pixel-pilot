@@ -35,7 +35,7 @@ import { storageManager, type Workspace as Project, type Deployment, type Enviro
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { GlobalHeader } from "@/components/workspace/global-header"
+import { DeploymentSetupAccordion } from "@/components/workspace/deployment-setup-accordion"
 
 interface GitHubRepo {
   id: string
@@ -378,6 +378,22 @@ export default function DeploymentClient() {
     }
   }
 
+  const handleVercelConnect = async () => {
+    toast({
+      title: "Vercel OAuth Not Available",
+      description: "Please use a Personal Access Token instead. Follow the setup instructions above.",
+      variant: "default"
+    })
+  }
+
+  const handleNetlifyConnect = async () => {
+    toast({
+      title: "Netlify OAuth Not Available",
+      description: "Please use a Personal Access Token instead. Follow the setup instructions above.",
+      variant: "default"
+    })
+  }
+
   const handleGitHubDeploy = async () => {
     if (!selectedProject) {
       toast({
@@ -558,7 +574,6 @@ export default function DeploymentClient() {
   // ...existing UI rendering code...
   return (
     <div>
-      <GlobalHeader />
       <div className="p-6">
         {/* Deployment Status */}
         {deploymentState.isDeploying && (
@@ -758,8 +773,16 @@ export default function DeploymentClient() {
                 </div>
               </TabsContent>
               <TabsContent value="vercel">
-                <div className="space-y-4">
-                  <Label>Vercel Personal Token</Label>
+                <div className="space-y-6">
+                  {/* Vercel Setup Instructions */}
+                  <DeploymentSetupAccordion
+                    platform="vercel"
+                    connectionStatus={deploymentState.vercelConnected ? 'connected' : 'not_connected'}
+                    onConnect={handleVercelConnect}
+                  />
+
+                  {/* Vercel Deployment Form */}
+                  <div className="space-y-4">
                   <Input value={vercelForm.token} onChange={(e) => setVercelForm(prev => ({ ...prev, token: e.target.value }))} />
                   <Label>Project Name</Label>
                   <Input value={vercelForm.projectName} onChange={(e) => setVercelForm(prev => ({ ...prev, projectName: e.target.value }))} />
@@ -843,11 +866,20 @@ export default function DeploymentClient() {
                       {deploymentState.isDeploying ? 'Deploying...' : 'Deploy to Vercel'}
                     </Button>
                   </div>
+                  </div>
                 </div>
               </TabsContent>
               <TabsContent value="netlify">
-                <div className="space-y-4">
-                  <Label>Netlify Personal Access Token</Label>
+                <div className="space-y-6">
+                  {/* Netlify Setup Instructions */}
+                  <DeploymentSetupAccordion
+                    platform="netlify"
+                    connectionStatus={deploymentState.netlifyConnected ? 'connected' : 'not_connected'}
+                    onConnect={handleNetlifyConnect}
+                  />
+
+                  {/* Netlify Deployment Form */}
+                  <div className="space-y-4">
                   <Input value={netlifyForm.token} onChange={(e) => setNetlifyForm(prev => ({ ...prev, token: e.target.value }))} />
                   <Label>Site Name</Label>
                   <Input value={netlifyForm.siteName} onChange={(e) => setNetlifyForm(prev => ({ ...prev, siteName: e.target.value }))} />
@@ -931,6 +963,7 @@ export default function DeploymentClient() {
                     }} disabled={deploymentState.isDeploying || !netlifyForm.token}>
                       {deploymentState.isDeploying ? 'Deploying...' : 'Deploy to Netlify'}
                     </Button>
+                  </div>
                   </div>
                 </div>
               </TabsContent>
