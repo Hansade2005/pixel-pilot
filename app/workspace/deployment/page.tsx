@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -56,11 +56,10 @@ interface ProjectDisplay extends Project {
   environmentVariables: EnvironmentVariable[]
 }
 
-export default function DeploymentPage() {
+function DeploymentPage({ projectId }: { projectId?: string | null }) {
   const { toast } = useToast()
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const projectId = searchParams.get('project')
+  // Remove useSearchParams from here - it's now passed as prop
 
   const [activeTab, setActiveTab] = useState("github")
   const [isLoading, setIsLoading] = useState(true)
@@ -94,6 +93,13 @@ export default function DeploymentPage() {
     siteName: '',
     buildCommand: 'npm run build',
     publishDir: 'out',
+  })
+
+  // Token states
+  const [savedTokens, setSavedTokens] = useState({
+    github: null as any,
+    vercel: null as any,
+    netlify: null as any,
   })
 
   useEffect(() => {
@@ -147,7 +153,14 @@ export default function DeploymentPage() {
           if (tokenResponse.ok) {
             const tokenData = await tokenResponse.json()
 
-            // Update GitHub form with token
+            // Save token to storage
+            await storageManager.createToken({
+              userId: currentUserId,
+              provider: 'github',
+              token: tokenData.access_token
+            })
+
+            setSavedTokens(prev => ({ ...prev, github: { token: tokenData.access_token } }))
             setGithubForm(prev => ({
               ...prev,
               token: tokenData.access_token
@@ -217,6 +230,33 @@ export default function DeploymentPage() {
         storageManager.getDeployments(),
         storageManager.getEnvironmentVariables()
       ])
+
+      // Load saved tokens
+      const [githubToken, vercelToken, netlifyToken] = await Promise.all([
+        storageManager.getToken(currentUserId, 'github').catch(() => null),
+        storageManager.getToken(currentUserId, 'vercel').catch(() => null),
+        storageManager.getToken(currentUserId, 'netlify').catch(() => null),
+      ])
+
+      setSavedTokens({
+        github: githubToken,
+        vercel: vercelToken,
+        netlify: netlifyToken,
+      })
+
+      // Auto-populate forms with saved tokens
+      if (githubToken) {
+        setGithubForm(prev => ({ ...prev, token: githubToken.token }))
+        setDeploymentState(prev => ({ ...prev, githubConnected: true }))
+      }
+      if (vercelToken) {
+        setVercelForm(prev => ({ ...prev, token: vercelToken.token }))
+        setDeploymentState(prev => ({ ...prev, vercelConnected: true }))
+      }
+      if (netlifyToken) {
+        setNetlifyForm(prev => ({ ...prev, token: netlifyToken.token }))
+        setDeploymentState(prev => ({ ...prev, netlifyConnected: true }))
+      }
 
       const projectsWithData: ProjectDisplay[] = projectsData.map(project => {
         const projectDeployments = deployments.filter(d => d.workspaceId === project.id)
@@ -379,8 +419,40 @@ export default function DeploymentPage() {
     }
   }
 
+  const saveToken = async (provider: 'github' | 'vercel' | 'netlify', token: string) => {
+    if (!token.trim()) return
+
+    try {
+      await storageManager.init()
+      await storageManager.createToken({
+        userId: currentUserId,
+        provider,
+        token: token.trim()
+      })
+
+      setSavedTokens(prev => ({ ...prev, [provider]: { token: token.trim() } }))
+
+      toast({
+        title: "Token Saved",
+        description: `${provider.charAt(0).toUpperCase() + provider.slice(1)} token saved successfully`,
+      })
+    } catch (error) {
+      console.error(`Error saving ${provider} token:`, error)
+      toast({
+        title: "Save Failed",
+        description: `Failed to save ${provider} token`,
+        variant: "destructive"
+      })
+    }
+  }
+
   const handleVercelDeploy = async () => {
     if (!selectedProject) return
+
+    // Save Vercel token if not already saved
+    if (vercelForm.token && !savedTokens.vercel) {
+      await saveToken('vercel', vercelForm.token)
+    }
 
     setDeploymentState(prev => ({ ...prev, isDeploying: true, currentStep: 'deploying' }))
 
@@ -448,6 +520,11 @@ export default function DeploymentPage() {
 
   const handleNetlifyDeploy = async () => {
     if (!selectedProject) return
+
+    // Save Netlify token if not already saved
+    if (netlifyForm.token && !savedTokens.netlify) {
+      await saveToken('netlify', netlifyForm.token)
+    }
 
     setDeploymentState(prev => ({ ...prev, isDeploying: true, currentStep: 'deploying' }))
 
@@ -721,13 +798,27 @@ export default function DeploymentPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="vercel-token">Vercel Token</Label>
-                        <Input
-                          id="vercel-token"
-                          type="password"
-                          placeholder="vercel_xxxxxxxxxxxx"
-                          value={vercelForm.token}
-                          onChange={(e) => setVercelForm(prev => ({ ...prev, token: e.target.value }))}
-                        />
+                        <div className="flex gap-2">
+                          <Input
+                            id="vercel-token"
+                            type="password"
+                            placeholder="vercel_xxxxxxxxxxxx"
+                            value={vercelForm.token}
+                            onChange={(e) => setVercelForm(prev => ({ ...prev, token: e.target.value }))}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => saveToken('vercel', vercelForm.token)}
+                            disabled={!vercelForm.token.trim() || vercelForm.token === savedTokens.vercel?.token}
+                          >
+                            Save
+                          </Button>
+                        </div>
+                        {savedTokens.vercel && (
+                          <p className="text-sm text-green-600">✓ Token saved and will be used automatically</p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="project-name">Project Name</Label>
@@ -787,13 +878,27 @@ export default function DeploymentPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="netlify-token">Netlify Token</Label>
-                        <Input
-                          id="netlify-token"
-                          type="password"
-                          placeholder="netlify_xxxxxxxxxxxx"
-                          value={netlifyForm.token}
-                          onChange={(e) => setNetlifyForm(prev => ({ ...prev, token: e.target.value }))}
-                        />
+                        <div className="flex gap-2">
+                          <Input
+                            id="netlify-token"
+                            type="password"
+                            placeholder="netlify_xxxxxxxxxxxx"
+                            value={netlifyForm.token}
+                            onChange={(e) => setNetlifyForm(prev => ({ ...prev, token: e.target.value }))}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => saveToken('netlify', netlifyForm.token)}
+                            disabled={!netlifyForm.token.trim() || netlifyForm.token === savedTokens.netlify?.token}
+                          >
+                            Save
+                          </Button>
+                        </div>
+                        {savedTokens.netlify && (
+                          <p className="text-sm text-green-600">✓ Token saved and will be used automatically</p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="site-name">Site Name</Label>
@@ -862,3 +967,24 @@ export default function DeploymentPage() {
     </div>
   )
 }
+
+// Wrapper component that handles useSearchParams with Suspense
+function DeploymentPageWrapper() {
+  const searchParams = useSearchParams()
+  const projectId = searchParams.get('project')
+
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background">
+        <GlobalHeader />
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </div>
+    }>
+      <DeploymentPage projectId={projectId} />
+    </Suspense>
+  )
+}
+
+export default DeploymentPageWrapper
