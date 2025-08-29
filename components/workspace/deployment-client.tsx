@@ -57,6 +57,29 @@ interface ProjectDisplay extends Project {
   environmentVariables: EnvironmentVariable[]
 }
 
+// Utility function to generate valid GitHub repository names
+const generateValidRepoName = (input: string): string => {
+  if (!input) return ''
+
+  // Convert to lowercase and replace spaces with hyphens
+  let name = input.toLowerCase().replace(/\s+/g, '-')
+
+  // Remove invalid characters (only allow letters, numbers, hyphens, underscores, periods)
+  name = name.replace(/[^a-z0-9._-]/g, '')
+
+  // Remove multiple consecutive hyphens, underscores, or periods
+  name = name.replace(/[-_.]{2,}/g, (match) => match[0])
+
+  // Remove leading/trailing hyphens, underscores, or periods
+  name = name.replace(/^[-_.]+|[-_.]+$/g, '')
+
+  // Ensure it's not empty and doesn't exceed 100 characters
+  if (!name) name = 'my-project'
+  if (name.length > 100) name = name.substring(0, 100)
+
+  return name
+}
+
 export default function DeploymentClient() {
   const { toast } = useToast()
   const router = useRouter()
@@ -104,6 +127,24 @@ export default function DeploymentClient() {
     netlify: null as any,
   })
 
+  // Helper function to extract GitHub repo in owner/repo format
+  const getGitHubRepo = (project: Project | null): string | undefined => {
+    if (!project?.githubRepoUrl) return undefined
+    const match = project.githubRepoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/)
+    return match ? `${match[1]}/${match[2]}` : undefined
+  }
+
+  // Generate a valid GitHub repository name
+  const generateValidRepoName = (projectName: string): string => {
+    return projectName
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]/g, '-') // Replace invalid characters with hyphens
+      .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
+      .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+      .substring(0, 100) // Limit to 100 characters
+      || 'my-project' // Fallback if name becomes empty
+  }
+
   useEffect(() => {
     getCurrentUser()
   }, [])
@@ -122,7 +163,7 @@ export default function DeploymentClient() {
         // Pre-fill form data
         setGithubForm(prev => ({
           ...prev,
-          repoName: project.name.toLowerCase().replace(/\s+/g, '-'),
+          repoName: generateValidRepoName(project.name),
           repoDescription: project.description || '',
         }))
         setVercelForm(prev => ({
@@ -338,9 +379,54 @@ export default function DeploymentClient() {
   }
 
   const handleGitHubDeploy = async () => {
-    if (!selectedProject) return
+    if (!selectedProject) {
+      toast({
+        title: "No Project Selected",
+        description: "Please select a project to deploy",
+        variant: "destructive"
+      })
+      return
+    }
 
-    setDeploymentState(prev => ({ ...prev, isDeploying: true, currentStep: 'deploying' }))
+    if (!githubForm.repoName) {
+      toast({
+        title: "Repository Name Required",
+        description: "Please enter a repository name",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (!githubForm.token) {
+      toast({
+        title: "Token Required",
+        description: "Please provide a GitHub token",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // Validate repository name format
+    const nameRegex = /^[a-zA-Z0-9._-]+$/;
+    if (!nameRegex.test(githubForm.repoName)) {
+      toast({
+        title: "Invalid Repository Name",
+        description: "Repository name can only contain letters, numbers, hyphens, underscores, and periods",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (githubForm.repoName.length > 100) {
+      toast({
+        title: "Repository Name Too Long",
+        description: "Repository name must be 100 characters or less",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setDeploymentState(prev => ({ ...prev, isDeploying: true, currentStep: 'connecting' }))
 
     try {
       // First create the GitHub repository
@@ -357,15 +443,46 @@ export default function DeploymentClient() {
 
       if (!repoResponse.ok) {
         const errorData = await repoResponse.json()
-        throw new Error(errorData.error || 'Failed to create repository')
+        console.error('Repository creation failed:', errorData)
+
+        // Provide specific error messages based on status code
+        if (repoResponse.status === 422) {
+          toast({
+            title: "Repository Creation Failed",
+            description: errorData.error || "Repository name may already exist or is invalid. Try using a different name.",
+            variant: "destructive"
+          })
+        } else if (repoResponse.status === 401) {
+          toast({
+            title: "Authentication Failed",
+            description: "Invalid GitHub token. Please check your token and try again.",
+            variant: "destructive"
+          })
+        } else if (repoResponse.status === 403) {
+          toast({
+            title: "Access Forbidden",
+            description: "You don't have permission to create repositories. Check your token permissions.",
+            variant: "destructive"
+          })
+        } else {
+          toast({
+            title: "Repository Creation Failed",
+            description: errorData.error || "Failed to create repository",
+            variant: "destructive"
+          })
+        }
+
+        setDeploymentState(prev => ({ ...prev, isDeploying: false }))
+        return
       }
 
       const repoData = await repoResponse.json()
+      setDeploymentState(prev => ({ ...prev, currentStep: 'deploying' }))
 
       // Update project with GitHub repo URL
       await storageManager.updateWorkspace(selectedProject.id, {
-        githubRepoUrl: repoData.html_url,
-        deploymentStatus: 'deployed',
+        githubRepoUrl: repoData.url,
+        deploymentStatus: 'in_progress',
         lastActivity: new Date().toISOString(),
       })
 
@@ -375,7 +492,7 @@ export default function DeploymentClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           repoName: githubForm.repoName,
-          repoOwner: githubForm.token ? 'authenticated-user' : 'unknown', // This should be extracted from token
+          repoOwner: repoData.fullName.split('/')[0],
           token: githubForm.token,
           workspaceId: selectedProject.id,
         })
@@ -388,10 +505,16 @@ export default function DeploymentClient() {
 
       const deployData = await deployResponse.json()
 
+      // Update project with deployment status
+      await storageManager.updateWorkspace(selectedProject.id, {
+        deploymentStatus: 'deployed',
+        lastActivity: new Date().toISOString(),
+      })
+
       // Create deployment record
       await storageManager.createDeployment({
         workspaceId: selectedProject.id,
-        url: repoData.html_url,
+        url: repoData.url,
         status: 'ready',
         commitSha: deployData.commitSha || 'initial',
         commitMessage: deployData.commitMessage || 'Repository created and code deployed',
@@ -400,12 +523,19 @@ export default function DeploymentClient() {
         provider: 'github'
       })
 
-      toast({ title: 'Deployment Ready', description: `Successfully deployed ${deployData.filesUploaded || 'all'} files to ${repoData.html_url}` })
+      toast({
+        title: 'Deployment Successful',
+        description: `Successfully deployed ${deployData.filesUploaded || 'all'} files to ${repoData.url}`
+      })
       setDeploymentState(prev => ({ ...prev, isDeploying: false, currentStep: 'complete' }))
 
     } catch (error) {
       console.error('GitHub deploy error:', error)
-      toast({ title: 'Deployment Failed', description: (error as Error).message || 'Failed to deploy', variant: 'destructive' })
+      toast({
+        title: 'Deployment Failed',
+        description: (error as Error).message || 'Failed to deploy to GitHub',
+        variant: "destructive"
+      })
       setDeploymentState(prev => ({ ...prev, isDeploying: false }))
     }
   }
@@ -479,21 +609,137 @@ export default function DeploymentClient() {
               </TabsList>
               <TabsContent value="github">
                 <div className="space-y-4">
-                  <Label>Repository Name</Label>
-                  <Input value={githubForm.repoName} onChange={(e) => setGithubForm(prev => ({ ...prev, repoName: e.target.value }))} />
-                  <Label>Personal Access Token</Label>
-                  <Input value={githubForm.token} onChange={(e) => setGithubForm(prev => ({ ...prev, token: e.target.value }))} />
-                  <div className="flex items-center space-x-2">
-                    <Button onClick={async () => {
-                      // Save token
-                      if (!githubForm.token) return
-                      await storageManager.createToken({ userId: currentUserId, provider: 'github', token: githubForm.token })
-                      setSavedTokens(prev => ({ ...prev, github: { token: githubForm.token } }))
-                      toast({ title: 'Saved', description: 'GitHub token saved' })
-                    }}>Save Token</Button>
-                    <Button variant="secondary" onClick={handleGitHubConnect}>Connect via OAuth</Button>
-                    <Button variant="default" onClick={handleGitHubDeploy} disabled={deploymentState.isDeploying}>{deploymentState.isDeploying ? 'Deploying...' : 'Deploy'}</Button>
+                  <div>
+                    <Label htmlFor="repo-name">Repository Name</Label>
+                    <div className="flex space-x-2 mt-1">
+                      <Input
+                        id="repo-name"
+                        value={githubForm.repoName}
+                        onChange={(e) => setGithubForm(prev => ({ ...prev, repoName: e.target.value }))}
+                        placeholder="my-awesome-project"
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (selectedProject) {
+                            const validName = generateValidRepoName(selectedProject.name)
+                            setGithubForm(prev => ({ ...prev, repoName: validName }))
+                          }
+                        }}
+                        disabled={!selectedProject}
+                      >
+                        Generate
+                      </Button>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Only letters, numbers, hyphens, underscores, and periods allowed. Max 100 characters.
+                    </p>
                   </div>
+
+                  <div>
+                    <Label htmlFor="repo-description">Repository Description (Optional)</Label>
+                    <Textarea
+                      id="repo-description"
+                      value={githubForm.repoDescription}
+                      onChange={(e) => setGithubForm(prev => ({ ...prev, repoDescription: e.target.value }))}
+                      placeholder="A brief description of your project"
+                      rows={2}
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="is-private"
+                      checked={githubForm.isPrivate}
+                      onChange={(e) => setGithubForm(prev => ({ ...prev, isPrivate: e.target.checked }))}
+                      className="rounded"
+                    />
+                    <Label htmlFor="is-private">Make repository private</Label>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="github-token">Personal Access Token</Label>
+                    <Input
+                      id="github-token"
+                      type="password"
+                      value={githubForm.token}
+                      onChange={(e) => setGithubForm(prev => ({ ...prev, token: e.target.value }))}
+                      placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                      className="mt-1"
+                    />
+                    <p className="text-sm text-gray-500 mt-1">
+                      <a
+                        href="https://github.com/settings/tokens"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        Create a Personal Access Token
+                      </a> with repo permissions
+                    </p>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      onClick={async () => {
+                        if (!githubForm.token) {
+                          toast({
+                            title: "Token Required",
+                            description: "Please enter your GitHub token",
+                            variant: "destructive"
+                          })
+                          return
+                        }
+                        await storageManager.createToken({ userId: currentUserId, provider: 'github', token: githubForm.token })
+                        setSavedTokens(prev => ({ ...prev, github: { token: githubForm.token } }))
+                        setDeploymentState(prev => ({ ...prev, githubConnected: true }))
+                        toast({ title: 'Saved', description: 'GitHub token saved successfully' })
+                      }}
+                      disabled={!githubForm.token}
+                    >
+                      Save Token
+                    </Button>
+                    <Button variant="secondary" onClick={handleGitHubConnect}>
+                      Connect via OAuth
+                    </Button>
+                    <Button
+                      variant="default"
+                      onClick={handleGitHubDeploy}
+                      disabled={deploymentState.isDeploying || !githubForm.repoName || !githubForm.token || !selectedProject}
+                    >
+                      {deploymentState.isDeploying ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Deploying...
+                        </>
+                      ) : (
+                        <>
+                          <Github className="mr-2 h-4 w-4" />
+                          Deploy to GitHub
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  {!githubForm.repoName && selectedProject && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                      <p className="text-sm text-blue-800">
+                        💡 Tip: Click "Generate" to auto-create a repository name from your project, or enter a custom name above.
+                      </p>
+                    </div>
+                  )}
+
+                  {githubForm.repoName && !/^[a-zA-Z0-9._-]+$/.test(githubForm.repoName) && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                      <p className="text-sm text-yellow-800">
+                        ⚠️ Repository name contains invalid characters. Only letters, numbers, hyphens, underscores, and periods are allowed.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
               <TabsContent value="vercel">
