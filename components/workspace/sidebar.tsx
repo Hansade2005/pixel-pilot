@@ -384,6 +384,14 @@ export function Sidebar({
               variant="outline" 
               size="sm" 
               className="w-20"
+              onClick={() => window.open('/workspace/deployment', '_blank')}
+            >
+              Deploy
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-20"
               onClick={() => window.open('/workspace/management', '_blank')}
             >
               Manage

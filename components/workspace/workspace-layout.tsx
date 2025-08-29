@@ -15,7 +15,6 @@ import { CodePreviewPanel } from "./code-preview-panel"
 import { ProjectHeader } from "./project-header"
 import { FileExplorer } from "./file-explorer"
 import { CodeEditor } from "./code-editor"
-import { DeploymentDialog } from "./deployment-dialog"
 import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
@@ -50,7 +49,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [activeTab, setActiveTab] = useState<"code" | "preview">("code")
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [deploymentDialogOpen, setDeploymentDialogOpen] = useState(false)
   const { toast } = useToast()
   const [githubConnected, setGithubConnected] = useState<boolean | null>(null)
   const [clientProjects, setClientProjects] = useState<Workspace[]>(projects)
@@ -363,7 +361,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 toast({ title: 'Link Copied', description: 'Project link copied to clipboard' })
               }}
               onSettings={() => window.open('/workspace/management', '_blank')}
-              onDeploy={() => setDeploymentDialogOpen(true)}
+              onDeploy={() => router.push(`/workspace/deployment?project=${selectedProject?.id}`)}
               user={user}
               onProjectCreated={async (newProject) => {
                 // Refresh projects when a new one is created
@@ -543,7 +541,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                   variant="ghost"
                   size="sm"
                   className="h-6 px-2 text-xs"
-                  onClick={() => setDeploymentDialogOpen(true)}
+                  onClick={() => router.push(`/workspace/deployment?project=${selectedProject?.id}`)}
                   disabled={!selectedProject}
                 >
                   <Rocket className="h-3 w-3 mr-1" />
@@ -675,7 +673,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 variant="ghost"
                 size="sm"
                 className="h-8 w-8 p-0"
-                onClick={() => setDeploymentDialogOpen(true)}
+                onClick={() => router.push(`/workspace/deployment?project=${selectedProject?.id}`)}
                 disabled={!selectedProject}
               >
                 <Rocket className="h-4 w-4" />
@@ -789,12 +787,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         </div>
       )}
 
-      {/* Deployment Dialog */}
-      <DeploymentDialog
-        project={selectedProject}
-        open={deploymentDialogOpen}
-        onOpenChange={setDeploymentDialogOpen}
-      />
     </div>
   )
 }
