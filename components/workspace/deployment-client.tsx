@@ -486,6 +486,20 @@ export default function DeploymentClient() {
         lastActivity: new Date().toISOString(),
       })
 
+      // Get all files from the workspace for deployment
+      await storageManager.init()
+      const projectFiles = await storageManager.getFiles(selectedProject.id)
+
+      if (projectFiles.length === 0) {
+        toast({
+          title: "No Files Found",
+          description: "No files found in the workspace to deploy",
+          variant: "destructive"
+        })
+        setDeploymentState(prev => ({ ...prev, isDeploying: false }))
+        return
+      }
+
       // Deploy code to the repository
       const deployResponse = await fetch('/api/github/deploy', {
         method: 'POST',
@@ -495,6 +509,7 @@ export default function DeploymentClient() {
           repoOwner: repoData.fullName.split('/')[0],
           token: githubForm.token,
           workspaceId: selectedProject.id,
+          files: projectFiles, // Include files in the request
         })
       })
 
@@ -762,6 +777,20 @@ export default function DeploymentClient() {
                       setDeploymentState(prev => ({ ...prev, isDeploying: true, currentStep: 'deploying' }))
 
                       try {
+                        // Get all files from the workspace for deployment
+                        await storageManager.init()
+                        const projectFiles = await storageManager.getFiles(selectedProject.id)
+
+                        if (projectFiles.length === 0) {
+                          toast({
+                            title: "No Files Found",
+                            description: "No files found in the workspace to deploy",
+                            variant: "destructive"
+                          })
+                          setDeploymentState(prev => ({ ...prev, isDeploying: false }))
+                          return
+                        }
+
                         // Deploy to Vercel
                         const deployResponse = await fetch('/api/vercel/deploy', {
                           method: 'POST',
@@ -772,6 +801,7 @@ export default function DeploymentClient() {
                             token: vercelForm.token,
                             workspaceId: selectedProject.id,
                             githubRepo: selectedProject.githubRepoUrl ? `${githubForm.repoName}` : undefined,
+                            files: projectFiles, // Include files in the request
                           })
                         })
 
@@ -835,6 +865,20 @@ export default function DeploymentClient() {
                       setDeploymentState(prev => ({ ...prev, isDeploying: true, currentStep: 'deploying' }))
 
                       try {
+                        // Get all files from the workspace for deployment
+                        await storageManager.init()
+                        const projectFiles = await storageManager.getFiles(selectedProject.id)
+
+                        if (projectFiles.length === 0) {
+                          toast({
+                            title: "No Files Found",
+                            description: "No files found in the workspace to deploy",
+                            variant: "destructive"
+                          })
+                          setDeploymentState(prev => ({ ...prev, isDeploying: false }))
+                          return
+                        }
+
                         // Deploy to Netlify
                         const deployResponse = await fetch('/api/netlify/deploy', {
                           method: 'POST',
@@ -846,6 +890,7 @@ export default function DeploymentClient() {
                             token: netlifyForm.token,
                             workspaceId: selectedProject.id,
                             githubRepo: selectedProject.githubRepoUrl ? `${githubForm.repoName}` : undefined,
+                            files: projectFiles, // Include files in the request
                           })
                         })
 

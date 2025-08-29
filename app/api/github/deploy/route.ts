@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { storageManager } from '@/lib/storage-manager';
+import { storageManager, File } from '@/lib/storage-manager';
 
 export async function POST(request: NextRequest) {
   try {
-    const { repoName, repoOwner, token, workspaceId } = await request.json();
+    const { repoName, repoOwner, token, workspaceId, files } = await request.json();
 
     if (!repoName || !repoOwner || !token || !workspaceId) {
       return NextResponse.json({
@@ -11,14 +11,16 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Initialize storage manager
-    await storageManager.init();
+    // Use provided files or fall back to storage manager
+    let projectFiles = files;
+    if (!projectFiles || !Array.isArray(projectFiles) || projectFiles.length === 0) {
+      // Initialize storage manager and get files from workspace
+      await storageManager.init();
+      projectFiles = await storageManager.getFiles(workspaceId);
 
-    // Get all files from the workspace
-    const files = await storageManager.getFiles(workspaceId);
-
-    if (files.length === 0) {
-      return NextResponse.json({ error: 'No files found in workspace' }, { status: 400 });
+      if (projectFiles.length === 0) {
+        return NextResponse.json({ error: 'No files found in workspace' }, { status: 400 });
+      }
     }
 
     // Get authenticated user info first
@@ -72,7 +74,7 @@ export async function POST(request: NextRequest) {
 
     // Create blobs for each file
     const blobs = [];
-    for (const file of files) {
+    for (const file of projectFiles) {
       if (file.isDirectory) continue; // Skip directories
 
       try {
@@ -113,7 +115,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`Created ${blobs.length} blobs out of ${files.filter(f => !f.isDirectory).length} files`);
+    console.log(`Created ${blobs.length} blobs out of ${projectFiles.filter((f: File) => !f.isDirectory).length} files`);
 
     if (blobs.length === 0) {
       return NextResponse.json({ error: 'No valid files to upload' }, { status: 400 });

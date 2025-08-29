@@ -3,7 +3,7 @@ import { storageManager } from '@/lib/storage-manager';
 
 export async function POST(request: NextRequest) {
   try {
-    const { siteName, buildCommand, publishDir, token, workspaceId, githubRepo } = await request.json();
+    const { siteName, buildCommand, publishDir, token, workspaceId, githubRepo, files } = await request.json();
 
     if (!siteName || !token || !workspaceId) {
       return NextResponse.json({
@@ -11,14 +11,16 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Initialize storage manager
-    await storageManager.init();
+    // Use provided files or fall back to storage manager
+    let projectFiles = files;
+    if (!projectFiles || !Array.isArray(projectFiles) || projectFiles.length === 0) {
+      // Initialize storage manager and get files from workspace
+      await storageManager.init();
+      projectFiles = await storageManager.getFiles(workspaceId);
 
-    // Get workspace files for deployment
-    const files = await storageManager.getFiles(workspaceId);
-
-    if (files.length === 0) {
-      return NextResponse.json({ error: 'No files found in workspace' }, { status: 400 });
+      if (projectFiles.length === 0) {
+        return NextResponse.json({ error: 'No files found in workspace' }, { status: 400 });
+      }
     }
 
     // Create Netlify site
@@ -58,7 +60,7 @@ export async function POST(request: NextRequest) {
     if (!githubRepo) {
       // Prepare files for deployment
       const deployFiles: Record<string, { content: string; encoding: string }> = {};
-      for (const file of files) {
+      for (const file of projectFiles) {
         if (!file.isDirectory && file.content) {
           deployFiles[file.path] = {
             content: Buffer.from(file.content).toString('base64'),
