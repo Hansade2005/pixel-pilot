@@ -57,6 +57,18 @@ interface ProjectDisplay extends Project {
   environmentVariables: EnvironmentVariable[]
 }
 
+interface DeployedRepo {
+  id: string
+  projectId: string
+  projectName: string
+  githubUrl: string
+  githubRepo: string
+  vercelUrl?: string
+  netlifyUrl?: string
+  deployedAt: string
+  lastUpdated: string
+}
+
 // Utility function to generate valid GitHub repository names
 const generateValidRepoName = (input: string): string => {
   if (!input) return ''
@@ -111,6 +123,7 @@ export default function DeploymentClient() {
     token: '',
     projectName: '',
     framework: 'nextjs',
+    githubRepoUrl: '',
   })
 
   const [netlifyForm, setNetlifyForm] = useState({
@@ -118,7 +131,14 @@ export default function DeploymentClient() {
     siteName: '',
     buildCommand: 'npm run build',
     publishDir: 'out',
+    githubRepoUrl: '',
   })
+
+  // Deployed repositories and URLs management
+  const [deployedRepos, setDeployedRepos] = useState<DeployedRepo[]>([])
+  const [availableRepos, setAvailableRepos] = useState<GitHubRepo[]>([])
+  const [selectedRepoForVercel, setSelectedRepoForVercel] = useState<string>('')
+  const [selectedRepoForNetlify, setSelectedRepoForNetlify] = useState<string>('')
 
   // Token states
   const [savedTokens, setSavedTokens] = useState({
@@ -143,6 +163,100 @@ export default function DeploymentClient() {
       .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
       .substring(0, 100) // Limit to 100 characters
       || 'my-project' // Fallback if name becomes empty
+  }
+
+  // Generate a unique Netlify site name
+  const generateUniqueSiteName = (projectName: string): string => {
+    const baseName = projectName
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '-') // Replace invalid characters with hyphens
+      .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
+      .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+      .substring(0, 50) // Leave room for suffix
+      || 'my-site' // Fallback if name becomes empty
+
+    // Add timestamp suffix to ensure uniqueness
+    const timestamp = Date.now().toString().slice(-4) // Last 4 digits of timestamp
+    return `${baseName}-${timestamp}`
+  }
+
+  // Generate a unique Vercel project name
+  const generateUniqueProjectName = (projectName: string): string => {
+    const baseName = projectName
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-') // Replace invalid characters with hyphens
+      .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
+      .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+      .substring(0, 45) // Leave room for suffix (Vercel max is 52)
+      || 'my-project' // Fallback if name becomes empty
+
+    // Add timestamp suffix to ensure uniqueness
+    const timestamp = Date.now().toString().slice(-4) // Last 4 digits of timestamp
+    return `${baseName}-${timestamp}`
+  }
+
+  // Load deployed repositories from storage
+  const loadDeployedRepos = async () => {
+    try {
+      await storageManager.init()
+      const deployments = await storageManager.getDeployments()
+      const repos: DeployedRepo[] = []
+
+      for (const deployment of deployments) {
+        const project = projects.find(p => p.id === deployment.workspaceId)
+        if (project) {
+          const existingRepo = repos.find(r => r.projectId === deployment.workspaceId)
+          if (existingRepo) {
+            // Update existing repo with new deployment info
+            if (deployment.provider === 'vercel') {
+              existingRepo.vercelUrl = deployment.url
+            } else if (deployment.provider === 'netlify') {
+              existingRepo.netlifyUrl = deployment.url
+            }
+            existingRepo.lastUpdated = deployment.createdAt || new Date().toISOString()
+          } else {
+            // Create new repo entry
+            repos.push({
+              id: deployment.id,
+              projectId: deployment.workspaceId,
+              projectName: project.name,
+              githubUrl: project.githubRepoUrl || '',
+              githubRepo: project.githubRepoUrl ? project.githubRepoUrl.split('/').slice(-2).join('/') : '',
+              vercelUrl: deployment.provider === 'vercel' ? deployment.url : undefined,
+              netlifyUrl: deployment.provider === 'netlify' ? deployment.url : undefined,
+              deployedAt: deployment.createdAt || new Date().toISOString(),
+              lastUpdated: deployment.createdAt || new Date().toISOString(),
+            })
+          }
+        }
+      }
+
+      setDeployedRepos(repos)
+    } catch (error) {
+      console.error('Error loading deployed repos:', error)
+    }
+  }
+
+  // Load available GitHub repositories
+  const loadAvailableRepos = async () => {
+    if (!githubForm.token) return
+
+    try {
+      const response = await fetch('/api/github/repos', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${githubForm.token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        const repos = await response.json()
+        setAvailableRepos(repos)
+      }
+    } catch (error) {
+      console.error('Error loading GitHub repos:', error)
+    }
   }
 
   useEffect(() => {
@@ -498,6 +612,7 @@ export default function DeploymentClient() {
       // Update project with GitHub repo URL
       await storageManager.updateWorkspace(selectedProject.id, {
         githubRepoUrl: repoData.url,
+        githubRepoName: repoData.name || githubForm.repoName,
         deploymentStatus: 'in_progress',
         lastActivity: new Date().toISOString(),
       })
@@ -552,6 +667,25 @@ export default function DeploymentClient() {
         branch: 'main',
         environment: 'production',
         provider: 'github'
+      })
+
+      // Save deployed repo information
+      const deployedRepo: DeployedRepo = {
+        id: `github_${selectedProject.id}_${Date.now()}`,
+        projectId: selectedProject.id,
+        projectName: selectedProject.name,
+        githubUrl: repoData.url,
+        githubRepo: `${repoData.fullName}`,
+        deployedAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+      }
+
+      setDeployedRepos(prev => {
+        const existing = prev.find(r => r.projectId === selectedProject.id)
+        if (existing) {
+          return prev.map(r => r.projectId === selectedProject.id ? { ...r, ...deployedRepo } : r)
+        }
+        return [...prev, deployedRepo]
       })
 
       toast({
@@ -685,7 +819,7 @@ export default function DeploymentClient() {
                       type="checkbox"
                       id="is-private"
                       checked={githubForm.isPrivate}
-                      onChange={(e) => setGithubForm(prev => ({ ...prev, isPrivate: e.target.checked }))}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setGithubForm(prev => ({ ...prev, isPrivate: e.target.checked }))}
                       className="rounded"
                     />
                     <Label htmlFor="is-private">Make repository private</Label>
@@ -783,89 +917,260 @@ export default function DeploymentClient() {
 
                   {/* Vercel Deployment Form */}
                   <div className="space-y-4">
-                  <Input value={vercelForm.token} onChange={(e) => setVercelForm(prev => ({ ...prev, token: e.target.value }))} />
-                  <Label>Project Name</Label>
-                  <Input value={vercelForm.projectName} onChange={(e) => setVercelForm(prev => ({ ...prev, projectName: e.target.value }))} />
-                  <div className="flex items-center space-x-2">
-                    <Button onClick={async () => {
-                      if (!vercelForm.token) return
-                      await storageManager.createToken({ userId: currentUserId, provider: 'vercel', token: vercelForm.token })
-                      setSavedTokens(prev => ({ ...prev, vercel: { token: vercelForm.token } }))
-                      setDeploymentState(prev => ({ ...prev, vercelConnected: true }))
-                      toast({ title: 'Saved', description: 'Vercel token saved' })
-                    }}>Save Token</Button>
-                    <Button variant="default" onClick={async () => {
-                      if (!selectedProject || !vercelForm.token) return
+                    <div>
+                      <Label htmlFor="vercel-token">Vercel Personal Token</Label>
+                      <Input
+                        id="vercel-token"
+                        type="password"
+                        value={vercelForm.token}
+                        onChange={(e) => setVercelForm(prev => ({ ...prev, token: e.target.value }))}
+                        placeholder="vercel_xxxxxxxxxxxxxxxxxxxx"
+                        className="mt-1"
+                      />
+                      <p className="text-sm text-gray-500 mt-1">
+                        <a
+                          href="https://vercel.com/account/tokens"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          Create a Personal Access Token
+                        </a> with project permissions
+                      </p>
+                    </div>
 
-                      setDeploymentState(prev => ({ ...prev, isDeploying: true, currentStep: 'deploying' }))
+                    <div>
+                      <Label htmlFor="vercel-project-name">Project Name</Label>
+                      <div className="flex space-x-2 mt-1">
+                        <Input
+                          id="vercel-project-name"
+                          value={vercelForm.projectName}
+                          onChange={(e) => setVercelForm(prev => ({ ...prev, projectName: e.target.value }))}
+                          placeholder="my-awesome-project"
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (selectedProject) {
+                              const uniqueName = generateUniqueProjectName(selectedProject.name)
+                              setVercelForm(prev => ({ ...prev, projectName: uniqueName }))
+                            }
+                          }}
+                          disabled={!selectedProject}
+                        >
+                          Generate Unique
+                        </Button>
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Only letters, numbers, and hyphens allowed. Cannot start or end with hyphen. Max 52 characters.
+                      </p>
+                    </div>
 
-                      try {
-                        // Get all files from the workspace for deployment
-                        await storageManager.init()
-                        const projectFiles = await storageManager.getFiles(selectedProject.id)
+                    {!vercelForm.projectName && selectedProject && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                        <p className="text-sm text-blue-800">
+                          💡 Tip: Click "Generate Unique" to auto-create a unique project name from your project, or enter a custom name above.
+                        </p>
+                      </div>
+                    )}
 
-                        if (projectFiles.length === 0) {
+                    {vercelForm.projectName && !/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(vercelForm.projectName) && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                        <p className="text-sm text-yellow-800">
+                          ⚠️ Project name contains invalid characters or format. Only lowercase letters, numbers, and hyphens are allowed. Cannot start or end with a hyphen.
+                        </p>
+                      </div>
+                    )}
+
+                    {vercelForm.projectName && vercelForm.projectName.length > 52 && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                        <p className="text-sm text-yellow-800">
+                          ⚠️ Project name is too long. Maximum 52 characters allowed.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* GitHub Repository Selection for Vercel */}
+                    <div>
+                      <Label htmlFor="vercel-repo-select">Deploy from GitHub Repository (Optional)</Label>
+                      <Select value={selectedRepoForVercel} onValueChange={setSelectedRepoForVercel}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Select a GitHub repository to deploy from" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Don't use GitHub repo (upload files)</SelectItem>
+                          {deployedRepos.map((repo) => (
+                            <SelectItem key={repo.id} value={repo.githubRepo}>
+                              {repo.projectName} ({repo.githubRepo})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Select a GitHub repository to deploy from, or leave empty to upload files directly.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Button onClick={async () => {
+                        if (!vercelForm.token) return
+                        await storageManager.createToken({ userId: currentUserId, provider: 'vercel', token: vercelForm.token })
+                        setSavedTokens(prev => ({ ...prev, vercel: { token: vercelForm.token } }))
+                        setDeploymentState(prev => ({ ...prev, vercelConnected: true }))
+                        toast({ title: 'Saved', description: 'Vercel token saved' })
+                      }}>Save Token</Button>
+                      <Button variant="default" onClick={async () => {
+                        if (!selectedProject || !vercelForm.token) return
+
+                        setDeploymentState(prev => ({ ...prev, isDeploying: true, currentStep: 'deploying' }))
+
+                        try {
+                          let deployData;
+
+                          if (selectedRepoForVercel) {
+                            // Deploy from GitHub repository
+                            const deployResponse = await fetch('/api/vercel/deploy', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                projectName: vercelForm.projectName,
+                                framework: vercelForm.framework,
+                                token: vercelForm.token,
+                                workspaceId: selectedProject.id,
+                                githubRepo: selectedRepoForVercel,
+                              })
+                            })
+
+                            if (!deployResponse.ok) {
+                              const errorData = await deployResponse.json()
+                              throw new Error(errorData.error || 'Failed to deploy to Vercel')
+                            }
+
+                            deployData = await deployResponse.json()
+                          } else {
+                            // Deploy by uploading files
+                            await storageManager.init()
+                            const projectFiles = await storageManager.getFiles(selectedProject.id)
+
+                            if (projectFiles.length === 0) {
+                              toast({
+                                title: "No Files Found",
+                                description: "No files found in the workspace to deploy",
+                                variant: "destructive"
+                              })
+                              setDeploymentState(prev => ({ ...prev, isDeploying: false }))
+                              return
+                            }
+
+                            const deployResponse = await fetch('/api/vercel/deploy', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                projectName: vercelForm.projectName,
+                                framework: vercelForm.framework,
+                                token: vercelForm.token,
+                                workspaceId: selectedProject.id,
+                                githubRepo: selectedRepoForVercel || undefined,
+                                files: selectedRepoForVercel ? undefined : projectFiles,
+                              })
+                            })
+
+                            if (!deployResponse.ok) {
+                              const errorData = await deployResponse.json()
+                              throw new Error(errorData.error || 'Failed to deploy to Vercel')
+                            }
+
+                            deployData = await deployResponse.json()
+                          }
+
+                          // Update project with Vercel deployment URL
+                          await storageManager.updateWorkspace(selectedProject.id, {
+                            vercelDeploymentUrl: deployData.url,
+                            deploymentStatus: 'deployed',
+                            lastActivity: new Date().toISOString(),
+                          })
+
+                          // Update deployed repos with Vercel URL
+                          if (selectedRepoForVercel) {
+                            setDeployedRepos(prev => prev.map(repo =>
+                              repo.githubRepo === selectedRepoForVercel
+                                ? { ...repo, vercelUrl: deployData.url, lastUpdated: new Date().toISOString() }
+                                : repo
+                            ))
+                          }
+
+                          // Create deployment record
+                          await storageManager.createDeployment({
+                            workspaceId: selectedProject.id,
+                            url: deployData.url,
+                            status: 'ready',
+                            commitSha: deployData.commitSha || 'initial',
+                            commitMessage: 'Deployed to Vercel',
+                            branch: 'main',
+                            environment: 'production',
+                            provider: 'vercel'
+                          })
+
+                          toast({ title: 'Deployment Ready', description: 'Successfully deployed to Vercel' })
+                          setDeploymentState(prev => ({ ...prev, isDeploying: false, currentStep: 'complete' }))
+
+                        } catch (error) {
+                          console.error('Vercel deploy error:', error)
+
+                          // Try to parse error response for better user feedback
+                          let errorMessage = 'Failed to deploy to Vercel'
+                          let errorTitle = 'Deployment Failed'
+
+                          try {
+                            const errorResponse = JSON.parse((error as Error).message)
+                            if (errorResponse.code === 'DUPLICATE_PROJECT_NAME') {
+                              errorTitle = 'Project Name Taken'
+                              errorMessage = errorResponse.error
+                              if (errorResponse.suggestion) {
+                                errorMessage += ` ${errorResponse.suggestion}`
+                              }
+                            } else if (errorResponse.code === 'INVALID_TOKEN') {
+                              errorTitle = 'Authentication Failed'
+                              errorMessage = errorResponse.error
+                            } else if (errorResponse.code === 'INSUFFICIENT_PERMISSIONS') {
+                              errorTitle = 'Permission Denied'
+                              errorMessage = errorResponse.error
+                            } else if (errorResponse.code === 'INVALID_PROJECT_NAME') {
+                              errorTitle = 'Invalid Project Name'
+                              errorMessage = errorResponse.error
+                            } else if (errorResponse.code === 'PROJECT_NAME_TOO_LONG') {
+                              errorTitle = 'Project Name Too Long'
+                              errorMessage = errorResponse.error
+                            } else if (errorResponse.code === 'RATE_LIMIT_EXCEEDED') {
+                              errorTitle = 'Rate Limit Exceeded'
+                              errorMessage = errorResponse.error
+                            } else if (errorResponse.code === 'BUILD_FAILED') {
+                              errorTitle = 'Build Failed'
+                              errorMessage = errorResponse.error
+                            } else if (errorResponse.code === 'PAYLOAD_TOO_LARGE') {
+                              errorTitle = 'Files Too Large'
+                              errorMessage = errorResponse.error
+                            } else if (errorResponse.error) {
+                              errorMessage = errorResponse.error
+                            }
+                          } catch (parseError) {
+                            // If parsing fails, use the original error message
+                            errorMessage = (error as Error).message || errorMessage
+                          }
+
                           toast({
-                            title: "No Files Found",
-                            description: "No files found in the workspace to deploy",
-                            variant: "destructive"
+                            title: errorTitle,
+                            description: errorMessage,
+                            variant: 'destructive'
                           })
                           setDeploymentState(prev => ({ ...prev, isDeploying: false }))
-                          return
                         }
-
-                        // Deploy to Vercel
-                        const deployResponse = await fetch('/api/vercel/deploy', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            projectName: vercelForm.projectName,
-                            framework: vercelForm.framework,
-                            token: vercelForm.token,
-                            workspaceId: selectedProject.id,
-                            githubRepo: selectedProject.githubRepoUrl ? `${githubForm.repoName}` : undefined,
-                            files: projectFiles, // Include files in the request
-                          })
-                        })
-
-                        if (!deployResponse.ok) {
-                          const errorData = await deployResponse.json()
-                          throw new Error(errorData.error || 'Failed to deploy to Vercel')
-                        }
-
-                        const deployData = await deployResponse.json()
-
-                        // Update project with Vercel deployment URL
-                        await storageManager.updateWorkspace(selectedProject.id, {
-                          vercelDeploymentUrl: deployData.url,
-                          deploymentStatus: 'deployed',
-                          lastActivity: new Date().toISOString(),
-                        })
-
-                        // Create deployment record
-                        await storageManager.createDeployment({
-                          workspaceId: selectedProject.id,
-                          url: deployData.url,
-                          status: 'ready',
-                          commitSha: deployData.commitSha || 'initial',
-                          commitMessage: 'Deployed to Vercel',
-                          branch: 'main',
-                          environment: 'production',
-                          provider: 'vercel'
-                        })
-
-                        toast({ title: 'Deployment Ready', description: 'Successfully deployed to Vercel' })
-                        setDeploymentState(prev => ({ ...prev, isDeploying: false, currentStep: 'complete' }))
-
-                      } catch (error) {
-                        console.error('Vercel deploy error:', error)
-                        toast({ title: 'Deployment Failed', description: (error as Error).message || 'Failed to deploy to Vercel', variant: 'destructive' })
-                        setDeploymentState(prev => ({ ...prev, isDeploying: false }))
-                      }
-                    }} disabled={deploymentState.isDeploying || !vercelForm.token}>
-                      {deploymentState.isDeploying ? 'Deploying...' : 'Deploy to Vercel'}
-                    </Button>
-                  </div>
+                      }} disabled={deploymentState.isDeploying || !vercelForm.token}>
+                        {deploymentState.isDeploying ? 'Deploying...' : 'Deploy to Vercel'}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </TabsContent>
@@ -880,9 +1185,91 @@ export default function DeploymentClient() {
 
                   {/* Netlify Deployment Form */}
                   <div className="space-y-4">
-                  <Input value={netlifyForm.token} onChange={(e) => setNetlifyForm(prev => ({ ...prev, token: e.target.value }))} />
-                  <Label>Site Name</Label>
-                  <Input value={netlifyForm.siteName} onChange={(e) => setNetlifyForm(prev => ({ ...prev, siteName: e.target.value }))} />
+                    <div>
+                      <Label htmlFor="netlify-token">Netlify Personal Token</Label>
+                      <Input
+                        id="netlify-token"
+                        type="password"
+                        value={netlifyForm.token}
+                        onChange={(e) => setNetlifyForm(prev => ({ ...prev, token: e.target.value }))}
+                        placeholder="Enter your Netlify token"
+                        className="mt-1"
+                      />
+                    </div>
+                  <div>
+                    <Label htmlFor="netlify-site-name">Site Name</Label>
+                    <div className="flex space-x-2 mt-1">
+                      <Input
+                        id="netlify-site-name"
+                        value={netlifyForm.siteName}
+                        onChange={(e) => setNetlifyForm(prev => ({ ...prev, siteName: e.target.value }))}
+                        placeholder="my-awesome-site"
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (selectedProject) {
+                            const uniqueName = generateUniqueSiteName(selectedProject.name)
+                            setNetlifyForm(prev => ({ ...prev, siteName: uniqueName }))
+                          }
+                        }}
+                        disabled={!selectedProject}
+                      >
+                        Generate Unique
+                      </Button>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Only letters, numbers, and hyphens allowed. Max 63 characters. Must be globally unique.
+                    </p>
+                  </div>
+
+                  {!netlifyForm.siteName && selectedProject && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                      <p className="text-sm text-blue-800">
+                        💡 Tip: Click "Generate Unique" to auto-create a unique site name from your project, or enter a custom name above.
+                      </p>
+                    </div>
+                  )}
+
+                  {netlifyForm.siteName && !/^[a-z0-9-]+$/.test(netlifyForm.siteName) && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                      <p className="text-sm text-yellow-800">
+                        ⚠️ Site name contains invalid characters. Only lowercase letters, numbers, and hyphens are allowed.
+                      </p>
+                    </div>
+                  )}
+
+                  {netlifyForm.siteName && netlifyForm.siteName.length > 63 && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                      <p className="text-sm text-yellow-800">
+                        ⚠️ Site name is too long. Maximum 63 characters allowed.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* GitHub Repository Selection for Netlify */}
+                  <div>
+                    <Label htmlFor="netlify-repo-select">Deploy from GitHub Repository (Optional)</Label>
+                    <Select value={selectedRepoForNetlify} onValueChange={setSelectedRepoForNetlify}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Select a GitHub repository to deploy from" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Don't use GitHub repo (upload files)</SelectItem>
+                        {deployedRepos.map((repo) => (
+                          <SelectItem key={repo.id} value={repo.githubRepo}>
+                            {repo.projectName} ({repo.githubRepo})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Select a GitHub repository to deploy from, or leave empty to upload files directly.
+                    </p>
+                  </div>
+
                   <div className="flex items-center space-x-2">
                     <Button onClick={async () => {
                       if (!netlifyForm.token) return
@@ -897,41 +1284,64 @@ export default function DeploymentClient() {
                       setDeploymentState(prev => ({ ...prev, isDeploying: true, currentStep: 'deploying' }))
 
                       try {
-                        // Get all files from the workspace for deployment
-                        await storageManager.init()
-                        const projectFiles = await storageManager.getFiles(selectedProject.id)
+                        let deployData;
 
-                        if (projectFiles.length === 0) {
-                          toast({
-                            title: "No Files Found",
-                            description: "No files found in the workspace to deploy",
-                            variant: "destructive"
+                        if (selectedRepoForNetlify) {
+                          // Deploy from GitHub repository
+                          const deployResponse = await fetch('/api/netlify/deploy', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              siteName: netlifyForm.siteName,
+                              buildCommand: netlifyForm.buildCommand,
+                              publishDir: netlifyForm.publishDir,
+                              token: netlifyForm.token,
+                              workspaceId: selectedProject.id,
+                              githubRepo: selectedRepoForNetlify,
+                            })
                           })
-                          setDeploymentState(prev => ({ ...prev, isDeploying: false }))
-                          return
-                        }
 
-                        // Deploy to Netlify
-                        const deployResponse = await fetch('/api/netlify/deploy', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            siteName: netlifyForm.siteName,
-                            buildCommand: netlifyForm.buildCommand,
-                            publishDir: netlifyForm.publishDir,
-                            token: netlifyForm.token,
-                            workspaceId: selectedProject.id,
-                            githubRepo: selectedProject.githubRepoUrl ? `${githubForm.repoName}` : undefined,
-                            files: projectFiles, // Include files in the request
+                          if (!deployResponse.ok) {
+                            const errorData = await deployResponse.json()
+                            throw new Error(errorData.error || 'Failed to deploy to Netlify')
+                          }
+
+                          deployData = await deployResponse.json()
+                        } else {
+                          // Deploy by uploading files
+                          await storageManager.init()
+                          const projectFiles = await storageManager.getFiles(selectedProject.id)
+
+                          if (projectFiles.length === 0) {
+                            toast({
+                              title: "No Files Found",
+                              description: "No files found in the workspace to deploy",
+                              variant: "destructive"
+                            })
+                            setDeploymentState(prev => ({ ...prev, isDeploying: false }))
+                            return
+                          }
+
+                          const deployResponse = await fetch('/api/netlify/deploy', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              siteName: netlifyForm.siteName,
+                              buildCommand: netlifyForm.buildCommand,
+                              publishDir: netlifyForm.publishDir,
+                              token: netlifyForm.token,
+                              workspaceId: selectedProject.id,
+                              files: projectFiles,
+                            })
                           })
-                        })
 
-                        if (!deployResponse.ok) {
-                          const errorData = await deployResponse.json()
-                          throw new Error(errorData.error || 'Failed to deploy to Netlify')
+                          if (!deployResponse.ok) {
+                            const errorData = await deployResponse.json()
+                            throw new Error(errorData.error || 'Failed to deploy to Netlify')
+                          }
+
+                          deployData = await deployResponse.json()
                         }
-
-                        const deployData = await deployResponse.json()
 
                         // Update project with Netlify deployment URL
                         await storageManager.updateWorkspace(selectedProject.id, {
@@ -939,6 +1349,15 @@ export default function DeploymentClient() {
                           deploymentStatus: 'deployed',
                           lastActivity: new Date().toISOString(),
                         })
+
+                        // Update deployed repos with Netlify URL
+                        if (selectedRepoForNetlify) {
+                          setDeployedRepos(prev => prev.map(repo =>
+                            repo.githubRepo === selectedRepoForNetlify
+                              ? { ...repo, netlifyUrl: deployData.url, lastUpdated: new Date().toISOString() }
+                              : repo
+                          ))
+                        }
 
                         // Create deployment record
                         await storageManager.createDeployment({
@@ -957,7 +1376,47 @@ export default function DeploymentClient() {
 
                       } catch (error) {
                         console.error('Netlify deploy error:', error)
-                        toast({ title: 'Deployment Failed', description: (error as Error).message || 'Failed to deploy to Netlify', variant: 'destructive' })
+
+                        // Try to parse error response for better user feedback
+                        let errorMessage = 'Failed to deploy to Netlify'
+                        let errorTitle = 'Deployment Failed'
+
+                        try {
+                          const errorResponse = JSON.parse((error as Error).message)
+                          if (errorResponse.code === 'DUPLICATE_SITE_NAME') {
+                            errorTitle = 'Site Name Taken'
+                            errorMessage = errorResponse.error
+                            if (errorResponse.suggestion) {
+                              errorMessage += ` ${errorResponse.suggestion}`
+                            }
+                          } else if (errorResponse.code === 'INVALID_TOKEN') {
+                            errorTitle = 'Authentication Failed'
+                            errorMessage = errorResponse.error
+                          } else if (errorResponse.code === 'INSUFFICIENT_PERMISSIONS') {
+                            errorTitle = 'Permission Denied'
+                            errorMessage = errorResponse.error
+                          } else if (errorResponse.code === 'INVALID_SITE_NAME') {
+                            errorTitle = 'Invalid Site Name'
+                            errorMessage = errorResponse.error
+                          } else if (errorResponse.code === 'SITE_NAME_TOO_LONG') {
+                            errorTitle = 'Site Name Too Long'
+                            errorMessage = errorResponse.error
+                          } else if (errorResponse.code === 'SITE_NAME_TOO_SHORT') {
+                            errorTitle = 'Site Name Too Short'
+                            errorMessage = errorResponse.error
+                          } else if (errorResponse.error) {
+                            errorMessage = errorResponse.error
+                          }
+                        } catch (parseError) {
+                          // If parsing fails, use the original error message
+                          errorMessage = (error as Error).message || errorMessage
+                        }
+
+                        toast({
+                          title: errorTitle,
+                          description: errorMessage,
+                          variant: 'destructive'
+                        })
                         setDeploymentState(prev => ({ ...prev, isDeploying: false }))
                       }
                     }} disabled={deploymentState.isDeploying || !netlifyForm.token}>
@@ -970,6 +1429,64 @@ export default function DeploymentClient() {
             </Tabs>
           </CardContent>
         </Card>
+
+        {/* --- Repo Management Section --- */}
+        <div className="mt-10">
+          <Card>
+            <CardHeader>
+              <CardTitle>Connected GitHub Repositories</CardTitle>
+              <CardDescription>Manage and view all your deployed GitHub repos and their URLs. Select a repo above to deploy to Vercel or Netlify.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {deployedRepos.length === 0 ? (
+                  <p className="text-gray-500">No GitHub repositories connected yet.</p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr>
+                        <th className="text-left">Project Name</th>
+                        <th className="text-left">Repo Name</th>
+                        <th className="text-left">Repo URL</th>
+                        <th className="text-left">Vercel URL</th>
+                        <th className="text-left">Netlify URL</th>
+                        <th className="text-left">Last Updated</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {deployedRepos.map(repo => (
+                        <tr key={repo.id} className="border-b">
+                          <td>{repo.projectName}</td>
+                          <td>{repo.githubRepo || '-'}</td>
+                          <td>
+                            <a href={repo.githubUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                              {repo.githubUrl}
+                            </a>
+                          </td>
+                          <td>
+                            {repo.vercelUrl ? (
+                              <a href={repo.vercelUrl} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline">
+                                {repo.vercelUrl}
+                              </a>
+                            ) : '-'}
+                          </td>
+                          <td>
+                            {repo.netlifyUrl ? (
+                              <a href={repo.netlifyUrl} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline">
+                                {repo.netlifyUrl}
+                              </a>
+                            ) : '-'}
+                          </td>
+                          <td>{new Date(repo.lastUpdated).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )
