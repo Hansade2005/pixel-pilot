@@ -140,74 +140,74 @@ export default function DeploymentClient() {
   // Handle GitHub OAuth callback
   useEffect(() => {
     const handleGitHubCallback = async () => {
-      // Check for code in URL hash (new approach) or search params (fallback)
-      const hashParams = new URLSearchParams(window.location.hash.substring(1))
-      const hashCode = hashParams.get('github_code')
       const searchParams = new URLSearchParams(window.location.search)
-      const searchCode = searchParams.get('code')
-      const code = hashCode || searchCode
+      const oauthSuccess = searchParams.get('oauth_success')
+      const accessToken = searchParams.get('access_token')
+      const tokenType = searchParams.get('token_type')
+      const scope = searchParams.get('scope')
+      const error = searchParams.get('error')
 
-      if (code) {
+      // Handle OAuth errors
+      if (error) {
+        console.error('GitHub OAuth error:', error)
+        toast({
+          title: "Connection Failed",
+          description: `GitHub OAuth error: ${error}`,
+          variant: "destructive"
+        })
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname)
+        return
+      }
+
+      // Handle successful OAuth
+      if (oauthSuccess === 'true' && accessToken) {
         try {
-          // Exchange code for token
-          const tokenResponse = await fetch('/api/auth/github/oauth-callback', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code })
+          // Save token to storage
+          await storageManager.createToken({
+            userId: currentUserId,
+            provider: 'github',
+            token: accessToken
           })
 
-          if (tokenResponse.ok) {
-            const tokenData = await tokenResponse.json()
+          setSavedTokens(prev => ({ ...prev, github: { token: accessToken } }))
+          setGithubForm(prev => ({
+            ...prev,
+            token: accessToken
+          }))
 
-            // Save token to storage
-            await storageManager.createToken({
-              userId: currentUserId,
-              provider: 'github',
-              token: tokenData.access_token
-            })
+          setDeploymentState(prev => ({
+            ...prev,
+            githubConnected: true,
+            isDeploying: false
+          }))
 
-            setSavedTokens(prev => ({ ...prev, github: { token: tokenData.access_token } }))
-            setGithubForm(prev => ({
-              ...prev,
-              token: tokenData.access_token
-            }))
-
-            setDeploymentState(prev => ({
-              ...prev,
-              githubConnected: true,
-              isDeploying: false
-            }))
-
-            // Restore project selection if it was stored
-            const storedProjectId = sessionStorage.getItem('github_oauth_project')
-            if (storedProjectId && projects.length > 0) {
-              const project = projects.find(p => p.id === storedProjectId)
-              if (project) {
-                setSelectedProject(project)
-              }
-            }
-
-            // Clean up sessionStorage
-            sessionStorage.removeItem('github_oauth_return_url')
-            sessionStorage.removeItem('github_oauth_project')
-
-            toast({
-              title: "GitHub Connected",
-              description: "Successfully connected to GitHub",
-            })
-
-            // Clean up URL - remove hash if it contains the code
-            if (hashCode) {
-              window.history.replaceState({}, document.title, window.location.pathname + window.location.search)
-            } else {
-              window.history.replaceState({}, document.title, window.location.pathname)
+          // Restore project selection if it was stored
+          const storedProjectId = sessionStorage.getItem('github_oauth_project')
+          if (storedProjectId && projects.length > 0) {
+            const project = projects.find(p => p.id === storedProjectId)
+            if (project) {
+              setSelectedProject(project)
             }
           }
+
+          // Clean up sessionStorage
+          sessionStorage.removeItem('github_oauth_return_url')
+          sessionStorage.removeItem('github_oauth_project')
+
+          toast({
+            title: "GitHub Connected",
+            description: "Successfully connected to GitHub",
+          })
+
+          // Clean up URL
+          window.history.replaceState({}, document.title, window.location.pathname)
+
         } catch (error) {
           console.error('GitHub callback error:', error)
           toast({
             title: "Connection Failed",
-            description: "Failed to connect to GitHub",
+            description: "Failed to save GitHub token",
             variant: "destructive"
           })
           setDeploymentState(prev => ({ ...prev, isDeploying: false }))
@@ -216,7 +216,7 @@ export default function DeploymentClient() {
     }
 
     handleGitHubCallback()
-  }, [projects])
+  }, [projects, currentUserId])
 
   const getCurrentUser = async () => {
     try {
@@ -317,7 +317,7 @@ export default function DeploymentClient() {
       const GITHUB_CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID || 'Ov23lihgU0dNPk4ct1Au'
       const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_URL || 'https://dev.pixelways.co'
 
-      const redirectUri = encodeURIComponent(`${APP_DOMAIN}/workspace/deployment`)
+      const redirectUri = encodeURIComponent(`${APP_DOMAIN}/api/auth/github/oauth-callback`)
       const scope = encodeURIComponent('repo,user')
       const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`
 

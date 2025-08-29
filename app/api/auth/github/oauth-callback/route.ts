@@ -21,25 +21,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${APP_DOMAIN}/workspace/deployment?error=no_code`)
   }
 
-  // Verify state parameter for security (if you implement state verification)
-  // For now, we'll proceed with the code
-
-  // Redirect to the deployment page with the code in the hash fragment
-  // This keeps the code secure and allows the frontend to process it
-  const redirectUrl = `${APP_DOMAIN}/workspace/deployment#github_code=${encodeURIComponent(code)}`
-
-  return NextResponse.redirect(redirectUrl)
-}
-
-export async function POST(request: NextRequest) {
   try {
-    const { code } = await request.json()
-
-    if (!code) {
-      return NextResponse.json({ error: 'No code provided' }, { status: 400 })
-    }
-
-    // Exchange code for access token
+    // Exchange code for access token immediately
     const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
       headers: {
@@ -64,17 +47,24 @@ export async function POST(request: NextRequest) {
       throw new Error(tokenData.error_description || tokenData.error)
     }
 
-    return NextResponse.json({
-      access_token: tokenData.access_token,
-      token_type: tokenData.token_type,
-      scope: tokenData.scope
-    })
+    // Redirect back to deployment page with success and token data
+    const redirectUrl = new URL(`${APP_DOMAIN}/workspace/deployment`)
+    redirectUrl.searchParams.set('oauth_success', 'true')
+    redirectUrl.searchParams.set('access_token', tokenData.access_token)
+    redirectUrl.searchParams.set('token_type', tokenData.token_type || 'bearer')
+    redirectUrl.searchParams.set('scope', tokenData.scope || 'repo,user')
+
+    return NextResponse.redirect(redirectUrl.toString())
 
   } catch (error) {
     console.error('GitHub OAuth callback error:', error)
-    return NextResponse.json(
-      { error: 'Failed to exchange code for token' },
-      { status: 500 }
-    )
+    return NextResponse.redirect(`${APP_DOMAIN}/workspace/deployment?error=token_exchange_failed`)
   }
+}
+
+export async function POST(request: NextRequest) {
+  return NextResponse.json(
+    { error: 'POST method not supported. Use GET method for OAuth callback.' },
+    { status: 405 }
+  )
 }
