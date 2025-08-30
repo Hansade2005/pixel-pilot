@@ -403,7 +403,7 @@ export function Sidebar({
       {/* Projects Container - Fixed height with scrolling for mobile */}
       <div className="flex-1 overflow-hidden">
         {isMobile ? (
-          <div className="max-h-70 overflow-y-auto px-4">
+          <div className={filteredAndSortedProjects.length > 3 ? "max-h-70 overflow-y-auto px-4" : "px-4"}>
             <div className="space-y-1 pb-4">
               {filteredAndSortedProjects.map((project) => (
                 <div key={project.id + '-' + project.slug} className="group relative">

@@ -25,7 +25,18 @@ import {
   GitBranch,
   GitCommit,
   ChevronLeft,
-  Database
+  Database,
+  Rocket,
+  Calendar,
+  Server,
+  FolderOpen,
+  Search,
+  Filter,
+  History,
+  BarChart3,
+  TrendingUp,
+  Users,
+  Shield
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { storageManager, type Workspace as Project, type Deployment, type EnvironmentVariable } from "@/lib/storage-manager"
@@ -55,6 +66,14 @@ interface ProjectDisplay extends Project {
   environmentVariables: EnvironmentVariable[]
 }
 
+// Quick stats interface
+interface QuickStats {
+  projectsCount: number
+  deploymentsCount: number
+  lastActivity: string
+  activeProjects: number
+}
+
 export default function ManagementPage() {
   const { toast } = useToast()
   const router = useRouter()
@@ -75,6 +94,14 @@ export default function ManagementPage() {
     environment: "production",
     isSecret: false,
     selectedProjectId: "" // Added selectedProjectId to track which project is selected
+  })
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterStatus, setFilterStatus] = useState('all')
+  const [quickStats, setQuickStats] = useState<QuickStats>({
+    projectsCount: 0,
+    deploymentsCount: 0,
+    lastActivity: 'Never',
+    activeProjects: 0
   })
 
   useEffect(() => {
@@ -191,6 +218,23 @@ export default function ManagementPage() {
     }
   }
 
+  const calculateQuickStats = async (projects: ProjectDisplay[], deployments: Deployment[]) => {
+    try {
+      const stats: QuickStats = {
+        projectsCount: projects.length,
+        deploymentsCount: deployments.length,
+        lastActivity: projects.length > 0 
+          ? new Date(Math.max(...projects.map(p => new Date(p.lastActivity).getTime()))).toLocaleString()
+          : 'Never',
+        activeProjects: projects.filter(p => p.deploymentStatus === 'deployed').length
+      }
+
+      setQuickStats(stats)
+    } catch (error) {
+      console.error('Error calculating quick stats:', error)
+    }
+  }
+
   const loadData = async () => {
     setIsLoading(true)
     try {
@@ -233,6 +277,9 @@ export default function ManagementPage() {
       // For now, we'll keep GitHub repos empty since we're not using Supabase
       setGithubRepos([])
       
+      // Calculate quick stats
+      await calculateQuickStats(projectsWithData, deployments)
+      
       // Initialize sample data if no projects exist
       if (projects.length === 0) {
         await initializeSampleData()
@@ -266,6 +313,7 @@ export default function ManagementPage() {
         url: '', // Will be updated when deployment completes
         status: 'building',
         commitSha: newDeployment.commitSha,
+        commitMessage: `Deployment triggered from management page`,
         branch: newDeployment.branch,
         environment: newDeployment.environment,
         provider: 'vercel'
@@ -471,16 +519,26 @@ export default function ManagementPage() {
     )
   }
 
+  const filteredProjects = projects.filter(project => {
+    const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          (project.description && project.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    
+    if (filterStatus === 'all') return matchesSearch
+    if (filterStatus === 'deployed') return matchesSearch && project.deploymentStatus === 'deployed'
+    if (filterStatus === 'not_deployed') return matchesSearch && project.deploymentStatus !== 'deployed'
+    return matchesSearch
+  })
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex items-center justify-center min-h-screen bg-gray-900">
+        <Loader2 className="h-8 w-8 animate-spin text-white" />
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-screen bg-gray-900 text-white">
       <GlobalHeader 
         title="Project Management"
         showSettingsButton={false}
@@ -490,25 +548,134 @@ export default function ManagementPage() {
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col space-y-2 mb-6">
             <h1 className="text-3xl font-bold">Project Management</h1>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-gray-400">
               Manage your projects, deployments, and environment variables
             </p>
           </div>
 
+          {/* Quick Stats Row */}
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="bg-gray-800 border-gray-700">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-blue-900 rounded-lg">
+                    <FolderOpen className="h-5 w-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400">Total Projects</p>
+                    <p className="text-2xl font-bold">{quickStats.projectsCount}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-gray-800 border-gray-700">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-green-900 rounded-lg">
+                    <Rocket className="h-5 w-5 text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400">Deployments</p>
+                    <p className="text-2xl font-bold">{quickStats.deploymentsCount}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-gray-800 border-gray-700">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-purple-900 rounded-lg">
+                    <TrendingUp className="h-5 w-5 text-purple-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400">Active Projects</p>
+                    <p className="text-2xl font-bold">{quickStats.activeProjects}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-gray-800 border-gray-700">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-orange-900 rounded-lg">
+                    <Calendar className="h-5 w-5 text-orange-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400">Last Activity</p>
+                    <p className="text-sm font-bold truncate">
+                      {quickStats.lastActivity === 'Never' ? 'Never' : new Date(quickStats.lastActivity).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Search and Filter Bar */}
+          <Card className="mb-6 bg-gray-800 border-gray-700">
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search projects..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10 w-full sm:w-64 bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Filter className="h-4 w-4 text-gray-400" />
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                      className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
+                    >
+                      <option value="all" className="bg-gray-700">All Projects</option>
+                      <option value="deployed" className="bg-gray-700">Deployed</option>
+                      <option value="not_deployed" className="bg-gray-700">Not Deployed</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={exportData}
+                    className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Export Data
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={clearAllData}
+                    className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Clear All
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             {/* Improved responsive tabs */}
-            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 gap-2">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="deployments">Deployments</TabsTrigger>
-              <TabsTrigger value="environment">Environment</TabsTrigger>
-              <TabsTrigger value="github">GitHub</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 gap-2 bg-gray-800">
+              <TabsTrigger value="overview" className="data-[state=active]:bg-gray-700 data-[state=active]:text-white">Overview</TabsTrigger>
+              <TabsTrigger value="deployments" className="data-[state=active]:bg-gray-700 data-[state=active]:text-white">Deployments</TabsTrigger>
+              <TabsTrigger value="environment" className="data-[state=active]:bg-gray-700 data-[state=active]:text-white">Environment</TabsTrigger>
+              <TabsTrigger value="github" className="data-[state=active]:bg-gray-700 data-[state=active]:text-white">GitHub</TabsTrigger>
             </TabsList>
 
             {/* Overview Tab */}
             <TabsContent value="overview" className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                {projects.map((project) => (
-                  <Card key={project.id} className="hover:shadow-lg transition-shadow">
+                {filteredProjects.map((project) => (
+                  <Card key={project.id} className="bg-gray-800 border-gray-700 hover:shadow-lg transition-shadow">
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
@@ -517,88 +684,133 @@ export default function ManagementPage() {
                           ) : (
                             <Globe className="h-5 w-5 text-green-500 flex-shrink-0" />
                           )}
-                          <CardTitle className="text-lg truncate">{project.name}</CardTitle>
+                          <CardTitle className="text-lg truncate">
+                            {project.name.length > 12 ? `${project.name.substring(0, 12)}...` : project.name}
+                          </CardTitle>
                         </div>
-                        <Badge variant="outline" className="ml-2 flex-shrink-0">{project.platform}</Badge>
+                        <Badge variant="outline" className="ml-2 flex-shrink-0 bg-gray-700 text-gray-300 border-gray-600">
+                          {project.platform}
+                        </Badge>
                       </div>
-                      <CardDescription>
-                        {project.url ? (
-                          <a 
-                            href={project.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-blue-500 hover:underline flex items-center space-x-1"
-                          >
-                            <span className="truncate">{project.url.replace(/^https?:\/\//, '')}</span>
-                            <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                          </a>
+                      <CardDescription className="text-gray-400">
+                        {project.description ? (
+                          <span className="truncate">{project.description.length > 30 ? `${project.description.substring(0, 30)}...` : project.description}</span>
                         ) : (
-                          "No deployment URL"
+                          "No description"
                         )}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      {project.lastDeployment ? (
+                      {project.url ? (
                         <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Last Deployment</span>
-                            {getStatusBadge(project.lastDeployment.status)}
+                          <div className="flex items-center space-x-2">
+                            <ExternalLink className="h-4 w-4 text-gray-400" />
+                            <a 
+                              href={project.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-blue-400 hover:underline text-sm truncate"
+                            >
+                              {project.url.replace(/^https?:\/\//, '').length > 25 ? 
+                                `${project.url.replace(/^https?:\/\//, '').substring(0, 25)}...` : 
+                                project.url.replace(/^https?:\/\//, '')}
+                            </a>
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            {new Date(project.lastDeployment.createdAt).toLocaleDateString()} {new Date(project.lastDeployment.createdAt).toLocaleTimeString()}
-                          </div>
+                          {project.lastDeployment ? (
+                            <div className="flex items-center justify-between pt-2">
+                              <span className="text-xs text-gray-400">Last Deployment</span>
+                              {getStatusBadge(project.lastDeployment.status)}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-gray-400 pt-2">
+                              No deployments yet
+                            </div>
+                          )}
                         </div>
                       ) : (
-                        <div className="text-sm text-muted-foreground">
-                          No deployments yet
+                        <div className="text-sm text-gray-400">
+                          Not deployed
                         </div>
                       )}
+                      <div className="flex justify-between items-center mt-4">
+                        <span className="text-xs text-gray-400">
+                          {new Date(project.lastActivity).toLocaleDateString()}
+                        </span>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => router.push(`/workspace/deployment?project=${project.id}`)}
+                          className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                        >
+                          Manage
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 ))}
+                {filteredProjects.length === 0 && (
+                  <div className="col-span-full text-center py-12 text-gray-400">
+                    <FolderOpen className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+                    <h3 className="text-lg font-medium mb-2">No projects found</h3>
+                    <p className="mb-4">
+                      {searchQuery ? 'Try a different search term' : 'Get started by creating a new project'}
+                    </p>
+                    <Button 
+                      onClick={() => router.push('/workspace')}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      Create Project
+                    </Button>
+                  </div>
+                )}
               </div>
             </TabsContent>
 
             {/* Deployments Tab */}
             <TabsContent value="deployments" className="space-y-6">
-              <Card>
+              <Card className="bg-gray-800 border-gray-700">
                 <CardHeader>
-                  <CardTitle>Trigger New Deployment</CardTitle>
-                  <CardDescription>
+                  <CardTitle className="flex items-center space-x-2 text-white">
+                    <Rocket className="h-5 w-5 text-blue-400" />
+                    <span>Trigger New Deployment</span>
+                  </CardTitle>
+                  <CardDescription className="text-gray-400">
                     Deploy a specific commit or branch to your project
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <Label htmlFor="commit-sha">Commit SHA (Optional)</Label>
+                      <Label htmlFor="commit-sha" className="text-gray-300">Commit SHA (Optional)</Label>
                       <Input
                         id="commit-sha"
                         placeholder="abc123..."
                         value={newDeployment.commitSha}
                         onChange={(e) => setNewDeployment(prev => ({ ...prev, commitSha: e.target.value }))}
+                        className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="branch">Branch (Optional)</Label>
+                      <Label htmlFor="branch" className="text-gray-300">Branch (Optional)</Label>
                       <Input
                         id="branch"
                         placeholder="main"
                         value={newDeployment.branch}
                         onChange={(e) => setNewDeployment(prev => ({ ...prev, branch: e.target.value }))}
+                        className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="environment">Environment</Label>
+                      <Label htmlFor="environment" className="text-gray-300">Environment</Label>
                       <select
                         id="environment"
-                        className="w-full px-3 py-2 border border-input rounded-md"
+                        className="w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-700 text-white"
                         value={newDeployment.environment}
                         onChange={(e) => setNewDeployment(prev => ({ ...prev, environment: e.target.value }))}
                       >
-                        <option value="production">Production</option>
-                        <option value="preview">Preview</option>
-                        <option value="development">Development</option>
+                        <option value="production" className="bg-gray-700">Production</option>
+                        <option value="preview" className="bg-gray-700">Preview</option>
+                        <option value="development" className="bg-gray-700">Development</option>
                       </select>
                     </div>
                   </div>
@@ -610,10 +822,10 @@ export default function ManagementPage() {
                         onClick={() => triggerDeployment(project.id)}
                         disabled={!newDeployment.commitSha && !newDeployment.branch}
                         variant="outline"
-                        className="flex-1 min-w-[150px]"
+                        className="flex-1 min-w-[150px] bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
                       >
                         <RefreshCw className="h-4 w-4 mr-2" />
-                        Deploy {project.name}
+                        Deploy {project.name.length > 12 ? `${project.name.substring(0, 12)}...` : project.name}
                       </Button>
                     ))}
                   </div>
@@ -622,9 +834,9 @@ export default function ManagementPage() {
 
               <div className="space-y-4">
                 {projects.map((project) => (
-                  <Card key={project.id}>
+                  <Card key={project.id} className="bg-gray-800 border-gray-700">
                     <CardHeader>
-                      <CardTitle className="flex items-center space-x-2">
+                      <CardTitle className="flex items-center space-x-2 text-white">
                         {project.platform === 'vercel' ? (
                           <Globe className="h-5 w-5 text-blue-500" />
                         ) : (
@@ -636,22 +848,22 @@ export default function ManagementPage() {
                     <CardContent>
                       {project.lastDeployment ? (
                         <div className="space-y-3">
-                          <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                          <div className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
                             <div className="flex items-center space-x-3">
                               {getStatusIcon(project.lastDeployment.status)}
                               <div>
-                                <div className="font-medium">
+                                <div className="font-medium text-white">
                                   {project.lastDeployment.commitMessage || 'Deployment'}
                                 </div>
-                                <div className="text-sm text-muted-foreground">
+                                <div className="text-sm text-gray-400">
                                   {project.lastDeployment.commitSha && (
                                     <span className="font-mono text-xs">
                                       {project.lastDeployment.commitSha.substring(0, 7)}
                                     </span>
                                   )}
                                   {project.lastDeployment.branch && (
-                                    <span className="ml-2">
-                                      <GitBranch className="h-3 w-3 inline mr-1" />
+                                    <span className="ml-2 flex items-center">
+                                      <GitBranch className="h-3 w-3 mr-1" />
                                       {project.lastDeployment.branch}
                                     </span>
                                   )}
@@ -665,6 +877,7 @@ export default function ManagementPage() {
                                 size="sm"
                                 onClick={() => rollbackDeployment(project.id, project.lastDeployment!.id)}
                                 disabled={project.lastDeployment.status !== 'ready'}
+                                className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
                               >
                                 <RotateCcw className="h-4 w-4 mr-1" />
                                 Rollback
@@ -673,7 +886,7 @@ export default function ManagementPage() {
                           </div>
                         </div>
                       ) : (
-                        <div className="text-center py-6 text-muted-foreground">
+                        <div className="text-center py-6 text-gray-400">
                           No deployments found
                         </div>
                       )}
@@ -685,10 +898,13 @@ export default function ManagementPage() {
 
             {/* Environment Variables Tab */}
             <TabsContent value="environment" className="space-y-6">
-              <Card>
+              <Card className="bg-gray-800 border-gray-700">
                 <CardHeader>
-                  <CardTitle>Add Environment Variable</CardTitle>
-                  <CardDescription>
+                  <CardTitle className="flex items-center space-x-2 text-white">
+                    <Settings className="h-5 w-5" />
+                    <span>Add Environment Variable</span>
+                  </CardTitle>
+                  <CardDescription className="text-gray-400">
                     Add new environment variables to your projects
                   </CardDescription>
                 </CardHeader>
@@ -697,49 +913,51 @@ export default function ManagementPage() {
                     {/* Improved responsive grid for environment variable form */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div>
-                        <Label htmlFor="env-key">Key</Label>
+                        <Label htmlFor="env-key" className="text-gray-300">Key</Label>
                         <Input
                           id="env-key"
                           placeholder="API_KEY"
                           value={newEnvVar.key}
                           onChange={(e) => setNewEnvVar(prev => ({ ...prev, key: e.target.value }))}
+                          className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="env-value">Value</Label>
+                        <Label htmlFor="env-value" className="text-gray-300">Value</Label>
                         <Input
                           id="env-value"
                           type={newEnvVar.isSecret ? "password" : "text"}
                           placeholder="your-value-here"
                           value={newEnvVar.value}
                           onChange={(e) => setNewEnvVar(prev => ({ ...prev, value: e.target.value }))}
+                          className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="env-environment">Environment</Label>
+                        <Label htmlFor="env-environment" className="text-gray-300">Environment</Label>
                         <select
                           id="env-environment"
-                          className="w-full px-3 py-2 h-10 border border-input bg-background rounded-md"
+                          className="w-full px-3 py-2 h-10 border border-gray-600 bg-gray-700 text-white rounded-md"
                           value={newEnvVar.environment}
                           onChange={(e) => setNewEnvVar(prev => ({ ...prev, environment: e.target.value }))}
                         >
-                          <option value="production">Production</option>
-                          <option value="preview">Preview</option>
-                          <option value="development">Development</option>
+                          <option value="production" className="bg-gray-700">Production</option>
+                          <option value="preview" className="bg-gray-700">Preview</option>
+                          <option value="development" className="bg-gray-700">Development</option>
                         </select>
                       </div>
                       <div>
-                        <Label htmlFor="env-project">Project</Label>
+                        <Label htmlFor="env-project" className="text-gray-300">Project</Label>
                         <select
                           id="env-project"
-                          className="w-full px-3 py-2 h-10 border border-input bg-background rounded-md"
+                          className="w-full px-3 py-2 h-10 border border-gray-600 bg-gray-700 text-white rounded-md"
                           value={newEnvVar.selectedProjectId}
                           onChange={(e) => setNewEnvVar(prev => ({ ...prev, selectedProjectId: e.target.value }))}
                         >
-                          <option value="">Select a project</option>
+                          <option value="" className="bg-gray-700">Select a project</option>
                           {projects.map(project => (
-                            <option key={project.id} value={project.id}>
-                              {project.name}
+                            <option key={project.id} value={project.id} className="bg-gray-700">
+                              {project.name.length > 20 ? `${project.name.substring(0, 20)}...` : project.name}
                             </option>
                           ))}
                         </select>
@@ -752,9 +970,9 @@ export default function ManagementPage() {
                           type="checkbox"
                           checked={newEnvVar.isSecret}
                           onChange={(e) => setNewEnvVar(prev => ({ ...prev, isSecret: e.target.checked }))}
-                          className="rounded"
+                          className="rounded bg-gray-700 border-gray-600 text-blue-500"
                         />
-                        <span className="text-sm">Treat as secret (values will be hidden)</span>
+                        <span className="text-sm text-gray-300">Treat as secret (values will be hidden)</span>
                       </label>
                     </div>
                   </div>
@@ -763,6 +981,7 @@ export default function ManagementPage() {
                     <Button
                       onClick={addEnvironmentVariable}
                       disabled={!newEnvVar.key || !newEnvVar.value || !newEnvVar.selectedProjectId}
+                      className="bg-blue-600 hover:bg-blue-700"
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Add Environment Variable
@@ -773,9 +992,9 @@ export default function ManagementPage() {
 
               <div className="space-y-4">
                 {projects.map((project) => (
-                  <Card key={project.id}>
+                  <Card key={project.id} className="bg-gray-800 border-gray-700">
                     <CardHeader>
-                      <CardTitle className="flex items-center space-x-2">
+                      <CardTitle className="flex items-center space-x-2 text-white">
                         <Settings className="h-5 w-5" />
                         <span>{project.name} Environment Variables</span>
                       </CardTitle>
@@ -784,13 +1003,13 @@ export default function ManagementPage() {
                       {project.environmentVariables.length > 0 ? (
                         <div className="space-y-3">
                           {project.environmentVariables.map((envVar, index) => (
-                            <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                            <div key={index} className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
                               <div>
-                                <div className="font-medium">{envVar.key}</div>
-                                <div className="text-sm text-muted-foreground">
+                                <div className="font-medium text-white">{envVar.key}</div>
+                                <div className="text-sm text-gray-400">
                                   {envVar.isSecret ? '••••••••' : envVar.value}
                                 </div>
-                                <Badge variant="outline" className="mt-1">
+                                <Badge variant="outline" className="mt-1 bg-gray-600 text-gray-300 border-gray-500">
                                   {envVar.environment}
                                 </Badge>
                               </div>
@@ -798,6 +1017,7 @@ export default function ManagementPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => deleteEnvironmentVariable(project.id, envVar.key, envVar.environment)}
+                                className="text-gray-400 hover:text-white"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -805,7 +1025,7 @@ export default function ManagementPage() {
                           ))}
                         </div>
                       ) : (
-                        <div className="text-center py-6 text-muted-foreground">
+                        <div className="text-center py-6 text-gray-400">
                           No environment variables found
                         </div>
                       )}
@@ -817,13 +1037,13 @@ export default function ManagementPage() {
 
             {/* GitHub Tab */}
             <TabsContent value="github" className="space-y-6">
-              <Card>
+              <Card className="bg-gray-800 border-gray-700">
                 <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
+                  <CardTitle className="flex items-center space-x-2 text-white">
                     <Github className="h-5 w-5" />
                     <span>GitHub Repositories</span>
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="text-gray-400">
                     Manage your connected GitHub repositories and trigger deployments
                   </CardDescription>
                 </CardHeader>
@@ -831,14 +1051,14 @@ export default function ManagementPage() {
                   {githubRepos.length > 0 ? (
                     <div className="space-y-3">
                       {githubRepos.map((repo) => (
-                        <div key={repo.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                        <div key={repo.id} className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
                           <div className="flex items-center space-x-3">
                             <Github className="h-5 w-5" />
                             <div>
-                              <div className="font-medium">{repo.name}</div>
-                              <div className="text-sm text-muted-foreground">{repo.fullName}</div>
+                              <div className="font-medium text-white">{repo.name}</div>
+                              <div className="text-sm text-gray-400">{repo.fullName}</div>
                               {repo.lastCommit && (
-                                <div className="text-xs text-muted-foreground mt-1">
+                                <div className="text-xs text-gray-400 mt-1">
                                   <GitCommit className="h-3 w-3 inline mr-1" />
                                   {repo.lastCommit.sha.substring(0, 7)} - {repo.lastCommit.message}
                                 </div>
@@ -846,11 +1066,14 @@ export default function ManagementPage() {
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <Badge variant="outline">{repo.defaultBranch}</Badge>
+                            <Badge variant="outline" className="bg-gray-600 text-gray-300 border-gray-500">
+                              {repo.defaultBranch}
+                            </Badge>
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => window.open(repo.url, '_blank')}
+                              className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
                             >
                               <ExternalLink className="h-4 w-4 mr-1" />
                               View
@@ -860,7 +1083,7 @@ export default function ManagementPage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-6 text-muted-foreground">
+                    <div className="text-center py-6 text-gray-400">
                       No GitHub repositories found. Connect your GitHub account to get started.
                     </div>
                   )}

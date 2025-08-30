@@ -31,6 +31,12 @@ export function ModelSelector({
     return acc
   }, {} as Record<string, ChatModel[]>)
 
+  // Function to truncate text to 4 characters
+  const truncateToFourChars = (text: string | undefined) => {
+    if (!text) return '';
+    return text.length > 4 ? text.substring(0, 4) + '...' : text;
+  };
+
   if (compact) {
     return (
       <div className={`flex items-center ${className}`}>
@@ -39,7 +45,7 @@ export function ModelSelector({
           <SelectTrigger className="h-6 px-2 min-w-[56px] border-0 bg-transparent text-xs shadow-none focus:ring-0 p-0">
             <div className="flex items-center justify-center">
               <SelectValue>
-                <span className="font-medium text-sm leading-none">{currentModel?.name || selectedModel}</span>
+                <span className="font-medium text-sm leading-none">{truncateToFourChars(currentModel?.name || selectedModel)}</span>
               </SelectValue>
             </div>
           </SelectTrigger>
@@ -79,7 +85,7 @@ export function ModelSelector({
         <SelectTrigger className="w-full">
           <div className="flex items-center gap-2">
             <SelectValue>
-              <span className="font-medium">{currentModel?.name || selectedModel}</span>
+              <span className="font-medium">{truncateToFourChars(currentModel?.name || selectedModel)}</span>
             </SelectValue>
           </div>
         </SelectTrigger>
