@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
+import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -114,12 +115,6 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { DeploymentSetupAccordion } from "@/components/workspace/deployment-setup-accordion"
 
-// Utility function to truncate text
-const truncateText = (text: string, maxLength: number = 22): string => {
-  if (text.length <= maxLength) return text
-  return text.substring(0, maxLength) + "..."
-}
-
 interface GitHubRepo {
   id: string
   name: string
@@ -222,125 +217,6 @@ export default function DeploymentClient() {
   const searchParams = useSearchParams()
   const projectId = searchParams.get('project')
 
-  // Add CSS animations
-  useEffect(() => {
-    const style = document.createElement('style')
-    style.textContent = `
-      @keyframes fadeInUp {
-        from {
-          opacity: 0;
-          transform: translateY(30px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-
-      @keyframes fadeInLeft {
-        from {
-          opacity: 0;
-          transform: translateX(-30px);
-        }
-        to {
-          opacity: 1;
-          transform: translateX(0);
-        }
-      }
-
-      @keyframes fadeInRight {
-        from {
-          opacity: 0;
-          transform: translateX(30px);
-        }
-        to {
-          opacity: 1;
-          transform: translateX(0);
-        }
-      }
-
-      @keyframes pulse {
-        0%, 100% {
-          opacity: 1;
-        }
-        50% {
-          opacity: 0.5;
-        }
-      }
-
-      @keyframes slideInFromBottom {
-        from {
-          transform: translateY(100%);
-          opacity: 0;
-        }
-        to {
-          transform: translateY(0);
-          opacity: 1;
-        }
-      }
-
-      .scroll-fade-in {
-        animation: fadeInUp 0.8s ease-out both;
-      }
-
-      .hover-lift {
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      }
-
-      .hover-lift:hover {
-        transform: translateY(-4px) scale(1.02);
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-      }
-
-      .floating {
-        animation: floating 3s ease-in-out infinite;
-      }
-
-      @keyframes floating {
-        0% {
-          transform: translateY(0px);
-        }
-        50% {
-          transform: translateY(-10px);
-        }
-        100% {
-          transform: translateY(0px);
-        }
-      }
-
-      .glow-effect {
-        box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
-        transition: box-shadow 0.3s ease;
-      }
-
-      .glow-effect:hover {
-        box-shadow: 0 0 30px rgba(59, 130, 246, 0.5);
-      }
-
-      .stagger-animation {
-        animation: fadeInUp 0.6s ease-out both;
-      }
-
-      .stagger-animation:nth-child(1) { animation-delay: 0.1s; }
-      .stagger-animation:nth-child(2) { animation-delay: 0.2s; }
-      .stagger-animation:nth-child(3) { animation-delay: 0.3s; }
-
-      .smooth-scroll {
-        scroll-behavior: smooth;
-      }
-
-      .parallax-bg {
-        transform: translateY(calc(var(--scroll-y) * 0.5));
-        will-change: transform;
-      }
-    `
-    document.head.appendChild(style)
-
-    return () => {
-      document.head.removeChild(style)
-    }
-  }, [])
-
   const [activeTab, setActiveTab] = useState("github")
   const [isLoading, setIsLoading] = useState(true)
   const [projects, setProjects] = useState<ProjectDisplay[]>([])
@@ -378,7 +254,7 @@ export default function DeploymentClient() {
   })
 
   // Enhanced state variables
-  const [isDarkMode, setIsDarkMode] = useState(true)
+  const [isDarkMode, setIsDarkMode] = useState(false)
   const [showWizard, setShowWizard] = useState(false)
   const [wizardStep, setWizardStep] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
@@ -596,7 +472,7 @@ export default function DeploymentClient() {
             break
           case 'd':
             event.preventDefault()
-            // Dark mode is always enabled
+            setIsDarkMode(!isDarkMode)
             break
         }
       }
@@ -606,46 +482,14 @@ export default function DeploymentClient() {
     return () => document.removeEventListener('keydown', handleKeyPress)
   }, [keyboardShortcuts, selectedProject, isDarkMode])
 
-  const [scrollY, setScrollY] = useState(0)
-  const [isVisible, setIsVisible] = useState(false)
-  const [animatedElements, setAnimatedElements] = useState<Set<string>>(new Set())
-
-  // Scroll effect handler
+  // Initialize enhanced features
   useEffect(() => {
-    const handleScroll = () => {
-      setScrollY(window.scrollY)
+    if (currentUserId) {
+      calculateQuickStats()
+      loadDeploymentHistory()
+      initializeEnvironments()
     }
-
-    const handleScrollAnimation = () => {
-      const elements = document.querySelectorAll('[data-animate]')
-      elements.forEach((element) => {
-        const rect = element.getBoundingClientRect()
-        const elementTop = rect.top
-        const elementBottom = rect.bottom
-        const isVisible = elementTop < window.innerHeight - 100 && elementBottom > 0
-
-        if (isVisible && !animatedElements.has(element.id)) {
-          setAnimatedElements(prev => new Set([...prev, element.id]))
-        }
-      })
-    }
-
-    window.addEventListener('scroll', handleScroll)
-    window.addEventListener('scroll', handleScrollAnimation)
-
-    // Trigger initial animation check
-    setTimeout(handleScrollAnimation, 100)
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll)
-      window.removeEventListener('scroll', handleScrollAnimation)
-    }
-  }, [animatedElements])
-
-  // Fade in effect on mount
-  useEffect(() => {
-    setIsVisible(true)
-  }, [])
+  }, [currentUserId])
 
   // Load deployed repositories from storage
   const loadDeployedRepos = async (projectsList?: ProjectDisplay[]) => {
@@ -1197,48 +1041,57 @@ export default function DeploymentClient() {
     }
   }
 
-  // ...existing UI rendering code...
   return (
     <TooltipProvider>
-      <div className={`min-h-screen dark bg-gray-900 text-white transition-all duration-1000 ease-out gradient-bg ${
-        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-      }`}>
+      <div className={`min-h-screen ${isDarkMode ? 'dark bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
         {/* Enhanced Header with Project Context */}
-        <div className={`bg-gray-800 border-b border-gray-700 px-6 py-4 transition-all duration-300 ease-out ${
-          scrollY > 50 ? 'shadow-lg backdrop-blur-sm bg-gray-800/95' : ''
-        }`}>
+        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Breadcrumb Navigation */}
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbLink href="/" className="flex items-center space-x-2 text-gray-300 hover:text-white">
+                  <BreadcrumbLink href="/" className="flex items-center space-x-2">
                     <Home className="h-4 w-4" />
                     <span>Home</span>
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbLink href="/workspace" className="text-gray-300 hover:text-white">Projects</BreadcrumbLink>
+                  <BreadcrumbLink href="/workspace">Projects</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbPage className="flex items-center space-x-2 text-white">
+                  <BreadcrumbPage className="flex items-center space-x-2">
                     <FolderOpen className="h-4 w-4" />
-                    <span className="text-truncate-22" title={selectedProject?.name || 'Select Project'}>
-                      {selectedProject ? truncateText(selectedProject.name) : 'Select Project'}
-                    </span>
+                    <span>{selectedProject?.name || 'Select Project'}</span>
                   </BreadcrumbPage>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbPage className="text-white">Deployments</BreadcrumbPage>
+                  <BreadcrumbPage>Deployments</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
 
             {/* Header Actions */}
             <div className="flex items-center space-x-4">
+              {/* Dark Mode Toggle */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsDarkMode(!isDarkMode)}
+                    className="h-8 w-8 p-0"
+                  >
+                    {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Toggle {isDarkMode ? 'light' : 'dark'} mode</p>
+                </TooltipContent>
+              </Tooltip>
 
               {/* Keyboard Shortcuts */}
               <Tooltip>
@@ -1253,12 +1106,7 @@ export default function DeploymentClient() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <div className="text-sm">
-                    <p className="font-medium mb-1">Keyboard Shortcuts:</p>
-                    <p>Ctrl+K: Toggle shortcuts panel</p>
-                    <p>Ctrl+R: Refresh deployment status</p>
-                    <p>Dark mode: Always enabled</p>
-                  </div>
+                  <p>Keyboard shortcuts: {keyboardShortcuts ? 'ON' : 'OFF'}</p>
                 </TooltipContent>
               </Tooltip>
 
@@ -1277,62 +1125,42 @@ export default function DeploymentClient() {
           </div>
 
           {/* Quick Stats Row */}
-          <div className={`mt-4 grid grid-cols-1 md:grid-cols-4 gap-4 transition-all duration-700 ease-out ${
-            animatedElements.has('quick-stats') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-          }`} data-animate id="quick-stats" style={{
-            animation: animatedElements.has('quick-stats') ? 'fadeInUp 0.6s ease-out 0.4s both' : 'none'
-          }}>
-            <Card className="p-3 bg-gray-800 border-gray-700 hover:bg-gray-750 transition-all duration-200 hover:shadow-lg hover-lift">
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="p-3">
               <div className="flex items-center space-x-2">
-                <Rocket className={`h-4 w-4 text-blue-600 transition-all duration-300 ${
-                  animatedElements.has('quick-stats') ? 'animate-floating' : ''
-                }`} style={{
-                  animationDelay: '0.4s'
-                }} />
+                <Rocket className="h-4 w-4 text-blue-600" />
                 <div>
-                  <p className="text-sm font-medium text-white">Deployments</p>
-                  <p className="text-2xl font-bold text-white">{quickStats.deploymentsCount}</p>
+                  <p className="text-sm font-medium">Deployments</p>
+                  <p className="text-2xl font-bold">{quickStats.deploymentsCount}</p>
                 </div>
               </div>
             </Card>
-            <Card className="p-3 bg-gray-800 border-gray-700 hover:bg-gray-750 transition-all duration-200 hover:shadow-lg hover-lift">
+            <Card className="p-3">
               <div className="flex items-center space-x-2">
-                <Calendar className={`h-4 w-4 text-green-600 transition-all duration-300 ${
-                  animatedElements.has('quick-stats') ? 'animate-floating' : ''
-                }`} style={{
-                  animationDelay: '0.5s'
-                }} />
+                <Calendar className="h-4 w-4 text-green-600" />
                 <div>
-                  <p className="text-sm font-medium text-white">Last Deploy</p>
-                  <p className="text-sm font-bold text-white">
+                  <p className="text-sm font-medium">Last Deploy</p>
+                  <p className="text-sm font-bold">
                     {quickStats.lastDeploymentTime === 'Never' ? 'Never' : new Date(quickStats.lastDeploymentTime).toLocaleDateString()}
                   </p>
                 </div>
               </div>
             </Card>
-            <Card className="p-3 bg-gray-800 border-gray-700 hover:bg-gray-750 transition-all duration-200 hover:shadow-lg hover-lift">
+            <Card className="p-3">
               <div className="flex items-center space-x-2">
-                <Server className={`h-4 w-4 text-purple-600 transition-all duration-300 ${
-                  animatedElements.has('quick-stats') ? 'animate-floating' : ''
-                }`} style={{
-                  animationDelay: '0.6s'
-                }} />
+                <Server className="h-4 w-4 text-purple-600" />
                 <div>
-                  <p className="text-sm font-medium text-white">Active Environments</p>
-                  <p className="text-2xl font-bold text-white">{quickStats.activeEnvironments}</p>
+                  <p className="text-sm font-medium">Active Environments</p>
+                  <p className="text-2xl font-bold">{quickStats.activeEnvironments}</p>
                 </div>
               </div>
             </Card>
-            <Card className="p-3 bg-gray-800 border-gray-700 hover:bg-gray-750 transition-all duration-200 hover:shadow-lg hover-lift">
+            <Card className="p-3">
               <div className="flex items-center space-x-2">
-                <FolderOpen className={`h-4 w-4 text-orange-600 transition-all duration-300 ${
-                  animatedElements.has('quick-stats') ? 'animate-floating' : ''
-                }`} style={{
-                  animationDelay: '0.7s'
-                }} />
+                <FolderOpen className="h-4 w-4 text-orange-600" />
                 <div>
-                  <p className="text-sm font-medium text-white">Total Projects</p>
-                  <p className="text-2xl font-bold text-white">{quickStats.totalProjects}</p>
+                  <p className="text-sm font-medium">Total Projects</p>
+                  <p className="text-2xl font-bold">{quickStats.totalProjects}</p>
                 </div>
               </div>
             </Card>
@@ -1343,25 +1171,25 @@ export default function DeploymentClient() {
           {/* First-time User Wizard */}
           {showWizard && (
             <Dialog open={showWizard} onOpenChange={setShowWizard}>
-              <DialogContent className="max-w-2xl bg-gray-800 border-gray-700">
+              <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                  <DialogTitle className="flex items-center space-x-2 text-white">
-                    <Sparkles className="h-5 w-5 text-yellow-400" />
+                  <DialogTitle className="flex items-center space-x-2">
+                    <Sparkles className="h-5 w-5 text-yellow-500" />
                     <span>Welcome to Deployment Center!</span>
                   </DialogTitle>
-                  <DialogDescription className="text-gray-400">
+                  <DialogDescription>
                     Let's get you set up with your first deployment in {wizardStep} easy steps.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="py-4">
                   {wizardStep === 1 && (
                     <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-white">Step 1: Select Your Project</h3>
-                      <p className="text-sm text-gray-300">
+                      <h3 className="text-lg font-semibold">Step 1: Select Your Project</h3>
+                      <p className="text-sm text-gray-600">
                         Choose the project you want to deploy from the dropdown above.
                       </p>
-                      <div className="bg-blue-900/20 p-4 rounded-lg border border-blue-800">
-                        <p className="text-sm text-blue-300">
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <p className="text-sm">
                           💡 <strong>Tip:</strong> If you haven't created a project yet, go back to the workspace and create one first.
                         </p>
                       </div>
@@ -1369,37 +1197,37 @@ export default function DeploymentClient() {
                   )}
                   {wizardStep === 2 && (
                     <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-white">Step 2: Choose Your Platform</h3>
-                      <p className="text-sm text-gray-300">
+                      <h3 className="text-lg font-semibold">Step 2: Choose Your Platform</h3>
+                      <p className="text-sm text-gray-600">
                         Select GitHub, Vercel, or Netlify based on your deployment needs.
                       </p>
                       <div className="grid grid-cols-3 gap-4">
-                        <div className="text-center p-4 border border-gray-600 rounded-lg hover:bg-gray-700 cursor-pointer bg-gray-800">
-                          <Github className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-                          <p className="font-medium text-white">GitHub</p>
-                          <p className="text-xs text-gray-400">Code Repository</p>
+                        <div className="text-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                          <Github className="h-8 w-8 mx-auto mb-2 text-gray-700" />
+                          <p className="font-medium">GitHub</p>
+                          <p className="text-xs text-gray-500">Code Repository</p>
                         </div>
-                        <div className="text-center p-4 border border-gray-600 rounded-lg hover:bg-gray-700 cursor-pointer bg-gray-800">
-                          <Globe className="h-8 w-8 mx-auto mb-2 text-blue-400" />
-                          <p className="font-medium text-white">Vercel</p>
-                          <p className="text-xs text-gray-400">Frontend Hosting</p>
+                        <div className="text-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                          <Globe className="h-8 w-8 mx-auto mb-2 text-blue-600" />
+                          <p className="font-medium">Vercel</p>
+                          <p className="text-xs text-gray-500">Frontend Hosting</p>
                         </div>
-                        <div className="text-center p-4 border border-gray-600 rounded-lg hover:bg-gray-700 cursor-pointer bg-gray-800">
-                          <Globe2 className="h-8 w-8 mx-auto mb-2 text-green-400" />
-                          <p className="font-medium text-white">Netlify</p>
-                          <p className="text-xs text-gray-400">Static Hosting</p>
+                        <div className="text-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                          <Globe2 className="h-8 w-8 mx-auto mb-2 text-green-600" />
+                          <p className="font-medium">Netlify</p>
+                          <p className="text-xs text-gray-500">Static Hosting</p>
                         </div>
                       </div>
                     </div>
                   )}
                   {wizardStep === 3 && (
                     <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-white">Step 3: Configure & Deploy</h3>
-                      <p className="text-sm text-gray-300">
+                      <h3 className="text-lg font-semibold">Step 3: Configure & Deploy</h3>
+                      <p className="text-sm text-gray-600">
                         Fill in the required information and click deploy. We'll handle the rest!
                       </p>
-                      <div className="bg-green-900/20 p-4 rounded-lg border border-green-800">
-                        <p className="text-sm text-green-300">
+                      <div className="bg-green-50 p-4 rounded-lg">
+                        <p className="text-sm">
                           ✅ <strong>Ready to deploy!</strong> Your project will be live in minutes.
                         </p>
                       </div>
@@ -1411,7 +1239,6 @@ export default function DeploymentClient() {
                     variant="outline"
                     onClick={() => setWizardStep(Math.max(1, wizardStep - 1))}
                     disabled={wizardStep === 1}
-                    className="border-gray-600 text-gray-300 hover:bg-gray-700"
                   >
                     Previous
                   </Button>
@@ -1423,7 +1250,6 @@ export default function DeploymentClient() {
                         setShowWizard(false)
                       }
                     }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
                   >
                     {wizardStep === 3 ? 'Get Started' : 'Next'}
                   </Button>
@@ -1433,19 +1259,17 @@ export default function DeploymentClient() {
           )}
 
           {/* Enhanced Project Selection */}
-          <Card className={`mb-6 bg-gray-800 border-gray-700 transition-all duration-500 ease-out delay-100 ${
-            animatedElements.has('project-selection') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-          }`} data-animate id="project-selection">
+          <Card className="mb-6">
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2 text-white">
-                <Target className="h-5 w-5 text-blue-400" />
+              <CardTitle className="flex items-center space-x-2">
+                <Target className="h-5 w-5" />
                 <span>Project Selection</span>
               </CardTitle>
-              <CardDescription className="text-gray-400">
+              <CardDescription>
                 Choose a project to deploy. Need help getting started?
                 <Button
                   variant="link"
-                  className="p-0 h-auto ml-1 text-blue-400 hover:text-blue-300"
+                  className="p-0 h-auto ml-1"
                   onClick={() => setShowWizard(true)}
                 >
                   View Setup Guide
@@ -1458,7 +1282,7 @@ export default function DeploymentClient() {
                   const project = projects.find(p => p.id === value)
                   setSelectedProject(project || null)
                 }}>
-                  <SelectTrigger className="flex-1 bg-gray-700 border-gray-600 text-white">
+                  <SelectTrigger className="flex-1">
                     <SelectValue placeholder="Choose a project to deploy">
                       {selectedProject && (
                         <div className="flex items-center space-x-2">
@@ -1467,26 +1291,22 @@ export default function DeploymentClient() {
                               {selectedProject.name.charAt(0).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="text-truncate-22" title={selectedProject.name}>
-                          {truncateText(selectedProject.name)}
-                        </span>
+                          <span>{selectedProject.name}</span>
                         </div>
                       )}
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent className="bg-gray-700 border-gray-600">
+                  <SelectContent>
                     {projects.map((project) => (
-                      <SelectItem key={project.id} value={project.id} className="text-white hover:bg-gray-600">
+                      <SelectItem key={project.id} value={project.id}>
                         <div className="flex items-center space-x-2">
                           <Avatar className="h-6 w-6">
                             <AvatarFallback>
                               {project.name.charAt(0).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="text-truncate-22" title={project.name}>
-                          {truncateText(project.name)}
-                        </span>
-                          <Badge variant="outline" className="text-xs border-gray-500 text-gray-300">
+                          <span>{project.name}</span>
+                          <Badge variant="outline" className="text-xs">
                             {project.platform}
                           </Badge>
                         </div>
@@ -1497,7 +1317,7 @@ export default function DeploymentClient() {
                 {selectedProject && (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="outline" size="sm" className="border-gray-600 text-gray-300 hover:bg-gray-700">
+                      <Button variant="outline" size="sm">
                         <Settings className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
@@ -1511,63 +1331,51 @@ export default function DeploymentClient() {
           </Card>
 
         {/* Interactive Deployment Cards */}
-        <div className="mb-6" data-animate id="platform-cards">
-          <h2 className={`text-2xl font-bold mb-4 text-white transition-all duration-700 ease-out delay-200 ${
-            animatedElements.has('platform-cards') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-          }`}>Choose Deployment Platform</h2>
-          <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 transition-all duration-700 ease-out delay-300 ${
-            animatedElements.has('platform-cards') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-          }`}>
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold mb-4">Choose Deployment Platform</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* GitHub Card */}
             <Card
-              className={`cursor-pointer transition-all duration-200 hover:shadow-lg bg-gray-800 border-gray-700 hover:bg-gray-750 transform hover:scale-105 hover:-translate-y-1 ${
-                animatedElements.has('platform-cards') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+              className={`cursor-pointer transition-all duration-200 hover:shadow-lg ${
+                activeTab === 'github' ? 'ring-2 ring-blue-500 shadow-lg' : ''
               }`}
               onClick={() => setActiveTab('github')}
-              style={{
-                transitionDelay: animatedElements.has('platform-cards') ? '0.1s' : '0s',
-                animation: animatedElements.has('platform-cards') ? 'fadeInUp 0.6s ease-out 0.1s both' : 'none'
-              }}
             >
               <CardHeader className="text-center">
                 <div className="flex justify-center mb-2">
-                  <div className={`p-3 rounded-full ${activeTab === 'github' ? 'bg-blue-900/50' : 'bg-gray-700'} transition-all duration-300`}>
-                    <Github className={`h-8 w-8 ${activeTab === 'github' ? 'text-blue-400' : 'text-gray-400'} transition-all duration-300 ${
-                      animatedElements.has('platform-cards') ? 'animate-floating' : ''
-                    }`} style={{
-                      animationDelay: '0.1s'
-                    }} />
+                  <div className={`p-3 rounded-full ${activeTab === 'github' ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                    <Github className={`h-8 w-8 ${activeTab === 'github' ? 'text-blue-600' : 'text-gray-600'}`} />
                   </div>
                 </div>
-                <CardTitle className="flex items-center justify-center space-x-2 text-white">
+                <CardTitle className="flex items-center justify-center space-x-2">
                   <span>GitHub</span>
                   {deploymentState.githubConnected && (
-                    <Badge variant="secondary" className="text-xs bg-green-900/50 text-green-300 border-green-700">
+                    <Badge variant="secondary" className="text-xs">
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                       Connected
                     </Badge>
                   )}
                 </CardTitle>
-                <CardDescription className="text-gray-400">Host your code repository</CardDescription>
+                <CardDescription>Host your code repository</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2 text-sm text-gray-300">
+                <div className="space-y-2 text-sm text-gray-600">
                   <div className="flex items-center space-x-2">
-                    <GitBranch className="h-4 w-4 text-gray-400" />
+                    <GitBranch className="h-4 w-4" />
                     <span>Version control</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Users className="h-4 w-4 text-gray-400" />
+                    <Users className="h-4 w-4" />
                     <span>Collaboration</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Shield className="h-4 w-4 text-gray-400" />
+                    <Shield className="h-4 w-4" />
                     <span>Private repos</span>
                   </div>
                 </div>
                 {selectedProject?.githubRepoUrl && (
-                  <div className="mt-4 p-2 bg-green-900/20 rounded-lg border border-green-800">
-                    <p className="text-xs text-green-300 flex items-center">
+                  <div className="mt-4 p-2 bg-green-50 rounded-lg">
+                    <p className="text-xs text-green-800 flex items-center">
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                       Repository connected
                     </p>
@@ -1578,61 +1386,53 @@ export default function DeploymentClient() {
 
             {/* Vercel Card */}
             <Card
-              className={`cursor-pointer transition-all duration-200 hover:shadow-lg bg-gray-800 border-gray-700 hover:bg-gray-750 transform hover:scale-105 hover:-translate-y-1 hover-lift ${
-                animatedElements.has('platform-cards') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+              className={`cursor-pointer transition-all duration-200 hover:shadow-lg ${
+                activeTab === 'vercel' ? 'ring-2 ring-blue-500 shadow-lg' : ''
               }`}
               onClick={() => setActiveTab('vercel')}
-              style={{
-                transitionDelay: animatedElements.has('platform-cards') ? '0.2s' : '0s',
-                animation: animatedElements.has('platform-cards') ? 'fadeInUp 0.6s ease-out 0.2s both' : 'none'
-              }}
             >
               <CardHeader className="text-center">
                 <div className="flex justify-center mb-2">
-                  <div className={`p-3 rounded-full ${activeTab === 'vercel' ? 'bg-blue-900/50' : 'bg-gray-700'} transition-all duration-300`}>
-                    <Globe className={`h-8 w-8 ${activeTab === 'vercel' ? 'text-blue-400' : 'text-gray-400'} transition-all duration-300 ${
-                      animatedElements.has('platform-cards') ? 'animate-floating' : ''
-                    }`} style={{
-                      animationDelay: '0.2s'
-                    }} />
+                  <div className={`p-3 rounded-full ${activeTab === 'vercel' ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                    <Globe className={`h-8 w-8 ${activeTab === 'vercel' ? 'text-blue-600' : 'text-gray-600'}`} />
                   </div>
                 </div>
-                <CardTitle className="flex items-center justify-center space-x-2 text-white">
+                <CardTitle className="flex items-center justify-center space-x-2">
                   <span>Vercel</span>
                   {deploymentState.vercelConnected && (
-                    <Badge variant="secondary" className="text-xs bg-green-900/50 text-green-300 border-green-700">
+                    <Badge variant="secondary" className="text-xs">
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                       Connected
                     </Badge>
                   )}
                 </CardTitle>
-                <CardDescription className="text-gray-400">Deploy frontend applications</CardDescription>
+                <CardDescription>Deploy frontend applications</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2 text-sm text-gray-300">
+                <div className="space-y-2 text-sm text-gray-600">
                   <div className="flex items-center space-x-2">
-                    <Zap className="h-4 w-4 text-gray-400" />
+                    <Zap className="h-4 w-4" />
                     <span>Global CDN</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Activity className="h-4 w-4 text-gray-400" />
+                    <Activity className="h-4 w-4" />
                     <span>Analytics</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <GitBranch className="h-4 w-4 text-gray-400" />
+                    <GitBranch className="h-4 w-4" />
                     <span>Preview deploys</span>
                   </div>
                 </div>
                 {selectedProject?.vercelDeploymentUrl && (
-                  <div className="mt-4 p-2 bg-green-900/20 rounded-lg border border-green-800">
-                    <p className="text-xs text-green-300 flex items-center">
+                  <div className="mt-4 p-2 bg-green-50 rounded-lg">
+                    <p className="text-xs text-green-800 flex items-center">
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                       Deployed at{' '}
                       <a
                         href={selectedProject.vercelDeploymentUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="underline ml-1 hover:text-green-200"
+                        className="underline ml-1"
                       >
                         {selectedProject.vercelDeploymentUrl}
                       </a>
@@ -1644,61 +1444,53 @@ export default function DeploymentClient() {
 
             {/* Netlify Card */}
             <Card
-              className={`cursor-pointer transition-all duration-200 hover:shadow-lg bg-gray-800 border-gray-700 hover:bg-gray-750 transform hover:scale-105 hover:-translate-y-1 hover-lift ${
-                animatedElements.has('platform-cards') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+              className={`cursor-pointer transition-all duration-200 hover:shadow-lg ${
+                activeTab === 'netlify' ? 'ring-2 ring-blue-500 shadow-lg' : ''
               }`}
               onClick={() => setActiveTab('netlify')}
-              style={{
-                transitionDelay: animatedElements.has('platform-cards') ? '0.3s' : '0s',
-                animation: animatedElements.has('platform-cards') ? 'fadeInUp 0.6s ease-out 0.3s both' : 'none'
-              }}
             >
               <CardHeader className="text-center">
                 <div className="flex justify-center mb-2">
-                  <div className={`p-3 rounded-full ${activeTab === 'netlify' ? 'bg-green-900/50' : 'bg-gray-700'} transition-all duration-300`}>
-                    <Globe2 className={`h-8 w-8 ${activeTab === 'netlify' ? 'text-green-400' : 'text-gray-400'} transition-all duration-300 ${
-                      animatedElements.has('platform-cards') ? 'animate-floating' : ''
-                    }`} style={{
-                      animationDelay: '0.3s'
-                    }} />
+                  <div className={`p-3 rounded-full ${activeTab === 'netlify' ? 'bg-green-100' : 'bg-gray-100'}`}>
+                    <Globe2 className={`h-8 w-8 ${activeTab === 'netlify' ? 'text-green-600' : 'text-gray-600'}`} />
                   </div>
                 </div>
-                <CardTitle className="flex items-center justify-center space-x-2 text-white">
+                <CardTitle className="flex items-center justify-center space-x-2">
                   <span>Netlify</span>
                   {deploymentState.netlifyConnected && (
-                    <Badge variant="secondary" className="text-xs bg-green-900/50 text-green-300 border-green-700">
+                    <Badge variant="secondary" className="text-xs">
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                       Connected
                     </Badge>
                   )}
                 </CardTitle>
-                <CardDescription className="text-gray-400">Deploy static sites & SPAs</CardDescription>
+                <CardDescription>Deploy static sites & SPAs</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2 text-sm text-gray-300">
+                <div className="space-y-2 text-sm text-gray-600">
                   <div className="flex items-center space-x-2">
-                    <Server className="h-4 w-4 text-gray-400" />
+                    <Server className="h-4 w-4" />
                     <span>Static hosting</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <GitBranch className="h-4 w-4 text-gray-400" />
+                    <GitBranch className="h-4 w-4" />
                     <span>Branch deploys</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Shield className="h-4 w-4 text-gray-400" />
+                    <Shield className="h-4 w-4" />
                     <span>SSL included</span>
                   </div>
                 </div>
                 {selectedProject?.netlifyDeploymentUrl && (
-                  <div className="mt-4 p-2 bg-green-900/20 rounded-lg border border-green-800">
-                    <p className="text-xs text-green-300 flex items-center">
+                  <div className="mt-4 p-2 bg-green-50 rounded-lg">
+                    <p className="text-xs text-green-800 flex items-center">
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                       Deployed at{' '}
                       <a
                         href={selectedProject.netlifyDeploymentUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="underline ml-1 hover:text-green-200"
+                        className="underline ml-1"
                       >
                         {selectedProject.netlifyDeploymentUrl}
                       </a>
@@ -1712,17 +1504,15 @@ export default function DeploymentClient() {
 
         {/* Enhanced Status System */}
         {deploymentState.isDeploying && (
-          <Card className={`mb-6 bg-gray-800 border-gray-700 transition-all duration-500 ease-out ${
-            animatedElements.has('status-card') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-          }`} data-animate id="status-card">
+          <Card className="mb-6">
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2 text-white">
+              <CardTitle className="flex items-center space-x-2">
                 <div className="animate-pulse">
-                  <Building className="h-5 w-5 text-blue-400" />
+                  <Building className="h-5 w-5 text-blue-600" />
                 </div>
                 <span>Deployment in Progress</span>
                 {estimatedTime && (
-                  <Badge variant="outline" className="ml-auto border-gray-600 text-gray-300">
+                  <Badge variant="outline" className="ml-auto">
                     <Timer className="h-3 w-3 mr-1" />
                     ~{formatBuildTime(estimatedTime)}
                   </Badge>
@@ -1779,10 +1569,10 @@ export default function DeploymentClient() {
                         <EyeOff className="h-4 w-4" />
                       </Button>
                     </div>
-                    <ScrollArea className="h-32 w-full rounded-md border border-gray-600 p-2 bg-gray-800">
+                    <ScrollArea className="h-32 w-full rounded-md border p-2 bg-gray-50">
                       <div className="text-xs font-mono space-y-1">
                         {buildLogs.map((log, index) => (
-                          <div key={index} className="text-gray-300">
+                          <div key={index} className="text-gray-700">
                             {log}
                           </div>
                         ))}
@@ -1794,10 +1584,7 @@ export default function DeploymentClient() {
             </CardContent>
           </Card>
         )}
-
-        <Card className={`mb-6 bg-gray-800 border-gray-700 transition-all duration-500 ease-out delay-200 ${
-          animatedElements.has('deployment-form') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-        }`} data-animate id="deployment-form">
+        <Card className="mb-6">
           <CardContent className="p-6">
             {/* Search and Filter Bar */}
             <div className="flex items-center justify-between mb-6">
@@ -1808,27 +1595,27 @@ export default function DeploymentClient() {
                     placeholder="Search deployments..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 w-64 bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                    className="pl-10 w-64"
                   />
                 </div>
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger className="w-32 bg-gray-700 border-gray-600 text-white">
+                  <SelectTrigger className="w-32">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-gray-700 border-gray-600">
-                    <SelectItem value="all" className="text-white hover:bg-gray-600">All Status</SelectItem>
-                    <SelectItem value="success" className="text-white hover:bg-gray-600">Success</SelectItem>
-                    <SelectItem value="failed" className="text-white hover:bg-gray-600">Failed</SelectItem>
-                    <SelectItem value="in_progress" className="text-white hover:bg-gray-600">In Progress</SelectItem>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="success">Success</SelectItem>
+                    <SelectItem value="failed">Failed</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="flex items-center space-x-2">
-                <Button variant="outline" size="sm" className="border-gray-600 text-gray-300 hover:bg-gray-700">
+                <Button variant="outline" size="sm">
                   <History className="h-4 w-4 mr-2" />
                   Deployment History
                 </Button>
-                <Button variant="outline" size="sm" className="border-gray-600 text-gray-300 hover:bg-gray-700">
+                <Button variant="outline" size="sm">
                   <Settings className="h-4 w-4 mr-2" />
                   Environments
                 </Button>
@@ -1837,23 +1624,19 @@ export default function DeploymentClient() {
 
             {/* GitHub Deployment Form */}
             {activeTab === 'github' && (
-              <div className={`space-y-6 transition-all duration-700 ease-out ${
-                animatedElements.has('github-form') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-              }`} data-animate id="github-form" style={{
-                animation: animatedElements.has('github-form') ? 'fadeInUp 0.6s ease-out 0.6s both' : 'none'
-              }}>
+              <div className="space-y-6">
                 {/* Connection Status */}
-                <Alert className="bg-gray-800 border-gray-700">
-                  <Info className="h-4 w-4 text-blue-400" />
-                  <AlertDescription className="text-gray-300">
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
                     {deploymentState.githubConnected ? (
                       <span className="flex items-center">
-                        <CheckCircle2 className="h-4 w-4 text-green-400 mr-2" />
+                        <CheckCircle2 className="h-4 w-4 text-green-600 mr-2" />
                         Connected to GitHub
                       </span>
                     ) : (
                       <span className="flex items-center">
-                        <AlertCircle className="h-4 w-4 text-yellow-400 mr-2" />
+                        <AlertCircle className="h-4 w-4 text-yellow-600 mr-2" />
                         Not connected to GitHub. Please provide your token below.
                       </span>
                     )}
@@ -1863,7 +1646,7 @@ export default function DeploymentClient() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <div>
-                      <Label htmlFor="repo-name" className="flex items-center space-x-2 text-white">
+                      <Label htmlFor="repo-name" className="flex items-center space-x-2">
                         <span>Repository Name</span>
                         <Tooltip>
                           <TooltipTrigger>
@@ -1880,7 +1663,7 @@ export default function DeploymentClient() {
                           value={githubForm.repoName}
                           onChange={(e) => setGithubForm(prev => ({ ...prev, repoName: e.target.value }))}
                           placeholder="my-awesome-project"
-                          className="flex-1 bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                          className="flex-1"
                         />
                         <Button
                           variant="outline"
@@ -1892,25 +1675,24 @@ export default function DeploymentClient() {
                             }
                           }}
                           disabled={!selectedProject}
-                          className="border-gray-600 text-gray-300 hover:bg-gray-700"
                         >
                           Generate
                         </Button>
                       </div>
-                      <p className="text-sm text-gray-400 mt-1">
+                      <p className="text-sm text-gray-500 mt-1">
                         Only letters, numbers, hyphens, underscores, and periods allowed. Max 100 characters.
                       </p>
                     </div>
 
                     <div>
-                      <Label htmlFor="repo-description" className="text-white">Repository Description (Optional)</Label>
+                      <Label htmlFor="repo-description">Repository Description (Optional)</Label>
                       <Textarea
                         id="repo-description"
                         value={githubForm.repoDescription}
                         onChange={(e) => setGithubForm(prev => ({ ...prev, repoDescription: e.target.value }))}
                         placeholder="A brief description of your project"
                         rows={2}
-                        className="mt-1 bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                        className="mt-1"
                       />
                     </div>
 
@@ -1971,18 +1753,18 @@ export default function DeploymentClient() {
 
                     {/* Smart Defaults */}
                     {!githubForm.repoName && selectedProject && (
-                      <Alert className="bg-blue-900/20 border-blue-800">
-                        <Lightbulb className="h-4 w-4 text-blue-400" />
-                        <AlertDescription className="text-blue-300">
+                      <Alert>
+                        <Lightbulb className="h-4 w-4" />
+                        <AlertDescription>
                           💡 <strong>Smart suggestion:</strong> Click "Generate" to auto-create a repository name from your project, or enter a custom name above.
                         </AlertDescription>
                       </Alert>
                     )}
 
                     {githubForm.repoName && !/^[a-zA-Z0-9._-]+$/.test(githubForm.repoName) && (
-                      <Alert variant="destructive" className="bg-red-900/20 border-red-800">
-                        <AlertTriangle className="h-4 w-4 text-red-400" />
-                        <AlertDescription className="text-red-300">
+                      <Alert variant="destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>
                           ⚠️ Repository name contains invalid characters. Only letters, numbers, hyphens, underscores, and periods are allowed.
                         </AlertDescription>
                       </Alert>
@@ -2039,11 +1821,7 @@ export default function DeploymentClient() {
 
             {/* Vercel Deployment Form */}
             {activeTab === 'vercel' && (
-              <div className={`space-y-6 transition-all duration-700 ease-out ${
-                animatedElements.has('vercel-form') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-              }`} data-animate id="vercel-form" style={{
-                animation: animatedElements.has('vercel-form') ? 'fadeInUp 0.6s ease-out 0.6s both' : 'none'
-              }}>
+              <div className="space-y-6">
                 {/* Vercel Setup Instructions */}
                 <DeploymentSetupAccordion
                   platform="vercel"
@@ -2129,18 +1907,18 @@ export default function DeploymentClient() {
 
                     {/* Smart Defaults for Vercel */}
                     {!vercelForm.projectName && selectedProject && (
-                      <Alert className="bg-blue-900/20 border-blue-800">
-                        <Lightbulb className="h-4 w-4 text-blue-400" />
-                        <AlertDescription className="text-blue-300">
+                      <Alert>
+                        <Lightbulb className="h-4 w-4" />
+                        <AlertDescription>
                           💡 <strong>Smart suggestion:</strong> Click "Generate Unique" to auto-create a unique project name from your project.
                         </AlertDescription>
                       </Alert>
                     )}
 
                     {vercelForm.projectName && !/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(vercelForm.projectName) && (
-                      <Alert variant="destructive" className="bg-red-900/20 border-red-800">
-                        <AlertTriangle className="h-4 w-4 text-red-400" />
-                        <AlertDescription className="text-red-300">
+                      <Alert variant="destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>
                           ⚠️ Project name contains invalid characters or format. Only lowercase letters, numbers, and hyphens are allowed. Cannot start or end with a hyphen.
                         </AlertDescription>
                       </Alert>
@@ -2313,11 +2091,7 @@ export default function DeploymentClient() {
 
             {/* Netlify Deployment Form */}
             {activeTab === 'netlify' && (
-              <div className={`space-y-6 transition-all duration-700 ease-out ${
-                animatedElements.has('netlify-form') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-              }`} data-animate id="netlify-form" style={{
-                animation: animatedElements.has('netlify-form') ? 'fadeInUp 0.6s ease-out 0.6s both' : 'none'
-              }}>
+              <div className="space-y-6">
                 {/* Netlify Setup Instructions */}
                 <DeploymentSetupAccordion
                   platform="netlify"
@@ -2425,18 +2199,18 @@ export default function DeploymentClient() {
 
                     {/* Smart Defaults for Netlify */}
                     {!netlifyForm.siteName && selectedProject && (
-                      <Alert className="bg-blue-900/20 border-blue-800">
-                        <Lightbulb className="h-4 w-4 text-blue-400" />
-                        <AlertDescription className="text-blue-300">
+                      <Alert>
+                        <Lightbulb className="h-4 w-4" />
+                        <AlertDescription>
                           💡 <strong>Smart suggestion:</strong> Click "Generate Unique" to auto-create a unique site name from your project.
                         </AlertDescription>
                       </Alert>
                     )}
 
                     {netlifyForm.siteName && !/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(netlifyForm.siteName) && (
-                      <Alert variant="destructive" className="bg-red-900/20 border-red-800">
-                        <AlertTriangle className="h-4 w-4 text-red-400" />
-                        <AlertDescription className="text-red-300">
+                      <Alert variant="destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>
                           ⚠️ Site name contains invalid characters or format. Only lowercase letters, numbers, and hyphens are allowed. Cannot start or end with a hyphen.
                         </AlertDescription>
                       </Alert>
@@ -2614,141 +2388,114 @@ export default function DeploymentClient() {
                 </div>
               </div>
             )}
-        </CardContent>
+          </CardContent>
         </Card>
 
         {/* --- Repo Management Section --- */}
-        <div className={`mt-10 transition-all duration-500 ease-out delay-300 ${
-          animatedElements.has('repo-management') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-        }`} data-animate id="repo-management">
-          <Card className="bg-gray-800 border-gray-700">
+        <div className="mt-10">
+          <Card>
             <CardHeader>
-              <CardTitle className="text-white">Connected GitHub Repositories</CardTitle>
-              <CardDescription className="text-gray-400">Manage and view all your deployed GitHub repos and their URLs. Select a repo above to deploy to Vercel or Netlify.</CardDescription>
+              <CardTitle>Connected GitHub Repositories</CardTitle>
+              <CardDescription>Manage and view all your deployed GitHub repos and their URLs. Select a repo above to deploy to Vercel or Netlify.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {deployedRepos.length === 0 ? (
-                  <p className="text-gray-400">No GitHub repositories connected yet.</p>
+                  <p className="text-gray-500 text-center py-4">No GitHub repositories connected yet.</p>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {deployedRepos.map((repo, index) => (
-                      <Card
+                      <motion.div
                         key={repo.id}
-                        className={`bg-gray-800 border-gray-700 hover:bg-gray-750 transition-all duration-200 hover:shadow-lg hover-lift ${
-                          animatedElements.has('repo-cards') ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-                        }`}
-                        style={{
-                          animation: animatedElements.has('repo-cards') ? `fadeInUp 0.6s ease-out ${index * 0.1}s both` : 'none'
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ 
+                          duration: 0.5, 
+                          delay: index * 0.1,
+                          ease: "easeOut"
+                        }}
+                        whileHover={{ 
+                          y: -5, 
+                          transition: { duration: 0.2 } 
                         }}
                       >
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-white text-lg flex items-center justify-between">
-                            <span className="text-truncate-22" title={repo.projectName}>
-                              {truncateText(repo.projectName)}
-                            </span>
-                            <Badge variant="outline" className="text-xs border-gray-600 text-gray-300">
-                              {new Date(repo.lastUpdated).toLocaleDateString()}
-                            </Badge>
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          {/* Repository Name Row */}
-                          <div className="flex items-start space-x-3">
-                            <div className="flex-shrink-0 w-20 flex items-center space-x-2">
-                              <Github className={`h-4 w-4 text-gray-400 transition-all duration-300 ${
-                                animatedElements.has('repo-cards') ? 'animate-floating' : ''
-                              }`} style={{
-                                animationDelay: `${index * 0.1 + 0.1}s`
-                              }} />
-                              <span className="text-sm font-medium text-gray-400">Repo:</span>
+                        <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg h-full flex flex-col">
+                          <div className="p-4 flex-grow">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <h3 className="font-semibold text-lg truncate" title={repo.projectName}>
+                                  {repo.projectName.length > 22 
+                                    ? `${repo.projectName.substring(0, 22)}...` 
+                                    : repo.projectName}
+                                </h3>
+                                <p className="text-sm text-gray-500 mt-1">
+                                  {repo.githubRepo || 'No repo name'}
+                                </p>
+                              </div>
+                              <Badge variant="secondary" className="ml-2">
+                                <Github className="h-3 w-3 mr-1" />
+                                GitHub
+                              </Badge>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <span className="text-sm text-gray-300 break-all">
-                                {repo.githubRepo || 'Not set'}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* GitHub URL Row */}
-                          <div className="flex items-start space-x-3">
-                            <div className="flex-shrink-0 w-20 flex items-center space-x-2">
-                              <ExternalLink className={`h-4 w-4 text-blue-400 transition-all duration-300 ${
-                                animatedElements.has('repo-cards') ? 'animate-floating' : ''
-                              }`} style={{
-                                animationDelay: `${index * 0.1 + 0.2}s`
-                              }} />
-                              <span className="text-sm font-medium text-gray-400">GitHub:</span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              {repo.githubUrl ? (
-                                <a
-                                  href={repo.githubUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-sm text-blue-400 hover:text-blue-300 underline break-all block"
-                                >
-                                  {repo.githubUrl}
-                                </a>
-                              ) : (
-                                <span className="text-sm text-gray-500">Not deployed</span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Vercel URL Row */}
-                          <div className="flex items-start space-x-3">
-                            <div className="flex-shrink-0 w-20 flex items-center space-x-2">
-                              <Globe className={`h-4 w-4 text-green-400 transition-all duration-300 ${
-                                animatedElements.has('repo-cards') ? 'animate-floating' : ''
-                              }`} style={{
-                                animationDelay: `${index * 0.1 + 0.3}s`
-                              }} />
-                              <span className="text-sm font-medium text-gray-400">Vercel:</span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              {repo.vercelUrl ? (
-                                <a
-                                  href={repo.vercelUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-sm text-green-400 hover:text-green-300 underline break-all block"
-                                >
-                                  {repo.vercelUrl}
-                                </a>
-                              ) : (
-                                <span className="text-sm text-gray-500">Not deployed</span>
-                              )}
+                            
+                            <div className="mt-4 space-y-3">
+                              <div>
+                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Repository URL</p>
+                                {repo.githubUrl ? (
+                                  <a 
+                                    href={repo.githubUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="text-blue-600 hover:underline text-sm break-all transition-colors duration-200"
+                                  >
+                                    {repo.githubUrl}
+                                  </a>
+                                ) : (
+                                  <span className="text-gray-400 text-sm">Not available</span>
+                                )}
+                              </div>
+                              
+                              <div>
+                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Vercel URL</p>
+                                {repo.vercelUrl ? (
+                                  <a 
+                                    href={repo.vercelUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="text-green-600 hover:underline text-sm break-all transition-colors duration-200"
+                                  >
+                                    {repo.vercelUrl}
+                                  </a>
+                                ) : (
+                                  <span className="text-gray-400 text-sm">Not deployed</span>
+                                )}
+                              </div>
+                              
+                              <div>
+                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Netlify URL</p>
+                                {repo.netlifyUrl ? (
+                                  <a 
+                                    href={repo.netlifyUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="text-green-600 hover:underline text-sm break-all transition-colors duration-200"
+                                  >
+                                    {repo.netlifyUrl}
+                                  </a>
+                                ) : (
+                                  <span className="text-gray-400 text-sm">Not deployed</span>
+                                )}
+                              </div>
                             </div>
                           </div>
-
-                          {/* Netlify URL Row */}
-                          <div className="flex items-start space-x-3">
-                            <div className="flex-shrink-0 w-20 flex items-center space-x-2">
-                              <Globe2 className={`h-4 w-4 text-green-400 transition-all duration-300 ${
-                                animatedElements.has('repo-cards') ? 'animate-floating' : ''
-                              }`} style={{
-                                animationDelay: `${index * 0.1 + 0.4}s`
-                              }} />
-                              <span className="text-sm font-medium text-gray-400">Netlify:</span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              {repo.netlifyUrl ? (
-                                <a
-                                  href={repo.netlifyUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-sm text-green-400 hover:text-green-300 underline break-all block"
-                                >
-                                  {repo.netlifyUrl}
-                                </a>
-                              ) : (
-                                <span className="text-sm text-gray-500">Not deployed</span>
-                              )}
-                            </div>
+                          
+                          <div className="mt-auto pt-3 border-t border-gray-100 px-4 py-2">
+                            <p className="text-xs text-gray-500">
+                              Last updated: {new Date(repo.lastUpdated).toLocaleDateString()}
+                            </p>
                           </div>
-                        </CardContent>
-                      </Card>
+                        </Card>
+                      </motion.div>
                     ))}
                   </div>
                 )}
@@ -2757,6 +2504,7 @@ export default function DeploymentClient() {
           </Card>
         </div>
       </div>
-   </div> </TooltipProvider>
+      </div>
+    </TooltipProvider>
   )
 }
