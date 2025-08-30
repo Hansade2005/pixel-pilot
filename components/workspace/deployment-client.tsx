@@ -196,14 +196,27 @@ export default function DeploymentClient() {
   }
 
   // Load deployed repositories from storage
-  const loadDeployedRepos = async () => {
+  const loadDeployedRepos = async (projectsList?: ProjectDisplay[]) => {
     try {
       await storageManager.init()
-      const deployments = await storageManager.getDeployments()
+      const [deployments, allProjects] = await Promise.all([
+        storageManager.getDeployments(),
+        storageManager.getWorkspaces(currentUserId)
+      ])
+
+      // Use provided projects or load all projects
+      const projectsToUse = projectsList || allProjects.map(project => ({
+        ...project,
+        url: project.vercelDeploymentUrl || project.netlifyDeploymentUrl || project.githubRepoUrl,
+        platform: (project.vercelDeploymentUrl ? 'vercel' : project.netlifyDeploymentUrl ? 'netlify' : 'github') as 'vercel' | 'netlify' | 'github',
+        lastDeployment: undefined,
+        environmentVariables: []
+      } as ProjectDisplay))
+
       const repos: DeployedRepo[] = []
 
       for (const deployment of deployments) {
-        const project = projects.find(p => p.id === deployment.workspaceId)
+        const project = projectsToUse.find(p => p.id === deployment.workspaceId)
         if (project) {
           const existingRepo = repos.find(r => r.projectId === deployment.workspaceId)
           if (existingRepo) {
@@ -212,21 +225,31 @@ export default function DeploymentClient() {
               existingRepo.vercelUrl = deployment.url
             } else if (deployment.provider === 'netlify') {
               existingRepo.netlifyUrl = deployment.url
+            } else if (deployment.provider === 'github') {
+              // For GitHub deployments, the URL is the repo URL
+              existingRepo.githubUrl = deployment.url
+              existingRepo.githubRepo = deployment.url.split('/').slice(-2).join('/')
             }
             existingRepo.lastUpdated = deployment.createdAt || new Date().toISOString()
           } else {
             // Create new repo entry
-            repos.push({
+            const repoEntry: DeployedRepo = {
               id: deployment.id,
               projectId: deployment.workspaceId,
               projectName: project.name,
-              githubUrl: project.githubRepoUrl || '',
-              githubRepo: project.githubRepoUrl ? project.githubRepoUrl.split('/').slice(-2).join('/') : '',
+              githubUrl: project.githubRepoUrl || (deployment.provider === 'github' ? deployment.url : ''),
+              githubRepo: project.githubRepoUrl ? project.githubRepoUrl.split('/').slice(-2).join('/') :
+                         (deployment.provider === 'github' ? deployment.url.split('/').slice(-2).join('/') : ''),
               vercelUrl: deployment.provider === 'vercel' ? deployment.url : undefined,
               netlifyUrl: deployment.provider === 'netlify' ? deployment.url : undefined,
               deployedAt: deployment.createdAt || new Date().toISOString(),
               lastUpdated: deployment.createdAt || new Date().toISOString(),
-            })
+            }
+
+            // Only add if it has GitHub repo info
+            if (repoEntry.githubUrl || deployment.provider === 'github') {
+              repos.push(repoEntry)
+            }
           }
         }
       }
@@ -445,6 +468,9 @@ export default function DeploymentClient() {
 
       setProjects(projectsWithData)
 
+      // Load deployed repositories for dropdowns
+      await loadDeployedRepos()
+
       // Set default selected project if none specified
       if (!projectId && projectsWithData.length > 0) {
         setSelectedProject(projectsWithData[0])
@@ -617,6 +643,17 @@ export default function DeploymentClient() {
         lastActivity: new Date().toISOString(),
       })
 
+      // Refresh projects list to include updated workspace
+      const updatedProjects = await storageManager.getWorkspaces(currentUserId)
+      const projectsWithDisplay: ProjectDisplay[] = updatedProjects.map(project => ({
+        ...project,
+        url: project.vercelDeploymentUrl || project.netlifyDeploymentUrl || project.githubRepoUrl,
+        platform: (project.vercelDeploymentUrl ? 'vercel' : project.netlifyDeploymentUrl ? 'netlify' : 'github') as 'vercel' | 'netlify' | 'github',
+        lastDeployment: undefined,
+        environmentVariables: []
+      }))
+      setProjects(projectsWithDisplay)
+
       // Get all files from the workspace for deployment
       await storageManager.init()
       const projectFiles = await storageManager.getFiles(selectedProject.id)
@@ -668,6 +705,9 @@ export default function DeploymentClient() {
         environment: 'production',
         provider: 'github'
       })
+
+      // Reload deployed repos to update dropdowns
+      await loadDeployedRepos()
 
       // Save deployed repo information
       const deployedRepo: DeployedRepo = {
@@ -1113,6 +1153,9 @@ export default function DeploymentClient() {
                             provider: 'vercel'
                           })
 
+                          // Reload deployed repos to update dropdowns
+                          await loadDeployedRepos()
+
                           toast({ title: 'Deployment Ready', description: 'Successfully deployed to Vercel' })
                           setDeploymentState(prev => ({ ...prev, isDeploying: false, currentStep: 'complete' }))
 
@@ -1371,6 +1414,9 @@ export default function DeploymentClient() {
                           environment: 'production',
                           provider: 'netlify'
                         })
+
+                        // Reload deployed repos to update dropdowns
+                        await loadDeployedRepos()
 
                         toast({ title: 'Deployment Ready', description: 'Successfully deployed to Netlify' })
                         setDeploymentState(prev => ({ ...prev, isDeploying: false, currentStep: 'complete' }))
