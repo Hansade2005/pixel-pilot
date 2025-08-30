@@ -58,6 +58,18 @@ interface GitHubRepo {
   }
 }
 
+interface DeployedRepo {
+  id: string
+  projectId: string
+  projectName: string
+  githubUrl: string
+  githubRepo: string
+  vercelUrl?: string
+  netlifyUrl?: string
+  deployedAt: string
+  lastUpdated: string
+}
+
 // Extended project interface for display
 interface ProjectDisplay extends Project {
   url?: string
@@ -81,6 +93,7 @@ export default function ManagementPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [projects, setProjects] = useState<ProjectDisplay[]>([])
   const [githubRepos, setGithubRepos] = useState<GitHubRepo[]>([])
+  const [deployedRepos, setDeployedRepos] = useState<DeployedRepo[]>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string>("sample-user") // Default fallback
   const [newDeployment, setNewDeployment] = useState({
@@ -274,8 +287,8 @@ export default function ManagementPage() {
       
       setProjects(projectsWithData)
       
-      // For now, we'll keep GitHub repos empty since we're not using Supabase
-      setGithubRepos([])
+      // Load deployed repositories
+      await loadDeployedRepos()
       
       // Calculate quick stats
       await calculateQuickStats(projectsWithData, deployments)
@@ -293,6 +306,84 @@ export default function ManagementPage() {
       })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Load deployed repositories from storage
+  const loadDeployedRepos = async (projectsList?: ProjectDisplay[]) => {
+    try {
+      await storageManager.init()
+      const [deployments, allProjects] = await Promise.all([
+        storageManager.getDeployments(),
+        storageManager.getWorkspaces(currentUserId)
+      ])
+
+      // Use provided projects or load all projects
+      const projectsToUse = projectsList || allProjects.map(project => ({
+        ...project,
+        url: project.vercelDeploymentUrl || project.netlifyDeploymentUrl || project.githubRepoUrl,
+        platform: (project.vercelDeploymentUrl ? 'vercel' : project.netlifyDeploymentUrl ? 'netlify' : 'github') as 'vercel' | 'netlify' | 'github',
+        lastDeployment: undefined,
+        environmentVariables: []
+      } as ProjectDisplay))
+
+      const repos: DeployedRepo[] = []
+
+      for (const deployment of deployments) {
+        const project = projectsToUse.find(p => p.id === deployment.workspaceId)
+        if (project) {
+          const existingRepo = repos.find(r => r.projectId === deployment.workspaceId)
+          if (existingRepo) {
+            // Update existing repo with new deployment info
+            if (deployment.provider === 'vercel') {
+              existingRepo.vercelUrl = deployment.url
+            } else if (deployment.provider === 'netlify') {
+              existingRepo.netlifyUrl = deployment.url
+            } else if (deployment.provider === 'github') {
+              // For GitHub deployments, the URL is the repo URL
+              existingRepo.githubUrl = deployment.url
+              existingRepo.githubRepo = deployment.url.split('/').slice(-2).join('/')
+            }
+            existingRepo.lastUpdated = deployment.createdAt || new Date().toISOString()
+          } else {
+            // Create new repo entry
+            const repoEntry: DeployedRepo = {
+              id: deployment.id,
+              projectId: deployment.workspaceId,
+              projectName: project.name,
+              githubUrl: project.githubRepoUrl || (deployment.provider === 'github' ? deployment.url : ''),
+              githubRepo: project.githubRepoUrl ? project.githubRepoUrl.split('/').slice(-2).join('/') :
+                (deployment.provider === 'github' ? deployment.url.split('/').slice(-2).join('/') : ''),
+              vercelUrl: deployment.provider === 'vercel' ? deployment.url : undefined,
+              netlifyUrl: deployment.provider === 'netlify' ? deployment.url : undefined,
+              deployedAt: deployment.createdAt || new Date().toISOString(),
+              lastUpdated: deployment.createdAt || new Date().toISOString(),
+            }
+
+            // Only add if it has GitHub repo info
+            if (repoEntry.githubUrl || deployment.provider === 'github') {
+              repos.push(repoEntry)
+            }
+          }
+        }
+      }
+
+      setDeployedRepos(repos)
+      
+      // Transform deployed repos to GitHubRepo format for display
+      const githubReposDisplay: GitHubRepo[] = repos
+        .filter(repo => repo.githubUrl)
+        .map(repo => ({
+          id: repo.id,
+          name: repo.githubRepo.split('/')[1] || repo.projectName,
+          fullName: repo.githubRepo,
+          url: repo.githubUrl,
+          defaultBranch: 'main', // Default value since we don't have this info
+        }))
+
+      setGithubRepos(githubReposDisplay)
+    } catch (error) {
+      console.error('Error loading deployed repos:', error)
     }
   }
 
@@ -1041,42 +1132,38 @@ export default function ManagementPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2 text-white">
                     <Github className="h-5 w-5" />
-                    <span>GitHub Repositories</span>
+                    <span>Deployed Repositories</span>
                   </CardTitle>
                   <CardDescription className="text-gray-400">
-                    Manage your connected GitHub repositories and trigger deployments
+                    View your deployed GitHub repositories
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {githubRepos.length > 0 ? (
+                  {deployedRepos.length > 0 ? (
                     <div className="space-y-3">
-                      {githubRepos.map((repo) => (
+                      {deployedRepos
+                        .filter(repo => repo.githubUrl)
+                        .map((repo) => (
                         <div key={repo.id} className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
                           <div className="flex items-center space-x-3">
                             <Github className="h-5 w-5" />
                             <div>
-                              <div className="font-medium text-white">{repo.name}</div>
-                              <div className="text-sm text-gray-400">{repo.fullName}</div>
-                              {repo.lastCommit && (
-                                <div className="text-xs text-gray-400 mt-1">
-                                  <GitCommit className="h-3 w-3 inline mr-1" />
-                                  {repo.lastCommit.sha.substring(0, 7)} - {repo.lastCommit.message}
-                                </div>
-                              )}
+                              <div className="font-medium text-white">{repo.projectName}</div>
+                              <div className="text-sm text-gray-400">{repo.githubRepo}</div>
+                              <div className="text-xs text-gray-400 mt-1">
+                                Deployed: {new Date(repo.deployedAt).toLocaleDateString()}
+                              </div>
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <Badge variant="outline" className="bg-gray-600 text-gray-300 border-gray-500">
-                              {repo.defaultBranch}
-                            </Badge>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => window.open(repo.url, '_blank')}
+                              onClick={() => window.open(repo.githubUrl, '_blank')}
                               className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
                             >
                               <ExternalLink className="h-4 w-4 mr-1" />
-                              View
+                              View Repo
                             </Button>
                           </div>
                         </div>
@@ -1084,7 +1171,86 @@ export default function ManagementPage() {
                     </div>
                   ) : (
                     <div className="text-center py-6 text-gray-400">
-                      No GitHub repositories found. Connect your GitHub account to get started.
+                      No deployed repositories found. Deploy a project to GitHub to see it listed here.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-gray-800 border-gray-700">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2 text-white">
+                    <FolderOpen className="h-5 w-5" />
+                    <span>All Deployed Projects</span>
+                  </CardTitle>
+                  <CardDescription className="text-gray-400">
+                    View all your deployed projects across different platforms
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {deployedRepos.length > 0 ? (
+                    <div className="space-y-3">
+                      {deployedRepos.map((repo) => (
+                        <div key={repo.id} className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <div className="flex items-center space-x-2">
+                              {repo.githubUrl && <Github className="h-5 w-5 text-gray-400" />}
+                              {repo.vercelUrl && <Globe className="h-5 w-5 text-blue-400" />}
+                              {repo.netlifyUrl && <Globe className="h-5 w-5 text-green-400" />}
+                            </div>
+                            <div>
+                              <div className="font-medium text-white">{repo.projectName}</div>
+                              <div className="text-sm text-gray-400">
+                                {repo.githubRepo && <span>GitHub: {repo.githubRepo}</span>}
+                                {repo.vercelUrl && <span>Vercel: {repo.vercelUrl.replace(/^https?:\/\//, '')}</span>}
+                                {repo.netlifyUrl && <span>Netlify: {repo.netlifyUrl.replace(/^https?:\/\//, '')}</span>}
+                              </div>
+                              <div className="text-xs text-gray-400 mt-1">
+                                Last updated: {new Date(repo.lastUpdated).toLocaleDateString()}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {repo.githubUrl && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.open(repo.githubUrl, '_blank')}
+                                className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                              >
+                                <Github className="h-4 w-4 mr-1" />
+                                Repo
+                              </Button>
+                            )}
+                            {repo.vercelUrl && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.open(repo.vercelUrl!, '_blank')}
+                                className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                              >
+                                <Globe className="h-4 w-4 mr-1 text-blue-400" />
+                                Vercel
+                              </Button>
+                            )}
+                            {repo.netlifyUrl && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.open(repo.netlifyUrl!, '_blank')}
+                                className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                              >
+                                <Globe className="h-4 w-4 mr-1 text-green-400" />
+                                Netlify
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 text-gray-400">
+                      No deployed projects found.
                     </div>
                   )}
                 </CardContent>
