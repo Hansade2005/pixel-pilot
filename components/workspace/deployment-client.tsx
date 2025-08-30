@@ -137,8 +137,8 @@ export default function DeploymentClient() {
   // Deployed repositories and URLs management
   const [deployedRepos, setDeployedRepos] = useState<DeployedRepo[]>([])
   const [availableRepos, setAvailableRepos] = useState<GitHubRepo[]>([])
-  const [selectedRepoForVercel, setSelectedRepoForVercel] = useState<string>('')
-  const [selectedRepoForNetlify, setSelectedRepoForNetlify] = useState<string>('')
+  const [selectedRepoForVercel, setSelectedRepoForVercel] = useState<string>('none')
+  const [selectedRepoForNetlify, setSelectedRepoForNetlify] = useState<string>('none')
 
   // Token states
   const [savedTokens, setSavedTokens] = useState({
@@ -995,12 +995,12 @@ export default function DeploymentClient() {
                     {/* GitHub Repository Selection for Vercel */}
                     <div>
                       <Label htmlFor="vercel-repo-select">Deploy from GitHub Repository (Optional)</Label>
-                      <Select value={selectedRepoForVercel} onValueChange={setSelectedRepoForVercel}>
+                      <Select value={selectedRepoForVercel || 'none'} onValueChange={setSelectedRepoForVercel}>
                         <SelectTrigger className="mt-1">
                           <SelectValue placeholder="Select a GitHub repository to deploy from" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Don't use GitHub repo (upload files)</SelectItem>
+                          <SelectItem value="none">Don't use GitHub repo (upload files)</SelectItem>
                           {deployedRepos.map((repo) => (
                             <SelectItem key={repo.id} value={repo.githubRepo}>
                               {repo.projectName} ({repo.githubRepo})
@@ -1029,7 +1029,7 @@ export default function DeploymentClient() {
                         try {
                           let deployData;
 
-                          if (selectedRepoForVercel) {
+                          if (selectedRepoForVercel && selectedRepoForVercel !== 'none') {
                             // Deploy from GitHub repository
                             const deployResponse = await fetch('/api/vercel/deploy', {
                               method: 'POST',
@@ -1072,8 +1072,8 @@ export default function DeploymentClient() {
                                 framework: vercelForm.framework,
                                 token: vercelForm.token,
                                 workspaceId: selectedProject.id,
-                                githubRepo: selectedRepoForVercel || undefined,
-                                files: selectedRepoForVercel ? undefined : projectFiles,
+                                githubRepo: selectedRepoForVercel && selectedRepoForVercel !== 'none' ? selectedRepoForVercel : undefined,
+                                files: (!selectedRepoForVercel || selectedRepoForVercel === 'none') ? projectFiles : undefined,
                               })
                             })
 
@@ -1093,7 +1093,7 @@ export default function DeploymentClient() {
                           })
 
                           // Update deployed repos with Vercel URL
-                          if (selectedRepoForVercel) {
+                          if (selectedRepoForVercel && selectedRepoForVercel !== 'none') {
                             setDeployedRepos(prev => prev.map(repo =>
                               repo.githubRepo === selectedRepoForVercel
                                 ? { ...repo, vercelUrl: deployData.url, lastUpdated: new Date().toISOString() }
@@ -1252,12 +1252,12 @@ export default function DeploymentClient() {
                   {/* GitHub Repository Selection for Netlify */}
                   <div>
                     <Label htmlFor="netlify-repo-select">Deploy from GitHub Repository (Optional)</Label>
-                    <Select value={selectedRepoForNetlify} onValueChange={setSelectedRepoForNetlify}>
+                    <Select value={selectedRepoForNetlify || 'none'} onValueChange={setSelectedRepoForNetlify}>
                       <SelectTrigger className="mt-1">
                         <SelectValue placeholder="Select a GitHub repository to deploy from" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Don't use GitHub repo (upload files)</SelectItem>
+                        <SelectItem value="none">Don't use GitHub repo (upload files)</SelectItem>
                         {deployedRepos.map((repo) => (
                           <SelectItem key={repo.id} value={repo.githubRepo}>
                             {repo.projectName} ({repo.githubRepo})
@@ -1286,7 +1286,7 @@ export default function DeploymentClient() {
                       try {
                         let deployData;
 
-                        if (selectedRepoForNetlify) {
+                        if (selectedRepoForNetlify && selectedRepoForNetlify !== 'none') {
                           // Deploy from GitHub repository
                           const deployResponse = await fetch('/api/netlify/deploy', {
                             method: 'POST',
@@ -1331,6 +1331,7 @@ export default function DeploymentClient() {
                               publishDir: netlifyForm.publishDir,
                               token: netlifyForm.token,
                               workspaceId: selectedProject.id,
+                              githubRepo: undefined,
                               files: projectFiles,
                             })
                           })
@@ -1351,7 +1352,7 @@ export default function DeploymentClient() {
                         })
 
                         // Update deployed repos with Netlify URL
-                        if (selectedRepoForNetlify) {
+                        if (selectedRepoForNetlify && selectedRepoForNetlify !== 'none') {
                           setDeployedRepos(prev => prev.map(repo =>
                             repo.githubRepo === selectedRepoForNetlify
                               ? { ...repo, netlifyUrl: deployData.url, lastUpdated: new Date().toISOString() }
