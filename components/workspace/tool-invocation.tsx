@@ -13,6 +13,11 @@ import {
   Package,
   Settings,
   Wrench,
+  Globe,
+  FileSearch,
+  BookOpen,
+  Database,
+  User
 } from "lucide-react"
 import { AnimatePresence, motion } from "framer-motion"
 import { useMemo, useState } from "react"
@@ -484,20 +489,53 @@ function SingleToolCard({
 
 // Helper functions
 function getToolIconAndColor(toolName: string): { icon: any; color: string } {
-  if (toolName.includes('plan') || toolName.includes('analyze')) {
-    return { icon: Lightbulb, color: 'text-blue-500' }
+  // File operation tools
+  if (toolName.includes('file') || toolName.includes('create') || toolName.includes('write') || toolName.includes('read') || toolName.includes('delete') || toolName.includes('list')) {
+    return { icon: FileText, color: 'text-orange-500' }
   }
+  
+  // Knowledge base tools
+  if (toolName === 'search_knowledge' || toolName === 'get_knowledge_item') {
+    return { icon: BookOpen, color: 'text-purple-500' }
+  }
+  
+  // Web search tools
+  if (toolName === 'web_search') {
+    return { icon: Globe, color: 'text-blue-500' }
+  }
+  
+  if (toolName === 'web_extract') {
+    return { icon: FileSearch, color: 'text-indigo-500' }
+  }
+  
+  // Project and context tools
+  if (toolName === 'get_project_summary') {
+    return { icon: Database, color: 'text-green-500' }
+  }
+  
+  if (toolName === 'recall_context') {
+    return { icon: User, color: 'text-yellow-500' }
+  }
+  
+  if (toolName.includes('project') || toolName.includes('context') || toolName.includes('summary')) {
+    return { icon: Settings, color: 'text-blue-500' }
+  }
+  
+  // Planning and analysis tools
+  if (toolName.includes('plan') || toolName.includes('analyze') || toolName.includes('results_summary')) {
+    return { icon: Lightbulb, color: 'text-yellow-500' }
+  }
+  
+  // Build and execution tools
   if (toolName.includes('build') || toolName.includes('execute')) {
     return { icon: Hammer, color: 'text-green-500' }
   }
-  if (toolName.includes('file') || toolName.includes('create')) {
-    return { icon: FileText, color: 'text-orange-500' }
-  }
-  if (toolName.includes('dependency') || toolName.includes('package')) {
+  
+  // General search tools (fallback)
+  if (toolName.includes('search')) {
     return { icon: Package, color: 'text-purple-500' }
   }
-  if (toolName.includes('edit') || toolName.includes('modify')) {
-    return { icon: Settings, color: 'text-yellow-500' }
-  }
+  
+  // Default fallback
   return { icon: Wrench, color: 'text-gray-500' }
 }

@@ -363,34 +363,28 @@ export default function TodoApp() {
       <div className="border-b border-border bg-card">
         <div className="flex items-center justify-between px-4 py-2">
           <div className="flex space-x-1">
-            {!isMobile && (
+            {isMobile && (
               <Button
-                variant={activeTab === "code" ? "secondary" : "ghost"}
+                variant={activeTab === "preview" ? "secondary" : "ghost"}
                 size="sm"
-                onClick={() => onTabChange("code")}
+                onClick={() => onTabChange("preview")}
               >
-                <Code className="h-4 w-4 mr-2" />
-                Code
+                <Eye className="h-4 w-4 mr-2" />
+                Preview
               </Button>
             )}
-            <Button
-              variant={activeTab === "preview" ? "secondary" : "ghost"}
-              size="sm"
-              onClick={() => onTabChange("preview")}
-            >
-              <Eye className="h-4 w-4 mr-2" />
-              Preview
-            </Button>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={exportProject}
-            disabled={isExporting}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            {isExporting ? 'Exporting...' : 'Export'}
-          </Button>
+          {isMobile && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={exportProject}
+              disabled={isExporting}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {isExporting ? 'Exporting...' : 'Export'}
+            </Button>
+          )}
         </div>
       </div>
 

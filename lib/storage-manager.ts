@@ -78,6 +78,34 @@ export interface Checkpoint {
   label?: string // Optional label for the checkpoint
 }
 
+// Conversation memory interface for persistent chat history
+export interface ConversationMemory {
+  id: string
+  projectId: string
+  userId: string
+  messages: Array<{
+    role: 'user' | 'assistant' | 'system'
+    content: string
+    timestamp: string
+    toolCalls?: any[]
+    toolResults?: any[]
+  }>
+  summary: string
+  keyPoints: string[]
+  lastActivity: string
+  createdAt: string
+  updatedAt: string
+  // AI-enhanced memory fields
+  aiInsights?: string[]
+  semanticSummary?: string
+  technicalPatterns?: string[]
+  architecturalDecisions?: string[]
+  nextLogicalSteps?: string[]
+  potentialImprovements?: string[]
+  relevanceScore?: number
+  contextForFuture?: string
+}
+
 export interface Deployment {
   id: string
   workspaceId: string
@@ -152,6 +180,12 @@ export interface StorageInterface {
   deleteCheckpoint(id: string): Promise<boolean>;
   restoreCheckpoint(checkpointId: string): Promise<boolean>;
   
+  // Conversation memory methods for persistent chat history
+  createConversationMemory(memory: Omit<ConversationMemory, 'id' | 'createdAt' | 'updatedAt'>): Promise<ConversationMemory>;
+  getConversationMemory(projectId: string, userId: string): Promise<ConversationMemory | null>;
+  updateConversationMemory(id: string, updates: Partial<ConversationMemory>): Promise<ConversationMemory | null>;
+  deleteConversationMemory(id: string): Promise<boolean>;
+  
   // Additional utility methods
   importTable(tableName: string, data: any[]): Promise<void>;
   
@@ -170,6 +204,7 @@ class InMemoryStorage implements StorageInterface {
   private deployments: Map<string, Deployment> = new Map()
   private environmentVariables: Map<string, EnvironmentVariable> = new Map()
   private checkpoints: Map<string, Checkpoint> = new Map() // Add checkpoints map
+  private conversationMemories: Map<string, ConversationMemory> = new Map() // Add conversation memories map
 
   private constructor() {}
 
@@ -582,6 +617,47 @@ class InMemoryStorage implements StorageInterface {
 
     return true
   }
+
+  // Conversation memory methods
+  async createConversationMemory(memory: Omit<ConversationMemory, 'id' | 'createdAt' | 'updatedAt'>): Promise<ConversationMemory> {
+    const id = this.generateId()
+    const now = new Date().toISOString()
+    const newMemory: ConversationMemory = {
+      ...memory,
+      id,
+      createdAt: now,
+      updatedAt: now
+    }
+    this.conversationMemories.set(id, newMemory)
+    return newMemory
+  }
+
+  async getConversationMemory(projectId: string, userId: string): Promise<ConversationMemory | null> {
+    // Find memory by projectId and userId combination
+    for (const memory of this.conversationMemories.values()) {
+      if (memory.projectId === projectId && memory.userId === userId) {
+        return memory
+      }
+    }
+    return null
+  }
+
+  async updateConversationMemory(id: string, updates: Partial<ConversationMemory>): Promise<ConversationMemory | null> {
+    const memory = this.conversationMemories.get(id)
+    if (!memory) return null
+    
+    const updatedMemory: ConversationMemory = {
+      ...memory,
+      ...updates,
+      updatedAt: new Date().toISOString()
+    }
+    this.conversationMemories.set(id, updatedMemory)
+    return updatedMemory
+  }
+
+  async deleteConversationMemory(id: string): Promise<boolean> {
+    return this.conversationMemories.delete(id)
+  }
 }
 
 // Client-side IndexedDB storage
@@ -652,6 +728,14 @@ class IndexedDBStorage implements StorageInterface {
           checkpointStore.createIndex('workspaceId', 'workspaceId', { unique: false })
           checkpointStore.createIndex('messageId', 'messageId', { unique: false })
           checkpointStore.createIndex('createdAt', 'createdAt', { unique: false })
+        }
+
+        // Create conversation memory store with proper indexing
+        if (!db.objectStoreNames.contains('conversationMemories')) {
+          const memoryStore = db.createObjectStore('conversationMemories', { keyPath: 'id' })
+          memoryStore.createIndex('projectId', 'projectId', { unique: false })
+          memoryStore.createIndex('userId', 'userId', { unique: false })
+          memoryStore.createIndex('lastActivity', 'lastActivity', { unique: false })
         }
       }
     })
@@ -1205,8 +1289,7 @@ class IndexedDBStorage implements StorageInterface {
   }
 
   async runQuery(tableName: string, query: string): Promise<any> {
-    // Simple query runner: supports key=value or key='value'
-    if (!this.db) await this.init();
+    // Simple query implementation for in-memory storage
     const all = await this.getAllEntries(tableName);
     if (!query.trim()) return all;
     const [key, val] = query.split('=');
@@ -1489,6 +1572,84 @@ class IndexedDBStorage implements StorageInterface {
       }
     })
   }
+
+  // Conversation memory methods for IndexedDB
+  async createConversationMemory(memory: Omit<ConversationMemory, 'id' | 'createdAt' | 'updatedAt'>): Promise<ConversationMemory> {
+    if (!this.db) throw new Error('Database not initialized')
+    
+    const id = this.generateId()
+    const now = new Date().toISOString()
+    const newMemory: ConversationMemory = {
+      ...memory,
+      id,
+      createdAt: now,
+      updatedAt: now
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['conversationMemories'], 'readwrite')
+      const store = transaction.objectStore('conversationMemories')
+      const request = store.add(newMemory)
+
+      request.onsuccess = () => resolve(newMemory)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getConversationMemory(projectId: string, userId: string): Promise<ConversationMemory | null> {
+    if (!this.db) throw new Error('Database not initialized')
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['conversationMemories'], 'readonly')
+      const store = transaction.objectStore('conversationMemories')
+      const index = store.index('projectId')
+      const request = index.getAll(projectId)
+
+      request.onsuccess = () => {
+        const memories = request.result || []
+        // Find memory that matches both projectId and userId
+        const memory = memories.find(m => m.userId === userId)
+        resolve(memory || null)
+      }
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async updateConversationMemory(id: string, updates: Partial<ConversationMemory>): Promise<ConversationMemory | null> {
+    if (!this.db) throw new Error('Database not initialized')
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['conversationMemories'], 'readwrite')
+      const store = transaction.objectStore('conversationMemories')
+      const getRequest = store.get(id)
+      
+      getRequest.onsuccess = () => {
+        const memory = getRequest.result
+        if (memory) {
+          const updatedMemory = { ...memory, ...updates, updatedAt: new Date().toISOString() }
+          const putRequest = store.put(updatedMemory)
+          putRequest.onsuccess = () => resolve(updatedMemory)
+          putRequest.onerror = () => reject(putRequest.error)
+        } else {
+          resolve(null)
+        }
+      }
+      getRequest.onerror = () => reject(getRequest.error)
+    })
+  }
+
+  async deleteConversationMemory(id: string): Promise<boolean> {
+    if (!this.db) throw new Error('Database not initialized')
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['conversationMemories'], 'readwrite')
+      const store = transaction.objectStore('conversationMemories')
+      const request = store.delete(id)
+      
+      request.onsuccess = () => resolve(true)
+      request.onerror = () => reject(request.error)
+    })
+  }
 }
 
 // Universal storage manager
@@ -1747,6 +1908,27 @@ class StorageManager {
   async restoreCheckpoint(checkpointId: string): Promise<boolean> {
     await this.init()
     return this.storage!.restoreCheckpoint(checkpointId)
+  }
+
+  // Conversation memory methods
+  async createConversationMemory(memory: Omit<ConversationMemory, 'id' | 'createdAt' | 'updatedAt'>): Promise<ConversationMemory> {
+    await this.init()
+    return this.storage!.createConversationMemory(memory)
+  }
+
+  async getConversationMemory(projectId: string, userId: string): Promise<ConversationMemory | null> {
+    await this.init()
+    return this.storage!.getConversationMemory(projectId, userId)
+  }
+
+  async updateConversationMemory(id: string, updates: Partial<ConversationMemory>): Promise<ConversationMemory | null> {
+    await this.init()
+    return this.storage!.updateConversationMemory(id, updates)
+  }
+
+  async deleteConversationMemory(id: string): Promise<boolean> {
+    await this.init()
+    return this.storage!.deleteConversationMemory(id)
   }
 
   /**

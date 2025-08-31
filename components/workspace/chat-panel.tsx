@@ -19,7 +19,12 @@ import {
   AlertTriangle,
   Zap,
   Undo2,
-  Redo2
+  Redo2,
+  Globe,
+  FileSearch,
+  BookOpen,
+  Database,
+  User
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import ReactMarkdown from 'react-markdown'
@@ -199,6 +204,12 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
       case 'list_files': return FolderOpen
       case 'delete_file': return X
       case 'tool_results_summary': return Check
+      case 'web_search': return Globe
+      case 'web_extract': return FileSearch
+      case 'search_knowledge': return BookOpen
+      case 'get_knowledge_item': return BookOpen
+      case 'get_project_summary': return Database
+      case 'recall_context': return User
       default: return Wrench
     }
   }
@@ -211,6 +222,12 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
       case 'list_files': return 'Listed'
       case 'delete_file': return 'Deleted'
       case 'tool_results_summary': return 'Summary Generated'
+      case 'web_search': return 'Searched'
+      case 'web_extract': return 'Extracted'
+      case 'search_knowledge': return 'Knowledge Searched'
+      case 'get_knowledge_item': return 'Knowledge Retrieved'
+      case 'get_project_summary': return 'Project Summarized'
+      case 'recall_context': return 'Context Recalled'
       default: return 'Executed'
     }
   }
@@ -218,6 +235,11 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
   const isSuccess = toolCall.result?.success !== false
   const fileName = toolCall.result?.path?.split('/').pop() || toolCall.result?.path || 'file'
   const fileCount = toolCall.result?.count || (toolCall.result?.files?.length)
+  
+  // Special handling for web search tools
+  const searchQuery = toolCall.result?.query || 'web search'
+  const urlCount = Array.isArray(toolCall.result?.urls) ? toolCall.result.urls.length : 
+                   toolCall.result?.urls ? 1 : 0
 
   const IconComponent = getToolIcon(toolCall.name)
 
@@ -282,6 +304,745 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
               <ExpandableAISummary content={toolCall.result.summary} />
             </div>
           )}
+      </div>
+    )
+  }
+  
+  // Special handling for web_search tool
+  if (toolCall.name === 'web_search') {
+    const [isExpanded, setIsExpanded] = useState(false)
+    
+    // Debug logging to see the actual structure
+    console.log('[DEBUG] web_search tool result:', toolCall.result)
+    
+    const resultCount = toolCall.result?.metadata?.resultCount || toolCall.result?.results?.length || 0
+    const cleanResults = toolCall.result?.cleanResults || toolCall.result?.results || []
+    
+    return (
+      <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
+        {/* Header - Clickable to toggle */}
+        <div
+          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
+          isSuccess
+            ? 'bg-muted border-l-4 border-l-blue-500'
+            : 'bg-red-900/20 border-l-4 border-l-red-500'
+          }`}
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-full ${
+            isSuccess ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white' : 'bg-red-500 text-white'
+          }`}>
+            <IconComponent className="w-4 h-4" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-foreground">Web Search</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <span>{resultCount} results found</span>
+              <span>•</span>
+                <span>{isSuccess ? 'Success' : 'Failed'}</span>
+            </div>
+          </div>
+            {/* Chevron indicator */}
+            <div className="ml-2">
+              {isExpanded ? (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            )}
+          </div>
+        </div>
+        </div>
+        
+        {/* Search Results Content - Collapsible */}
+        {isSuccess && isExpanded && (
+          <div className="p-4 bg-background border-t">
+            <div className="max-h-96 overflow-y-auto">
+              {/* Query Header */}
+              <div className="mb-4">
+                <h2 className="text-lg font-bold text-white mb-2">Search Query</h2>
+                <p className="text-gray-300 text-sm bg-gray-800 px-3 py-2 rounded border border-gray-600">
+                  "{searchQuery}"
+                </p>
+              </div>
+              
+              {/* Results Content */}
+              {cleanResults ? (
+                <div className="prose prose-sm max-w-none">
+                  <h3 className="text-base font-bold text-white mb-3">Search Results</h3>
+                  <ReactMarkdown 
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      h1: ({ children }) => (
+                        <h1 className="text-lg font-bold mb-3 text-white">{children}</h1>
+                      ),
+                      h2: ({ children }) => (
+                        <h2 className="text-base font-bold mb-2 text-white">{children}</h2>
+                      ),
+                      h3: ({ children }) => (
+                        <h3 className="text-sm font-bold mb-2 text-white">{children}</h3>
+                      ),
+                      p: ({ children }) => (
+                        <p className="text-white leading-[1.5] mb-2 font-medium">{children}</p>
+                      ),
+                      ul: ({ children }) => (
+                        <ul className="list-none space-y-1 text-white mb-3">{children}</ul>
+                      ),
+                      li: ({ children }) => (
+                        <li className="text-white">{children}</li>
+                      ),
+                      code: ({ children }) => (
+                        <code className="bg-gray-600 px-1 py-0.5 rounded text-xs font-mono text-white">{children}</code>
+                      ),
+                      hr: () => (
+                        <hr className="my-4 border-gray-600" />
+                      )
+                    }}
+                  >
+                    {cleanResults}
+                  </ReactMarkdown>
+                </div>
+              ) : (
+                <div className="text-muted-foreground text-sm">
+                  No search results available to display.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+  
+  // Special handling for web_extract tool
+  if (toolCall.name === 'web_extract') {
+    const [isExpanded, setIsExpanded] = useState(false)
+    
+    // Debug logging to see the actual structure
+    console.log('[DEBUG] web_extract tool result:', toolCall.result)
+    
+    const cleanResults = toolCall.result?.cleanResults || toolCall.result?.results || []
+    const urlCount = toolCall.result?.metadata?.urlCount || toolCall.result?.metadata?.contentCount || toolCall.result?.urls?.length || 0
+    
+    return (
+      <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
+        {/* Header - Clickable to toggle */}
+        <div
+          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
+          isSuccess
+            ? 'bg-muted border-l-4 border-l-purple-500'
+            : 'bg-red-900/20 border-l-4 border-l-red-500'
+          }`}
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-full ${
+            isSuccess ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white' : 'bg-red-500 text-white'
+          }`}>
+            <IconComponent className="w-4 h-4" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-foreground">Content Extraction</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <span>{urlCount} URL{urlCount !== 1 ? 's' : ''} processed</span>
+              <span>•</span>
+                <span>{isSuccess ? 'Success' : 'Failed'}</span>
+            </div>
+          </div>
+            {/* Chevron indicator */}
+            <div className="ml-2">
+              {isExpanded ? (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            )}
+          </div>
+        </div>
+        </div>
+        
+        {/* Extracted Content - Collapsible */}
+        {isSuccess && isExpanded && (
+          <div className="p-4 bg-background border-t">
+            <div className="max-h-96 overflow-y-auto">
+              {/* URLs Header */}
+              <div className="mb-4">
+                <h2 className="text-lg font-bold text-white mb-2">Processed URLs</h2>
+                <div className="space-y-2">
+                  {(toolCall.result?.urls || []).map((url: string, index: number) => (
+                    <div key={index} className="text-gray-300 text-sm bg-gray-800 px-3 py-2 rounded border border-gray-600">
+                      {url}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Results Content */}
+              {cleanResults ? (
+                <div className="prose prose-sm max-w-none">
+                  <h3 className="text-base font-bold text-white mb-3">Extracted Content</h3>
+                  <ReactMarkdown 
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      h1: ({ children }) => (
+                        <h1 className="text-lg font-bold mb-3 text-white">{children}</h1>
+                      ),
+                      h2: ({ children }) => (
+                        <h2 className="text-base font-bold mb-2 text-white">{children}</h2>
+                      ),
+                      h3: ({ children }) => (
+                        <h3 className="text-sm font-bold mb-2 text-white">{children}</h3>
+                      ),
+                      p: ({ children }) => (
+                        <p className="text-white leading-[1.5] mb-2 font-medium">{children}</p>
+                      ),
+                      ul: ({ children }) => (
+                        <ul className="list-none space-y-1 text-white mb-3">{children}</ul>
+                      ),
+                      li: ({ children }) => (
+                        <li className="text-white">{children}</li>
+                      ),
+                      code: ({ children }) => (
+                        <code className="bg-gray-600 px-1 py-0.5 rounded text-xs font-mono text-white">{children}</code>
+                      ),
+                      hr: () => (
+                        <hr className="my-4 border-gray-600" />
+                      )
+                    }}
+                  >
+                    {cleanResults}
+                  </ReactMarkdown>
+                </div>
+              ) : (
+                <div className="text-muted-foreground text-sm">
+                  No extracted content available to display.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Special handling for list_files tool
+  if (toolCall.name === 'list_files') {
+    const [isExpanded, setIsExpanded] = useState(false)
+    const files = toolCall.result?.files || toolCall.result?.results || []
+    
+    return (
+      <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
+        {/* Header - Clickable to toggle */}
+        <div
+          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
+            isSuccess
+              ? 'bg-muted border-l-4 border-l-primary'
+              : 'bg-red-900/20 border-l-4 border-l-red-500'
+          }`}
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-full ${
+              isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
+            }`}>
+              <IconComponent className="w-4 h-4" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-foreground">File Listing</span>
+                {fileCount && (
+                  <span className="text-xs text-muted-foreground">({fileCount} files)</span>
+                )}
+              </div>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <span>{getToolAction(toolCall.name)}</span>
+                <span>•</span>
+                <span>{isSuccess ? 'Completed' : 'Failed'}</span>
+              </div>
+            </div>
+            {/* Chevron indicator */}
+            <div className="ml-2">
+              {isExpanded ? (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* Files Table - Collapsible */}
+        {isSuccess && isExpanded && (
+          <div className="p-4 bg-background border-t">
+            <div className="max-h-96 overflow-y-auto">
+              {files && files.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-600">
+                        <th className="text-left py-2 px-3 text-white font-medium">Name</th>
+                        <th className="text-left py-2 px-3 text-white font-medium">Path</th>
+                        <th className="text-left py-2 px-3 text-white font-medium">Type</th>
+                        <th className="text-left py-2 px-3 text-white font-medium">Size</th>
+                        <th className="text-left py-2 px-3 text-white font-medium">Modified</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {files.map((file: any, index: number) => (
+                        <tr key={index} className="border-b border-gray-700 hover:bg-gray-700/30">
+                          <td className="py-2 px-3 text-white">
+                            <div className="flex items-center gap-2">
+                              {file.isDirectory ? (
+                                <FolderOpen className="w-4 h-4 text-blue-400" />
+                              ) : (
+                                <FileText className="w-4 h-4 text-gray-400" />
+                              )}
+                              {file.name || file.path?.split('/').pop() || 'Unknown'}
+                            </div>
+                          </td>
+                          <td className="py-2 px-3 text-gray-300 text-xs font-mono">
+                            {file.path || 'N/A'}
+                          </td>
+                          <td className="py-2 px-3 text-gray-300">
+                            {file.isDirectory ? 'Directory' : (file.type || file.fileType || 'Unknown')}
+                          </td>
+                          <td className="py-2 px-3 text-gray-300">
+                            {file.isDirectory ? '-' : (file.size ? `${file.size} chars` : 'N/A')}
+                          </td>
+                          <td className="py-2 px-3 text-gray-300 text-xs">
+                            {file.updatedAt || file.createdAt ? 
+                              new Date(file.updatedAt || file.createdAt).toLocaleDateString() : 
+                              'N/A'
+                            }
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-muted-foreground text-sm">
+                  No files found to display.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Special handling for read_file tool
+  if (toolCall.name === 'read_file') {
+    const [isExpanded, setIsExpanded] = useState(false)
+    const filePath = toolCall.result?.path || toolCall.args?.path || 'Unknown file'
+    const fileContent = toolCall.result?.content || ''
+    const fileExtension = filePath.split('.').pop() || 'text'
+    
+    return (
+      <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
+        {/* Header - Clickable to toggle */}
+        <div
+          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
+            isSuccess
+              ? 'bg-muted border-l-4 border-l-primary'
+              : 'bg-red-900/20 border-l-4 border-l-red-500'
+          }`}
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-full ${
+              isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
+            }`}>
+              <IconComponent className="w-4 h-4" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-foreground">File Read</span>
+                <span className="text-xs text-muted-foreground">({filePath})</span>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <span>{getToolAction(toolCall.name)}</span>
+                <span>•</span>
+                <span>{isSuccess ? 'Completed' : 'Failed'}</span>
+              </div>
+            </div>
+            {/* Chevron indicator */}
+            <div className="ml-2">
+              {isExpanded ? (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* File Content - Collapsible with Syntax Highlighting */}
+        {isSuccess && isExpanded && (
+          <div className="p-4 bg-background border-t">
+            <div className="max-h-96 overflow-y-auto">
+              {fileContent ? (
+                <div className="bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-gray-700 border-b border-gray-600 text-xs font-medium text-white">
+                    {filePath} • {fileExtension}
+                  </div>
+                  <pre className="p-4 overflow-x-auto bg-[#1e1e1e]">
+                    <code className={`hljs language-${fileExtension} text-sm text-white`}>
+                      {fileContent}
+                    </code>
+                  </pre>
+                </div>
+              ) : (
+                <div className="text-muted-foreground text-sm">
+                  No file content available to display.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Special handling for recall_context tool
+  if (toolCall.name === 'recall_context') {
+    const [isExpanded, setIsExpanded] = useState(false)
+    const context = toolCall.result || {}
+    
+    return (
+      <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
+        {/* Header - Clickable to toggle */}
+        <div
+          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
+            isSuccess
+              ? 'bg-muted border-l-4 border-l-primary'
+              : 'bg-red-900/20 border-l-4 border-l-red-500'
+          }`}
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-full ${
+              isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
+            }`}>
+              <IconComponent className="w-4 h-4" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-foreground">Context Recall</span>
+                <span className="text-xs text-muted-foreground">({context.count || 0} messages)</span>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <span>{getToolAction(toolCall.name)}</span>
+                <span>•</span>
+                <span>{isSuccess ? 'Completed' : 'Failed'}</span>
+              </div>
+            </div>
+            {/* Chevron indicator */}
+            <div className="ml-2">
+              {isExpanded ? (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* Context Content - Collapsible */}
+        {isSuccess && isExpanded && (
+          <div className="p-4 bg-background border-t">
+            <div className="max-h-96 overflow-y-auto">
+              <div className="prose prose-sm max-w-none">
+                <ReactMarkdown 
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    h1: ({ children }) => (
+                      <h1 className="text-lg font-bold mb-3 text-white">{children}</h1>
+                    ),
+                    h2: ({ children }) => (
+                      <h2 className="text-base font-bold mb-2 text-white">{children}</h2>
+                    ),
+                    h3: ({ children }) => (
+                      <h3 className="text-sm font-bold mb-2 text-white">{children}</h3>
+                    ),
+                    p: ({ children }) => (
+                      <p className="text-white leading-[1.5] mb-2 font-medium">{children}</p>
+                    ),
+                    ul: ({ children }) => (
+                      <ul className="list-none space-y-1 text-white mb-3">{children}</ul>
+                    ),
+                    li: ({ children }) => (
+                      <li className="text-white">{children}</li>
+                    ),
+                    code: ({ children }) => (
+                      <code className="bg-gray-600 px-1 py-0.5 rounded text-xs font-mono text-white">{children}</code>
+                    ),
+                    hr: () => (
+                      <hr className="my-4 border-gray-600" />
+                    )
+                  }}
+                >
+                  {context.summary || 'Context recalled successfully.'}
+                </ReactMarkdown>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Special handling for learn_patterns tool
+  if (toolCall.name === 'learn_patterns') {
+    const [isExpanded, setIsExpanded] = useState(false)
+    const patterns = toolCall.result || {}
+    
+    return (
+      <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
+        {/* Header - Clickable to toggle */}
+        <div
+          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
+            isSuccess
+              ? 'bg-muted border-l-4 border-l-primary'
+              : 'bg-red-900/20 border-l-4 border-l-red-500'
+          }`}
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-full ${
+              isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
+            }`}>
+              <IconComponent className="w-4 h-4" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-foreground">Pattern Learning</span>
+                <span className="text-xs text-muted-foreground">({patterns.analysis?.type || 'all'})</span>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <span>{getToolAction(toolCall.name)}</span>
+                <span>•</span>
+                <span>{isSuccess ? 'Completed' : 'Failed'}</span>
+              </div>
+            </div>
+            {/* Chevron indicator */}
+            <div className="ml-2">
+              {isExpanded ? (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* Pattern Analysis - Collapsible */}
+        {isSuccess && isExpanded && (
+          <div className="p-4 bg-background border-t">
+            <div className="max-h-96 overflow-y-auto">
+              <div className="prose prose-sm max-w-none">
+                <ReactMarkdown 
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    h1: ({ children }) => (
+                      <h1 className="text-lg font-bold mb-3 text-white">{children}</h1>
+                    ),
+                    h2: ({ children }) => (
+                      <h2 className="text-base font-bold mb-2 text-white">{children}</h2>
+                    ),
+                    h3: ({ children }) => (
+                      <h3 className="text-sm font-bold mb-2 text-white">{children}</h3>
+                    ),
+                    p: ({ children }) => (
+                      <p className="text-white leading-[1.5] mb-2 font-medium">{children}</p>
+                    ),
+                    ul: ({ children }) => (
+                      <ul className="list-none space-y-1 text-white mb-3">{children}</ul>
+                    ),
+                    li: ({ children }) => (
+                      <li className="text-white">{children}</li>
+                    ),
+                    code: ({ children }) => (
+                      <code className="bg-gray-600 px-1 py-0.5 rounded text-xs font-mono text-white">{children}</code>
+                    ),
+                    hr: () => (
+                      <hr className="my-4 border-gray-600" />
+                    )
+                  }}
+                >
+                  {patterns.analysis?.report || 'Pattern analysis completed successfully.'}
+                </ReactMarkdown>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Special handling for analyze_project tool
+  if (toolCall.name === 'analyze_project') {
+    const [isExpanded, setIsExpanded] = useState(false)
+    const analysis = toolCall.result || {}
+    
+    return (
+      <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
+        {/* Header - Clickable to toggle */}
+        <div
+          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
+            isSuccess
+              ? 'bg-muted border-l-4 border-l-primary'
+              : 'bg-red-900/20 border-l-4 border-l-red-500'
+          }`}
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-full ${
+              isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
+            }`}>
+              <IconComponent className="w-4 h-4" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-foreground">Project Analysis</span>
+                <span className="text-xs text-muted-foreground">({analysis.totalFiles || 0} files)</span>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <span>{getToolAction(toolCall.name)}</span>
+                <span>•</span>
+                <span>{isSuccess ? 'Completed' : 'Failed'}</span>
+              </div>
+            </div>
+            {/* Chevron indicator */}
+            <div className="ml-2">
+              {isExpanded ? (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* Project Analysis - Collapsible */}
+        {isSuccess && isExpanded && (
+          <div className="p-4 bg-background border-t">
+            <div className="max-h-96 overflow-y-auto">
+              <div className="prose prose-sm max-w-none">
+                <ReactMarkdown 
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    h1: ({ children }) => (
+                      <h1 className="text-lg font-bold mb-3 text-white">{children}</h1>
+                    ),
+                    h2: ({ children }) => (
+                      <h2 className="text-base font-bold mb-2 text-white">{children}</h2>
+                    ),
+                    h3: ({ children }) => (
+                      <h3 className="text-sm font-bold mb-2 text-white">{children}</h3>
+                    ),
+                    p: ({ children }) => (
+                      <p className="text-white leading-[1.5] mb-2 font-medium">{children}</p>
+                    ),
+                    ul: ({ children }) => (
+                      <ul className="list-none space-y-1 text-white mb-3">{children}</ul>
+                    ),
+                    li: ({ children }) => (
+                      <li className="text-white">{children}</li>
+                    ),
+                    code: ({ children }) => (
+                      <code className="bg-gray-600 px-1 py-0.5 rounded text-xs font-mono text-white">{children}</code>
+                    ),
+                    hr: () => (
+                      <hr className="my-4 border-gray-600" />
+                    )
+                  }}
+                >
+                  {toolCall.result?.message || 'Project analysis completed successfully.'}
+                </ReactMarkdown>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Special handling for write_file and edit_file tools
+  if (toolCall.name === 'write_file' || toolCall.name === 'edit_file') {
+    const [isExpanded, setIsExpanded] = useState(false)
+    const filePath = toolCall.result?.path || toolCall.args?.path || 'Unknown file'
+    const fileContent = toolCall.result?.content || toolCall.args?.content || ''
+    const fileExtension = filePath.split('.').pop() || 'text'
+    
+    return (
+      <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
+        {/* Header - Clickable to toggle */}
+        <div
+          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
+            isSuccess
+              ? 'bg-muted border-l-4 border-l-primary'
+              : 'bg-red-900/20 border-l-4 border-l-red-500'
+          }`}
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-full ${
+              isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
+            }`}>
+              <IconComponent className="w-4 h-4" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-foreground">
+                  {toolCall.name === 'write_file' ? 'File Created' : 'File Modified'}
+                </span>
+                <span className="text-xs text-muted-foreground">({filePath})</span>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <span>{getToolAction(toolCall.name)}</span>
+                <span>•</span>
+                <span>{isSuccess ? 'Completed' : 'Failed'}</span>
+              </div>
+            </div>
+            {/* Chevron indicator */}
+            <div className="ml-2">
+              {isExpanded ? (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* File Content - Collapsible with Syntax Highlighting */}
+        {isSuccess && isExpanded && (
+          <div className="p-4 bg-background border-t">
+            <div className="max-h-96 overflow-y-auto">
+              {fileContent ? (
+                <div className="bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-gray-700 border-b border-gray-600 text-xs font-medium text-white">
+                    {filePath} • {fileExtension}
+                  </div>
+                  <pre className="p-4 overflow-x-auto bg-[#1e1e1e]">
+                    <code className={`hljs language-${fileExtension} text-sm text-white`}>
+                      {fileContent}
+                    </code>
+                  </pre>
+                </div>
+              ) : (
+                <div className="text-muted-foreground text-sm">
+                  No file content available to display.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -1049,11 +1810,13 @@ export function ChatPanel({
           throw new Error(jsonResponse.error)
         }
         
-        // Create assistant message with enhanced tool execution results
+        // CRITICAL: Prevent empty assistant messages from being rendered
+        // Only create and display the message if there's actual content
+        if (jsonResponse.message && jsonResponse.message.trim()) {
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          content: jsonResponse.message || "Done! Switch to preview to see changes.",
+            content: jsonResponse.message,
           createdAt: new Date().toISOString(),
           metadata: {
             toolCalls: jsonResponse.toolCalls || [],
@@ -1069,6 +1832,11 @@ export function ChatPanel({
         
         setMessages(prev => [...prev, assistantMessage])
         await saveMessageToIndexedDB(assistantMessage)
+          
+          console.log('[DEBUG] Added assistant message with content:', jsonResponse.message.substring(0, 100) + '...')
+        } else {
+          console.log('[DEBUG] Skipped empty assistant message, content was empty or whitespace only')
+        }
         
         // Apply file operations to client-side IndexedDB for persistence
         if (jsonResponse.fileOperations && jsonResponse.fileOperations.length > 0) {
@@ -1918,7 +2686,7 @@ export function ChatPanel({
                             )}
                             
                             {/* Message content */}
-                            <div className="bg-card text-card-foreground border rounded-xl shadow-sm overflow-hidden max-w-[70%]">
+                            <div className="bg-card text-card-foreground border rounded-xl shadow-sm overflow-hidden w-full">
                               <div className="p-4">
                                 <div className="chat-message-content prose prose-sm max-w-none">
                                 <ReactMarkdown 
@@ -1949,7 +2717,7 @@ export function ChatPanel({
                                       );
                                     },
                                     p: ({ children }) => (
-                                        <p className="text-white leading-[1.5] mb-3 last:mb-0 font-medium">{children}</p>
+                                        <p className="text-white leading-[1.5]  text-sm mb-3 last:mb-0 font-medium">{children}</p>
                                     ),
                                     ul: ({ children }) => (
                                         <ul className="list-disc list-inside space-y-1 text-white mb-3">{children}</ul>

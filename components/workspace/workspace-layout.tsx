@@ -47,7 +47,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const searchParams = useSearchParams()
   const [selectedProject, setSelectedProject] = useState<Workspace | null>(null)
   const [activeTab, setActiveTab] = useState<"code" | "preview">("code")
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true) // Changed from false to true
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const { toast } = useToast()
   const [githubConnected, setGithubConnected] = useState<boolean | null>(null)
@@ -403,7 +403,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             {!isLoadingProjects && (
               <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
                 {/* Left Panel - Chat (Resizable) */}
-                <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
+                <ResizablePanel defaultSize={35} minSize={20} maxSize={40}>
                   <div className="h-full flex flex-col border-r border-border">
                     <ChatPanel 
                       project={selectedProject}
@@ -433,24 +433,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 {/* Right Panel - Code Editor / Preview (Resizable) */}
                 <ResizablePanel defaultSize={55} minSize={30}>
                   <div className="h-full flex flex-col">
-                    {activeTab === "code" ? (
-                      <CodeEditor
-                        file={selectedFile}
-                        onSave={(file, content) => {
-                          // Update the file content in state if needed
-                          console.log("File saved:", file.name, content.length, "characters")
-                          
-                          // Force file explorer refresh to show updated content
-                          setFileExplorerKey(prev => prev + 1)
-                          console.log("File saved successfully, triggering file explorer refresh")
-                        }}
-                      />
-                    ) : (
-                      <CodePreviewPanel project={selectedProject} activeTab={activeTab} onTabChange={setActiveTab} />
-                    )}
-
-                    {/* Tab Switcher */}
-                    <div className="border-t border-border bg-card p-2 flex-shrink-0">
+                    {/* Tab Switcher - Moved to the top */}
+                    <div className="border-b border-border bg-card p-2 flex-shrink-0">
                       <div className="flex space-x-1">
                         <Button
                           variant={activeTab === "code" ? "secondary" : "ghost"}
@@ -468,6 +452,22 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                         </Button>
                       </div>
                     </div>
+
+                    {activeTab === "code" ? (
+                      <CodeEditor
+                        file={selectedFile}
+                        onSave={(file, content) => {
+                          // Update the file content in state if needed
+                          console.log("File saved:", file.name, content.length, "characters")
+                          
+                          // Force file explorer refresh to show updated content
+                          setFileExplorerKey(prev => prev + 1)
+                          console.log("File saved successfully, triggering file explorer refresh")
+                        }}
+                      />
+                    ) : (
+                      <CodePreviewPanel project={selectedProject} activeTab={activeTab} onTabChange={setActiveTab} />
+                    )}
                   </div>
                 </ResizablePanel>
               </ResizablePanelGroup>

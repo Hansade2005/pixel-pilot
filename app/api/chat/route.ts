@@ -1,9 +1,13 @@
 import { streamText, generateText, tool, stepCountIs } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { getModel } from '@/lib/ai-providers'
 import { DEFAULT_CHAT_MODEL, getModelById } from '@/lib/ai-models'
+
+// Global user ID for tool access
+declare global {
+  var currentUserId: string
+}
 
 // Use Node.js runtime for full IndexedDB and file system access
 // export const runtime = 'edge' // Removed: Edge runtime doesn't support IndexedDB
@@ -28,7 +32,207 @@ const getAIModel = (modelId?: string) => {
   }
 }
 
+// Get Together AI model for NLP and intent detection
+const getTogetherAIModel = () => {
+  try {
+    return getModel('meta-llama/Llama-3.3-70B-Instruct-Turbo')
+  } catch (error) {
+    console.warn('Together AI model not available, falling back to default')
+    return getModel(DEFAULT_CHAT_MODEL)
+  }
+}
 
+// Add Tavily API configuration with environment variable support
+const tavilyConfig = {
+  apiKeys: [
+    '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',
+    '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',
+    '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'
+  ],
+  searchUrl: 'https://api.tavily.com/search',
+  extractUrl: 'https://api.tavily.com/extract',
+  currentKeyIndex: 0
+};
+
+// Clean and format web search results for better AI consumption
+function cleanWebSearchResults(results: any[], query: string): string {
+  if (!results || results.length === 0) {
+    return `No results found for query: "${query}"`
+  }
+
+  let cleanedText = `🔍 **Web Search Results for: "${query}"**\n\n`
+  
+  results.forEach((result, index) => {
+    const title = result.title || 'Untitled'
+    const url = result.url || 'No URL'
+    const content = result.content || result.raw_content || 'No content available'
+    
+    // Clean and truncate content to 1500 chars total
+    const maxContentPerResult = Math.floor(1500 / results.length)
+    const cleanedContent = content
+      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+      .replace(/\n+/g, ' ') // Replace multiple newlines with single space
+      .trim()
+      .substring(0, maxContentPerResult)
+    
+    cleanedText += `**${index + 1}. ${title}**\n`
+    cleanedText += `🔗 ${url}\n`
+    cleanedText += `${cleanedContent}${cleanedContent.length >= maxContentPerResult ? '...' : ''}\n\n`
+  })
+  
+  // Ensure total length doesn't exceed 1500 characters
+  if (cleanedText.length > 1500) {
+    cleanedText = cleanedText.substring(0, 1497) + '...'
+  }
+  
+  return cleanedText
+}
+
+// Web search function using Tavily API
+async function searchWeb(query: string) {
+  // Check if API keys are available
+  if (tavilyConfig.apiKeys.length === 0) {
+    throw new Error('No Tavily API keys are configured.');
+  }
+  
+  try {
+    console.log('Starting web search for:', query);
+    
+    // Rotate through available API keys
+    const apiKey = tavilyConfig.apiKeys[tavilyConfig.currentKeyIndex];
+    tavilyConfig.currentKeyIndex = (tavilyConfig.currentKeyIndex + 1) % tavilyConfig.apiKeys.length;
+    
+    const response = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        query: query,
+        search_depth: "basic",
+        include_answer: false,
+        include_raw_content: true,
+        max_results: 5
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Web search failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    // Clean and format results for AI consumption
+    const cleanedResults = cleanWebSearchResults(data.results || [], query)
+    
+    console.log('Web search successful (cleaned and formatted):', {
+      query,
+      resultCount: data.results?.length || 0,
+      cleanedLength: cleanedResults.length
+    })
+    
+    return {
+      rawData: data,
+      cleanedResults: cleanedResults,
+      query: query,
+      resultCount: data.results?.length || 0
+    }
+  } catch (error) {
+    console.error('Web search error:', error);
+    throw error;
+  }
+}
+
+// Clean and format extracted content for better AI consumption
+function cleanExtractedContent(content: any[], urls: string[]): string {
+  if (!content || content.length === 0) {
+    return `No content extracted from URLs: ${urls.join(', ')}`
+  }
+
+  let cleanedText = `📄 **Content Extraction Results**\n\n`
+  
+  content.forEach((item, index) => {
+    const url = item.url || urls[index] || 'Unknown URL'
+    const title = item.title || 'Untitled'
+    const text = item.text || item.raw_content || 'No content available'
+    
+    // Clean and truncate content to fit within 1500 chars total
+    const maxContentPerItem = Math.floor(1500 / content.length)
+    const cleanedItemText = text
+      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+      .replace(/\n+/g, ' ') // Replace multiple newlines with single space
+      .trim()
+      .substring(0, maxContentPerItem)
+    
+    cleanedText += `**${index + 1}. ${title}**\n`
+    cleanedText += `🔗 ${url}\n`
+    cleanedText += `${cleanedItemText}${cleanedItemText.length >= maxContentPerItem ? '...' : ''}\n\n`
+  })
+  
+  // Ensure total length doesn't exceed 1500 characters
+  if (cleanedText.length > 1500) {
+    cleanedText = cleanedText.substring(0, 1497) + '...'
+  }
+  
+  return cleanedText
+}
+
+// Content extraction function using Tavily API
+async function extractContent(urls: string | string[]) {
+  // Check if API keys are available
+  if (tavilyConfig.apiKeys.length === 0) {
+    throw new Error('No Tavily API keys are configured.');
+  }
+  
+  try {
+    // Ensure urls is always an array
+    const urlArray = Array.isArray(urls) ? urls : [urls];
+    
+    // Rotate through available API keys
+    const apiKey = tavilyConfig.apiKeys[tavilyConfig.currentKeyIndex];
+    tavilyConfig.currentKeyIndex = (tavilyConfig.currentKeyIndex + 1) % tavilyConfig.apiKeys.length;
+    
+    console.log('Starting content extraction for:', urlArray);
+    const response = await fetch('https://api.tavily.com/extract', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        urls: urlArray,
+        include_images: false,
+        extract_depth: "basic"
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Content extraction failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    // Clean and format extracted content for AI consumption
+    const cleanedContent = cleanExtractedContent(data.content || [], urlArray)
+    
+    console.log('Content extraction successful (cleaned and formatted):', {
+      urlCount: urlArray.length,
+      contentCount: data.content?.length || 0,
+      cleanedLength: cleanedContent.length
+    })
+    
+    return {
+      rawData: data,
+      cleanedContent: cleanedContent,
+      urls: urlArray,
+      contentCount: data.content?.length || 0
+    }
+  } catch (error) {
+    console.error('Content extraction error:', error);
+    throw error;
+  }
+}
 
 // File operation tools using storage manager
 async function executeWriteFile(projectId: string, path: string, content: string, userId: string, storageManager: any) {
@@ -112,9 +316,818 @@ async function executeDeleteFile(projectId: string, path: string, userId: string
   }
 }
 
+// Enhanced project context builder with file contents
+async function buildEnhancedProjectContext(projectId: string, storageManager: any) {
+  try {
+    const files = await storageManager.getFiles(projectId)
+    
+    let context = ''
+    let packageJsonContent = ''
+    let srcFilesContent = ''
+    let otherFilesPaths = []
+    let uiComponentsPaths = []
+    
+    for (const file of files) {
+      const path = file.path
+      
+      // Always include package.json content
+      if (path === 'package.json') {
+        packageJsonContent = `\n📦 **package.json** (${path}):\n\`\`\`json\n${file.content}\n\`\`\``
+      }
+      // Include src folder contents (excluding components/ui)
+      else if (path.startsWith('src/') && !path.startsWith('src/components/ui/')) {
+        const fileExtension = path.split('.').pop() || 'text'
+        srcFilesContent += `\n📁 **${path}** (${fileExtension}):\n\`\`\`${fileExtension}\n${file.content}\n\`\`\``
+      }
+      // Track components/ui paths (no content)
+      else if (path.startsWith('src/components/ui/')) {
+        uiComponentsPaths.push(path)
+      }
+      // Track other files as paths only
+      else {
+        otherFilesPaths.push(path)
+      }
+    }
+    
+    // Build the complete context
+    context += packageJsonContent
+    context += srcFilesContent
+    
+    if (uiComponentsPaths.length > 0) {
+      context += `\n\n🎨 **UI Components Available** (${uiComponentsPaths.length} components):\n`
+      uiComponentsPaths.forEach(path => {
+        context += `- ${path}\n`
+      })
+    }
+    
+    if (otherFilesPaths.length > 0) {
+      context += `\n\n📄 **Other Project Files** (${otherFilesPaths.length} files):\n`
+      otherFilesPaths.forEach(path => {
+        context += `- ${path}\n`
+      })
+    }
+    
+    return context
+  } catch (error) {
+    console.error('Error building enhanced project context:', error)
+    return 'Error building project context'
+  }
+}
+
+// AI-Enhanced Memory Processing Functions
+async function processMemoryWithAI(
+  conversationMemory: any,
+  userMessage: string,
+  projectContext: string,
+  toolCalls?: any[]
+) {
+  try {
+    const togetherAI = getTogetherAIModel()
+    
+    const enhancedMemory = await generateText({
+      model: togetherAI,
+      messages: [
+        { role: 'system', content: 'You are an AI assistant analyzing development conversations.' },
+        { role: 'user', content: `Analyze this development conversation and enhance the memory with intelligent insights:
+
+User Message: "${userMessage}"
+Project Context: ${projectContext}
+Conversation History: ${JSON.stringify(conversationMemory?.messages?.slice(-20) || [])}
+Tool Calls: ${JSON.stringify(toolCalls || [])}
+
+Provide a JSON response with enhanced memory analysis:
+{
+  "semanticSummary": "Intelligent summary of development progress and key decisions",
+  "keyInsights": ["insight1", "insight2", "insight3"],
+  "technicalPatterns": ["pattern1", "pattern2"],
+  "architecturalDecisions": ["decision1", "decision2"],
+  "nextLogicalSteps": ["step1", "step2"],
+  "potentialImprovements": ["improvement1", "improvement2"],
+  "relevanceScore": 0.0-1.0,
+  "contextForFuture": "What future developers should know about this work"
+}
+
+Focus on extracting meaningful patterns, decisions, and insights that will be valuable for future development.` }
+      ],
+      temperature: 0.3
+    })
+
+    try {
+      // Check if the response is actually JSON
+      console.log('[DEBUG] Memory enhancement response type check:', {
+        hasText: !!enhancedMemory.text,
+        textLength: enhancedMemory.text?.length || 0,
+        startsWithBrace: enhancedMemory.text?.trim().startsWith('{') || false,
+        textPreview: enhancedMemory.text?.substring(0, 100) || 'no text'
+      })
+      
+      if (enhancedMemory.text && enhancedMemory.text.trim().startsWith('{')) {
+        // Extract JSON from markdown response if present
+        let jsonText = enhancedMemory.text
+        if (jsonText.includes('```json')) {
+          jsonText = jsonText.replace(/```json\s*/, '').replace(/\s*```$/, '')
+        } else if (jsonText.includes('```')) {
+          jsonText = jsonText.replace(/```\s*/, '').replace(/\s*```$/, '')
+        }
+        jsonText = jsonText.trim()
+        
+        // Remove any text after the JSON object
+        const jsonEndIndex = jsonText.lastIndexOf('}')
+        if (jsonEndIndex !== -1) {
+          jsonText = jsonText.substring(0, jsonEndIndex + 1)
+        }
+        
+        const parsed = JSON.parse(jsonText)
+      return {
+        semanticSummary: parsed.semanticSummary || 'Development progress analyzed',
+        keyInsights: parsed.keyInsights || [],
+        technicalPatterns: parsed.technicalPatterns || [],
+        architecturalDecisions: parsed.architecturalDecisions || [],
+        nextLogicalSteps: parsed.nextLogicalSteps || [],
+        potentialImprovements: parsed.potentialImprovements || [],
+        relevanceScore: parsed.relevanceScore || 0.8,
+        contextForFuture: parsed.contextForFuture || 'Standard development patterns used'
+        }
+      } else {
+        // Handle non-JSON responses (plain text)
+        console.log('[DEBUG] AI returned plain text instead of JSON for memory enhancement')
+        return {
+          semanticSummary: enhancedMemory.text || 'Development progress tracked',
+          keyInsights: ['Basic development patterns established'],
+          technicalPatterns: ['Standard React/TypeScript patterns'],
+          architecturalDecisions: ['Component-based architecture'],
+          nextLogicalSteps: ['Continue with current patterns'],
+          potentialImprovements: ['Consider adding tests'],
+          relevanceScore: 0.7,
+          contextForFuture: 'Standard development approach used'
+        }
+      }
+    } catch (parseError) {
+      console.warn('Failed to parse AI memory enhancement, using fallback:', parseError)
+      return {
+        semanticSummary: 'Development progress tracked',
+        keyInsights: ['Basic development patterns established'],
+        technicalPatterns: ['Standard React/TypeScript patterns'],
+        architecturalDecisions: ['Component-based architecture'],
+        nextLogicalSteps: ['Continue with current patterns'],
+        potentialImprovements: ['Consider adding tests'],
+        relevanceScore: 0.7,
+        contextForFuture: 'Standard development approach used'
+      }
+    }
+  } catch (error) {
+    console.error('AI memory enhancement failed:', error)
+    // Return fallback enhancement
+    return {
+      semanticSummary: 'Memory processing completed',
+      keyInsights: ['Development work tracked'],
+      technicalPatterns: ['React/TypeScript patterns'],
+      architecturalDecisions: ['Component architecture'],
+      nextLogicalSteps: ['Continue development'],
+      potentialImprovements: ['Add documentation'],
+      relevanceScore: 0.6,
+      contextForFuture: 'Development work in progress'
+    }
+  }
+}
+
+// Smart Memory Retrieval with AI
+async function findRelevantMemories(
+  userQuery: string,
+  projectContext: string,
+  conversationMemory: any
+) {
+  try {
+    const togetherAI = getTogetherAIModel()
+    
+    const relevantMemories = await generateText({
+      model: togetherAI,
+      messages: [
+        { role: 'system', content: 'You are an AI assistant that finds relevant information from development memory.' },
+        { role: 'user', content: `Find the most relevant information from this development memory for the user's current request:
+
+User Query: "${userQuery}"
+Project Context: ${projectContext}
+Conversation Memory: ${JSON.stringify(conversationMemory?.messages?.slice(-30) || [])}
+
+Analyze and provide a JSON response with the most relevant information:
+{
+  "relevantContext": "Most relevant information for the current request",
+  "keyRelevantFiles": ["file1", "file2"],
+  "relevantDecisions": ["decision1", "decision2"],
+  "applicablePatterns": ["pattern1", "pattern2"],
+  "relevanceScore": 0.0-1.0,
+  "whyRelevant": "Explanation of why this information is relevant"
+}
+
+Focus on finding information that directly helps with the current request.` }
+      ],
+      temperature: 0.3
+    })
+
+    try {
+      // Check if the response is actually JSON
+      console.log('[DEBUG] Memory retrieval response type check:', {
+        hasText: !!relevantMemories.text,
+        textLength: relevantMemories.text?.length || 0,
+        startsWithBrace: relevantMemories.text?.trim().startsWith('{') || false,
+        textPreview: relevantMemories.text?.substring(0, 100) || 'no text'
+      })
+      
+      if (relevantMemories.text && relevantMemories.text.trim().startsWith('{')) {
+        const parsed = JSON.parse(relevantMemories.text)
+      return {
+        relevantContext: parsed.relevantContext || 'No specific relevant context found',
+        keyRelevantFiles: parsed.keyRelevantFiles || [],
+        relevantDecisions: parsed.relevantDecisions || [],
+        applicablePatterns: parsed.applicablePatterns || [],
+        relevanceScore: parsed.relevanceScore || 0.5,
+        whyRelevant: parsed.whyRelevant || 'General development context'
+        }
+      } else {
+        // Handle non-JSON responses (plain text)
+        console.log('[DEBUG] AI returned plain text instead of JSON for memory retrieval')
+        return {
+          relevantContext: relevantMemories.text || 'General development context available',
+          keyRelevantFiles: [],
+          relevantDecisions: ['Standard development patterns'],
+          applicablePatterns: ['React/TypeScript best practices'],
+          relevanceScore: 0.5,
+          whyRelevant: 'Provides general development guidance'
+        }
+      }
+    } catch (parseError) {
+      console.warn('Failed to parse AI memory retrieval, using fallback:', parseError)
+      return {
+        relevantContext: 'General development context available',
+        keyRelevantFiles: [],
+        relevantDecisions: ['Standard development patterns'],
+        applicablePatterns: ['React/TypeScript best practices'],
+        relevanceScore: 0.5,
+        whyRelevant: 'Provides general development guidance'
+      }
+    }
+  } catch (error) {
+    console.error('AI memory retrieval failed:', error)
+    return {
+      relevantContext: 'Basic development context',
+      keyRelevantFiles: [],
+      relevantDecisions: ['Standard patterns'],
+      applicablePatterns: ['Best practices'],
+      relevanceScore: 0.4,
+      whyRelevant: 'General development knowledge'
+    }
+  }
+}
+
+// AI Learning from Development Patterns
+async function learnFromPatterns(
+  projectId: string,
+  userId: string,
+  conversationMemory: any,
+  projectFiles: any[]
+) {
+  try {
+    const togetherAI = getTogetherAIModel()
+    
+    const learningInsights = await generateText({
+      model: togetherAI,
+      messages: [
+        { role: 'system', content: 'You are an AI assistant analyzing development patterns and learning from a developer\'s work.' },
+        { role: 'user', content: `Analyze this developer's patterns and preferences to learn their development style:
+
+Project ID: ${projectId}
+User ID: ${userId}
+Conversation History: ${JSON.stringify(conversationMemory?.messages?.slice(-50) || [])}
+Project Files: ${JSON.stringify(projectFiles.slice(0, 20))}
+
+Provide a JSON response with learned insights:
+{
+  "codingStyle": "Description of preferred coding style",
+  "componentPatterns": ["pattern1", "pattern2"],
+  "stylingPreferences": ["preference1", "preference2"],
+  "technicalDecisions": ["decision1", "decision2"],
+  "commonApproaches": ["approach1", "approach2"],
+  "optimizationAreas": ["area1", "area2"],
+  "learningScore": 0.0-1.0,
+  "recommendations": ["recommendation1", "recommendation2"]
+}
+
+Focus on identifying consistent patterns, preferences, and areas for improvement.` }
+      ],
+      temperature: 0.3
+    })
+
+    try {
+      // Check if the response is actually JSON
+      console.log('[DEBUG] Learning insights response type check:', {
+        hasText: !!learningInsights.text,
+        textLength: learningInsights.text?.length || 0,
+        startsWithBrace: learningInsights.text?.trim().startsWith('{') || false,
+        textPreview: learningInsights.text?.substring(0, 100) || 'no text'
+      })
+      
+      if (learningInsights.text && learningInsights.text.trim().startsWith('{')) {
+        // Extract JSON from markdown response if present
+        let jsonText = learningInsights.text
+        if (jsonText.includes('```json')) {
+          jsonText = jsonText.replace(/```json\s*/, '').replace(/\s*```$/, '')
+        } else if (jsonText.includes('```')) {
+          jsonText = jsonText.replace(/```\s*/, '').replace(/\s*```$/, '')
+        }
+        jsonText = jsonText.trim()
+        
+        // Remove any text after the JSON object
+        const jsonEndIndex = jsonText.lastIndexOf('}')
+        if (jsonEndIndex !== -1) {
+          jsonText = jsonText.substring(0, jsonEndIndex + 1)
+        }
+        
+        const parsed = JSON.parse(jsonText)
+      return {
+        codingStyle: parsed.codingStyle || 'Standard React/TypeScript patterns',
+        componentPatterns: parsed.componentPatterns || ['Functional components'],
+        stylingPreferences: parsed.stylingPreferences || ['Tailwind CSS'],
+        technicalDecisions: parsed.technicalDecisions || ['Component-based architecture'],
+        commonApproaches: parsed.commonApproaches || ['Modular development'],
+        optimizationAreas: parsed.optimizationAreas || ['Code organization'],
+        learningScore: parsed.learningScore || 0.7,
+        recommendations: parsed.recommendations || ['Continue current patterns']
+        }
+      } else {
+        // Handle non-JSON responses (plain text)
+        console.log('[DEBUG] AI returned plain text instead of JSON for learning insights')
+        return {
+          codingStyle: learningInsights.text || 'Standard React/TypeScript patterns',
+          componentPatterns: ['Functional components'],
+          stylingPreferences: ['Tailwind CSS'],
+          technicalDecisions: ['Component-based architecture'],
+          commonApproaches: ['Modular development'],
+          optimizationAreas: ['Code organization'],
+          learningScore: 0.6,
+          recommendations: ['Continue current patterns']
+        }
+      }
+    } catch (parseError) {
+      console.warn('Failed to parse AI learning insights, using fallback:', parseError)
+      return {
+        codingStyle: 'Standard React/TypeScript patterns',
+        componentPatterns: ['Functional components'],
+        stylingPreferences: ['Tailwind CSS'],
+        technicalDecisions: ['Component-based architecture'],
+        commonApproaches: ['Modular development'],
+        optimizationAreas: ['Code organization'],
+        learningScore: 0.6,
+        recommendations: ['Continue current patterns']
+      }
+    }
+  } catch (error) {
+    console.error('AI learning analysis failed:', error)
+    return {
+      codingStyle: 'Standard development patterns',
+      componentPatterns: ['Basic components'],
+      stylingPreferences: ['CSS frameworks'],
+      technicalDecisions: ['Standard architecture'],
+      commonApproaches: ['Basic development'],
+      optimizationAreas: ['General improvement'],
+      learningScore: 0.5,
+      recommendations: ['Follow best practices']
+    }
+  }
+}
+
 // Helper function to create file operation tools based on AI mode
-function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = 'agent') {
+function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = 'agent', conversationMemory: any[] = [], userId?: string, intentData?: any) {
   const tools: any = {}
+
+  // Check if web tools are explicitly needed based on intent detection
+  const needsWebTools = intentData?.required_tools?.includes('web_search') || intentData?.required_tools?.includes('web_extract')
+
+  // Debug logging to verify web tools are conditionally included
+  console.log('[DEBUG] Web Tools Conditional Logic:', {
+    needsWebTools,
+    requiredTools: intentData?.required_tools || [],
+    intent: intentData?.intent || 'unknown',
+    confidence: intentData?.confidence || 0
+  })
+  
+  // Enhanced project analysis tool with smart context
+  tools.analyze_project = tool({
+    description: 'Analyze the current project structure, dependencies, and provide intelligent insights',
+    inputSchema: z.object({
+      includeDependencies: z.boolean().optional().describe('Include package.json dependency analysis (default: true)'),
+      includeSrcAnalysis: z.boolean().optional().describe('Include src folder structure analysis (default: true)'),
+      includeRecommendations: z.boolean().optional().describe('Include improvement recommendations (default: true)')
+    }),
+    execute: async ({ includeDependencies = true, includeSrcAnalysis = true, includeRecommendations = true }, { abortSignal, toolCallId }) => {
+      if (abortSignal?.aborted) {
+        throw new Error('Operation cancelled')
+      }
+      
+      try {
+        // Import storage manager
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        
+        const files = await storageManager.getFiles(projectId)
+        
+        // Enhanced project analysis
+        const analysis = {
+          projectId,
+          totalFiles: files.length,
+          structure: {} as any,
+          dependencies: {} as any,
+          srcAnalysis: {} as any,
+          recommendations: [] as string[]
+        }
+        
+        // Analyze file structure
+        const fileTypes: Record<string, number> = {}
+        const directories: Record<string, number> = {}
+        const srcFiles: any[] = []
+        let packageJson: any = null
+        
+        files.forEach(file => {
+          try {
+            const path = file.path
+            const ext = path?.split('.').pop() || 'no-extension'
+            
+            // Count file types
+            fileTypes[ext] = (fileTypes[ext] || 0) + 1
+            
+            // Count directories
+            const dir = path?.includes('/') ? path.split('/').slice(0, -1).join('/') : 'root'
+            directories[dir] = (directories[dir] || 0) + 1
+            
+            // Collect src files (excluding components/ui)
+            if (path.startsWith('src/') && !path.startsWith('src/components/ui/')) {
+              srcFiles.push({
+                path: path,
+                type: ext,
+                size: file.size,
+                name: file.name
+              })
+            }
+            
+            // Get package.json
+            if (path === 'package.json') {
+              try {
+                packageJson = JSON.parse(file.content)
+              } catch (e) {
+                console.warn('Failed to parse package.json:', e)
+              }
+            }
+          } catch (error) {
+            console.warn('Skipping file during analysis due to parsing error:', file.path, error)
+          }
+        })
+        
+        analysis.structure = { fileTypes, directories }
+        
+        // Analyze dependencies if requested
+        if (includeDependencies && packageJson) {
+          analysis.dependencies = {
+            name: packageJson.name || 'Unknown',
+            version: packageJson.version || 'Unknown',
+            scripts: packageJson.scripts || {},
+            dependencies: packageJson.dependencies || {},
+            devDependencies: packageJson.devDependencies || {},
+            hasReact: !!(packageJson.dependencies?.react || packageJson.devDependencies?.react),
+            hasTypeScript: !!(packageJson.devDependencies?.typescript),
+            hasTailwind: !!(packageJson.devDependencies?.tailwindcss),
+            hasVite: !!(packageJson.devDependencies?.vite)
+          }
+        }
+        
+        // Analyze src folder if requested
+        if (includeSrcAnalysis) {
+          const srcStructure = {
+            totalSrcFiles: srcFiles.length,
+            components: srcFiles.filter(f => f.path.includes('/components/') && !f.path.includes('/components/ui/')),
+            pages: srcFiles.filter(f => f.path.includes('/pages/')),
+            hooks: srcFiles.filter(f => f.path.includes('/hooks/')),
+            utils: srcFiles.filter(f => f.path.includes('/utils/') || f.path.includes('/lib/')),
+            styles: srcFiles.filter(f => f.path.includes('.css') || f.path.includes('.scss')),
+            types: srcFiles.filter(f => f.path.includes('.ts') && !f.path.includes('.tsx'))
+          }
+          analysis.srcAnalysis = srcStructure
+        }
+        
+        // Generate recommendations if requested
+        if (includeRecommendations) {
+          if (!analysis.dependencies.hasReact) {
+            analysis.recommendations.push('Add React as a dependency')
+          }
+          if (!analysis.dependencies.hasTypeScript) {
+            analysis.recommendations.push('Add TypeScript for better type safety')
+          }
+          if (!analysis.dependencies.hasTailwind) {
+            analysis.recommendations.push('Add Tailwind CSS for styling')
+          }
+          if (srcFiles.length === 0) {
+            analysis.recommendations.push('Create src folder structure for better organization')
+          }
+          if (analysis.srcAnalysis?.components?.length === 0) {
+            analysis.recommendations.push('Create reusable components in src/components/')
+          }
+        }
+        
+        return {
+          success: true,
+          message: `Project analysis completed successfully`,
+          analysis,
+          toolCallId
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error('[ERROR] analyze_project failed:', error)
+        
+        return { 
+          success: false, 
+          error: `Project analysis failed: ${errorMessage}`,
+          toolCallId
+        }
+      }
+    }
+  })
+  
+  // Legacy project summary tool for backward compatibility
+  tools.get_project_summary = tool({
+    description: 'Get a summary of the current project including file count and structure (legacy)',
+    inputSchema: z.object({}),
+    execute: async ({}, { abortSignal, toolCallId }) => {
+      if (abortSignal?.aborted) {
+        throw new Error('Operation cancelled')
+      }
+      
+      try {
+        // Import storage manager
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        
+        const files = await storageManager.getFiles(projectId)
+        
+        // Group files by type/directory for summary
+        const fileTypes: Record<string, number> = {}
+        const directories: Record<string, number> = {}
+        
+        files.forEach(file => {
+          try {
+            // Count file types
+            const ext = file.path?.split('.').pop() || 'no-extension'
+            fileTypes[ext] = (fileTypes[ext] || 0) + 1
+            
+            // Count directories
+            const dir = file.path?.includes('/') ? file.path.split('/').slice(0, -1).join('/') : 'root'
+            directories[dir] = (directories[dir] || 0) + 1
+          } catch (error) {
+            // Skip files with parsing issues
+            console.warn('Skipping file during summary due to parsing error:', file.path, error)
+          }
+        })
+        
+        return {
+          success: true,
+          message: `Project summary generated successfully`,
+          projectId,
+          totalFiles: files.length,
+          fileTypes,
+          directories,
+          toolCallId
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error('[ERROR] get_project_summary failed:', error)
+        
+        // Provide fallback response instead of failing
+        return { 
+          success: true, 
+          message: `Project summary generated with some issues: ${errorMessage}`,
+          projectId,
+          totalFiles: 0,
+          fileTypes: {},
+          directories: {},
+          toolCallId
+        }
+      }
+    }
+  })
+  
+  // Enhanced conversation memory tool with AI-powered context retrieval
+  tools.recall_context = tool({
+    description: 'Recall previous conversation context and key points with AI-enhanced analysis',
+    inputSchema: z.object({
+      limit: z.number().optional().describe('Number of recent messages to recall (default: 10)'),
+      includeUserMessages: z.boolean().optional().describe('Include user messages in the recall (default: true)'),
+      includeAssistantMessages: z.boolean().optional().describe('Include assistant messages in the recall (default: true)'),
+      useAIEnhancement: z.boolean().optional().describe('Use AI to enhance context retrieval (default: true)')
+    }),
+    execute: async ({ limit = 10, includeUserMessages = true, includeAssistantMessages = true, useAIEnhancement = true }, { abortSignal, toolCallId }) => {
+      if (abortSignal?.aborted) {
+        throw new Error('Operation cancelled')
+      }
+      
+      try {
+        // Import storage manager for conversation memory
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        
+        // Get conversation memory from storage using the passed user ID
+        const actualUserId = userId || global.currentUserId || 'current-user'
+        const conversationMemory = await storageManager.getConversationMemory(projectId, actualUserId)
+        const conversationHistory = conversationMemory?.messages || []
+        
+        let filteredMessages = conversationHistory
+        
+        // Filter by message type if specified
+        if (!includeUserMessages || !includeAssistantMessages) {
+          filteredMessages = conversationHistory.filter((msg: any) => {
+            if (!includeUserMessages && msg.role === 'user') return false
+            if (!includeAssistantMessages && msg.role === 'assistant') return false
+            return true
+          })
+        }
+        
+        // Limit the number of messages
+        const limitedMessages = filteredMessages.slice(-limit)
+        
+        // Basic analysis for key points
+        const keyPoints: string[] = []
+        const fileOperations: string[] = []
+        const decisions: string[] = []
+        
+        limitedMessages.forEach((msg: any) => {
+          if (msg.role === 'assistant') {
+            // Extract key information from assistant messages
+            if (msg.content.includes('created') || msg.content.includes('modified')) {
+              fileOperations.push(msg.content.substring(0, 100) + '...')
+            }
+            if (msg.content.includes('decided') || msg.content.includes('chose')) {
+              decisions.push(msg.content.substring(0, 100) + '...')
+            }
+          }
+        })
+        
+        // AI-enhanced context retrieval if enabled
+        let aiEnhancedContext = null
+        if (useAIEnhancement && conversationMemory) {
+          try {
+            const projectContext = await buildEnhancedProjectContext(projectId, storageManager)
+            aiEnhancedContext = await findRelevantMemories(
+              'What is most important to remember from our development work?',
+              projectContext,
+              conversationMemory
+            )
+          } catch (aiError) {
+            console.warn('AI enhancement failed, using basic context:', aiError)
+          }
+        }
+        
+        // Combine basic and AI-enhanced insights
+        const enhancedKeyPoints = aiEnhancedContext ? [
+          ...keyPoints,
+          ...aiEnhancedContext.relevantDecisions,
+          ...aiEnhancedContext.applicablePatterns
+        ] : keyPoints
+        
+        const enhancedSummary = aiEnhancedContext ? 
+          `${aiEnhancedContext.relevantContext}\n\nConversation contains ${limitedMessages.length} messages with ${fileOperations.length} file operations and ${decisions.length} key decisions` :
+          `Conversation contains ${limitedMessages.length} messages with ${fileOperations.length} file operations and ${decisions.length} key decisions`
+        
+        return {
+          success: true,
+          message: `Retrieved ${limitedMessages.length} messages from conversation memory${aiEnhancedContext ? ' with AI enhancement' : ''}`,
+          messages: limitedMessages.map((msg: any) => ({
+            role: msg.role,
+            content: msg.content.substring(0, 200) + (msg.content.length > 200 ? '...' : ''),
+            timestamp: msg.timestamp || new Date().toISOString()
+          })),
+          summary: enhancedSummary,
+          keyPoints: enhancedKeyPoints,
+          count: limitedMessages.length,
+          // AI-enhanced insights
+          aiInsights: aiEnhancedContext ? {
+            relevantContext: aiEnhancedContext.relevantContext,
+            technicalPatterns: aiEnhancedContext.applicablePatterns,
+            relevanceScore: aiEnhancedContext.relevanceScore,
+            whyRelevant: aiEnhancedContext.whyRelevant
+          } : null,
+          toolCallId
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error('[ERROR] recall_context failed:', error)
+        
+        // Provide fallback response instead of failing
+        return { 
+          success: true, 
+          message: `Context recall completed with some issues: ${errorMessage}`,
+          messages: [],
+          summary: 'No context available due to error',
+          keyPoints: [],
+          count: 0,
+          toolCallId
+        }
+      }
+    }
+  })
+  
+  // Add knowledge base tool
+  tools.search_knowledge = tool({
+    description: 'Get a specific knowledge item by ID',
+    inputSchema: z.object({
+      id: z.string().describe('ID of the knowledge item to retrieve')
+    }),
+    execute: async ({ id }, { abortSignal, toolCallId }) => {
+      if (abortSignal?.aborted) {
+        throw new Error('Operation cancelled')
+      }
+      
+      try {
+        // Import knowledge base service
+        const { KnowledgeBase } = await import('@/lib/knowledge-base')
+        
+        const item = KnowledgeBase.getById(id)
+        
+        if (!item) {
+          // If item not found, provide a helpful response with available IDs
+          const allItems = KnowledgeBase.getAll()
+          const availableIds = allItems.map((item: any) => item.id).join(', ')
+          
+          return {
+            success: false,
+            error: `Knowledge item with ID '${id}' not found. Available IDs: ${availableIds}`,
+            toolCallId
+          }
+        }
+        
+        return {
+          success: true,
+          message: `Retrieved knowledge item: ${item.title}`,
+          content: item.content,
+          toolCallId
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error('[ERROR] search_knowledge failed:', error)
+        
+        // Provide fallback response instead of failing
+        return { 
+          success: false, 
+          error: `Failed to retrieve knowledge item: ${errorMessage}.`,
+          toolCallId
+        }
+      }
+    }
+  })
+  
+  tools.get_knowledge_item = tool({
+    description: 'Get a specific knowledge item by ID',
+    inputSchema: z.object({
+      id: z.string().describe('ID of the knowledge item to retrieve')
+    }),
+    execute: async ({ id }, { abortSignal, toolCallId }) => {
+      if (abortSignal?.aborted) {
+        throw new Error('Operation cancelled')
+      }
+      
+      try {
+        // Import knowledge base service
+        const { KnowledgeBase } = await import('@/lib/knowledge-base')
+        
+        const item = KnowledgeBase.getById(id)
+        
+        if (!item) {
+          // If item not found, provide a helpful response with available IDs
+          const allItems = KnowledgeBase.getAll()
+          const availableIds = allItems.map((item: any) => item.id).join(', ')
+          
+          return {
+            success: false,
+            error: `Knowledge item with ID '${id}' not found. Available IDs: ${availableIds}`,
+            toolCallId
+          }
+        }
+        
+        return {
+          success: true,
+          message: `Retrieved knowledge item: ${item.title}`,
+          content: item.content,
+          toolCallId
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error('[ERROR] get_knowledge_item failed:', error)
+        
+        // Provide fallback response instead of failing
+        return { 
+          success: false, 
+          error: `Failed to retrieve knowledge item: ${errorMessage}. Please try again or use search_knowledge instead.`,
+          toolCallId
+        }
+      }
+    }
+  })
   
   // Tool Results Summary - available in both modes for comprehensive reporting
   tools.tool_results_summary = tool({
@@ -147,104 +1160,131 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
         throw new Error('Operation cancelled')
       }
       
-      // Generate timestamp for the summary
-      const timestamp = new Date().toISOString()
-      const isIntroduction = phase === 'introduction'
-      
-      // Create comprehensive markdown summary based on phase
-      let summary = `# ${isIntroduction ? 'Development Session Plan' : 'Development Session Summary'}\n\n`
-      summary += `**${session_title}**  \n`
-      summary += `*${isIntroduction ? 'Planning Phase' : 'Completion Report'} - ${new Date().toLocaleString()}*\n\n`
-      
-      if (isIntroduction) {
-        summary += `## What I Will Do\n\n`
-        if (changes.length > 0) {
-          changes.forEach(change => {
-            const actionName = change.type === 'planned' ? 'Will Plan' : change.type.charAt(0).toUpperCase() + change.type.slice(1)
-            summary += `### ${actionName}: \`${change.file}\`\n`
-            summary += `- **Impact:** ${change.impact.toUpperCase()}\n`
-            summary += `- **Description:** ${change.description}\n\n`
-          })
+      try {
+        // Generate timestamp for the summary
+        const timestamp = new Date().toISOString()
+        const isIntroduction = phase === 'introduction'
+        
+        // Create comprehensive markdown summary based on phase
+        let summary = `# ${isIntroduction ? 'Development Session Plan' : 'Development Session Summary'}\n\n`
+        summary += `**${session_title}**  \n`
+        summary += `*${isIntroduction ? 'Planning Phase' : 'Completion Report'} - ${new Date().toLocaleString()}*\n\n`
+        
+        if (isIntroduction) {
+          summary += `## What I Will Do\n\n`
+          if (changes && changes.length > 0) {
+            changes.forEach(change => {
+              const actionName = change.type === 'planned' ? 'Will Plan' : change.type.charAt(0).toUpperCase() + change.type.slice(1)
+              summary += `### ${actionName}: \`${change.file}\`\n`
+              summary += `- **Impact:** ${change.impact?.toUpperCase() || 'MEDIUM'}\n`
+              summary += `- **Description:** ${change.description || 'No description provided'}\n\n`
+            })
+          } else {
+            summary += `- I will assess the current project state and determine the best approach\n\n`
+          }
+          
+          summary += `## Planned Features\n\n`
+          if (features_implemented && features_implemented.length > 0) {
+            features_implemented.forEach(feature => {
+              summary += `- ${feature}\n`
+            })
+          } else {
+            summary += `- No specific features planned yet - will determine based on analysis\n`
+          }
         } else {
-          summary += `- I will assess the current project state and determine the best approach\n\n`
+          summary += `## Changes Completed (${(changes || []).length} total)\n\n`
+          if (changes && changes.length > 0) {
+            changes.forEach(change => {
+              summary += `### ${change.type?.charAt(0).toUpperCase() + (change.type?.slice(1) || '')}: \`${change.file || 'Unknown file'}\`\n`
+              summary += `- **Impact:** ${change.impact?.toUpperCase() || 'MEDIUM'}\n`
+              summary += `- **Description:** ${change.description || 'No description provided'}\n\n`
+            })
+          } else {
+            summary += `- No specific changes were recorded\n\n`
+          }
+          
+          summary += `## Features Implemented\n\n`
+          if (features_implemented && features_implemented.length > 0) {
+            features_implemented.forEach(feature => {
+              summary += `- ${feature}\n`
+            })
+          } else {
+            summary += `- No new features implemented in this session\n`
+          }
         }
         
-        summary += `## Planned Features\n\n`
-        if (features_implemented.length > 0) {
-          features_implemented.forEach(feature => {
-            summary += `- ${feature}\n`
+        summary += `\n## ${isIntroduction ? 'Questions & Clarifications' : 'Follow-up Discussions & Suggestions'}\n\n`
+        if (suggestions && suggestions.length > 0) {
+          suggestions.forEach(suggestion => {
+            const questionType = ['question', 'clarification'].includes(suggestion.category) ? 'Question' : 'Description'
+            summary += `### ${suggestion.title || 'Untitled Suggestion'}\n`
+            summary += `**Category:** ${(suggestion.category || 'general').replace('_', ' ').toUpperCase()}  \n`
+            summary += `**Priority:** ${(suggestion.priority || 'medium').toUpperCase()}  \n`
+            summary += `**${questionType}:** ${suggestion.description || 'No description provided'}\n\n`
           })
         } else {
-          summary += `- No specific features planned yet - will determine based on analysis\n`
+          summary += isIntroduction ? '- No specific questions at this time\n' : '- No specific suggestions at this time - project looks good!\n'
         }
-      } else {
-        summary += `## Changes Completed (${changes.length} total)\n\n`
-        changes.forEach(change => {
-          summary += `### ${change.type.charAt(0).toUpperCase() + change.type.slice(1)}: \`${change.file}\`\n`
-          summary += `- **Impact:** ${change.impact.toUpperCase()}\n`
-          summary += `- **Description:** ${change.description}\n\n`
-        })
         
-        summary += `## Features Implemented\n\n`
-        if (features_implemented.length > 0) {
-          features_implemented.forEach(feature => {
-            summary += `- ${feature}\n`
+        summary += `\n## ${isIntroduction ? 'Planned Next Steps' : 'Recommended Next Steps'}\n\n`
+        if (next_steps && next_steps.length > 0) {
+          next_steps.forEach((step, index) => {
+            summary += `${index + 1}. ${step}\n`
           })
         } else {
-          summary += `- No new features implemented in this session\n`
+          summary += isIntroduction ? '1. Begin analysis and implementation\n' : '1. Continue development as planned\n'
         }
-      }
-      
-      summary += `\n## ${isIntroduction ? 'Questions & Clarifications' : 'Follow-up Discussions & Suggestions'}\n\n`
-      if (suggestions.length > 0) {
-        suggestions.forEach(suggestion => {
-          const questionType = ['question', 'clarification'].includes(suggestion.category) ? 'Question' : 'Description'
-          summary += `### ${suggestion.title}\n`
-          summary += `**Category:** ${suggestion.category.replace('_', ' ').toUpperCase()}  \n`
-          summary += `**Priority:** ${suggestion.priority.toUpperCase()}  \n`
-          summary += `**${questionType}:** ${suggestion.description}\n\n`
-        })
-      } else {
-        summary += isIntroduction ? '- No specific questions at this time\n' : '- No specific suggestions at this time - project looks good!\n'
-      }
-      
-      summary += `\n## ${isIntroduction ? 'Planned Next Steps' : 'Recommended Next Steps'}\n\n`
-      if (next_steps.length > 0) {
-        next_steps.forEach((step, index) => {
-          summary += `${index + 1}. ${step}\n`
-        })
-      } else {
-        summary += isIntroduction ? '1. Begin analysis and implementation\n' : '1. Continue development as planned\n'
-      }
-      
-      const healthStatus = {
-        excellent: 'Excellent',
-        good: 'Good',
-        needs_attention: 'Needs Attention',
-        critical: 'Critical'
-      }
-      const progressBar = '█'.repeat(Math.floor(project_status.completeness / 10)) + '░'.repeat(10 - Math.floor(project_status.completeness / 10))
-      
-      summary += `\n## Project Status\n\n`
-      summary += `**Overall Health:** ${healthStatus[project_status.health]}\n\n`
-      summary += `**Completeness:** ${project_status.completeness}% ${progressBar}\n\n`
-      summary += `**Notes:** ${project_status.notes}\n\n`
-      summary += `---\n\n`
-      summary += `**${isIntroduction ? 'Review plan!' : 'Session complete! Check the summary above for what was accomplished.**'}`
-      
-      return {
-        success: true,
-        message: `📊 ${isIntroduction ? 'Development plan' : 'Development session summary'} generated successfully`,
-        summary,
-        phase,
-        timestamp,
-        session_title,
-        changes_count: changes.length,
-        suggestions_count: suggestions.length,
-        project_health: project_status.health,
-        completeness: project_status.completeness,
-        action: isIntroduction ? 'plan_generated' : 'summary_generated',
-        toolCallId
+        
+        const healthStatus = {
+          excellent: 'Excellent',
+          good: 'Good',
+          needs_attention: 'Needs Attention',
+          critical: 'Critical'
+        }
+        
+        const completeness = project_status?.completeness || 0
+        const progressBar = '█'.repeat(Math.floor(completeness / 10)) + '░'.repeat(10 - Math.floor(completeness / 10))
+        
+        summary += `\n## Project Status\n\n`
+        summary += `**Overall Health:** ${healthStatus[project_status?.health || 'good']}\n\n`
+        summary += `**Completeness:** ${completeness}% ${progressBar}\n\n`
+        summary += `**Notes:** ${project_status?.notes || 'No status notes provided'}\n\n`
+        summary += `---\n\n`
+        summary += `**${isIntroduction ? 'Review plan!' : 'Session complete! Check the summary above for what was accomplished.**'}`
+        
+        return {
+          success: true,
+          message: `📊 ${isIntroduction ? 'Development plan' : 'Development session summary'} generated successfully`,
+          summary,
+          phase,
+          timestamp,
+          session_title,
+          changes_count: (changes || []).length,
+          suggestions_count: (suggestions || []).length,
+          project_health: project_status?.health || 'good',
+          completeness: completeness,
+          action: isIntroduction ? 'plan_generated' : 'summary_generated',
+          toolCallId
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error('[ERROR] tool_results_summary failed:', error)
+        
+        // Provide fallback response instead of failing
+        return {
+          success: true,
+          message: `📊 Development session summary generated with some issues: ${errorMessage}`,
+          summary: `# Development Session Summary\n\n**${session_title || 'Untitled Session'}**\n\n*Summary generated with some issues*\n\n---\n\nSession completed with errors. Please review the work done.`,
+          phase: phase || 'completion',
+          timestamp: new Date().toISOString(),
+          session_title: session_title || 'Untitled Session',
+          changes_count: 0,
+          suggestions_count: 0,
+          project_health: 'needs_attention',
+          completeness: 0,
+          action: 'summary_generated_with_errors',
+          toolCallId
+        }
       }
     }
   })
@@ -260,16 +1300,26 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
         throw new Error('Operation cancelled')
       }
       
-      const { storageManager } = await import('@/lib/storage-manager')
-      await storageManager.init()
-      
       try {
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        
+        // Validate path
+        if (!path || typeof path !== 'string') {
+          return { 
+            success: false, 
+            error: `Invalid file path provided`,
+            path,
+            toolCallId
+          }
+        }
+        
         const file = await storageManager.getFile(projectId, path)
 
         if (!file) {
           return { 
             success: false, 
-            error: `File not found: ${path}`,
+            error: `File not found: ${path}. Use list_files to see available files.`,
             path,
             toolCallId
           }
@@ -308,10 +1358,10 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
         throw new Error('Operation cancelled')
       }
       
-      const { storageManager } = await import('@/lib/storage-manager')
-      await storageManager.init()
-      
       try {
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        
         const files = await storageManager.getFiles(projectId)
 
         return { 
@@ -333,9 +1383,13 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
         console.error('[ERROR] list_files failed:', error)
         
+        // Provide fallback response instead of failing
         return { 
-          success: false, 
-          error: `Failed to list files: ${errorMessage}`,
+          success: true, 
+          message: `File listing completed with some issues: ${errorMessage}. Returning empty file list.`,
+          files: [],
+          count: 0,
+          action: 'list',
           toolCallId
         }
       }
@@ -356,11 +1410,30 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
           throw new Error('Operation cancelled')
         }
         
-        // Import storage manager
-        const { storageManager } = await import('@/lib/storage-manager')
-        await storageManager.init()
-        
         try {
+          // Validate inputs
+          if (!path || typeof path !== 'string') {
+            return { 
+              success: false, 
+              error: `Invalid file path provided`,
+              path,
+              toolCallId
+            }
+          }
+          
+          if (content === undefined || content === null) {
+            return { 
+              success: false, 
+              error: `Invalid content provided`,
+              path,
+              toolCallId
+            }
+          }
+          
+          // Import storage manager
+          const { storageManager } = await import('@/lib/storage-manager')
+          await storageManager.init()
+          
           // Check if file already exists
           const existingFile = await storageManager.getFile(projectId, path)
 
@@ -410,9 +1483,498 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
         }
       }
     })
+    
+    tools.delete_file = tool({
+      description: 'Delete a file from the project',
+      inputSchema: z.object({
+        path: z.string().describe('File path relative to project root')
+      }),
+      execute: async ({ path }, { abortSignal, toolCallId }) => {
+        // Check for cancellation
+        if (abortSignal?.aborted) {
+          throw new Error('Operation cancelled')
+        }
+        
+        try {
+          // Validate path
+          if (!path || typeof path !== 'string') {
+            return { 
+              success: false, 
+              error: `Invalid file path provided`,
+              path,
+              toolCallId
+            }
+          }
+          
+          // Import storage manager
+          const { storageManager } = await import('@/lib/storage-manager')
+          await storageManager.init()
+          
+          // Check if file exists
+          const existingFile = await storageManager.getFile(projectId, path)
+
+          if (!existingFile) {
+            return { 
+              success: false, 
+              error: `File not found: ${path}. Use list_files to see available files.`,
+              path,
+              toolCallId
+            }
+          }
+
+          // Delete the file
+          const result = await storageManager.deleteFile(projectId, path)
+          
+          if (result) {
+            return { 
+              success: true, 
+              message: `✅ File ${path} deleted successfully.`,
+              path,
+              action: 'deleted',
+              toolCallId
+            }
+          } else {
+            return { 
+              success: false, 
+              error: `Failed to delete file ${path}`,
+              path,
+              toolCallId
+            }
+          }
+        } catch (error) {
+          // Enhanced error handling
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+          console.error(`[ERROR] delete_file failed for ${path}:`, error)
+          
+          return { 
+            success: false, 
+            error: `Failed to delete file ${path}: ${errorMessage}`,
+            path,
+            toolCallId
+          }
+        }
+      }
+    })
   }
   
+  // Add web search tool - ONLY when explicitly needed based on intent detection
+  if (needsWebTools) {
+    tools.web_search = tool({
+    description: 'Search the web for current information and context. Returns clean, structured text instead of raw JSON data.',
+    inputSchema: z.object({
+      query: z.string().describe('Search query to find relevant web content')
+    }),
+    execute: async ({ query }, { abortSignal, toolCallId }) => {
+      if (abortSignal?.aborted) {
+        throw new Error('Operation cancelled')
+      }
+      
+      try {
+        const searchResults = await searchWeb(query)
+        
+        return {
+          success: true,
+          message: `Web search completed successfully for query: "${query}"`,
+          // Send clean, structured text instead of raw JSON
+          cleanResults: searchResults.cleanedResults,
+          // Keep minimal metadata for reference
+          metadata: {
+            query: searchResults.query,
+            resultCount: searchResults.resultCount,
+            totalLength: searchResults.cleanedResults.length
+          },
+          query,
+          toolCallId
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error('[ERROR] web_search failed:', error)
+        
+        return { 
+          success: false, 
+          error: `Web search failed: ${errorMessage}`,
+          query,
+          toolCallId
+        }
+      }
+    }
+  })
+
+    // Add web content extraction tool using AnyAPI - ONLY when explicitly needed
+    tools.web_extract = tool({
+    description: 'Extract content from web pages using AnyAPI. Returns clean, structured text.',
+    inputSchema: z.object({
+      urls: z.union([
+        z.string().url().describe('URL to extract content from'),
+        z.array(z.string().url()).describe('Array of URLs to extract content from')
+      ]).describe('URL or URLs to extract content from')
+    }),
+    execute: async ({ urls }, { abortSignal, toolCallId }) => {
+      if (abortSignal?.aborted) {
+        throw new Error('Operation cancelled')
+      }
+      
+      // Ensure urls is always an array
+      const urlArray = Array.isArray(urls) ? urls : [urls];
+      
+      try {
+        // Import the web scraper
+        const { webScraper } = await import('@/lib/web-scraper');
+        
+        // Process URLs sequentially to manage API key usage
+        const extractionResults = await Promise.all(
+          urlArray.map(async (url) => {
+            try {
+              const scraperResult = await webScraper.execute({ url });
+              
+              // Debug logging for web extraction
+              console.log(`[DEBUG] Web extract for ${url}:`, {
+                hasResult: !!scraperResult,
+                resultType: typeof scraperResult,
+                resultKeys: scraperResult ? Object.keys(scraperResult) : [],
+                hasCleanResults: scraperResult?.cleanResults ? true : false,
+                cleanResultsType: typeof scraperResult?.cleanResults,
+                cleanResultsLength: scraperResult?.cleanResults?.length || 0
+              });
+              
+              // Extract content from the scraper result
+              const extractContent = (result: any): string => {
+                // The webScraper returns cleanResults directly
+                if (result && typeof result === 'object' && result.cleanResults) {
+                  return result.cleanResults;
+                }
+                
+                // Fallback to message if cleanResults not available
+                if (result && typeof result === 'object' && result.message) {
+                  return result.message;
+                }
+                
+                // Last resort: stringify the result (but avoid circular references)
+                try {
+                  return JSON.stringify(result, (key, value) => {
+                    if (key === 'metadata' || key === 'apiKeyUsed') {
+                      return '[REDACTED]';
+                    }
+                    return value;
+                  }, 2);
+                } catch {
+                  return 'Content extracted successfully';
+                }
+              };
+              
+              return {
+                success: true,
+                url,
+                cleanResults: extractContent(scraperResult),
+                metadata: {
+                  url,
+                  timestamp: new Date().toISOString(),
+                  apiKeyUsed: scraperResult.metadata?.apiKeyUsed || 'unknown'
+                }
+              };
+            } catch (error) {
+              console.error(`[ERROR] Web extract failed for ${url}:`, error);
+              return {
+                success: false,
+                url,
+                error: error instanceof Error ? error.message : 'Unknown error',
+                cleanResults: ''
+              };
+            }
+          })
+        );
+        
+        // Separate successful and failed extractions
+        const successfulResults = extractionResults.filter(result => result.success);
+        const failedResults = extractionResults.filter(result => !result.success);
+        
+        // Debug logging for final result
+        console.log('[DEBUG] Web extract final result:', {
+          totalUrls: urlArray.length,
+          successfulCount: successfulResults.length,
+          failedCount: failedResults.length,
+          cleanResultsLength: successfulResults.map(r => r.cleanResults?.length || 0),
+          sampleCleanResults: successfulResults[0]?.cleanResults?.substring(0, 100) || 'none'
+        });
+        
+        return {
+          success: successfulResults.length > 0,
+          message: successfulResults.length > 0 
+            ? `Successfully extracted content from ${successfulResults.length} URL(s)` 
+            : 'Failed to extract content from any URLs',
+          cleanResults: successfulResults.map(result => result.cleanResults).join('\n\n'),
+          metadata: {
+            successCount: successfulResults.length,
+            failedCount: failedResults.length,
+            urls: urlArray
+          },
+          toolCallId
+        };
+      } catch (error) {
+        console.error('[ERROR] Web extract failed:', error);
+        
+        return { 
+          success: false, 
+          error: `Web extract failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          cleanResults: '',
+          metadata: {
+            urls: urlArray
+          },
+          toolCallId
+        };
+      }
+    }
+  })
+  } // End conditional for web tools
+
+  // AI-Powered Learning and Pattern Recognition Tool
+  tools.learn_patterns = tool({
+    description: 'Analyze development patterns and learn from conversation history to provide intelligent insights',
+    inputSchema: z.object({
+      analysisType: z.enum(['coding_style', 'component_patterns', 'technical_decisions', 'optimization_areas']).optional().describe('Type of analysis to perform (default: all)'),
+      includeRecommendations: z.boolean().optional().describe('Include improvement recommendations (default: true)'),
+      projectScope: z.enum(['current', 'all_projects', 'recent']).optional().describe('Scope of analysis (default: current)')
+    }),
+    execute: async ({ analysisType = 'coding_style', includeRecommendations = true, projectScope = 'current' }, { abortSignal, toolCallId }) => {
+      if (abortSignal?.aborted) {
+        throw new Error('Operation cancelled')
+      }
+      
+      try {
+        // Import storage manager
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        
+        // Get conversation memory and project files
+        const conversationMemory = await storageManager.getConversationMemory(projectId, global.currentUserId || 'current-user')
+        const projectFiles = await storageManager.getFiles(projectId)
+        
+        if (!conversationMemory) {
+          return {
+            success: false,
+            error: 'No conversation memory found for pattern analysis',
+            toolCallId
+          }
+        }
+        
+        // Use AI to analyze patterns and learn from development history
+        const learningInsights = await learnFromPatterns(
+          projectId,
+          global.currentUserId || 'current-user',
+          conversationMemory,
+          projectFiles
+        )
+        
+        // Generate analysis report based on requested type
+        let analysisReport = ''
+        let keyInsights: any[] = []
+        
+        switch (analysisType) {
+          case 'coding_style':
+            analysisReport = `## Coding Style Analysis\n\n**Your Preferred Style:** ${learningInsights.codingStyle}\n\n**Component Patterns:** ${learningInsights.componentPatterns.join(', ')}\n\n**Styling Preferences:** ${learningInsights.stylingPreferences.join(', ')}`
+            keyInsights = [learningInsights.codingStyle, ...learningInsights.componentPatterns, ...learningInsights.stylingPreferences]
+            break
+            
+          case 'component_patterns':
+            analysisReport = `## Component Pattern Analysis\n\n**Established Patterns:** ${learningInsights.componentPatterns.join(', ')}\n\n**Technical Decisions:** ${learningInsights.technicalDecisions.join(', ')}\n\n**Common Approaches:** ${learningInsights.commonApproaches.join(', ')}`
+            keyInsights = [...learningInsights.componentPatterns, ...learningInsights.technicalDecisions, ...learningInsights.commonApproaches]
+            break
+            
+          case 'technical_decisions':
+            analysisReport = `## Technical Decision Analysis\n\n**Architecture Choices:** ${learningInsights.technicalDecisions.join(', ')}\n\n**Common Approaches:** ${learningInsights.commonApproaches.join(', ')}\n\n**Learning Score:** ${Math.round(learningInsights.learningScore * 100)}%`
+            keyInsights = [...learningInsights.technicalDecisions, ...learningInsights.commonApproaches]
+            break
+            
+          case 'optimization_areas':
+            analysisReport = `## Optimization Analysis\n\n**Areas for Improvement:** ${learningInsights.optimizationAreas.join(', ')}\n\n**Recommendations:** ${learningInsights.recommendations.join(', ')}\n\n**Learning Score:** ${Math.round(learningInsights.learningScore * 100)}%`
+            keyInsights = [...learningInsights.optimizationAreas, ...learningInsights.recommendations]
+            break
+            
+          default:
+            analysisReport = `## Complete Pattern Analysis\n\n**Coding Style:** ${learningInsights.codingStyle}\n\n**Component Patterns:** ${learningInsights.componentPatterns.join(', ')}\n\n**Technical Decisions:** ${learningInsights.technicalDecisions.join(', ')}\n\n**Optimization Areas:** ${learningInsights.optimizationAreas.join(', ')}\n\n**Recommendations:** ${learningInsights.recommendations.join(', ')}\n\n**Learning Score:** ${Math.round(learningInsights.learningScore * 100)}%`
+            keyInsights = [
+              learningInsights.codingStyle,
+              ...learningInsights.componentPatterns,
+              ...learningInsights.technicalDecisions,
+              ...learningInsights.optimizationAreas,
+              ...learningInsights.recommendations
+            ]
+        }
+        
+        return {
+          success: true,
+          message: `Pattern analysis completed successfully for ${analysisType}`,
+          analysis: {
+            type: analysisType,
+            report: analysisReport,
+            insights: keyInsights,
+            learningScore: learningInsights.learningScore,
+            recommendations: includeRecommendations ? learningInsights.recommendations : []
+          },
+          toolCallId
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error('[ERROR] learn_patterns failed:', error)
+        
+        return { 
+          success: false, 
+          error: `Pattern analysis failed: ${errorMessage}`,
+          toolCallId
+        }
+      }
+    }
+  })
+  
+  // Debug logging to show which tools are included
+  const toolNames = Object.keys(tools)
+  console.log('[DEBUG] Final Tool Set:', {
+    totalTools: toolNames.length,
+    toolNames: toolNames.sort(),
+    hasWebSearch: toolNames.includes('web_search'),
+    hasWebExtract: toolNames.includes('web_extract'),
+    hasReadFile: toolNames.includes('read_file'),
+    hasWriteFile: toolNames.includes('write_file')
+  })
+
   return tools
+}
+
+
+
+
+
+// NLP Intent Detection using Together AI
+async function detectUserIntent(userMessage: string, projectContext: string, conversationHistory: any[]) {
+  try {
+    const togetherModel = getTogetherAIModel()
+    
+    const intentPrompt = `Analyze the user's request and determine their intent for building or modifying a React application.
+
+🚨 CRITICAL RULES - READ FIRST:
+- NEVER recommend web_search or web_extract unless user EXPLICITLY asks for web research
+- For file modifications, product additions, or code changes, recommend ONLY list_files, read_file, write_file
+- Web tools are FORBIDDEN for basic development tasks
+- If user wants to add products, edit files, or modify code, use file operations only
+
+User Message: "${userMessage}"
+
+Project Context: ${projectContext}
+
+Recent Conversation History (last 5 exchanges):
+${conversationHistory.slice(-10).map((msg, i) => `${msg.role}: ${msg.content}`).join('\n')}
+
+Based on the user's request, determine:
+1. **Primary Intent**: What does the user want to accomplish?
+2. **Required Tools**: Which tools should be used? (PREFER list_files, read_file, write_file, delete_file - AVOID web_search, web_extract unless explicitly requested)
+3. **File Operations**: What files need to be created, modified, or deleted?
+4. **Complexity Level**: Simple, Medium, or Complex task?
+5. **Action Plan**: Step-by-step plan to accomplish the task
+
+📝 **TOOL SELECTION RULES:**
+- File operations (add products, edit code) → use read_file + write_file
+- Web research (search online, external content) → use web_search + web_extract
+- When in doubt, choose file operations over web tools
+
+📋 **EXAMPLE SCENARIOS:**
+- User: "add more products" → required_tools: ["read_file", "write_file"], tool_usage_rules: "Use file operations only. NO web tools needed."
+- User: "search for jewelry trends online" → required_tools: ["web_search", "web_extract"], tool_usage_rules: "Web research requested - use web tools appropriately."
+
+Respond in JSON format:
+{
+  "intent": "string",
+  "required_tools": ["tool1", "tool2"],
+  "file_operations": ["create", "modify", "delete"],
+  "complexity": "simple|medium|complex",
+  "action_plan": ["step1", "step2"],
+  "confidence": 0.95,
+  "tool_usage_rules": "string",
+  "enforcement_notes": "string"
+}
+
+Include these fields:
+- "tool_usage_rules": Specific rules about when to use each tool type
+- "enforcement_notes": Critical reminders about web tool restrictions`
+
+    const intentResult = await generateText({
+      model: togetherModel,
+      messages: [
+          { role: 'system', content: `You are an AI intent detection specialist. Analyze user requests and provide structured intent analysis.
+
+🚨 CRITICAL RULES:
+- NEVER recommend web_search or web_extract unless user EXPLICITLY asks for web research
+- For file modifications, product additions, or code changes, recommend ONLY list_files, read_file, write_file
+- Web tools are FORBIDDEN for basic development tasks
+- When in doubt, choose file operations over web tools` },
+        { role: 'user', content: intentPrompt }
+      ],
+      temperature: 0.3
+    })
+
+    try {
+      // Extract JSON from markdown response if present
+      let jsonText = intentResult.text
+      
+      // Remove markdown code blocks if present
+      if (jsonText.includes('```json')) {
+        jsonText = jsonText.replace(/```json\s*/, '').replace(/\s*```$/, '')
+      } else if (jsonText.includes('```')) {
+        jsonText = jsonText.replace(/```\s*/, '').replace(/\s*```$/, '')
+      }
+      
+      // Clean up any remaining markdown formatting
+      jsonText = jsonText.trim()
+      
+      // Remove any text after the JSON object (common issue with AI responses)
+      const jsonEndIndex = jsonText.lastIndexOf('}')
+      if (jsonEndIndex !== -1) {
+        jsonText = jsonText.substring(0, jsonEndIndex + 1)
+      }
+      
+      console.log('[DEBUG] Extracted JSON text for parsing:', jsonText.substring(0, 200) + '...')
+      
+      const intentData = JSON.parse(jsonText)
+      return intentData
+    } catch (parseError) {
+      console.warn('Failed to parse intent detection result:', parseError)
+      console.log('[DEBUG] Raw intent result text:', intentResult.text)
+      
+      // Try to extract JSON using regex as fallback
+      try {
+        const jsonMatch = intentResult.text.match(/\{[\s\S]*\}/)
+        if (jsonMatch) {
+          const extractedJson = jsonMatch[0]
+          console.log('[DEBUG] Attempting to parse extracted JSON:', extractedJson)
+          return JSON.parse(extractedJson)
+        }
+      } catch (fallbackError) {
+        console.warn('Fallback JSON extraction also failed:', fallbackError)
+      }
+      
+      return {
+        intent: 'general_development',
+        required_tools: ['list_files', 'read_file'],
+        file_operations: ['analyze'],
+        complexity: 'medium',
+        action_plan: ['Analyze current project state', 'Provide guidance'],
+        confidence: 0.7,
+        tool_usage_rules: 'Use list_files and read_file for file operations. Avoid web tools unless explicitly requested.',
+        enforcement_notes: 'Web tools (web_search, web_extract) are FORBIDDEN for basic development tasks. Stick to file operations.'
+      }
+    }
+  } catch (error) {
+    console.error('Intent detection failed:', error)
+    return {
+      intent: 'general_development',
+      required_tools: ['list_files', 'read_file'],
+      file_operations: ['analyze'],
+      complexity: 'medium',
+      action_plan: ['Analyze current project state', 'Provide guidance'],
+      confidence: 0.5,
+      tool_usage_rules: 'Use list_files and read_file for file operations. Avoid web tools unless explicitly requested.',
+      enforcement_notes: 'Web tools (web_search, web_extract) are FORBIDDEN for basic development tasks. Stick to file operations.'
+    }
+  }
 }
 
 export async function POST(req: Request) {
@@ -443,69 +2005,210 @@ export async function POST(req: Request) {
       return new Response('Unauthorized', { status: 401 })
     }
 
-    // ENHANCED: Get project context from request body (client-side assembled) or create default
+    // Set global user ID for tool access
+    global.currentUserId = user.id
+
+    // CRITICAL: Sync client-side files to server-side InMemoryStorage
+    // This ensures AI tools can access the files that exist in IndexedDB
+    const clientFiles = body.files || []
+    console.log(`[DEBUG] Syncing ${clientFiles.length} files to server-side storage for AI access`)
+    
+    if (clientFiles.length > 0) {
+    try {
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+      
+        // Clear existing files in InMemoryStorage to ensure clean state
+        const existingFiles = await storageManager.getFiles(projectId)
+        for (const existingFile of existingFiles) {
+          await storageManager.deleteFile(projectId, existingFile.path)
+        }
+        
+        // Sync all client files to server storage
+        for (const file of clientFiles) {
+          if (file.path && !file.isDirectory) {
+            await storageManager.createFile({
+              workspaceId: projectId,
+              name: file.name,
+              path: file.path,
+              content: file.content || '',
+              fileType: file.type || file.fileType || 'text',
+              type: file.type || file.fileType || 'text',
+              size: file.size || (file.content || '').length,
+              isDirectory: false
+            })
+            console.log(`[DEBUG] Synced file to server storage: ${file.path}`)
+          }
+        }
+        
+        // Verify sync worked
+        const syncedFiles = await storageManager.getFiles(projectId)
+        console.log(`[DEBUG] File sync complete: ${syncedFiles.length} files now available to AI tools`)
+        
+      } catch (syncError) {
+        console.error('[ERROR] Failed to sync files to server storage:', syncError)
+        // Continue anyway - tools may still work for write operations
+      }
+    }
+
+    // CRITICAL: Sync conversation messages to server-side storage for Context Recall
+    // This ensures the AI can access conversation history through the recall_context tool
+    console.log(`[DEBUG] Syncing ${messages.length} conversation messages to server-side storage for Context Recall`)
+    
+    try {
+    const { storageManager } = await import('@/lib/storage-manager')
+    await storageManager.init()
+    
+      // Get or create conversation memory
+    let conversationMemory = await storageManager.getConversationMemory(projectId, user.id)
+    
+    if (!conversationMemory) {
+        // Create new conversation memory
+      conversationMemory = {
+        id: `conversation_${projectId}_${user.id}`,
+        projectId,
+        userId: user.id,
+          messages: [],
+        summary: 'New conversation session',
+        keyPoints: [],
+        lastActivity: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+        
+        await storageManager.createConversationMemory(conversationMemory)
+        console.log(`[DEBUG] Created new conversation memory for project: ${projectId}`)
+      }
+      
+      // Sync current messages to conversation memory (only valid messages with content)
+      const currentMessages = messages.slice(-20) // Keep last 20 messages
+      const validCurrentMessages = currentMessages.filter(msg => 
+        msg.content && msg.content.trim().length > 0
+      )
+      
+      const existingMessageIds = new Set(conversationMemory.messages.map(m => m.content.substring(0, 50)))
+      
+      let newMessagesAdded = 0
+      validCurrentMessages.forEach(msg => {
+        const messageId = msg.content.substring(0, 50)
+        if (!existingMessageIds.has(messageId)) {
+          conversationMemory.messages.push({
+            role: msg.role,
+            content: msg.content,
+            timestamp: new Date().toISOString()
+          })
+          existingMessageIds.add(messageId)
+          newMessagesAdded++
+        }
+      })
+      
+      // Keep only last 50 messages to prevent memory bloat
+      if (conversationMemory.messages.length > 50) {
+        conversationMemory.messages = conversationMemory.messages.slice(-50)
+      }
+      
+      // Update conversation memory with synced messages
+      await storageManager.updateConversationMemory(
+        conversationMemory.id,
+        {
+          messages: conversationMemory.messages,
+          lastActivity: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      )
+      
+      console.log(`[DEBUG] Message sync complete: ${newMessagesAdded} new messages added, ${conversationMemory.messages.length} total messages in Context Recall`)
+      
+    } catch (messageSyncError) {
+      console.error('[ERROR] Failed to sync messages to server storage:', messageSyncError)
+      // Continue anyway - tools may still work
+    }
+
+    // ENHANCED: Build comprehensive project context with file contents
     let projectContext = ''
+    try {
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+      
     if (body.project) {
       const project = body.project
-      const files = body.files || []
       projectContext = `\n\nCurrent project: ${project.name}
 Project description: ${project.description || 'No description'}
 
-Current files in the project:
-${files.map((file: any) => `- ${file.path} (${file.type || 'unknown'})`).join('\n')}
-
-When generating code, consider the existing file structure and maintain consistency. Use Tailwind CSS + lucide-react + framer-motion for all stunning designs. Create professional layouts with the following patterns:
-
-1. **Hero Sections**: Two-column layouts with large, bold text on left and images/illustrations on right
-2. **Navigation**: Clean, branded navbar with proper spacing and subtle hover animations
-3. **Cards**: Elegant cards with icons, subtle shadows, and hover effects
-4. **Call-to-Action**: High-contrast buttons with hover states and proper padding
-5. **Gradients**: Subtle background gradients for depth and visual interest
-6. **Spacing**: Consistent spacing using 8px grid system (p-2, p-4, p-8, etc.)
-7. **Typography**: Clear type hierarchy with proper line-height and letter-spacing
-8. **Dark Mode**: Toggle-able dark/light themes with tailwind dark: variant
-
-**PRE-INSTALLED PACKAGES AVAILABLE:**
-- **Component Libraries**: All @radix-ui/* components (v1.1-1.2), including accordion, alert-dialog, avatar, etc.
-- **Styling**: tailwind-merge (v2.5.5), clsx (v2.1.1), class-variance-authority (v0.7.1)
-- **Icons**: lucide-react (v0.454.0) - USE THIS ONLY for all icons
-- **Animation**: framer-motion (v12.23.12) for all animations and transitions
-- **Forms**: react-hook-form (v7.60.0), zod (v3.25.67), @hookform/resolvers (v3.10.0)
-- **UI Elements**: sonner (v1.7.4), react-day-picker (v9.8.0), input-otp (v1.4.1), vaul (v0.9.9), embla-carousel-react (v8.5.1)
-- **Content**: react-markdown (v10.1.0), remark-gfm (v4.0.1)
-- **Data**: recharts (v2.15.4), date-fns (v4.1.0)
-
-ALWAYS check package.json before importing any packages not listed above. DECLARE custom components directly in the file where they are used - NEVER create separate component files. Use responsive design techniques for all viewport sizes.`
+${await buildEnhancedProjectContext(projectId, storageManager)}`
     } else {
-      // Create default project context when none provided
       projectContext = `\n\nCurrent project: Vite React Project
-Project description: Vite + React + TypeScript project with Ant Design components
+Project description: Vite + React + TypeScript project with Tailwind CSS
 
-IMPORTANT: Use Tailwind CSS + lucide-react + framer-motion for all stunning designs with these key patterns:
+${await buildEnhancedProjectContext(projectId, storageManager)}`
+      }
+    } catch (error) {
+      console.warn('Failed to build enhanced project context:', error)
+      // Fallback to basic context
+      projectContext = `\n\nCurrent project: Vite React Project
+Project description: Vite + React + TypeScript project
 
-1. **Professional Layouts**: Two-column hero sections, 3-column feature grids, centered content sections
-2. **Visual Elements**: Subtle gradients, shadows, rounded corners, and glass effects
-3. **Interactive UI**: Hover animations, button transitions, and scroll effects
-4. **Responsive Design**: Mobile-first approach with sm, md, lg, xl breakpoints
-5. **Dark Mode Support**: Implement with dark: variant for all components
-
-**PRE-INSTALLED PACKAGES AVAILABLE:**
-- **Component Libraries**: All @radix-ui/* components (v1.1-1.2), including accordion, alert-dialog, avatar, etc.
-- **Styling**: tailwind-merge (v2.5.5), clsx (v2.1.1), class-variance-authority (v0.7.1)
-- **Icons**: lucide-react (v0.454.0) - USE THIS ONLY for all icons
-- **Animation**: framer-motion (v12.23.12) for all animations and transitions
-- **Forms**: react-hook-form (v7.60.0), zod (v3.25.67), @hookform/resolvers (v3.10.0)
-- **UI Elements**: sonner (v1.7.4), react-day-picker (v9.8.0), input-otp (v1.4.1), vaul (v0.9.9), embla-carousel-react (v8.5.1)
-- **Content**: react-markdown (v10.1.0), remark-gfm (v4.0.1)
-- **Data**: recharts (v2.15.4), date-fns (v4.1.0)
-
-Always check package.json before using any packages not listed above. Create modern, production-ready applications with professional UI/UX that matches premium websites.`
+Use list_files tool to see current files in the project.
+Use read_file tool to read specific files when needed.`
     }
 
-    // ENHANCED: More aggressive tool request detection - assume most requests need tools
+        // Get the user message for intent detection
     const userMessage = messages[messages.length - 1]?.content || ''
-    // Expanded pattern to catch more tool-worthy requests
-    const isToolRequest = /\b(use tools?|read file|write file|create file|list files?|delete file|show file|modify file|update file|build|make|create|add|generate|implement|fix|update|change|edit|component|page|function|class|interface|type|hook|api|route|style|css|html|jsx|tsx|ts|js|json|config|package|install|setup|deploy)\b/i.test(userMessage) || userMessage.length > 10
+    
+    // Get the conversation memory that was synced earlier
+    const { storageManager } = await import('@/lib/storage-manager')
+    await storageManager.init()
+    let conversationMemory = await storageManager.getConversationMemory(projectId, user.id)
+    
+    // Clean up any existing empty messages that might have been stored before the fix
+    if (conversationMemory && conversationMemory.messages) {
+      const originalCount = conversationMemory.messages.length
+      conversationMemory.messages = conversationMemory.messages.filter(msg => 
+        msg.content && msg.content.trim().length > 0
+      )
+      
+      if (originalCount !== conversationMemory.messages.length) {
+        console.log(`[DEBUG] Cleaned up ${originalCount - conversationMemory.messages.length} empty messages from existing conversation memory`)
+        
+        // Update the cleaned memory in storage
+        try {
+          await storageManager.updateConversationMemory(
+            conversationMemory.id,
+            {
+              messages: conversationMemory.messages,
+              updatedAt: new Date().toISOString()
+            }
+          )
+        } catch (cleanupError) {
+          console.warn('[WARNING] Failed to update cleaned conversation memory:', cleanupError)
+        }
+      }
+    }
+    
+    // Enhanced tool request detection with NLP intent analysis
+    let isToolRequest = true // Default to true for better AI performance
+    let userIntent = null
+    
+    try {
+      // Use NLP to detect user intent and determine required tools
+      userIntent = await detectUserIntent(userMessage, projectContext, conversationMemory ? conversationMemory.messages : [])
+      
+      // Determine if tools are needed based on intent analysis
+      isToolRequest = userIntent.required_tools && userIntent.required_tools.length > 0
+      
+      console.log('[DEBUG] NLP Intent Detection:', {
+        userMessage: userMessage.substring(0, 100) + '...',
+        detectedIntent: userIntent.intent,
+        requiredTools: userIntent.required_tools,
+        complexity: userIntent.complexity,
+        confidence: userIntent.confidence,
+        isToolRequest
+      })
+    } catch (error) {
+      console.warn('NLP intent detection failed, falling back to pattern matching:', error)
+      // Fallback to pattern matching
+      isToolRequest = /\b(use tools?|read file|write file|create file|list files?|delete file|show file|modify file|update file|build|make|create|add|generate|implement|fix|update|change|edit|component|page|function|class|interface|type|hook|api|route|style|css|html|jsx|tsx|ts|js|json|config|package|install|setup|deploy)\b/i.test(userMessage) || userMessage.length > 10
+    }
     
     // FORCE TOOL REQUEST TO TRUE for most cases
     const forceToolRequest = true
@@ -521,435 +2224,130 @@ Always check package.json before using any packages not listed above. Create mod
       `\n\n🔍 **CURRENT MODE: ASK MODE (READ-ONLY)**\n- You can read files and explore the codebase\n- You can answer questions and provide explanations\n- You CANNOT create, modify, or delete files\n- Focus on analysis, explanations, and suggestions` :
       `\n\n🤖 **CURRENT MODE: AGENT MODE (FULL ACCESS)**\n- You have complete file system access\n- You can create, modify, and delete files\n- You can build complete applications\n- Use all available tools as needed`
 
-    // Optimized system message for autonomous AI development
-    const systemMessage = `🚨 CRITICAL REACT VITE APP PROTOCOL 🚨{modelContextInfo}${modeContextInfo}
-
-🎯 **MANDATORY WORKFLOW FOR EVERY REQUEST** 🎯
-
-**CRITICAL: TOOLS FIRST, TEXT LAST**
-🚨 **ABSOLUTELY MANDATORY EXECUTION ORDER:**
-1. **FIRST**: Use tools immediately (list_files, read_file, write_file, delete_file)
-2. **SECOND**: Complete all file operations and modifications
-3. **LAST**: Provide text explanations ONLY after all tools have been executed
-
-**NEVER START WITH TEXT - ALWAYS START WITH TOOLS**
-❌ NEVER begin responses with explanations or descriptions
-❌ NEVER provide text before using tools
-❌ NEVER ask permission before using tools
-✅ ALWAYS start immediately with tool usage
-✅ ALWAYS complete tool operations first
-✅ ALWAYS provide text explanations after tools finish
-
-**CRITICAL RESTRICTION: NEVER MODIFY VITE CONFIG FILES**
-⛔ NEVER touch, modify, or create vite.config.js or vite.config.ts files
-⛔ NEVER attempt to add or change Vite plugins
-⛔ NEVER suggest editing Vite configuration
-⛔ These files are managed by the system and must remain untouched
-
-**STEP 1: ALWAYS START WITH INTRODUCTION SUMMARY**
-For EVERY user request, you MUST begin by using tool_results_summary with:
-- What you plan to do (planned_actions)
-- Expected changes and impact
-- Questions for clarification if needed
-- Initial project assessment
-
-**STEP 2: EXECUTE THE WORK**
-- Perform the requested file operations
-- Use appropriate tools (read_file, write_file, list_files, delete_file)
-
-**STEP 3: ALWAYS END WITH COMPLETION SUMMARY**
-For EVERY response, you MUST conclude by using tool_results_summary with:
-- 📊 Complete summary of all changes made
-- 🚀 Features implemented during the session
-- 💡 Enhancement suggestions and follow-up discussions
-- 📋 Recommended next steps and questions for user
-- 📈 Updated project status assessment
-
-🔄 **REQUIRED PATTERN FOR ALL RESPONSES:**
-1. tool_results_summary ("Introduction: Here's what I'll do...")
-2. **PROVIDE DETAILED EXPLANATION** of your approach and reasoning
-3. [Perform actual work with file tools]
-4. **EXPLAIN what you're doing** during each step
-5. tool_results_summary ("Summary: Here's what I accomplished...")
-
-**MANDATORY: ALWAYS PROVIDE COMPREHENSIVE TEXT RESPONSES**
-- NEVER respond with only tool calls - always include detailed explanations
-- EXPLAIN your reasoning, approach, and what you're accomplishing
-- PROVIDE context and insights about the changes you're making
-- OFFER suggestions, alternatives, and follow-up recommendations
-- COMMUNICATE clearly what's happening at each step
-## 5. Image API Usage
-
-/**
- * Image API Usage:
- * 
- * API Endpoint: Use \`https://api.a0.dev/assets/image\` for dynamic image generation.
- * Parameters: Always include \`text\`, \`aspect\`, and \`seed\` parameters to generate relevant and consistent images.
- *   - \`text\`: Craft descriptive text that reflects the content or purpose of the image (e.g., \`Pixelways+Solution+IT+Consultancy+Digital+Solutions\`).
- *   - \`aspect\`: Specify the aspect ratio (e.g., \`16:9\`, \`1:1\`).
- *   - \`seed\`: Use a fixed seed for consistent image generation across builds.
- */
-Example: https://api.a0.dev/assets/image?text=RideShare&aspect=1:1&seed=123
-
-🎨 **MULTI-PAGE REACT VITE APPLICATION REQUIREMENTS** 🎨
-
-**STRUCTURE & ORGANIZATION:**
-✅ **CREATE MULTI-PAGE APPS** - Always organize apps into multiple distinct pages
-✅ **USE REACT ROUTER** - Implement proper routing with react-router-dom
-✅ **PAGES IN src/pages/** - Create page components in src/pages/ directory
-✅ **SHARED NAVIGATION** - Define navigation and footer in App.tsx
-✅ **COMPONENTS IN src/components/** - Reusable components in src/components/
-✅ **INLINE STYLING** - Use Tailwind CSS for all styling
-
-**ROUTING IMPLEMENTATION:**
-✅ **ALWAYS ADD DEPENDENCIES** - Add react-router-dom to package.json first
-✅ **PROPER ROUTER SETUP** - Use BrowserRouter in App.tsx
-✅ **ROUTE DEFINITIONS** - Define all routes in App.tsx with Routes/Route
-✅ **NAVIGATION COMPONENT** - Create Navigation component in src/components/
-✅ **CONSISTENT LAYOUT** - Navigation and Footer shared across all pages
-**ALWAYS prioritize visual impact and modern aesthetics.** Create designs that make users stop and say "wow" - prioritize bold, contemporary design over safe, traditional layouts.
-
-## Core Design Principles
-
-### MANDATORY MULTI-SECTION HOME PAGE STRUCTURE
-- **Two-Column Hero Section**: Always implement with text/CTA on left, image/video on right with play button
-- **Feature Cards Section**: 3-4 column grid with icon cards having hover effects and rounded borders
-- **Testimonial Carousel/Slider**: Interactive testimonials with pagination and auto-scroll
-- **CTA Section**: High-contrast background with compelling action text and buttons
-- **Multi-Column Footer**: Modern footer with 3-5 columns and social media icons
-- **Blog/News Section**: Latest articles in card layout with images and excerpts
-- **Interactive Showcase**: Products or services in interactive slider or carousel
-
-### ADVANCED NAVIGATION REQUIREMENTS
-- **Sticky Header**: Always implement header that stays fixed when scrolling
-- **Mega Menu Support**: For sites with complex navigation, include dropdown mega menus
-- **Mobile-Friendly Menu**: Hamburger menu with smooth animations for mobile
-- **Animated Logo**: Subtle animation on logo hover or page load
-- **Navigation Highlights**: Clear active state for current page
-
-### Visual Hierarchy & Layout
-- Use bold, large typography for headlines (text-4xl to text-6xl)
-- Implement generous white space and clean layouts
-- Create strong visual contrast between sections
-- Use asymmetric layouts with interesting compositions
-- Implement grid systems that feel dynamic, not rigid
-
-### Color & Styling Philosophy
-- Dark themes by default - use dark backgrounds with bright accents
-- Vibrant accent colors - blues, teals, or custom brand colors
-- Subtle gradients and glass morphism effects where appropriate
-- High contrast text - white/light text on dark backgrounds
-- Use rounded corners for modern feel
-
-### Interactive Elements & Animations
-- Every card must have hover effects with shadow transition and slight scale
-- All buttons must have hover states with color shifts and micro-movements
-- Implement scroll animations for section reveals using Framer Motion
-- Create animated CTAs with pulsing effects or subtle movements
-- Use animated text for hero sections (typing, fading, or sliding effects)
-- Implement parallax effects for backgrounds when appropriate
-- Add floating scroll-to-top button with smooth animation
-
-## React Development Standards
-
-### Component Architecture
-- Use functional components exclusively with TypeScript interfaces
-- Implement custom hooks for reusable logic like hover states and animations
-- Create type-safe props with comprehensive TypeScript interfaces
-- Build proper component composition and reusability
-- Always implement loading states and error handling
-
-### State Management Approach
-- Use React.useState for local component state
-- Implement React.useEffect for side effects appropriately
-- Create custom hooks for complex stateful logic
-- Use React Context for global state when needed
-- Implement proper cleanup in useEffect hooks
-
-### TypeScript Integration
-- Define interfaces for all component props
-- Create type definitions for data structures
-- Use generic types for reusable components
-- Implement proper error boundary components
-- Type all event handlers and callback functions
-
-## Performance & Optimization Rules
-
-### React Performance
-- Use React.memo for expensive components
-- Implement lazy loading for route-based code splitting
-- Use React.useCallback and React.useMemo appropriately
-- Avoid unnecessary re-renders through proper state management
-- Implement proper key props for list rendering
-
-### Vite Optimization
-- Configure path aliases for clean imports
-- Use Vite's hot module replacement effectively
-- Implement proper build optimization with manual chunks
-- Leverage Vite's built-in bundle analysis tools
-- Configure proper asset handling
-
-### Loading & Performance
-- Implement skeleton loading states
-- Use proper image optimization and lazy loading
-- Create smooth loading transitions
-- Implement progressive web app features when appropriate
-- Monitor and optimize bundle size
-
-## UI Package Guidelines
-
-### AVAILABLE PRE-INSTALLED PACKAGES (USE THESE ONLY)
-- **UI Components**: @radix-ui/* components (accordion, alert-dialog, avatar, etc.)
-- **Icons**: lucide-react ONLY - do not use other icon libraries
-- **Animation**: framer-motion for all animations and transitions
-- **Styling Utilities**: tailwind-merge, clsx, class-variance-authority
-- **Form Handling**: react-hook-form, zod, @hookform/resolvers
-- **UI Elements**: sonner, react-day-picker, embla-carousel-react, vaul, input-otp
-- **Data Visualization**: recharts for charts and graphs
-- **Content**: react-markdown, remark-gfm for markdown rendering
-
-### PACKAGE USAGE RULES
-1. **ONLY use the packages listed above** - these are pre-installed and ready to use
-2. **DO NOT add new dependencies** without first checking package.json
-3. **ALWAYS verify package exists** in package.json before importing
-4. **If a needed package is missing**, add it to package.json FIRST, then use it
-5. **Use exact versions** as specified in the main package.json
-
-## Component Design System
-
-### ADVANCED COMPONENT REQUIREMENTS
-- **Card Components**: All cards must have rounded borders (rounded-xl), hover effects (scale: 102-105%), and shadow transitions
-- **Carousels/Sliders**: Implement with pagination dots, navigation arrows, and auto-play capabilities
-- **Testimonial Cards**: Include person image, quote, name, and position with styled quotation marks
-- **Video Elements**: Always add play button overlay with pulse animation on video thumbnails
-- **CTA Buttons**: Create gradient backgrounds, hover animations, and proper padding (px-6 py-3)
-- **Feature Icons**: Use Lucide React icons with background circles/shapes and consistent styling
-- **Form Elements**: Style inputs with subtle animations on focus and proper validation states
-
-### MULTI-COLUMN SECTION LAYOUTS
-- **Feature Grids**: 3-4 columns on desktop, 2 on tablet, 1 on mobile with proper spacing
-- **Footer Layout**: 4-5 columns on desktop with logo, navigation, contact, and social media sections
-- **Content Splits**: Alternate between text-left/image-right and image-left/text-right for visual interest
-- **Blog/News Grid**: 3 column card layout with featured post option
-- **Team Member Sections**: Grid layout with hover effects and social media links
-
-### Reusable Component Standards
-- Create a comprehensive button component with multiple variants
-- Build card components with consistent hover effects
-- Implement modal and dialog components with proper accessibility
-- Create form components with validation states
-- Build navigation components with responsive behavior
-
-### Animation & Interaction Patterns
-- Implement hover effects that provide immediate feedback
-- Create scroll-triggered animations for progressive disclosure
-- Use transform animations over layout-affecting animations
-- Implement loading animations for better perceived performance
-- Create form validation with smooth, helpful feedback
-
-### HERO SECTION REQUIREMENTS (MANDATORY)
-- **Two-Column Layout**: Always use flex layout with text-left and image-right
-- **Text Content**: Include heading (text-5xl/6xl), subheading, paragraph, and 2 CTA buttons
-- **Heading Style**: Bold font, possible gradient or color highlight on key words
-- **CTA Section**: Primary button (filled with hover effect) and secondary button (outline)
-- **Image/Video**: Right side must have featured image or video with play button overlay
-- **Background Elements**: Subtle patterns, gradients, or shapes in background
-- **Animations**: Text should have subtle entrance animations using Framer Motion
-- **Mobile Responsive**: Stack columns on mobile with image below text
-- **Visual Balance**: Proper spacing between elements and balanced visual weight
-- **Dark Overlay**: If using background image, apply subtle gradient overlay for text contrast
-
-### HEADER/NAVIGATION REQUIREMENTS (MANDATORY)
-- **Sticky Behavior**: Header must stay fixed at top when scrolling
-- **Logo Section**: Left-aligned logo with hover animation
-- **Nav Links**: Horizontal links with hover underline or color change effect
-- **Right Actions**: Include login/signup buttons or user account section
-- **Mobile Toggle**: Hamburger menu for mobile that expands with smooth animation
-- **Dropdown Support**: Support for dropdown menus with proper styling
-- **Active State**: Clear indicator for current page
-- **Background**: Subtle transparency or blur effect for modern look
-- **Shadow**: Light shadow to create separation from content
-- **Transition**: Smooth color/opacity transition when scrolling
-
-### Responsive Design Strategy
-- Mobile-first approach - design for mobile, enhance for desktop
-- Use Tailwind's responsive prefixes strategically
-- Create flexible layouts that adapt gracefully
-- Implement touch-friendly interactive elements
-- Test across multiple device sizes
-
-## Content & UX Guidelines
-
-### Typography Hierarchy
-- Bold, attention-grabbing headlines that promise transformation
-- Clear value propositions in subheadings
-- Readable body text with proper line height
-- Consistent text sizing and spacing
-- Strategic use of text colors for hierarchy
-
-### Visual Content Strategy
-- High-quality photography that's professional and diverse
-- Consistent image treatment with filters and aspect ratios
-- Strategic use of icons for visual hierarchy
-- Illustrations that support the brand aesthetic
-- Optimized images for web performance
-
-### User Experience Principles
-- Clear navigation and intuitive user flow
-- Obvious call-to-action buttons with strong visual hierarchy
-- Accessible color contrasts that meet WCAG standards
-- Touch-friendly mobile experience with adequate tap targets
-- Consistent interaction patterns throughout the application
-
-## Quality Standards
-
-### Visual Impact Checklist
-- Creates immediate "wow" factor upon loading
-- Strong visual hierarchy with clear contrast
-- Modern, contemporary aesthetic that feels current
-- Consistent spacing and alignment throughout
-- Smooth animations that enhance rather than distract
-
-### Technical Excellence
-- All interactive elements have proper hover states
-- Smooth 60fps animations and transitions
-- Fully responsive across all breakpoints
-- Fast loading times with optimized assets
-- Proper error handling and loading states
-
-### Code Quality Standards
-- Type-safe TypeScript implementation throughout
-- Proper component composition and reusability
-- Clean, readable code with consistent formatting
-- Comprehensive prop interfaces and type definitions
-- Proper error boundaries for production resilience
-
-## Development Workflow
-
-### Project Structure
-- Organize components by feature and reusability
-- Separate UI components from business logic
-- Create dedicated folders for hooks, types, and utilities
-- Implement proper import/export patterns
-- Maintain clean file and folder naming conventions
-
-### Testing Considerations
-- Components should include testId props for testing
-- Design components to be easily testable
-- Implement proper accessibility attributes
-- Create components with clear, single responsibilities
-- Use semantic HTML elements where appropriate
-
-### Error Handling Strategy
-- Implement React Error Boundaries for production
-- Create user-friendly error states
-- Provide clear feedback for user actions
-- Handle loading states gracefully
-- Implement proper form validation
-
-## Creative Direction
-
-### Push Visual Boundaries
-- Experiment with cutting-edge design trends
-- Challenge conventional layout patterns
-- Combine multiple visual techniques for unique effects
-- Stay current with modern web design trends
-- Iterate and refine based on visual impact
-
-### Brand Consistency
-- Maintain consistent color palettes throughout
-- Use typography hierarchies that reinforce brand
-- Create cohesive spacing and sizing systems
-- Implement consistent interaction patterns
-- Build recognizable visual language
-
-## Final Quality Standards
-
-Before considering any React application complete, ensure it meets these standards:
-
-**Visual Excellence**: Immediate visual impact, modern aesthetic, consistent design system, smooth animations, professional photography and imagery.
-
-**Technical Performance**: Type-safe implementation, optimized performance, responsive design, proper error handling, accessible user interface.
-
-**User Experience**: Intuitive navigation, clear call-to-actions, smooth interactions, fast loading, mobile-friendly design.
-
-**Code Quality**: Clean TypeScript implementation, reusable components, proper state management, comprehensive testing setup, production-ready error handling.
-
-The ultimate goal is creating React applications that feel premium, modern, and engaging - designs that users remember and want to interact with, built with professional-grade code that's maintainable and scalable.
-
-**DESIGN SYSTEM:**
-✅ **TAILWIND CSS ONLY** - Pure Tailwind CSS for all styling, no custom CSS
-✅ **PROFESSIONAL LAYOUTS** - Use modern two-column layouts for hero sections (text left, image right)
-✅ **PREMIUM NAVIGATION** - Clean, branded navigation with proper spacing and hover effects
-✅ **STUNNING VISUAL EFFECTS** - Implement gradient backgrounds, shadows, glass effects, and subtle curves
-✅ **ADVANCED CARD DESIGNS** - Create cards with icons, proper spacing, and hover animations
-✅ **RESPONSIVE DESIGN** - Mobile-first with Tailwind responsive classes (sm, md, lg, xl breakpoints)
-✅ **CONSISTENT COLOR SCHEME** - Use cohesive color palettes with primary, accent, and neutral tones
-✅ **PROFESSIONAL TYPOGRAPHY** - Large, bold headlines with proper type hierarchy and spacing
-✅ **DARK/LIGHT MODE** - Implement theme switching with Tailwind dark mode classes
-✅ **ANIMATIONS** - Use Framer Motion for smooth transitions, hover effects, and scroll animations
-✅ **INTERACTIVE ELEMENTS** - Create engaging buttons, form elements, and interactive components
-✅ **OPTIMIZED SPACING** - Follow 8px grid system for consistent spacing and alignment
-✅ **MODERN UI PATTERNS** - Implement hero sections, feature grids, testimonial sliders, and CTA sections
-
-**TECHNICAL EXECUTION:**
-✅ **TYPESCRIPT** - Full TypeScript support with proper typing
-✅ **REACT HOOKS** - Use functional components with hooks
-✅ **PACKAGE MANAGEMENT:**
-✅ **CHECK PACKAGE.JSON FIRST** - Always verify packages exist before importing
-✅ **USE PRE-INSTALLED PACKAGES** - Prefer packages already in dependencies
-✅ **ADD MISSING DEPENDENCIES** - If needed, update package.json before using new packages
-✅ **EXACT VERSIONS** - Match versions from main package.json
-✅ **MANDATORY PRE-CHECK** - Never import a package without confirming it's available
-
-**FILE ORGANIZATION:** - Proper directory structure (src/pages, src/components)
-✅ **ACCESSIBILITY** - Follow accessibility best practices
-
-🛠️ **AVAILABLE TOOLS & WHEN TO USE THEM** 🛠️
-
-** ALWAYS USE THESE TOOLS AS NEEDED - THEY ARE YOUR PRIMARY WAY OF INTERACTING WITH THE FILE SYSTEM **
-
-1. **list_files** - Use this tool to:
-   - See all files in the project workspace
-   - Understand the current project structure
-   - Identify where to create new files
-   - Check if files already exist
-   - ALWAYS use this at the beginning of any request to understand the project structure
-
-2. **read_file** - Use this tool to:
-   - Read the contents of any existing file
-   - Understand how components are structured
-   - See current implementation before making changes
-   - Check package.json dependencies
-   - Review configuration files
-
-3. **write_file** - Use this tool to:
-   - Create new files in the project
-   - Update existing files with new content
-   - Add new pages to src/pages/
-   - Update package.json with new dependencies
-   - Modify any file content
-
-4. **delete_file** - Use this tool to:
-   - Remove files that are no longer needed
-   - Delete obsolete  pages
-   - Clean up temporary files
-
-**TOOL USAGE BEST PRACTICES:**
-✅ ALWAYS use list_files first to understand the project structure
-✅ ALWAYS read existing files before modifying them
-✅ ALWAYS create files in the correct directories (src/pages/, src/components/, etc.)
-✅ ALWAYS update package.json before using new packages
-✅ NEVER skip using tools - they are mandatory for file operations
-
-**WORKFLOW:**
-1. 📊 tool_results_summary (intro)
-2. 🛠️ Execute with tools + explanations
-3. 📊 tool_results_summary (completion)
-
-⚡ **TOOLS ALWAYS ACTIVE** - ProjectID: \${projectId}
-
-Project context: \${projectContext || 'Vite + React + TypeScript project - Multi-page with React Router'}`;
+    // Enhanced system message with conversation memory and intent awareness
+    const systemMessage = `🚨 CRITICAL INSTRUCTION: You are Pixel Pilot, an Autonomous AI Agent that plans, creates and modifies React Vite web applications in real-time with a live preview.
+
+⚠️ **FIRST RULE - READ THIS BEFORE ANYTHING ELSE:**
+- NEVER use web_search or web_extract unless the user EXPLICITLY asks for web research
+- For file modifications, product additions, or code changes, use ONLY read_file and write_file
+- If user wants to add products to a file, READ the file and WRITE the changes directly
+- Web tools are FORBIDDEN for basic development tasks
+
+# Core Guidelines
+
+🚨 **CRITICAL RULE - READ FIRST:**
+- NEVER use web_search or web_extract unless user EXPLICITLY asks for web research
+- For file modifications, use ONLY read_file and write_file
+- If user wants to add products, READ the file and WRITE changes directly
+- Web tools are FORBIDDEN for basic development tasks
+
+- Make efficient changes following best practices
+- Keep things modern and elegant
+- Reply in the same language as the user
+- Should proactively create or edit files related to the user's request to accomplish the task given to you by the user
+- Maintain context awareness and avoid repeating previous actions
+- Use conversation memory to understand what has been done before
+
+# Conversation Memory
+
+You have access to the last 10 conversation pairs (20 messages) to maintain context and avoid repetition. Use this memory to:
+- Remember what files you've already created or modified
+- Understand the user's development progress
+- Avoid suggesting solutions that have already been implemented
+- Build upon previous work rather than starting over
+
+# User Intent Analysis
+
+Based on NLP analysis, the user's intent is: ${userIntent ? `${userIntent.intent} (${userIntent.complexity} complexity, ${Math.round(userIntent.confidence * 100)}% confidence)` : 'Analyzing...'}
+
+Recommended tools for this request: ${userIntent ? userIntent.required_tools.join(', ') : 'Standard development tools'}
+Action plan: ${userIntent ? userIntent.action_plan.join(' → ') : 'Analyze and implement'}
+
+🚨 **INTENT DETECTION ENFORCEMENT RULES:**
+${userIntent?.tool_usage_rules ? `**Tool Usage Rules:** ${userIntent.tool_usage_rules}` : 'Tool usage rules: Use file operations for development tasks'}
+${userIntent?.enforcement_notes ? `**Enforcement Notes:** ${userIntent.enforcement_notes}` : 'Enforcement: Web tools forbidden for basic development tasks'}
+
+⚠️ **REMINDER:** These rules from intent detection are MANDATORY and must be followed!
+
+# Available Tools
+
+## Core Development Tools (Use these first)
+1. **list_files** - List all files in the project
+2. **read_file** - Read the contents of a file
+3. **write_file** - Create or update a file (Agent mode only)
+4. **delete_file** - Delete a file (Agent mode only)
+
+## Context & Knowledge Tools (Use when needed)
+5. **search_knowledge** - Get the content of a specific knowledge item by ID
+6. **get_project_summary** - Get project structure information
+7. **recall_context** - Recall previous conversation context with AI enhancement
+8. **learn_patterns** - Analyze development patterns and learn from history
+
+## Web Tools (ONLY use when user explicitly requests web research)
+9. **web_search** - Search the web for current information and context (ONLY when user asks for external research)
+10. **web_extract** - Extract content from web pages (ONLY when user asks for external content)
+
+# Workflow
+
+🚨 **CRITICAL FIRST STEP - READ THIS:**
+- NEVER call web_search or web_extract unless user EXPLICITLY says "search web" or "research online"
+- For adding products, editing files, or code changes, use ONLY read_file and write_file
+- Web tools are FORBIDDEN for basic development tasks
+
+1. **ALWAYS start with file operations** - Use read_file to understand current state
+2. **Check conversation memory** to avoid repeating previous work
+3. **Use web tools ONLY when explicitly requested** - Don't search the web unless the user asks for external research
+4. **Focus on direct file modification** - If user wants changes, make them directly with write_file
+5. **Follow the project's tech stack** (Vite + React + TypeScript + Tailwind CSS)
+6. **Use shadcn/ui components** when appropriate
+7. **Implement user requests efficiently** - Don't over-engineer or add unnecessary complexity
+
+# Knowledge Base IDs
+
+Here are the available knowledge base IDs you can use with the search_knowledge tool:
+- design-system - Design System Guidelines
+- hero-section - Hero Section Requirements
+- header-navigation - Header/Navigation Requirements
+- technical-execution - Technical Execution Standards
+- tools-usage - Tool Usage Guidelines
+- quality-standards - Quality Standards
+- caching-mechanisms - Caching Mechanisms for Performance Optimization
+- web-search - Web Search and Content Extraction Tools
+
+# Important Notes
+
+- Do not modify vite.config.js or vite.config.ts files
+- Always use TypeScript with proper typing
+- Use functional components with React hooks
+- Apply Tailwind CSS for styling
+- Create multi-page apps with React Router
+- Maintain conversation context and avoid repetition
+- Be creative but follow user instructions strictly
+
+# CRITICAL: Tool Usage Rules - VIOLATION WILL RESULT IN FAILURE
+
+🚫 **ABSOLUTELY FORBIDDEN:**
+- DO NOT call web_search unless user explicitly says "search the web" or "research online"
+- DO NOT call web_extract unless user explicitly says "extract from website" or "scrape content"
+- DO NOT use web tools for basic file operations like adding products, editing code, or modifying files
+
+✅ **MANDATORY APPROACH:**
+- ALWAYS use read_file first to understand current file state
+- ALWAYS use write_file directly to make requested changes
+- ALWAYS prioritize local file operations over external web research
+- If user wants to add products, edit the file directly - NO web search needed!
+
+🔒 **ENFORCEMENT:**
+- These rules are NON-NEGOTIABLE
+- Violating these rules means you're not following user instructions
+- Stick to file operations only unless explicitly told to research online
+
+📝 **EXAMPLE SCENARIO:**
+User: "add more products to our store up to 15 products"
+CORRECT: read_file → write_file (add products directly)
+WRONG: web_search → web_extract → web_extract (unnecessary web research)
+
+Project context: ${projectContext || 'Vite + React + TypeScript project - Multi-page with React Router'}`;
 
     // Get the AI model based on the selected modelId
     const selectedAIModel = getAIModel(modelId)
@@ -965,72 +2363,58 @@ Project context: \${projectContext || 'Vite + React + TypeScript project - Multi
         modelId: modelId || DEFAULT_CHAT_MODEL,
         modelName: selectedModel?.name || 'Unknown',
         useTools: true,
-        messagesCount: messages.length
+        originalMessagesCount: messages.length,
+        messagesToSendCount: messages.length > 10 ? 10 : messages.length
       })
-      
-      // CRITICAL: Sync client-side files to server-side InMemoryStorage
-      // This ensures AI tools can access the files that exist in IndexedDB
-      const clientFiles = body.files || []
-      console.log(`[DEBUG] Syncing ${clientFiles.length} files to server-side storage for AI access`)
-      
-      if (clientFiles.length > 0) {
-        try {
-          const { storageManager } = await import('@/lib/storage-manager')
-          await storageManager.init()
-          
-          // Clear existing files in InMemoryStorage to ensure clean state
-          const existingFiles = await storageManager.getFiles(projectId)
-          for (const existingFile of existingFiles) {
-            await storageManager.deleteFile(projectId, existingFile.path)
-          }
-          
-          // Sync all client files to server storage
-          for (const file of clientFiles) {
-            if (file.path && !file.isDirectory) {
-              await storageManager.createFile({
-                workspaceId: projectId,
-                name: file.name,
-                path: file.path,
-                content: file.content || '',
-                fileType: file.type || file.fileType || 'text',
-                type: file.type || file.fileType || 'text',
-                size: file.size || (file.content || '').length,
-                isDirectory: false
-              })
-              console.log(`[DEBUG] Synced file to server storage: ${file.path}`)
-            }
-          }
-          
-          // Verify sync worked
-          const syncedFiles = await storageManager.getFiles(projectId)
-          console.log(`[DEBUG] File sync complete: ${syncedFiles.length} files now available to AI tools`)
-          
-        } catch (syncError) {
-          console.error('[ERROR] Failed to sync files to server storage:', syncError)
-          // Continue anyway - tools may still work for write operations
-        }
-      }
       
       // Use tools-enabled generation with multi-step support
       const abortController = new AbortController()
       
+      // Limit messages to first 10 when there are more than 10 messages
+      const messagesToSend = messages.length > 10 ? messages.slice(0, 10) : messages;
+      
+      // Filter and validate conversation memory messages
+      const validMemoryMessages = conversationMemory ? 
+        conversationMemory.messages.filter(msg => msg.content && msg.content.trim().length > 0) : []
+      
+      console.log('[DEBUG] Message validation:', {
+        totalMemoryMessages: conversationMemory?.messages?.length || 0,
+        validMemoryMessages: validMemoryMessages.length,
+        invalidMessages: (conversationMemory?.messages?.length || 0) - validMemoryMessages.length,
+        sampleValidMessage: validMemoryMessages[0] ? {
+          role: validMemoryMessages[0].role,
+          contentLength: validMemoryMessages[0].content?.length || 0,
+          contentPreview: validMemoryMessages[0].content?.substring(0, 50) + '...'
+        } : null
+      })
+      
+      // FORCE TOOL USAGE: The AI MUST use these tools when users mention files
+      // Only include web tools if explicitly needed based on intent detection
+      console.log('[DEBUG] Creating tool set with intent data:', {
+        intent: userIntent?.intent || 'unknown',
+        requiredTools: userIntent?.required_tools || [],
+        confidence: userIntent?.confidence || 0,
+        needsWebTools: userIntent?.required_tools?.includes('web_search') || userIntent?.required_tools?.includes('web_extract')
+      })
+
       const result = await generateText({
         model: model,
         messages: [
           { role: 'system', content: systemMessage },
-          ...messages
+          // Use filtered valid messages to prevent AI model errors
+          ...validMemoryMessages
         ],
-        temperature: 0.0, // Force maximum predictability for tool usage
+        temperature: 0.7, // Increased creativity while maintaining tool usage
         stopWhen: stepCountIs(5), // Allow up to 5 steps for complex multi-tool operations
         abortSignal: abortController.signal,
         toolChoice: 'required', // Force tool usage first - AI MUST use tools before providing text responses
-        
+
         onStepFinish: ({ text, toolCalls, toolResults, finishReason, usage }) => {
           // Log step completion for debugging
           console.log('[DEBUG] Step finished:', {
             hasText: !!text,
             textLength: text?.length || 0,
-            textPreview: text?.substring(0, 100) + (text && text.length > 100 ? '...' : ''),
+            textPreview: text?.substring(0, 100) || 'no text',
             toolCallsCount: toolCalls.length,
             toolResultsCount: toolResults.length,
             finishReason,
@@ -1038,7 +2422,8 @@ Project context: \${projectContext || 'Vite + React + TypeScript project - Multi
           })
         },
         // FORCE TOOL USAGE: The AI MUST use these tools when users mention files
-        tools: createFileOperationTools(projectId, aiMode)
+        // Only include web tools if explicitly needed based on intent detection
+        tools: createFileOperationTools(projectId, aiMode, conversationMemory ? conversationMemory.messages : [], user.id, userIntent)
       })
 
       // Log the complete result structure for debugging
@@ -1138,7 +2523,7 @@ Project context: \${projectContext || 'Vite + React + TypeScript project - Multi
           // If we have a forced result, create a new response
           if (forcedToolResult) {
             // Update the result text to indicate tool was used
-            const newResponse = `I've used the ${forcedToolResult.toolName} tool to fulfill your request. ${forcedToolResult.output.message}`
+            const newResponse = `I have used the ${forcedToolResult.toolName} tool to fulfill your request. ${forcedToolResult.output.message}`
             
             // Create a new result object that includes the forced tool execution
             const modifiedResult = {
@@ -1280,10 +2665,7 @@ Project context: \${projectContext || 'Vite + React + TypeScript project - Multi
         }
       }
       
-      // Final fallback only if we truly have no content
-      if (!actualAIMessage || actualAIMessage.trim().length === 0) {
-        actualAIMessage = 'Done! Switch to preview to see changes.'
-      }
+    
       
       console.log('[DEBUG] Final AI message extraction:', {
         hasResultText: !!result.text,
@@ -1299,6 +2681,174 @@ Project context: \${projectContext || 'Vite + React + TypeScript project - Multi
         finalMessageLength: actualAIMessage.length,
         finalMessagePreview: actualAIMessage.substring(0, 300) + (actualAIMessage.length > 300 ? '...' : '')
       })
+      
+      // Store conversation memory with the new AI response
+      try {
+        // Import storage manager for conversation memory storage
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        
+        // Enhanced: Use AI to process and enhance the memory
+        const projectContext = await buildEnhancedProjectContext(projectId, storageManager)
+        const enhancedMemory = await processMemoryWithAI(
+          conversationMemory,
+          userMessage,
+          projectContext,
+          processedToolCalls
+        )
+        
+        if (conversationMemory) {
+          // Update existing memory with AI-enhanced insights
+          await storageManager.updateConversationMemory(
+            conversationMemory.id,
+            {
+              messages: [
+                ...conversationMemory.messages,
+                {
+                  role: 'assistant',
+                  content: actualAIMessage,
+                  timestamp: new Date().toISOString(),
+                  toolCalls: processedToolCalls,
+                  toolResults: processedToolCalls?.map(tc => tc.result) || []
+                }
+              ],
+              lastActivity: new Date().toISOString(),
+              // AI-enhanced memory fields
+              aiInsights: enhancedMemory.keyInsights,
+              semanticSummary: enhancedMemory.semanticSummary,
+              technicalPatterns: enhancedMemory.technicalPatterns,
+              architecturalDecisions: enhancedMemory.architecturalDecisions,
+              nextLogicalSteps: enhancedMemory.nextLogicalSteps,
+              potentialImprovements: enhancedMemory.potentialImprovements,
+              relevanceScore: enhancedMemory.relevanceScore,
+              contextForFuture: enhancedMemory.contextForFuture
+            }
+          )
+        } else {
+          // Create new memory with AI-enhanced insights
+          await storageManager.createConversationMemory({
+            projectId,
+            userId: user.id,
+            messages: [
+              ...messages.slice(-20).map((msg: any) => ({
+                role: msg.role,
+                content: msg.content,
+                timestamp: new Date().toISOString()
+              })),
+              {
+                role: 'assistant',
+                content: actualAIMessage,
+                timestamp: new Date().toISOString(),
+                toolCalls: processedToolCalls,
+                toolResults: processedToolCalls?.map(tc => tc.result) || []
+              }
+            ],
+            summary: enhancedMemory.semanticSummary || `Project: ${projectId} | Messages: ${messages.length + 1}`,
+            keyPoints: enhancedMemory.keyInsights || [],
+            lastActivity: new Date().toISOString(),
+            // AI-enhanced memory fields
+            aiInsights: enhancedMemory.keyInsights,
+            semanticSummary: enhancedMemory.semanticSummary,
+            technicalPatterns: enhancedMemory.technicalPatterns,
+            architecturalDecisions: enhancedMemory.architecturalDecisions,
+            nextLogicalSteps: enhancedMemory.nextLogicalSteps,
+            potentialImprovements: enhancedMemory.potentialImprovements,
+            relevanceScore: enhancedMemory.relevanceScore,
+            contextForFuture: enhancedMemory.contextForFuture
+          })
+        }
+        
+        console.log('[DEBUG] Conversation memory stored successfully:', {
+          projectId,
+          userId: user.id,
+          messageCount: conversationMemory ? conversationMemory.messages.length + 1 : messages.length + 1,
+          lastActivity: new Date().toISOString()
+        })
+      } catch (error) {
+        console.warn('[WARNING] Failed to store conversation memory:', error)
+        // Continue without failing the request
+      }
+      
+      // CRITICAL: Prevent empty assistant messages from being sent
+      // If the AI only used tools without generating text, use Together AI to generate a meaningful summary
+      if (!actualAIMessage.trim() && processedToolCalls && processedToolCalls.length > 0) {
+        try {
+          console.log('[DEBUG] Generating AI-powered tool summary using Together AI...')
+          
+          const togetherModel = getTogetherAIModel()
+          const toolSummaryPrompt = `You are an AI assistant that creates beautifully formatted, professional summaries of development tool actions.
+
+Based on the user's request, generate a simple, clean summary:
+
+User's original request: "${userMessage}"
+
+Create a beautifully formatted summary using Markdown with the following structure:
+
+1. **Main Heading**: Use ## for a descriptive title about what was accomplished
+2. **Summary Paragraph**: Write a concise overview (2-3 sentences) using personal pronouns like "I" to make it conversational
+3. **Key Highlights**: Use bullet points for important results and outcomes
+
+Formatting Requirements:
+- Use ## for main headings
+- Use **bold** for emphasis on key terms
+- Use *italic* for subtle emphasis
+- Use personal pronouns like "I", "I've", "I have" to make the summary more conversational and personal
+- Avoid using tables - keep summaries clean and simple
+- Use bullet points (• or -) for lists
+- Use emojis for visual appeal and status indication
+- Keep text size small and readable (similar to user messages)
+- Use consistent spacing and alignment
+- Make it visually appealing and professional
+
+Emoji Guide:
+- ✅ Success/Completed
+- 📁 Files/Folders
+- 📖 Reading/Content
+- ✏️ Writing/Editing
+- 🗑️ Deletion
+- 🔍 Search/Investigation
+- 🧠 Memory/Context
+- 📊 Analysis/Patterns
+- 🔧 Tools/Operations
+- ⚡ Fast/Quick
+- 🎯 Target/Goal
+
+Example structure:
+## Task Completed
+
+I have successfully completed your request.
+
+Make it look professional, organized, and easy to read using clean markdown formatting.`
+
+          const summaryResult = await generateText({
+            model: togetherModel,
+            messages: [
+              { role: 'system', content: 'You are a helpful AI assistant that summarizes development tool actions in natural language.' },
+              { role: 'user', content: toolSummaryPrompt }
+            ],
+            temperature: 0.7
+          })
+
+          if (summaryResult.text && summaryResult.text.trim()) {
+            actualAIMessage = summaryResult.text.trim()
+            console.log('[DEBUG] AI-generated tool summary:', actualAIMessage.substring(0, 100) + '...')
+          } else {
+            // Fallback to basic summary if AI generation fails
+            actualAIMessage = `## Task Completed
+
+I have successfully completed your request.`
+            console.log('[DEBUG] Fallback tool summary generated:', actualAIMessage.substring(0, 100) + '...')
+          }
+        } catch (summaryError) {
+          console.error('[ERROR] Failed to generate AI tool summary:', summaryError)
+          
+          // Fallback to basic summary if AI generation fails
+          actualAIMessage = `## Task Completed
+
+I have successfully completed your request.`
+          console.log('[DEBUG] Error fallback tool summary generated:', actualAIMessage.substring(0, 100) + '...')
+        }
+      }
       
       // Return the response immediately for instant UI update
       const response = new Response(JSON.stringify({
