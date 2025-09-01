@@ -270,6 +270,11 @@ const SEARCH_START = "<<<<<<< SEARCH";
 const DIVIDER = "=======";
 const REPLACE_END = ">>>>>>> REPLACE";
 
+// Helper function to escape special regex characters
+function escapeRegExp(string: string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Parse AI response into search/replace blocks
 function parseSearchReplaceBlocks(aiResponse: string) {
   const blocks: Array<{search: string, replace: string}> = [];
@@ -809,12 +814,25 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
         const { storageManager } = await import('@/lib/storage-manager')
         await storageManager.init()
         
+        console.log(`[DEBUG] analyze_project: Getting files for projectId: ${projectId}`)
         const files = await storageManager.getFiles(projectId)
+        console.log(`[DEBUG] analyze_project: Found ${files.length} files in storage`)
+        
+        // Use the files from storage (they should be properly synced)
+        let allFiles = files
+        console.log(`[DEBUG] analyze_project: Using ${files.length} files from storage`)
+        
+        // Build enhanced project context using the same function
+        const enhancedContext = await buildEnhancedProjectContext(projectId, storageManager)
+        console.log(`[DEBUG] analyze_project: Built enhanced context with ${enhancedContext.length} characters`)
+        console.log(`[DEBUG] analyze_project: Available files count: ${allFiles.length}`)
+        
+        const files_to_analyze = allFiles
         
         // Enhanced project analysis
         const analysis = {
           projectId,
-          totalFiles: files.length,
+          totalFiles: files_to_analyze.length,
           structure: {} as any,
           dependencies: {} as any,
           srcAnalysis: {} as any,
@@ -827,7 +845,7 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
         const srcFiles: any[] = []
         let packageJson: any = null
         
-        files.forEach(file => {
+        files_to_analyze.forEach(file => {
           try {
             const path = file.path
             const ext = path?.split('.').pop() || 'no-extension'
@@ -916,6 +934,8 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
           success: true,
           message: `Project analysis completed successfully`,
           analysis,
+          projectContext: enhancedContext, // Include the enhanced project context
+          enhancedProjectInfo: `Found ${files_to_analyze.length} files in project`,
           toolCallId
         }
       } catch (error) {
@@ -1637,22 +1657,40 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
     })
 
     tools.edit_file = tool({
-      description: 'Edit an existing file using precise search/replace operations. The AI should output search/replace blocks in the surrounding text using the format: <<<<<<< SEARCH\\n[code to find]\\n=======\\n[replacement code]\\n>>>>>>> REPLACE',
+      description: 'Edit an existing file using precise search/replace operations. Provide the search and replace blocks directly as parameters.',
       inputSchema: z.object({
-        path: z.string().describe('File path relative to project root to edit')
+        path: z.string().describe('File path relative to project root to edit'),
+        searchReplaceBlocks: z.array(z.object({
+          search: z.string().describe('Exact text to find in the file (must match exactly including whitespace)'),
+          replace: z.string().describe('Text to replace the search text with'),
+          replaceAll: z.boolean().optional().describe('If true, replace all occurrences. If false or omitted, replace only the first occurrence.'),
+          occurrenceIndex: z.number().optional().describe('If specified, replace only the Nth occurrence (1-based index). Overrides replaceAll.'),
+          validateAfter: z.string().optional().describe('Optional text that should exist in the file after this operation (for validation)')
+        })).describe('Array of search/replace operations to perform'),
+        dryRun: z.boolean().optional().describe('If true, validate all operations without applying changes'),
+        rollbackOnFailure: z.boolean().optional().describe('If true, rollback all changes if any operation fails (default: true)')
       }),
-      execute: async ({ path }, { abortSignal, toolCallId }) => {
+      execute: async ({ path, searchReplaceBlocks, dryRun = false, rollbackOnFailure = true }, { abortSignal, toolCallId }) => {
         // Check for cancellation
         if (abortSignal?.aborted) {
           throw new Error('Operation cancelled')
         }
         
         try {
-          // Validate path
+          // Validate inputs
           if (!path || typeof path !== 'string') {
             return { 
               success: false, 
               error: `Invalid file path provided`,
+              path,
+              toolCallId
+            }
+          }
+
+          if (!searchReplaceBlocks || !Array.isArray(searchReplaceBlocks) || searchReplaceBlocks.length === 0) {
+            return { 
+              success: false, 
+              error: `No search/replace blocks provided`,
               path,
               toolCallId
             }
@@ -1674,18 +1712,249 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
             }
           }
 
-          // Return success with file info - the actual editing will be done in post-processing
-          // when we have access to the AI's full response text with search/replace blocks
+          // Helper functions
+          function escapeRegExp(string: string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          }
+
+          function findNthOccurrence(content: string, searchText: string, n: number): number {
+            let index = -1;
+            for (let i = 0; i < n; i++) {
+              index = content.indexOf(searchText, index + 1);
+              if (index === -1) return -1;
+            }
+            return index;
+          }
+
+          function replaceNthOccurrence(content: string, searchText: string, replaceText: string, n: number): string {
+            const index = findNthOccurrence(content, searchText, n);
+            if (index === -1) return content;
+            return content.substring(0, index) + replaceText + content.substring(index + searchText.length);
+          }
+
+          // Initialize tracking arrays
+          const appliedEdits: Array<{
+            blockIndex: number;
+            search: string;
+            replace: string;
+            status: string;
+            replaceAll?: boolean;
+            occurrenceIndex?: number;
+            occurrencesReplaced?: number;
+            validationPassed?: boolean;
+          }> = [];
+          const failedEdits: Array<{
+            blockIndex: number;
+            search: string;
+            replace: string;
+            status: string;
+            reason: string;
+            validationError?: string;
+          }> = [];
+
+          // Store original content for rollback
+          const originalContent = existingFile.content;
+          let modifiedContent = originalContent;
+          const contentSnapshots: string[] = [originalContent];
+
+          // Phase 1: Dry run validation (always performed)
+          console.log(`[DEBUG] Starting validation phase for ${searchReplaceBlocks.length} blocks`);
+          
+          let tempContent = originalContent;
+          const validationResults: Array<{
+            blockIndex: number;
+            canApply: boolean;
+            reason?: string;
+            occurrencesFound: number;
+          }> = [];
+
+          for (let i = 0; i < searchReplaceBlocks.length; i++) {
+            const block = searchReplaceBlocks[i];
+            const searchText = block.search;
+            const replaceText = block.replace;
+            const replaceAll = block.replaceAll || false;
+            const occurrenceIndex = block.occurrenceIndex;
+            const validateAfter = block.validateAfter;
+
+            // Count occurrences in current temp content
+            const occurrences = (tempContent.match(new RegExp(escapeRegExp(searchText), 'g')) || []).length;
+            
+            let canApply = true;
+            let reason = '';
+
+            if (occurrences === 0) {
+              canApply = false;
+              reason = 'Search text not found in content';
+            } else if (occurrenceIndex && occurrenceIndex > occurrences) {
+              canApply = false;
+              reason = `Requested occurrence ${occurrenceIndex} but only ${occurrences} occurrences found`;
+            }
+
+            validationResults.push({
+              blockIndex: i,
+              canApply,
+              reason,
+              occurrencesFound: occurrences
+            });
+
+            // If this block can be applied, simulate the change for next validation
+            if (canApply) {
+              if (occurrenceIndex) {
+                tempContent = replaceNthOccurrence(tempContent, searchText, replaceText, occurrenceIndex);
+              } else if (replaceAll) {
+                tempContent = tempContent.replaceAll(searchText, replaceText);
+              } else {
+                tempContent = tempContent.replace(searchText, replaceText);
+              }
+
+              // Validate the content after this change if specified
+              if (validateAfter && !tempContent.includes(validateAfter)) {
+                canApply = false;
+                reason = `Validation failed: expected text "${validateAfter}" not found after operation`;
+                validationResults[i].canApply = false;
+                validationResults[i].reason = reason;
+              }
+            }
+          }
+
+          // Check if any validations failed
+          const failedValidations = validationResults.filter(r => !r.canApply);
+          
+          if (dryRun) {
+            // Return dry run results
+            return {
+              success: failedValidations.length === 0,
+              message: `🔍 Dry run completed. ${validationResults.length - failedValidations.length}/${validationResults.length} operations would succeed.`,
+              path,
+              action: 'dry_run_completed',
+              toolCallId,
+              dryRunResults: {
+                totalBlocks: searchReplaceBlocks.length,
+                validBlocks: validationResults.length - failedValidations.length,
+                invalidBlocks: failedValidations.length,
+                validationResults,
+                previewContent: tempContent
+              }
+            };
+          }
+
+          // Phase 2: Apply changes (only if not dry run)
+          console.log(`[DEBUG] Applying ${validationResults.length - failedValidations.length} valid operations`);
+          
+          for (let i = 0; i < searchReplaceBlocks.length; i++) {
+            const block = searchReplaceBlocks[i];
+            const validation = validationResults[i];
+            
+            if (!validation.canApply) {
+              failedEdits.push({
+                blockIndex: i,
+                search: block.search,
+                replace: block.replace,
+                status: 'failed',
+                reason: validation.reason || 'Validation failed'
+              });
+              
+              if (rollbackOnFailure) {
+                console.log(`[DEBUG] Block ${i} failed, rolling back all changes`);
+                modifiedContent = originalContent;
+                return {
+                  success: false,
+                  error: `Operation ${i + 1} failed: ${validation.reason}. All changes rolled back.`,
+                  path,
+                  toolCallId,
+                  rollbackPerformed: true,
+                  failedEdits
+                };
+              }
+              continue;
+            }
+
+            const searchText = block.search;
+            const replaceText = block.replace;
+            const replaceAll = block.replaceAll || false;
+            const occurrenceIndex = block.occurrenceIndex;
+
+            // Apply the replacement
+            let occurrencesReplaced = 0;
+            
+            if (occurrenceIndex) {
+              modifiedContent = replaceNthOccurrence(modifiedContent, searchText, replaceText, occurrenceIndex);
+              occurrencesReplaced = 1;
+            } else if (replaceAll) {
+              const beforeCount = (modifiedContent.match(new RegExp(escapeRegExp(searchText), 'g')) || []).length;
+              modifiedContent = modifiedContent.replaceAll(searchText, replaceText);
+              occurrencesReplaced = beforeCount;
+            } else {
+              modifiedContent = modifiedContent.replace(searchText, replaceText);
+              occurrencesReplaced = 1;
+            }
+
+            // Validate after replacement if specified
+            let validationPassed = true;
+            if (block.validateAfter && !modifiedContent.includes(block.validateAfter)) {
+              validationPassed = false;
+              if (rollbackOnFailure) {
+                console.log(`[DEBUG] Post-operation validation failed for block ${i}, rolling back`);
+                modifiedContent = originalContent;
+                return {
+                  success: false,
+                  error: `Post-operation validation failed for block ${i + 1}. All changes rolled back.`,
+                  path,
+                  toolCallId,
+                  rollbackPerformed: true,
+                  validationError: `Expected text "${block.validateAfter}" not found after operation`
+                };
+              }
+            }
+
+            appliedEdits.push({
+              blockIndex: i,
+              search: searchText,
+              replace: replaceText,
+              status: 'applied',
+              replaceAll,
+              occurrenceIndex,
+              occurrencesReplaced,
+              validationPassed
+            });
+
+            // Take snapshot after each successful operation
+            contentSnapshots.push(modifiedContent);
+          }
+
+          // Check if any edits were applied
+          if (appliedEdits.length === 0) {
+            return {
+              success: false,
+              error: `No changes could be applied. All ${failedEdits.length} search/replace operations failed.`,
+              path,
+              toolCallId,
+              failedEdits
+            }
+          }
+
+          // Update the file in storage
+          await storageManager.updateFile(projectId, path, { 
+            content: modifiedContent,
+            updatedAt: new Date().toISOString()
+          });
+
+          console.log(`[DEBUG] Successfully applied ${appliedEdits.length} edits to ${path}`);
+          
           return {
             success: true,
-            message: `✅ File ${path} ready for editing. Search/replace blocks will be processed from AI response.`,
+            message: `✅ File ${path} updated successfully. Applied ${appliedEdits.length}/${searchReplaceBlocks.length} changes.`,
             path,
-            content: existingFile.content,
-            action: 'edit_pending',
+            content: modifiedContent,
+            action: 'edit_completed',
             toolCallId,
-            // Mark this as needing post-processing
-            needsPostProcessing: true
+            appliedEdits,
+            failedEdits: failedEdits.length > 0 ? failedEdits : undefined,
+            validationResults,
+            rollbackOnFailure,
+            contentSnapshots: contentSnapshots.length > 2 ? ['original', '...', 'final'] : contentSnapshots.map((_, i) => i === 0 ? 'original' : `step_${i}`)
           }
+
         } catch (error) {
           // Enhanced error handling
           const errorMessage = error instanceof Error ? error.message : 'Unknown error'
@@ -2331,29 +2600,84 @@ Use read_file tool to read specific files when needed.`
       }
     }
     
-    // Enhanced tool request detection with NLP intent analysis
+    // Enhanced tool request detection with autonomous planning integration
     let isToolRequest = true // Default to true for better AI performance
     let userIntent = null
+    let enhancedIntentData = null
+    let shouldUseAutonomousPlanning = false
     
     try {
-      // Use NLP to detect user intent and determine required tools
-      userIntent = await detectUserIntent(userMessage, projectContext, conversationMemory ? conversationMemory.messages : [])
+      // Import the enhanced intent detector
+      const { EnhancedIntentDetector } = await import('@/lib/enhanced-intent-detector')
       
-      // Determine if tools are needed based on intent analysis
-      isToolRequest = userIntent.required_tools && userIntent.required_tools.length > 0
+      // Get existing files for context
+      const existingFiles = clientFiles.map((f: { path?: string }) => f.path).filter(Boolean)
       
-      console.log('[DEBUG] NLP Intent Detection:', {
+      // Use enhanced intent detection with autonomous planning capabilities
+      enhancedIntentData = await EnhancedIntentDetector.detectEnhancedIntent(
+        userMessage,
+        projectContext,
+        conversationMemory ? conversationMemory.messages : [],
+        existingFiles,
+        body.packageJson
+      )
+      
+      // Set legacy userIntent for backward compatibility
+      userIntent = {
+        intent: enhancedIntentData.intent,
+        required_tools: enhancedIntentData.required_tools,
+        file_operations: enhancedIntentData.file_operations,
+        complexity: enhancedIntentData.complexity,
+        action_plan: enhancedIntentData.action_plan,
+        confidence: enhancedIntentData.confidence,
+        tool_usage_rules: enhancedIntentData.tool_usage_rules,
+        enforcement_notes: enhancedIntentData.enforcement_notes
+      }
+      
+      // Determine execution strategy
+      shouldUseAutonomousPlanning = enhancedIntentData.requires_autonomous_planning
+      isToolRequest = enhancedIntentData.required_tools && enhancedIntentData.required_tools.length > 0
+      
+      console.log('[DEBUG] Enhanced Intent Detection:', {
         userMessage: userMessage.substring(0, 100) + '...',
-        detectedIntent: userIntent.intent,
-        requiredTools: userIntent.required_tools,
-        complexity: userIntent.complexity,
-        confidence: userIntent.confidence,
+        detectedIntent: enhancedIntentData.intent,
+        complexity: enhancedIntentData.complexity,
+        execution_mode: enhancedIntentData.execution_mode,
+        requires_autonomous_planning: shouldUseAutonomousPlanning,
+        confidence: enhancedIntentData.confidence,
+        planning_confidence: enhancedIntentData.planning_confidence,
+        estimated_duration: enhancedIntentData.estimated_duration,
         isToolRequest
       })
+      
+      // If autonomous planning is required, log the instructions
+      if (shouldUseAutonomousPlanning && enhancedIntentData.autonomous_instructions) {
+        console.log('[DEBUG] Autonomous Instructions Generated:', {
+          project_type: enhancedIntentData.project_type,
+          complexity: enhancedIntentData.complexity,
+          execution_mode: enhancedIntentData.execution_mode,
+          estimated_duration: enhancedIntentData.estimated_duration
+        })
+      }
+      
     } catch (error) {
-      console.warn('NLP intent detection failed, falling back to pattern matching:', error)
-      // Fallback to pattern matching
+      console.warn('Enhanced intent detection failed, falling back to basic intent detection:', error)
+      
+      // Fallback to original intent detection
+      try {
+        userIntent = await detectUserIntent(userMessage, projectContext, conversationMemory ? conversationMemory.messages : [])
+        isToolRequest = userIntent.required_tools && userIntent.required_tools.length > 0
+        
+        console.log('[DEBUG] Fallback Intent Detection:', {
+          detectedIntent: userIntent.intent,
+          requiredTools: userIntent.required_tools,
+          confidence: userIntent.confidence
+        })
+      } catch (fallbackError) {
+        console.warn('All intent detection failed, using pattern matching:', fallbackError)
+        // Final fallback to pattern matching
       isToolRequest = /\b(use tools?|read file|write file|create file|list files?|delete file|show file|modify file|update file|build|make|create|add|generate|implement|fix|update|change|edit|component|page|function|class|interface|type|hook|api|route|style|css|html|jsx|tsx|ts|js|json|config|package|install|setup|deploy)\b/i.test(userMessage) || userMessage.length > 10
+      }
     }
     
     // FORCE TOOL REQUEST TO TRUE for most cases
@@ -2370,13 +2694,27 @@ Use read_file tool to read specific files when needed.`
       `\n\n🔍 **CURRENT MODE: ASK MODE (READ-ONLY)**\n- You can read files and explore the codebase\n- You can answer questions and provide explanations\n- You CANNOT create, modify, or delete files\n- Focus on analysis, explanations, and suggestions` :
       `\n\n🤖 **CURRENT MODE: AGENT MODE (FULL ACCESS)**\n- You have complete file system access\n- You can create, modify, and delete files\n- You can build complete applications\n- Use all available tools as needed`
 
-    // Enhanced system message with conversation memory and intent awareness
-    const systemMessage = `🚨 CRITICAL INSTRUCTION: You are Pixel Pilot, an Autonomous AI Agent that plans, creates and modifies React Vite web applications in real-time with a live preview.
+    // Add autonomous planning context if applicable
+    const autonomousPlanningContext = shouldUseAutonomousPlanning && enhancedIntentData?.autonomous_instructions ? 
+      `\n\n${enhancedIntentData.autonomous_instructions}` : ''
 
-# React Website Builder AI - Master System Prompt
+    // Enhanced system message with conversation memory, intent awareness, and autonomous planning
+    const systemMessage = `🚨 CRITICAL INSTRUCTION: You are Pixel Pilot, an Elite Autonomous AI Agent that plans, creates and modifies React Vite web applications in real-time with a live preview.
+
+# React Website Builder AI - Master System Prompt with Autonomous Planning
 
 ## Core Mission
-You are a React website builder AI specialized in creating **modern, professional, and visually stunning** React applications that will **WOW users**. Every application you generate must be a masterpiece of modern web design that showcases cutting-edge aesthetics and exceptional user experience.
+You are an elite React website builder AI specialized in creating **modern, professional, and visually stunning** React applications that will **WOW users**. Every application you generate must be a masterpiece of modern web design that showcases cutting-edge aesthetics and exceptional user experience.
+
+${shouldUseAutonomousPlanning ? `
+## 🤖 AUTONOMOUS EXECUTION MODE
+You are currently operating in AUTONOMOUS EXECUTION MODE. This means:
+- You have been provided with a comprehensive execution plan
+- You should execute the plan systematically without waiting for user approval
+- You must verify dependencies, read files, and create complete implementations
+- You should provide progress updates as you work through the plan
+- You can adapt the plan based on actual project structure and requirements
+` : ''}
 
 ⚠️ **FIRST RULE - READ THIS BEFORE ANYTHING ELSE:**
 - NEVER use web_search or web_extract unless the user EXPLICITLY asks for web research
@@ -2653,60 +2991,129 @@ ${userIntent?.enforcement_notes ? `**Enforcement Notes:** ${userIntent.enforceme
 10. **web_search** - Search the web for current information and context (ONLY when user asks for external research)
 11. **web_extract** - Extract content from web pages (ONLY when user asks for external content)
 
-# File Editing with Search/Replace Blocks
+# File Editing with Search/Replace Parameters
 
-When using the **edit_file** tool, you must provide search/replace blocks in this exact format:
+When using the **edit_file** tool, provide search/replace operations as parameters in the tool call:
 
-\`\`\`
-<<<<<<< SEARCH
-[exact code to find - must match perfectly including whitespace]
-=======
-[replacement code]
->>>>>>> REPLACE
-\`\`\`
+## Tool Parameters:
+- **path**: File path relative to project root
+- **searchReplaceBlocks**: Array of objects with:
+  - **search**: Exact text to find (must match perfectly including whitespace)
+  - **replace**: Text to replace the search text with
+  - **replaceAll**: (optional) If true, replace all occurrences. Default: false (first only)
+  - **occurrenceIndex**: (optional) Replace only the Nth occurrence (1-based). Overrides replaceAll
+  - **validateAfter**: (optional) Text that must exist after this operation (for validation)
+- **dryRun**: (optional) If true, validate operations without applying changes
+- **rollbackOnFailure**: (optional) If true, rollback all changes if any operation fails (default: true)
+
+## Enhanced Features:
+1. **Exact Occurrence Control**: Specify which occurrence to replace with \`occurrenceIndex\`
+2. **Validation**: Use \`validateAfter\` to ensure operations succeed
+3. **Dry Run**: Preview changes with \`dryRun: true\` before applying
+4. **Rollback Protection**: Automatic rollback if any operation fails
+5. **Sequential Validation**: Each operation validates against the result of previous operations
 
 ## Critical Rules for Search/Replace:
-1. **Exact Match Required**: Search blocks must match existing code EXACTLY (including whitespace and indentation)
-2. **Multiple Changes**: Use separate search/replace blocks for each change
+1. **Exact Match Required**: Search text must match existing code EXACTLY (including whitespace and indentation)
+2. **Multiple Changes**: Provide multiple objects in the searchReplaceBlocks array
 3. **Preserve Structure**: Maintain proper imports, component structure, and TypeScript types
 4. **Context Awareness**: Include enough surrounding code for unique identification
+5. **Order Matters**: Operations are applied sequentially, each affecting the next
 
 ## Examples:
 
-**Change text content:**
-\`\`\`
-<<<<<<< SEARCH
-    <h1>Old Title</h1>
-=======
-    <h1>New Title</h1>
->>>>>>> REPLACE
-\`\`\`
-
-**Add code after existing line:**
-\`\`\`
-<<<<<<< SEARCH
-  </div>
-=======
-    <button onClick={handleClick}>New Button</button>
-  </div>
->>>>>>> REPLACE
+**Basic change:**
+\`\`\`json
+{
+  "path": "src/App.tsx",
+  "searchReplaceBlocks": [
+    {
+      "search": "    <h1>Old Title</h1>",
+      "replace": "    <h1>New Title</h1>"
+    }
+  ]
+}
 \`\`\`
 
-**Delete code:**
-\`\`\`
-<<<<<<< SEARCH
-  <p>This paragraph will be removed.</p>
-=======
->>>>>>> REPLACE
+**Replace specific occurrence:**
+\`\`\`json
+{
+  "path": "src/App.tsx", 
+  "searchReplaceBlocks": [
+    {
+      "search": "className=\\"btn\\"",
+      "replace": "className=\\"btn btn-primary\\"",
+      "occurrenceIndex": 2
+    }
+  ]
+}
 \`\`\`
 
-**Modify imports:**
+**Replace all occurrences:**
+\`\`\`json
+{
+  "path": "src/App.tsx",
+  "searchReplaceBlocks": [
+    {
+      "search": "console.log",
+      "replace": "// console.log",
+      "replaceAll": true
+    }
+  ]
+}
 \`\`\`
-<<<<<<< SEARCH
-import { useState } from 'react'
-=======
-import { useState, useEffect } from 'react'
->>>>>>> REPLACE
+
+**Complex operation with validation:**
+\`\`\`json
+{
+  "path": "src/App.tsx",
+  "searchReplaceBlocks": [
+    {
+      "search": "import React from 'react'",
+      "replace": "import React, { useState } from 'react'",
+      "validateAfter": "useState"
+    },
+    {
+      "search": "function App() {",
+      "replace": "function App() {\\n  const [count, setCount] = useState(0);",
+      "validateAfter": "setCount"
+    }
+  ]
+}
+\`\`\`
+
+**Dry run (preview changes):**
+\`\`\`json
+{
+  "path": "src/App.tsx",
+  "dryRun": true,
+  "searchReplaceBlocks": [
+    {
+      "search": "Old Content",
+      "replace": "New Content"
+    }
+  ]
+}
+\`\`\`
+
+**Safe moving content (with rollback):**
+\`\`\`json
+{
+  "path": "src/App.tsx",
+  "rollbackOnFailure": true,
+  "searchReplaceBlocks": [
+    {
+      "search": "  <div className=\\"sidebar\\">\\n    <nav>Nav content</nav>\\n  </div>\\n",
+      "replace": "",
+      "validateAfter": "<main>"
+    },
+    {
+      "search": "  </main>",
+      "replace": "    <div className=\\"sidebar\\">\\n      <nav>Nav content</nav>\\n    </div>\\n  </main>",
+      "validateAfter": "sidebar"
+    }
+  ]
+}
 \`\`\`
 
 # Workflow
@@ -2839,7 +3246,7 @@ WORKFLOW:
 2. edit_file with search/replace blocks (preferred)
 3. If edit_file fails: write_file with complete updated file
 
-Project context: ${projectContext || 'Vite + React + TypeScript project - Multi-page with React Router'}`;
+Project context: ${projectContext || 'Vite + React + TypeScript project - Multi-page with React Router'}${modelContextInfo}${modeContextInfo}${autonomousPlanningContext}`;
 
     // Get the AI model based on the selected modelId
     const selectedAIModel = getAIModel(modelId)
@@ -2897,7 +3304,7 @@ Project context: ${projectContext || 'Vite + React + TypeScript project - Multi-
           ...validMemoryMessages
         ],
         temperature: 0.1, // Increased creativity while maintaining tool usage
-        stopWhen: stepCountIs(5), // Allow up to 5 steps for complex multi-tool operations
+        stopWhen: stepCountIs(shouldUseAutonomousPlanning ? 25 : 10), // Allow up to 25 steps for autonomous execution, 10 for regular operations
         abortSignal: abortController.signal,
         toolChoice: 'required', // Force tool usage first - AI MUST use tools before providing text responses
 
@@ -3376,70 +3783,7 @@ I have successfully completed your request.`
             success: toolCall.result?.success !== false
           }
 
-          // Post-process edit_file operations
-          if (toolCall.name === 'edit_file' && toolCall.result?.needsPostProcessing) {
-            try {
-              console.log('[DEBUG] Post-processing edit_file operation...')
-              
-              // Find the AI response text that contains search/replace blocks
-              // We need to look through the result steps to find the text with search/replace blocks
-              let aiResponseText = '';
-              
-              // Look through all steps to find text containing search/replace blocks
-              for (const step of result.steps || []) {
-                if (step.text && step.text.includes('<<<<<<< SEARCH')) {
-                  aiResponseText = step.text;
-                  break;
-                }
-              }
-              
-              if (!aiResponseText) {
-                console.log('[DEBUG] No search/replace blocks found in AI response')
-                operation.success = false;
-                operation.error = 'No search/replace blocks found in AI response';
-              } else {
-                // Parse search/replace blocks from AI response
-                const editBlocks = parseSearchReplaceBlocks(aiResponseText);
-                console.log(`[DEBUG] Found ${editBlocks.length} search/replace blocks`);
-                
-                if (editBlocks.length === 0) {
-                  operation.success = false;
-                  operation.error = 'No valid search/replace blocks found';
-                } else {
-                  // Apply edits to the file content
-                  const originalContent = toolCall.result.content;
-                  const { modifiedContent, appliedEdits, failedEdits } = applySearchReplaceEdits(originalContent, editBlocks);
-                  
-                  console.log(`[DEBUG] Edit results: ${appliedEdits.length} applied, ${failedEdits.length} failed`);
-                  
-                  if (appliedEdits.length > 0) {
-                    // Update the file in storage
-                    const { storageManager } = await import('@/lib/storage-manager');
-                    await storageManager.init();
-                    await storageManager.updateFile(projectId, operation.path, { 
-                      content: modifiedContent,
-                      updatedAt: new Date().toISOString()
-                    });
-                    
-                    // Update operation with final content
-                    operation.content = modifiedContent;
-                    operation.success = true;
-                    operation.appliedEdits = appliedEdits;
-                    operation.failedEdits = failedEdits;
-                    console.log(`[DEBUG] Successfully applied ${appliedEdits.length} edits to ${operation.path}`);
-                  } else {
-                    operation.success = false;
-                    operation.error = `No changes could be applied. ${failedEdits.length} edits failed.`;
-                    operation.failedEdits = failedEdits;
-                  }
-                }
-              }
-            } catch (error) {
-              console.error('[ERROR] Post-processing edit_file failed:', error);
-              operation.success = false;
-              operation.error = `Post-processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-            }
-          }
+          // No post-processing needed for edit_file - it's handled directly in the tool execution
           
           // Debug log each operation
           console.log(`[DEBUG] File operation ${index}:`, operation)
