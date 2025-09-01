@@ -401,56 +401,85 @@ async function executeDeleteFile(projectId: string, path: string, userId: string
   }
 }
 
-// Enhanced project context builder with file contents
+// Enhanced project context builder with selective full content
 async function buildEnhancedProjectContext(projectId: string, storageManager: any) {
   try {
     const files = await storageManager.getFiles(projectId)
     
     let context = ''
-    let packageJsonContent = ''
-    let srcFilesContent = ''
+    let coreFilesContent = ''
+    let srcFilesPaths = []
     let otherFilesPaths = []
     let uiComponentsPaths = []
+    let configFilesPaths = []
+    
+    // Files that should include full content
+    const fullContentFiles = ['package.json', 'src/App.tsx', 'App.tsx', 'index.html']
     
     for (const file of files) {
       const path = file.path
       
-      // Always include package.json content
-      if (path === 'package.json') {
-        packageJsonContent = `\n📦 **package.json** (${path}):\n\`\`\`json\n${file.content}\n\`\`\``
-      }
-      // Include src folder contents (excluding components/ui)
-      else if (path.startsWith('src/') && !path.startsWith('src/components/ui/')) {
+      // Include full content for core foundational files
+      if (fullContentFiles.some(coreFile => path === coreFile || path.endsWith(coreFile))) {
         const fileExtension = path.split('.').pop() || 'text'
-        srcFilesContent += `\n📁 **${path}** (${fileExtension}):\n\`\`\`${fileExtension}\n${file.content}\n\`\`\``
+        const language = fileExtension === 'tsx' ? 'tsx' : fileExtension === 'json' ? 'json' : fileExtension === 'html' ? 'html' : fileExtension
+        coreFilesContent += `\n📋 **${path}** (${fileExtension}):\n\`\`\`${language}\n${file.content}\n\`\`\`\n`
       }
-      // Track components/ui paths (no content)
+      // Categorize src folder files (excluding components/ui and core files already handled)
+      else if (path.startsWith('src/') && !path.startsWith('src/components/ui/') && !fullContentFiles.some(coreFile => path.endsWith(coreFile))) {
+        srcFilesPaths.push(path)
+      }
+      // Categorize components/ui paths
       else if (path.startsWith('src/components/ui/')) {
         uiComponentsPaths.push(path)
       }
-      // Track other files as paths only
-      else {
+      // Categorize config files (excluding those with full content)
+      else if ((path.match(/\.(json|js|ts|config|env)$/) || ['tailwind.config.js', 'vite.config.ts', 'tsconfig.json', '.env'].some(config => path.includes(config))) && !fullContentFiles.some(coreFile => path.endsWith(coreFile))) {
+        configFilesPaths.push(path)
+      }
+      // Other files (excluding those with full content)
+      else if (!fullContentFiles.some(coreFile => path.endsWith(coreFile))) {
         otherFilesPaths.push(path)
       }
     }
     
-    // Build the complete context
-    context += packageJsonContent
-    context += srcFilesContent
+    // Build the complete context starting with core files content
+    context += coreFilesContent
+    
+    if (srcFilesPaths.length > 0) {
+      context += `\n📁 **Source Files** (${srcFilesPaths.length} files):\n`
+      srcFilesPaths.forEach(path => {
+        context += `- ${path}\n`
+      })
+    }
     
     if (uiComponentsPaths.length > 0) {
-      context += `\n\n🎨 **UI Components Available** (${uiComponentsPaths.length} components):\n`
+      context += `\n🎨 **UI Components Available** (${uiComponentsPaths.length} components):\n`
       uiComponentsPaths.forEach(path => {
         context += `- ${path}\n`
       })
     }
     
+    if (configFilesPaths.length > 0) {
+      context += `\n⚙️ **Configuration Files** (${configFilesPaths.length} files):\n`
+      configFilesPaths.forEach(path => {
+        context += `- ${path}\n`
+      })
+    }
+    
     if (otherFilesPaths.length > 0) {
-      context += `\n\n📄 **Other Project Files** (${otherFilesPaths.length} files):\n`
+      context += `\n📄 **Other Project Files** (${otherFilesPaths.length} files):\n`
       otherFilesPaths.forEach(path => {
         context += `- ${path}\n`
       })
     }
+    
+    context += `\n\n💡 **Usage Instructions**:\n`
+    context += `- Core files (package.json, App.tsx, index.html) are shown above with full content\n`
+    context += `- Use read_file tool to read other specific file contents when needed\n`
+    context += `- Use list_files tool to get updated file listings\n`
+    context += `- Use write_file tool to create or modify files\n`
+    context += `- Use edit_file tool for precise modifications to existing files\n`
     
     return context
   } catch (error) {
