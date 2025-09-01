@@ -234,6 +234,12 @@ CRITICAL RULES:
 - Be precise in tool selection and execution mode determination
 - Always provide detailed, actionable analysis
 
+RESPONSE FORMAT:
+- RESPOND ONLY WITH VALID JSON
+- DO NOT include explanatory text before or after the JSON
+- DO NOT use markdown code blocks
+- Return ONLY the JSON object as specified in the prompt
+
 Your analysis determines how the AI will execute the user's request, so accuracy is critical.`
           },
           { role: 'user', content: enhancedIntentPrompt }
@@ -246,19 +252,42 @@ Your analysis determines how the AI will execute the user's request, so accuracy
       try {
         let jsonText = intentResult.text
         
-        // Clean up JSON response
+        // Clean up JSON response - handle various formats
         if (jsonText.includes('```json')) {
-          jsonText = jsonText.replace(/```json\s*/, '').replace(/\s*```$/, '')
+          // Extract from markdown code blocks
+          const match = jsonText.match(/```json\s*([\s\S]*?)\s*```/)
+          if (match) {
+            jsonText = match[1]
+          } else {
+            jsonText = jsonText.replace(/```json\s*/, '').replace(/\s*```$/, '')
+          }
         } else if (jsonText.includes('```')) {
-          jsonText = jsonText.replace(/```\s*/, '').replace(/\s*```$/, '')
+          // Extract from generic code blocks
+          const match = jsonText.match(/```\s*([\s\S]*?)\s*```/)
+          if (match) {
+            jsonText = match[1]
+          } else {
+            jsonText = jsonText.replace(/```\s*/, '').replace(/\s*```$/, '')
+          }
+        } else {
+          // Look for JSON object in the text
+          const jsonMatch = jsonText.match(/\{[\s\S]*\}/)
+          if (jsonMatch) {
+            jsonText = jsonMatch[0]
+          }
         }
 
         jsonText = jsonText.trim()
+        
+        // Find the actual JSON boundaries more precisely
+        const jsonStartIndex = jsonText.indexOf('{')
         const jsonEndIndex = jsonText.lastIndexOf('}')
-        if (jsonEndIndex !== -1) {
-          jsonText = jsonText.substring(0, jsonEndIndex + 1)
+        
+        if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
+          jsonText = jsonText.substring(jsonStartIndex, jsonEndIndex + 1)
         }
 
+        console.log('[DEBUG] Cleaned JSON text for parsing:', jsonText.substring(0, 200) + '...')
         enhancedIntentData = JSON.parse(jsonText)
         
         // Generate autonomous instructions if required

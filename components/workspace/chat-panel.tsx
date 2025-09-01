@@ -26,6 +26,9 @@ import {
   Database,
   User
 } from "lucide-react"
+import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown"
+import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
+import { FileSearchResult } from "@/lib/file-lookup-service"
 import { useToast } from "@/hooks/use-toast"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -1489,6 +1492,13 @@ export function ChatPanel({
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null) // Ref for messages container
 
+  // File attachment state
+  const [attachedFiles, setAttachedFiles] = useState<FileSearchResult[]>([])
+  const [showFileDropdown, setShowFileDropdown] = useState(false)
+  const [fileQuery, setFileQuery] = useState("")
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 })
+  const [atCommandStartIndex, setAtCommandStartIndex] = useState(-1)
+
   // Handle project changes - load chat history when project changes
   React.useEffect(() => {
     const handleProjectChange = async () => {
@@ -1689,6 +1699,112 @@ export function ChatPanel({
     }
   }
 
+  // File attachment handlers
+  const detectAtCommand = (text: string, cursorPosition: number) => {
+    const beforeCursor = text.substring(0, cursorPosition);
+    const atIndex = beforeCursor.lastIndexOf('@');
+    
+    if (atIndex === -1) return null;
+    
+    // Check if @ is at start of line or preceded by whitespace
+    const charBeforeAt = atIndex > 0 ? beforeCursor[atIndex - 1] : ' ';
+    if (charBeforeAt !== ' ' && charBeforeAt !== '\n' && atIndex !== 0) {
+      return null;
+    }
+    
+    // Find the end of the command (space, newline, or end of string)
+    const afterAt = text.substring(atIndex + 1);
+    const spaceIndex = afterAt.search(/[\s\n]/);
+    const endIndex = spaceIndex === -1 ? text.length : atIndex + 1 + spaceIndex;
+    
+    return {
+      startIndex: atIndex,
+      endIndex,
+      query: text.substring(atIndex + 1, endIndex)
+    };
+  };
+
+  const calculateDropdownPosition = (textarea: HTMLTextAreaElement, atIndex: number) => {
+    // Create a temporary div to measure text dimensions
+    const div = document.createElement('div');
+    div.style.cssText = window.getComputedStyle(textarea).cssText;
+    div.style.position = 'absolute';
+    div.style.visibility = 'hidden';
+    div.style.height = 'auto';
+    div.style.width = textarea.clientWidth + 'px';
+    div.style.whiteSpace = 'pre-wrap';
+    div.style.wordWrap = 'break-word';
+    
+    document.body.appendChild(div);
+    
+    // Get text up to the @ symbol
+    const textBeforeAt = textarea.value.substring(0, atIndex);
+    div.textContent = textBeforeAt;
+    
+    const rect = textarea.getBoundingClientRect();
+    const lines = Math.floor(div.scrollHeight / parseFloat(window.getComputedStyle(div).lineHeight));
+    
+    document.body.removeChild(div);
+    
+    // Calculate position
+    const lineHeight = parseFloat(window.getComputedStyle(textarea).lineHeight);
+    const top = rect.bottom + 8; // Position below the textarea
+    const left = rect.left;
+    
+    return { top, left };
+  };
+
+  const handleFileSelect = (file: FileSearchResult) => {
+    if (!textareaRef.current) return;
+    
+    const textarea = textareaRef.current;
+    const cursorPos = textarea.selectionStart;
+    const atCommand = detectAtCommand(inputMessage, cursorPos);
+    
+    if (atCommand) {
+      // Replace the @query with @filename
+      const before = inputMessage.substring(0, atCommand.startIndex);
+      const after = inputMessage.substring(atCommand.endIndex);
+      const replacement = `@${file.name}`;
+      
+      const newMessage = before + replacement + after;
+      setInputMessage(newMessage);
+      
+      // Add to attached files if not already present
+      if (!attachedFiles.some(f => f.id === file.id)) {
+        setAttachedFiles(prev => [...prev, file]);
+      }
+      
+      // Position cursor after the replacement
+      setTimeout(() => {
+        const newCursorPos = atCommand.startIndex + replacement.length;
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+        textarea.focus();
+      }, 0);
+    }
+    
+    setShowFileDropdown(false);
+    setFileQuery("");
+    setAtCommandStartIndex(-1);
+  };
+
+  const handleRemoveAttachedFile = (fileId: string) => {
+    setAttachedFiles(prev => prev.filter(f => f.id !== fileId));
+    
+    // Also remove the @filename from the input message
+    const fileToRemove = attachedFiles.find(f => f.id === fileId);
+    if (fileToRemove) {
+      const pattern = new RegExp(`@${fileToRemove.name}\\b`, 'g');
+      setInputMessage(prev => prev.replace(pattern, '').replace(/\s+/g, ' ').trim());
+    }
+  };
+
+  const closeFileDropdown = () => {
+    setShowFileDropdown(false);
+    setFileQuery("");
+    setAtCommandStartIndex(-1);
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!inputMessage.trim() || !project || isLoading) return
@@ -1731,15 +1847,47 @@ export function ChatPanel({
       }
     }
 
+    // Prepare message content with attached files
+    let messageContent = inputMessage.trim();
+    
+    // If there are attached files, append their content to the message
+    if (attachedFiles.length > 0) {
+      const fileContexts: string[] = [];
+      
+      try {
+        const { storageManager } = await import('@/lib/storage-manager');
+        await storageManager.init();
+        
+        for (const attachedFile of attachedFiles) {
+          try {
+            const fileData = await storageManager.getFile(project.id, attachedFile.path);
+            if (fileData && fileData.content) {
+              fileContexts.push(`\n\n--- File: ${attachedFile.path} ---\n${fileData.content}\n--- End of ${attachedFile.name} ---`);
+            }
+          } catch (error) {
+            console.error(`Error loading attached file ${attachedFile.path}:`, error);
+            fileContexts.push(`\n\n--- File: ${attachedFile.path} ---\n[Error loading file content]\n--- End of ${attachedFile.name} ---`);
+          }
+        }
+        
+        if (fileContexts.length > 0) {
+          messageContent = `${messageContent}\n\n=== ATTACHED FILES CONTEXT ===${fileContexts.join('')}\n=== END ATTACHED FILES ===`;
+        }
+      } catch (error) {
+        console.error('Error loading attached files:', error);
+      }
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: inputMessage.trim(),
+      content: messageContent,
       createdAt: new Date().toISOString(),
     }
 
     setMessages(prev => [...prev, userMessage])
     setInputMessage("")
+    setAttachedFiles([]) // Clear attached files after sending
     setIsLoading(true)
 
     // Reset textarea height to default during loading
@@ -2808,6 +2956,19 @@ export function ChatPanel({
       }`}>
         
         <form onSubmit={handleSendMessage} className="space-y-3">
+          {/* Attached Files Display */}
+          {attachedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2 px-2">
+              {attachedFiles.map((file) => (
+                <FileAttachmentBadge
+                  key={file.id}
+                  file={file}
+                  onRemove={() => handleRemoveAttachedFile(file.id)}
+                />
+              ))}
+            </div>
+          )}
+
           <div className="relative flex items-center bg-[#2b2b2b] border border-gray-600 rounded-[24px] px-4 py-3">
             {/* Main input row: textarea + mode selector */}
             <div className="flex items-center w-full relative">
@@ -2823,8 +2984,29 @@ export function ChatPanel({
                 ref={textareaRef}
                 value={inputMessage}
                 onChange={(e) => {
-                  setInputMessage(e.target.value)
+                  const newValue = e.target.value;
+                  setInputMessage(newValue);
                   const textarea = e.target as HTMLTextAreaElement;
+                  
+                  // Handle @ command detection
+                  const cursorPos = textarea.selectionStart;
+                  const atCommand = detectAtCommand(newValue, cursorPos);
+                  
+                  if (atCommand) {
+                    setFileQuery(atCommand.query);
+                    setAtCommandStartIndex(atCommand.startIndex);
+                    
+                    if (!showFileDropdown) {
+                      const position = calculateDropdownPosition(textarea, atCommand.startIndex);
+                      setDropdownPosition(position);
+                      setShowFileDropdown(true);
+                    }
+                  } else {
+                    if (showFileDropdown) {
+                      closeFileDropdown();
+                    }
+                  }
+                  
                   // Reset to baseline then expand up to the max (90px)
                   textarea.style.height = '64px';
                   const newHeight = Math.min(textarea.scrollHeight, 140)
@@ -2845,13 +3027,42 @@ export function ChatPanel({
                   textarea.style.height = newHeight + 'px';
                   textarea.style.overflowY = textarea.scrollHeight > 140 ? 'auto' : 'hidden'
                 }}
+                onClick={(e) => {
+                  // Handle cursor position changes for @ command detection
+                  const textarea = e.target as HTMLTextAreaElement;
+                  const cursorPos = textarea.selectionStart;
+                  const atCommand = detectAtCommand(inputMessage, cursorPos);
+                  
+                  if (atCommand && !showFileDropdown) {
+                    setFileQuery(atCommand.query);
+                    setAtCommandStartIndex(atCommand.startIndex);
+                    const position = calculateDropdownPosition(textarea, atCommand.startIndex);
+                    setDropdownPosition(position);
+                    setShowFileDropdown(true);
+                  } else if (!atCommand && showFileDropdown) {
+                    closeFileDropdown();
+                  }
+                }}
                 onKeyDown={(e) => {
+                  // Handle dropdown navigation
+                  if (showFileDropdown) {
+                    if (e.key === 'Escape') {
+                      e.preventDefault();
+                      closeFileDropdown();
+                      return;
+                    }
+                    // Let the dropdown handle other keys (Arrow keys, Enter)
+                    if (['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) {
+                      return; // Let the dropdown component handle these
+                    }
+                  }
+                  
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
                     handleSendMessage(e)
                   }
                 }}
-                placeholder={isEditingRevertedMessage ? "Editing reverted message... Make changes and press Enter to send" : "Plan, build and ship faster."}
+                placeholder={isEditingRevertedMessage ? "Editing reverted message... Make changes and press Enter to send" : "Plan, build and ship faster. Type @ to attach files."}
                 className={`flex-1 bg-transparent border-none outline-none text-white placeholder-gray-400 text-[15px] resize-none rounded-md px-2 py-2 leading-[1.5] min-h-[48px] max-h-[140px] ${
                   isEditingRevertedMessage ? 'border-yellow-500 ring-yellow-500 ring-2' : ''
                 }`}
@@ -2895,6 +3106,16 @@ export function ChatPanel({
           </div>
         </form>
       </footer>
+
+      {/* File Attachment Dropdown */}
+      <FileAttachmentDropdown
+        isVisible={showFileDropdown}
+        query={fileQuery}
+        onFileSelect={handleFileSelect}
+        onClose={closeFileDropdown}
+        position={dropdownPosition}
+        projectId={project?.id || null}
+      />
       
     </div>
   )
