@@ -35,6 +35,7 @@ import { AiModeSelector, type AIMode } from "@/components/ui/ai-mode-selector"
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai-models"
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
 import { createCheckpoint } from '@/lib/checkpoint-utils'
+import { ThinkingIndicator } from "@/components/ui/thinking-indicator"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -2779,30 +2780,11 @@ export function ChatPanel({
                 </div>
               ))}
               
-              {/* Show thinking indicator as AI message when loading */}
+              {/* Show interactive thinking indicator when loading */}
               {isLoading && (
                 <div className="mb-6">
-                  <div className="flex items-start space-x-3">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-r from-green-500 to-blue-600 flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">AI</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Pixel</span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                      {/* Thinking indicator as AI message */}
-                      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden">
-                        <div className="p-4">
-                        <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                            <span className="text-gray-600 dark:text-gray-400">Thinking...</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden">
+                    <ThinkingIndicator />
                   </div>
                 </div>
               )}
