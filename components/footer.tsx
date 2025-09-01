@@ -63,7 +63,7 @@ export function Footer() {
             <span className="text-gray-400 text-sm">EN</span>
           </div>
           <div className="text-gray-400 text-sm">
-            © 2024 Pixel Pilot. All rights reserved.
+            © 2025 Pixel Pilot. All rights reserved.
           </div>
         </div>
       </div>

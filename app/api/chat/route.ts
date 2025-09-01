@@ -2313,6 +2313,36 @@ Here are the available knowledge base IDs you can use with the search_knowledge 
 - quality-standards - Quality Standards
 - caching-mechanisms - Caching Mechanisms for Performance Optimization
 - web-search - Web Search and Content Extraction Tools
+- image-generation - Image Generation API Guidelines
+
+# Image Generation API
+
+🖼️ **IMAGE GENERATION ENDPOINT:** https://api.a0.dev/assets/image
+
+**USAGE:**
+- **text parameter**: Describe the image you want to generate (image prompt)
+- **seed parameter**: A number for consistent image generation (optional, defaults to random)
+- **aspect parameter**: Image aspect ratio (optional, e.g., "1:1", "16:9", "4:3")
+
+**EXAMPLE URLS:**
+- Basic: https://api.a0.dev/assets/image?text=RideShare&aspect=1:1&seed=123
+- Product: https://api.a0.dev/assets/image?text=Modern%20laptop%20computer&aspect=16:9&seed=456
+- Hero: https://api.a0.dev/assets/image?text=Business%20team%20collaboration&aspect=16:9&seed=789
+
+**IMPLEMENTATION:**
+1. Use the URL directly in img src attributes
+2. Encode spaces as %20 in the text parameter
+3. Use descriptive prompts for better image quality
+4. Keep seed consistent for similar images
+5. Choose appropriate aspect ratios for different use cases
+
+**BEST PRACTICES:**
+✅ Use descriptive, specific prompts for better results
+✅ Encode special characters properly in URLs
+✅ Use consistent seeds for related images
+✅ Choose aspect ratios that match your design needs
+✅ Test different prompts to find the best results
+✅ Use this API for all image needs in the application
 
 # Important Notes
 
@@ -2323,6 +2353,7 @@ Here are the available knowledge base IDs you can use with the search_knowledge 
 - Create multi-page apps with React Router
 - Maintain conversation context and avoid repetition
 - Be creative but follow user instructions strictly
+- Use the image generation API for all image needs in the application
 
 # CRITICAL: Tool Usage Rules - VIOLATION WILL RESULT IN FAILURE
 
