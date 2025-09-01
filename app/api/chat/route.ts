@@ -265,7 +265,87 @@ async function executeWriteFile(projectId: string, path: string, content: string
   }
 }
 
+// Search/Replace constants for file editing
+const SEARCH_START = "<<<<<<< SEARCH";
+const DIVIDER = "=======";
+const REPLACE_END = ">>>>>>> REPLACE";
 
+// Parse AI response into search/replace blocks
+function parseSearchReplaceBlocks(aiResponse: string) {
+  const blocks: Array<{search: string, replace: string}> = [];
+  const lines = aiResponse.split('\n');
+  
+  let currentBlock: {search: string[], replace: string[]} | null = null;
+  let mode: 'none' | 'search' | 'replace' = 'none';
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    if (line.trim() === SEARCH_START) {
+      currentBlock = { search: [], replace: [] };
+      mode = 'search';
+    } else if (line.trim() === DIVIDER && currentBlock) {
+      mode = 'replace';
+    } else if (line.trim() === REPLACE_END && currentBlock) {
+      blocks.push({
+        search: currentBlock.search.join('\n'),
+        replace: currentBlock.replace.join('\n')
+      });
+      currentBlock = null;
+      mode = 'none';
+    } else if (mode === 'search' && currentBlock) {
+      currentBlock.search.push(line);
+    } else if (mode === 'replace' && currentBlock) {
+      currentBlock.replace.push(line);
+    }
+  }
+  
+  return blocks;
+}
+
+// Apply search/replace edits to content
+function applySearchReplaceEdits(content: string, blocks: Array<{search: string, replace: string}>) {
+  let modifiedContent = content;
+  const appliedEdits: Array<{
+    blockIndex: number;
+    search: string;
+    replace: string;
+    status: string;
+  }> = [];
+  const failedEdits: Array<{
+    blockIndex: number;
+    search: string;
+    replace: string;
+    status: string;
+    reason: string;
+  }> = [];
+  
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+    const searchText = block.search;
+    const replaceText = block.replace;
+    
+    if (modifiedContent.includes(searchText)) {
+      modifiedContent = modifiedContent.replace(searchText, replaceText);
+      appliedEdits.push({
+        blockIndex: i,
+        search: searchText,
+        replace: replaceText,
+        status: 'applied'
+      });
+    } else {
+      failedEdits.push({
+        blockIndex: i,
+        search: searchText,
+        replace: replaceText,
+        status: 'failed',
+        reason: 'Search text not found in content'
+      });
+    }
+  }
+  
+  return { modifiedContent, appliedEdits, failedEdits };
+}
 
 async function executeReadFile(projectId: string, path: string, userId: string, storageManager: any) {
   try {
@@ -1555,6 +1635,71 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
         }
       }
     })
+
+    tools.edit_file = tool({
+      description: 'Edit an existing file using precise search/replace operations. The AI should output search/replace blocks in the surrounding text using the format: <<<<<<< SEARCH\\n[code to find]\\n=======\\n[replacement code]\\n>>>>>>> REPLACE',
+      inputSchema: z.object({
+        path: z.string().describe('File path relative to project root to edit')
+      }),
+      execute: async ({ path }, { abortSignal, toolCallId }) => {
+        // Check for cancellation
+        if (abortSignal?.aborted) {
+          throw new Error('Operation cancelled')
+        }
+        
+        try {
+          // Validate path
+          if (!path || typeof path !== 'string') {
+            return { 
+              success: false, 
+              error: `Invalid file path provided`,
+              path,
+              toolCallId
+            }
+          }
+
+          // Import storage manager
+          const { storageManager } = await import('@/lib/storage-manager')
+          await storageManager.init()
+          
+          // Check if file exists
+          const existingFile = await storageManager.getFile(projectId, path)
+
+          if (!existingFile) {
+            return { 
+              success: false, 
+              error: `File not found: ${path}. Use list_files to see available files.`,
+              path,
+              toolCallId
+            }
+          }
+
+          // Return success with file info - the actual editing will be done in post-processing
+          // when we have access to the AI's full response text with search/replace blocks
+          return {
+            success: true,
+            message: `✅ File ${path} ready for editing. Search/replace blocks will be processed from AI response.`,
+            path,
+            content: existingFile.content,
+            action: 'edit_pending',
+            toolCallId,
+            // Mark this as needing post-processing
+            needsPostProcessing: true
+          }
+        } catch (error) {
+          // Enhanced error handling
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+          console.error(`[ERROR] edit_file failed for ${path}:`, error)
+          
+          return { 
+            success: false, 
+            error: `Failed to edit file ${path}: ${errorMessage}`,
+            path,
+            toolCallId
+          }
+        }
+      }
+    })
   }
   
   // Add web search tool - ONLY when explicitly needed based on intent detection
@@ -1834,7 +1979,8 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
     hasWebSearch: toolNames.includes('web_search'),
     hasWebExtract: toolNames.includes('web_extract'),
     hasReadFile: toolNames.includes('read_file'),
-    hasWriteFile: toolNames.includes('write_file')
+    hasWriteFile: toolNames.includes('write_file'),
+    hasEditFile: toolNames.includes('edit_file')
   })
 
   return tools
@@ -1853,7 +1999,7 @@ async function detectUserIntent(userMessage: string, projectContext: string, con
 
 🚨 CRITICAL RULES - READ FIRST:
 - NEVER recommend web_search or web_extract unless user EXPLICITLY asks for web research
-- For file modifications, product additions, or code changes, recommend ONLY list_files, read_file, write_file
+- For file modifications, product additions, or code changes, recommend ONLY list_files, read_file, write_file, edit_file
 - Web tools are FORBIDDEN for basic development tasks
 - If user wants to add products, edit files, or modify code, use file operations only
 
@@ -1866,18 +2012,18 @@ ${conversationHistory.slice(-10).map((msg, i) => `${msg.role}: ${msg.content}`).
 
 Based on the user's request, determine:
 1. **Primary Intent**: What does the user want to accomplish?
-2. **Required Tools**: Which tools should be used? (PREFER list_files, read_file, write_file, delete_file - AVOID web_search, web_extract unless explicitly requested)
+2. **Required Tools**: Which tools should be used? (PREFER list_files, read_file, write_file, edit_file, delete_file - AVOID web_search, web_extract unless explicitly requested)
 3. **File Operations**: What files need to be created, modified, or deleted?
 4. **Complexity Level**: Simple, Medium, or Complex task?
 5. **Action Plan**: Step-by-step plan to accomplish the task
 
 📝 **TOOL SELECTION RULES:**
-- File operations (add products, edit code) → use read_file + write_file
+- File operations (add products, edit code) → use read_file + write_file/edit_file
 - Web research (search online, external content) → use web_search + web_extract
 - When in doubt, choose file operations over web tools
 
 📋 **EXAMPLE SCENARIOS:**
-- User: "add more products" → required_tools: ["read_file", "write_file"], tool_usage_rules: "Use file operations only. NO web tools needed."
+- User: "add more products" → required_tools: ["read_file", "edit_file"], tool_usage_rules: "Use file operations only. NO web tools needed."
 - User: "search for jewelry trends online" → required_tools: ["web_search", "web_extract"], tool_usage_rules: "Web research requested - use web tools appropriately."
 
 Respond in JSON format:
@@ -1903,7 +2049,7 @@ Include these fields:
 
 🚨 CRITICAL RULES:
 - NEVER recommend web_search or web_extract unless user EXPLICITLY asks for web research
-- For file modifications, product additions, or code changes, recommend ONLY list_files, read_file, write_file
+- For file modifications, product additions, or code changes, recommend ONLY list_files, read_file, write_file, edit_file
 - Web tools are FORBIDDEN for basic development tasks
 - When in doubt, choose file operations over web tools` },
         { role: 'user', content: intentPrompt }
@@ -1958,7 +2104,7 @@ Include these fields:
         complexity: 'medium',
         action_plan: ['Analyze current project state', 'Provide guidance'],
         confidence: 0.7,
-        tool_usage_rules: 'Use list_files and read_file for file operations. Avoid web tools unless explicitly requested.',
+        tool_usage_rules: 'Use list_files, read_file, write_file, and edit_file for file operations. Avoid web tools unless explicitly requested.',
         enforcement_notes: 'Web tools (web_search, web_extract) are FORBIDDEN for basic development tasks. Stick to file operations.'
       }
     }
@@ -1971,7 +2117,7 @@ Include these fields:
       complexity: 'medium',
       action_plan: ['Analyze current project state', 'Provide guidance'],
       confidence: 0.5,
-      tool_usage_rules: 'Use list_files and read_file for file operations. Avoid web tools unless explicitly requested.',
+      tool_usage_rules: 'Use list_files, read_file, write_file, and edit_file for file operations. Avoid web tools unless explicitly requested.',
       enforcement_notes: 'Web tools (web_search, web_extract) are FORBIDDEN for basic development tasks. Stick to file operations.'
     }
   }
@@ -2494,32 +2640,116 @@ ${userIntent?.enforcement_notes ? `**Enforcement Notes:** ${userIntent.enforceme
 1. **list_files** - List all files in the project
 2. **read_file** - Read the contents of a file
 3. **write_file** - Create or update a file (Agent mode only)
-4. **delete_file** - Delete a file (Agent mode only)
+4. **edit_file** - Edit existing files using AI-powered search/replace operations (Agent mode only)
+5. **delete_file** - Delete a file (Agent mode only)
 
 ## Context & Knowledge Tools (Use when needed)
-5. **search_knowledge** - Get the content of a specific knowledge item by ID
-6. **get_project_summary** - Get project structure information
-7. **recall_context** - Recall previous conversation context with AI enhancement
-8. **learn_patterns** - Analyze development patterns and learn from history
+6. **search_knowledge** - Get the content of a specific knowledge item by ID
+7. **get_project_summary** - Get project structure information
+8. **recall_context** - Recall previous conversation context with AI enhancement
+9. **learn_patterns** - Analyze development patterns and learn from history
 
 ## Web Tools (ONLY use when user explicitly requests web research)
-9. **web_search** - Search the web for current information and context (ONLY when user asks for external research)
-10. **web_extract** - Extract content from web pages (ONLY when user asks for external content)
+10. **web_search** - Search the web for current information and context (ONLY when user asks for external research)
+11. **web_extract** - Extract content from web pages (ONLY when user asks for external content)
+
+# File Editing with Search/Replace Blocks
+
+When using the **edit_file** tool, you must provide search/replace blocks in this exact format:
+
+\`\`\`
+<<<<<<< SEARCH
+[exact code to find - must match perfectly including whitespace]
+=======
+[replacement code]
+>>>>>>> REPLACE
+\`\`\`
+
+## Critical Rules for Search/Replace:
+1. **Exact Match Required**: Search blocks must match existing code EXACTLY (including whitespace and indentation)
+2. **Multiple Changes**: Use separate search/replace blocks for each change
+3. **Preserve Structure**: Maintain proper imports, component structure, and TypeScript types
+4. **Context Awareness**: Include enough surrounding code for unique identification
+
+## Examples:
+
+**Change text content:**
+\`\`\`
+<<<<<<< SEARCH
+    <h1>Old Title</h1>
+=======
+    <h1>New Title</h1>
+>>>>>>> REPLACE
+\`\`\`
+
+**Add code after existing line:**
+\`\`\`
+<<<<<<< SEARCH
+  </div>
+=======
+    <button onClick={handleClick}>New Button</button>
+  </div>
+>>>>>>> REPLACE
+\`\`\`
+
+**Delete code:**
+\`\`\`
+<<<<<<< SEARCH
+  <p>This paragraph will be removed.</p>
+=======
+>>>>>>> REPLACE
+\`\`\`
+
+**Modify imports:**
+\`\`\`
+<<<<<<< SEARCH
+import { useState } from 'react'
+=======
+import { useState, useEffect } from 'react'
+>>>>>>> REPLACE
+\`\`\`
 
 # Workflow
 
 🚨 **CRITICAL FIRST STEP - READ THIS:**
 - NEVER call web_search or web_extract unless user EXPLICITLY says "search web" or "research online"
-- For adding products, editing files, or code changes, use ONLY read_file and write_file
+- For adding products, editing files, or code changes, use ONLY read_file, write_file, and edit_file
 - Web tools are FORBIDDEN for basic development tasks
 
 1. **ALWAYS start with file operations** - Use read_file to understand current state
 2. **Check conversation memory** to avoid repeating previous work
 3. **Use web tools ONLY when explicitly requested** - Don't search the web unless the user asks for external research
-4. **Focus on direct file modification** - If user wants changes, make them directly with write_file
+4. **Focus on direct file modification** - Use write_file for new files, edit_file for precise modifications to existing files
 5. **Follow the project's tech stack** (Vite + React + TypeScript + Tailwind CSS)
 6. **Use shadcn/ui components** when appropriate
 7. **Implement user requests efficiently** - Don't over-engineer or add unnecessary complexity
+
+## 🎯 **File Modification Strategy - CRITICAL**
+
+**FOR EXISTING FILES - ALWAYS FOLLOW THIS ORDER:**
+
+1. **FIRST CHOICE: Use edit_file tool** for modifying existing files
+   - Preferred method for precise changes to existing content
+   - Use search/replace blocks to make targeted modifications
+   - More efficient than rewriting entire files
+
+2. **FALLBACK: Use write_file tool** if edit_file fails
+   - If search/replace blocks cannot find the exact text to modify
+   - If the file structure has changed significantly
+   - If edit_file returns an error or fails to apply changes
+   - Rewrite the entire file with all changes included
+
+**EXAMPLE WORKFLOW:**
+User: "Change the title in App.tsx"
+1. Try: edit_file tool with search/replace blocks
+2. If that fails: read_file tool then write_file tool with complete updated content
+
+**WHEN TO USE EACH TOOL:**
+- edit_file tool: Small changes, bug fixes, adding/removing specific code sections
+- write_file tool: New files, major refactoring, or when edit_file fails
+- read_file tool: Always read first to understand current state
+
+⚠️ **IMPORTANT**: If edit_file fails for any reason (search text not found, parsing errors, etc.), immediately try write_file as a backup approach.
 
 # Knowledge Base IDs
 
@@ -2583,8 +2813,10 @@ Here are the available knowledge base IDs you can use with the search_knowledge 
 
 ✅ **MANDATORY APPROACH:**
 - ALWAYS use read_file first to understand current file state
-- ALWAYS use write_file directly to make requested changes
+- ALWAYS use edit_file FIRST for modifying existing files (preferred method)
+- ALWAYS use write_file as FALLBACK if edit_file fails or for new files
 - ALWAYS prioritize local file operations over external web research
+- If edit_file fails (search text not found, errors), immediately use write_file to rewrite the entire file
 - If user wants to add products, edit the file directly - NO web search needed!
 
 🔒 **ENFORCEMENT:**
@@ -2592,10 +2824,20 @@ Here are the available knowledge base IDs you can use with the search_knowledge 
 - Violating these rules means you're not following user instructions
 - Stick to file operations only unless explicitly told to research online
 
-📝 **EXAMPLE SCENARIO:**
+📝 **EXAMPLE SCENARIOS:**
 User: "add more products to our store up to 15 products"
-CORRECT: read_file → write_file (add products directly)
+CORRECT: read_file → edit_file (try first) → write_file (if edit_file fails)
 WRONG: web_search → web_extract → web_extract (unnecessary web research)
+
+User: "change the title of the homepage"
+CORRECT: read_file → edit_file (try first) → write_file (fallback if needed)
+WRONG: read_file → write_file (without trying edit_file first)
+
+User: "fix the button styling in Header.tsx"
+WORKFLOW: 
+1. read_file to see current content
+2. edit_file with search/replace blocks (preferred)
+3. If edit_file fails: write_file with complete updated file
 
 Project context: ${projectContext || 'Vite + React + TypeScript project - Multi-page with React Router'}`;
 
@@ -2654,7 +2896,7 @@ Project context: ${projectContext || 'Vite + React + TypeScript project - Multi-
           // Use filtered valid messages to prevent AI model errors
           ...validMemoryMessages
         ],
-        temperature: 0.7, // Increased creativity while maintaining tool usage
+        temperature: 0.1, // Increased creativity while maintaining tool usage
         stopWhen: stepCountIs(5), // Allow up to 5 steps for complex multi-tool operations
         abortSignal: abortController.signal,
         toolChoice: 'required', // Force tool usage first - AI MUST use tools before providing text responses
@@ -3117,7 +3359,7 @@ I have successfully completed your request.`
         })),
         serverSideExecution: true,  // Flag to indicate server-side execution
         // IMPORTANT: Include file operations for client-side persistence
-        fileOperations: processedToolCalls?.map((toolCall, index) => {
+        fileOperations: (await Promise.all((processedToolCalls || []).map(async (toolCall, index) => {
           console.log(`[DEBUG] Processing toolCall ${index}:`, {
             name: toolCall.name,
             hasResult: !!toolCall.result,
@@ -3126,19 +3368,84 @@ I have successfully completed your request.`
             argsKeys: toolCall.args ? Object.keys(toolCall.args) : []
           })
           
-          const operation = {
+          let operation: any = {
             type: toolCall.name,
             path: toolCall.result?.path || toolCall.args?.path,
             content: toolCall.args?.content || toolCall.result?.content,
             projectId: projectId,
             success: toolCall.result?.success !== false
           }
+
+          // Post-process edit_file operations
+          if (toolCall.name === 'edit_file' && toolCall.result?.needsPostProcessing) {
+            try {
+              console.log('[DEBUG] Post-processing edit_file operation...')
+              
+              // Find the AI response text that contains search/replace blocks
+              // We need to look through the result steps to find the text with search/replace blocks
+              let aiResponseText = '';
+              
+              // Look through all steps to find text containing search/replace blocks
+              for (const step of result.steps || []) {
+                if (step.text && step.text.includes('<<<<<<< SEARCH')) {
+                  aiResponseText = step.text;
+                  break;
+                }
+              }
+              
+              if (!aiResponseText) {
+                console.log('[DEBUG] No search/replace blocks found in AI response')
+                operation.success = false;
+                operation.error = 'No search/replace blocks found in AI response';
+              } else {
+                // Parse search/replace blocks from AI response
+                const editBlocks = parseSearchReplaceBlocks(aiResponseText);
+                console.log(`[DEBUG] Found ${editBlocks.length} search/replace blocks`);
+                
+                if (editBlocks.length === 0) {
+                  operation.success = false;
+                  operation.error = 'No valid search/replace blocks found';
+                } else {
+                  // Apply edits to the file content
+                  const originalContent = toolCall.result.content;
+                  const { modifiedContent, appliedEdits, failedEdits } = applySearchReplaceEdits(originalContent, editBlocks);
+                  
+                  console.log(`[DEBUG] Edit results: ${appliedEdits.length} applied, ${failedEdits.length} failed`);
+                  
+                  if (appliedEdits.length > 0) {
+                    // Update the file in storage
+                    const { storageManager } = await import('@/lib/storage-manager');
+                    await storageManager.init();
+                    await storageManager.updateFile(projectId, operation.path, { 
+                      content: modifiedContent,
+                      updatedAt: new Date().toISOString()
+                    });
+                    
+                    // Update operation with final content
+                    operation.content = modifiedContent;
+                    operation.success = true;
+                    operation.appliedEdits = appliedEdits;
+                    operation.failedEdits = failedEdits;
+                    console.log(`[DEBUG] Successfully applied ${appliedEdits.length} edits to ${operation.path}`);
+                  } else {
+                    operation.success = false;
+                    operation.error = `No changes could be applied. ${failedEdits.length} edits failed.`;
+                    operation.failedEdits = failedEdits;
+                  }
+                }
+              }
+            } catch (error) {
+              console.error('[ERROR] Post-processing edit_file failed:', error);
+              operation.success = false;
+              operation.error = `Post-processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+            }
+          }
           
           // Debug log each operation
           console.log(`[DEBUG] File operation ${index}:`, operation)
           
           return operation
-        }).filter((op, index) => {
+        }))).filter((op, index) => {
           const shouldInclude = op.success && op.path && (op.type === 'write_file' || op.type === 'edit_file' || op.type === 'delete_file')
           console.log(`[DEBUG] Operation ${index} filter result:`, {
             success: op.success,
