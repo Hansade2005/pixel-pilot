@@ -73,7 +73,7 @@ export default function SignupPage() {
         <Card>
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-            <CardDescription>Join AI App Builder and start creating</CardDescription>
+                            <CardDescription>Join Pixel Pilot and start creating</CardDescription>
           </CardHeader>
           <CardContent>
             {/* GitHub OAuth Button */}

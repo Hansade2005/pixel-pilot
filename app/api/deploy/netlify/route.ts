@@ -89,7 +89,7 @@ export async function POST(req: Request) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${siteName || 'AI App Builder'}</title>
+            <title>${siteName || 'Pixel Pilot'}</title>
 </head>
 <body>
     <div id="root"></div>

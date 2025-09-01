@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     // Create GitHub repository
     const { data: repo } = await octokit.rest.repos.createForAuthenticatedUser({
       name: repoName,
-      description: repoDescription || 'Created with AI App Builder',
+              description: repoDescription || 'Created with Pixel Pilot',
       private: false,
       auto_init: false,
     })
@@ -124,7 +124,7 @@ module.exports = nextConfig`,
       const { data: commit } = await octokit.rest.git.createCommit({
         owner: githubUser.login,
         repo: repo.name,
-        message: 'Initial commit from AI App Builder',
+        message: 'Initial commit from Pixel Pilot',
         tree: createdTree.sha,
       })
 
