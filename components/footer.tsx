@@ -1,0 +1,72 @@
+import { Logo } from "@/components/ui/logo"
+import Link from "next/link"
+
+export function Footer() {
+  return (
+    <footer className="relative z-10 bg-gray-900/50 backdrop-blur-sm border-t border-gray-800">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
+          <div className="col-span-2 md:col-span-1">
+            <Logo variant="text" size="md" className="mb-4" />
+            <p className="text-gray-400 text-sm">
+              Build something amazing with AI-powered development.
+            </p>
+          </div>
+          
+          <div>
+            <h3 className="text-white font-semibold mb-4">Company</h3>
+            <ul className="space-y-2 text-sm">
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Careers</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Press & media</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Enterprise</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Security</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Trust center</Link></li>
+            </ul>
+          </div>
+          
+          <div>
+            <h3 className="text-white font-semibold mb-4">Product</h3>
+            <ul className="space-y-2 text-sm">
+              <li><Link href="/pricing" className="text-gray-400 hover:text-white transition-colors">Pricing</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Student discount</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Solutions</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Integrations</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Changelog</Link></li>
+            </ul>
+          </div>
+          
+          <div>
+            <h3 className="text-white font-semibold mb-4">Resources</h3>
+            <ul className="space-y-2 text-sm">
+              <li><Link href="/learn" className="text-gray-400 hover:text-white transition-colors">Learn</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">How-to guides</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Videos</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Blog</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Support</Link></li>
+            </ul>
+          </div>
+          
+          <div>
+            <h3 className="text-white font-semibold mb-4">Community</h3>
+            <ul className="space-y-2 text-sm">
+              <li><Link href="/community" className="text-gray-400 hover:text-white transition-colors">Discord</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Reddit</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">X/Twitter</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">LinkedIn</Link></li>
+            </ul>
+          </div>
+        </div>
+        
+        <div className="border-t border-gray-800 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
+          <div className="flex items-center space-x-4 mb-4 md:mb-0">
+            <Logo variant="icon" size="sm" />
+            <span className="text-gray-400 text-sm">EN</span>
+          </div>
+          <div className="text-gray-400 text-sm">
+            © 2024 Pixel Pilot. All rights reserved.
+          </div>
+        </div>
+      </div>
+    </footer>
+  )
+}

@@ -61,8 +61,9 @@ export async function POST(req: Request) {
 async function handleStreamingPreview(req: Request) {
   try {
     // Check if E2B API key is configured
-    if (!process.env.E2B_API_KEY) {
-      console.error('E2B_API_KEY environment variable is not set')
+    const e2bApiKey = process.env.E2B_API_KEY || 'e2b_03abf205497af89f4331b62f3417d13c6ad7ade0'
+    if (!process.env.E2B_API_KEY && !e2bApiKey) {
+      console.error('E2B_API_KEY environment variable is not set and no fallback key available')
       
       // Create a ReadableStream that immediately sends the error
       const stream = new ReadableStream({
@@ -504,8 +505,9 @@ devDependencies:
 async function handleRegularPreview(req: Request) {
   try {
     // Check if E2B API key is configured
-    if (!process.env.E2B_API_KEY) {
-      console.error('E2B_API_KEY environment variable is not set')
+    const e2bApiKey = process.env.E2B_API_KEY || 'e2b_03abf205497af89f4331b62f3417d13c6ad7ade0'
+    if (!process.env.E2B_API_KEY && !e2bApiKey) {
+      console.error('E2B_API_KEY environment variable is not set and no fallback key available')
       return Response.json({ 
         error: 'Preview service is not configured. Please contact support.',
         details: 'Missing E2B API key'

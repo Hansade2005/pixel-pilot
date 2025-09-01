@@ -105,6 +105,88 @@ body {
   }
 }
 
+/* Lovable.dev inspired gradient background */
+.lovable-gradient {
+  background: linear-gradient(
+    180deg,
+    #0f172a 0%,
+    #1e293b 25%,
+    #334155 50%,
+    #475569 75%,
+    #f97316 100%
+  );
+}
+
+/* Enhanced noise texture */
+.noise-texture {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.3;
+}
+
+/* Heart icon gradient */
+.heart-gradient {
+  background: linear-gradient(135deg, #f97316 0%, #ec4899 100%);
+}
+
+/* Chat input styling */
+.chat-input-container {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Pixel Pilot Logo Animations */
+@keyframes logo-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(147, 51, 234, 0.5);
+  }
+}
+
+@keyframes pixel-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes sparkle-rotate {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.1);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+.logo-glow {
+  animation: logo-glow 3s ease-in-out infinite;
+}
+
+.pixel-float {
+  animation: pixel-float 4s ease-in-out infinite;
+}
+
+.sparkle-rotate {
+  animation: sparkle-rotate 6s linear infinite;
+}
+
+/* Enhanced hover effects for logo */
+.logo-hover-effect {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.logo-hover-effect:hover {
+  transform: scale(1.05) rotate(2deg);
+  filter: brightness(1.1) contrast(1.1);
+}
+
 /* VS Code-style file explorer */
 .bg-sidebar {
   background-color: hsl(var(--sidebar));

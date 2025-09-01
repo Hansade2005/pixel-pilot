@@ -43,7 +43,8 @@ import { storageManager, type Workspace as Project, type Deployment, type Enviro
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { GlobalHeader } from "../../../components/workspace/global-header"
+import { Navigation } from "@/components/navigation"
+import { Footer } from "@/components/footer"
 
 interface GitHubRepo {
   id: string
@@ -629,20 +630,25 @@ export default function ManagementPage() {
   }
 
   return (
-    <div className="flex flex-col h-full min-h-screen bg-gray-900 text-white">
-      <GlobalHeader 
-        title="Project Management"
-        showSettingsButton={false}
-      />
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Enhanced Gradient Background */}
+      <div className="absolute inset-0 lovable-gradient" />
       
-      <div className="flex-1 overflow-auto p-4 md:p-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col space-y-2 mb-6">
-            <h1 className="text-3xl font-bold">Project Management</h1>
-            <p className="text-muted-foreground text-gray-400">
-              Manage your projects, deployments, and environment variables
-            </p>
-          </div>
+      {/* Noise Texture Overlay */}
+      <div className="absolute inset-0 noise-texture" />
+
+      {/* Navigation */}
+      <Navigation />
+      
+      <div className="relative z-10 pt-16 pb-24">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex flex-col space-y-2 mb-6">
+              <h1 className="text-3xl font-bold text-white">Project Management</h1>
+              <p className="text-gray-400">
+                Manage your projects, deployments, and environment variables
+              </p>
+            </div>
 
           {/* Quick Stats Row */}
           <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1259,6 +1265,10 @@ export default function ManagementPage() {
           </Tabs>
         </div>
       </div>
+    </div>
+      
+      {/* Footer */}
+      <Footer />
     </div>
   )
 }
