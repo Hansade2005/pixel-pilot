@@ -851,9 +851,15 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
         let allFiles = files
         console.log(`[DEBUG] analyze_project: Using ${files.length} files from storage`)
         
-        // Build enhanced project context using the same function
-        const enhancedContext = await buildEnhancedProjectContext(projectId, storageManager)
-        console.log(`[DEBUG] analyze_project: Built enhanced context with ${enhancedContext.length} characters`)
+        // Build lightweight project summary instead of full context
+        const projectSummary = `Project has ${allFiles.length} files including:
+- ${allFiles.filter(f => f.path === 'package.json').length} package.json
+- ${allFiles.filter(f => f.path.includes('App.tsx')).length} App.tsx files  
+- ${allFiles.filter(f => f.path === 'index.html').length} index.html
+- ${allFiles.filter(f => f.path.startsWith('src/components/ui/')).length} UI components
+- ${allFiles.filter(f => f.path.startsWith('src/') && !f.path.startsWith('src/components/ui/')).length} other source files`
+        
+        console.log(`[DEBUG] analyze_project: Built lightweight summary (${projectSummary.length} characters)`)
         console.log(`[DEBUG] analyze_project: Available files count: ${allFiles.length}`)
         
         const files_to_analyze = allFiles
@@ -963,7 +969,7 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
           success: true,
           message: `Project analysis completed successfully`,
           analysis,
-          projectContext: enhancedContext, // Include the enhanced project context
+          projectContext: projectSummary, // Include lightweight project summary instead
           enhancedProjectInfo: `Found ${files_to_analyze.length} files in project`,
           toolCallId
         }
@@ -2170,7 +2176,8 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
   })
   } // End conditional for web tools
 
-  // AI-Powered Learning and Pattern Recognition Tool
+  // AI-Powered Learning and Pattern Recognition Tool (temporarily disabled to reduce token usage)
+  if (false) { // Disabled to prevent excessive context accumulation
   tools.learn_patterns = tool({
     description: 'Analyze development patterns and learn from conversation history to provide intelligent insights',
     inputSchema: z.object({
@@ -2268,6 +2275,7 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
       }
     }
   })
+  } // End learn_patterns conditional
   
   // Debug logging to show which tools are included
   const toolNames = Object.keys(tools)
@@ -3333,7 +3341,7 @@ Project context: ${projectContext || 'Vite + React + TypeScript project - Multi-
           ...validMemoryMessages
         ],
         temperature: 0.1, // Increased creativity while maintaining tool usage
-        stopWhen: stepCountIs(shouldUseAutonomousPlanning ? 25 : 10), // Allow up to 25 steps for autonomous execution, 10 for regular operations
+        stopWhen: stepCountIs(shouldUseAutonomousPlanning ? 12 : 8), // Reduced steps to prevent context explosion and timeouts
         abortSignal: abortController.signal,
         toolChoice: 'required', // Force tool usage first - AI MUST use tools before providing text responses
 
