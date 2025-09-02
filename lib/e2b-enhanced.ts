@@ -1,5 +1,8 @@
 import { Sandbox } from '@e2b/code-interpreter'
 
+// Store active E2B sandbox instances for reuse
+const activeSandboxes = new Map<string, any>()
+
 export enum SandboxErrorType {
   CREATION_FAILED = 'CREATION_FAILED',
   CONNECTION_FAILED = 'CONNECTION_FAILED',
@@ -238,6 +241,68 @@ export class EnhancedE2BSandbox {
         this.id,
         error instanceof Error ? error : undefined
       )
+    }
+  }
+
+  /**
+   * Execute a terminal command interactively using real E2B SDK
+   */
+  async executeTerminalCommand(
+    command: string,
+    options?: {
+      onOutput?: (data: string) => void
+      onError?: (data: string) => void
+    }
+  ): Promise<{ output: string; error: string; exitCode: number }> {
+    try {
+      console.log(`[E2B ${this.id}] Terminal: ${command}`)
+      
+      // Use the native E2B container directly for better streaming
+      if (this.container && this.container.commands) {
+        let stdout = ''
+        let stderr = ''
+        
+        const result = await this.container.commands.run(command, {
+          onStdout: (data: string) => {
+            stdout += data
+            if (options?.onOutput) {
+              options.onOutput(data)
+            }
+          },
+          onStderr: (data: string) => {
+            stderr += data
+            if (options?.onError) {
+              options.onError(data)
+            }
+          },
+        })
+        
+        return {
+          output: stdout,
+          error: stderr,
+          exitCode: result.exitCode || 0
+        }
+      } else {
+        // Fallback to the enhanced command execution
+        const result = await this.executeCommand(command, {
+          onStdout: options?.onOutput,
+          onStderr: options?.onError,
+          workingDirectory: '/project'
+        })
+        
+        return {
+          output: result.stdout,
+          error: result.stderr,
+          exitCode: result.exitCode
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Command failed'
+      return {
+        output: '',
+        error: errorMessage,
+        exitCode: 1
+      }
     }
   }
 
@@ -677,11 +742,22 @@ export async function createEnhancedSandbox(config?: {
  */
 export async function reconnectToSandbox(sandboxId: string): Promise<EnhancedE2BSandbox> {
   try {
+    // Check if we already have this sandbox cached
+    if (activeSandboxes.has(sandboxId)) {
+      console.log(`Reusing cached E2B sandbox: ${sandboxId}`)
+      return activeSandboxes.get(sandboxId)
+    }
+
     const sandbox = await Sandbox.connect(sandboxId, {
       apiKey: process.env.E2B_API_KEY,
     })
 
-    return new EnhancedE2BSandbox(sandboxId, sandbox)
+    const enhancedSandbox = new EnhancedE2BSandbox(sandboxId, sandbox)
+    
+    // Cache the sandbox for reuse
+    activeSandboxes.set(sandboxId, enhancedSandbox)
+    
+    return enhancedSandbox
   } catch (error) {
     throw new SandboxError(
       SandboxErrorType.CONNECTION_FAILED,
@@ -689,5 +765,37 @@ export async function reconnectToSandbox(sandboxId: string): Promise<EnhancedE2B
       sandboxId,
       error instanceof Error ? error : undefined
     )
+  }
+}
+
+/**
+ * Get or create E2B sandbox instance
+ */
+export async function getOrCreateSandbox(sandboxId?: string): Promise<EnhancedE2BSandbox> {
+  if (sandboxId) {
+    try {
+      return await reconnectToSandbox(sandboxId)
+    } catch (error) {
+      console.warn(`Failed to reconnect to sandbox ${sandboxId}, creating new one:`, error)
+    }
+  }
+  
+  // Create new sandbox if reconnection failed or no ID provided
+  return await createEnhancedSandbox()
+}
+
+/**
+ * List all running E2B sandboxes
+ */
+export async function listRunningSandboxes(): Promise<any[]> {
+  try {
+    const paginator = await Sandbox.list({
+      query: { state: ['running'] }
+    })
+    
+    return await paginator.nextItems()
+  } catch (error) {
+    console.error('Failed to list running sandboxes:', error)
+    return []
   }
 }

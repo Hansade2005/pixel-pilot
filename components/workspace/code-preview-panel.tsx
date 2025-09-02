@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Code, Eye, FileText, Download, ExternalLink, RotateCcw, Play, Square, Zap, Server, Terminal, ChevronDown, ChevronUp, RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
@@ -40,9 +41,13 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
   const [consoleLogs, setConsoleLogs] = useState<Array<{id: string, timestamp: Date, type: 'info' | 'error' | 'warn', message: string}>>([])
   const [isConsoleOpen, setIsConsoleOpen] = useState(false)
   const [webContainerInstance, setWebContainerInstance] = useState<any>(null)
+  const [e2bInstance, setE2bInstance] = useState<any>(null)
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(false)
   const [isWebContainerSupported, setIsWebContainerSupported] = useState(false)
+  const [consoleActiveTab, setConsoleActiveTab] = useState("console")
+  const [terminalHistory, setTerminalHistory] = useState<Array<{id: string, command: string, output: string, timestamp: Date}>>([])
+  const [terminalInput, setTerminalInput] = useState("")
 
   useEffect(() => {
     if (preview.url) {
@@ -66,13 +71,23 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
 
   // Auto-scroll console to bottom when new logs are added
   useEffect(() => {
-    if (isConsoleOpen && consoleLogs.length > 0) {
+    if (isConsoleOpen && consoleLogs.length > 0 && consoleActiveTab === 'console') {
       const consoleContainer = document.querySelector('#console-scroll-area')
       if (consoleContainer) {
         consoleContainer.scrollTop = consoleContainer.scrollHeight
       }
     }
-  }, [consoleLogs, isConsoleOpen])
+  }, [consoleLogs, isConsoleOpen, consoleActiveTab])
+
+  // Auto-scroll terminal to bottom when new commands are added
+  useEffect(() => {
+    if (isConsoleOpen && terminalHistory.length > 0 && consoleActiveTab === 'terminal') {
+      const terminalContainer = document.querySelector('#terminal-scroll-area')
+      if (terminalContainer) {
+        terminalContainer.scrollTop = terminalContainer.scrollHeight
+      }
+    }
+  }, [terminalHistory, isConsoleOpen, consoleActiveTab])
 
   // Auto-sync files periodically when WebContainer is running (optional)
   useEffect(() => {
@@ -102,14 +117,15 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
     return () => clearInterval(interval)
   }, [autoSyncEnabled, webContainerInstance, project, lastSyncTime])
 
-  // Cleanup sandbox on unmount
+  // Only cleanup E2B sandboxes on unmount, keep WebContainer running
   useEffect(() => {
     return () => {
-      if (preview.sandboxId) {
+      if (preview.sandboxId && preview.previewType === 'e2b') {
         cleanupSandbox()
       }
+      // WebContainer stays alive across tab switches
     }
-  }, [preview.sandboxId])
+  }, [preview.sandboxId, preview.previewType])
 
   const addConsoleLog = (type: 'info' | 'error' | 'warn', message: string) => {
     const logEntry = {
@@ -128,6 +144,71 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
 
   const clearConsoleLogs = () => {
     setConsoleLogs([])
+  }
+
+  const executeTerminalCommand = async (command: string) => {
+    const activeInstance = preview.previewType === 'webcontainer' ? webContainerInstance : e2bInstance
+    if (!activeInstance || !command.trim()) return
+
+    const commandEntry = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      command: command.trim(),
+      output: '',
+      timestamp: new Date()
+    }
+
+    // Add command to history immediately
+    setTerminalHistory(prev => [...prev, commandEntry])
+    setTerminalInput('')
+
+    try {
+      const result = await activeInstance.executeTerminalCommand(command.trim(), {
+        onOutput: (data: string) => {
+          // Update the command entry with streaming output
+          setTerminalHistory(prev => 
+            prev.map(entry => 
+              entry.id === commandEntry.id 
+                ? { ...entry, output: entry.output + data }
+                : entry
+            )
+          )
+        },
+        onError: (data: string) => {
+          // Handle error output
+          setTerminalHistory(prev => 
+            prev.map(entry => 
+              entry.id === commandEntry.id 
+                ? { ...entry, output: entry.output + `\nError: ${data}` }
+                : entry
+            )
+          )
+        }
+      })
+
+      // Update with final result
+      setTerminalHistory(prev => 
+        prev.map(entry => 
+          entry.id === commandEntry.id 
+            ? { 
+                ...entry, 
+                output: result.output + (result.error ? `\nError: ${result.error}` : '')
+              }
+            : entry
+        )
+      )
+    } catch (error) {
+      setTerminalHistory(prev => 
+        prev.map(entry => 
+          entry.id === commandEntry.id 
+            ? { ...entry, output: `Error: ${error instanceof Error ? error.message : 'Unknown error'}` }
+            : entry
+        )
+      )
+    }
+  }
+
+  const clearTerminalHistory = () => {
+    setTerminalHistory([])
   }
 
   const createE2BPreview = async () => {
@@ -177,6 +258,129 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
           previewType: 'e2b',
         })
         setCurrentLog("Preview ready!")
+        
+        // Add welcome message to E2B terminal
+        setTerminalHistory([{
+          id: 'e2b-welcome',
+          command: 'Welcome to E2B Terminal',
+          output: `E2B Sandbox ${data.sandboxId} is ready!
+Available commands: ls, cat, npm, node, git, python, etc.
+Working directory: /project
+Note: E2B terminal commands run on the server`,
+          timestamp: new Date()
+        }])
+        
+        // Create E2B terminal with real streaming API
+        setE2bInstance({
+          sandboxId: data.sandboxId,
+          executeTerminalCommand: async (command: string, options?: { onOutput?: (data: string) => void, onError?: (data: string) => void }) => {
+            try {
+              // Use streaming API for real-time output
+              const response = await fetch('/api/preview/e2b-command-stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  sandboxId: data.sandboxId,
+                  command: command 
+                }),
+              })
+              
+              if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+              }
+
+              let output = ''
+              let error = ''
+              let exitCode = 0
+
+              // Handle streaming response
+              const reader = response.body?.getReader()
+              const decoder = new TextDecoder()
+
+              if (reader) {
+                try {
+                  while (true) {
+                    const { done, value } = await reader.read()
+                    if (done) break
+
+                    if (value) {
+                      const text = decoder.decode(value, { stream: true })
+                      const lines = text.split('\n')
+                      
+                      for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                          try {
+                            const data = JSON.parse(line.slice(6))
+                            
+                            if (data.type === 'stdout' && data.data) {
+                              output += data.data
+                              if (options?.onOutput) {
+                                options.onOutput(data.data)
+                              }
+                            } else if (data.type === 'stderr' && data.data) {
+                              error += data.data
+                              if (options?.onError) {
+                                options.onError(data.data)
+                              }
+                            } else if (data.type === 'complete') {
+                              exitCode = data.exitCode || 0
+                            } else if (data.type === 'error') {
+                              error += data.message
+                              if (options?.onError) {
+                                options.onError(data.message)
+                              }
+                            }
+                          } catch (parseError) {
+                            // Ignore parsing errors for non-JSON lines
+                          }
+                        }
+                      }
+                    }
+                  }
+                } finally {
+                  reader.releaseLock()
+                }
+              }
+              
+              return { output, error, exitCode }
+              
+            } catch (fetchError) {
+              // Fallback to regular API if streaming fails
+              try {
+                const response = await fetch('/api/preview/e2b-command', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    sandboxId: data.sandboxId,
+                    command: command 
+                  }),
+                })
+                
+                const result = await response.json()
+                
+                if (options?.onOutput && result.output) {
+                  options.onOutput(result.output)
+                }
+                if (options?.onError && result.error) {
+                  options.onError(result.error)
+                }
+                
+                return {
+                  output: result.output || '',
+                  error: result.error || '',
+                  exitCode: result.exitCode || 0
+                }
+              } catch (fallbackError) {
+                return {
+                  output: '',
+                  error: `Failed to execute command: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`,
+                  exitCode: 1
+                }
+              }
+            }
+          }
+        })
+        
         return
       }
 
@@ -218,6 +422,128 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
                         previewType: 'e2b',
                       })
                       setCurrentLog("Server ready")
+                      
+                      // Add welcome message to E2B terminal
+                      setTerminalHistory([{
+                        id: 'e2b-welcome',
+                        command: 'Welcome to E2B Terminal',
+                        output: `E2B Sandbox ${data.sandboxId} is ready!
+Available commands: ls, cat, npm, node, git, python, etc.
+Working directory: /project
+Note: E2B terminal commands run on the server`,
+                        timestamp: new Date()
+                      }])
+                      
+                      // Create E2B terminal with real streaming API
+                      setE2bInstance({
+                        sandboxId: data.sandboxId,
+                        executeTerminalCommand: async (command: string, options?: { onOutput?: (data: string) => void, onError?: (data: string) => void }) => {
+                          try {
+                            // Use streaming API for real-time output
+                            const response = await fetch('/api/preview/e2b-command-stream', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ 
+                                sandboxId: data.sandboxId,
+                                command: command 
+                              }),
+                            })
+                            
+                            if (!response.ok) {
+                              throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+                            }
+
+                            let output = ''
+                            let error = ''
+                            let exitCode = 0
+
+                            // Handle streaming response
+                            const reader = response.body?.getReader()
+                            const decoder = new TextDecoder()
+
+                            if (reader) {
+                              try {
+                                while (true) {
+                                  const { done, value } = await reader.read()
+                                  if (done) break
+
+                                  if (value) {
+                                    const text = decoder.decode(value, { stream: true })
+                                    const lines = text.split('\n')
+                                    
+                                    for (const line of lines) {
+                                      if (line.startsWith('data: ')) {
+                                        try {
+                                          const data = JSON.parse(line.slice(6))
+                                          
+                                          if (data.type === 'stdout' && data.data) {
+                                            output += data.data
+                                            if (options?.onOutput) {
+                                              options.onOutput(data.data)
+                                            }
+                                          } else if (data.type === 'stderr' && data.data) {
+                                            error += data.data
+                                            if (options?.onError) {
+                                              options.onError(data.data)
+                                            }
+                                          } else if (data.type === 'complete') {
+                                            exitCode = data.exitCode || 0
+                                          } else if (data.type === 'error') {
+                                            error += data.message
+                                            if (options?.onError) {
+                                              options.onError(data.message)
+                                            }
+                                          }
+                                        } catch (parseError) {
+                                          // Ignore parsing errors for non-JSON lines
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              } finally {
+                                reader.releaseLock()
+                              }
+                            }
+                            
+                            return { output, error, exitCode }
+                            
+                          } catch (fetchError) {
+                            // Fallback to regular API if streaming fails
+                            try {
+                              const response = await fetch('/api/preview/e2b-command', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ 
+                                  sandboxId: data.sandboxId,
+                                  command: command 
+                                }),
+                              })
+                              
+                              const result = await response.json()
+                              
+                              if (options?.onOutput && result.output) {
+                                options.onOutput(result.output)
+                              }
+                              if (options?.onError && result.error) {
+                                options.onError(result.error)
+                              }
+                              
+                              return {
+                                output: result.output || '',
+                                error: result.error || '',
+                                exitCode: result.exitCode || 0
+                              }
+                            } catch (fallbackError) {
+                              return {
+                                output: '',
+                                error: `Failed to execute command: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`,
+                                exitCode: 1
+                              }
+                            }
+                          }
+                        }
+                      })
                     }
                   } catch (e) {
                     // Ignore parsing errors for non-JSON lines
@@ -312,11 +638,11 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
 
       // Install dependencies
       setCurrentLog("Installing dependencies...")
-      addConsoleLog('info', '📥 Installing dependencies with npm...')
+      addConsoleLog('info', '📥 Installing dependencies with pnpm (faster than npm)...')
       await webContainer.installDependencies({
         onOutput: (data) => {
-          addConsoleLog('info', `[npm] ${data}`)
-          if (data.includes('added') || data.includes('packages')) {
+          addConsoleLog('info', `[pnpm] ${data}`)
+          if (data.includes('added') || data.includes('packages') || data.includes('dependencies installed')) {
             setCurrentLog("Installing dependencies... " + data.split('\n')[0])
           }
         }
@@ -354,6 +680,16 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
       
       setCurrentLog("WebContainer preview ready!")
       setLastSyncTime(new Date()) // Set initial sync time
+      
+      // Add welcome message to terminal
+      setTerminalHistory([{
+        id: 'welcome',
+        command: 'Welcome to WebContainer Terminal',
+        output: `WebContainer ${webContainer.id} is ready!
+Available commands: ls, cat, npm, node, git, etc.
+Working directory: /project`,
+        timestamp: new Date()
+      }])
       
       toast({
         title: "WebContainer Ready",
@@ -719,10 +1055,10 @@ export default function TodoApp() {
               </Button>
               {!preview.sandboxId ? (
                 <div className="flex space-x-2">
-                  <Button
-                    size="sm"
+                <Button
+                  size="sm"
                     onClick={createE2BPreview}
-                    disabled={!project || preview.isLoading}
+                  disabled={!project || preview.isLoading}
                     variant="outline"
                   >
                     <Server className="h-4 w-4 mr-2" />
@@ -742,7 +1078,7 @@ export default function TodoApp() {
                     {!isWebContainerSupported && (
                       <span className="ml-1 text-xs opacity-50">(Needs restart)</span>
                     )}
-                  </Button>
+                </Button>
                 </div>
               ) : (
                 <Button
@@ -793,10 +1129,10 @@ export default function TodoApp() {
                 <h3 className="text-lg font-semibold mb-2">Live Preview</h3>
                 <p className="text-muted-foreground mb-4">Choose your preview environment</p>
                 <div className="flex space-x-3 justify-center">
-                  <Button 
+                <Button 
                     onClick={createE2BPreview} 
-                    disabled={!project || preview.isLoading}
-                    className="rounded-full px-6"
+                  disabled={!project || preview.isLoading}
+                  className="rounded-full px-6"
                     variant="outline"
                   >
                     <Server className="h-4 w-4 mr-2" />
@@ -816,14 +1152,14 @@ export default function TodoApp() {
                     {!isWebContainerSupported && (
                       <span className="ml-1 text-xs opacity-50">(Needs restart)</span>
                     )}
-                  </Button>
+                </Button>
                 </div>
               </div>
               </div>
               )}
             </div>
 
-            {/* Console Accordion - Show for both preview types when active */}
+            {/* Console & Terminal Tabs - Show for both preview types when active */}
             {preview.previewType && (
               <div className="border-t border-border">
                 <Accordion type="single" collapsible value={isConsoleOpen ? "console" : ""} onValueChange={(value) => setIsConsoleOpen(value === "console")}>
@@ -831,76 +1167,136 @@ export default function TodoApp() {
                     <AccordionTrigger className="px-4 py-2 hover:no-underline hover:bg-muted/50">
                       <div className="flex items-center space-x-2">
                         <Terminal className="h-4 w-4" />
-                        <span className="text-sm font-medium">Console</span>
-                        {consoleLogs.length > 0 && (
+                        <span className="text-sm font-medium">Console & Terminal</span>
+                        {(consoleLogs.length > 0 || terminalHistory.length > 0) && (
                           <span className="text-xs bg-muted px-2 py-1 rounded-full">
-                            {consoleLogs.length}
+                            {consoleLogs.length + terminalHistory.length}
                           </span>
                         )}
                       </div>
                     </AccordionTrigger>
                     <AccordionContent className="px-0 pb-0">
                       <div className="h-48 bg-black text-green-400 font-mono text-xs">
-                        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-700">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-gray-400">
-                              {preview.previewType === 'webcontainer' ? 'WebContainer Console' : 'E2B Console'}
-                            </span>
-                            {lastSyncTime && (
-                              <span className="text-xs text-gray-500">
-                                Last sync: {lastSyncTime.toLocaleTimeString()}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            {preview.previewType === 'webcontainer' && (
+                        <Tabs value={consoleActiveTab} onValueChange={setConsoleActiveTab} className="h-full flex flex-col">
+                          <div className="flex items-center justify-between px-4 py-2 border-b border-gray-700">
+                            <div className="flex items-center space-x-2">
+                              <TabsList className="h-6 bg-gray-800 p-0">
+                                <TabsTrigger value="console" className="h-5 px-2 text-xs text-gray-400 data-[state=active]:text-green-400 data-[state=active]:bg-gray-700">
+                                  Console
+                                </TabsTrigger>
+                                {(preview.previewType === 'webcontainer' || preview.previewType === 'e2b') && (
+                                  <TabsTrigger value="terminal" className="h-5 px-2 text-xs text-gray-400 data-[state=active]:text-green-400 data-[state=active]:bg-gray-700">
+                                    Terminal
+                                  </TabsTrigger>
+                                )}
+                              </TabsList>
+                              {lastSyncTime && consoleActiveTab === 'console' && (
+                                <span className="text-xs text-gray-500">
+                                  Last sync: {lastSyncTime.toLocaleTimeString()}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              {preview.previewType === 'webcontainer' && consoleActiveTab === 'console' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
+                                  className={`h-6 px-2 text-xs ${
+                                    autoSyncEnabled 
+                                      ? 'text-green-400 hover:text-green-300' 
+                                      : 'text-gray-400 hover:text-white'
+                                  }`}
+                                  title={autoSyncEnabled ? 'Disable auto-sync' : 'Enable auto-sync'}
+                                >
+                                  <RefreshCw className={`h-3 w-3 mr-1 ${autoSyncEnabled ? 'animate-spin' : ''}`} />
+                                  Auto
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
-                                className={`h-6 px-2 text-xs ${
-                                  autoSyncEnabled 
-                                    ? 'text-green-400 hover:text-green-300' 
-                                    : 'text-gray-400 hover:text-white'
-                                }`}
-                                title={autoSyncEnabled ? 'Disable auto-sync' : 'Enable auto-sync'}
+                                onClick={consoleActiveTab === 'console' ? clearConsoleLogs : clearTerminalHistory}
+                                className="h-6 px-2 text-gray-400 hover:text-white"
                               >
-                                <RefreshCw className={`h-3 w-3 mr-1 ${autoSyncEnabled ? 'animate-spin' : ''}`} />
-                                Auto
+                                Clear
                               </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={clearConsoleLogs}
-                              className="h-6 px-2 text-gray-400 hover:text-white"
-                            >
-                              Clear
-                            </Button>
+                            </div>
                           </div>
-                        </div>
-                        <ScrollArea className="h-40" id="console-scroll-area">
-                          <div className="p-4 space-y-1">
-                            {consoleLogs.length === 0 ? (
-                              <div className="text-gray-500">No logs yet...</div>
-                            ) : (
-                              consoleLogs.map((log) => (
-                                <div key={log.id} className="flex items-start space-x-2">
-                                  <span className="text-gray-500 text-xs shrink-0">
-                                    {log.timestamp.toLocaleTimeString()}
-                                  </span>
-                                  <span className={`text-xs ${
-                                    log.type === 'error' ? 'text-red-400' :
-                                    log.type === 'warn' ? 'text-yellow-400' :
-                                    'text-green-400'
-                                  }`}>
-                                    {log.message}
-                                  </span>
+                          
+                          <TabsContent value="console" className="flex-1 m-0">
+                            <ScrollArea className="h-40" id="console-scroll-area">
+                              <div className="p-4 space-y-1">
+                                {consoleLogs.length === 0 ? (
+                                  <div className="text-gray-500">No logs yet...</div>
+                                ) : (
+                                  consoleLogs.map((log) => (
+                                    <div key={log.id} className="flex items-start space-x-2">
+                                      <span className="text-gray-500 text-xs shrink-0">
+                                        {log.timestamp.toLocaleTimeString()}
+                                      </span>
+                                      <span className={`text-xs ${
+                                        log.type === 'error' ? 'text-red-400' :
+                                        log.type === 'warn' ? 'text-yellow-400' :
+                                        'text-green-400'
+                                      }`}>
+                                        {log.message}
+                                      </span>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </ScrollArea>
+                          </TabsContent>
+                          
+                          {(preview.previewType === 'webcontainer' || preview.previewType === 'e2b') && (
+                            <TabsContent value="terminal" className="flex-1 m-0 flex flex-col">
+                              <ScrollArea className="flex-1" id="terminal-scroll-area">
+                                <div className="p-4 space-y-2">
+                                  {terminalHistory.length === 0 ? (
+                                    <div className="text-gray-500">
+                                      {preview.previewType === 'webcontainer' ? 'WebContainer' : 'E2B'} Terminal - Type commands below
+                                    </div>
+                                  ) : (
+                                    terminalHistory.map((entry) => (
+                                      <div key={entry.id} className="space-y-1">
+                                        <div className="flex items-center space-x-2">
+                                          <span className="text-gray-500 text-xs">
+                                            {entry.timestamp.toLocaleTimeString()}
+                                          </span>
+                                          <span className="text-blue-400">$</span>
+                                          <span className="text-white text-xs">{entry.command}</span>
+                                        </div>
+                                        {entry.output && (
+                                          <div className="text-green-400 text-xs whitespace-pre-wrap ml-4 pl-2 border-l border-gray-600">
+                                            {entry.output}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))
+                                  )}
                                 </div>
-                              ))
-                            )}
-                          </div>
-                        </ScrollArea>
+                              </ScrollArea>
+                              <div className="border-t border-gray-700 p-2">
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-blue-400 text-xs">$</span>
+                                  <Input
+                                    value={terminalInput}
+                                    onChange={(e) => setTerminalInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        executeTerminalCommand(terminalInput)
+                                      }
+                                    }}
+                                    placeholder="Enter command..."
+                                    className="flex-1 h-6 bg-transparent border-none text-white text-xs placeholder-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0"
+                                    disabled={!(preview.previewType === 'webcontainer' ? webContainerInstance : e2bInstance)}
+                                  />
+                                </div>
+                              </div>
+                            </TabsContent>
+                          )}
+                        </Tabs>
                       </div>
                     </AccordionContent>
                   </AccordionItem>

@@ -278,7 +278,7 @@ export class EnhancedWebContainer {
   }
 
   /**
-   * Install dependencies using npm
+   * Install dependencies using pnpm (faster than npm)
    */
   async installDependencies(
     options?: {
@@ -286,11 +286,26 @@ export class EnhancedWebContainer {
       onError?: (data: string) => void
     }
   ): Promise<CommandResult> {
-    console.log(`[WebContainer ${this.id}] Installing dependencies...`)
+    console.log(`[WebContainer ${this.id}] Installing dependencies with pnpm...`)
     
-    return await this.executeCommand('npm', ['install'], {
-      onOutput: options?.onOutput || ((data: string) => console.log(`[npm] ${data}`)),
-      onError: options?.onError || ((data: string) => console.error(`[npm Error] ${data}`))
+    try {
+      // First, ensure pnpm is available
+      await this.executeCommand('pnpm', ['--version'], {
+        onOutput: (data) => console.log(`[pnpm version] ${data}`)
+      })
+    } catch (error) {
+      // If pnpm is not available, install it globally
+      console.log(`[WebContainer ${this.id}] Installing pnpm globally...`)
+      await this.executeCommand('npm', ['install', '-g', 'pnpm'], {
+        onOutput: options?.onOutput || ((data: string) => console.log(`[npm] ${data}`)),
+        onError: options?.onError || ((data: string) => console.error(`[npm Error] ${data}`))
+      })
+    }
+    
+    // Use pnpm for dependency installation
+    return await this.executeCommand('pnpm', ['install'], {
+      onOutput: options?.onOutput || ((data: string) => console.log(`[pnpm] ${data}`)),
+      onError: options?.onError || ((data: string) => console.error(`[pnpm Error] ${data}`))
     })
   }
 
@@ -311,7 +326,8 @@ export class EnhancedWebContainer {
         throw new Error('WebContainer not initialized')
       }
 
-      const command = options?.command || 'npm'
+      // Use pnpm for dev server by default
+      const command = options?.command || 'pnpm'
       const args = options?.args || ['run', 'dev']
 
       console.log(`[WebContainer ${this.id}] Starting dev server: ${command} ${args.join(' ')}`)
@@ -408,6 +424,39 @@ export class EnhancedWebContainer {
         resolve({ url, port })
       })
     })
+  }
+
+  /**
+   * Execute a terminal command interactively
+   */
+  async executeTerminalCommand(
+    command: string,
+    options?: {
+      onOutput?: (data: string) => void
+      onError?: (data: string) => void
+    }
+  ): Promise<{ output: string; error: string; exitCode: number }> {
+    try {
+      console.log(`[WebContainer ${this.id}] Terminal: ${command}`)
+      
+      const result = await this.executeCommand(command, [], {
+        onOutput: options?.onOutput,
+        onError: options?.onError
+      })
+      
+      return {
+        output: result.stdout,
+        error: result.stderr,
+        exitCode: result.exitCode
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Command failed'
+      return {
+        output: '',
+        error: errorMessage,
+        exitCode: 1
+      }
+    }
   }
 
   /**
