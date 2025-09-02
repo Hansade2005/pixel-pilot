@@ -1746,9 +1746,25 @@ export function ChatPanel({
     
     document.body.removeChild(div);
     
-    // Calculate position
-    const lineHeight = parseFloat(window.getComputedStyle(textarea).lineHeight);
-    const top = rect.bottom + 8; // Position below the textarea
+    // Calculate position - Position ABOVE the textarea
+    const dropdownHeight = 320; // Approximate dropdown height
+    const viewportHeight = window.innerHeight;
+    const spaceAbove = rect.top;
+    const spaceBelow = viewportHeight - rect.bottom;
+    
+    // Prefer positioning above, but fall back to below if not enough space
+    let top: number;
+    if (spaceAbove >= dropdownHeight + 16) {
+      // Enough space above - position above the textarea
+      top = rect.top - dropdownHeight - 8;
+    } else if (spaceBelow >= dropdownHeight + 16) {
+      // Not enough space above but enough below - position below
+      top = rect.bottom + 8;
+    } else {
+      // Not enough space either way - position above anyway and let it scroll
+      top = Math.max(16, rect.top - dropdownHeight - 8);
+    }
+    
     const left = rect.left;
     
     return { top, left };
