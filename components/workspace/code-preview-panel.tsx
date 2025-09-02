@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Input } from "@/components/ui/input"
-import { Code, Eye, FileText, Download, ExternalLink, RotateCcw, Play, Square } from "lucide-react"
+import { Code, Eye, FileText, Download, ExternalLink, RotateCcw, Play, Square, Zap, Server, Terminal, ChevronDown, ChevronUp, RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { Workspace as Project } from "@/lib/storage-manager"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -20,6 +21,7 @@ interface PreviewState {
   url: string | null
   isLoading: boolean
   processId: string | null
+  previewType: 'e2b' | 'webcontainer' | null
 }
 
 export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePreviewPanelProps) {
@@ -30,16 +32,60 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
     url: null,
     isLoading: false,
     processId: null,
+    previewType: null,
   })
   const [customUrl, setCustomUrl] = useState("")
   const [currentLog, setCurrentLog] = useState("Initializing preview...")
   const [isExporting, setIsExporting] = useState(false)
+  const [consoleLogs, setConsoleLogs] = useState<Array<{id: string, timestamp: Date, type: 'info' | 'error' | 'warn', message: string}>>([])
+  const [isConsoleOpen, setIsConsoleOpen] = useState(false)
+  const [webContainerInstance, setWebContainerInstance] = useState<any>(null)
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(false)
 
   useEffect(() => {
     if (preview.url) {
       setCustomUrl(preview.url)
     }
   }, [preview.url])
+
+  // Auto-scroll console to bottom when new logs are added
+  useEffect(() => {
+    if (isConsoleOpen && consoleLogs.length > 0) {
+      const consoleContainer = document.querySelector('#console-scroll-area')
+      if (consoleContainer) {
+        consoleContainer.scrollTop = consoleContainer.scrollHeight
+      }
+    }
+  }, [consoleLogs, isConsoleOpen])
+
+  // Auto-sync files periodically when WebContainer is running (optional)
+  useEffect(() => {
+    if (!autoSyncEnabled || !webContainerInstance || !project) return
+
+    const interval = setInterval(async () => {
+      try {
+        // Check if files have been modified since last sync
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        const files = await storageManager.getFiles(project.id)
+        
+        if (files && files.length > 0) {
+          // Simple check: if we haven't synced yet or files might have changed
+          const shouldSync = !lastSyncTime || (Date.now() - lastSyncTime.getTime() > 30000) // 30 seconds
+          
+          if (shouldSync) {
+            addConsoleLog('info', '🔄 Auto-syncing files...')
+            await refreshWebContainer()
+          }
+        }
+      } catch (error) {
+        console.error('Auto-sync failed:', error)
+      }
+    }, 30000) // Check every 30 seconds
+
+    return () => clearInterval(interval)
+  }, [autoSyncEnabled, webContainerInstance, project, lastSyncTime])
 
   // Cleanup sandbox on unmount
   useEffect(() => {
@@ -50,11 +96,32 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
     }
   }, [preview.sandboxId])
 
-  const createPreview = async () => {
+  const addConsoleLog = (type: 'info' | 'error' | 'warn', message: string) => {
+    const logEntry = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: new Date(),
+      type,
+      message: message.trim()
+    }
+    
+    setConsoleLogs(prev => {
+      const newLogs = [...prev, logEntry]
+      // Keep only last 100 logs to prevent memory issues
+      return newLogs.slice(-100)
+    })
+  }
+
+  const clearConsoleLogs = () => {
+    setConsoleLogs([])
+  }
+
+  const createE2BPreview = async () => {
     if (!project) return
 
     setPreview(prev => ({ ...prev, isLoading: true }))
     setCurrentLog("Booting VM...")
+    clearConsoleLogs() // Clear previous logs
+    addConsoleLog('info', '🚀 Starting E2B preview...')
     
     try {
       // Fetch files from IndexedDB client-side
@@ -92,6 +159,7 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
           url: data.url,
           isLoading: false,
           processId: data.processId,
+          previewType: 'e2b',
         })
         setCurrentLog("Preview ready!")
         return
@@ -132,6 +200,7 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
                         url: data.url,
                         isLoading: false,
                         processId: data.processId,
+                        previewType: 'e2b',
                       })
                       setCurrentLog("Server ready")
                     }
@@ -163,15 +232,152 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
     }
   }
 
+  const createWebContainerPreview = async () => {
+    if (!project) return
+
+    setPreview(prev => ({ ...prev, isLoading: true, previewType: 'webcontainer' }))
+    setCurrentLog("Initializing WebContainer...")
+    clearConsoleLogs() // Clear previous logs
+    addConsoleLog('info', '🚀 Starting WebContainer preview...')
+    
+    try {
+      // Import WebContainer service
+      const { createWebContainer } = await import('@/lib/webcontainer-enhanced')
+      
+      // Fetch files from IndexedDB client-side
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+      const files = await storageManager.getFiles(project.id)
+      
+      if (!files || files.length === 0) {
+        throw new Error('No files found in project')
+      }
+
+      // Validate files with the API first
+      setCurrentLog("Validating project files...")
+      const validationResponse = await fetch('/api/preview/webcontainer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          projectId: project.id,
+          files: files 
+        }),
+      })
+
+      if (!validationResponse.ok) {
+        const errorData = await validationResponse.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Files validation failed')
+      }
+
+      const validationData = await validationResponse.json()
+      
+      // Show warnings if any
+      if (validationData.compatibility?.warnings?.length > 0) {
+        console.warn('WebContainer warnings:', validationData.compatibility.warnings)
+        toast({
+          title: "WebContainer Warnings",
+          description: validationData.compatibility.warnings[0],
+          variant: "default",
+        })
+      }
+
+      // Create WebContainer instance
+      setCurrentLog("Creating WebContainer...")
+      addConsoleLog('info', '📦 Creating WebContainer instance...')
+      const webContainer = await createWebContainer()
+      setWebContainerInstance(webContainer) // Store instance for cleanup
+      
+      // Mount files
+      setCurrentLog("Mounting project files...")
+      addConsoleLog('info', `📁 Mounting ${files.length} project files...`)
+      await webContainer.mountFiles(files.map(f => ({
+        path: f.path,
+        content: f.content
+      })))
+
+      // Install dependencies
+      setCurrentLog("Installing dependencies...")
+      addConsoleLog('info', '📥 Installing dependencies with npm...')
+      await webContainer.installDependencies({
+        onOutput: (data) => {
+          addConsoleLog('info', `[npm] ${data}`)
+          if (data.includes('added') || data.includes('packages')) {
+            setCurrentLog("Installing dependencies... " + data.split('\n')[0])
+          }
+        }
+      })
+
+      // Start dev server
+      setCurrentLog("Starting development server...")
+      addConsoleLog('info', '🚀 Starting development server...')
+      const { url, port } = await webContainer.startDevServer({
+        onOutput: (data) => {
+          // Determine log type based on content
+          const logType = data.includes('error') || data.includes('Error') || data.includes('ERROR') 
+            ? 'error' 
+            : data.includes('warn') || data.includes('Warning') || data.includes('WARN')
+            ? 'warn'
+            : 'info'
+          
+          addConsoleLog(logType, `[dev] ${data}`)
+          
+          if (data.includes('ready') || data.includes('Local:') || data.includes('localhost')) {
+            setCurrentLog("Development server is ready!")
+            addConsoleLog('info', `✅ Development server ready at ${url}:${port}`)
+          }
+        }
+      })
+
+      // Update preview state
+      setPreview({
+        sandboxId: webContainer.id,
+        url: url,
+        isLoading: false,
+        processId: 'webcontainer-dev-server',
+        previewType: 'webcontainer',
+      })
+      
+      setCurrentLog("WebContainer preview ready!")
+      setLastSyncTime(new Date()) // Set initial sync time
+      
+      toast({
+        title: "WebContainer Ready",
+        description: "Your app is now running in WebContainer",
+      })
+
+    } catch (error) {
+      console.error('WebContainer preview error:', error)
+      const errorMessage = error instanceof Error ? error.message : "Could not create WebContainer preview"
+      setCurrentLog(`Error: ${errorMessage}`)
+      addConsoleLog('error', `❌ WebContainer Error: ${errorMessage}`)
+      setPreview(prev => ({ ...prev, isLoading: false }))
+      toast({
+        title: "WebContainer Failed",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    }
+  }
+
   const cleanupSandbox = async () => {
     if (!preview.sandboxId) return
 
     try {
+      if (preview.previewType === 'e2b') {
+        // Cleanup E2B sandbox
       await fetch('/api/preview', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sandboxId: preview.sandboxId }),
       })
+      } else if (preview.previewType === 'webcontainer') {
+        // Cleanup WebContainer (client-side only)
+        console.log('Cleaning up WebContainer:', preview.sandboxId)
+        if (webContainerInstance) {
+          await webContainerInstance.terminate()
+          setWebContainerInstance(null)
+        }
+      }
     } catch (error) {
       console.error('Error cleaning up sandbox:', error)
     }
@@ -181,17 +387,79 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
       url: null,
       isLoading: false,
       processId: null,
+      previewType: null,
     })
     setCurrentLog("Preview stopped")
+    addConsoleLog('info', '🛑 Preview stopped')
   }
 
-  const refreshPreview = () => {
-    if (preview.url) {
-      // Force iframe reload
+  const refreshPreview = async () => {
+    if (!preview.url) return
+
+    if (preview.previewType === 'webcontainer' && webContainerInstance) {
+      // Smart refresh for WebContainer - sync files and trigger HMR
+      await refreshWebContainer()
+    } else {
+      // Standard iframe refresh for E2B
       const iframe = document.querySelector('#preview-iframe') as HTMLIFrameElement
       if (iframe) {
         iframe.src = iframe.src
+        addConsoleLog('info', '🔄 Preview refreshed')
       }
+    }
+  }
+
+  const refreshWebContainer = async () => {
+    if (!project || !webContainerInstance) return
+
+    try {
+      addConsoleLog('info', '🔄 Syncing latest project files...')
+      
+      // Fetch latest files from IndexedDB
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+      const latestFiles = await storageManager.getFiles(project.id)
+      
+      if (!latestFiles || latestFiles.length === 0) {
+        addConsoleLog('warn', '⚠️ No files found to sync')
+        return
+      }
+
+      // Sync files to WebContainer
+      const syncResult = await webContainerInstance.syncFiles(latestFiles.map((f: any) => ({
+        path: f.path,
+        content: f.content
+      })))
+
+      if (syncResult.success) {
+        addConsoleLog('info', `✅ Synced ${syncResult.successCount} files successfully`)
+        setLastSyncTime(new Date()) // Track sync time
+        
+        // Trigger hot reload
+        await webContainerInstance.triggerHotReload()
+        addConsoleLog('info', '🔥 Hot reload triggered - changes should appear automatically')
+        
+        toast({
+          title: "Files Synced",
+          description: `Updated ${syncResult.successCount} files in WebContainer`,
+        })
+      } else {
+        addConsoleLog('warn', `⚠️ Some files failed to sync: ${syncResult.errorCount} errors`)
+        toast({
+          title: "Partial Sync",
+          description: `${syncResult.successCount} files synced, ${syncResult.errorCount} failed`,
+          variant: "default",
+        })
+      }
+    } catch (error) {
+      console.error('WebContainer refresh error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to sync files'
+      addConsoleLog('error', `❌ Sync failed: ${errorMessage}`)
+      toast({
+        title: "Sync Failed",
+        description: errorMessage,
+        variant: "destructive",
+      })
     }
   }
 
@@ -424,18 +692,36 @@ export default function TodoApp() {
                 size="sm"
                 onClick={refreshPreview}
                 disabled={!preview.url}
+                title={preview.previewType === 'webcontainer' 
+                  ? 'Sync latest files and trigger hot reload' 
+                  : 'Refresh preview'
+                }
               >
                 <RotateCcw className="h-4 w-4" />
+                {preview.previewType === 'webcontainer' && (
+                  <span className="ml-1 text-xs">Sync</span>
+                )}
               </Button>
               {!preview.sandboxId ? (
+                <div className="flex space-x-2">
+                  <Button
+                    size="sm"
+                    onClick={createE2BPreview}
+                    disabled={!project || preview.isLoading}
+                    variant="outline"
+                  >
+                    <Server className="h-4 w-4 mr-2" />
+                    {preview.isLoading && preview.previewType === 'e2b' ? 'Starting...' : 'Start E2B'}
+                  </Button>
                 <Button
                   size="sm"
-                  onClick={createPreview}
+                    onClick={createWebContainerPreview}
                   disabled={!project || preview.isLoading}
                 >
-                  <Play className="h-4 w-4 mr-2" />
-                  {preview.isLoading ? 'Starting...' : 'Start Preview'}
+                    <Zap className="h-4 w-4 mr-2" />
+                    {preview.isLoading && preview.previewType === 'webcontainer' ? 'Starting...' : 'Start WebContainer'}
                 </Button>
+                </div>
               ) : (
                 <Button
                   variant="destructive"
@@ -443,7 +729,7 @@ export default function TodoApp() {
                   onClick={cleanupSandbox}
                 >
                   <Square className="h-4 w-4 mr-2" />
-                  Stop
+                  Stop {preview.previewType === 'webcontainer' ? 'WebContainer' : 'E2B'}
                 </Button>
               )}
             </div>
@@ -483,19 +769,115 @@ export default function TodoApp() {
               <div className="text-center">
                 <Eye className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-semibold mb-2">Live Preview</h3>
-                <p className="text-muted-foreground mb-4">Click "Start Preview" to see your app running</p>
+                <p className="text-muted-foreground mb-4">Choose your preview environment</p>
+                <div className="flex space-x-3 justify-center">
+                  <Button 
+                    onClick={createE2BPreview} 
+                    disabled={!project || preview.isLoading}
+                    className="rounded-full px-6"
+                    variant="outline"
+                  >
+                    <Server className="h-4 w-4 mr-2" />
+                    {preview.isLoading && preview.previewType === 'e2b' ? 'Starting...' : 'Start E2B'}
+                  </Button>
                 <Button 
-                  onClick={createPreview} 
+                    onClick={createWebContainerPreview} 
                   disabled={!project || preview.isLoading}
                   className="rounded-full px-6"
                 >
-                  <Play className="h-4 w-4 mr-2" />
-                  {preview.isLoading ? 'Starting...' : 'Start Preview'}
+                    <Zap className="h-4 w-4 mr-2" />
+                    {preview.isLoading && preview.previewType === 'webcontainer' ? 'Starting...' : 'Start WebContainer'}
                 </Button>
+                </div>
               </div>
               </div>
               )}
             </div>
+
+            {/* Console Accordion - Show for both preview types when active */}
+            {preview.previewType && (
+              <div className="border-t border-border">
+                <Accordion type="single" collapsible value={isConsoleOpen ? "console" : ""} onValueChange={(value) => setIsConsoleOpen(value === "console")}>
+                  <AccordionItem value="console" className="border-b-0">
+                    <AccordionTrigger className="px-4 py-2 hover:no-underline hover:bg-muted/50">
+                      <div className="flex items-center space-x-2">
+                        <Terminal className="h-4 w-4" />
+                        <span className="text-sm font-medium">Console</span>
+                        {consoleLogs.length > 0 && (
+                          <span className="text-xs bg-muted px-2 py-1 rounded-full">
+                            {consoleLogs.length}
+                          </span>
+                        )}
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-0 pb-0">
+                      <div className="h-48 bg-black text-green-400 font-mono text-xs">
+                        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-700">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-gray-400">
+                              {preview.previewType === 'webcontainer' ? 'WebContainer Console' : 'E2B Console'}
+                            </span>
+                            {lastSyncTime && (
+                              <span className="text-xs text-gray-500">
+                                Last sync: {lastSyncTime.toLocaleTimeString()}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {preview.previewType === 'webcontainer' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
+                                className={`h-6 px-2 text-xs ${
+                                  autoSyncEnabled 
+                                    ? 'text-green-400 hover:text-green-300' 
+                                    : 'text-gray-400 hover:text-white'
+                                }`}
+                                title={autoSyncEnabled ? 'Disable auto-sync' : 'Enable auto-sync'}
+                              >
+                                <RefreshCw className={`h-3 w-3 mr-1 ${autoSyncEnabled ? 'animate-spin' : ''}`} />
+                                Auto
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={clearConsoleLogs}
+                              className="h-6 px-2 text-gray-400 hover:text-white"
+                            >
+                              Clear
+                            </Button>
+                          </div>
+                        </div>
+                        <ScrollArea className="h-40" id="console-scroll-area">
+                          <div className="p-4 space-y-1">
+                            {consoleLogs.length === 0 ? (
+                              <div className="text-gray-500">No logs yet...</div>
+                            ) : (
+                              consoleLogs.map((log) => (
+                                <div key={log.id} className="flex items-start space-x-2">
+                                  <span className="text-gray-500 text-xs shrink-0">
+                                    {log.timestamp.toLocaleTimeString()}
+                                  </span>
+                                  <span className={`text-xs ${
+                                    log.type === 'error' ? 'text-red-400' :
+                                    log.type === 'warn' ? 'text-yellow-400' :
+                                    'text-green-400'
+                                  }`}>
+                                    {log.message}
+                                  </span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </ScrollArea>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              </div>
+            )}
           </div>
         )}
       </div>
