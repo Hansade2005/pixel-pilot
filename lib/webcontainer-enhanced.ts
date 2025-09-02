@@ -310,7 +310,7 @@ export class EnhancedWebContainer {
   }
 
   /**
-   * Start development server
+   * Start development server with enhanced startup handling
    */
   async startDevServer(options?: {
     command?: string
@@ -326,32 +326,101 @@ export class EnhancedWebContainer {
         throw new Error('WebContainer not initialized')
       }
 
-      // Use pnpm for dev server by default
-      const command = options?.command || 'pnpm'
-      const args = options?.args || ['run', 'dev']
+      // Try multiple strategies for starting dev server
+      const strategies = [
+        { command: 'pnpm', args: ['run', 'dev'] },
+        { command: 'pnpm', args: ['dev'] },
+        { command: 'npm', args: ['run', 'dev'] },
+        { command: 'npm', args: ['start'] },
+        { command: 'npx', args: ['vite'] },
+        { command: 'npx', args: ['vite', '--host'] }
+      ]
 
-      console.log(`[WebContainer ${this.id}] Starting dev server: ${command} ${args.join(' ')}`)
+      let lastError: Error | null = null
 
-      // Start the development server process
-      this.devServerProcess = await this.container.spawn(command, args)
+      for (const strategy of strategies) {
+        try {
+          console.log(`[WebContainer ${this.id}] Trying strategy: ${strategy.command} ${strategy.args.join(' ')}`)
+          
+          if (options?.onOutput) {
+            options.onOutput(`Trying: ${strategy.command} ${strategy.args.join(' ')}\n`)
+          }
 
-      // Handle output
-      if (this.devServerProcess.output) {
-        const reader = this.devServerProcess.output.getReader()
-        const decoder = new TextDecoder()
+          // Start the development server process
+          this.devServerProcess = await this.container.spawn(strategy.command, strategy.args)
 
-        // Don't await this - let it run in background
-        this.handleDevServerOutput(reader, decoder, options)
+          let serverReady = false
+          let serverUrl = ''
+          let serverPort = 0
+
+          // Handle output with enhanced detection
+          if (this.devServerProcess.output) {
+            const reader = this.devServerProcess.output.getReader()
+            const decoder = new TextDecoder()
+
+            // Set up output handling with timeout
+            const outputPromise = this.handleDevServerOutputWithDetection(reader, decoder, options, (url, port) => {
+              serverReady = true
+              serverUrl = url
+              serverPort = port
+            })
+
+            // Wait for server ready or timeout (30 seconds)
+            const timeoutPromise = new Promise<void>((_, reject) => {
+              setTimeout(() => {
+                reject(new Error('Dev server startup timeout (30s)'))
+              }, 30000)
+            })
+
+            // Race between server ready and timeout
+            try {
+              await Promise.race([
+                new Promise<void>((resolve) => {
+                  const checkReady = () => {
+                    if (serverReady) {
+                      resolve()
+                    } else {
+                      setTimeout(checkReady, 100)
+                    }
+                  }
+                  checkReady()
+                }),
+                timeoutPromise
+              ])
+
+              // Server is ready!
+              console.log(`[WebContainer ${this.id}] Dev server ready with strategy: ${strategy.command}`)
+              
+              return {
+                processId: 'webcontainer-dev-server',
+                url: serverUrl || `http://localhost:${serverPort || 5173}`,
+                port: serverPort || 5173
+              }
+
+            } catch (timeoutError) {
+              console.warn(`[WebContainer ${this.id}] Strategy ${strategy.command} timed out, trying next...`)
+              
+              // Kill the current process and try next strategy
+              if (this.devServerProcess) {
+                this.devServerProcess.kill()
+                this.devServerProcess = null
+              }
+              
+              lastError = timeoutError as Error
+              continue // Try next strategy
+            }
+          }
+
+        } catch (strategyError) {
+          console.warn(`[WebContainer ${this.id}] Strategy ${strategy.command} failed:`, strategyError)
+          lastError = strategyError as Error
+          continue // Try next strategy
+        }
       }
 
-      // Wait for server to be ready
-      const { url, port } = await this.waitForServerReady()
+      // All strategies failed
+      throw new Error(`All dev server startup strategies failed. Last error: ${lastError?.message || 'Unknown error'}`)
 
-      return {
-        processId: 'webcontainer-dev-server',
-        url,
-        port
-      }
     } catch (error) {
       throw new WebContainerError(
         WebContainerErrorType.COMMAND_FAILED,
@@ -359,6 +428,71 @@ export class EnhancedWebContainer {
         this.id,
         error instanceof Error ? error : undefined
       )
+    }
+  }
+
+  /**
+   * Handle dev server output with enhanced server detection
+   */
+  private async handleDevServerOutputWithDetection(
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+    decoder: TextDecoder,
+    options?: {
+      onOutput?: (data: string) => void
+      onError?: (data: string) => void
+      onReady?: (url: string, port: number) => void
+    },
+    onServerReady?: (url: string, port: number) => void
+  ): Promise<void> {
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        if (value) {
+          const text = typeof value === 'string' ? value : new TextDecoder().decode(value as Uint8Array)
+          
+          if (options?.onOutput) {
+            options.onOutput(text)
+          }
+
+          // Enhanced server ready detection
+          const serverReadyPatterns = [
+            /Local:\s*http:\/\/localhost:(\d+)/i,
+            /localhost:(\d+)/i,
+            /ready in \d+/i,
+            /dev server running/i,
+            /vite.*ready/i,
+            /server.*ready/i,
+            /listening.*(\d+)/i
+          ]
+
+          for (const pattern of serverReadyPatterns) {
+            const match = text.match(pattern)
+            if (match) {
+              const port = parseInt(match[1]) || 5173
+              const url = `http://localhost:${port}`
+              
+              console.log(`[WebContainer ${this.id}] Server ready detected: ${url}`)
+              this.devServerUrl = url
+              
+              if (onServerReady) {
+                onServerReady(url, port)
+              }
+              
+              if (options?.onReady) {
+                options.onReady(url, port)
+              }
+              
+              return // Server is ready, exit
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`[WebContainer ${this.id}] Error reading dev server output:`, error)
+    } finally {
+      reader.releaseLock()
     }
   }
 
@@ -456,6 +590,91 @@ export class EnhancedWebContainer {
         error: errorMessage,
         exitCode: 1
       }
+    }
+  }
+
+  /**
+   * Force start dev server if it gets stuck after package installation
+   */
+  async forceStartDevServer(options?: {
+    onOutput?: (data: string) => void
+    onError?: (data: string) => void
+  }): Promise<{ processId: string; url: string; port: number }> {
+    try {
+      if (!this.container) {
+        throw new Error('WebContainer not initialized')
+      }
+
+      console.log(`[WebContainer ${this.id}] Force starting dev server...`)
+      
+      if (options?.onOutput) {
+        options.onOutput('Force starting dev server...\n')
+      }
+
+      // Kill any existing dev server process
+      if (this.devServerProcess) {
+        console.log(`[WebContainer ${this.id}] Killing existing dev server process...`)
+        this.devServerProcess.kill()
+        this.devServerProcess = null
+      }
+
+      // Wait a moment for cleanup
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      // Try direct vite command first (most reliable for React/Vite projects)
+      try {
+        console.log(`[WebContainer ${this.id}] Trying direct vite command...`)
+        
+        if (options?.onOutput) {
+          options.onOutput('Trying direct vite command...\n')
+        }
+
+        this.devServerProcess = await this.container.spawn('npx', ['vite', '--host', '0.0.0.0'])
+        
+        // Wait for vite to start
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        
+        // Assume vite starts on port 5173 by default
+        const url = 'http://localhost:5173'
+        this.devServerUrl = url
+        
+        console.log(`[WebContainer ${this.id}] Force started dev server at ${url}`)
+        
+        if (options?.onOutput) {
+          options.onOutput(`✅ Dev server force started at ${url}\n`)
+        }
+
+        return {
+          processId: 'webcontainer-dev-server-force',
+          url,
+          port: 5173
+        }
+
+      } catch (viteError) {
+        console.warn(`[WebContainer ${this.id}] Direct vite failed, trying npm run dev...`)
+        
+        // Fallback to npm run dev
+        this.devServerProcess = await this.container.spawn('npm', ['run', 'dev'])
+        
+        await new Promise(resolve => setTimeout(resolve, 3000))
+        
+        const url = 'http://localhost:3000' // Next.js default
+        this.devServerUrl = url
+        
+        return {
+          processId: 'webcontainer-dev-server-fallback',
+          url,
+          port: 3000
+        }
+      }
+
+    } catch (error) {
+      throw new WebContainerError(
+        WebContainerErrorType.COMMAND_FAILED,
+        `Force start failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        this.id,
+        error instanceof Error ? error : undefined
+      )
     }
   }
 

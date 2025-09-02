@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
-import { Code, Eye, FileText, Download, ExternalLink, RotateCcw, Play, Square, Zap, Server, Terminal, ChevronDown, ChevronUp, RefreshCw } from "lucide-react"
+import { Code, Eye, FileText, Download, ExternalLink, RotateCcw, Play, Square, Zap, Server, Terminal, ChevronDown, ChevronUp, RefreshCw, AlertTriangle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { Workspace as Project } from "@/lib/storage-manager"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -48,6 +48,7 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
   const [consoleActiveTab, setConsoleActiveTab] = useState("console")
   const [terminalHistory, setTerminalHistory] = useState<Array<{id: string, command: string, output: string, timestamp: Date}>>([])
   const [terminalInput, setTerminalInput] = useState("")
+  const [isSessionResumed, setIsSessionResumed] = useState(false)
 
   useEffect(() => {
     if (preview.url) {
@@ -55,12 +56,15 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
     }
   }, [preview.url])
 
-  // Check WebContainer support on mount
+  // Check WebContainer support and detect existing sessions on mount
   useEffect(() => {
     const checkSupport = async () => {
       try {
         const { isWebContainerSupported } = await import('@/lib/webcontainer-enhanced')
         setIsWebContainerSupported(isWebContainerSupported())
+        
+        // Check for existing WebContainer session in browser
+        await detectExistingWebContainerSession()
       } catch (error) {
         console.warn('Failed to check WebContainer support:', error)
         setIsWebContainerSupported(false)
@@ -209,6 +213,96 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
 
   const clearTerminalHistory = () => {
     setTerminalHistory([])
+  }
+
+  const detectExistingWebContainerSession = async () => {
+    try {
+      // Check localStorage for existing WebContainer session
+      const existingSession = localStorage.getItem(`webcontainer-session-${project?.id}`)
+      if (existingSession) {
+        const sessionData = JSON.parse(existingSession)
+        const sessionAge = Date.now() - sessionData.timestamp
+        
+        // If session is less than 1 hour old, consider it potentially active
+        if (sessionAge < 60 * 60 * 1000) {
+          console.log('[WebContainer] Detected existing session:', sessionData)
+          
+          // Try to reconnect to the existing WebContainer
+          try {
+            const { createWebContainer } = await import('@/lib/webcontainer-enhanced')
+            const webContainer = await createWebContainer()
+            
+            // Check if it's actually running by testing a simple command
+            const testResult = await webContainer.executeTerminalCommand('echo "session-test"')
+            if (testResult.output.includes('session-test')) {
+              // Session is active, restore state
+              setWebContainerInstance(webContainer)
+              setPreview({
+                sandboxId: sessionData.id,
+                url: sessionData.url,
+                isLoading: false,
+                processId: sessionData.processId,
+                previewType: 'webcontainer'
+              })
+              
+              addConsoleLog('info', '🔄 Resumed existing WebContainer session')
+              console.log('[WebContainer] Successfully resumed existing session')
+              setIsSessionResumed(true)
+              return true
+            }
+          } catch (reconnectError) {
+            console.log('[WebContainer] Existing session not active, will create new one')
+            localStorage.removeItem(`webcontainer-session-${project?.id}`)
+          }
+        } else {
+          // Session too old, remove it
+          localStorage.removeItem(`webcontainer-session-${project?.id}`)
+        }
+      }
+    } catch (error) {
+      console.warn('[WebContainer] Error detecting existing session:', error)
+    }
+    return false
+  }
+
+  const forceStartDevServer = async () => {
+    if (!webContainerInstance || preview.previewType !== 'webcontainer') return
+
+    try {
+      addConsoleLog('warn', '⚠️ Force starting dev server...')
+      setCurrentLog("Force starting development server...")
+      
+      const result = await webContainerInstance.forceStartDevServer({
+        onOutput: (data: string) => {
+          addConsoleLog('info', `[force-start] ${data}`)
+        }
+      })
+
+      // Update preview URL
+      setPreview(prev => ({
+        ...prev,
+        url: result.url,
+        processId: result.processId
+      }))
+
+      setCurrentLog("Dev server force started!")
+      addConsoleLog('info', `✅ Dev server force started at ${result.url}`)
+      
+      toast({
+        title: "Dev Server Started",
+        description: `Force started at ${result.url}`,
+      })
+
+    } catch (error) {
+      console.error('Force start error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Force start failed'
+      addConsoleLog('error', `❌ Force start failed: ${errorMessage}`)
+      toast({
+        title: "Force Start Failed",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    }
   }
 
   const createE2BPreview = async () => {
@@ -648,53 +742,91 @@ Note: E2B terminal commands run on the server`,
         }
       })
 
-      // Start dev server
+      // Start dev server with timeout handling
       setCurrentLog("Starting development server...")
       addConsoleLog('info', '🚀 Starting development server...')
-      const { url, port } = await webContainer.startDevServer({
-        onOutput: (data) => {
-          // Determine log type based on content
-          const logType = data.includes('error') || data.includes('Error') || data.includes('ERROR') 
-            ? 'error' 
-            : data.includes('warn') || data.includes('Warning') || data.includes('WARN')
-            ? 'warn'
-            : 'info'
-          
-          addConsoleLog(logType, `[dev] ${data}`)
-          
-          if (data.includes('ready') || data.includes('Local:') || data.includes('localhost')) {
-            setCurrentLog("Development server is ready!")
-            addConsoleLog('info', `✅ Development server ready at ${url}:${port}`)
+      
+      try {
+        const { url, port } = await webContainer.startDevServer({
+          onOutput: (data) => {
+            // Determine log type based on content
+            const logType = data.includes('error') || data.includes('Error') || data.includes('ERROR') 
+              ? 'error' 
+              : data.includes('warn') || data.includes('Warning') || data.includes('WARN')
+              ? 'warn'
+              : 'info'
+            
+            addConsoleLog(logType, `[dev] ${data}`)
+            
+            if (data.includes('ready') || data.includes('Local:') || data.includes('localhost')) {
+              setCurrentLog("Development server is ready!")
+              addConsoleLog('info', `✅ Development server ready at ${url}:${port}`)
+            }
           }
-        }
-      })
+        })
 
-      // Update preview state
-      setPreview({
-        sandboxId: webContainer.id,
-        url: url,
-        isLoading: false,
-        processId: 'webcontainer-dev-server',
-        previewType: 'webcontainer',
-      })
-      
-      setCurrentLog("WebContainer preview ready!")
-      setLastSyncTime(new Date()) // Set initial sync time
-      
-      // Add welcome message to terminal
-      setTerminalHistory([{
-        id: 'welcome',
-        command: 'Welcome to WebContainer Terminal',
-        output: `WebContainer ${webContainer.id} is ready!
-Available commands: ls, cat, npm, node, git, etc.
+        // Update preview state with successful dev server
+        setPreview({
+          sandboxId: webContainer.id,
+          url: url,
+          isLoading: false,
+          processId: 'webcontainer-dev-server',
+          previewType: 'webcontainer',
+        })
+        
+        setCurrentLog("WebContainer preview ready!")
+        setLastSyncTime(new Date())
+        
+        // Save session data for resume capability
+        if (project?.id) {
+          localStorage.setItem(`webcontainer-session-${project.id}`, JSON.stringify({
+            id: webContainer.id,
+            url: url,
+            processId: 'webcontainer-dev-server',
+            timestamp: Date.now(),
+            projectId: project.id
+          }))
+          console.log('[WebContainer] Session data saved for resume capability')
+        }
+        
+        // Add welcome message to terminal
+        setTerminalHistory([{
+          id: 'welcome',
+          command: 'Welcome to WebContainer Terminal',
+          output: `WebContainer ${webContainer.id} is ready!
+Available commands: ls, cat, pnpm, node, git, etc.
 Working directory: /project`,
-        timestamp: new Date()
-      }])
-      
-      toast({
-        title: "WebContainer Ready",
-        description: "Your app is now running in WebContainer",
-      })
+          timestamp: new Date()
+        }])
+        
+        toast({
+          title: "WebContainer Ready",
+          description: "Your app is now running in WebContainer",
+        })
+
+      } catch (devServerError) {
+        // Dev server failed to start - show force start option
+        console.error('Dev server startup failed:', devServerError)
+        addConsoleLog('error', `❌ Dev server startup failed: ${devServerError instanceof Error ? devServerError.message : 'Unknown error'}`)
+        addConsoleLog('info', '💡 You can try "Force Start" button in the console if packages installed successfully')
+        
+        // Set preview state without URL (will show Force Start button)
+        setPreview({
+          sandboxId: webContainer.id,
+          url: null,
+          isLoading: false,
+          processId: null,
+          previewType: 'webcontainer',
+        })
+        
+        setCurrentLog("Dev server startup failed - try Force Start")
+        
+        toast({
+          title: "Dev Server Issue",
+          description: "Packages installed but dev server didn't start. Try Force Start button.",
+          variant: "destructive",
+        })
+      }
 
     } catch (error) {
       console.error('WebContainer preview error:', error)
@@ -727,6 +859,12 @@ Working directory: /project`,
         if (webContainerInstance) {
           await webContainerInstance.terminate()
           setWebContainerInstance(null)
+        }
+        
+        // Remove session data
+        if (project?.id) {
+          localStorage.removeItem(`webcontainer-session-${project.id}`)
+          console.log('[WebContainer] Session data cleared')
         }
       }
     } catch (error) {
@@ -1060,10 +1198,10 @@ export default function TodoApp() {
                     onClick={createE2BPreview}
                   disabled={!project || preview.isLoading}
                     variant="outline"
-                  >
+                >
                     <Server className="h-4 w-4 mr-2" />
                     {preview.isLoading && preview.previewType === 'e2b' ? 'Starting...' : 'Start E2B'}
-                  </Button>
+                </Button>
                                   <Button
                     size="sm"
                     onClick={createWebContainerPreview}
@@ -1081,14 +1219,22 @@ export default function TodoApp() {
                 </Button>
                 </div>
               ) : (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={cleanupSandbox}
-                >
-                  <Square className="h-4 w-4 mr-2" />
-                  Stop {preview.previewType === 'webcontainer' ? 'WebContainer' : 'E2B'}
-                </Button>
+                <div className="flex items-center space-x-2">
+                  {isSessionResumed && preview.previewType === 'webcontainer' && (
+                    <div className="flex items-center space-x-1 text-xs text-green-600 dark:text-green-400">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span>Resumed</span>
+                    </div>
+                  )}
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={cleanupSandbox}
+                  >
+                    <Square className="h-4 w-4 mr-2" />
+                    Stop {preview.previewType === 'webcontainer' ? 'WebContainer' : 'E2B'}
+                  </Button>
+                </div>
               )}
             </div>
 
@@ -1173,7 +1319,7 @@ export default function TodoApp() {
                             {consoleLogs.length + terminalHistory.length}
                           </span>
                         )}
-                      </div>
+          </div>
                     </AccordionTrigger>
                     <AccordionContent className="px-0 pb-0">
                       <div className="h-48 bg-black text-green-400 font-mono text-xs">
@@ -1184,11 +1330,13 @@ export default function TodoApp() {
                                 <TabsTrigger value="console" className="h-5 px-2 text-xs text-gray-400 data-[state=active]:text-green-400 data-[state=active]:bg-gray-700">
                                   Console
                                 </TabsTrigger>
-                                {(preview.previewType === 'webcontainer' || preview.previewType === 'e2b') && (
-                                  <TabsTrigger value="terminal" className="h-5 px-2 text-xs text-gray-400 data-[state=active]:text-green-400 data-[state=active]:bg-gray-700">
-                                    Terminal
-                                  </TabsTrigger>
-                                )}
+                                <TabsTrigger 
+                                  value="terminal" 
+                                  className="h-5 px-2 text-xs text-gray-400 data-[state=active]:text-green-400 data-[state=active]:bg-gray-700"
+                                  disabled={!(preview.previewType === 'webcontainer' || preview.previewType === 'e2b')}
+                                >
+                                  Terminal {preview.previewType ? `(${preview.previewType === 'webcontainer' ? 'WebContainer' : 'E2B'})` : '(Start Preview)'}
+                                </TabsTrigger>
                               </TabsList>
                               {lastSyncTime && consoleActiveTab === 'console' && (
                                 <span className="text-xs text-gray-500">
@@ -1198,20 +1346,34 @@ export default function TodoApp() {
                             </div>
                             <div className="flex items-center space-x-2">
                               {preview.previewType === 'webcontainer' && consoleActiveTab === 'console' && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
-                                  className={`h-6 px-2 text-xs ${
-                                    autoSyncEnabled 
-                                      ? 'text-green-400 hover:text-green-300' 
-                                      : 'text-gray-400 hover:text-white'
-                                  }`}
-                                  title={autoSyncEnabled ? 'Disable auto-sync' : 'Enable auto-sync'}
-                                >
-                                  <RefreshCw className={`h-3 w-3 mr-1 ${autoSyncEnabled ? 'animate-spin' : ''}`} />
-                                  Auto
-                                </Button>
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setAutoSyncEnabled(!autoSyncEnabled)}
+                                    className={`h-6 px-2 text-xs ${
+                                      autoSyncEnabled 
+                                        ? 'text-green-400 hover:text-green-300' 
+                                        : 'text-gray-400 hover:text-white'
+                                    }`}
+                                    title={autoSyncEnabled ? 'Disable auto-sync' : 'Enable auto-sync'}
+                                  >
+                                    <RefreshCw className={`h-3 w-3 mr-1 ${autoSyncEnabled ? 'animate-spin' : ''}`} />
+                                    Auto
+                                  </Button>
+                                  {!preview.url && webContainerInstance && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={forceStartDevServer}
+                                      className="h-6 px-2 text-xs text-orange-400 hover:text-orange-300"
+                                      title="Force start dev server if stuck after package installation"
+                                    >
+                                      <AlertTriangle className="h-3 w-3 mr-1" />
+                                      Force Start
+                                    </Button>
+                                  )}
+                                </>
                               )}
                               <Button
                                 variant="ghost"
@@ -1249,11 +1411,17 @@ export default function TodoApp() {
                             </ScrollArea>
                           </TabsContent>
                           
-                          {(preview.previewType === 'webcontainer' || preview.previewType === 'e2b') && (
-                            <TabsContent value="terminal" className="flex-1 m-0 flex flex-col">
+                          <TabsContent value="terminal" className="flex-1 m-0 flex flex-col">
                               <ScrollArea className="flex-1" id="terminal-scroll-area">
                                 <div className="p-4 space-y-2">
-                                  {terminalHistory.length === 0 ? (
+                                  {!preview.previewType ? (
+                                    <div className="text-center py-8">
+                                      <div className="text-gray-400 mb-2">🚀 Start a preview to use the terminal</div>
+                                      <div className="text-xs text-gray-500">
+                                        Click "Start WebContainer" or "Start E2B" above to begin
+                                      </div>
+                                    </div>
+                                  ) : terminalHistory.length === 0 ? (
                                     <div className="text-gray-500">
                                       {preview.previewType === 'webcontainer' ? 'WebContainer' : 'E2B'} Terminal - Type commands below
                                     </div>
@@ -1277,9 +1445,12 @@ export default function TodoApp() {
                                   )}
                                 </div>
                               </ScrollArea>
-                              <div className="border-t border-gray-700 p-2">
+                              <div className="border-t border-gray-700 p-3 bg-gray-900">
+                                <div className="mb-2 text-xs text-gray-400">
+                                  {preview.previewType ? '💻 Type your command below and press Enter to execute:' : '⚠️ Start a preview first to use the terminal'}
+                                </div>
                                 <div className="flex items-center space-x-2">
-                                  <span className="text-blue-400 text-xs">$</span>
+                                  <span className="text-blue-400 text-sm font-mono">$</span>
                                   <Input
                                     value={terminalInput}
                                     onChange={(e) => setTerminalInput(e.target.value)}
@@ -1289,13 +1460,12 @@ export default function TodoApp() {
                                       }
                                     }}
                                     placeholder="Enter command..."
-                                    className="flex-1 h-6 bg-transparent border-none text-white text-xs placeholder-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0"
+                                    className="flex-1 h-8 bg-gray-800 border border-gray-600 text-white text-sm placeholder-gray-400 focus-visible:ring-1 focus-visible:ring-blue-500 focus-visible:border-blue-500 px-3"
                                     disabled={!(preview.previewType === 'webcontainer' ? webContainerInstance : e2bInstance)}
                                   />
                                 </div>
                               </div>
                             </TabsContent>
-                          )}
                         </Tabs>
                       </div>
                     </AccordionContent>
