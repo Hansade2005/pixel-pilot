@@ -214,6 +214,9 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
       case 'get_knowledge_item': return BookOpen
       case 'get_project_summary': return Database
       case 'recall_context': return User
+      case 'analyze_dependencies': return Zap
+      case 'scan_code_imports': return AlertTriangle
+      case 'learn_patterns': return Undo2
       default: return Wrench
     }
   }
@@ -232,6 +235,9 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
       case 'get_knowledge_item': return 'Knowledge Retrieved'
       case 'get_project_summary': return 'Project Summarized'
       case 'recall_context': return 'Context Recalled'
+      case 'analyze_dependencies': return 'Dependencies Analyzed'
+      case 'scan_code_imports': return 'Imports Scanned'
+      case 'learn_patterns': return 'Patterns Learned'
       default: return 'Executed'
     }
   }
@@ -881,6 +887,150 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
                   {patterns.analysis?.report || 'Pattern analysis completed successfully.'}
                 </ReactMarkdown>
               </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Special handling for analyze_dependencies tool
+  if (toolCall.name === 'analyze_dependencies') {
+    const [isExpanded, setIsExpanded] = useState(false)
+    const analysis = toolCall.result?.analysis || {}
+    const filePath = analysis.filePath || 'Unknown file'
+    const missingDeps = analysis.missingDependencies || []
+    const addedDeps = analysis.addedDependencies || []
+    
+    return (
+      <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
+        <div 
+          className="px-3 py-2 flex items-center gap-3 cursor-pointer hover:bg-muted/50 transition-colors"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="p-1.5 rounded-md bg-yellow-100 dark:bg-yellow-900/30">
+            <Zap className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-foreground">Dependencies Analyzed</span>
+              <span className="text-xs text-muted-foreground">({filePath})</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              {missingDeps.length > 0 ? (
+                <span className="text-orange-600 dark:text-orange-400">
+                  {addedDeps.length > 0 ? `Auto-added ${addedDeps.length} dependencies` : `Found ${missingDeps.length} missing dependencies`}
+                </span>
+              ) : (
+                <span className="text-green-600 dark:text-green-400">All dependencies valid</span>
+              )}
+            </div>
+          </div>
+          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+        </div>
+        
+        {isExpanded && (
+          <div className="border-t bg-muted/30 p-3">
+            <div className="space-y-2 text-sm">
+              {addedDeps.length > 0 && (
+                <div>
+                  <div className="font-medium text-green-600 dark:text-green-400 mb-1">✅ Auto-Added Dependencies:</div>
+                  <ul className="list-disc list-inside space-y-1 text-muted-foreground ml-2">
+                    {addedDeps.map((dep: string, index: number) => (
+                      <li key={index}>{dep}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {missingDeps.length > 0 && addedDeps.length === 0 && (
+                <div>
+                  <div className="font-medium text-orange-600 dark:text-orange-400 mb-1">⚠️ Missing Dependencies:</div>
+                  <ul className="list-disc list-inside space-y-1 text-muted-foreground ml-2">
+                    {missingDeps.map((dep: any, index: number) => (
+                      <li key={index}>{dep.package}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {analysis.suggestions?.length > 0 && (
+                <div>
+                  <div className="font-medium text-blue-600 dark:text-blue-400 mb-1">🔧 Suggestions:</div>
+                  <ul className="list-disc list-inside space-y-1 text-muted-foreground ml-2">
+                    {analysis.suggestions.map((suggestion: string, index: number) => (
+                      <li key={index}>{suggestion}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Special handling for scan_code_imports tool
+  if (toolCall.name === 'scan_code_imports') {
+    const [isExpanded, setIsExpanded] = useState(false)
+    const analysis = toolCall.result?.analysis || {}
+    const filePath = analysis.filePath || 'Unknown file'
+    const issues = analysis.issues || []
+    const imports = analysis.imports || []
+    
+    return (
+      <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
+        <div 
+          className="px-3 py-2 flex items-center gap-3 cursor-pointer hover:bg-muted/50 transition-colors"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="p-1.5 rounded-md bg-orange-100 dark:bg-orange-900/30">
+            <AlertTriangle className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-foreground">Code Imports Scanned</span>
+              <span className="text-xs text-muted-foreground">({filePath})</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              {issues.length > 0 ? (
+                <span className="text-red-600 dark:text-red-400">
+                  Found {issues.length} import/export issues
+                </span>
+              ) : (
+                <span className="text-green-600 dark:text-green-400">All imports/exports valid</span>
+              )}
+            </div>
+          </div>
+          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+        </div>
+        
+        {isExpanded && (
+          <div className="border-t bg-muted/30 p-3">
+            <div className="space-y-2 text-sm">
+              {issues.length > 0 ? (
+                <div>
+                  <div className="font-medium text-red-600 dark:text-red-400 mb-1">❌ Import/Export Issues:</div>
+                  <ul className="list-disc list-inside space-y-1 text-muted-foreground ml-2">
+                    {issues.map((issue: any, index: number) => (
+                      <li key={index}>
+                        <span className="font-medium">{issue.type}:</span> {issue.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div className="text-green-600 dark:text-green-400">
+                  ✅ All {imports.length} imports validated successfully
+                </div>
+              )}
+              
+              {analysis.summary && (
+                <div className="text-muted-foreground text-xs mt-2">
+                  {analysis.summary}
+                </div>
+              )}
             </div>
           </div>
         )}
