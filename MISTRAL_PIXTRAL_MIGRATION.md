@@ -53,6 +53,15 @@ async function detectUserIntent(userMessage: string, projectContext: string, con
 }
 ```
 
+### 6. Enhanced Intent Detection
+```typescript
+// Enhanced Intent Detection with Autonomous Planning
+const getEnhancedPlanningModel = () => {
+  return getModel('pixtral-12b-2409')
+  // ... uses Pixtral for complex application pattern detection
+}
+```
+
 ### 2. Memory Processing
 ```typescript
 async function processMemoryWithAI(conversationMemory: any, userMessage: string, projectContext: string, toolCalls?: any[]) {

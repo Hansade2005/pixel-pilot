@@ -101,10 +101,10 @@ const COMPLEX_APPLICATION_PATTERNS: ComplexApplicationPattern[] = [
   }
 ]
 
-// Get the enhanced planning model (Llama-3.3-70B-Instruct-Turbo)
+// Get the enhanced planning model (Mistral Pixtral-12B-2409)
 const getEnhancedPlanningModel = () => {
   try {
-    return getModel('meta-llama/Llama-3.3-70B-Instruct-Turbo')
+    return getModel('pixtral-12b-2409')
   } catch (error) {
     console.warn('Enhanced planning model not available, falling back to default')
     return getModel('auto')
