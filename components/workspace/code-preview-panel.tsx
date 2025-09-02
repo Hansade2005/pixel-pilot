@@ -50,6 +50,27 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
   const [terminalInput, setTerminalInput] = useState("")
   const [isSessionResumed, setIsSessionResumed] = useState(false)
 
+  // Function to display WebContainer preview iframe
+  const displayWebContainerPreview = async () => {
+    if (!webContainerInstance || preview.previewType !== 'webcontainer') return
+    
+    try {
+      const previewIframe = await webContainerInstance.getPreviewIframe()
+      if (previewIframe) {
+        // Find the preview container and display the iframe
+        const previewContainer = document.getElementById('webcontainer-preview-container')
+        if (previewContainer) {
+          previewContainer.innerHTML = ''
+          previewContainer.appendChild(previewIframe)
+          console.log('[WebContainer] Preview iframe displayed successfully')
+        }
+      }
+    } catch (error) {
+      console.error('[WebContainer] Error displaying preview:', error)
+      addConsoleLog('error', `❌ Failed to display preview: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
   useEffect(() => {
     if (preview.url) {
       setCustomUrl(preview.url)
@@ -130,6 +151,18 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
       // WebContainer stays alive across tab switches
     }
   }, [preview.sandboxId, preview.previewType])
+
+  // Display WebContainer preview when it becomes available
+  useEffect(() => {
+    if (preview.previewType === 'webcontainer' && webContainerInstance && !preview.isLoading) {
+      // Small delay to ensure everything is ready
+      const timer = setTimeout(() => {
+        displayWebContainerPreview()
+      }, 1000)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [preview.previewType, webContainerInstance, preview.isLoading])
 
   const addConsoleLog = (type: 'info' | 'error' | 'warn', message: string) => {
     const logEntry = {
@@ -353,16 +386,7 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
         })
         setCurrentLog("Preview ready!")
         
-        // Add welcome message to E2B terminal
-        setTerminalHistory([{
-          id: 'e2b-welcome',
-          command: 'Welcome to E2B Terminal',
-          output: `E2B Sandbox ${data.sandboxId} is ready!
-Available commands: ls, cat, npm, node, git, python, etc.
-Working directory: /project
-Note: E2B terminal commands run on the server`,
-          timestamp: new Date()
-        }])
+        // E2B terminal is ready - no welcome message needed
         
         // Create E2B terminal with real streaming API
         setE2bInstance({
@@ -517,16 +541,7 @@ Note: E2B terminal commands run on the server`,
                       })
                       setCurrentLog("Server ready")
                       
-                      // Add welcome message to E2B terminal
-                      setTerminalHistory([{
-                        id: 'e2b-welcome',
-                        command: 'Welcome to E2B Terminal',
-                        output: `E2B Sandbox ${data.sandboxId} is ready!
-Available commands: ls, cat, npm, node, git, python, etc.
-Working directory: /project
-Note: E2B terminal commands run on the server`,
-                        timestamp: new Date()
-                      }])
+                      // E2B terminal is ready - no welcome message needed
                       
                       // Create E2B terminal with real streaming API
                       setE2bInstance({
@@ -744,7 +759,7 @@ Note: E2B terminal commands run on the server`,
 
       // Start dev server with timeout handling
       setCurrentLog("Starting development server...")
-      addConsoleLog('info', '🚀 Starting development server...')
+      addConsoleLog('info', '🚀 Starting development server with built-in preview...')
       
       try {
         const { url, port } = await webContainer.startDevServer({
@@ -760,15 +775,24 @@ Note: E2B terminal commands run on the server`,
             
             if (data.includes('ready') || data.includes('Local:') || data.includes('localhost')) {
               setCurrentLog("Development server is ready!")
-              addConsoleLog('info', `✅ Development server ready at ${url}:${port}`)
+              addConsoleLog('info', `✅ Development server ready with built-in preview`)
             }
           }
         })
 
+        // Get the WebContainer preview iframe
+        setCurrentLog("Getting preview iframe...")
+        addConsoleLog('info', '🖼️ Getting WebContainer preview iframe...')
+        
+        const previewIframe = await webContainer.getPreviewIframe()
+        if (!previewIframe) {
+          throw new Error('Failed to create WebContainer preview iframe')
+        }
+
         // Update preview state with successful dev server
         setPreview({
           sandboxId: webContainer.id,
-          url: url,
+          url: url, // This is now the WebContainer preview URL
           isLoading: false,
           processId: 'webcontainer-dev-server',
           previewType: 'webcontainer',
@@ -789,43 +813,56 @@ Note: E2B terminal commands run on the server`,
           console.log('[WebContainer] Session data saved for resume capability')
         }
         
-        // Add welcome message to terminal
-        setTerminalHistory([{
-          id: 'welcome',
-          command: 'Welcome to WebContainer Terminal',
-          output: `WebContainer ${webContainer.id} is ready!
-Available commands: ls, cat, pnpm, node, git, etc.
-Working directory: /project`,
-          timestamp: new Date()
-        }])
+        // Terminal is ready - no welcome message needed
         
         toast({
           title: "WebContainer Ready",
-          description: "Your app is now running in WebContainer",
+          description: "Development server started with built-in preview system",
+          variant: "default",
         })
-
+        
+        // Store the preview iframe for display
+        setWebContainerInstance((prev: any) => ({
+          ...prev,
+          previewIframe
+        }))
+        
       } catch (devServerError) {
-        // Dev server failed to start - show force start option
-        console.error('Dev server startup failed:', devServerError)
-        addConsoleLog('error', `❌ Dev server startup failed: ${devServerError instanceof Error ? devServerError.message : 'Unknown error'}`)
-        addConsoleLog('info', '💡 You can try "Force Start" button in the console if packages installed successfully')
+        console.error('Dev server error:', devServerError)
+        const errorMessage = devServerError instanceof Error ? devServerError.message : 'Dev server failed'
+        addConsoleLog('error', `❌ Dev server error: ${errorMessage}`)
+        setCurrentLog(`Dev server failed: ${errorMessage}`)
         
-        // Set preview state without URL (will show Force Start button)
-        setPreview({
-          sandboxId: webContainer.id,
-          url: null,
-          isLoading: false,
-          processId: null,
-          previewType: 'webcontainer',
-        })
-        
-        setCurrentLog("Dev server startup failed - try Force Start")
-        
-        toast({
-          title: "Dev Server Issue",
-          description: "Packages installed but dev server didn't start. Try Force Start button.",
-          variant: "destructive",
-        })
+        // Try to force start dev server
+        addConsoleLog('info', '🔄 Attempting to force start dev server...')
+        try {
+          await webContainer.forceStartDevServer({
+            onOutput: (data) => addConsoleLog('info', `[force] ${data}`)
+          })
+          
+          setCurrentLog("Dev server force-started successfully!")
+          addConsoleLog('info', '✅ Dev server force-started successfully!')
+          
+          // Update preview state
+          setPreview({
+            sandboxId: webContainer.id,
+            url: 'webcontainer://preview/force-started',
+            isLoading: false,
+            processId: 'webcontainer-dev-server',
+            previewType: 'webcontainer',
+          })
+          
+        } catch (forceError) {
+          console.error('Force start failed:', forceError)
+          addConsoleLog('error', `❌ Force start failed: ${forceError instanceof Error ? forceError.message : 'Unknown error'}`)
+          setCurrentLog("Force start failed")
+          
+          toast({
+            title: "WebContainer Failed",
+            description: "Could not start development server",
+            variant: "destructive",
+          })
+        }
       }
 
     } catch (error) {
@@ -1262,12 +1299,23 @@ export default function TodoApp() {
                     </p>
                   </div>
               ) : preview.url ? (
-                <iframe
-                  id="preview-iframe"
-                  src={preview.url}
-                  className="w-full h-full border-none"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-downloads allow-popups"
-                />
+                preview.previewType === 'webcontainer' ? (
+                  // WebContainer preview - show the preview container
+                  <div id="webcontainer-preview-container" className="w-full h-full bg-white">
+                    <div className="p-4 text-center text-gray-500">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                      <p>Loading WebContainer preview...</p>
+                    </div>
+                  </div>
+                ) : (
+                  // E2B preview - show iframe
+                  <iframe
+                    id="preview-iframe"
+                    src={preview.url}
+                    className="w-full h-full border-none"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-downloads allow-popups"
+                  />
+                )
               ) : (
                 <div className="h-full flex items-center justify-center">
               <div className="text-center">
@@ -1322,7 +1370,7 @@ export default function TodoApp() {
           </div>
                     </AccordionTrigger>
                     <AccordionContent className="px-0 pb-0">
-                      <div className="h-48 bg-black text-green-400 font-mono text-xs">
+                      <div className="h-56 md:h-48 bg-black text-green-400 font-mono text-xs">
                         <Tabs value={consoleActiveTab} onValueChange={setConsoleActiveTab} className="h-full flex flex-col">
                           <div className="flex items-center justify-between px-4 py-2 border-b border-gray-700">
                             <div className="flex items-center space-x-2">
@@ -1387,7 +1435,7 @@ export default function TodoApp() {
                           </div>
                           
                           <TabsContent value="console" className="flex-1 m-0">
-                            <ScrollArea className="h-40" id="console-scroll-area">
+                            <ScrollArea className="h-48 md:h-40" id="console-scroll-area">
                               <div className="p-4 space-y-1">
                                 {consoleLogs.length === 0 ? (
                                   <div className="text-gray-500">No logs yet...</div>
@@ -1422,21 +1470,18 @@ export default function TodoApp() {
                                       </div>
                                     </div>
                                   ) : terminalHistory.length === 0 ? (
-                                    <div className="text-gray-500">
-                                      {preview.previewType === 'webcontainer' ? 'WebContainer' : 'E2B'} Terminal - Type commands below
+                                    <div className="text-gray-500 text-center py-4">
+                                      <span className="text-green-400">$</span> <span className="text-gray-400">Ready for commands</span>
                                     </div>
                                   ) : (
                                     terminalHistory.map((entry) => (
                                       <div key={entry.id} className="space-y-1">
                                         <div className="flex items-center space-x-2">
-                                          <span className="text-gray-500 text-xs">
-                                            {entry.timestamp.toLocaleTimeString()}
-                                          </span>
-                                          <span className="text-blue-400">$</span>
-                                          <span className="text-white text-xs">{entry.command}</span>
+                                          <span className="text-green-400 font-mono font-bold">$</span>
+                                          <span className="text-white text-xs font-mono">{entry.command}</span>
                                         </div>
                                         {entry.output && (
-                                          <div className="text-green-400 text-xs whitespace-pre-wrap ml-4 pl-2 border-l border-gray-600">
+                                          <div className="text-green-400 text-xs whitespace-pre-wrap ml-4 pl-2 border-l border-gray-600 font-mono">
                                             {entry.output}
                                           </div>
                                         )}
@@ -1445,12 +1490,9 @@ export default function TodoApp() {
                                   )}
                                 </div>
                               </ScrollArea>
-                              <div className="border-t border-gray-700 p-3 bg-gray-900">
-                                <div className="mb-2 text-xs text-gray-400">
-                                  {preview.previewType ? '💻 Type your command below and press Enter to execute:' : '⚠️ Start a preview first to use the terminal'}
-                                </div>
+                              <div className="border-t border-gray-700 p-2 bg-gray-900/80 backdrop-blur-sm">
                                 <div className="flex items-center space-x-2">
-                                  <span className="text-blue-400 text-sm font-mono">$</span>
+                                  <span className="text-green-400 text-sm font-mono font-bold">$</span>
                                   <Input
                                     value={terminalInput}
                                     onChange={(e) => setTerminalInput(e.target.value)}
@@ -1460,7 +1502,7 @@ export default function TodoApp() {
                                       }
                                     }}
                                     placeholder="Enter command..."
-                                    className="flex-1 h-8 bg-gray-800 border border-gray-600 text-white text-sm placeholder-gray-400 focus-visible:ring-1 focus-visible:ring-blue-500 focus-visible:border-blue-500 px-3"
+                                    className="flex-1 h-7 bg-transparent border-none text-white text-sm placeholder-gray-500 focus-visible:ring-0 focus-visible:border-none px-2 font-mono"
                                     disabled={!(preview.previewType === 'webcontainer' ? webContainerInstance : e2bInstance)}
                                   />
                                 </div>

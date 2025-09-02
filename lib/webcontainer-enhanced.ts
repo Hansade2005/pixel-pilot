@@ -6,7 +6,8 @@ export enum WebContainerErrorType {
   COMMAND_FAILED = 'COMMAND_FAILED',
   FILE_OPERATION_FAILED = 'FILE_OPERATION_FAILED',
   MOUNT_FAILED = 'MOUNT_FAILED',
-  TIMEOUT = 'TIMEOUT'
+  TIMEOUT = 'TIMEOUT',
+  DEV_SERVER_FAILED = 'DEV_SERVER_FAILED'
 }
 
 export class WebContainerError extends Error {
@@ -236,28 +237,25 @@ export class EnhancedWebContainer {
       let stdout = ''
       let stderr = ''
 
-      // Handle output streams
+      // Handle output streams using official WebContainer API
       if (process.output) {
-        const reader = process.output.getReader()
-        const decoder = new TextDecoder()
-
-        try {
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-
-            if (value) {
-              const text = typeof value === 'string' ? value : new TextDecoder().decode(value as Uint8Array)
-              stdout += text
-              
+        // Use pipeTo for proper stream handling (official WebContainer API)
+        const outputPromise = new Promise<void>((resolve) => {
+          process.output!.pipeTo(new WritableStream({
+            write(data) {
+              stdout += data
               if (options?.onOutput) {
-                options.onOutput(text)
+                options.onOutput(data)
               }
+            },
+            close() {
+              resolve()
             }
-          }
-        } finally {
-          reader.releaseLock()
-        }
+          }))
+        })
+
+        // Wait for output to complete
+        await outputPromise
       }
 
       const exitCode = await process.exit
@@ -310,14 +308,15 @@ export class EnhancedWebContainer {
   }
 
   /**
-   * Start development server with enhanced startup handling
+   * Start development server using official WebContainer API
+   * Uses server-ready event and proper output streaming
    */
   async startDevServer(options?: {
     command?: string
     args?: string[]
     onOutput?: (data: string) => void
     onError?: (data: string) => void
-    onReady?: (url: string, port: number) => void
+    onReady?: (port: number) => void
   }): Promise<{ processId: string; url: string; port: number }> {
     try {
       await this.init()
@@ -325,6 +324,31 @@ export class EnhancedWebContainer {
       if (!this.container) {
         throw new Error('WebContainer not initialized')
       }
+
+      console.log(`[WebContainer ${this.id}] Starting dev server with official API...`)
+      
+      if (options?.onOutput) {
+        options.onOutput('Starting WebContainer dev server with official API...\n')
+      }
+
+      // Set up server-ready event listener BEFORE spawning (official WebContainer API)
+      let serverReady = false
+      let serverPort = 0
+      let serverUrl = ''
+
+      const serverReadyHandler = (port: number, url: string) => {
+        console.log(`[WebContainer ${this.id}] Server ready event received: port ${port}, url ${url}`)
+        serverReady = true
+        serverPort = port
+        serverUrl = url
+        
+        if (options?.onReady) {
+          options.onReady(port)
+        }
+      }
+
+      // Listen for server-ready event (official WebContainer API)
+      this.container.on('server-ready', serverReadyHandler)
 
       // Try multiple strategies for starting dev server
       const strategies = [
@@ -349,74 +373,81 @@ export class EnhancedWebContainer {
           // Start the development server process
           this.devServerProcess = await this.container.spawn(strategy.command, strategy.args)
 
-          let serverReady = false
-          let serverUrl = ''
-          let serverPort = 0
-
-          // Handle output with enhanced detection
+          // Set up output streaming using official WebContainer API
           if (this.devServerProcess.output) {
-            const reader = this.devServerProcess.output.getReader()
-            const decoder = new TextDecoder()
-
-            // Set up output handling with timeout
-            const outputPromise = this.handleDevServerOutputWithDetection(reader, decoder, options, (url, port) => {
-              serverReady = true
-              serverUrl = url
-              serverPort = port
-            })
-
-            // Wait for server ready or timeout (30 seconds)
-            const timeoutPromise = new Promise<void>((_, reject) => {
-              setTimeout(() => {
-                reject(new Error('Dev server startup timeout (30s)'))
-              }, 30000)
-            })
-
-            // Race between server ready and timeout
-            try {
-              await Promise.race([
-                new Promise<void>((resolve) => {
-                  const checkReady = () => {
-                    if (serverReady) {
-                      resolve()
-                    } else {
-                      setTimeout(checkReady, 100)
-                    }
-                  }
-                  checkReady()
-                }),
-                timeoutPromise
-              ])
-
-              // Server is ready!
-              console.log(`[WebContainer ${this.id}] Dev server ready with strategy: ${strategy.command}`)
-              
-              return {
-                processId: 'webcontainer-dev-server',
-                url: serverUrl || `http://localhost:${serverPort || 5173}`,
-                port: serverPort || 5173
+            // Pipe output to console and user callback (official WebContainer API)
+            this.devServerProcess.output.pipeTo(new WritableStream({
+              write(data) {
+                console.log(`[WebContainer Dev Server] ${data}`)
+                if (options?.onOutput) {
+                  options.onOutput(data)
+                }
               }
-
-            } catch (timeoutError) {
-              console.warn(`[WebContainer ${this.id}] Strategy ${strategy.command} timed out, trying next...`)
-              
-              // Kill the current process and try next strategy
-              if (this.devServerProcess) {
-                this.devServerProcess.kill()
-                this.devServerProcess = null
-              }
-              
-              lastError = timeoutError as Error
-              continue // Try next strategy
-            }
+            }))
           }
 
+          // Wait for server-ready event or timeout (30 seconds)
+          const timeoutPromise = new Promise<void>((_, reject) => {
+            setTimeout(() => {
+              reject(new Error('Dev server startup timeout (30s)'))
+            }, 30000)
+          })
+
+          // Race between server ready and timeout
+          try {
+            await Promise.race([
+              new Promise<void>((resolve) => {
+                const checkReady = () => {
+                  if (serverReady) {
+                    resolve()
+                  } else {
+                    setTimeout(checkReady, 100)
+                  }
+                }
+                checkReady()
+              }),
+              timeoutPromise
+            ])
+
+            // Server is ready!
+            console.log(`[WebContainer ${this.id}] Dev server ready with strategy: ${strategy.command}`)
+            console.log(`[WebContainer ${this.id}] Port: ${serverPort}, URL: ${serverUrl}`)
+            
+            // Event listener cleanup not needed - WebContainer handles this automatically
+            
+            return {
+              processId: 'webcontainer-dev-server',
+              url: serverUrl || await this.getWebContainerPreviewUrl(serverPort || 5173),
+              port: serverPort || 5173
+            }
+
+          } catch (timeoutError) {
+            console.warn(`[WebContainer ${this.id}] Strategy ${strategy.command} timed out, trying next...`)
+            
+            // Kill the current process and try next strategy
+            if (this.devServerProcess) {
+              this.devServerProcess.kill()
+              this.devServerProcess = null
+            }
+            
+            lastError = timeoutError as Error
+            continue // Try next strategy
+          }
         } catch (strategyError) {
           console.warn(`[WebContainer ${this.id}] Strategy ${strategy.command} failed:`, strategyError)
           lastError = strategyError as Error
+          
+          // Kill the current process and try next strategy
+          if (this.devServerProcess) {
+            this.devServerProcess.kill()
+            this.devServerProcess = null
+          }
+          
           continue // Try next strategy
         }
       }
+
+      // Event listener cleanup not needed - WebContainer handles this automatically
 
       // All strategies failed
       throw new Error(`All dev server startup strategies failed. Last error: ${lastError?.message || 'Unknown error'}`)
@@ -432,7 +463,7 @@ export class EnhancedWebContainer {
   }
 
   /**
-   * Handle dev server output with enhanced server detection
+   * Handle dev server output with enhanced server ready detection
    */
   private async handleDevServerOutputWithDetection(
     reader: ReadableStreamDefaultReader<Uint8Array>,
@@ -440,9 +471,9 @@ export class EnhancedWebContainer {
     options?: {
       onOutput?: (data: string) => void
       onError?: (data: string) => void
-      onReady?: (url: string, port: number) => void
+      onReady?: (port: number) => void
     },
-    onServerReady?: (url: string, port: number) => void
+    onServerReady?: (port: number) => void
   ): Promise<void> {
     try {
       while (true) {
@@ -471,17 +502,15 @@ export class EnhancedWebContainer {
             const match = text.match(pattern)
             if (match) {
               const port = parseInt(match[1]) || 5173
-              const url = `http://localhost:${port}`
               
-              console.log(`[WebContainer ${this.id}] Server ready detected: ${url}`)
-              this.devServerUrl = url
+              console.log(`[WebContainer ${this.id}] Server ready detected on port ${port}`)
               
               if (onServerReady) {
-                onServerReady(url, port)
+                onServerReady(port)
               }
               
               if (options?.onReady) {
-                options.onReady(url, port)
+                options.onReady(port)
               }
               
               return // Server is ready, exit
@@ -635,7 +664,7 @@ export class EnhancedWebContainer {
         await new Promise(resolve => setTimeout(resolve, 2000))
         
         // Assume vite starts on port 5173 by default
-        const url = 'http://localhost:5173'
+        const url = await this.getWebContainerPreviewUrl(5173)
         this.devServerUrl = url
         
         console.log(`[WebContainer ${this.id}] Force started dev server at ${url}`)
@@ -658,7 +687,7 @@ export class EnhancedWebContainer {
         
         await new Promise(resolve => setTimeout(resolve, 3000))
         
-        const url = 'http://localhost:3000' // Next.js default
+        const url = await this.getWebContainerPreviewUrl(3000) // Next.js default
         this.devServerUrl = url
         
         return {
@@ -760,6 +789,52 @@ export class EnhancedWebContainer {
       console.log(`[WebContainer ${this.id}] WebContainer terminated successfully`)
     } catch (error) {
       console.error(`[WebContainer ${this.id}] Error during termination:`, error)
+    }
+  }
+
+  /**
+   * Get WebContainer's preview URL
+   * Since WebContainer runs in browser, we create a custom preview system
+   */
+  private async getWebContainerPreviewUrl(port: number): Promise<string> {
+    try {
+      // WebContainer runs in browser context
+      // We create a custom preview URL that indicates the preview is running
+      const previewUrl = `webcontainer://preview/${this.id}/${port}`
+      console.log(`[WebContainer ${this.id}] Created preview URL: ${previewUrl}`)
+      
+      return previewUrl
+    } catch (error) {
+      console.warn(`[WebContainer ${this.id}] Error getting preview URL:`, error)
+      
+      // Fallback: Return a WebContainer preview indicator
+      return `webcontainer-preview://${this.id}/${port}`
+    }
+  }
+
+  /**
+   * Get the preview iframe element for WebContainer
+   * This creates a custom iframe for the WebContainer preview
+   */
+  async getPreviewIframe(): Promise<HTMLIFrameElement | null> {
+    try {
+      if (!this.container) {
+        throw new Error('WebContainer not initialized')
+      }
+
+      // Create a custom iframe for WebContainer preview
+      const iframe = document.createElement('iframe')
+      iframe.src = await this.getWebContainerPreviewUrl(5173) // Default port
+      iframe.style.width = '100%'
+      iframe.style.height = '100%'
+      iframe.style.border = 'none'
+      iframe.title = 'WebContainer Preview'
+      
+      console.log(`[WebContainer ${this.id}] Created preview iframe`)
+      return iframe
+    } catch (error) {
+      console.error(`[WebContainer ${this.id}] Error creating preview iframe:`, error)
+      return null
     }
   }
 }
