@@ -497,9 +497,42 @@ export class EnhancedWebContainer {
 }
 
 /**
+ * Check if WebContainer is supported in the current environment
+ */
+export function isWebContainerSupported(): boolean {
+  try {
+    // Check for basic requirements
+    if (typeof window === 'undefined') return false
+    if (!window.Worker) return false
+    if (!window.SharedArrayBuffer) return false
+    
+    // Check for cross-origin isolation
+    if (!window.crossOriginIsolated) {
+      console.warn('WebContainer requires Cross-Origin Isolation. Please add the required headers to your Next.js config.')
+      return false
+    }
+    
+    return true
+  } catch (error) {
+    console.warn('WebContainer support check failed:', error)
+    return false
+  }
+}
+
+/**
  * Create a new WebContainer instance
  */
 export async function createWebContainer(): Promise<EnhancedWebContainer> {
+  // Check support first
+  if (!isWebContainerSupported()) {
+    throw new WebContainerError(
+      WebContainerErrorType.CREATION_FAILED,
+      'WebContainer is not supported in this environment. Please ensure Cross-Origin Isolation is enabled.',
+      undefined,
+      undefined
+    )
+  }
+
   const id = `webcontainer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
   const webContainer = new EnhancedWebContainer(id)
   

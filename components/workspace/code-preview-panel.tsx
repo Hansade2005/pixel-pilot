@@ -42,12 +42,27 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
   const [webContainerInstance, setWebContainerInstance] = useState<any>(null)
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(false)
+  const [isWebContainerSupported, setIsWebContainerSupported] = useState(false)
 
   useEffect(() => {
     if (preview.url) {
       setCustomUrl(preview.url)
     }
   }, [preview.url])
+
+  // Check WebContainer support on mount
+  useEffect(() => {
+    const checkSupport = async () => {
+      try {
+        const { isWebContainerSupported } = await import('@/lib/webcontainer-enhanced')
+        setIsWebContainerSupported(isWebContainerSupported())
+      } catch (error) {
+        console.warn('Failed to check WebContainer support:', error)
+        setIsWebContainerSupported(false)
+      }
+    }
+    checkSupport()
+  }, [])
 
   // Auto-scroll console to bottom when new logs are added
   useEffect(() => {
@@ -713,14 +728,21 @@ export default function TodoApp() {
                     <Server className="h-4 w-4 mr-2" />
                     {preview.isLoading && preview.previewType === 'e2b' ? 'Starting...' : 'Start E2B'}
                   </Button>
-                <Button
-                  size="sm"
+                                  <Button
+                    size="sm"
                     onClick={createWebContainerPreview}
-                  disabled={!project || preview.isLoading}
-                >
+                    disabled={!project || preview.isLoading || !isWebContainerSupported}
+                    title={!isWebContainerSupported 
+                      ? 'WebContainer requires Cross-Origin Isolation. Please restart your dev server after the config update.' 
+                      : 'Start WebContainer preview'
+                    }
+                  >
                     <Zap className="h-4 w-4 mr-2" />
                     {preview.isLoading && preview.previewType === 'webcontainer' ? 'Starting...' : 'Start WebContainer'}
-                </Button>
+                    {!isWebContainerSupported && (
+                      <span className="ml-1 text-xs opacity-50">(Needs restart)</span>
+                    )}
+                  </Button>
                 </div>
               ) : (
                 <Button
@@ -780,14 +802,21 @@ export default function TodoApp() {
                     <Server className="h-4 w-4 mr-2" />
                     {preview.isLoading && preview.previewType === 'e2b' ? 'Starting...' : 'Start E2B'}
                   </Button>
-                <Button 
+                                  <Button 
                     onClick={createWebContainerPreview} 
-                  disabled={!project || preview.isLoading}
-                  className="rounded-full px-6"
-                >
+                    disabled={!project || preview.isLoading || !isWebContainerSupported}
+                    className="rounded-full px-6"
+                    title={!isWebContainerSupported 
+                      ? 'WebContainer requires Cross-Origin Isolation. Please restart your dev server after the config update.' 
+                      : 'Start WebContainer preview'
+                    }
+                  >
                     <Zap className="h-4 w-4 mr-2" />
                     {preview.isLoading && preview.previewType === 'webcontainer' ? 'Starting...' : 'Start WebContainer'}
-                </Button>
+                    {!isWebContainerSupported && (
+                      <span className="ml-1 text-xs opacity-50">(Needs restart)</span>
+                    )}
+                  </Button>
                 </div>
               </div>
               </div>
