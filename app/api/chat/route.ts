@@ -704,32 +704,45 @@ async function learnFromPatterns(
   try {
     const mistralPixtral = getMistralPixtralModel()
     
+    // OPTIMIZATION 1: Filter files - only src/ files, exclude ui components
+    const relevantFiles = projectFiles.filter(file => 
+      file.path.startsWith('src/') && 
+      !file.path.startsWith('src/components/ui/') &&
+      !file.isDirectory
+    )
+    
+    // OPTIMIZATION 2: Truncate file content to max 50 tokens (~200 chars) per file
+    const truncatedFiles = relevantFiles.slice(0, 10).map(file => ({
+      path: file.path,
+      content: (file.content || '').substring(0, 200) + (file.content?.length > 200 ? '...' : ''),
+      type: file.fileType || 'text'
+    }))
+    
+    // OPTIMIZATION 3: Only last 5 messages with truncation
+    const recentMessages = (conversationMemory?.messages || [])
+      .slice(-5)
+      .map((msg: any) => ({
+        role: msg.role,
+        content: (msg.content || '').substring(0, 100) + (msg.content?.length > 100 ? '...' : '')
+      }))
+    
+    // OPTIMIZATION 4: Ultra-compact prompt to stay under 200 tokens total
+    const promptContent = `Recent: ${JSON.stringify(recentMessages)}
+Files: ${JSON.stringify(truncatedFiles)}
+JSON: {"style":"brief","patterns":["p1"],"tech":["t1"],"score":0.7,"recs":["r1"]}`
+    
+    // Debug: Estimate token usage (rough approximation: 4 chars = 1 token)
+    const estimatedTokens = Math.ceil((promptContent.length + 60) / 4) // +60 for system message
+    console.log(`[DEBUG] learn_patterns optimized token estimate: ${estimatedTokens} tokens`)
+    
     const learningInsights = await generateText({
       model: mistralPixtral,
       messages: [
-        { role: 'system', content: 'You are an AI assistant analyzing development patterns and learning from a developer\'s work.' },
-        { role: 'user', content: `Analyze this developer's patterns and preferences to learn their development style:
-
-Project ID: ${projectId}
-User ID: ${userId}
-Conversation History: ${JSON.stringify(conversationMemory?.messages?.slice(-50) || [])}
-Project Files: ${JSON.stringify(projectFiles.slice(0, 20))}
-
-Provide a JSON response with learned insights:
-{
-  "codingStyle": "Description of preferred coding style",
-  "componentPatterns": ["pattern1", "pattern2"],
-  "stylingPreferences": ["preference1", "preference2"],
-  "technicalDecisions": ["decision1", "decision2"],
-  "commonApproaches": ["approach1", "approach2"],
-  "optimizationAreas": ["area1", "area2"],
-  "learningScore": 0.0-1.0,
-  "recommendations": ["recommendation1", "recommendation2"]
-}
-
-Focus on identifying consistent patterns, preferences, and areas for improvement.` }
+        { role: 'system', content: 'Analyze dev patterns from minimal context. Respond with compact JSON.' },
+        { role: 'user', content: promptContent }
       ],
-      temperature: 0.3
+      temperature: 0.1
+      // Note: maxTokens not available in this AI SDK version, relying on prompt engineering
     })
 
     try {
@@ -759,14 +772,14 @@ Focus on identifying consistent patterns, preferences, and areas for improvement
         
         const parsed = JSON.parse(jsonText)
       return {
-        codingStyle: parsed.codingStyle || 'Standard React/TypeScript patterns',
-        componentPatterns: parsed.componentPatterns || ['Functional components'],
-        stylingPreferences: parsed.stylingPreferences || ['Tailwind CSS'],
-        technicalDecisions: parsed.technicalDecisions || ['Component-based architecture'],
-        commonApproaches: parsed.commonApproaches || ['Modular development'],
-        optimizationAreas: parsed.optimizationAreas || ['Code organization'],
-        learningScore: parsed.learningScore || 0.7,
-        recommendations: parsed.recommendations || ['Continue current patterns']
+        codingStyle: parsed.style || parsed.codingStyle || 'Standard React/TypeScript patterns',
+        componentPatterns: parsed.patterns || parsed.componentPatterns || ['Functional components'],
+        stylingPreferences: parsed.styling || parsed.stylingPreferences || ['Tailwind CSS'],
+        technicalDecisions: parsed.tech || parsed.technicalDecisions || ['Component-based architecture'],
+        commonApproaches: parsed.approaches || parsed.commonApproaches || ['Modular development'],
+        optimizationAreas: parsed.areas || parsed.optimizationAreas || ['Code organization'],
+        learningScore: parsed.score || parsed.learningScore || 0.7,
+        recommendations: parsed.recs || parsed.recommendations || ['Continue current patterns']
         }
       } else {
         // Handle non-JSON responses (plain text)
@@ -2176,10 +2189,10 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
   })
   } // End conditional for web tools
 
-  // AI-Powered Learning and Pattern Recognition Tool (temporarily disabled to reduce token usage)
-  if (false) { // Disabled to prevent excessive context accumulation
+  // AI-Powered Learning and Pattern Recognition Tool (optimized for minimal token usage)
+  if (aiMode === 'agent') { // Re-enabled with strict optimizations
   tools.learn_patterns = tool({
-    description: 'Analyze development patterns and learn from conversation history to provide intelligent insights',
+    description: 'Analyze development patterns from recent messages and src files (optimized, <200 tokens)',
     inputSchema: z.object({
       analysisType: z.enum(['coding_style', 'component_patterns', 'technical_decisions', 'optimization_areas']).optional().describe('Type of analysis to perform (default: all)'),
       includeRecommendations: z.boolean().optional().describe('Include improvement recommendations (default: true)'),
@@ -2276,6 +2289,358 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
     }
   })
   } // End learn_patterns conditional
+
+  // AI Dependency Analyzer - Validates imports and auto-adds missing dependencies
+  tools.analyze_dependencies = tool({
+    description: 'Analyze file imports, validate against package.json, and automatically add missing dependencies with latest versions',
+    inputSchema: z.object({
+      filePath: z.string().describe('Path of the file to analyze'),
+      fileContent: z.string().describe('Content of the file to analyze'),
+      autoFix: z.boolean().optional().describe('Automatically suggest package.json updates (default: true)')
+    }),
+    execute: async ({ filePath, fileContent, autoFix = true }, { abortSignal, toolCallId }) => {
+      if (abortSignal?.aborted) {
+        throw new Error('Operation cancelled')
+      }
+      
+      try {
+        // Import storage manager
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        
+        // Get package.json
+        const packageJsonFile = await storageManager.getFile(projectId, 'package.json')
+        if (!packageJsonFile) {
+          return {
+            success: false,
+            error: 'package.json not found',
+            toolCallId
+          }
+        }
+        
+        let packageJson: any = {}
+        try {
+          packageJson = JSON.parse(packageJsonFile.content)
+        } catch (error) {
+          return {
+            success: false,
+            error: 'Invalid package.json format',
+            toolCallId
+          }
+        }
+        
+        // Use AI to analyze imports and get latest package versions
+        const mistralPixtral = getMistralPixtralModel()
+        
+        const analysisPrompt = `Analyze this file for import statements and validate against package.json dependencies.
+
+File: ${filePath}
+Content: ${fileContent.substring(0, 2000)}${fileContent.length > 2000 ? '...' : ''}
+
+Current package.json dependencies:
+${JSON.stringify({
+  dependencies: packageJson.dependencies || {},
+  devDependencies: packageJson.devDependencies || {}
+}, null, 2)}
+
+Find all import statements and identify missing packages. For missing packages, provide the latest stable version.
+
+Common package versions (use these if found):
+- axios: "^1.6.0", lodash: "^4.17.21", moment: "^2.29.4"
+- @types/react: "^18.2.0", @types/node: "^20.0.0"
+- framer-motion: "^10.16.0", react-router-dom: "^6.20.0"
+- tailwindcss: "^3.4.0", @headlessui/react: "^1.7.0"
+
+Respond with JSON:
+{
+  "imports": [{"package": "react", "statement": "import React from 'react'", "exists": true}],
+  "missingDeps": [{"package": "axios", "version": "^1.6.0", "type": "dependency"}],
+  "valid": true/false,
+  "summary": "Brief analysis"
+}
+
+Dependency types:
+- Runtime packages (axios, lodash, framer-motion) → "dependency"  
+- Type definitions (@types/*) → "devDependency"
+- Build tools, testing, linting → "devDependency"`
+        
+        const analysis = await generateText({
+          model: mistralPixtral,
+          messages: [
+            { role: 'system', content: 'You are a dependency analyzer. Extract import statements and validate against package.json. Respond with compact JSON only.' },
+            { role: 'user', content: analysisPrompt }
+          ],
+          temperature: 0.1
+        })
+        
+        // Parse AI response
+        let analysisResult: any = {}
+        try {
+          let jsonText = analysis.text || '{}'
+          if (jsonText.includes('```json')) {
+            jsonText = jsonText.replace(/```json\s*/, '').replace(/\s*```$/, '')
+          } else if (jsonText.includes('```')) {
+            jsonText = jsonText.replace(/```\s*/, '').replace(/\s*```$/, '')
+          }
+          jsonText = jsonText.trim()
+          
+          // Find JSON object bounds
+          const startIndex = jsonText.indexOf('{')
+          const endIndex = jsonText.lastIndexOf('}')
+          if (startIndex !== -1 && endIndex !== -1) {
+            jsonText = jsonText.substring(startIndex, endIndex + 1)
+          }
+          
+          analysisResult = JSON.parse(jsonText)
+        } catch (parseError) {
+          console.warn('Failed to parse dependency analysis, using fallback')
+          analysisResult = {
+            imports: [],
+            missingDeps: [],
+            valid: true,
+            summary: 'Analysis completed with fallback parsing'
+          }
+        }
+        
+        // AUTO-FIX: Add missing dependencies to package.json using edit_file tool
+        let packageJsonUpdated = false
+        const addedDependencies: string[] = []
+        
+        if (autoFix && analysisResult.missingDeps?.length > 0) {
+          try {
+            for (const missingDep of analysisResult.missingDeps) {
+              const packageName = missingDep.package
+              const version = missingDep.version || '^1.0.0' // Default version if AI doesn't provide one
+              const depType = missingDep.type || 'dependency'
+              
+              // Determine which section to update
+              const sectionKey = depType === 'devDependency' ? 'devDependencies' : 'dependencies'
+              const currentSection = packageJson[sectionKey] || {}
+              
+              // Skip if package already exists
+              if (currentSection[packageName]) {
+                continue
+              }
+              
+              // Use edit_file logic to add the dependency
+              try {
+                // Update the in-memory package.json object
+                const updatedPackageJson = { ...packageJson }
+                
+                if (depType === 'devDependency') {
+                  updatedPackageJson.devDependencies = updatedPackageJson.devDependencies || {}
+                  updatedPackageJson.devDependencies[packageName] = version
+                } else {
+                  updatedPackageJson.dependencies = updatedPackageJson.dependencies || {}
+                  updatedPackageJson.dependencies[packageName] = version
+                }
+                
+                // Update the file using storage manager
+                await storageManager.updateFile(projectId, 'package.json', {
+                  content: JSON.stringify(updatedPackageJson, null, 2),
+                  updatedAt: new Date().toISOString()
+                })
+                
+                addedDependencies.push(`${packageName}@${version} (${depType})`)
+                packageJsonUpdated = true
+                
+                console.log(`[DEPENDENCY AUTO-FIX] Added ${packageName}@${version} to ${sectionKey}`)
+              } catch (editError) {
+                console.warn(`[DEPENDENCY AUTO-FIX] Failed to add ${packageName}:`, editError)
+              }
+            }
+          } catch (autoFixError) {
+            console.error('[ERROR] Auto-fix dependencies failed:', autoFixError)
+          }
+        }
+        
+        // Build response
+        const result = {
+          success: true,
+          message: packageJsonUpdated ? 
+            `Dependencies auto-added to package.json for ${filePath}: ${addedDependencies.join(', ')}` :
+            `Dependency analysis completed for ${filePath}`,
+          analysis: {
+            filePath,
+            imports: analysisResult.imports || [],
+            missingDependencies: analysisResult.missingDeps || [],
+            isValid: analysisResult.valid !== false || packageJsonUpdated,
+            summary: analysisResult.summary || 'Dependencies validated',
+            autoFixed: packageJsonUpdated,
+            addedDependencies: addedDependencies,
+            suggestions: packageJsonUpdated ? 
+              [`Run 'npm install' to install the newly added dependencies`] :
+              (analysisResult.missingDeps?.map((dep: any) => `npm install ${dep.package}`) || [])
+          },
+          toolCallId
+        }
+        
+        // Log issues if any
+        if (analysisResult.missingDeps?.length > 0) {
+          console.warn(`[DEPENDENCY WARNING] Missing dependencies in ${filePath}:`, analysisResult.missingDeps)
+        }
+        
+        return result
+        
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error('[ERROR] analyze_dependencies failed:', error)
+        
+        return { 
+          success: false, 
+          error: `Dependency analysis failed: ${errorMessage}`,
+          toolCallId
+        }
+      }
+    }
+  })
+
+  // AI Code Scanner - Validates import/export relationships between project files
+  tools.scan_code_imports = tool({
+    description: 'Scan file imports/exports and validate relationships between project files to prevent runtime errors',
+    inputSchema: z.object({
+      filePath: z.string().describe('Path of the file to scan'),
+      fileContent: z.string().describe('Content of the file to scan'),
+      validateExports: z.boolean().optional().describe('Validate export/import relationships (default: true)')
+    }),
+    execute: async ({ filePath, fileContent, validateExports = true }, { abortSignal, toolCallId }) => {
+      if (abortSignal?.aborted) {
+        throw new Error('Operation cancelled')
+      }
+      
+      try {
+        // Import storage manager
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        
+        // Get all project files for reference validation
+        const allProjectFiles = await storageManager.getFiles(projectId)
+        
+        // Filter to only project files (exclude node_modules)
+        const projectFiles = allProjectFiles.filter(file => 
+          !file.path.includes('node_modules') && 
+          !file.isDirectory &&
+          (file.path.endsWith('.ts') || file.path.endsWith('.tsx') || file.path.endsWith('.js') || file.path.endsWith('.jsx'))
+        )
+        
+        // Create truncated file map with only import/export sections
+        const fileExportMap: any = {}
+        for (const file of projectFiles) {
+          if (file.content) {
+            // Extract only import and export sections to save tokens
+            const lines = file.content.split('\n')
+            const importLines = lines.filter(line => 
+              line.trim().startsWith('import ') || 
+              line.trim().startsWith('export ')
+            )
+            
+            fileExportMap[file.path] = {
+              imports: importLines.filter(line => line.trim().startsWith('import ')).slice(0, 10), // Max 10 imports
+              exports: importLines.filter(line => line.trim().startsWith('export ')).slice(0, 10), // Max 10 exports
+              hasDefaultExport: file.content.includes('export default'),
+              hasNamedExports: file.content.includes('export {') || file.content.includes('export const') || file.content.includes('export function')
+            }
+          }
+        }
+        
+        // Use AI to analyze import/export relationships
+        const mistralPixtral = getMistralPixtralModel()
+        
+        const scanPrompt = `Analyze this file's imports and validate against project file exports.
+
+Target File: ${filePath}
+Content (first 1000 chars): ${fileContent.substring(0, 1000)}${fileContent.length > 1000 ? '...' : ''}
+
+Project Files Export Map (truncated for efficiency):
+${JSON.stringify(fileExportMap, null, 2)}
+
+Validate:
+1. All imported files exist in project
+2. Imported exports exist in target files  
+3. Import syntax matches export type (default vs named)
+
+Respond with compact JSON:
+{
+  "imports": [{"from": "./Button", "imports": ["Button"], "exists": true, "exportsMatch": true}],
+  "issues": [{"type": "missing_file", "import": "./Missing", "message": "File not found"}],
+  "valid": true/false,
+  "summary": "Brief scan result"
+}`
+        
+        const scanResult = await generateText({
+          model: mistralPixtral,
+          messages: [
+            { role: 'system', content: 'You are a code scanner. Validate import/export relationships. Respond with compact JSON only.' },
+            { role: 'user', content: scanPrompt }
+          ],
+          temperature: 0.1
+        })
+        
+        // Parse AI response
+        let scanAnalysis: any = {}
+        try {
+          let jsonText = scanResult.text || '{}'
+          if (jsonText.includes('```json')) {
+            jsonText = jsonText.replace(/```json\s*/, '').replace(/\s*```$/, '')
+          } else if (jsonText.includes('```')) {
+            jsonText = jsonText.replace(/```\s*/, '').replace(/\s*```$/, '')
+          }
+          jsonText = jsonText.trim()
+          
+          // Find JSON object bounds
+          const startIndex = jsonText.indexOf('{')
+          const endIndex = jsonText.lastIndexOf('}')
+          if (startIndex !== -1 && endIndex !== -1) {
+            jsonText = jsonText.substring(startIndex, endIndex + 1)
+          }
+          
+          scanAnalysis = JSON.parse(jsonText)
+        } catch (parseError) {
+          console.warn('Failed to parse code scan analysis, using fallback')
+          scanAnalysis = {
+            imports: [],
+            issues: [],
+            valid: true,
+            summary: 'Scan completed with fallback parsing'
+          }
+        }
+        
+        // Build comprehensive response
+        const result = {
+          success: true,
+          message: `Code scan completed for ${filePath}`,
+          analysis: {
+            filePath,
+            imports: scanAnalysis.imports || [],
+            issues: scanAnalysis.issues || [],
+            isValid: scanAnalysis.valid !== false,
+            summary: scanAnalysis.summary || 'Code scan completed',
+            totalProjectFiles: projectFiles.length,
+            scannedImports: scanAnalysis.imports?.length || 0,
+            foundIssues: scanAnalysis.issues?.length || 0
+          },
+          toolCallId
+        }
+        
+        // Log issues if any
+        if (scanAnalysis.issues?.length > 0) {
+          console.warn(`[CODE SCAN WARNING] Issues found in ${filePath}:`, scanAnalysis.issues)
+        }
+        
+        return result
+        
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error('[ERROR] scan_code_imports failed:', error)
+        
+        return { 
+          success: false, 
+          error: `Code scan failed: ${errorMessage}`,
+          toolCallId
+        }
+      }
+    }
+  })
   
   // Debug logging to show which tools are included
   const toolNames = Object.keys(tools)
@@ -3259,6 +3624,8 @@ Here are the available knowledge base IDs you can use with the search_knowledge 
 - ALWAYS use read_file first to understand current file state
 - ALWAYS use edit_file FIRST for modifying existing files (preferred method)
 - ALWAYS use write_file as FALLBACK if edit_file fails or for new files
+- ALWAYS use analyze_dependencies AFTER creating or modifying files with imports to auto-add missing dependencies to package.json
+- ALWAYS use scan_code_imports AFTER file operations to validate import/export relationships and prevent runtime errors
 - ALWAYS prioritize local file operations over external web research
 - If edit_file fails (search text not found, errors), immediately use write_file to rewrite the entire file
 - If user wants to add products, edit the file directly - NO web search needed!
@@ -3282,6 +3649,8 @@ WORKFLOW:
 1. read_file to see current content
 2. edit_file with search/replace blocks (preferred)
 3. If edit_file fails: write_file with complete updated file
+4. analyze_dependencies to auto-add any missing dependencies to package.json
+5. scan_code_imports to validate import/export relationships
 
 Project context: ${projectContext || 'Vite + React + TypeScript project - Multi-page with React Router'}${modelContextInfo}${modeContextInfo}${autonomousPlanningContext}`;
 
