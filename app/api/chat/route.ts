@@ -32,12 +32,12 @@ const getAIModel = (modelId?: string) => {
   }
 }
 
-// Get Together AI model for NLP and intent detection
-const getTogetherAIModel = () => {
+// Get Mistral Pixtral model for NLP and intent detection
+const getMistralPixtralModel = () => {
   try {
-    return getModel('meta-llama/Llama-3.3-70B-Instruct-Turbo')
+    return getModel('pixtral-12b-2409')
   } catch (error) {
-    console.warn('Together AI model not available, falling back to default')
+    console.warn('Mistral Pixtral model not available, falling back to default')
     return getModel(DEFAULT_CHAT_MODEL)
   }
 }
@@ -496,10 +496,10 @@ async function processMemoryWithAI(
   toolCalls?: any[]
 ) {
   try {
-    const togetherAI = getTogetherAIModel()
+    const mistralPixtral = getMistralPixtralModel()
     
     const enhancedMemory = await generateText({
-      model: togetherAI,
+      model: mistralPixtral,
       messages: [
         { role: 'system', content: 'You are an AI assistant analyzing development conversations.' },
         { role: 'user', content: `Analyze this development conversation and enhance the memory with intelligent insights:
@@ -612,10 +612,10 @@ async function findRelevantMemories(
   conversationMemory: any
 ) {
   try {
-    const togetherAI = getTogetherAIModel()
+    const mistralPixtral = getMistralPixtralModel()
     
     const relevantMemories = await generateText({
-      model: togetherAI,
+      model: mistralPixtral,
       messages: [
         { role: 'system', content: 'You are an AI assistant that finds relevant information from development memory.' },
         { role: 'user', content: `Find the most relevant information from this development memory for the user's current request:
@@ -702,10 +702,10 @@ async function learnFromPatterns(
   projectFiles: any[]
 ) {
   try {
-    const togetherAI = getTogetherAIModel()
+    const mistralPixtral = getMistralPixtralModel()
     
     const learningInsights = await generateText({
-      model: togetherAI,
+      model: mistralPixtral,
       messages: [
         { role: 'system', content: 'You are an AI assistant analyzing development patterns and learning from a developer\'s work.' },
         { role: 'user', content: `Analyze this developer's patterns and preferences to learn their development style:
@@ -2288,10 +2288,10 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
 
 
 
-// NLP Intent Detection using Together AI
+// NLP Intent Detection using Mistral Pixtral
 async function detectUserIntent(userMessage: string, projectContext: string, conversationHistory: any[]) {
   try {
-    const togetherModel = getTogetherAIModel()
+    const mistralPixtralModel = getMistralPixtralModel()
     
     const intentPrompt = `Analyze the user's request and determine their intent for building or modifying a React application.
 
@@ -2341,7 +2341,7 @@ Include these fields:
 - "enforcement_notes": Critical reminders about web tool restrictions`
 
     const intentResult = await generateText({
-      model: togetherModel,
+      model: mistralPixtralModel,
       messages: [
           { role: 'system', content: `You are an AI intent detection specialist. Analyze user requests and provide structured intent analysis.
 
@@ -3698,12 +3698,12 @@ Project context: ${projectContext || 'Vite + React + TypeScript project - Multi-
       }
       
       // CRITICAL: Prevent empty assistant messages from being sent
-      // If the AI only used tools without generating text, use Together AI to generate a meaningful summary
+      // If the AI only used tools without generating text, use Mistral Pixtral to generate a meaningful summary
       if (!actualAIMessage.trim() && processedToolCalls && processedToolCalls.length > 0) {
         try {
-          console.log('[DEBUG] Generating AI-powered tool summary using Together AI...')
+          console.log('[DEBUG] Generating AI-powered tool summary using Mistral Pixtral...')
           
-          const togetherModel = getTogetherAIModel()
+          const mistralPixtralModel = getMistralPixtralModel()
           const toolSummaryPrompt = `You are an AI assistant that creates beautifully formatted, professional summaries of development tool actions.
 
 Based on the user's request, generate a simple, clean summary:
@@ -3749,7 +3749,7 @@ I have successfully completed your request.
 Make it look professional, organized, and easy to read using clean markdown formatting.`
 
           const summaryResult = await generateText({
-            model: togetherModel,
+            model: mistralPixtralModel,
             messages: [
               { role: 'system', content: 'You are a helpful AI assistant that summarizes development tool actions in natural language.' },
               { role: 'user', content: toolSummaryPrompt }
