@@ -98,6 +98,12 @@ export function FileAttachmentDropdown({
     }
 
     try {
+      // Check if files are stale and refresh if needed
+      if (fileLookupService.isStale()) {
+        console.log('[FileAttachmentDropdown] Files appear stale, force refreshing...');
+        await fileLookupService.forceRefresh();
+      }
+      
       const results = fileLookupService.searchFiles(searchQuery, 8);
       setFiles(results);
       setSelectedIndex(0);
@@ -109,9 +115,16 @@ export function FileAttachmentDropdown({
 
   useEffect(() => {
     if (isVisible) {
-      searchFiles(query);
+      // Always refresh when dropdown opens to show latest files
+      const refreshAndSearch = async () => {
+        if (projectId) {
+          await fileLookupService.forceRefresh();
+        }
+        await searchFiles(query);
+      };
+      refreshAndSearch();
     }
-  }, [query, isVisible, searchFiles]);
+  }, [query, isVisible, searchFiles, projectId]);
 
   // Handle keyboard navigation
   useEffect(() => {

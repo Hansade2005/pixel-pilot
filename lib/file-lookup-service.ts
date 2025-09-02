@@ -19,8 +19,31 @@ export interface FileSearchResult {
 export class FileLookupService {
   private files: File[] = [];
   private projectId: string | null = null;
+  private isListening: boolean = false;
 
-  constructor() {}
+  constructor() {
+    this.setupFileChangeListener();
+  }
+
+  /**
+   * Setup file change event listener for auto-refresh
+   */
+  private setupFileChangeListener(): void {
+    if (typeof window === 'undefined' || this.isListening) return;
+    
+    const handleFilesChanged = (e: CustomEvent) => {
+      const detail = e.detail as { projectId: string; forceRefresh?: boolean };
+      if (detail.projectId === this.projectId) {
+        console.log('[FileLookupService] Detected files changed event, refreshing files for @ command');
+        this.refreshFiles();
+      }
+    };
+    
+    window.addEventListener('files-changed', handleFilesChanged as EventListener);
+    this.isListening = true;
+    
+    console.log('[FileLookupService] File change listener setup complete');
+  }
 
   /**
    * Initialize the service with project files
@@ -218,6 +241,22 @@ export class FileLookupService {
    */
   getFileCount(): number {
     return this.files.length;
+  }
+
+  /**
+   * Force refresh files (useful for manual refresh)
+   */
+  async forceRefresh(): Promise<void> {
+    console.log('[FileLookupService] Force refreshing files...');
+    await this.refreshFiles();
+  }
+
+  /**
+   * Check if files are stale and need refresh
+   */
+  isStale(): boolean {
+    // Consider files stale if no files loaded or if it's been a while
+    return this.files.length === 0;
   }
 }
 
