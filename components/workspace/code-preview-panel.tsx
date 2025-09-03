@@ -725,13 +725,15 @@ export default function TodoApp() {
                 onValueChange={(value) => setIsConsoleOpen(value === "console")}
               >
                 <AccordionItem value="console" className="border-none">
-                  <AccordionTrigger className="px-4 py-2 hover:no-underline">
+                  <AccordionTrigger className={`px-4 py-2 hover:no-underline ${isMobile ? 'py-3' : 'py-2'}`}>
                     <div className="flex items-center space-x-2">
-                      <Terminal className="h-4 w-4" />
-                      <span className="font-medium">Console</span>
+                      <Terminal className={`${isMobile ? 'h-5 w-5' : 'h-4 w-4'}`} />
+                      <span className={`font-medium ${isMobile ? 'text-sm' : 'text-base'}`}>Console</span>
                       {/* Total count badge */}
                       {(consoleOutput.length > 0 || browserLogs.length > 0) && (
-                        <span className="ml-2 px-2 py-1 text-xs bg-primary text-primary-foreground rounded-full font-medium">
+                        <span className={`ml-2 px-2 py-1 text-xs bg-primary text-primary-foreground rounded-full font-medium ${
+                          isMobile ? 'px-2.5 py-1.5' : 'px-2 py-1'
+                        }`}>
                           {consoleOutput.length + browserLogs.length}
                         </span>
                       )}
@@ -739,15 +741,17 @@ export default function TodoApp() {
                       {preview.sandboxId && (
                         <div className="flex items-center space-x-1">
                           <div className={`w-2 h-2 rounded-full ${streamReader ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
-                          <span className="text-xs text-muted-foreground">
+                          <span className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-xs'}`}>
                             {streamReader ? 'Live' : 'Connected'}
                           </span>
                         </div>
                       )}
                     </div>
-                    {/* Show latest output when collapsed */}
+                    {/* Show latest output when collapsed - mobile optimized */}
                     {!isConsoleOpen && (consoleOutput.length > 0 || browserLogs.length > 0) && (
-                      <div className="ml-auto text-xs text-muted-foreground max-w-48 truncate">
+                      <div className={`ml-auto text-muted-foreground truncate ${
+                        isMobile ? 'text-xs max-w-32' : 'text-xs max-w-48'
+                      }`}>
                         {activeConsoleTab === 'terminal' && consoleOutput.length > 0 
                           ? consoleOutput[consoleOutput.length - 1]
                           : activeConsoleTab === 'browser' && browserLogs.length > 0
@@ -757,9 +761,9 @@ export default function TodoApp() {
                       </div>
                     )}
                   </AccordionTrigger>
-                  <AccordionContent className="px-4 pb-4">
-                    {/* Console Tabs */}
-                    <div className="mb-3">
+                  <AccordionContent className={`px-4 pb-4 ${isMobile ? 'px-3 pb-3' : 'px-4 pb-4'}`}>
+                    {/* Console Tabs - Mobile optimized */}
+                    <div className={`mb-3 ${isMobile ? 'mb-2' : 'mb-3'}`}>
                       <div className="flex space-x-1 bg-muted rounded-lg p-1">
                         <button
                           onClick={() => setActiveConsoleTab('terminal')}
@@ -767,13 +771,15 @@ export default function TodoApp() {
                             activeConsoleTab === 'terminal'
                               ? 'bg-background text-foreground shadow-sm'
                               : 'text-muted-foreground hover:text-foreground'
-                          }`}
-                          title="Terminal output (Ctrl+1)"
+                          } ${isMobile ? 'py-2.5 text-xs touch-manipulation' : 'py-2 text-xs'}`}
+                          title={isMobile ? "Terminal" : "Terminal output (Ctrl+1)"}
                         >
-                          <Terminal className="h-3 w-3 inline mr-1" />
+                          <Terminal className={`${isMobile ? 'h-3 w-3' : 'h-3 w-3'} inline mr-1`} />
                           Terminal
                           {consoleOutput.length > 0 && (
-                            <span className="ml-1 px-1.5 py-0.5 text-xs bg-muted-foreground/20 rounded-full">
+                            <span className={`ml-1 px-1.5 py-0.5 text-xs bg-muted-foreground/20 rounded-full ${
+                              isMobile ? 'px-1 py-0.5' : 'px-1.5 py-0.5'
+                            }`}>
                               {consoleOutput.length}
                             </span>
                           )}
@@ -784,13 +790,15 @@ export default function TodoApp() {
                             activeConsoleTab === 'browser'
                               ? 'bg-background text-foreground shadow-sm'
                               : 'text-muted-foreground hover:text-foreground'
-                          }`}
-                          title="Browser logs (Ctrl+2)"
+                          } ${isMobile ? 'py-2.5 text-xs touch-manipulation' : 'py-2 text-xs'}`}
+                          title={isMobile ? "Browser Logs" : "Browser logs (Ctrl+2)"}
                         >
-                          <Code className="h-3 w-3 inline mr-1" />
+                          <Code className={`${isMobile ? 'h-3 w-3' : 'h-3 w-3'} inline mr-1`} />
                           Browser Logs
                           {browserLogs.length > 0 && (
-                            <span className="ml-1 px-1.5 py-0.5 text-xs bg-muted-foreground/20 rounded-full">
+                            <span className={`ml-1 px-1.5 py-0.5 text-xs bg-muted-foreground/20 rounded-full ${
+                              isMobile ? 'px-1 py-0.5' : 'px-1.5 py-0.5'
+                            }`}>
                               {browserLogs.length}
                             </span>
                           )}
@@ -798,13 +806,20 @@ export default function TodoApp() {
                       </div>
                     </div>
 
-                    {/* Terminal Tab Content */}
+                    {/* Terminal Tab Content - Mobile height optimized for bottom tabs */}
                     {activeConsoleTab === 'terminal' && (
-                      <div ref={consoleRef} className="bg-muted rounded-lg p-3 max-h-48 overflow-y-auto">
+                      <div 
+                        ref={consoleRef} 
+                        className={`bg-muted rounded-lg overflow-y-auto ${
+                          isMobile ? 'max-h-28 p-2' : 'max-h-48 p-3'
+                        }`}
+                      >
                         {consoleOutput.length === 0 ? (
-                          <p className="text-muted-foreground text-sm">
-                            Terminal output will appear here when the dev server starts...
-                          </p>
+                          <div className={`text-center ${isMobile ? 'py-1' : 'py-2'}`}>
+                            <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
+                              {isMobile ? 'Terminal output will appear here...' : 'Terminal output will appear here when the dev server starts...'}
+                            </p>
+                          </div>
                         ) : (
                           <div className="space-y-1">
                             {consoleOutput.map((output, index) => {
@@ -815,12 +830,12 @@ export default function TodoApp() {
                               return (
                                 <div 
                                   key={index} 
-                                  className={`text-xs font-mono ${
+                                  className={`font-mono ${
                                     isError ? 'text-red-500' : 
                                     isSuccess ? 'text-green-500' : 
                                     isWarning ? 'text-yellow-500' : 
                                     'text-muted-foreground'
-                                  }`}
+                                  } ${isMobile ? 'text-xs leading-tight' : 'text-xs'}`}
                                 >
                                   {output}
                                 </div>
@@ -831,16 +846,21 @@ export default function TodoApp() {
                       </div>
                     )}
 
-                    {/* Browser Logs Tab Content */}
+                    {/* Browser Logs Tab Content - Mobile height optimized for bottom tabs */}
                     {activeConsoleTab === 'browser' && (
-                      <div ref={browserLogsRef} className="bg-muted rounded-lg p-3 max-h-48 overflow-y-auto">
+                      <div 
+                        ref={browserLogsRef} 
+                        className={`bg-muted rounded-lg overflow-y-auto ${
+                          isMobile ? 'max-h-28 p-2' : 'max-h-48 p-3'
+                        }`}
+                      >
                         {browserLogs.length === 0 ? (
-                          <div className="text-center py-4">
-                            <Code className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                            <p className="text-muted-foreground text-sm mb-2">
+                          <div className={`text-center ${isMobile ? 'py-2' : 'py-4'}`}>
+                            <Code className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} text-muted-foreground mx-auto mb-2`} />
+                            <p className={`text-muted-foreground mb-2 ${isMobile ? 'text-xs' : 'text-sm'}`}>
                               Browser console logs will appear here
                             </p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-xs'}`}>
                               Try adding console.log() statements in your app code
                             </p>
                           </div>
@@ -854,12 +874,12 @@ export default function TodoApp() {
                               return (
                                 <div 
                                   key={index} 
-                                  className={`text-xs font-mono ${
+                                  className={`font-mono ${
                                     isError ? 'text-red-500' : 
                                     isWarning ? 'text-yellow-500' : 
                                     isInfo ? 'text-blue-500' : 
                                     'text-muted-foreground'
-                                  }`}
+                                  } ${isMobile ? 'text-xs leading-tight' : 'text-xs'}`}
                                 >
                                   {log}
                                 </div>
@@ -870,30 +890,30 @@ export default function TodoApp() {
                       </div>
                     )}
 
-                    {/* Action Buttons */}
+                    {/* Action Buttons - Mobile optimized with better touch targets */}
                     {(consoleOutput.length > 0 || browserLogs.length > 0) && (
-                      <div className="flex justify-between items-center mt-2">
-                        <div className="text-xs text-muted-foreground">
+                      <div className={`flex justify-between items-center mt-2 ${isMobile ? 'mt-2' : 'mt-2'}`}>
+                        <div className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-xs'}`}>
                           {activeConsoleTab === 'terminal' 
                             ? (streamReader ? 'Streaming live from dev server...' : 'Terminal output captured')
                             : 'Browser logs captured'
                           }
                         </div>
-                        <div className="flex space-x-2">
+                        <div className={`flex space-x-2 ${isMobile ? 'space-x-1' : 'space-x-2'}`}>
                           <Button
                             variant="outline"
-                            size="sm"
+                            size={isMobile ? "sm" : "sm"}
                             onClick={activeConsoleTab === 'terminal' ? clearConsole : clearBrowserLogs}
-                            className="text-xs"
+                            className={`${isMobile ? 'text-xs px-2 py-1 touch-manipulation' : 'text-xs'}`}
                           >
                             Clear {activeConsoleTab === 'terminal' ? 'Terminal' : 'Browser Logs'}
                           </Button>
                           {preview.sandboxId && (
                             <Button
                               variant="outline"
-                              size="sm"
+                              size={isMobile ? "sm" : "sm"}
                               onClick={clearAllLogs}
-                              className="text-xs"
+                              className={`${isMobile ? 'text-xs px-2 py-1 touch-manipulation' : 'text-xs'}`}
                             >
                               Clear All
                             </Button>
@@ -901,9 +921,9 @@ export default function TodoApp() {
                           {preview.sandboxId && (
                             <Button
                               variant="outline"
-                              size="sm"
+                              size={isMobile ? "sm" : "sm"}
                               onClick={() => setIsConsoleOpen(false)}
-                              className="text-xs"
+                              className={`${isMobile ? 'text-xs px-2 py-1 touch-manipulation' : 'text-xs'}`}
                             >
                               Close Console
                             </Button>
