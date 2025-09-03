@@ -140,9 +140,6 @@ importers:
       '@vercel/sdk':
         specifier: ^1.10.4
         version: 1.10.4
-      '@webcontainer/api':
-        specifier: ^1.1.9
-        version: 1.6.1
       ai:
         specifier: ^5.0.23
         version: 5.0.23(zod@3.25.67)
@@ -1513,9 +1510,6 @@ packages:
     peerDependenciesMeta:
       '@modelcontextprotocol/sdk':
         optional: true
-
-  '@webcontainer/api@1.6.1':
-    resolution: {integrity: sha512-2RS2KiIw32BY1Icf6M1DvqSmcon9XICZCDgS29QJb2NmF12ZY2V5Ia+949hMKB3Wno+P/Y8W+sPP59PZeXSELg==}
 
   accepts@1.3.8:
     resolution: {integrity: sha512-PYAthTa2m2VKxuvSD3DPC/Gy+U+sOA1LAuT8mkmRuvw+NACSaeXEQ+NHcVF7rONl6qcaxV3Uuemwawk+7+SJLw==}
@@ -3794,8 +3788,6 @@ snapshots:
   '@vercel/sdk@1.10.4':
     dependencies:
       zod: 3.25.67
-
-  '@webcontainer/api@1.6.1': {}
 
   accepts@1.3.8:
     dependencies:
