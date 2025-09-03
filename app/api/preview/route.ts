@@ -444,10 +444,27 @@ devDependencies:
               processId: devServer.processId 
             })}\n\n`)
 
-            // Close the stream after a short delay to ensure the final message is sent
-            setTimeout(() => {
-              controller.close()
-            }, 500)
+            // Keep the stream open for continuous console output
+            // The stream will be closed when the client disconnects or when cleanupSandbox is called
+            // This allows real-time streaming of dev server output
+            
+            // Set up a heartbeat to keep the connection alive
+            const heartbeat = setInterval(() => {
+              try {
+                controller.enqueue(`data: ${JSON.stringify({ log: 'Server running...' })}\n\n`)
+              } catch (error) {
+                // Client disconnected, stop heartbeat
+                clearInterval(heartbeat)
+                controller.close()
+              }
+            }, 30000) // Send heartbeat every 30 seconds
+
+            // Clean up heartbeat when stream is closed
+            const originalClose = controller.close.bind(controller)
+            controller.close = () => {
+              clearInterval(heartbeat)
+              originalClose()
+            }
           } catch (error) {
             // Enhanced cleanup on error
             if (sandbox) {

@@ -1,13 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
-import { Code, Eye, FileText, Download, ExternalLink, RotateCcw, Play, Square } from "lucide-react"
+import { Code, Eye, FileText, Download, ExternalLink, RotateCcw, Play, Square, Terminal } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { Workspace as Project } from "@/lib/storage-manager"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 
 interface CodePreviewPanelProps {
   project: Project | null
@@ -34,28 +35,209 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
   const [customUrl, setCustomUrl] = useState("")
   const [currentLog, setCurrentLog] = useState("Initializing preview...")
   const [isExporting, setIsExporting] = useState(false)
+  const [consoleOutput, setConsoleOutput] = useState<string[]>([])
+  const [isConsoleOpen, setIsConsoleOpen] = useState(false)
+  const [streamReader, setStreamReader] = useState<ReadableStreamDefaultReader<Uint8Array> | null>(null)
+  const consoleRef = useRef<HTMLDivElement>(null)
+  const [activeConsoleTab, setActiveConsoleTab] = useState<'terminal' | 'browser'>('terminal')
+  const [browserLogs, setBrowserLogs] = useState<string[]>([])
+  const browserLogsRef = useRef<HTMLDivElement>(null)
+
+  // Helper function to add timestamped console output
+  const addConsoleOutput = (message: string) => {
+    const timestamp = new Date().toLocaleTimeString()
+    setConsoleOutput(prev => [...prev, `[${timestamp}] ${message}`])
+  }
+
+  // Helper function to add timestamped browser logs
+  const addBrowserLog = (message: string, type: 'log' | 'error' | 'warn' | 'info' = 'log') => {
+    const timestamp = new Date().toLocaleTimeString()
+    const typeIcon = {
+      log: '📝',
+      error: '❌',
+      warn: '⚠️',
+      info: 'ℹ️'
+    }[type]
+    setBrowserLogs(prev => [...prev, `[${timestamp}] ${typeIcon} ${message}`])
+  }
 
   useEffect(() => {
     if (preview.url) {
       setCustomUrl(preview.url)
-      console.log('[E2B] Preview URL updated:', preview.url)
     }
   }, [preview.url])
 
-  // Cleanup sandbox on unmount
+  // Auto-scroll console to bottom when new output arrives
+  useEffect(() => {
+    if (consoleRef.current && isConsoleOpen && activeConsoleTab === 'terminal') {
+      consoleRef.current.scrollTop = consoleRef.current.scrollHeight
+    }
+  }, [consoleOutput, isConsoleOpen, activeConsoleTab])
+
+  // Auto-scroll browser logs to bottom when new output arrives
+  useEffect(() => {
+    if (browserLogsRef.current && isConsoleOpen && activeConsoleTab === 'browser') {
+      browserLogsRef.current.scrollTop = browserLogsRef.current.scrollHeight
+    }
+  }, [browserLogs, isConsoleOpen, activeConsoleTab])
+
+  // Set up iframe message listener for browser logs
+  useEffect(() => {
+    const handleIframeMessage = (event: MessageEvent) => {
+      // Only accept messages from our preview iframe
+      const iframe = document.querySelector('#preview-iframe') as HTMLIFrameElement
+      if (iframe && event.source === iframe.contentWindow) {
+        if (event.data.type === 'console') {
+          addBrowserLog(event.data.message, event.data.level)
+        }
+      }
+    }
+
+    window.addEventListener('message', handleIframeMessage)
+    return () => window.removeEventListener('message', handleIframeMessage)
+  }, [])
+
+  // Set up keyboard shortcuts for console tabs
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey && isConsoleOpen) {
+        if (event.key === '1') {
+          event.preventDefault()
+          setActiveConsoleTab('terminal')
+        } else if (event.key === '2') {
+          event.preventDefault()
+          setActiveConsoleTab('browser')
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isConsoleOpen])
+
+  // Inject console interceptor script into iframe when it loads
+  const injectConsoleInterceptor = (iframe: HTMLIFrameElement) => {
+    iframe.addEventListener('load', () => {
+      try {
+        const script = `
+          (function() {
+            const originalConsole = {
+              log: console.log,
+              error: console.error,
+              warn: console.warn,
+              info: console.info
+            };
+
+            // Intercept console methods
+            console.log = function(...args) {
+              originalConsole.log.apply(console, args);
+              window.parent.postMessage({
+                type: 'console',
+                level: 'log',
+                message: args.map(arg => 
+                  typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+                ).join(' ')
+              }, '*');
+            };
+
+            console.error = function(...args) {
+              originalConsole.error.apply(console, args);
+              window.parent.postMessage({
+                type: 'console',
+                level: 'error',
+                message: args.map(arg => 
+                  typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+                ).join(' ')
+              }, '*');
+            };
+
+            console.warn = function(...args) {
+              originalConsole.warn.apply(console, args);
+              window.parent.postMessage({
+                type: 'console',
+                level: 'warn',
+                message: args.map(arg => 
+                  typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+                ).join(' ')
+              }, '*');
+            };
+
+            console.info = function(...args) {
+              originalConsole.info.apply(console, args);
+              window.parent.postMessage({
+                type: 'console',
+                level: 'info',
+                message: args.map(arg => 
+                  typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+                ).join(' ')
+              }, '*');
+            };
+
+            // Intercept unhandled errors
+            window.addEventListener('error', function(event) {
+              window.parent.postMessage({
+                type: 'console',
+                level: 'error',
+                message: 'Unhandled Error: ' + event.message + ' at ' + event.filename + ':' + event.lineno
+              }, '*');
+            });
+
+            // Intercept unhandled promise rejections
+            window.addEventListener('unhandledrejection', function(event) {
+              window.parent.postMessage({
+                type: 'console',
+                level: 'error',
+                message: 'Unhandled Promise Rejection: ' + event.reason
+              }, '*');
+            });
+
+            // Send initial message to confirm interceptor is loaded
+            window.parent.postMessage({
+              type: 'console',
+              level: 'info',
+              message: 'Console interceptor loaded'
+            }, '*');
+          })();
+        `;
+        
+        // Use a safer method to inject the script
+        const scriptElement = iframe.contentDocument?.createElement('script')
+        if (scriptElement) {
+          scriptElement.textContent = script
+          iframe.contentDocument?.head?.appendChild(scriptElement)
+        }
+      } catch (error) {
+        console.warn('Failed to inject console interceptor:', error);
+      }
+    });
+  };
+
+  // Cleanup sandbox and stream on unmount
   useEffect(() => {
     return () => {
       if (preview.sandboxId) {
         cleanupSandbox()
       }
+      // Close stream reader if it exists
+      if (streamReader) {
+        streamReader.cancel()
+      }
     }
-  }, [preview.sandboxId])
+  }, [preview.sandboxId, streamReader])
 
   const createPreview = async () => {
     if (!project) return
 
     setPreview(prev => ({ ...prev, isLoading: true }))
     setCurrentLog("Booting VM...")
+    setConsoleOutput([]) // Clear previous console output
+    setBrowserLogs([]) // Clear previous browser logs
+    
+    // Close any existing stream
+    if (streamReader) {
+      streamReader.cancel()
+      setStreamReader(null)
+    }
     
     try {
       // Fetch files from IndexedDB client-side
@@ -88,7 +270,6 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
       const contentType = response.headers.get('content-type')
       if (contentType && contentType.includes('application/json')) {
         const data = await response.json()
-        console.log('[E2B] Received immediate JSON response:', data)
         setPreview({
           sandboxId: data.sandboxId,
           url: data.url,
@@ -101,9 +282,10 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
 
       // Handle streaming response
       const reader = response.body?.getReader()
-      const decoder = new TextDecoder()
-
       if (reader) {
+        setStreamReader(reader)
+        const decoder = new TextDecoder()
+
         try {
           while (true) {
             const { done, value } = await reader.read()
@@ -120,16 +302,18 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
                     const data = JSON.parse(line.slice(6))
                     if (data.log) {
                       setCurrentLog(data.log)
+                      // Add to console output for the accordion with timestamp
+                      addConsoleOutput(data.log)
                     }
                     if (data.error) {
                       console.error('Preview error:', data.error)
                       setCurrentLog(`Error: ${data.error}`)
+                      addConsoleOutput(`ERROR: ${data.error}`)
                       setPreview(prev => ({ ...prev, isLoading: false }))
                       break
                     }
                     if (data.sandboxId && data.url) {
                       // Preview is ready
-                      console.log('[E2B] Received sandbox data:', { sandboxId: data.sandboxId, url: data.url, processId: data.processId })
                       setPreview({
                         sandboxId: data.sandboxId,
                         url: data.url,
@@ -137,6 +321,9 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
                         processId: data.processId,
                       })
                       setCurrentLog("Server ready")
+                      addConsoleOutput("✅ Server ready")
+                      // Auto-open console when server is ready
+                      setIsConsoleOpen(true)
                     }
                   } catch (e) {
                     // Ignore parsing errors for non-JSON lines
@@ -148,19 +335,23 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
         } catch (streamError) {
           console.error('Streaming error:', streamError)
           setCurrentLog("Streaming error occurred")
+          addConsoleOutput("❌ Streaming error occurred")
           setPreview(prev => ({ ...prev, isLoading: false }))
         } finally {
           reader.releaseLock()
+          setStreamReader(null)
         }
       }
 
     } catch (error) {
       console.error('Error creating preview:', error)
-      setCurrentLog(`Error: ${error instanceof Error ? error.message : "Could not create preview environment"}`)
+      const errorMessage = error instanceof Error ? error.message : "Could not create preview environment"
+      setCurrentLog(`Error: ${errorMessage}`)
+      addConsoleOutput(`❌ Error: ${errorMessage}`)
       setPreview(prev => ({ ...prev, isLoading: false }))
       toast({
         title: "Preview Failed",
-        description: error instanceof Error ? error.message : "Could not create preview environment",
+        description: errorMessage,
         variant: "destructive",
       })
     }
@@ -168,6 +359,12 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
 
   const cleanupSandbox = async () => {
     if (!preview.sandboxId) return
+
+    // Close the stream reader if it exists
+    if (streamReader) {
+      streamReader.cancel()
+      setStreamReader(null)
+    }
 
     try {
       await fetch('/api/preview', {
@@ -186,6 +383,7 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
       processId: null,
     })
     setCurrentLog("Preview stopped")
+    addConsoleOutput("🛑 Preview stopped")
   }
 
   const refreshPreview = () => {
@@ -275,6 +473,19 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
     } finally {
       setIsExporting(false)
     }
+  }
+
+  const clearConsole = () => {
+    setConsoleOutput([])
+  }
+
+  const clearBrowserLogs = () => {
+    setBrowserLogs([])
+  }
+
+  const clearAllLogs = () => {
+    setConsoleOutput([])
+    setBrowserLogs([])
   }
 
   const sampleCode = `import React, { useState } from 'react'
@@ -480,8 +691,11 @@ export default function TodoApp() {
                   src={preview.url}
                   className="w-full h-full border-none"
                   sandbox="allow-scripts allow-same-origin allow-forms allow-downloads allow-popups"
-                  onLoad={() => console.log('[E2B] Iframe loaded successfully with URL:', preview.url)}
-                  onError={(e) => console.error('[E2B] Iframe failed to load:', e, 'URL:', preview.url)}
+                  ref={(iframe) => {
+                    if (iframe) {
+                      injectConsoleInterceptor(iframe)
+                    }
+                  }}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center">
@@ -500,6 +714,206 @@ export default function TodoApp() {
               </div>
               </div>
               )}
+            </div>
+
+            {/* Console Output Accordion */}
+            <div className="border-t border-border">
+              <Accordion 
+                type="single" 
+                collapsible 
+                value={isConsoleOpen ? "console" : undefined}
+                onValueChange={(value) => setIsConsoleOpen(value === "console")}
+              >
+                <AccordionItem value="console" className="border-none">
+                  <AccordionTrigger className="px-4 py-2 hover:no-underline">
+                    <div className="flex items-center space-x-2">
+                      <Terminal className="h-4 w-4" />
+                      <span className="font-medium">Console</span>
+                      {/* Total count badge */}
+                      {(consoleOutput.length > 0 || browserLogs.length > 0) && (
+                        <span className="ml-2 px-2 py-1 text-xs bg-primary text-primary-foreground rounded-full font-medium">
+                          {consoleOutput.length + browserLogs.length}
+                        </span>
+                      )}
+                      {/* Connection status indicator */}
+                      {preview.sandboxId && (
+                        <div className="flex items-center space-x-1">
+                          <div className={`w-2 h-2 rounded-full ${streamReader ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+                          <span className="text-xs text-muted-foreground">
+                            {streamReader ? 'Live' : 'Connected'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    {/* Show latest output when collapsed */}
+                    {!isConsoleOpen && (consoleOutput.length > 0 || browserLogs.length > 0) && (
+                      <div className="ml-auto text-xs text-muted-foreground max-w-48 truncate">
+                        {activeConsoleTab === 'terminal' && consoleOutput.length > 0 
+                          ? consoleOutput[consoleOutput.length - 1]
+                          : activeConsoleTab === 'browser' && browserLogs.length > 0
+                          ? browserLogs[browserLogs.length - 1]
+                          : 'Console active'
+                        }
+                      </div>
+                    )}
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pb-4">
+                    {/* Console Tabs */}
+                    <div className="mb-3">
+                      <div className="flex space-x-1 bg-muted rounded-lg p-1">
+                        <button
+                          onClick={() => setActiveConsoleTab('terminal')}
+                          className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                            activeConsoleTab === 'terminal'
+                              ? 'bg-background text-foreground shadow-sm'
+                              : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                          title="Terminal output (Ctrl+1)"
+                        >
+                          <Terminal className="h-3 w-3 inline mr-1" />
+                          Terminal
+                          {consoleOutput.length > 0 && (
+                            <span className="ml-1 px-1.5 py-0.5 text-xs bg-muted-foreground/20 rounded-full">
+                              {consoleOutput.length}
+                            </span>
+                          )}
+                        </button>
+                        <button
+                          onClick={() => setActiveConsoleTab('browser')}
+                          className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                            activeConsoleTab === 'browser'
+                              ? 'bg-background text-foreground shadow-sm'
+                              : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                          title="Browser logs (Ctrl+2)"
+                        >
+                          <Code className="h-3 w-3 inline mr-1" />
+                          Browser Logs
+                          {browserLogs.length > 0 && (
+                            <span className="ml-1 px-1.5 py-0.5 text-xs bg-muted-foreground/20 rounded-full">
+                              {browserLogs.length}
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Terminal Tab Content */}
+                    {activeConsoleTab === 'terminal' && (
+                      <div ref={consoleRef} className="bg-muted rounded-lg p-3 max-h-48 overflow-y-auto">
+                        {consoleOutput.length === 0 ? (
+                          <p className="text-muted-foreground text-sm">
+                            Terminal output will appear here when the dev server starts...
+                          </p>
+                        ) : (
+                          <div className="space-y-1">
+                            {consoleOutput.map((output, index) => {
+                              const isError = output.includes('ERROR:') || output.includes('❌')
+                              const isSuccess = output.includes('✅') || output.includes('Server ready')
+                              const isWarning = output.includes('Warning:')
+                              
+                              return (
+                                <div 
+                                  key={index} 
+                                  className={`text-xs font-mono ${
+                                    isError ? 'text-red-500' : 
+                                    isSuccess ? 'text-green-500' : 
+                                    isWarning ? 'text-yellow-500' : 
+                                    'text-muted-foreground'
+                                  }`}
+                                >
+                                  {output}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Browser Logs Tab Content */}
+                    {activeConsoleTab === 'browser' && (
+                      <div ref={browserLogsRef} className="bg-muted rounded-lg p-3 max-h-48 overflow-y-auto">
+                        {browserLogs.length === 0 ? (
+                          <div className="text-center py-4">
+                            <Code className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                            <p className="text-muted-foreground text-sm mb-2">
+                              Browser console logs will appear here
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Try adding console.log() statements in your app code
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            {browserLogs.map((log, index) => {
+                              const isError = log.includes('❌') || log.includes('Unhandled Error') || log.includes('Unhandled Promise')
+                              const isWarning = log.includes('⚠️')
+                              const isInfo = log.includes('ℹ️')
+                              
+                              return (
+                                <div 
+                                  key={index} 
+                                  className={`text-xs font-mono ${
+                                    isError ? 'text-red-500' : 
+                                    isWarning ? 'text-yellow-500' : 
+                                    isInfo ? 'text-blue-500' : 
+                                    'text-muted-foreground'
+                                  }`}
+                                >
+                                  {log}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    {(consoleOutput.length > 0 || browserLogs.length > 0) && (
+                      <div className="flex justify-between items-center mt-2">
+                        <div className="text-xs text-muted-foreground">
+                          {activeConsoleTab === 'terminal' 
+                            ? (streamReader ? 'Streaming live from dev server...' : 'Terminal output captured')
+                            : 'Browser logs captured'
+                          }
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={activeConsoleTab === 'terminal' ? clearConsole : clearBrowserLogs}
+                            className="text-xs"
+                          >
+                            Clear {activeConsoleTab === 'terminal' ? 'Terminal' : 'Browser Logs'}
+                          </Button>
+                          {preview.sandboxId && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={clearAllLogs}
+                              className="text-xs"
+                            >
+                              Clear All
+                            </Button>
+                          )}
+                          {preview.sandboxId && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setIsConsoleOpen(false)}
+                              className="text-xs"
+                            >
+                              Close Console
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </div>
           </div>
         )}
