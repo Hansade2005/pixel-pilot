@@ -980,7 +980,7 @@ export default function TodoApp() {
                       </div>
                     )}
 
-                    {/* Browser Logs Tab Content - Mobile height optimized for bottom tabs */}
+                    {/* Browser Logs Tab Content - Clean and simple like terminal */}
                     {activeConsoleTab === 'browser' && (
                       <div 
                         ref={browserLogsRef} 
@@ -989,13 +989,9 @@ export default function TodoApp() {
                         }`}
                       >
                         {browserLogs.length === 0 ? (
-                          <div className={`text-center ${isMobile ? 'py-2' : 'py-4'}`}>
-                            <Code className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} text-muted-foreground mx-auto mb-2`} />
-                            <p className={`text-muted-foreground mb-2 ${isMobile ? 'text-xs' : 'text-sm'}`}>
-                              Browser console logs will appear here
-                            </p>
-                            <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-xs'}`}>
-                              Try adding console.log() statements in your app code
+                          <div className={`text-center ${isMobile ? 'py-1' : 'py-2'}`}>
+                            <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
+                              {isMobile ? 'Browser logs...' : 'Browser console logs...'}
                             </p>
                           </div>
                         ) : (
