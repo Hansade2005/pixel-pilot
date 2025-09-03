@@ -97,6 +97,106 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
     return () => window.removeEventListener('message', handleIframeMessage)
   }, [])
 
+  // Add a listener for console interceptor injection requests
+  useEffect(() => {
+    const handleInterceptorRequest = (event: MessageEvent) => {
+      const iframe = document.querySelector('#preview-iframe') as HTMLIFrameElement
+      if (iframe && event.source === iframe.contentWindow && event.data.type === 'inject-console-interceptor') {
+        try {
+          // The iframe is requesting the console interceptor script
+          iframe.contentWindow?.postMessage({
+            type: 'console-interceptor-script',
+            script: `
+              (function() {
+                const originalConsole = {
+                  log: console.log,
+                  error: console.error,
+                  warn: console.warn,
+                  info: console.info
+                };
+
+                // Intercept console methods
+                console.log = function(...args) {
+                  originalConsole.log.apply(console, args);
+                  window.parent.postMessage({
+                    type: 'console',
+                    level: 'log',
+                    message: args.map(arg => 
+                      typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+                    ).join(' ')
+                  }, '*');
+                };
+
+                console.error = function(...args) {
+                  originalConsole.error.apply(console, args);
+                  window.parent.postMessage({
+                    type: 'console',
+                    level: 'error',
+                    message: args.map(arg => 
+                      typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+                    ).join(' ')
+                  }, '*');
+                };
+
+                console.warn = function(...args) {
+                  originalConsole.warn.apply(console, args);
+                  window.parent.postMessage({
+                    type: 'console',
+                    level: 'warn',
+                    message: args.map(arg => 
+                      typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+                    ).join(' ')
+                  }, '*');
+                };
+
+                console.info = function(...args) {
+                  originalConsole.info.apply(console, args);
+                  window.parent.postMessage({
+                    type: 'console',
+                    level: 'info',
+                    message: args.map(arg => 
+                      typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+                    ).join(' ')
+                  }, '*');
+                };
+
+                // Intercept unhandled errors
+                window.addEventListener('error', function(event) {
+                  window.parent.postMessage({
+                    type: 'console',
+                    level: 'error',
+                    message: 'Unhandled Error: ' + event.message + ' at ' + event.filename + ':' + event.lineno
+                  }, '*');
+                });
+
+                // Intercept unhandled promise rejections
+                window.addEventListener('unhandledrejection', function(event) {
+                  window.parent.postMessage({
+                    type: 'console',
+                    level: 'error',
+                    message: 'Unhandled Promise Rejection: ' + event.reason
+                  }, '*');
+                });
+
+                // Send initial message to confirm interceptor is loaded
+                window.parent.postMessage({
+                  type: 'console',
+                  level: 'info',
+                  message: 'Console interceptor loaded'
+                }, '*');
+              })();
+            `
+          }, '*')
+        } catch (error) {
+          console.warn('Failed to send console interceptor script:', error)
+        }
+      }
+    }
+
+    window.addEventListener('message', handleInterceptorRequest)
+    return () => window.removeEventListener('message', handleInterceptorRequest)
+  }, [])
+
   // Set up keyboard shortcuts for console tabs
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -119,95 +219,125 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
   const injectConsoleInterceptor = (iframe: HTMLIFrameElement) => {
     iframe.addEventListener('load', () => {
       try {
-        const script = `
-          (function() {
-            const originalConsole = {
-              log: console.log,
-              error: console.error,
-              warn: console.warn,
-              info: console.info
-            };
+        // Wait a bit for the iframe to fully load
+        setTimeout(() => {
+          try {
+            const script = `
+              (function() {
+                const originalConsole = {
+                  log: console.log,
+                  error: console.error,
+                  warn: console.warn,
+                  info: console.info
+                };
 
-            // Intercept console methods
-            console.log = function(...args) {
-              originalConsole.log.apply(console, args);
-              window.parent.postMessage({
-                type: 'console',
-                level: 'log',
-                message: args.map(arg => 
-                  typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
-                ).join(' ')
-              }, '*');
-            };
+                // Intercept console methods
+                console.log = function(...args) {
+                  originalConsole.log.apply(console, args);
+                  window.parent.postMessage({
+                    type: 'console',
+                    level: 'log',
+                    message: args.map(arg => 
+                      typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+                    ).join(' ')
+                  }, '*');
+                };
 
-            console.error = function(...args) {
-              originalConsole.error.apply(console, args);
-              window.parent.postMessage({
-                type: 'console',
-                level: 'error',
-                message: args.map(arg => 
-                  typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
-                ).join(' ')
-              }, '*');
-            };
+                console.error = function(...args) {
+                  originalConsole.error.apply(console, args);
+                  window.parent.postMessage({
+                    type: 'console',
+                    level: 'error',
+                    message: args.map(arg => 
+                      typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+                    ).join(' ')
+                  }, '*');
+                };
 
-            console.warn = function(...args) {
-              originalConsole.warn.apply(console, args);
-              window.parent.postMessage({
-                type: 'console',
-                level: 'warn',
-                message: args.map(arg => 
-                  typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
-                ).join(' ')
-              }, '*');
-            };
+                console.warn = function(...args) {
+                  originalConsole.warn.apply(console, args);
+                  window.parent.postMessage({
+                    type: 'console',
+                    level: 'warn',
+                    message: args.map(arg => 
+                      typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+                    ).join(' ')
+                  }, '*');
+                };
 
-            console.info = function(...args) {
-              originalConsole.info.apply(console, args);
-              window.parent.postMessage({
-                type: 'console',
-                level: 'info',
-                message: args.map(arg => 
-                  typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
-                ).join(' ')
-              }, '*');
-            };
+                console.info = function(...args) {
+                  originalConsole.info.apply(console, args);
+                  window.parent.postMessage({
+                    type: 'console',
+                    level: 'info',
+                    message: args.map(arg => 
+                      typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+                    ).join(' ')
+                  }, '*');
+                };
 
-            // Intercept unhandled errors
-            window.addEventListener('error', function(event) {
-              window.parent.postMessage({
-                type: 'console',
-                level: 'error',
-                message: 'Unhandled Error: ' + event.message + ' at ' + event.filename + ':' + event.lineno
-              }, '*');
-            });
+                // Intercept unhandled errors
+                window.addEventListener('error', function(event) {
+                  window.parent.postMessage({
+                    type: 'console',
+                    level: 'error',
+                    message: 'Unhandled Error: ' + event.message + ' at ' + event.filename + ':' + event.lineno
+                  }, '*');
+                });
 
-            // Intercept unhandled promise rejections
-            window.addEventListener('unhandledrejection', function(event) {
-              window.parent.postMessage({
-                type: 'console',
-                level: 'error',
-                message: 'Unhandled Promise Rejection: ' + event.reason
-              }, '*');
-            });
+                // Intercept unhandled promise rejections
+                window.addEventListener('unhandledrejection', function(event) {
+                  window.parent.postMessage({
+                    type: 'console',
+                    level: 'error',
+                    message: 'Unhandled Promise Rejection: ' + event.reason
+                  }, '*');
+                });
 
-            // Send initial message to confirm interceptor is loaded
-            window.parent.postMessage({
-              type: 'console',
-              level: 'info',
-              message: 'Console interceptor loaded'
-            }, '*');
-          })();
-        `;
-        
-        // Use a safer method to inject the script
-        const scriptElement = iframe.contentDocument?.createElement('script')
-        if (scriptElement) {
-          scriptElement.textContent = script
-          iframe.contentDocument?.head?.appendChild(scriptElement)
-        }
+                // Send initial message to confirm interceptor is loaded
+                window.parent.postMessage({
+                  type: 'console',
+                  level: 'info',
+                  message: 'Console interceptor loaded'
+                }, '*');
+              })();
+            `;
+            
+            // Try multiple methods to inject the script
+            try {
+              // Method 1: Direct script injection
+              const scriptElement = iframe.contentDocument?.createElement('script')
+              if (scriptElement && iframe.contentDocument?.head) {
+                scriptElement.textContent = script
+                iframe.contentDocument.head.appendChild(scriptElement)
+                console.log('Console interceptor injected via script element')
+              } else {
+                throw new Error('Cannot access iframe contentDocument')
+              }
+            } catch (scriptError) {
+              console.warn('Script element injection failed, trying eval method:', scriptError)
+              
+              // Method 2: Try eval (may be blocked by sandbox)
+              try {
+                (iframe.contentWindow as any)?.eval(script)
+                console.log('Console interceptor injected via eval')
+              } catch (evalError) {
+                console.warn('Eval injection failed, trying postMessage method:', evalError)
+                
+                // Method 3: PostMessage to iframe (requires iframe to listen)
+                iframe.contentWindow?.postMessage({
+                  type: 'inject-console-interceptor',
+                  script: script
+                }, '*')
+                console.log('Console interceptor sent via postMessage')
+              }
+            }
+          } catch (error) {
+            console.warn('Failed to inject console interceptor:', error);
+          }
+        }, 1000) // Wait 1 second for iframe to fully load
       } catch (error) {
-        console.warn('Failed to inject console interceptor:', error);
+        console.warn('Failed to set up console interceptor:', error);
       }
     });
   };
@@ -289,7 +419,10 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
         try {
           while (true) {
             const { done, value } = await reader.read()
-            if (done) break
+            if (done) {
+              console.log('Stream ended')
+              break
+            }
 
             const chunk = decoder.decode(value, { stream: true })
             
@@ -324,6 +457,7 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
                       addConsoleOutput("✅ Server ready")
                       // Auto-open console when server is ready
                       setIsConsoleOpen(true)
+                      // DON'T break here - keep the stream open for continuous logs
                     }
                   } catch (e) {
                     // Ignore parsing errors for non-JSON lines
