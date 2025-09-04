@@ -3066,11 +3066,130 @@ export function ChatPanel({
                       <button
                         className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-200 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
                         title="Retry message"
-                        onClick={() => {
-                          // Set the message content as the input and enable edit mode
-                          setInputMessage(msg.content);
-                          setIsEditingRevertedMessage(true);
-                          setRevertMessageId(msg.id);
+                        onClick={async () => {
+                          // Retry the message by sending it again
+                          if (!project || isLoading) return;
+                          
+                          const messageContent = msg.content;
+                          
+                          const userMessage: Message = {
+                            id: Date.now().toString(),
+                            role: "user",
+                            content: messageContent,
+                            createdAt: new Date().toISOString(),
+                          }
+
+                          setMessages(prev => [...prev, userMessage])
+                          setIsLoading(true)
+
+                          // Create abort controller for this request
+                          const controller = new AbortController()
+                          setAbortController(controller)
+
+                          // Save user message to IndexedDB
+                          await saveMessageToIndexedDB(userMessage)
+                          
+                          // Create checkpoint for this message
+                          if (project) {
+                            try {
+                              await new Promise(resolve => setTimeout(resolve, 50))
+                              await createCheckpoint(project.id, userMessage.id)
+                              console.log(`[Checkpoint] Created checkpoint for retry message ${userMessage.id}`)
+                            } catch (error) {
+                              console.error('[Checkpoint] Error creating checkpoint for retry:', error)
+                            }
+                          }
+
+                          try {
+                            // Fetch project files and chat history from IndexedDB
+                            const { storageManager } = await import('@/lib/storage-manager')
+                            await storageManager.init()
+                            const files = await storageManager.getFiles(project.id)
+
+                            const endpoint = '/api/chat'
+                            const body = {
+                              messages: [...messages, userMessage].map(({ id, createdAt, ...msg }) => msg),
+                              projectId: project.id,
+                              useTools: true,
+                              selectedModel,
+                              aiMode,
+                              files: files || []
+                            }
+
+                            const response = await fetch(endpoint, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify(body),
+                              signal: controller.signal
+                            })
+
+                            if (!response.ok) {
+                              throw new Error(`HTTP error! status: ${response.status}`)
+                            }
+
+                            const reader = response.body?.getReader()
+                            if (!reader) {
+                              throw new Error('No response body')
+                            }
+
+                            let assistantMessage: Message = {
+                              id: (Date.now() + 1).toString(),
+                              role: "assistant",
+                              content: "",
+                              createdAt: new Date().toISOString(),
+                            }
+
+                            setMessages(prev => [...prev, assistantMessage])
+
+                            const decoder = new TextDecoder()
+                            let buffer = ''
+
+                            while (true) {
+                              const { done, value } = await reader.read()
+                              if (done) break
+
+                              buffer += decoder.decode(value, { stream: true })
+                              const lines = buffer.split('\n')
+                              buffer = lines.pop() || ''
+
+                              for (const line of lines) {
+                                if (line.startsWith('data: ')) {
+                                  try {
+                                    const data = JSON.parse(line.slice(6))
+                                    
+                                    if (data.type === 'content') {
+                                      assistantMessage.content += data.content
+                                      setMessages(prev => prev.map(msg => 
+                                        msg.id === assistantMessage.id ? { ...assistantMessage } : msg
+                                      ))
+                                    }
+                                  } catch (e) {
+                                    // Ignore parsing errors
+                                  }
+                                }
+                              }
+                            }
+
+                            // Save final assistant message to IndexedDB
+                            await saveMessageToIndexedDB(assistantMessage)
+
+                          } catch (error) {
+                            console.error('Error retrying message:', error)
+                            
+                            if (error instanceof Error && error.name === 'AbortError') {
+                              console.log('Retry request was aborted')
+                              return
+                            }
+                            
+                            toast({
+                              title: "Error",
+                              description: `Failed to retry message: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                              variant: "destructive",
+                            })
+                          } finally {
+                            setIsLoading(false)
+                            setAbortController(null)
+                          }
                         }}
                       >
                         <ArrowUp className="w-3.5 h-3.5" />
