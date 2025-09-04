@@ -610,7 +610,7 @@ export function Sidebar({
 
       {/* Delete Project Confirmation Dialog */}
       <AlertDialog open={!!deleteProjectId} onOpenChange={() => setDeleteProjectId(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className={isMobile ? 'z-[80]' : ''}>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Project</AlertDialogTitle>
             <AlertDialogDescription>
@@ -638,7 +638,7 @@ export function Sidebar({
           onToggleCollapse()
         }
       }}>
-        <DialogContent>
+        <DialogContent className={isMobile ? 'z-[80]' : ''}>
           <DialogHeader>
             <DialogTitle>Rename Project</DialogTitle>
             <DialogDescription>
@@ -675,7 +675,7 @@ export function Sidebar({
           onToggleCollapse()
         }
       }}>
-        <DialogContent>
+        <DialogContent className={isMobile ? 'z-[80]' : ''}>
           <DialogHeader>
             <DialogTitle>Clone Project</DialogTitle>
             <DialogDescription>
