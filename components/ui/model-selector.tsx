@@ -31,10 +31,17 @@ export function ModelSelector({
     return acc
   }, {} as Record<string, ChatModel[]>)
 
-  // Function to truncate text to 4 characters
-  const truncateToFourChars = (text: string | undefined) => {
+  // Function to truncate text - 4 chars for auto, 3 chars for others
+  const truncateModelName = (text: string | undefined) => {
     if (!text) return '';
-    return text.length > 4 ? text.substring(0, 4) + '...' : text;
+    
+    // Check if it's "auto" (case insensitive)
+    if (text.toLowerCase() === 'auto') {
+      return text.length > 4 ? text.substring(0, 4) + '...' : text;
+    }
+    
+    // For all other models, truncate to 3 characters
+    return text.length > 3 ? text.substring(0, 3) + '...' : text;
   };
 
   if (compact) {
@@ -45,7 +52,7 @@ export function ModelSelector({
           <SelectTrigger className="h-6 px-2 min-w-[56px] border-0 bg-transparent text-xs shadow-none focus:ring-0 p-0">
             <div className="flex items-center justify-center">
               <SelectValue>
-                <span className="font-medium text-sm leading-none">{truncateToFourChars(currentModel?.name || selectedModel)}</span>
+                <span className="font-medium text-sm leading-none">{truncateModelName(currentModel?.name || selectedModel)}</span>
               </SelectValue>
             </div>
           </SelectTrigger>
@@ -85,7 +92,7 @@ export function ModelSelector({
         <SelectTrigger className="w-full">
           <div className="flex items-center gap-2">
             <SelectValue>
-              <span className="font-medium">{truncateToFourChars(currentModel?.name || selectedModel)}</span>
+              <span className="font-medium">{truncateModelName(currentModel?.name || selectedModel)}</span>
             </SelectValue>
           </div>
         </SelectTrigger>
