@@ -1303,22 +1303,28 @@ export default function TodoApp() {
                     </p>
                   </div>
               ) : preview.url ? (
-                <div className={`w-full h-full flex items-center justify-center ${
-                  previewViewMode === 'mobile' ? 'bg-gray-100 dark:bg-gray-800' : ''
-                }`}>
-                  <div className={`${
-                    previewViewMode === 'mobile' 
-                      ? 'w-80 h-[600px] border-8 border-gray-300 dark:border-gray-600 rounded-[2rem] shadow-2xl bg-white overflow-hidden' 
-                      : 'w-full h-full'
-                  }`}>
+                <div className="w-full h-full relative">
+                  {previewViewMode === 'mobile' ? (
+                    <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+                      <div className="w-80 h-[600px] border-8 border-gray-300 dark:border-gray-600 rounded-[2rem] shadow-2xl bg-white overflow-hidden">
+                        <iframe
+                          id="preview-iframe"
+                          src={preview.url}
+                          className="w-full h-full rounded-[1.5rem] border-none"
+                          sandbox="allow-scripts allow-same-origin allow-forms allow-downloads allow-popups"
+                          ref={(iframe) => {
+                            if (iframe) {
+                              injectConsoleInterceptor(iframe)
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
                     <iframe
                       id="preview-iframe"
                       src={preview.url}
-                      className={`border-none ${
-                        previewViewMode === 'mobile' 
-                          ? 'w-full h-full rounded-[1.5rem]' 
-                          : 'w-full h-full'
-                      }`}
+                      className="w-full h-full border-none"
                       sandbox="allow-scripts allow-same-origin allow-forms allow-downloads allow-popups"
                       ref={(iframe) => {
                         if (iframe) {
@@ -1326,7 +1332,7 @@ export default function TodoApp() {
                         }
                       }}
                     />
-                  </div>
+                  )}
                 </div>
               ) : (
                 <div className="h-full flex items-center justify-center">
