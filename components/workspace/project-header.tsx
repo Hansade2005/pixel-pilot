@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Play, GitBranch, Share, Settings, Plus } from "lucide-react"
+import { Play, GitBranch, Share, Settings, Plus, Rocket } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
 import React, { useState } from 'react'
 import type { Workspace as Project } from "@/lib/storage-manager"
@@ -221,20 +221,21 @@ export function ProjectHeader({
         
         <Button variant="outline" size="sm" onClick={handleShareClick}
           disabled={!project}
+          title={copied ? 'Copied!' : 'Share'}
         >
-          <Share className="h-4 w-4 mr-2" />
-          {copied ? 'Copied!' : 'Share'}
+          <Share className="h-4 w-4" />
         </Button>
         
         <Button variant="outline" size="sm" onClick={onSettings}
           disabled={!project}
+          title="Settings"
         >
-          <Settings className="h-4 w-4 mr-2" />
-          Settings
+          <Settings className="h-4 w-4" />
         </Button>
-        <Button size="sm" onClick={onDeploy} disabled={!project}>
-          <Play className="h-4 w-4 mr-2" />
-          Deploy
+        <Button size="sm" onClick={onDeploy} disabled={!project}
+          title="Deploy"
+        >
+          <Rocket className="h-4 w-4" />
         </Button>
       </div>
     </div>
