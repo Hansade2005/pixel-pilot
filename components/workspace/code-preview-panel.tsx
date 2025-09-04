@@ -1254,34 +1254,16 @@ export default function TodoApp() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Tabs */}
-      <div className="border-b border-border bg-card">
-        <div className="flex items-center justify-between px-4 py-2">
-          <div className="flex space-x-1">
-            {isMobile && (
-              <Button
-                variant={activeTab === "preview" ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => onTabChange("preview")}
-              >
-                <Eye className="h-4 w-4 mr-2" />
-                Preview
-              </Button>
-            )}
+      {/* Tabs - Hidden on mobile */}
+      {!isMobile && (
+        <div className="border-b border-border bg-card">
+          <div className="flex items-center justify-between px-4 py-2">
+            <div className="flex space-x-1">
+              {/* Desktop tabs would go here if needed */}
+            </div>
           </div>
-          {isMobile && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={exportProject}
-              disabled={isExporting}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              {isExporting ? 'Exporting...' : 'Export'}
-            </Button>
-          )}
         </div>
-      </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 min-h-0">
@@ -1298,7 +1280,7 @@ export default function TodoApp() {
         ) : (
           <div className="h-full bg-background flex flex-col">
             {/* Preview Content */}
-            <div className="flex-1 min-h-0">
+            <div className={`flex-1 min-h-0 ${isMobile && isConsoleOpen ? 'pb-48' : ''}`}>
               {preview.isLoading ? (
                 <div className="text-center">
                     {/* Interactive Preview Loader */}
@@ -1366,7 +1348,7 @@ export default function TodoApp() {
             </div>
 
             {/* Console Output Accordion */}
-            <div className="border-t border-border">
+            <div className={`border-t border-border ${isMobile ? 'fixed bottom-12 left-0 right-0 z-40 bg-background shadow-lg' : ''}`}>
               <Accordion 
                 type="single" 
                 collapsible 
