@@ -15,6 +15,7 @@ interface CodePreviewPanelProps {
   project: Project | null
   activeTab: "code" | "preview"
   onTabChange: (tab: "code" | "preview") => void
+  previewViewMode?: 'desktop' | 'mobile'
 }
 
 export interface CodePreviewPanelRef {
@@ -31,7 +32,7 @@ interface PreviewState {
   processId: string | null
 }
 
-export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanelProps>(({ project, activeTab, onTabChange }, ref) => {
+export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanelProps>(({ project, activeTab, onTabChange, previewViewMode = 'desktop' }, ref) => {
   const { toast } = useToast()
   const isMobile = useIsMobile()
   const [preview, setPreview] = useState<PreviewState>({
@@ -1320,17 +1321,31 @@ export default function TodoApp() {
                     </p>
                   </div>
               ) : preview.url ? (
-                <iframe
-                  id="preview-iframe"
-                  src={preview.url}
-                  className="w-full h-full border-none"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-downloads allow-popups"
-                  ref={(iframe) => {
-                    if (iframe) {
-                      injectConsoleInterceptor(iframe)
-                    }
-                  }}
-                />
+                <div className={`w-full h-full flex items-center justify-center ${
+                  previewViewMode === 'mobile' ? 'bg-gray-100 dark:bg-gray-800' : ''
+                }`}>
+                  <div className={`${
+                    previewViewMode === 'mobile' 
+                      ? 'w-80 h-[600px] border-8 border-gray-300 dark:border-gray-600 rounded-[2rem] shadow-2xl bg-white overflow-hidden' 
+                      : 'w-full h-full'
+                  }`}>
+                    <iframe
+                      id="preview-iframe"
+                      src={preview.url}
+                      className={`border-none ${
+                        previewViewMode === 'mobile' 
+                          ? 'w-full h-full rounded-[1.5rem]' 
+                          : 'w-full h-full'
+                      }`}
+                      sandbox="allow-scripts allow-same-origin allow-forms allow-downloads allow-popups"
+                      ref={(iframe) => {
+                        if (iframe) {
+                          injectConsoleInterceptor(iframe)
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
               ) : (
                 <div className="h-full flex items-center justify-center">
               <div className="text-center">

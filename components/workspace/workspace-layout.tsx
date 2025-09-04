@@ -15,7 +15,7 @@ import { CodePreviewPanel } from "./code-preview-panel"
 import { ProjectHeader } from "./project-header"
 import { FileExplorer } from "./file-explorer"
 import { CodeEditor } from "./code-editor"
-import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square } from "lucide-react"
+import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -85,6 +85,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     isLoading: false,
     processId: null as string | null,
   })
+  
+  // Preview view mode state
+  const [previewViewMode, setPreviewViewMode] = useState<'desktop' | 'mobile'>('desktop')
 
   // Listen for preview state changes from CodePreviewPanel
   useEffect(() => {
@@ -548,6 +551,28 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                         {/* Preview Controls - Only show in Preview tab */}
                         {activeTab === "preview" && (
                           <div className="flex items-center space-x-2">
+                            {/* Mobile/Desktop View Toggle */}
+                            <div className="flex items-center border border-border rounded-lg p-1 bg-muted/50">
+                              <Button
+                                variant={previewViewMode === 'desktop' ? 'default' : 'ghost'}
+                                size="sm"
+                                onClick={() => setPreviewViewMode('desktop')}
+                                className="h-6 w-6 p-0"
+                                title="Desktop View"
+                              >
+                                <Monitor className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant={previewViewMode === 'mobile' ? 'default' : 'ghost'}
+                                size="sm"
+                                onClick={() => setPreviewViewMode('mobile')}
+                                className="h-6 w-6 p-0"
+                                title="Mobile View"
+                              >
+                                <Smartphone className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            
                             <div className="relative">
                               <Input
                                 placeholder="Preview URL..."
@@ -623,7 +648,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                         }}
                       />
                     ) : (
-                      <CodePreviewPanel ref={codePreviewRef} project={selectedProject} activeTab={activeTab} onTabChange={setActiveTab} />
+                      <CodePreviewPanel ref={codePreviewRef} project={selectedProject} activeTab={activeTab} onTabChange={setActiveTab} previewViewMode={previewViewMode} />
                     )}
                   </div>
                 </ResizablePanel>
@@ -895,6 +920,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     project={selectedProject}
                     activeTab="preview"
                     onTabChange={() => {}}
+                    previewViewMode={previewViewMode}
                   />
                 </div>
               </TabsContent>
