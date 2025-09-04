@@ -31,16 +31,9 @@ export function ModelSelector({
     return acc
   }, {} as Record<string, ChatModel[]>)
 
-  // Function to truncate text - 4 chars for auto, 3 chars for others
+  // Function to truncate text to 3 characters for all models
   const truncateModelName = (text: string | undefined) => {
     if (!text) return '';
-    
-    // Check if it's "auto" (case insensitive)
-    if (text.toLowerCase() === 'auto') {
-      return text.length > 4 ? text.substring(0, 4) + '...' : text;
-    }
-    
-    // For all other models, truncate to 3 characters
     return text.length > 3 ? text.substring(0, 3) + '...' : text;
   };
 
