@@ -5,7 +5,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import type { User } from "@supabase/supabase-js"
 import type { Workspace, File } from "@/lib/storage-manager"
@@ -15,7 +15,7 @@ import { CodePreviewPanel } from "./code-preview-panel"
 import { ProjectHeader } from "./project-header"
 import { FileExplorer } from "./file-explorer"
 import { CodeEditor } from "./code-editor"
-import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus } from "lucide-react"
+import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -65,6 +65,70 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [newProjectName, setNewProjectName] = useState("")
   const [newProjectDescription, setNewProjectDescription] = useState("")
   const [isCreating, setIsCreating] = useState(false)
+  
+  // Preview-related state
+  const [customUrl, setCustomUrl] = useState("")
+  const [preview, setPreview] = useState({
+    sandboxId: null as string | null,
+    url: null as string | null,
+    isLoading: false,
+    processId: null as string | null,
+  })
+  
+  // Refs to access CodePreviewPanel methods
+  const codePreviewRef = useRef<import('./code-preview-panel').CodePreviewPanelRef | null>(null)
+  
+  // Sync preview state from CodePreviewPanel
+  const [syncedPreview, setSyncedPreview] = useState({
+    sandboxId: null as string | null,
+    url: null as string | null,
+    isLoading: false,
+    processId: null as string | null,
+  })
+
+  // Listen for preview state changes from CodePreviewPanel
+  useEffect(() => {
+    const handlePreviewStateChange = (event: CustomEvent) => {
+      const { preview } = event.detail
+      setSyncedPreview(preview)
+    }
+    
+    const handlePreviewUrlChange = (event: CustomEvent) => {
+      const { url } = event.detail
+      setCustomUrl(url)
+    }
+    
+    const handlePreviewReady = (event: CustomEvent) => {
+      const { preview } = event.detail
+      setSyncedPreview(preview)
+      setCustomUrl(preview.url || '')
+    }
+    
+    const handlePreviewStarting = (event: CustomEvent) => {
+      const { preview } = event.detail
+      setSyncedPreview(preview)
+    }
+    
+    const handlePreviewStopped = (event: CustomEvent) => {
+      const { preview } = event.detail
+      setSyncedPreview(preview)
+      setCustomUrl('')
+    }
+    
+    window.addEventListener('preview-state-changed', handlePreviewStateChange as EventListener)
+    window.addEventListener('preview-url-changed', handlePreviewUrlChange as EventListener)
+    window.addEventListener('preview-ready', handlePreviewReady as EventListener)
+    window.addEventListener('preview-starting', handlePreviewStarting as EventListener)
+    window.addEventListener('preview-stopped', handlePreviewStopped as EventListener)
+    
+    return () => {
+      window.removeEventListener('preview-state-changed', handlePreviewStateChange as EventListener)
+      window.removeEventListener('preview-url-changed', handlePreviewUrlChange as EventListener)
+      window.removeEventListener('preview-ready', handlePreviewReady as EventListener)
+      window.removeEventListener('preview-starting', handlePreviewStarting as EventListener)
+      window.removeEventListener('preview-stopped', handlePreviewStopped as EventListener)
+    }
+  }, [])
 
   // Load projects from IndexedDB on client-side
   useEffect(() => {
@@ -301,6 +365,32 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     }
   }
 
+  // Preview control functions
+  const refreshPreview = () => {
+    const currentPreview = codePreviewRef.current?.preview
+    if (currentPreview?.url) {
+      window.open(currentPreview.url, '_blank')
+    }
+  }
+
+  const openStackBlitz = () => {
+    if (selectedProject && codePreviewRef.current) {
+      codePreviewRef.current.openStackBlitz()
+    }
+  }
+
+  const createPreview = () => {
+    if (codePreviewRef.current) {
+      codePreviewRef.current.createPreview()
+    }
+  }
+
+  const cleanupSandbox = () => {
+    if (codePreviewRef.current) {
+      codePreviewRef.current.cleanupSandbox()
+    }
+  }
+
   return (
     <div className="h-screen flex bg-background relative">
       {/* Desktop Layout */}
@@ -433,23 +523,90 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 {/* Right Panel - Code Editor / Preview (Resizable) */}
                 <ResizablePanel defaultSize={55} minSize={30}>
                   <div className="h-full flex flex-col">
-                    {/* Tab Switcher - Moved to the top */}
+                    {/* Tab Switcher with Preview Controls */}
                     <div className="border-b border-border bg-card p-2 flex-shrink-0">
-                      <div className="flex space-x-1">
-                        <Button
-                          variant={activeTab === "code" ? "secondary" : "ghost"}
-                          size="sm"
-                          onClick={() => setActiveTab("code")}
-                        >
-                          Code
-                        </Button>
-                        <Button
-                          variant={activeTab === "preview" ? "secondary" : "ghost"}
-                          size="sm"
-                          onClick={() => setActiveTab("preview")}
-                        >
-                          Preview
-                        </Button>
+                      <div className="flex items-center justify-between">
+                        <div className="flex space-x-1">
+                          <Button
+                            variant={activeTab === "code" ? "secondary" : "ghost"}
+                            size="sm"
+                            onClick={() => setActiveTab("code")}
+                            title="Code Editor"
+                          >
+                            <Code className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant={activeTab === "preview" ? "secondary" : "ghost"}
+                            size="sm"
+                            onClick={() => setActiveTab("preview")}
+                            title="Live Preview"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        
+                        {/* Preview Controls - Only show in Preview tab */}
+                        {activeTab === "preview" && (
+                          <div className="flex items-center space-x-2">
+                            <div className="relative">
+                              <Input
+                                placeholder="Preview URL..."
+                                value={syncedPreview.url || customUrl}
+                                onChange={(e) => setCustomUrl(e.target.value)}
+                                className="pl-10 pr-10 rounded-full w-64"
+                                disabled={syncedPreview.isLoading}
+                              />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={refreshPreview}
+                                disabled={!syncedPreview.url}
+                                title="Refresh preview"
+                                className="absolute left-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 hover:bg-muted"
+                              >
+                                <RotateCcw className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => window.open(syncedPreview.url || customUrl, '_blank')}
+                                disabled={!syncedPreview.url && !customUrl}
+                                title="Open URL in new tab"
+                                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 hover:bg-muted"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={openStackBlitz}
+                              disabled={!selectedProject}
+                              title="Open in StackBlitz IDE"
+                            >
+                              <Code className="h-4 w-4" />
+                            </Button>
+                            {!syncedPreview.sandboxId ? (
+                              <Button
+                                size="sm"
+                                onClick={createPreview}
+                                disabled={!selectedProject || syncedPreview.isLoading}
+                                title={syncedPreview.isLoading ? 'Starting preview...' : 'Start preview'}
+                              >
+                                <Play className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={cleanupSandbox}
+                                title="Stop preview"
+                              >
+                                <Square className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -466,7 +623,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                         }}
                       />
                     ) : (
-                      <CodePreviewPanel project={selectedProject} activeTab={activeTab} onTabChange={setActiveTab} />
+                      <CodePreviewPanel ref={codePreviewRef} project={selectedProject} activeTab={activeTab} onTabChange={setActiveTab} />
                     )}
                   </div>
                 </ResizablePanel>
@@ -734,6 +891,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               <TabsContent value="preview" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
                 <div className="h-full overflow-hidden">
                   <CodePreviewPanel
+                    ref={codePreviewRef}
                     project={selectedProject}
                     activeTab="preview"
                     onTabChange={() => {}}

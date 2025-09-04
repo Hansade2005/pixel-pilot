@@ -1,19 +1,27 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
-import { Code, Eye, FileText, Download, ExternalLink, RotateCcw, Play, Square, Terminal } from "lucide-react"
+import { Code, Eye, FileText, Download, ExternalLink, RotateCcw, Play, Square, Terminal, Package, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { Workspace as Project } from "@/lib/storage-manager"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 
 interface CodePreviewPanelProps {
   project: Project | null
   activeTab: "code" | "preview"
   onTabChange: (tab: "code" | "preview") => void
+}
+
+export interface CodePreviewPanelRef {
+  createPreview: () => void
+  cleanupSandbox: () => void
+  openStackBlitz: () => void
+  preview: PreviewState
 }
 
 interface PreviewState {
@@ -23,7 +31,7 @@ interface PreviewState {
   processId: string | null
 }
 
-export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePreviewPanelProps) {
+export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanelProps>(({ project, activeTab, onTabChange }, ref) => {
   const { toast } = useToast()
   const isMobile = useIsMobile()
   const [preview, setPreview] = useState<PreviewState>({
@@ -39,47 +47,77 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
   const [isConsoleOpen, setIsConsoleOpen] = useState(false)
   const [streamReader, setStreamReader] = useState<ReadableStreamDefaultReader<Uint8Array> | null>(null)
   const consoleRef = useRef<HTMLDivElement>(null)
-  const [activeConsoleTab, setActiveConsoleTab] = useState<'terminal' | 'browser'>('terminal')
+  const [activeConsoleTab, setActiveConsoleTab] = useState<'console'>('console')
+  const [consoleHeight, setConsoleHeight] = useState(300) // Default height in pixels
+  const [isResizing, setIsResizing] = useState(false)
+  const resizeRef = useRef<HTMLDivElement>(null)
   const [browserLogs, setBrowserLogs] = useState<string[]>([])
   const browserLogsRef = useRef<HTMLDivElement>(null)
+  const [isStackBlitzOpen, setIsStackBlitzOpen] = useState(false)
+  const [backgroundProcess, setBackgroundProcess] = useState<{
+    pid: number | null
+    command: string | null
+    isRunning: boolean
+    logInterval?: NodeJS.Timeout
+  }>({ pid: null, command: null, isRunning: false })
+  const [processLogs, setProcessLogs] = useState<string[]>([])
+  const processLogsRef = useRef<HTMLDivElement>(null)
+  const eventSourceRef = useRef<EventSource | null>(null)
 
-  // Helper function to add timestamped console output
-  const addConsoleOutput = (message: string) => {
-    const timestamp = new Date().toLocaleTimeString()
-    setConsoleOutput(prev => [...prev, `[${timestamp}] ${message}`])
-  }
+  // Dispatch preview state changes to parent component
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('preview-state-changed', { 
+        detail: { preview } 
+      }))
+    }
+  }, [preview])
 
-  // Helper function to add timestamped browser logs
-  const addBrowserLog = (message: string, type: 'log' | 'error' | 'warn' | 'info' = 'log') => {
+  // Expose methods to parent component
+  useImperativeHandle(ref, () => ({
+    createPreview,
+    cleanupSandbox,
+    openStackBlitz,
+    preview
+  }), [preview])
+
+  // Unified console logging function - combines all log types
+  const addConsoleLog = (message: string, type: 'terminal' | 'browser' | 'process' | 'server' = 'terminal') => {
     const timestamp = new Date().toLocaleTimeString()
     const typeIcon = {
-      log: '📝',
-      error: '❌',
-      warn: '⚠️',
-      info: 'ℹ️'
+      terminal: '💻',
+      browser: '🌐',
+      process: '⚙️',
+      server: '🚀'
     }[type]
-    setBrowserLogs(prev => [...prev, `[${timestamp}] ${typeIcon} ${message}`])
+    const typeLabel = {
+      terminal: 'TERMINAL',
+      browser: 'BROWSER',
+      process: 'PROCESS',
+      server: 'SERVER'
+    }[type]
+
+    setConsoleOutput(prev => [...prev, `[${timestamp}] ${typeIcon} [${typeLabel}] ${message}`])
   }
 
   useEffect(() => {
     if (preview.url) {
       setCustomUrl(preview.url)
+      // Dispatch URL change event
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('preview-url-changed', { 
+          detail: { url: preview.url } 
+        }))
+      }
     }
   }, [preview.url])
 
   // Auto-scroll console to bottom when new output arrives
   useEffect(() => {
-    if (consoleRef.current && isConsoleOpen && activeConsoleTab === 'terminal') {
+    if (consoleRef.current && isConsoleOpen) {
       consoleRef.current.scrollTop = consoleRef.current.scrollHeight
     }
-  }, [consoleOutput, isConsoleOpen, activeConsoleTab])
-
-  // Auto-scroll browser logs to bottom when new output arrives
-  useEffect(() => {
-    if (browserLogsRef.current && isConsoleOpen && activeConsoleTab === 'browser') {
-      browserLogsRef.current.scrollTop = browserLogsRef.current.scrollHeight
-    }
-  }, [browserLogs, isConsoleOpen, activeConsoleTab])
+  }, [consoleOutput, browserLogs, processLogs, isConsoleOpen])
 
   // Set up iframe message listener for browser logs
   useEffect(() => {
@@ -88,7 +126,7 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
       const iframe = document.querySelector('#preview-iframe') as HTMLIFrameElement
       if (iframe && event.source === iframe.contentWindow) {
         if (event.data.type === 'console') {
-          addBrowserLog(event.data.message, event.data.level)
+          addConsoleLog(event.data.message, 'browser')
         }
       }
     }
@@ -197,17 +235,12 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
     return () => window.removeEventListener('message', handleInterceptorRequest)
   }, [])
 
-  // Set up keyboard shortcuts for console tabs
+  // Set up keyboard shortcuts for console
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey && isConsoleOpen) {
-        if (event.key === '1') {
-          event.preventDefault()
-          setActiveConsoleTab('terminal')
-        } else if (event.key === '2') {
-          event.preventDefault()
-          setActiveConsoleTab('browser')
-        }
+      if (event.ctrlKey && isConsoleOpen && event.key === '1') {
+        event.preventDefault()
+        // Console is already the only tab, no need to change
       }
     }
 
@@ -342,7 +375,7 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
     });
   };
 
-  // Cleanup sandbox and stream on unmount
+  // Cleanup sandbox, stream, background process, log interval, and EventSource on unmount only
   useEffect(() => {
     return () => {
       if (preview.sandboxId) {
@@ -352,16 +385,36 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
       if (streamReader) {
         streamReader.cancel()
       }
+      // Close EventSource if it exists
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close()
+        eventSourceRef.current = null
+      }
+      // Stop background process if running
+      if (backgroundProcess.isRunning && backgroundProcess.pid) {
+        stopBackgroundProcess()
+      }
+      // Clear log interval if it exists
+      if (backgroundProcess.logInterval) {
+        clearInterval(backgroundProcess.logInterval)
+      }
     }
-  }, [preview.sandboxId, streamReader])
+  }, []) // Empty dependency array - only run on unmount
 
   const createPreview = async () => {
     if (!project) return
 
-    setPreview(prev => ({ ...prev, isLoading: true }))
+    const loadingPreview = { ...preview, isLoading: true }
+    setPreview(loadingPreview)
     setCurrentLog("Booting VM...")
     setConsoleOutput([]) // Clear previous console output
-    setBrowserLogs([]) // Clear previous browser logs
+    
+    // Dispatch preview starting event
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('preview-starting', { 
+        detail: { preview: loadingPreview } 
+      }))
+    }
     
     // Close any existing stream
     if (streamReader) {
@@ -379,11 +432,12 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
         throw new Error('No files found in project')
       }
 
-      // Create a streaming request
+      // Create a streaming request with EventSource-like handling
       const response = await fetch('/api/preview', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
+          'Accept': 'text/event-stream', // Request streaming response
         },
         body: JSON.stringify({ 
           projectId: project.id,
@@ -410,7 +464,7 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
         return
       }
 
-      // Handle streaming response
+      // Handle streaming response with EventSource-like message handling
       const reader = response.body?.getReader()
       if (reader) {
         setStreamReader(reader)
@@ -426,38 +480,58 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
 
             const chunk = decoder.decode(value, { stream: true })
             
-            // Handle Server-Sent Events format
+            // Handle Server-Sent Events format - EventSource-like parsing
             if (chunk.includes('data: ')) {
               const lines = chunk.split('\n')
               for (const line of lines) {
                 if (line.startsWith('data: ')) {
                   try {
-                    const data = JSON.parse(line.slice(6))
-                    if (data.log) {
-                      setCurrentLog(data.log)
-                      // Add to console output for the accordion with timestamp
-                      addConsoleOutput(data.log)
+                    const msg = JSON.parse(line.slice(6))
+                    
+                    // EventSource-like message handling (exactly like the example)
+                    if (msg.type === "log") {
+                      setCurrentLog(msg.message)
+                      addConsoleLog(msg.message, 'server')
                     }
-                    if (data.error) {
-                      console.error('Preview error:', data.error)
-                      setCurrentLog(`Error: ${data.error}`)
-                      addConsoleOutput(`ERROR: ${data.error}`)
+
+                    if (msg.type === "error") {
+                      console.error('Preview error:', msg.message)
+                      setCurrentLog(`Error: ${msg.message}`)
+                      addConsoleLog(`[ERR] ${msg.message}`, 'server')
                       setPreview(prev => ({ ...prev, isLoading: false }))
                       break
                     }
-                    if (data.sandboxId && data.url) {
+
+                    if (msg.type === "ready") {
                       // Preview is ready
-                      setPreview({
-                        sandboxId: data.sandboxId,
-                        url: data.url,
+                      const newPreview = {
+                        sandboxId: msg.sandboxId,
+                        url: msg.url,
                         isLoading: false,
-                        processId: data.processId,
-                      })
+                        processId: msg.processId,
+                      }
+                      setPreview(newPreview)
                       setCurrentLog("Server ready")
-                      addConsoleOutput("✅ Server ready")
+                      addConsoleLog("✅ Server ready", 'server')
+
+                      // Dispatch preview ready event
+                      if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('preview-ready', { 
+                          detail: { preview: newPreview } 
+                        }))
+                      }
+
+                      // Start E2B log streaming for runtime logs
+                      startE2BLogStreaming(msg.sandboxId, msg.processId)
+
                       // Auto-open console when server is ready
                       setIsConsoleOpen(true)
                       // DON'T break here - keep the stream open for continuous logs
+                    }
+
+                    if (msg.type === "heartbeat") {
+                      // Just keep the connection alive, no need to log heartbeats
+                      continue
                     }
                   } catch (e) {
                     // Ignore parsing errors for non-JSON lines
@@ -469,7 +543,7 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
         } catch (streamError) {
           console.error('Streaming error:', streamError)
           setCurrentLog("Streaming error occurred")
-          addConsoleOutput("❌ Streaming error occurred")
+          addConsoleLog("❌ Streaming error occurred", 'server')
           setPreview(prev => ({ ...prev, isLoading: false }))
         } finally {
           reader.releaseLock()
@@ -481,7 +555,7 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
       console.error('Error creating preview:', error)
       const errorMessage = error instanceof Error ? error.message : "Could not create preview environment"
       setCurrentLog(`Error: ${errorMessage}`)
-      addConsoleOutput(`❌ Error: ${errorMessage}`)
+      addConsoleLog(`❌ Error: ${errorMessage}`, 'server')
       setPreview(prev => ({ ...prev, isLoading: false }))
       toast({
         title: "Preview Failed",
@@ -510,14 +584,22 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
       console.error('Error cleaning up sandbox:', error)
     }
 
-    setPreview({
+    const stoppedPreview = {
       sandboxId: null,
       url: null,
       isLoading: false,
       processId: null,
-    })
+    }
+    setPreview(stoppedPreview)
     setCurrentLog("Preview stopped")
-    addConsoleOutput("🛑 Preview stopped")
+    addConsoleLog("🛑 Preview stopped", 'server')
+    
+    // Dispatch preview stopped event
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('preview-stopped', { 
+        detail: { preview: stoppedPreview } 
+      }))
+    }
   }
 
   const refreshPreview = () => {
@@ -619,7 +701,471 @@ export function CodePreviewPanel({ project, activeTab, onTabChange }: CodePrevie
 
   const clearAllLogs = () => {
     setConsoleOutput([])
-    setBrowserLogs([])
+  }
+
+  // Console resize handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsResizing(true)
+  }
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isResizing) return
+    
+    const newHeight = window.innerHeight - e.clientY
+    const minHeight = 150
+    const maxHeight = window.innerHeight * 0.8
+    
+    if (newHeight >= minHeight && newHeight <= maxHeight) {
+      setConsoleHeight(newHeight)
+    }
+  }
+
+  const handleMouseUp = () => {
+    setIsResizing(false)
+  }
+
+  // Add global mouse event listeners for resizing
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = 'ns-resize'
+      document.body.style.userSelect = 'none'
+    } else {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [isResizing])
+
+  // Simple EventSource connection function - implements the example pattern
+  const startEventSourceConnection = (projectId: string, files: any[]) => {
+    try {
+      // For now, we'll use the existing fetch-based approach but with EventSource-like handling
+      // The backend already streams properly, we just need to handle it like EventSource
+      addConsoleLog("Starting preview process...", 'server')
+      
+      // The actual streaming is handled in the createPreview function
+      // This function is called after the POST request initiates the streaming
+      
+    } catch (error) {
+      console.error('Error starting EventSource connection:', error)
+      addConsoleLog(`Failed to start streaming: ${error instanceof Error ? error.message : 'Unknown error'}`, 'server')
+    }
+  }
+
+  // E2B streaming function - logs are already streaming through the main SSE connection
+  const startE2BLogStreaming = async (sandboxId: string, processId: string | number) => {
+    try {
+      addConsoleLog(`E2B sandbox ${sandboxId} is ready for log streaming`, 'server')
+
+      // Store process info for cleanup (no polling needed - logs stream via SSE)
+      setBackgroundProcess(prev => ({
+        ...prev,
+        pid: Number(processId),
+        command: 'npm run dev',
+        isRunning: true,
+        // No logInterval needed - logs stream through main connection
+      }))
+
+    } catch (error) {
+      console.error('Error setting up E2B log streaming:', error)
+      addConsoleLog(`Failed to setup log streaming: ${error instanceof Error ? error.message : 'Unknown error'}`, 'server')
+    }
+  }
+
+  // Background process management functions
+  const startBackgroundProcess = async (command: string) => {
+    if (backgroundProcess.isRunning) {
+      addConsoleLog('A process is already running. Stop it first.', 'process')
+      return
+    }
+
+    try {
+      addConsoleLog(`Starting background process: ${command}`, 'process')
+
+      // In a real implementation, this would connect to your sandbox API
+      // For now, we'll simulate the process starting
+      const response = await fetch('/api/background-process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command, background: true }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to start background process')
+      }
+
+      const data = await response.json()
+      const pid = data.pid
+
+      setBackgroundProcess({
+        pid,
+        command,
+        isRunning: true
+      })
+
+      addConsoleLog(`Background process started with PID: ${pid}`, 'process')
+
+      // Connect to the process stream
+      await connectToProcess(pid)
+
+    } catch (error) {
+      console.error('Error starting background process:', error)
+      addConsoleLog(`Failed to start process: ${error instanceof Error ? error.message : 'Unknown error'}`, 'process')
+    }
+  }
+
+  const connectToProcess = async (pid: number) => {
+    try {
+      addConsoleLog(`Connecting to process stream for PID: ${pid}`, 'process')
+
+      // Simulate connecting to process stream
+      // In a real implementation, this would establish a WebSocket or SSE connection
+      const response = await fetch(`/api/process-stream/${pid}`)
+
+      if (!response.ok) {
+        throw new Error('Failed to connect to process stream')
+      }
+
+      const reader = response.body?.getReader()
+      if (reader) {
+        const decoder = new TextDecoder()
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) {
+              addConsoleLog('Process stream ended', 'process')
+              break
+            }
+
+            const chunk = decoder.decode(value, { stream: true })
+
+            // Parse the chunk as JSON (assuming server sends JSON-formatted logs)
+            try {
+              const logData = JSON.parse(chunk)
+              if (logData.stdout) {
+                addConsoleLog(logData.stdout, 'process')
+              }
+              if (logData.stderr) {
+                addConsoleLog(logData.stderr, 'process')
+              }
+            } catch (parseError) {
+              // If not JSON, treat as raw output
+              addConsoleLog(chunk, 'process')
+            }
+          }
+        } catch (streamError) {
+          console.error('Streaming error:', streamError)
+          addConsoleLog('Streaming error occurred', 'process')
+        } finally {
+          reader.releaseLock()
+        }
+      }
+    } catch (error) {
+      console.error('Error connecting to process:', error)
+      addConsoleLog(`Failed to connect to process: ${error instanceof Error ? error.message : 'Unknown error'}`, 'process')
+    }
+  }
+
+  const stopBackgroundProcess = async () => {
+    if (!backgroundProcess.pid || !backgroundProcess.isRunning) {
+      addConsoleLog('No process is currently running', 'server')
+      return
+    }
+
+    try {
+      addConsoleLog(`Stopping process with PID: ${backgroundProcess.pid}`, 'server')
+
+      // Clear the log polling interval
+      if (backgroundProcess.logInterval) {
+        clearInterval(backgroundProcess.logInterval)
+      }
+
+      const response = await fetch(`/api/background-process/${backgroundProcess.pid}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to stop background process')
+      }
+
+      setBackgroundProcess({
+        pid: null,
+        command: null,
+        isRunning: false
+      })
+
+      addConsoleLog('Background process stopped successfully', 'server')
+
+    } catch (error) {
+      console.error('Error stopping background process:', error)
+      addConsoleLog(`Failed to stop process: ${error instanceof Error ? error.message : 'Unknown error'}`, 'server')
+    }
+  }
+
+  const clearProcessLogs = () => {
+    setProcessLogs([])
+  }
+
+
+  const openStackBlitz = async () => {
+    if (!project) return
+
+    try {
+      // Fetch files from IndexedDB client-side
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+      const files = await storageManager.getFiles(project.id)
+      
+      if (!files || files.length === 0) {
+        throw new Error('No files found in project')
+      }
+
+      // Convert files to StackBlitz format
+      const stackBlitzFiles: Record<string, string> = {}
+      
+      files.forEach(file => {
+        // Remove leading slash and normalize path
+        const normalizedPath = file.path.startsWith('/') ? file.path.substring(1) : file.path
+        
+        // Skip certain files that shouldn't be in StackBlitz
+        if (normalizedPath.includes('node_modules') || 
+            normalizedPath.includes('.git') ||
+            normalizedPath.includes('package-lock.json') ||
+            normalizedPath.includes('yarn.lock') ||
+            normalizedPath.includes('pnpm-lock.yaml') ||
+            normalizedPath.includes('.next') ||
+            normalizedPath.includes('dist') ||
+            normalizedPath.includes('build')) {
+          return
+        }
+        
+        stackBlitzFiles[normalizedPath] = file.content
+      })
+
+      // Ensure we have the required files for node template (Vite + TypeScript)
+      if (!stackBlitzFiles['index.html']) {
+        stackBlitzFiles['index.html'] = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${project.name || 'Vite + React + TS'}</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>`
+      }
+
+      if (!stackBlitzFiles['src/main.tsx']) {
+        stackBlitzFiles['src/main.tsx'] = `import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App.tsx'
+import './index.css'
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+)`
+      }
+
+      if (!stackBlitzFiles['src/App.tsx']) {
+        stackBlitzFiles['src/App.tsx'] = `import React from 'react'
+import './App.css'
+
+function App() {
+  return (
+    <div className="App">
+      <header className="App-header">
+        <h1>🚗 ${project.name || 'Your Project'}</h1>
+        <p>App generated by <strong>Pixel Builder</strong></p>
+        <div style={{
+          background: 'rgba(255,255,255,0.1)',
+          padding: '2rem',
+          borderRadius: '10px',
+          margin: '2rem 0'
+        }}>
+          <h2>✅ StackBlitz Preview Working!</h2>
+          <p>Your Vite + TypeScript project is now running in StackBlitz</p>
+          <p><strong>${Object.keys(stackBlitzFiles).length} files</strong> loaded successfully</p>
+          <p>Using <strong>pnpm</strong> for fast package management</p>
+          <div style={{
+            marginTop: '1rem',
+            padding: '1rem',
+            background: 'rgba(0,255,0,0.1)',
+            borderRadius: '8px',
+            border: '1px solid rgba(0,255,0,0.3)'
+          }}>
+            <p style={{ margin: 0, fontSize: '0.9rem' }}>
+              🎨 <strong>Pixel Builder</strong> - AI-powered app development platform
+            </p>
+          </div>
+        </div>
+      </header>
+    </div>
+  )
+}
+
+export default App`
+      }
+
+      // Ensure package.json has the right structure for Vite with pnpm
+      if (!stackBlitzFiles['package.json']) {
+        stackBlitzFiles['package.json'] = JSON.stringify({
+          name: project.name || 'vite-react-ts',
+          private: true,
+          version: '0.0.0',
+          type: 'module',
+          packageManager: 'pnpm@8.0.0',
+          scripts: {
+            dev: 'vite',
+            build: 'tsc && vite build',
+            preview: 'vite preview'
+          },
+          dependencies: {
+            react: '^18.2.0',
+            'react-dom': '^18.2.0'
+          },
+          devDependencies: {
+            '@types/react': '^18.2.0',
+            '@types/react-dom': '^18.2.0',
+            '@vitejs/plugin-react': '^4.0.0',
+            typescript: '^5.0.0',
+            vite: '^5.0.0'
+          }
+        }, null, 2)
+      } else {
+        // Update existing package.json to use pnpm
+        try {
+          const existingPackage = JSON.parse(stackBlitzFiles['package.json'])
+          existingPackage.packageManager = 'pnpm@8.0.0'
+          stackBlitzFiles['package.json'] = JSON.stringify(existingPackage, null, 2)
+        } catch (e) {
+          console.warn('Could not update existing package.json for pnpm:', e)
+        }
+      }
+
+      // Ensure vite.config.ts exists
+      if (!stackBlitzFiles['vite.config.ts']) {
+        stackBlitzFiles['vite.config.ts'] = `import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [react()],
+})`
+      }
+
+      // Add basic CSS if missing
+      if (!stackBlitzFiles['src/App.css']) {
+        stackBlitzFiles['src/App.css'] = `#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.App-header {
+  background-color: #282c34;
+  padding: 20px;
+  color: white;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+}`
+      }
+
+      if (!stackBlitzFiles['src/index.css']) {
+        stackBlitzFiles['src/index.css'] = `:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}`
+      }
+
+      // Load StackBlitz SDK dynamically
+      const loadStackBlitzSDK = (): Promise<any> => {
+        return new Promise((resolve, reject) => {
+          if (typeof window !== 'undefined' && (window as any).StackBlitzSDK) {
+            resolve((window as any).StackBlitzSDK)
+            return
+          }
+
+          const script = document.createElement('script')
+          script.src = 'https://unpkg.com/@stackblitz/sdk@1/bundles/sdk.umd.js'
+          script.onload = () => {
+            resolve((window as any).StackBlitzSDK)
+          }
+          script.onerror = () => {
+            reject(new Error('Failed to load StackBlitz SDK'))
+          }
+          
+          document.head.appendChild(script)
+        })
+      }
+
+      const StackBlitzSDK = await loadStackBlitzSDK()
+
+      // Open StackBlitz project with node template (WebContainers)
+      StackBlitzSDK.openProject({
+        title: `${project.name || 'App'} - Generated by Pixel Builder`,
+        description: `AI-generated ${project.name || 'application'} built with Pixel Builder. Features ${Object.keys(stackBlitzFiles).length} files including Vite + React + TypeScript setup.`,
+        template: 'node',
+        files: stackBlitzFiles
+      }, {
+        newWindow: true,
+        view: 'preview',
+        theme: 'dark',
+        hideDevTools: false,
+        hideExplorer: false,
+        terminalHeight: 40
+      })
+      
+      toast({
+        title: "StackBlitz Opened",
+        description: `Opened ${Object.keys(stackBlitzFiles).length} files in StackBlitz`,
+      })
+    } catch (error) {
+      console.error('Error opening StackBlitz:', error)
+      toast({
+        title: "StackBlitz Error",
+        description: error instanceof Error ? error.message : "Could not open StackBlitz preview",
+        variant: "destructive",
+      })
+    }
   }
 
   const sampleCode = `import React, { useState } from 'react'
@@ -750,52 +1296,6 @@ export default function TodoApp() {
           </ScrollArea>
         ) : (
           <div className="h-full bg-background flex flex-col">
-            {/* Preview Top Bar */}
-            <div className="flex items-center space-x-2 p-4 border-b border-border">
-              <Input
-                placeholder="Preview URL..."
-                value={customUrl}
-                onChange={(e) => setCustomUrl(e.target.value)}
-                className="flex-1"
-                disabled={preview.isLoading}
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => window.open(customUrl, '_blank')}
-                disabled={!customUrl}
-              >
-                <ExternalLink className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={refreshPreview}
-                disabled={!preview.url}
-              >
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-              {!preview.sandboxId ? (
-                <Button
-                  size="sm"
-                  onClick={createPreview}
-                  disabled={!project || preview.isLoading}
-                >
-                  <Play className="h-4 w-4 mr-2" />
-                  {preview.isLoading ? 'Starting...' : 'Start Preview'}
-                </Button>
-              ) : (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={cleanupSandbox}
-                >
-                  <Square className="h-4 w-4 mr-2" />
-                  Stop
-                </Button>
-              )}
-            </div>
-
             {/* Preview Content */}
             <div className="flex-1 min-h-0">
               {preview.isLoading ? (
@@ -880,172 +1380,120 @@ export default function TodoApp() {
                           </span>
                         </div>
                       )}
+                      {/* Clear console button */}
+                      {(consoleOutput.length > 0 || browserLogs.length > 0) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            clearAllLogs()
+                          }}
+                          className={`h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground ${
+                            isMobile ? 'h-7 w-7' : 'h-6 w-6'
+                          }`}
+                        >
+                          <Trash2 className={`${isMobile ? 'h-4 w-4' : 'h-3 w-3'}`} />
+                        </Button>
+                      )}
                     </div>
                     {/* Show latest output when collapsed - mobile optimized */}
-                    {!isConsoleOpen && (consoleOutput.length > 0 || browserLogs.length > 0) && (
+                    {!isConsoleOpen && consoleOutput.length > 0 && (
                       <div className={`ml-auto text-muted-foreground truncate ${
                         isMobile ? 'text-xs max-w-32' : 'text-xs max-w-48'
                       }`}>
-                        {activeConsoleTab === 'terminal' && consoleOutput.length > 0 
-                          ? consoleOutput[consoleOutput.length - 1]
-                          : activeConsoleTab === 'browser' && browserLogs.length > 0
-                          ? browserLogs[browserLogs.length - 1]
-                          : 'Console active'
-                        }
+                        {consoleOutput[consoleOutput.length - 1]}
                       </div>
                     )}
                   </AccordionTrigger>
-                  <AccordionContent className={`px-4 pb-4 ${isMobile ? 'px-3 pb-3' : 'px-4 pb-4'}`}>
-                    {/* Console Tabs - Mobile optimized */}
-                    <div className={`mb-3 ${isMobile ? 'mb-2' : 'mb-3'}`}>
-                      <div className="flex space-x-1 bg-muted rounded-lg p-1">
-                        <button
-                          onClick={() => setActiveConsoleTab('terminal')}
-                          className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                            activeConsoleTab === 'terminal'
-                              ? 'bg-background text-foreground shadow-sm'
-                              : 'text-muted-foreground hover:text-foreground'
-                          } ${isMobile ? 'py-2.5 text-xs touch-manipulation' : 'py-2 text-xs'}`}
-                          title={isMobile ? "Terminal" : "Terminal output (Ctrl+1)"}
-                        >
-                          <Terminal className={`${isMobile ? 'h-3 w-3' : 'h-3 w-3'} inline mr-1`} />
-                          Terminal
-                          {consoleOutput.length > 0 && (
-                            <span className={`ml-1 px-1.5 py-0.5 text-xs bg-muted-foreground/20 rounded-full ${
-                              isMobile ? 'px-1 py-0.5' : 'px-1.5 py-0.5'
-                            }`}>
-                              {consoleOutput.length}
-                            </span>
-                          )}
-                        </button>
-                        <button
-                          onClick={() => setActiveConsoleTab('browser')}
-                          className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                            activeConsoleTab === 'browser'
-                              ? 'bg-background text-foreground shadow-sm'
-                              : 'text-muted-foreground hover:text-foreground'
-                          } ${isMobile ? 'py-2.5 text-xs touch-manipulation' : 'py-2 text-xs'}`}
-                          title={isMobile ? "Browser Logs" : "Browser logs (Ctrl+2)"}
-                        >
-                          <Code className={`${isMobile ? 'h-3 w-3' : 'h-3 w-3'} inline mr-1`} />
-                          Browser Logs
-                          {browserLogs.length > 0 && (
-                            <span className={`ml-1 px-1.5 py-0.5 text-xs bg-muted-foreground/20 rounded-full ${
-                              isMobile ? 'px-1 py-0.5' : 'px-1.5 py-0.5'
-                            }`}>
-                              {browserLogs.length}
-                            </span>
-                          )}
-                        </button>
+                  <AccordionContent 
+                    className={`px-4 pb-4 ${isMobile ? 'px-3 pb-3' : 'px-4 pb-4'}`}
+                    style={{ height: isConsoleOpen ? `${consoleHeight}px` : 'auto' }}
+                  >
+                    {/* Resize Handle */}
+                    {isConsoleOpen && !isMobile && (
+                      <div
+                        ref={resizeRef}
+                        className={`w-full h-2 bg-border hover:bg-primary/30 cursor-ns-resize transition-colors flex items-center justify-center ${
+                          isResizing ? 'bg-primary/40' : ''
+                        }`}
+                        onMouseDown={handleMouseDown}
+                      >
+                        <div className="w-8 h-0.5 bg-muted-foreground/40 rounded-full" />
                       </div>
+                    )}
+                    {/* Unified Console Content */}
+                    <div
+                      ref={consoleRef}
+                      className={`bg-muted rounded-lg overflow-y-auto ${
+                        isMobile ? 'max-h-32 p-2' : 'p-3'
+                      }`}
+                      style={{ 
+                        height: isConsoleOpen && !isMobile ? `${consoleHeight - 60}px` : undefined,
+                        maxHeight: isMobile ? '8rem' : undefined
+                      }}
+                    >
+                      {consoleOutput.length === 0 ? (
+                        <div className={`text-center ${isMobile ? 'py-4' : 'py-8'}`}>
+                          <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
+                            {isMobile ? 'Console output will appear here...' : 'Console output will appear here when the dev server starts...'}
+                          </p>
+                          {preview.sandboxId && (
+                            <p className={`text-muted-foreground mt-2 ${isMobile ? 'text-xs' : 'text-sm'}`}>
+                              Logs from E2B sandbox will appear here
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          {consoleOutput.map((output, index) => {
+                            const isError = output.includes('ERROR:') || output.includes('❌') || output.includes('[SERVER]') && output.includes('stderr')
+                            const isSuccess = output.includes('✅') || output.includes('Server ready') || output.includes('successfully')
+                            const isWarning = output.includes('Warning:') || output.includes('⚠️')
+
+                            return (
+                              <div
+                                key={index}
+                                className={`font-mono ${
+                                  isError ? 'text-red-500' :
+                                  isSuccess ? 'text-green-500' :
+                                  isWarning ? 'text-yellow-500' :
+                                  'text-muted-foreground'
+                                } ${isMobile ? 'text-xs leading-tight' : 'text-xs'}`}
+                              >
+                                {output}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
 
-                    {/* Terminal Tab Content - Mobile height optimized for bottom tabs */}
-                    {activeConsoleTab === 'terminal' && (
-                      <div 
-                        ref={consoleRef} 
-                        className={`bg-muted rounded-lg overflow-y-auto ${
-                          isMobile ? 'max-h-28 p-2' : 'max-h-48 p-3'
-                        }`}
-                      >
-                        {consoleOutput.length === 0 ? (
-                          <div className={`text-center ${isMobile ? 'py-1' : 'py-2'}`}>
-                            <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
-                              {isMobile ? 'Terminal output will appear here...' : 'Terminal output will appear here when the dev server starts...'}
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="space-y-1">
-                            {consoleOutput.map((output, index) => {
-                              const isError = output.includes('ERROR:') || output.includes('❌')
-                              const isSuccess = output.includes('✅') || output.includes('Server ready')
-                              const isWarning = output.includes('Warning:')
-                              
-                              return (
-                                <div 
-                                  key={index} 
-                                  className={`font-mono ${
-                                    isError ? 'text-red-500' : 
-                                    isSuccess ? 'text-green-500' : 
-                                    isWarning ? 'text-yellow-500' : 
-                                    'text-muted-foreground'
-                                  } ${isMobile ? 'text-xs leading-tight' : 'text-xs'}`}
-                                >
-                                  {output}
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
 
-                    {/* Browser Logs Tab Content - Clean and simple like terminal */}
-                    {activeConsoleTab === 'browser' && (
-                      <div 
-                        ref={browserLogsRef} 
-                        className={`bg-muted rounded-lg overflow-y-auto ${
-                          isMobile ? 'max-h-28 p-2' : 'max-h-48 p-3'
-                        }`}
-                      >
-                        {browserLogs.length === 0 ? (
-                          <div className={`text-center ${isMobile ? 'py-1' : 'py-2'}`}>
-                            <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
-                              {isMobile ? 'Browser logs...' : 'Browser console logs...'}
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="space-y-1">
-                            {browserLogs.map((log, index) => {
-                              const isError = log.includes('❌') || log.includes('Unhandled Error') || log.includes('Unhandled Promise')
-                              const isWarning = log.includes('⚠️')
-                              const isInfo = log.includes('ℹ️')
-                              
-                              return (
-                                <div 
-                                  key={index} 
-                                  className={`font-mono ${
-                                    isError ? 'text-red-500' : 
-                                    isWarning ? 'text-yellow-500' : 
-                                    isInfo ? 'text-blue-500' : 
-                                    'text-muted-foreground'
-                                  } ${isMobile ? 'text-xs leading-tight' : 'text-xs'}`}
-                                >
-                                  {log}
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Action Buttons - Mobile optimized with better touch targets */}
-                    {(consoleOutput.length > 0 || browserLogs.length > 0) && (
+                    {/* Action Buttons - Single Console */}
+                    {consoleOutput.length > 0 && (
                       <div className={`flex justify-between items-center mt-2 ${isMobile ? 'mt-2' : 'mt-2'}`}>
                         <div className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-xs'}`}>
-                          {activeConsoleTab === 'terminal' 
-                            ? (streamReader ? 'Streaming live from dev server...' : 'Terminal output captured')
-                            : 'Browser logs captured'
-                          }
+                          {backgroundProcess.isRunning ? 'Streaming live from E2B sandbox...' : 'Console output captured'}
                         </div>
                         <div className={`flex space-x-2 ${isMobile ? 'space-x-1' : 'space-x-2'}`}>
                           <Button
                             variant="outline"
                             size={isMobile ? "sm" : "sm"}
-                            onClick={activeConsoleTab === 'terminal' ? clearConsole : clearBrowserLogs}
+                            onClick={clearAllLogs}
                             className={`${isMobile ? 'text-xs px-2 py-1 touch-manipulation' : 'text-xs'}`}
                           >
-                            Clear {activeConsoleTab === 'terminal' ? 'Terminal' : 'Browser Logs'}
+                            Clear Console
                           </Button>
-                          {preview.sandboxId && (
+                          {!isMobile && (
                             <Button
                               variant="outline"
-                              size={isMobile ? "sm" : "sm"}
-                              onClick={clearAllLogs}
-                              className={`${isMobile ? 'text-xs px-2 py-1 touch-manipulation' : 'text-xs'}`}
+                              size="sm"
+                              onClick={() => setConsoleHeight(300)}
+                              className="text-xs"
+                              title="Reset console height"
                             >
-                              Clear All
+                              Reset Height
                             </Button>
                           )}
                           {preview.sandboxId && (
@@ -1068,6 +1516,9 @@ export default function TodoApp() {
           </div>
         )}
       </div>
+
     </div>
   )
-}
+})
+
+CodePreviewPanel.displayName = "CodePreviewPanel"
