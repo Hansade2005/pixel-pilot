@@ -53,6 +53,8 @@ export async function GET(
     console.log(`Serving ${filePath} for subdomain ${subdomain}`)
     console.log(`Slug array:`, slug)
     console.log(`Request URL:`, req.url)
+    console.log(`Request pathname:`, new URL(req.url).pathname)
+    console.log(`Is root request:`, slug.length === 0)
 
     // Check if the subdomain exists in our Supabase tracking
     const supabase = await createClient()

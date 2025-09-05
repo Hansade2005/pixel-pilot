@@ -11,9 +11,20 @@ const nextConfig = {
   },
   async rewrites() {
     return [
-      // Handle wildcard subdomains for pipilot.dev
+      // Handle root path for wildcard subdomains
       {
-        source: '/((?!api/).*)',
+        source: '/',
+        destination: '/api/serve/',
+        has: [
+          {
+            type: 'host',
+            value: '^[a-z0-9][a-z0-9-]*[a-z0-9]\\.pipilot\\.dev$'
+          }
+        ]
+      },
+      // Handle all other paths for wildcard subdomains
+      {
+        source: '/((?!api/).+)',
         destination: '/api/serve/$1',
         has: [
           {
