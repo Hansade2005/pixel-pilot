@@ -33,6 +33,7 @@ import { useToast } from "@/hooks/use-toast"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Workspace as Project } from "@/lib/storage-manager"
+import { AuthModal } from "@/components/auth-modal"
 import { ChatDiagnostics } from "./chat-diagnostics"
 import { AiModeSelector, type AIMode } from "@/components/ui/ai-mode-selector"
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai-models"
@@ -1649,6 +1650,9 @@ export function ChatPanel({
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 })
   const [atCommandStartIndex, setAtCommandStartIndex] = useState(-1)
 
+  // Auth modal state
+  const [showAuthModal, setShowAuthModal] = useState(false)
+
   // Handle project changes - load chat history when project changes
   React.useEffect(() => {
     const handleProjectChange = async () => {
@@ -1973,7 +1977,13 @@ export function ChatPanel({
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!inputMessage.trim() || !project || isLoading) return
+    if (!inputMessage.trim() || isLoading) return
+
+    // If no project is selected, show auth modal
+    if (!project) {
+      setShowAuthModal(true)
+      return
+    }
 
     // Check if we're editing a reverted message
     if (isEditingRevertedMessage && revertMessageId) {
@@ -3400,6 +3410,16 @@ export function ChatPanel({
         onClose={closeFileDropdown}
         position={dropdownPosition}
         projectId={project?.id || null}
+      />
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={() => {
+          setShowAuthModal(false)
+          // Auth modal handles navigation internally
+        }}
       />
       
     </div>

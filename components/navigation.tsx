@@ -183,12 +183,16 @@ export function Navigation() {
                   </DropdownMenu>
                 ) : (
                   <div className="flex items-center space-x-4">
-                    <Button variant="ghost" className="text-white hover:text-gray-300">
-                      Log in
-                    </Button>
-                    <Button className="bg-purple-600 hover:bg-purple-700 text-white">
-                      Get started
-                    </Button>
+                    <Link href="/auth/login">
+                      <Button variant="ghost" className="text-white hover:text-gray-300">
+                        Log in
+                      </Button>
+                    </Link>
+                    <Link href="/auth/signup">
+                      <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+                        Get started
+                      </Button>
+                    </Link>
                   </div>
                 )}
               </>
@@ -329,15 +333,19 @@ export function Navigation() {
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        <Button 
-                          variant="ghost" 
-                          className="w-full text-white hover:text-gray-300 justify-start"
-                        >
-                          Log in
-                        </Button>
-                        <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white">
-                          Get started
-                        </Button>
+                        <Link href="/auth/login" onClick={closeMobileMenu}>
+                          <Button 
+                            variant="ghost" 
+                            className="w-full text-white hover:text-gray-300 justify-start"
+                          >
+                            Log in
+                          </Button>
+                        </Link>
+                        <Link href="/auth/signup" onClick={closeMobileMenu}>
+                          <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white">
+                            Get started
+                          </Button>
+                        </Link>
                       </div>
                     )}
                   </>

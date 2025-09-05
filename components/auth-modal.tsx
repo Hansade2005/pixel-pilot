@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator"
 import { Github, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
 
 interface AuthModalProps {
   isOpen: boolean
@@ -22,6 +23,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
   const [fullName, setFullName] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,7 +37,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            emailRedirectTo: `${window.location.origin}/`,
             data: {
               full_name: fullName,
             },
@@ -43,9 +45,9 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
         })
         if (error) throw error
         
-        // Show success message for email verification
-        setError("Please check your email to verify your account")
-        setIsLoading(false)
+        // Redirect to check email page like the signup page does
+        router.push("/auth/check-email")
+        onClose()
         return
       } else {
         const { error } = await supabase.auth.signInWithPassword({
@@ -54,7 +56,8 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
         })
         if (error) throw error
         
-        onSuccess()
+        // Redirect to home page like the login page does
+        router.push("/")
         onClose()
       }
     } catch (error: unknown) {
@@ -74,7 +77,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
         provider: 'github',
         options: {
           scopes: 'repo read:user workflow',
-          redirectTo: `${window.location.origin}/api/auth/github/callback`,
+          redirectTo: `${window.location.origin}/workspace`,
         },
       })
       if (error) throw error
@@ -101,10 +104,10 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
             <X className="h-4 w-4" />
           </Button>
           <CardTitle className="text-xl font-bold text-white">
-            {isSignUp ? "Create Account" : "Sign In"}
+            {isSignUp ? "Create Account" : "Welcome Back"}
           </CardTitle>
           <CardDescription className="text-gray-400">
-            {isSignUp ? "Join Pixel Builder to start building" : "Welcome back! Sign in to continue"}
+            {isSignUp ? "Join Pixel Pilot and start creating" : "Sign in to your Pixel Pilot account"}
           </CardDescription>
         </CardHeader>
         
@@ -185,7 +188,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
               disabled={isLoading}
             >
               {isLoading ? (
-                "Processing..."
+                isSignUp ? "Creating account..." : "Signing in..."
               ) : (
                 isSignUp ? "Create Account" : "Sign In"
               )}
