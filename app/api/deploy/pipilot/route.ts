@@ -3,6 +3,14 @@ import { createClient } from '@/lib/supabase/server'
 import { createEnhancedSandbox } from '@/lib/e2b-enhanced'
 import { storageManager } from '@/lib/storage-manager'
 
+export async function GET() {
+  return NextResponse.json({ 
+    message: 'Pipilot deployment API is running',
+    methods: ['POST'],
+    endpoint: '/api/deploy/pipilot'
+  })
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { projectId, siteName } = await request.json()

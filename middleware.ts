@@ -6,6 +6,11 @@ export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
   const pathname = request.nextUrl.pathname
   
+  // Skip middleware for API routes
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next()
+  }
+  
   // Handle subdomain routing for pipilot.dev (but not the main domain)
   if (hostname.endsWith('.pipilot.dev') && hostname !== 'pipilot.dev') {
     const subdomain = hostname.split('.')[0]
