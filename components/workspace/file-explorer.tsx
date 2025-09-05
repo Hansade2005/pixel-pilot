@@ -33,7 +33,8 @@ import {
   Settings,
   Package,
   FileDown,
-  File
+  File,
+  Upload
 } from "lucide-react"
 import type { Workspace as Project, File as FileItem } from "@/lib/storage-manager"
 import { dbManager } from '@/lib/indexeddb';
@@ -69,6 +70,10 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
   const [createInFolder, setCreateInFolder] = useState<string | null>(null)
   // Drag target for visual highlight
   const [dragOverFolder, setDragOverFolder] = useState<string | null>(null)
+  // File upload states
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadInFolder, setUploadInFolder] = useState<string | null>(null)
 
   const { toast } = useToast()
 
@@ -78,6 +83,15 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
   }
   const handleDrop = async (e: React.DragEvent, folderNode: FileNode) => {
     e.preventDefault()
+    setDragOverFolder(null)
+    
+    // Check if files are being dropped (upload)
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      await handleDropUpload(e, folderNode.type === "folder" ? folderNode.path : null)
+      return
+    }
+    
+    // Otherwise, handle file moving
     const filePath = e.dataTransfer.getData("text/plain")
     if (!project || !filePath || folderNode.type !== "folder") return
     try {
@@ -88,8 +102,7 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
       const newPath = `${folderNode.path}/${file.name}`
       await storageManager.updateFile(project.id, filePath, { path: newPath })
       await fetchFiles()
-  setDragOverFolder(null)
-  toast({ title: 'Moved file', description: `Moved ${file.name} to ${folderNode.path}` })
+      toast({ title: 'Moved file', description: `Moved ${file.name} to ${folderNode.path}` })
     } catch (error) {
       console.error("Error moving file:", error)
     }
@@ -1070,6 +1083,146 @@ enabled = false`
     toggleFolder(path)
   }
 
+  // File upload handlers
+  const handleFileUpload = async (files: FileList, targetFolder: string | null = null) => {
+    if (!project || files.length === 0) return
+
+    setIsUploading(true)
+    setUploadProgress(0)
+    setUploadInFolder(targetFolder)
+
+    try {
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+
+      const uploadPromises = Array.from(files).map(async (file, index) => {
+        const filePath = targetFolder ? `${targetFolder}/${file.name}` : file.name
+        
+        // Read file content
+        const content = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = (e) => resolve(e.target?.result as string || '')
+          reader.onerror = reject
+          reader.readAsText(file)
+        })
+
+        // Determine file type
+        const extension = file.name.split('.').pop()?.toLowerCase() || ''
+        const fileType = getFileTypeFromExtension(extension)
+
+        // Create file record
+        const newFile = await storageManager.createFile({
+          workspaceId: project.id,
+          name: file.name,
+          path: filePath,
+          content: content,
+          fileType: fileType,
+          type: fileType,
+          size: content.length,
+          isDirectory: false
+        })
+
+        // Update progress
+        setUploadProgress(((index + 1) / files.length) * 100)
+
+        return newFile
+      })
+
+      await Promise.all(uploadPromises)
+
+      toast({
+        title: "Files Uploaded",
+        description: `Successfully uploaded ${files.length} file(s)${targetFolder ? ` to ${targetFolder}` : ''}.`
+      })
+
+      await fetchFiles()
+    } catch (error) {
+      console.error("Error uploading files:", error)
+      toast({
+        title: "Upload Failed",
+        description: "Failed to upload files. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsUploading(false)
+      setUploadProgress(0)
+      setUploadInFolder(null)
+    }
+  }
+
+  const getFileTypeFromExtension = (extension: string): string => {
+    const typeMap: { [key: string]: string } = {
+      'tsx': 'text',
+      'ts': 'text',
+      'jsx': 'text',
+      'js': 'text',
+      'css': 'text',
+      'scss': 'text',
+      'sass': 'text',
+      'html': 'text',
+      'json': 'text',
+      'md': 'text',
+      'xml': 'text',
+      'yml': 'text',
+      'yaml': 'text',
+      'env': 'text',
+      'gitignore': 'text',
+      'py': 'text',
+      'java': 'text',
+      'cpp': 'text',
+      'c': 'text',
+      'php': 'text',
+      'rb': 'text',
+      'go': 'text',
+      'rs': 'text',
+      'sh': 'text',
+      'bat': 'text',
+      'ps1': 'text',
+      'sql': 'text',
+      'txt': 'text',
+      'log': 'text',
+      'conf': 'text',
+      'ini': 'text',
+      'toml': 'text',
+      'png': 'image',
+      'jpg': 'image',
+      'jpeg': 'image',
+      'gif': 'image',
+      'svg': 'image',
+      'webp': 'image',
+      'ico': 'image',
+      'pdf': 'document',
+      'doc': 'document',
+      'docx': 'document',
+      'xls': 'document',
+      'xlsx': 'document',
+      'ppt': 'document',
+      'pptx': 'document'
+    }
+    return typeMap[extension] || 'text'
+  }
+
+  const handleUploadClick = (targetFolder: string | null = null) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.multiple = true
+    input.onchange = (e) => {
+      const files = (e.target as HTMLInputElement).files
+      if (files) {
+        handleFileUpload(files, targetFolder)
+      }
+    }
+    input.click()
+  }
+
+  const handleDropUpload = async (e: React.DragEvent, targetFolder: string | null = null) => {
+    e.preventDefault()
+    const files = e.dataTransfer.files
+    if (files.length > 0) {
+      await handleFileUpload(files, targetFolder)
+    }
+  }
+
   const renderFileNode = (node: FileNode, depth = 0) => {
     const isSelected = selectedFile?.id === node.file?.id
     const isSearchMatch = searchQuery && node.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -1182,6 +1335,10 @@ enabled = false`
                     <Plus className="mr-2 h-4 w-4" />
                     New File
                   </ContextMenuItem>
+                  <ContextMenuItem onClick={() => handleUploadClick(node.path)}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload Files
+                  </ContextMenuItem>
               </>
             )}
             <ContextMenuItem onClick={() => {
@@ -1197,6 +1354,10 @@ enabled = false`
             }}>
               <Plus className="mr-2 h-4 w-4" />
               New File
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => handleUploadClick(null)}>
+              <Upload className="mr-2 h-4 w-4" />
+              Upload Files
             </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>
@@ -1256,12 +1417,16 @@ enabled = false`
 
       {/* File Tree Container - Fixed height with scrolling */}
       <div className="flex-1 overflow-hidden">
-        <div className="h-full overflow-y-auto overflow-x-hidden">
+        <div 
+          className="h-full overflow-y-auto overflow-x-hidden"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => handleDropUpload(e, null)}
+        >
           {files.length === 0 ? (
             <div className="p-4 text-center text-muted-foreground">
               <Folder className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">No files yet</p>
-              <p className="text-xs">Create your first file to get started</p>
+              <p className="text-xs">Create your first file or drag & drop files to get started</p>
             </div>
           ) : (
             <div className="p-2">
@@ -1270,6 +1435,29 @@ enabled = false`
           )}
         </div>
       </div>
+
+      {/* Upload Progress Indicator */}
+      {isUploading && (
+        <div className="border-t border-border p-2">
+          <div className="flex items-center space-x-2">
+            <Upload className="h-4 w-4 text-muted-foreground" />
+            <div className="flex-1">
+              <div className="text-xs text-muted-foreground mb-1">
+                Uploading files{uploadInFolder ? ` to ${uploadInFolder}` : ''}...
+              </div>
+              <div className="w-full bg-secondary rounded-full h-1.5">
+                <div 
+                  className="bg-primary h-1.5 rounded-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {Math.round(uploadProgress)}%
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create File Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
