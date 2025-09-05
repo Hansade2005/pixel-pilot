@@ -291,56 +291,81 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
     return sortTree(tree)
   }
 
+  // Component for Simple Icon with fallback
+  const SimpleIconWithFallback = ({ iconName, fallbackIcon }: { iconName: string, fallbackIcon: React.ReactNode }) => {
+    const [imageError, setImageError] = useState(false)
+    
+    if (imageError) {
+      return <>{fallbackIcon}</>
+    }
+    
+    return (
+      <img 
+        src={`https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/${iconName}.svg`}
+        alt={iconName}
+        className="h-4 w-4"
+        onError={() => setImageError(true)}
+      />
+    )
+  }
+
   const getFileIcon = (fileName: string) => {
     const extension = fileName.split('.').pop()?.toLowerCase()
+    
+    // Map file extensions to Simple Icons
+    const getSimpleIcon = (iconName: string, fallbackIcon: React.ReactNode) => {
+      return <SimpleIconWithFallback iconName={iconName} fallbackIcon={fallbackIcon} />
+    }
     
     switch (extension) {
       case 'tsx':
       case 'jsx':
-        return <FileCode className="h-4 w-4 text-blue-500" />
+        return getSimpleIcon('react', <FileCode className="h-4 w-4 text-blue-500" />)
       case 'ts':
+        return getSimpleIcon('typescript', <FileType className="h-4 w-4 text-blue-500" />)
       case 'js':
-        return <FileType className="h-4 w-4 text-yellow-500" />
+        return getSimpleIcon('javascript', <FileType className="h-4 w-4 text-yellow-500" />)
       case 'css':
+        return getSimpleIcon('css3', <File className="h-4 w-4 text-blue-500" />)
       case 'scss':
       case 'sass':
-        return <File className="h-4 w-4 text-pink-500" />
+        return getSimpleIcon('sass', <File className="h-4 w-4 text-pink-500" />)
       case 'html':
-        return <FileText className="h-4 w-4 text-orange-600" />
+        return getSimpleIcon('html5', <FileText className="h-4 w-4 text-orange-600" />)
       case 'json':
-        return <FileJson className="h-4 w-4 text-green-500" />
+        return getSimpleIcon('json', <FileJson className="h-4 w-4 text-green-500" />)
       case 'md':
-        return <FileDown className="h-4 w-4 text-purple-500" />
+        return getSimpleIcon('markdown', <FileDown className="h-4 w-4 text-purple-500" />)
       case 'xml':
-        return <FileText className="h-4 w-4 text-blue-600" />
+        return getSimpleIcon('xml', <FileText className="h-4 w-4 text-blue-600" />)
       case 'yml':
       case 'yaml':
-        return <Settings className="h-4 w-4 text-indigo-500" />
+        return getSimpleIcon('yaml', <Settings className="h-4 w-4 text-indigo-500" />)
       case 'env':
         return <Settings className="h-4 w-4 text-green-600" />
       case 'gitignore':
-        return <FileText className="h-4 w-4 text-gray-600" />
+        return getSimpleIcon('git', <FileText className="h-4 w-4 text-gray-600" />)
       case 'py':
-        return <FileCode className="h-4 w-4 text-blue-600" />
+        return getSimpleIcon('python', <FileCode className="h-4 w-4 text-blue-600" />)
       case 'java':
-        return <FileCode className="h-4 w-4 text-red-600" />
+        return getSimpleIcon('java', <FileCode className="h-4 w-4 text-red-600" />)
       case 'cpp':
       case 'c':
-        return <FileCode className="h-4 w-4 text-blue-700" />
+        return getSimpleIcon('cplusplus', <FileCode className="h-4 w-4 text-blue-700" />)
       case 'php':
-        return <FileCode className="h-4 w-4 text-purple-600" />
+        return getSimpleIcon('php', <FileCode className="h-4 w-4 text-purple-600" />)
       case 'rb':
-        return <FileCode className="h-4 w-4 text-red-500" />
+        return getSimpleIcon('ruby', <FileCode className="h-4 w-4 text-red-500" />)
       case 'go':
-        return <FileCode className="h-4 w-4 text-cyan-600" />
+        return getSimpleIcon('go', <FileCode className="h-4 w-4 text-cyan-600" />)
       case 'rs':
-        return <FileCode className="h-4 w-4 text-orange-700" />
+        return getSimpleIcon('rust', <FileCode className="h-4 w-4 text-orange-700" />)
       case 'sh':
       case 'bat':
       case 'ps1':
-        return <FileCode className="h-4 w-4 text-green-700" />
+        return getSimpleIcon('bash', <FileCode className="h-4 w-4 text-green-700" />)
       case 'sql':
-        return <FileText className="h-4 w-4 text-blue-800" />
+        return getSimpleIcon('mysql', <FileText className="h-4 w-4 text-blue-800" />)
       case 'txt':
       case 'log':
         return <FileText className="h-4 w-4 text-gray-500" />
@@ -352,11 +377,24 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
       case 'jpg':
       case 'jpeg':
       case 'gif':
-      case 'svg':
         return <FileImage className="h-4 w-4 text-orange-500" />
+      case 'svg':
+        return getSimpleIcon('svg', <FileImage className="h-4 w-4 text-orange-500" />)
       default:
         if (fileName === 'package.json') {
-          return <Package className="h-4 w-4 text-red-500" />
+          return getSimpleIcon('npm', <Package className="h-4 w-4 text-red-500" />)
+        }
+        if (fileName === 'yarn.lock') {
+          return getSimpleIcon('yarn', <Package className="h-4 w-4 text-blue-500" />)
+        }
+        if (fileName === 'pnpm-lock.yaml') {
+          return getSimpleIcon('pnpm', <Package className="h-4 w-4 text-orange-500" />)
+        }
+        if (fileName === 'Dockerfile') {
+          return getSimpleIcon('docker', <FileCode className="h-4 w-4 text-blue-500" />)
+        }
+        if (fileName === 'docker-compose.yml') {
+          return getSimpleIcon('docker', <FileCode className="h-4 w-4 text-blue-500" />)
         }
         return <FileText className="h-4 w-4 text-gray-500" />
     }
