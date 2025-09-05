@@ -129,11 +129,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'E2B API key missing' }, { status: 500 })
     }
 
+    // Get user from Supabase auth first
+    const supabase = await createClient()
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { workspaceId, subdomain, files } = await req.json()
 
-    if (!workspaceId || !subdomain || !files?.length) {
+    if (!subdomain || !files?.length) {
       return NextResponse.json({
-        error: 'Workspace ID, subdomain, and files are required'
+        error: 'Subdomain and files are required'
       }, { status: 400 })
     }
 
@@ -153,17 +160,30 @@ export async function POST(req: Request) {
     }
 
     // Check if subdomain is already taken
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { data: existingDeployment } = await supabase
+      .from('subdomain_tracking')
+      .select('subdomain')
+      .eq('subdomain', subdomain)
+      .eq('is_active', true)
+      .single()
+
+    if (existingDeployment) {
+      return NextResponse.json({
+        error: 'Subdomain is already taken',
+        code: 'SUBDOMAIN_TAKEN'
+      }, { status: 409 })
+    }
 
     // Initialize storage manager and get files from workspace
     await storageManager.init()
     let projectFiles = files
 
     if (!projectFiles || !Array.isArray(projectFiles) || projectFiles.length === 0) {
-      projectFiles = await storageManager.getFiles(workspaceId)
-      if (projectFiles.length === 0) {
+      // If no files provided, try to get files from workspaceId if provided
+      if (workspaceId) {
+        projectFiles = await storageManager.getFiles(workspaceId)
+      }
+      if (!projectFiles || projectFiles.length === 0) {
         return NextResponse.json({ error: 'No files found in workspace' }, { status: 400 })
       }
     }
@@ -387,8 +407,9 @@ export async function POST(req: Request) {
       console.log(`Files uploaded successfully to ${storagePath}`)
 
       // Record deployment in IndexedDB (storage-manager)
+      // Use user ID as workspaceId since we're creating a deployment for the user
       const deploymentRecord = await storageManager.createDeployment({
-        workspaceId,
+        workspaceId: user.id,
         url: deploymentUrl,
         status: 'ready',
         provider: 'pipilot',
@@ -397,22 +418,13 @@ export async function POST(req: Request) {
       })
 
       // Record subdomain tracking in Supabase
-      const supabase = await createClient()
-
-      // Convert workspaceId to UUID format if needed
-      let workspaceUuid = workspaceId
-      if (workspaceId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspaceId)) {
-        // If not a UUID, try to convert or use user ID as fallback
-        console.warn(`Invalid UUID format for workspaceId: ${workspaceId}, using user ID instead`)
-        workspaceUuid = user.id
-      }
-
+      // Use user ID as workspace_id since this is a user-specific deployment
       const { error: trackingError } = await supabase
         .from('subdomain_tracking')
         .insert({
           subdomain,
           user_id: user.id,
-          workspace_id: workspaceUuid,
+          workspace_id: user.id, // Use user ID as workspace_id for user-specific deployments
           deployment_url: deploymentUrl,
           storage_path: storagePath,
           is_active: true
