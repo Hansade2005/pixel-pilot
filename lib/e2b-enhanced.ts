@@ -465,24 +465,6 @@ export class EnhancedE2BSandbox {
   }
 
   /**
-   * Read a file from the sandbox
-   */
-  async readFile(filePath: string): Promise<Buffer | null> {
-    try {
-      if (this.container.files && typeof this.container.files.read === 'function') {
-        return await this.container.files.read(filePath)
-      } else if (this.container.filesystem && typeof this.container.filesystem.read === 'function') {
-        return await this.container.filesystem.read(filePath)
-      } else {
-        throw new Error('No valid file read method found on container')
-      }
-    } catch (error) {
-      console.error(`[${this.id}] Error reading file ${filePath}:`, error)
-      throw error
-    }
-  }
-
-  /**
    * Get sandbox information and status
    */
   async getInfo(): Promise<any> {
@@ -629,6 +611,168 @@ export class EnhancedE2BSandbox {
       console.error(`[${this.id}] Termination error:`, error)
       // Don't throw error on termination failure, just log it
       console.warn(`[${this.id}] Failed to terminate sandbox gracefully, but continuing...`)
+    }
+  }
+
+  /**
+   * Compress a directory into a ZIP file
+   */
+  async compressDirectory(
+    sourcePath: string,
+    zipPath: string
+  ): Promise<void> {
+    try {
+      console.log(`[${this.id}] Compressing directory ${sourcePath} to ${zipPath}`)
+
+      // Install zip if not available
+      await this.executeCommand('which zip || apt-get update && apt-get install -y zip', {
+        timeoutMs: 60000
+      })
+
+      // Create ZIP file
+      const result = await this.executeCommand(`zip -r ${zipPath} ${sourcePath}`, {
+        timeoutMs: 300000 // 5 minutes for compression
+      })
+
+      if (result.exitCode !== 0) {
+        throw new Error(`Compression failed: ${result.stderr}`)
+      }
+
+      console.log(`[${this.id}] Directory compressed successfully`)
+    } catch (error) {
+      throw new SandboxError(
+        SandboxErrorType.FILE_OPERATION_FAILED,
+        `Failed to compress directory: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        this.id,
+        error instanceof Error ? error : undefined
+      )
+    }
+  }
+
+  /**
+   * Download a file from the sandbox
+   */
+  async downloadFile(filePath: string): Promise<Buffer> {
+    try {
+      console.log(`[${this.id}] Downloading file ${filePath}`)
+
+      // Use E2B's files.read method
+      const content = await this.container.files.read(filePath)
+
+      if (!content) {
+        throw new Error(`File ${filePath} not found or empty`)
+      }
+
+      // Convert to Buffer
+      const buffer = Buffer.from(content)
+      console.log(`[${this.id}] File downloaded successfully: ${buffer.length} bytes`)
+
+      return buffer
+    } catch (error) {
+      throw new SandboxError(
+        SandboxErrorType.FILE_OPERATION_FAILED,
+        `Failed to download file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        this.id,
+        error instanceof Error ? error : undefined
+      )
+    }
+  }
+
+  /**
+   * Create a pre-signed download URL for a file
+   */
+  async createDownloadUrl(
+    filePath: string,
+    expirationMs: number = 3600000 // 1 hour default
+  ): Promise<string> {
+    try {
+      console.log(`[${this.id}] Creating download URL for ${filePath}`)
+
+      // Use E2B's download URL feature if available
+      if (this.container.downloadUrl) {
+        const publicUrl = await this.container.downloadUrl(filePath, {
+          useSignatureExpiration: expirationMs
+        })
+        return publicUrl
+      }
+
+      // Fallback: direct download
+      const content = await this.downloadFile(filePath)
+      const blob = new Blob([content])
+
+      // Create object URL (client-side only)
+      if (typeof window !== 'undefined') {
+        return URL.createObjectURL(blob)
+      }
+
+      throw new Error('Download URL creation not supported in server environment')
+    } catch (error) {
+      throw new SandboxError(
+        SandboxErrorType.FILE_OPERATION_FAILED,
+        `Failed to create download URL: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        this.id,
+        error instanceof Error ? error : undefined
+      )
+    }
+  }
+
+  /**
+   * List files in a directory recursively
+   */
+  async listFilesRecursively(
+    directory: string,
+    maxDepth: number = 10
+  ): Promise<string[]> {
+    try {
+      console.log(`[${this.id}] Listing files recursively in ${directory}`)
+
+      const result = await this.executeCommand(
+        `find ${directory} -type f -not -path '*/node_modules/*' -not -path '*/.git/*' | head -1000`,
+        { timeoutMs: 30000 }
+      )
+
+      if (result.exitCode !== 0) {
+        throw new Error(`Failed to list files: ${result.stderr}`)
+      }
+
+      const files = result.stdout
+        .split('\n')
+        .filter(line => line.trim())
+        .map(line => line.trim())
+
+      console.log(`[${this.id}] Found ${files.length} files`)
+      return files
+    } catch (error) {
+      throw new SandboxError(
+        SandboxErrorType.FILE_OPERATION_FAILED,
+        `Failed to list files: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        this.id,
+        error instanceof Error ? error : undefined
+      )
+    }
+  }
+
+  /**
+   * Get file size
+   */
+  async getFileSize(filePath: string): Promise<number> {
+    try {
+      const result = await this.executeCommand(`stat -f%z ${filePath} 2>/dev/null || stat -c%s ${filePath}`, {
+        timeoutMs: 10000
+      })
+
+      if (result.exitCode !== 0) {
+        throw new Error(`Failed to get file size: ${result.stderr}`)
+      }
+
+      return parseInt(result.stdout.trim())
+    } catch (error) {
+      throw new SandboxError(
+        SandboxErrorType.FILE_OPERATION_FAILED,
+        `Failed to get file size: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        this.id,
+        error instanceof Error ? error : undefined
+      )
     }
   }
 

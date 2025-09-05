@@ -3,35 +3,35 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 export async function middleware(request: NextRequest) {
-  const hostname = request.headers.get('host') || ''
-  const pathname = request.nextUrl.pathname
-  
-  // Skip middleware for API routes
-  if (pathname.startsWith('/api/')) {
-    return NextResponse.next()
+  const host = request.headers.get('host') || ''
+  const url = request.nextUrl
+
+  // Handle wildcard subdomains for pipilot.dev
+  if (host.endsWith('.pipilot.dev') && host !== 'pipilot.dev' && host !== 'www.pipilot.dev') {
+    // Rewrite to our serving API
+    if (!url.pathname.startsWith('/api/')) {
+      const rewriteUrl = new URL(`/api/serve${url.pathname}`, request.url)
+      rewriteUrl.search = url.search
+
+      // Create rewrite response
+      const response = NextResponse.rewrite(rewriteUrl)
+
+      // Add caching headers for static files
+      if (url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2)$/)) {
+        response.headers.set('Cache-Control', 'public, max-age=31536000, immutable')
+      }
+
+      return response
+    }
   }
-  
-  // Handle subdomain routing for pipilot.dev (but not the main domain)
-  if (hostname.endsWith('.pipilot.dev') && hostname !== 'pipilot.dev') {
-    const subdomain = hostname.split('.')[0]
-    // Rewrite to our subdomain handler
-    const url = request.nextUrl.clone()
-    url.pathname = `/${subdomain}${pathname}`
-    return NextResponse.rewrite(url)
-  }
-  
-  // Handle localhost subdomains for development
-  if (hostname.endsWith('.localhost:3000') && hostname !== 'localhost:3000') {
-    const subdomain = hostname.split('.')[0]
-    const url = request.nextUrl.clone()
-    url.pathname = `/${subdomain}${pathname}`
-    return NextResponse.rewrite(url)
-  }
-  
-  // Apply auth middleware for main domain
+
   return await updateSession(request)
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|api/).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|api/).*)",
+    // Also match all paths for wildcard subdomains
+    "/(.*)"
+  ],
 }

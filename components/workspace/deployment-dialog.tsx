@@ -24,7 +24,7 @@ interface DeploymentDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-type DeploymentStep = 'github' | 'vercel' | 'netlify' | 'complete'
+type DeploymentStep = 'github' | 'vercel' | 'netlify' | 'pipilot' | 'complete'
 
 interface DeploymentState {
   step: DeploymentStep
@@ -32,6 +32,7 @@ interface DeploymentState {
   githubRepoUrl?: string
   vercelDeploymentUrl?: string
   netlifyDeploymentUrl?: string
+  pipilotDeploymentUrl?: string
   error?: string
 }
 
@@ -49,6 +50,17 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
     vercelToken: '',
     netlifyToken: '',
     siteName: project?.name?.toLowerCase().replace(/\s+/g, '-') || '',
+    subdomain: project?.name?.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '') || '',
+  })
+
+  const [subdomainStatus, setSubdomainStatus] = useState<{
+    checking: boolean
+    available: boolean | null
+    error: string | null
+  }>({
+    checking: false,
+    available: null,
+    error: null
   })
 
   const [hasGitHubToken, setHasGitHubToken] = useState(false)
@@ -57,6 +69,54 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
   const [vercelConnectionStatus, setVercelConnectionStatus] = useState<'checking' | 'connected' | 'not_connected' | 'connecting'>('checking')
   const [hasNetlifyToken, setHasNetlifyToken] = useState(false)
   const [netlifyConnectionStatus, setNetlifyConnectionStatus] = useState<'checking' | 'connected' | 'not_connected' | 'connecting'>('checking')
+
+  // Check subdomain availability
+  const checkSubdomainAvailability = async (subdomain: string) => {
+    if (!subdomain || !/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(subdomain)) {
+      setSubdomainStatus({ checking: false, available: null, error: null })
+      return
+    }
+
+    setSubdomainStatus({ checking: true, available: null, error: null })
+
+    try {
+      const response = await fetch(`/api/deploy/check-subdomain?subdomain=${encodeURIComponent(subdomain)}`)
+      const data = await response.json()
+
+      if (response.ok) {
+        setSubdomainStatus({
+          checking: false,
+          available: data.available,
+          error: null
+        })
+      } else {
+        setSubdomainStatus({
+          checking: false,
+          available: null,
+          error: data.error || 'Failed to check availability'
+        })
+      }
+    } catch (error) {
+      setSubdomainStatus({
+        checking: false,
+        available: null,
+        error: 'Network error'
+      })
+    }
+  }
+
+  // Debounced subdomain checking
+  React.useEffect(() => {
+    if (formData.subdomain) {
+      const timeoutId = setTimeout(() => {
+        checkSubdomainAvailability(formData.subdomain)
+      }, 500) // Wait 500ms after user stops typing
+
+      return () => clearTimeout(timeoutId)
+    } else {
+      setSubdomainStatus({ checking: false, available: null, error: null })
+    }
+  }, [formData.subdomain])
 
   // Check if user has tokens on dialog open
   React.useEffect(() => {
@@ -473,9 +533,87 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
     }
   }
 
+  const deployToPiPilot = async () => {
+    if (!project || !formData.subdomain) {
+      toast({
+        title: "Missing Information",
+        description: "Please provide subdomain name",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setDeploymentState(prev => ({ ...prev, isLoading: true, error: undefined }))
+
+    try {
+      // Fetch files from IndexedDB client-side
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+      const files = await storageManager.getFiles(project.id)
+
+      if (!files || files.length === 0) {
+        throw new Error('No files found in project')
+      }
+
+      const response = await fetch('/api/deploy/wildcard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspaceId: project.id,
+          subdomain: formData.subdomain,
+          files: files,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to deploy to PiPilot')
+      }
+
+      const result = await response.json()
+
+      setDeploymentState(prev => ({
+        ...prev,
+        isLoading: false,
+        pipilotDeploymentUrl: result.url,
+        step: 'complete',
+      }))
+
+      // Store deployment info in IndexedDB
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+
+      // Update the deployment record with the returned ID
+      if (result.deploymentId) {
+        await storageManager.updateDeployment(result.deploymentId, {
+          status: 'ready',
+          url: result.url
+        })
+      }
+
+      toast({
+        title: "PiPilot Deployment Successful",
+        description: `Your app is now live at ${result.subdomain}.pipilot.dev`,
+      })
+
+    } catch (error) {
+      setDeploymentState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to deploy to PiPilot',
+      }))
+
+      toast({
+        title: "PiPilot Deployment Failed",
+        description: error instanceof Error ? error.message : 'Failed to deploy to PiPilot',
+        variant: "destructive",
+      })
+    }
+  }
+
   const resetState = () => {
     setDeploymentState({
-      step: 'github',
+      step: 'pipilot',
       isLoading: false,
     })
     setFormData({
@@ -485,6 +623,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
       vercelToken: '',
       netlifyToken: '',
       siteName: project?.name?.toLowerCase().replace(/\s+/g, '-') || '',
+      subdomain: project?.name?.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '') || '',
     })
     setGitHubConnectionStatus('checking')
     setVercelConnectionStatus('checking')
@@ -687,9 +826,21 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
 
         <div className="space-y-6">
           {/* Step Indicator */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
             <div className={`flex items-center space-x-2 ${
-              deploymentState.step === 'github' ? 'text-accent' : 
+              deploymentState.step === 'pipilot' ? 'text-accent' :
+              deploymentState.pipilotDeploymentUrl ? 'text-green-500' : 'text-muted-foreground'
+            }`}>
+              {deploymentState.pipilotDeploymentUrl ? (
+                <CheckCircle className="h-4 w-4" />
+              ) : (
+                <Globe className="h-4 w-4" />
+              )}
+              <span className="text-sm font-medium">PiPilot</span>
+            </div>
+            <Separator className="flex-1" />
+            <div className={`flex items-center space-x-2 ${
+              deploymentState.step === 'github' ? 'text-accent' :
               deploymentState.githubRepoUrl ? 'text-green-500' : 'text-muted-foreground'
             }`}>
               {deploymentState.githubRepoUrl ? (
@@ -701,7 +852,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
             </div>
             <Separator className="flex-1" />
             <div className={`flex items-center space-x-2 ${
-              deploymentState.step === 'vercel' ? 'text-accent' : 
+              deploymentState.step === 'vercel' ? 'text-accent' :
               deploymentState.vercelDeploymentUrl ? 'text-green-500' : 'text-muted-foreground'
             }`}>
               {deploymentState.vercelDeploymentUrl ? (
@@ -713,7 +864,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
             </div>
             <Separator className="flex-1" />
             <div className={`flex items-center space-x-2 ${
-              deploymentState.step === 'netlify' ? 'text-accent' : 
+              deploymentState.step === 'netlify' ? 'text-accent' :
               deploymentState.netlifyDeploymentUrl ? 'text-green-500' : 'text-muted-foreground'
             }`}>
               {deploymentState.netlifyDeploymentUrl ? (
@@ -730,6 +881,100 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
             <div className="flex items-center space-x-2 text-destructive">
               <AlertCircle className="h-4 w-4" />
               <span className="text-sm">{deploymentState.error}</span>
+            </div>
+          )}
+
+          {/* PiPilot Step */}
+          {deploymentState.step === 'pipilot' && (
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
+                  Deploy to PiPilot.dev Subdomain
+                </h3>
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  Your project will be deployed to a custom subdomain on pipilot.dev (e.g., yoursite.pipilot.dev)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="subdomain">Subdomain Name</Label>
+                <Input
+                  id="subdomain"
+                  placeholder="yoursite"
+                  value={formData.subdomain}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '')
+                  }))}
+                  disabled={deploymentState.isLoading}
+                />
+
+                {/* Subdomain availability status */}
+                {formData.subdomain && (
+                  <div className="flex items-center space-x-2">
+                    {subdomainStatus.checking ? (
+                      <>
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                        <span className="text-xs text-muted-foreground">Checking availability...</span>
+                      </>
+                    ) : subdomainStatus.available === true ? (
+                      <>
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span className="text-xs text-green-600">Available!</span>
+                      </>
+                    ) : subdomainStatus.available === false ? (
+                      <>
+                        <AlertCircle className="h-4 w-4 text-red-500" />
+                        <span className="text-xs text-red-600">Not available</span>
+                      </>
+                    ) : subdomainStatus.error ? (
+                      <>
+                        <AlertCircle className="h-4 w-4 text-red-500" />
+                        <span className="text-xs text-red-600">{subdomainStatus.error}</span>
+                      </>
+                    ) : null}
+                  </div>
+                )}
+
+                <p className="text-xs text-muted-foreground">
+                  Your site will be available at: <strong>{formData.subdomain || 'yoursite'}.pipilot.dev</strong>
+                </p>
+              </div>
+
+              <Button
+                onClick={deployToPiPilot}
+                disabled={
+                  deploymentState.isLoading ||
+                  !formData.subdomain ||
+                  !/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(formData.subdomain) ||
+                  subdomainStatus.available === false ||
+                  subdomainStatus.checking
+                }
+                className="w-full"
+              >
+                {deploymentState.isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deploying to PiPilot...
+                  </>
+                ) : (
+                  <>
+                    <Globe className="h-4 w-4 mr-2" />
+                    Deploy to PiPilot.dev
+                  </>
+                )}
+              </Button>
+
+              <div className="text-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDeploymentState(prev => ({ ...prev, step: 'github' }))}
+                  disabled={deploymentState.isLoading}
+                >
+                  Or deploy to other platforms →
+                </Button>
+              </div>
             </div>
           )}
 
@@ -970,6 +1215,22 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
                     View
                   </Button>
                 </div>
+
+                {deploymentState.pipilotDeploymentUrl && (
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <Globe className="h-4 w-4" />
+                      <span className="text-sm font-medium">PiPilot Deployment</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => window.open(deploymentState.pipilotDeploymentUrl, '_blank')}
+                    >
+                      Visit
+                    </Button>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <div className="flex items-center space-x-2">
