@@ -95,22 +95,31 @@ function getContentType(filePath: string): string {
 /**
  * Extract files from ZIP buffer
  */
-async function extractZip(zipBuffer: Buffer): Promise<{ files: Buffer[], paths: string[] }> {
-  const zip = new JSZip()
-  const zipContent = await zip.loadAsync(zipBuffer)
+async function extractArchive(archiveBuffer: Buffer, archiveName: string): Promise<{ files: Buffer[], paths: string[] }> {
+  if (archiveName.endsWith('.zip')) {
+    // Handle ZIP files
+    const zip = new JSZip()
+    const zipContent = await zip.loadAsync(archiveBuffer)
 
-  const files: Buffer[] = []
-  const paths: string[] = []
+    const files: Buffer[] = []
+    const paths: string[] = []
 
-  for (const [path, file] of Object.entries(zipContent.files)) {
-    if (!file.dir) {
-      const content = await file.async('nodebuffer')
-      files.push(content)
-      paths.push(path)
+    for (const [path, file] of Object.entries(zipContent.files)) {
+      if (!file.dir) {
+        const content = await file.async('nodebuffer')
+        files.push(content)
+        paths.push(path)
+      }
     }
-  }
 
-  return { files, paths }
+    return { files, paths }
+  } else if (archiveName.endsWith('.tar.gz')) {
+    // For tar.gz, we'll extract it using the tar command in the sandbox
+    // This is a fallback - we'll handle this differently
+    throw new Error('TAR.GZ extraction not implemented yet')
+  } else {
+    throw new Error(`Unsupported archive format: ${archiveName}`)
+  }
 }
 
 export async function POST(req: Request) {
@@ -244,9 +253,24 @@ export async function POST(req: Request) {
 
       // Ensure zip utility is available
       console.log('Ensuring zip utility is available...')
-      await sandbox.executeCommand('which zip || (apt-get update && apt-get install -y zip)', {
-        workingDirectory: '/project'
-      })
+      try {
+        const checkZipResult = await sandbox.executeCommand('which zip', {
+          workingDirectory: '/project'
+        })
+        if (checkZipResult.exitCode !== 0) {
+          console.log('Zip not found, trying to install...')
+          // Try with sudo if available
+          await sandbox.executeCommand('sudo apt-get update && sudo apt-get install -y zip', {
+            workingDirectory: '/project'
+          })
+        } else {
+          console.log('Zip utility already available')
+        }
+      } catch (error) {
+        console.warn('Failed to install zip utility:', error)
+        // Continue without zip - we'll use tar instead
+        console.log('Will use tar for compression instead')
+      }
 
       // Check if dist folder exists
       console.log('Checking if dist folder exists...')
@@ -260,29 +284,101 @@ export async function POST(req: Request) {
         throw new Error('Build did not create dist folder. Please check your build configuration.')
       }
 
-      // Compress dist folder
+      // Compress dist folder (prefer tar over zip for better compatibility)
       console.log('Compressing dist folder...')
-      const zipResult = await sandbox.executeCommand(
-        'cd /project && zip -r dist.zip dist/',
-        { workingDirectory: '/project' }
-      )
+      let compressionSuccess = false
+      let archiveName = 'dist.tar.gz'
 
-      if (zipResult.exitCode !== 0) {
-        console.error('ZIP creation failed:', zipResult.stderr)
-        console.error('ZIP stdout:', zipResult.stdout)
-        throw new Error(`ZIP creation failed with exit code ${zipResult.exitCode}: ${zipResult.stderr}`)
+      try {
+        // Try tar first (usually available without installation)
+        const tarResult = await sandbox.executeCommand(
+          'cd /project && tar -czf dist.tar.gz dist/',
+          { workingDirectory: '/project' }
+        )
+
+        if (tarResult.exitCode === 0) {
+          console.log('Dist folder compressed with tar successfully')
+          compressionSuccess = true
+        } else {
+          throw new Error(`TAR failed: ${tarResult.stderr}`)
+        }
+      } catch (tarError) {
+        console.warn('TAR compression failed, trying zip:', tarError)
+
+        // Fallback to zip
+        try {
+          const zipResult = await sandbox.executeCommand(
+            'cd /project && zip -r dist.zip dist/',
+            { workingDirectory: '/project' }
+          )
+
+          if (zipResult.exitCode === 0) {
+            console.log('Dist folder compressed with zip successfully')
+            archiveName = 'dist.zip'
+            compressionSuccess = true
+          } else {
+            throw new Error(`ZIP failed: ${zipResult.stderr}`)
+          }
+        } catch (zipError) {
+          console.error('Both TAR and ZIP compression failed:', zipError)
+          throw new Error('Failed to compress dist folder with both tar and zip')
+        }
       }
-      console.log('Dist folder compressed successfully')
 
-      // Download the ZIP file
-      console.log('Downloading ZIP file from sandbox...')
-      const zipContent = await sandbox.downloadFile('/project/dist.zip')
-      console.log(`Downloaded ZIP file: ${zipContent.length} bytes`)
+      if (!compressionSuccess) {
+        throw new Error('Compression failed')
+      }
 
-      // Extract files from ZIP
-      console.log('Extracting files from ZIP...')
-      const { files: extractedFiles, paths: filePaths } = await extractZip(Buffer.from(zipContent))
-      console.log(`Extracted ${extractedFiles.length} files from ZIP`)
+      // Download the archive file
+      console.log(`Downloading ${archiveName} from sandbox...`)
+      const archiveContent = await sandbox.downloadFile(`/project/${archiveName}`)
+      console.log(`Downloaded archive file: ${archiveContent.length} bytes`)
+
+      // Extract files from archive
+      console.log(`Extracting files from ${archiveName}...`)
+      let extractedFiles: Buffer[] = []
+      let filePaths: string[] = []
+
+      if (archiveName.endsWith('.tar.gz')) {
+        // Extract tar.gz in sandbox and download individual files
+        console.log('Extracting tar.gz in sandbox...')
+        const extractResult = await sandbox.executeCommand(
+          'cd /project && mkdir -p extracted && tar -xzf dist.tar.gz -C extracted/',
+          { workingDirectory: '/project' }
+        )
+
+        if (extractResult.exitCode !== 0) {
+          throw new Error(`TAR extraction failed: ${extractResult.stderr}`)
+        }
+
+        // List all files in the extracted directory
+        const listResult = await sandbox.executeCommand(
+          'cd /project/extracted && find . -type f',
+          { workingDirectory: '/project' }
+        )
+
+        if (listResult.exitCode === 0) {
+          const filesList = listResult.stdout.trim().split('\n').filter(f => f.length > 0)
+
+          for (const filePath of filesList) {
+            try {
+              const cleanPath = filePath.startsWith('./') ? filePath.substring(2) : filePath
+              const fileContent = await sandbox.downloadFile(`/project/extracted/${cleanPath}`)
+              extractedFiles.push(fileContent)
+              filePaths.push(cleanPath)
+            } catch (error) {
+              console.warn(`Failed to download file ${filePath}:`, error)
+            }
+          }
+        }
+      } else {
+        // Handle ZIP files
+        const result = await extractArchive(Buffer.from(archiveContent), archiveName)
+        extractedFiles = result.files
+        filePaths = result.paths
+      }
+
+      console.log(`Extracted ${extractedFiles.length} files from archive`)
 
       // Upload to Supabase Storage
       console.log('Uploading files to Supabase Storage...')
