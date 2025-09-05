@@ -17,7 +17,7 @@ export default function OAuthRedirectPage() {
         const params = new URLSearchParams(hash)
         const provider = params.get('provider')
         const code = params.get('code')
-        const next = params.get('next') || '/workspace'
+        const next = params.get('next') || '/'
 
         if (!provider || !code) {
           toast({ title: 'OAuth Error', description: 'Missing provider or code in redirect.' })

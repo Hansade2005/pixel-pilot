@@ -32,7 +32,7 @@ export default function SignupPage() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/workspace`,
+          emailRedirectTo: `${window.location.origin}/`,
           data: {
             full_name: fullName,
           },
@@ -57,7 +57,7 @@ export default function SignupPage() {
         provider: 'github',
         options: {
           scopes: 'repo read:user workflow',
-          redirectTo: `${window.location.origin}/workspace`,
+          redirectTo: `${window.location.origin}/`,
         },
       })
       if (error) throw error

@@ -14,7 +14,7 @@ const poppins = Poppins({
 })
 
 export const metadata: Metadata = {
-  title: 'Pixel Pilot - Plan, build & ship',
+  title: 'Pixel Pilot - Plan, build & ship faster with AI',
   description: 'Plan, build & ship faster with Pixel Pilot. Create webapps by chatting with AI.',
   keywords: ['AI', 'app development',"mobile development","Canadian Vibe Coding Agent", 'web development', 'chat to code', 'pixel pilot'],
   authors: [{ name: 'Pixel Pilot' }],
