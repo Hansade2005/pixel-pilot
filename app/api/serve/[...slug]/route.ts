@@ -38,9 +38,21 @@ export async function GET(
 
     // Get the requested file path
     const slug = params.slug || []
-    const filePath = slug.length > 0 ? slug.join('/') : 'index.html'
+    
+    // Handle circular reference case where slug is ['api', 'serve']
+    let filePath = 'index.html'
+    if (slug.length > 0) {
+      if (slug[0] === 'api' && slug[1] === 'serve') {
+        // This is a circular reference, treat as root request
+        filePath = 'index.html'
+      } else {
+        filePath = slug.join('/')
+      }
+    }
 
     console.log(`Serving ${filePath} for subdomain ${subdomain}`)
+    console.log(`Slug array:`, slug)
+    console.log(`Request URL:`, req.url)
 
     // Check if the subdomain exists in our Supabase tracking
     const supabase = await createClient()

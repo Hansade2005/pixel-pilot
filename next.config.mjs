@@ -13,8 +13,8 @@ const nextConfig = {
     return [
       // Handle wildcard subdomains for pipilot.dev
       {
-        source: '/:path*',
-        destination: '/api/serve/:path*',
+        source: '/((?!api/).*)',
+        destination: '/api/serve/$1',
         has: [
           {
             type: 'host',
