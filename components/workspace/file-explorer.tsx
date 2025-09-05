@@ -1030,11 +1030,29 @@ enabled = false`
         await storageManager.deleteFile(project.id, file.path)
       }
       
+      // Also delete the folder itself if it exists as a directory record
+      const folderFile = projectFiles.find(file => file.path === folderPath && file.isDirectory)
+      if (folderFile) {
+        await storageManager.deleteFile(project.id, folderPath)
+        console.log('Deleted folder record:', folderPath)
+      }
+      
       console.log(`Deleted ${filesInFolder.length} files from folder: ${folderPath}`)
+      
+      // Show success toast
+      toast({
+        title: "Folder Deleted",
+        description: `Successfully deleted folder and ${filesInFolder.length} files inside it.`
+      })
       
       await fetchFiles()
     } catch (error) {
       console.error("Error deleting folder from IndexedDB:", error)
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete folder. Please try again.",
+        variant: "destructive"
+      })
     }
   }
 
