@@ -216,42 +216,79 @@ export async function POST(req: Request) {
       console.log('Files written to sandbox')
 
       // Install dependencies
-      await sandbox.installDependenciesRobust("/project", {
+      console.log('Installing dependencies...')
+      const installResult = await sandbox.installDependenciesRobust("/project", {
         timeoutMs: 0,
         onStdout: (data) => console.log(`[npm Install] ${data}`),
         onStderr: (data) => console.warn(`[npm Install Error] ${data}`),
       })
-      console.log('Dependencies installed')
+
+      if (installResult.exitCode !== 0) {
+        console.error('Dependency installation failed:', installResult.stderr)
+        throw new Error(`Dependency installation failed with exit code ${installResult.exitCode}`)
+      }
+      console.log('Dependencies installed successfully')
 
       // Build the project
+      console.log('Building project with npm run build...')
       const buildResult = await sandbox.executeCommand('npm run build', {
         workingDirectory: '/project'
       })
 
       if (buildResult.exitCode !== 0) {
-        throw new Error(`Build failed: ${buildResult.stderr}`)
+        console.error('Build failed:', buildResult.stderr)
+        console.error('Build stdout:', buildResult.stdout)
+        throw new Error(`Build failed with exit code ${buildResult.exitCode}: ${buildResult.stderr}`)
       }
       console.log('Project built successfully')
 
+      // Ensure zip utility is available
+      console.log('Ensuring zip utility is available...')
+      await sandbox.executeCommand('which zip || (apt-get update && apt-get install -y zip)', {
+        workingDirectory: '/project'
+      })
+
+      // Check if dist folder exists
+      console.log('Checking if dist folder exists...')
+      const checkDistResult = await sandbox.executeCommand(
+        'cd /project && ls -la dist/',
+        { workingDirectory: '/project' }
+      )
+
+      if (checkDistResult.exitCode !== 0) {
+        console.error('Dist folder not found:', checkDistResult.stderr)
+        throw new Error('Build did not create dist folder. Please check your build configuration.')
+      }
+
       // Compress dist folder
+      console.log('Compressing dist folder...')
       const zipResult = await sandbox.executeCommand(
         'cd /project && zip -r dist.zip dist/',
         { workingDirectory: '/project' }
       )
 
       if (zipResult.exitCode !== 0) {
-        throw new Error(`Failed to create ZIP: ${zipResult.stderr}`)
+        console.error('ZIP creation failed:', zipResult.stderr)
+        console.error('ZIP stdout:', zipResult.stdout)
+        throw new Error(`ZIP creation failed with exit code ${zipResult.exitCode}: ${zipResult.stderr}`)
       }
+      console.log('Dist folder compressed successfully')
 
       // Download the ZIP file
-      const zipContent = await sandbox.getNativeInstance().files.read('/project/dist.zip')
+      console.log('Downloading ZIP file from sandbox...')
+      const zipContent = await sandbox.downloadFile('/project/dist.zip')
+      console.log(`Downloaded ZIP file: ${zipContent.length} bytes`)
 
       // Extract files from ZIP
+      console.log('Extracting files from ZIP...')
       const { files: extractedFiles, paths: filePaths } = await extractZip(Buffer.from(zipContent))
+      console.log(`Extracted ${extractedFiles.length} files from ZIP`)
 
       // Upload to Supabase Storage
+      console.log('Uploading files to Supabase Storage...')
       const deploymentUrl = await uploadBuildToSupabase(subdomain, extractedFiles, filePaths)
       const storagePath = `projects/${subdomain}`
+      console.log(`Files uploaded successfully to ${storagePath}`)
 
       // Record deployment in IndexedDB (storage-manager)
       const deploymentRecord = await storageManager.createDeployment({
