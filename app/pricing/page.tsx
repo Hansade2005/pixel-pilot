@@ -12,6 +12,42 @@ import { Footer } from "@/components/footer"
 
 export default function PricingPage() {
   const [isAnnual, setIsAnnual] = useState(false)
+  const [openFAQ, setOpenFAQ] = useState<number | null>(null)
+
+  const faqData = [
+    {
+      question: "What is Pixel Pilot and how does it work?",
+      answer: "Pixel Pilot is an AI-powered development platform that helps you build web applications faster. Simply describe what you want to build, and our AI generates the code, handles the setup, and deploys your project automatically."
+    },
+    {
+      question: "What does the free plan include?",
+      answer: "The free plan includes 5 daily credits (up to 30 per month), public projects, unlimited collaborators, and access to all basic features. It's perfect for trying out Pixel Pilot and building small projects."
+    },
+    {
+      question: "What is a credit?",
+      answer: "A credit is used each time you make a request to our AI system. This includes generating code, making modifications, or deploying projects. Credits are consumed based on the complexity of your request."
+    },
+    {
+      question: "What tech stacks does Pixel Pilot know?",
+      answer: "Pixel Pilot supports modern web technologies including React, Next.js, Vue.js, Node.js, TypeScript, Tailwind CSS, and many popular libraries and frameworks. We're constantly adding support for new technologies."
+    },
+    {
+      question: "Who owns the projects and code?",
+      answer: "You own 100% of your projects and code. All generated code is yours to use, modify, and distribute as you see fit. We don't claim any ownership over your creations."
+    },
+    {
+      question: "How much does it cost to use?",
+      answer: "Pixel Pilot offers a free tier with 30 credits per month. Paid plans start at $25/month for Pro (100 credits) and $50/month for Business (100 credits with additional features). Enterprise plans are available with custom pricing."
+    },
+    {
+      question: "Do you offer a student discount?",
+      answer: "Yes! We offer up to 50% off Pixel Pilot Pro for verified students. Contact our support team with your student verification to get started with the discount."
+    },
+    {
+      question: "Where can I find out more?",
+      answer: "You can learn more about Pixel Pilot by visiting our documentation, joining our community Discord, or contacting our support team. We also have tutorials and examples to help you get started."
+    }
+  ]
 
   const pricingTiers = [
     {
@@ -193,21 +229,26 @@ export default function PricingPage() {
           <div className="mb-16">
             <h2 className="text-3xl font-bold text-white mb-8 text-center">Frequently Asked Questions</h2>
             <div className="space-y-4 max-w-3xl mx-auto">
-              {[
-                "What is Pixel Pilot and how does it work?",
-                "What does the free plan include?",
-                "What is a credit?",
-                "What tech stacks does Pixel Pilot know?",
-                "Who owns the projects and code?",
-                "How much does it cost to use?",
-                "Do you offer a student discount?",
-                "Where can I find out more?"
-              ].map((question, index) => (
-                <div key={index} className="bg-gray-800/50 rounded-lg p-4 backdrop-blur-sm border border-gray-700/50">
-                  <div className="flex items-center justify-between cursor-pointer">
-                    <span className="text-white font-medium">{question}</span>
-                    <ChevronDown className="w-5 h-5 text-gray-400" />
+              {faqData.map((faq, index) => (
+                <div key={index} className="bg-gray-800/50 rounded-lg backdrop-blur-sm border border-gray-700/50 overflow-hidden">
+                  <div 
+                    className="flex items-center justify-between cursor-pointer p-4 hover:bg-gray-700/50 transition-colors"
+                    onClick={() => setOpenFAQ(openFAQ === index ? null : index)}
+                  >
+                    <span className="text-white font-medium pr-4">{faq.question}</span>
+                    <ChevronDown 
+                      className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${
+                        openFAQ === index ? 'rotate-180' : ''
+                      }`} 
+                    />
                   </div>
+                  {openFAQ === index && (
+                    <div className="px-4 pb-4">
+                      <div className="text-gray-300 leading-relaxed">
+                        {faq.answer}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
