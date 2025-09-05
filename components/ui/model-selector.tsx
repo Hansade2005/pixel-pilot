@@ -34,6 +34,13 @@ export function ModelSelector({
   // Function to truncate text to 3 characters for all models
   const truncateModelName = (text: string | undefined) => {
     if (!text) return '';
+    
+    // For "auto" model, truncate to 3 chars but no ellipsis
+    if (text.toLowerCase() === 'auto') {
+      return text.length > 3 ? text.substring(0, 3) : text;
+    }
+    
+    // For all other models, truncate to 3 characters with ellipsis
     return text.length > 3 ? text.substring(0, 3) + '...' : text;
   };
 
