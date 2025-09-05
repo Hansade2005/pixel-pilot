@@ -29,8 +29,11 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Redirect unauthenticated users to login, except for auth pages and landing page
-  if (!user && !request.nextUrl.pathname.startsWith("/auth") && request.nextUrl.pathname !== "/") {
+  // Redirect unauthenticated users to login, except for auth pages, landing page, and public pages
+  const publicPages = ["/", "/community", "/pricing", "/enterprise", "/learn", "/launched"]
+  const isPublicPage = publicPages.includes(request.nextUrl.pathname)
+  
+  if (!user && !request.nextUrl.pathname.startsWith("/auth") && !isPublicPage) {
     const url = request.nextUrl.clone()
     url.pathname = "/auth/login"
     return NextResponse.redirect(url)
