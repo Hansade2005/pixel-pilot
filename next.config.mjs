@@ -18,7 +18,7 @@ const nextConfig = {
         has: [
           {
             type: 'host',
-            value: '*.pipilot.dev'
+            value: '^[a-z0-9][a-z0-9-]*[a-z0-9]\\.pipilot\\.dev$'
           }
         ]
       }
