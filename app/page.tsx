@@ -67,7 +67,7 @@ export default function LandingPage() {
       <main className="relative z-10 flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] px-4 pt-16">
         {/* Hero Section */}
         <div className="text-center mb-16">
-          <h1 className="text-2xl sm:text-4xl md:text-7xl lg:text-8xl font-bold text-white mb-4 md:mb-6 leading-tight">
+          <h2 className="text-2xl sm:text-4xl md:text-7xl lg:text-8xl font-bold text-white mb-4 md:mb-6 leading-tight">
             Build something{" "}
             <span className="inline-flex items-center">
               <div className="w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 rounded-full heart-gradient flex items-center justify-center mx-1 sm:mx-2">
@@ -75,7 +75,7 @@ export default function LandingPage() {
               </div>
               Amazing
             </span>
-          </h1>
+          </h2>
           <p className="text-xl md:text-2xl text-white/80 max-w-2xl mx-auto">
             Create webapps by chatting with AI.
           </p>
