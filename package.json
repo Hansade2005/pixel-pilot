@@ -19,6 +19,7 @@
     "@ai-sdk/ui-utils": "^1.2.11",
     "@codesandbox/sandpack-react": "^2.20.0",
     "@e2b/code-interpreter": "^2.0.0",
+    "adm-zip": "^0.5.10",
     "@hookform/resolvers": "^3.10.0",
     "@monaco-editor/react": "^4.7.0",
     "@octokit/rest": "^22.0.0",

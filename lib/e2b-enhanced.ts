@@ -465,6 +465,24 @@ export class EnhancedE2BSandbox {
   }
 
   /**
+   * Read a file from the sandbox
+   */
+  async readFile(filePath: string): Promise<Buffer | null> {
+    try {
+      if (this.container.files && typeof this.container.files.read === 'function') {
+        return await this.container.files.read(filePath)
+      } else if (this.container.filesystem && typeof this.container.filesystem.read === 'function') {
+        return await this.container.filesystem.read(filePath)
+      } else {
+        throw new Error('No valid file read method found on container')
+      }
+    } catch (error) {
+      console.error(`[${this.id}] Error reading file ${filePath}:`, error)
+      throw error
+    }
+  }
+
+  /**
    * Get sandbox information and status
    */
   async getInfo(): Promise<any> {

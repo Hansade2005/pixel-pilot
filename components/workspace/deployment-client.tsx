@@ -109,6 +109,7 @@ import {
   Signal
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { PipilotDeploy } from "./pipilot-deploy"
 import { storageManager, type Workspace as Project, type Deployment, type EnvironmentVariable } from "@/lib/storage-manager"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
@@ -1322,7 +1323,7 @@ export default function DeploymentClient() {
         {/* Interactive Deployment Cards */}
         <div className="mb-6">
           <h2 className="text-2xl font-bold mb-4">Choose Deployment Platform</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {/* GitHub Card */}
             <Card
               className={`bg-gray-800 border-gray-700 cursor-pointer transition-all duration-200 hover:shadow-lg ${
@@ -1486,6 +1487,50 @@ export default function DeploymentClient() {
                     </p>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* Pipilot Card */}
+            <Card
+              className={`bg-gray-800 border-gray-700 cursor-pointer transition-all duration-200 hover:shadow-lg ${
+                activeTab === 'pipilot' ? 'ring-2 ring-purple-500 shadow-lg' : ''
+              }`}
+              onClick={() => setActiveTab('pipilot')}
+            >
+              <CardHeader className="text-center">
+                <div className="flex justify-center mb-2">
+                  <div className={`p-3 rounded-full ${activeTab === 'pipilot' ? 'bg-purple-900' : 'bg-gray-700'}`}>
+                    <Rocket className={`h-8 w-8 ${activeTab === 'pipilot' ? 'text-purple-400' : 'text-gray-300'}`} />
+                  </div>
+                </div>
+                <CardTitle className="flex items-center justify-center space-x-2 text-white">
+                  <span>Pipilot</span>
+                  <Badge variant="secondary" className="text-xs bg-purple-700 text-purple-300">
+                    New
+                  </Badge>
+                </CardTitle>
+                <CardDescription className="text-gray-400">Deploy to pipilot.dev subdomain</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm text-gray-400">
+                  <div className="flex items-center space-x-2">
+                    <Rocket className="h-4 w-4" />
+                    <span>Instant deployment</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Globe className="h-4 w-4" />
+                    <span>Custom subdomain</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Zap className="h-4 w-4" />
+                    <span>Auto-build & optimize</span>
+                  </div>
+                </div>
+                <div className="mt-4 p-2 bg-purple-900 rounded-lg">
+                  <p className="text-xs text-purple-300">
+                    <code className="bg-purple-800 px-1 rounded">sitename.pipilot.dev</code>
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -2379,6 +2424,23 @@ export default function DeploymentClient() {
                     )}
                   </Button>
                 </div>
+              </div>
+            )}
+
+            {/* Pipilot Deployment Form */}
+            {activeTab === 'pipilot' && selectedProject && (
+              <div className="space-y-6">
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-white mb-2">Deploy to Pipilot</h3>
+                  <p className="text-gray-400 mb-6">
+                    Deploy your project to a custom subdomain on pipilot.dev
+                  </p>
+                </div>
+                
+                <PipilotDeploy 
+                  projectId={selectedProject.id}
+                  projectName={selectedProject.name}
+                />
               </div>
             )}
           </CardContent>
