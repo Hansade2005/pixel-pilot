@@ -398,12 +398,21 @@ export async function POST(req: Request) {
 
       // Record subdomain tracking in Supabase
       const supabase = await createClient()
+
+      // Convert workspaceId to UUID format if needed
+      let workspaceUuid = workspaceId
+      if (workspaceId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspaceId)) {
+        // If not a UUID, try to convert or use user ID as fallback
+        console.warn(`Invalid UUID format for workspaceId: ${workspaceId}, using user ID instead`)
+        workspaceUuid = user.id
+      }
+
       const { error: trackingError } = await supabase
         .from('subdomain_tracking')
         .insert({
           subdomain,
           user_id: user.id,
-          workspace_id: workspaceId,
+          workspace_id: workspaceUuid,
           deployment_url: deploymentUrl,
           storage_path: storagePath,
           is_active: true

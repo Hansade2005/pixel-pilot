@@ -10,6 +10,24 @@ export async function GET(
   { params }: { params: { slug: string[] } }
 ) {
   try {
+    // Handle test requests for debugging
+    if (params.slug && params.slug[0] === 'test') {
+      const host = req.headers.get('host') || ''
+      const subdomain = getSubdomainFromHost(host)
+
+      return new NextResponse(JSON.stringify({
+        message: 'Wildcard routing test',
+        host,
+        subdomain,
+        params,
+        timestamp: new Date().toISOString()
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+    }
+
     // Get the subdomain from the request
     const host = req.headers.get('host') || ''
     const subdomain = getSubdomainFromHost(host)
@@ -29,8 +47,16 @@ export async function GET(
     const { data: subdomainInfo, error } = await supabase
       .rpc('get_subdomain_info', { subdomain_param: subdomain })
 
-    if (error || !subdomainInfo || subdomainInfo.length === 0) {
-      return new NextResponse('Subdomain not found', { status: 404 })
+    console.log(`Subdomain lookup result:`, { error, dataLength: subdomainInfo?.length, subdomainInfo })
+
+    if (error) {
+      console.error('Database error:', error)
+      return new NextResponse(`Database error: ${error.message}`, { status: 500 })
+    }
+
+    if (!subdomainInfo || subdomainInfo.length === 0) {
+      console.log(`Subdomain ${subdomain} not found in tracking`)
+      return new NextResponse(`Subdomain ${subdomain} not found. Please redeploy to create tracking record.`, { status: 404 })
     }
 
     const deployment = subdomainInfo[0]
@@ -152,3 +178,4 @@ export async function OPTIONS(req: NextRequest) {
     },
   })
 }
+
