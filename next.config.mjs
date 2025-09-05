@@ -13,25 +13,8 @@ const nextConfig = {
     return [
       // Handle root path for wildcard subdomains
       {
-        source: '/',
-        destination: '/api/serve/',
-        has: [
-          {
-            type: 'host',
-            value: '^[a-z0-9][a-z0-9-]*[a-z0-9]\\.pipilot\\.dev$'
-          }
-        ]
-      },
-      // Handle all other paths for wildcard subdomains
-      {
-        source: '/((?!api/).+)',
-        destination: '/api/serve/$1',
-        has: [
-          {
-            type: 'host',
-            value: '^[a-z0-9][a-z0-9-]*[a-z0-9]\\.pipilot\\.dev$'
-          }
-        ]
+        source: '/api/serve/:path*',
+        destination: '/api/serve/[...slug]/route'
       }
     ]
   },
