@@ -399,6 +399,7 @@ export async function POST(req: Request) {
       }
 
       console.log(`Extracted ${extractedFiles.length} files from archive`)
+      console.log(`File paths:`, filePaths)
 
       // Upload to Supabase Storage
       console.log('Uploading files to Supabase Storage...')
