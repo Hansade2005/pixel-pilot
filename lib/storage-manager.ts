@@ -203,7 +203,7 @@ export interface StorageInterface {
   getCloudflarePagesProject(id: string): Promise<CloudflarePagesProject | null>;
   updateCloudflarePagesProject(id: string, updates: Partial<CloudflarePagesProject>): Promise<CloudflarePagesProject | null>;
   deleteCloudflarePagesProject(id: string): Promise<boolean>;
-
+  
   // Additional utility methods
   importTable(tableName: string, data: any[]): Promise<void>;
   

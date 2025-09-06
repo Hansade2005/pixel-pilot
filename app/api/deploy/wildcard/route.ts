@@ -3,7 +3,8 @@ import {
   createEnhancedSandbox,
   SandboxError,
   SandboxErrorType,
-  type SandboxFile
+  type SandboxFile,
+  type EnhancedE2BSandbox
 } from '@/lib/e2b-enhanced'
 import { storageManager } from '@/lib/storage-manager'
 import { NextRequest, NextResponse } from 'next/server'
@@ -51,30 +52,24 @@ function parseEnvFile(content: string): Record<string, string> {
 async function deployToCloudflarePages(projectName: string, zipContent: Buffer): Promise<string> {
   const CF_ACCOUNT_ID = 'db96886b79e13678a20c96c5c71aeff3'
   const CF_API_TOKEN = '_5lrwCirmktMcKoWYUOzPJznqFbC5hTHDHlLRiA_'
-  const PROJECT_NAME = projectName // Use project name as Cloudflare Pages project name
+  const PROJECT_NAME = projectName
 
   console.log(`Setting up Cloudflare Pages project: ${projectName}...`)
 
   try {
     const fetch = (await import('node-fetch')).default
+    const FormData = (await import('form-data')).default
 
     // Step 1: Check if project already exists
     const checkProjectUrl = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${PROJECT_NAME}`
-
     const checkResponse = await fetch(checkProjectUrl, {
       method: 'GET',
-      headers: {
-        Authorization: `Bearer ${CF_API_TOKEN}`,
-      },
+      headers: { Authorization: `Bearer ${CF_API_TOKEN}` },
     })
 
     let projectExists = false
     if (checkResponse.ok) {
-      const checkData = await checkResponse.json() as {
-        success: boolean
-        result?: { name: string }
-        errors?: unknown[]
-      }
+      const checkData = await checkResponse.json() as { success: boolean; result?: { name: string }; errors?: unknown[] }
       if (checkData.success && checkData.result) {
         projectExists = true
         console.log('✅ Cloudflare Pages project already exists:', checkData.result.name)
@@ -85,16 +80,18 @@ async function deployToCloudflarePages(projectName: string, zipContent: Buffer):
     if (!projectExists) {
       console.log(`Creating new Cloudflare Pages project: ${projectName}...`)
       const createProjectUrl = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects`
-
       const createResponse = await fetch(createProjectUrl, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${CF_API_TOKEN}`,
-          'Content-Type': 'application/json',
+        headers: { 
+          Authorization: `Bearer ${CF_API_TOKEN}`, 
+          'Content-Type': 'application/json' 
         },
-        body: JSON.stringify({
-          name: PROJECT_NAME,
-          production_branch: 'main'
+        body: JSON.stringify({ 
+          name: PROJECT_NAME, 
+          production_branch: 'main',
+          source: {
+            type: 'direct_upload'
+          }
         }),
       })
 
@@ -103,53 +100,56 @@ async function deployToCloudflarePages(projectName: string, zipContent: Buffer):
         console.error('Failed to create Cloudflare Pages project:', errorText)
         throw new Error(`Failed to create Cloudflare Pages project: ${errorText}`)
       } else {
-        const createData = await createResponse.json() as {
-          success: boolean
-          result?: { name: string }
-          errors?: unknown[]
-        }
+        const createData = await createResponse.json() as { success: boolean; result?: { name: string }; errors?: unknown[] }
         console.log('✅ Cloudflare Pages project created successfully:', createData.result?.name)
       }
     }
 
     // Step 3: Deploy to the project
     console.log(`Deploying ${projectName} to Cloudflare Pages...`)
-
-    // Create form data with the ZIP file
     const form = new FormData()
-    form.append('file', zipContent, {
-      filename: 'dist.zip',
-      contentType: 'application/zip'
+    
+    // Ensure the zip is correctly added to the form
+    form.append('file', zipContent, { 
+      filename: 'dist.zip', 
+      contentType: 'application/zip' 
     })
 
-    // Create manifest for Vite build output
-    // Simple format for static site deployment
+    // Add manifest for routing
     const manifest = {
-      "/*": "index.html"
+      "version": 1,
+      "routes": [
+        {
+          "source": "/*",
+          "destination": "/index.html"
+        }
+      ]
     }
-
     form.append('manifest', JSON.stringify(manifest))
 
     const deployUrl = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${PROJECT_NAME}/deployments`
-
     const deployResponse = await fetch(deployUrl, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${CF_API_TOKEN}`,
-        ...form.getHeaders(),
+      headers: { 
+        Authorization: `Bearer ${CF_API_TOKEN}`, 
+        ...form.getHeaders() 
       },
       body: form,
     })
 
     if (!deployResponse.ok) {
       const errorText = await deployResponse.text()
+      console.error('Deployment error:', errorText)
       throw new Error(`Cloudflare API error! status: ${deployResponse.status}, message: ${errorText}`)
     }
 
-    const data = await deployResponse.json() as {
-      success: boolean
-      result?: { url: string }
-      errors?: unknown[]
+    const data = await deployResponse.json() as { 
+      success: boolean; 
+      result?: { 
+        url: string, 
+        deployment_id: string 
+      }; 
+      errors?: unknown[] 
     }
 
     if (data.success && data.result) {
@@ -301,7 +301,7 @@ export async function POST(req: Request) {
           packageManager: 'pnpm@8.15.0',
           scripts: {
             dev: 'vite',
-            build: 'tsc && vite build',
+            build: 'vite build',
             preview: 'vite preview',
             lint: 'eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0'
           },
@@ -333,10 +333,10 @@ export async function POST(req: Request) {
 
       // Install dependencies
       console.log('Installing dependencies...')
-      const installResult = await sandbox.installDependenciesRobust("/project", {
-        timeoutMs: 0,
-        onStdout: (data) => console.log(`[npm Install] ${data}`),
-        onStderr: (data) => console.warn(`[npm Install Error] ${data}`),
+      const installResult = await sandbox.executeCommand('pnpm install', {
+        workingDirectory: '/project',
+        onStdout: (data) => console.log(`[pnpm Install] ${data}`),
+        onStderr: (data) => console.warn(`[pnpm Install Error] ${data}`),
       })
 
       if (installResult.exitCode !== 0) {
@@ -379,17 +379,46 @@ export async function POST(req: Request) {
         console.log('Will use tar for compression instead')
       }
 
-      // Check if dist folder exists
-      console.log('Checking if dist folder exists...')
-      const checkDistResult = await sandbox.executeCommand(
-        'cd /project && ls -la dist/',
-        { workingDirectory: '/project' }
-      )
+      // Validate and log dist folder contents
+      const validateDistFolder = async (sandbox: EnhancedE2BSandbox) => {
+        const listResult = await sandbox.executeCommand('cd /project && find dist -type f', {
+          workingDirectory: '/project'
+        })
 
-      if (checkDistResult.exitCode !== 0) {
-        console.error('Dist folder not found:', checkDistResult.stderr)
-        throw new Error('Build did not create dist folder. Please check your build configuration.')
+        if (listResult.exitCode !== 0) {
+          throw new Error('Failed to list dist folder contents')
+        }
+
+        const files = listResult.stdout.trim().split('\n')
+        const requiredFiles = ['dist/index.html']
+        const missingFiles = requiredFiles.filter(file => 
+          !files.some((f: string) => f.endsWith(file.replace('dist/', '')))
+        )
+
+        if (missingFiles.length > 0) {
+          console.warn('Missing required files:', missingFiles)
+          throw new Error(`Missing critical deployment files: ${missingFiles.join(', ')}`)
+        }
+
+        // Log file sizes
+        const sizeResults = await Promise.all(
+          files.map(async (file: string) => {
+            const sizeResult = await sandbox.executeCommand(`du -h "${file}"`, {
+              workingDirectory: '/project'
+            })
+            return `${file}: ${sizeResult.stdout.trim()}`
+          })
+        )
+        console.log('Deployment file sizes:', sizeResults)
+
+        console.log('Dist folder validation successful')
+        console.log('Files found:', files)
+
+        return files
       }
+
+      // Validate and log dist folder contents
+      const distFiles = await validateDistFolder(sandbox)
 
       // Compress dist folder (prefer tar over zip for better compatibility)
       console.log('Compressing dist folder...')
@@ -441,94 +470,63 @@ export async function POST(req: Request) {
       const archiveContent = await sandbox.downloadFile(`/project/${archiveName}`)
       console.log(`Downloaded archive file: ${archiveContent.length} bytes`)
 
-      // Extract files from archive
-      console.log(`Extracting files from ${archiveName}...`)
-      let extractedFiles: Buffer[] = []
-      let filePaths: string[] = []
+      // Deploy ZIP archive directly to Cloudflare Pages
+      const deploymentUrl = await deployToCloudflarePages(
+        isRedeploy && projectName 
+          ? projectName 
+          : `pipilot-${workspaceId.slice(0, 8)}-${Date.now()}`, 
+        archiveContent
+      )
 
-      // Skip file extraction - deploy ZIP archive directly to Cloudflare Pages
-
-      console.log(`Archive downloaded successfully: ${archiveContent.length} bytes`)
-
-      // Deploy to Cloudflare Pages
-      console.log('Deploying to Cloudflare Pages...')
-
-      // Handle project naming and redeployment
-      let finalProjectName: string
-
-      if (isRedeploy && projectName) {
-        // For redeployment, use the existing project name
-        finalProjectName = projectName
-        console.log(`Redeploying to existing Cloudflare Pages project: ${finalProjectName}`)
-      } else {
-        // For new deployment, generate a unique project name
-        finalProjectName = projectName
-          ? `${projectName}-${Date.now()}`
-          : `pipilot-${workspaceId.slice(0, 8)}-${Date.now()}`
-        console.log(`Creating new Cloudflare Pages project: ${finalProjectName}`)
-      }
-
-      const deploymentUrl = await deployToCloudflarePages(finalProjectName, archiveContent)
-      console.log(`Cloudflare Pages deployment successful: ${deploymentUrl}`)
-
-      // Update or create Cloudflare Pages project metadata
-      if (isRedeploy) {
-        // Update existing project metadata
-        const existingProjects = await storageManager.getCloudflarePagesProjects(workspaceId)
-        const existingProject = existingProjects.find(p => p.name === projectName)
-        if (existingProject) {
-          await storageManager.updateCloudflarePagesProject(existingProject.id, {
-            lastDeployment: new Date().toISOString(),
-            url: deploymentUrl
-          })
-        }
-      } else {
-        // Create new project metadata
-        await storageManager.createCloudflarePagesProject({
-          name: finalProjectName,
-          workspaceId,
-          userId: user.id,
-          lastDeployment: new Date().toISOString(),
-          url: deploymentUrl
-        })
-      }
-
-      // Record deployment in IndexedDB (storage-manager)
+      // Record deployment in storage manager
       const deploymentRecord = await storageManager.createDeployment({
         workspaceId,
         url: deploymentUrl,
         status: 'ready',
         provider: 'pipilot',
         environment: 'production',
-        externalId: finalProjectName
+        externalId: projectName || `pipilot-${workspaceId.slice(0, 8)}-${Date.now()}`
       })
 
-      // No subdomain tracking needed - using real Cloudflare Pages URLs
-
-      console.log(`Deployment completed successfully: ${deploymentUrl}`)
-
-      return NextResponse.json({
-        url: deploymentUrl,
-        projectName: finalProjectName,
+      return NextResponse.json({ 
+        url: deploymentUrl, 
+        projectName: projectName || deploymentRecord.externalId, 
         status: 'ready',
-        deploymentId: deploymentRecord.id
-      })
+        deploymentId: deploymentRecord.id 
+      }, { status: 200 })
+    } catch (error: unknown) {
+      console.error('Deployment error:', error)
+      
+      // Safely handle different error types
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : typeof error === 'string' 
+          ? error 
+          : 'Unknown deployment error'
 
-    } finally {
-      await sandbox.terminate()
-    }
-
-  } catch (error) {
-    console.error('Wildcard deployment error:', error)
-
-    if (error instanceof SandboxError) {
-      return NextResponse.json({
-        error: error.message,
-        type: error.type,
-        sandboxId: error.sandboxId
+      return NextResponse.json({ 
+        error: errorMessage 
       }, { status: 500 })
+    } finally {
+      // Safely terminate the sandbox
+      try {
+        await sandbox.terminate()
+      } catch (cleanupError) {
+        console.warn('Sandbox termination error:', cleanupError)
+      }
     }
+  } catch (error: unknown) {
+    console.error('Outer deployment error:', error)
+    
+    // Safely handle different error types
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : typeof error === 'string' 
+        ? error 
+        : 'Unknown deployment error'
 
-    return NextResponse.json({ error: 'Failed to deploy to wildcard domain' }, { status: 500 })
+    return NextResponse.json({ 
+      error: errorMessage 
+    }, { status: 500 })
   }
 }

@@ -802,7 +802,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
             </div>
             <Separator className="flex-1" />
             <div className={`flex items-center space-x-2 ${
-              deploymentState.step === 'github' ? 'text-accent' :
+              deploymentState.step === 'github' ? 'text-accent' : 
               deploymentState.githubRepoUrl ? 'text-green-500' : 'text-muted-foreground'
             }`}>
               {deploymentState.githubRepoUrl ? (
@@ -814,7 +814,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
             </div>
             <Separator className="flex-1" />
             <div className={`flex items-center space-x-2 ${
-              deploymentState.step === 'vercel' ? 'text-accent' :
+              deploymentState.step === 'vercel' ? 'text-accent' : 
               deploymentState.vercelDeploymentUrl ? 'text-green-500' : 'text-muted-foreground'
             }`}>
               {deploymentState.vercelDeploymentUrl ? (
@@ -826,7 +826,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
             </div>
             <Separator className="flex-1" />
             <div className={`flex items-center space-x-2 ${
-              deploymentState.step === 'netlify' ? 'text-accent' :
+              deploymentState.step === 'netlify' ? 'text-accent' : 
               deploymentState.netlifyDeploymentUrl ? 'text-green-500' : 'text-muted-foreground'
             }`}>
               {deploymentState.netlifyDeploymentUrl ? (
