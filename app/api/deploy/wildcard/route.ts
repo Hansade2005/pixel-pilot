@@ -50,9 +50,13 @@ function parseEnvFile(content: string): Record<string, string> {
  * Deploy build to Cloudflare Pages
  */
 async function deployToCloudflarePages(projectName: string, zipContent: Buffer): Promise<string> {
-  const CF_ACCOUNT_ID = 'db96886b79e13678a20c96c5c71aeff3'
-  const CF_API_TOKEN = '_5lrwCirmktMcKoWYUOzPJznqFbC5hTHDHlLRiA_'
+  const CF_ACCOUNT_ID = process.env.CF_ACCOUNT_ID
+  const CF_API_TOKEN = process.env.CF_API_TOKEN
   const PROJECT_NAME = projectName
+
+  if (!CF_ACCOUNT_ID || !CF_API_TOKEN) {
+    throw new Error('Cloudflare credentials not configured. Please set CF_ACCOUNT_ID and CF_API_TOKEN environment variables.')
+  }
 
   console.log(`Setting up Cloudflare Pages project: ${projectName}...`)
 
@@ -74,6 +78,15 @@ async function deployToCloudflarePages(projectName: string, zipContent: Buffer):
         projectExists = true
         console.log('✅ Cloudflare Pages project already exists:', checkData.result.name)
       }
+    } else if (checkResponse.status === 401) {
+      throw new Error('Cloudflare API authentication failed. Please check your CF_API_TOKEN.')
+    } else if (checkResponse.status === 403) {
+      throw new Error('Cloudflare API access denied. Please check your account permissions.')
+    } else if (checkResponse.status !== 404) {
+      // 404 is expected when project doesn't exist, other errors are problematic
+      const errorText = await checkResponse.text()
+      console.error('Error checking project existence:', errorText)
+      throw new Error(`Failed to check Cloudflare project: ${errorText}`)
     }
 
     // Step 2: Create the Cloudflare Pages project if it doesn't exist
@@ -98,6 +111,16 @@ async function deployToCloudflarePages(projectName: string, zipContent: Buffer):
       if (!createResponse.ok) {
         const errorText = await createResponse.text()
         console.error('Failed to create Cloudflare Pages project:', errorText)
+        
+        // Provide specific error messages
+        if (createResponse.status === 401) {
+          throw new Error('Cloudflare API authentication failed. Please check your CF_API_TOKEN.')
+        } else if (createResponse.status === 403) {
+          throw new Error('Cloudflare API access denied. Please check your account permissions.')
+        } else if (createResponse.status === 409) {
+          throw new Error('Cloudflare project name already exists. Please try a different name.')
+        }
+        
         throw new Error(`Failed to create Cloudflare Pages project: ${errorText}`)
       } else {
         const createData = await createResponse.json() as { success: boolean; result?: { name: string }; errors?: unknown[] }
@@ -140,6 +163,16 @@ async function deployToCloudflarePages(projectName: string, zipContent: Buffer):
     if (!deployResponse.ok) {
       const errorText = await deployResponse.text()
       console.error('Deployment error:', errorText)
+      
+      // Provide more specific error messages based on status code
+      if (deployResponse.status === 401) {
+        throw new Error('Cloudflare API authentication failed. Please check your CF_API_TOKEN.')
+      } else if (deployResponse.status === 403) {
+        throw new Error('Cloudflare API access denied. Please check your account permissions.')
+      } else if (deployResponse.status === 404) {
+        throw new Error('Cloudflare project not found. Please check your CF_ACCOUNT_ID.')
+      }
+      
       throw new Error(`Cloudflare API error! status: ${deployResponse.status}, message: ${errorText}`)
     }
 
