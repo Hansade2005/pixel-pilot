@@ -1,6 +1,6 @@
 'use server';
 
-import { redis } from '@/lib/redis';
+import { redis, subdomainUtils } from '@/lib/redis';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { domainConfig } from '@/lib/redis';
@@ -26,9 +26,8 @@ export async function createSubdomainAction(
     };
   }
 
-  const subdomainAlreadyExists = await redis.get(
-    `subdomain:${sanitizedSubdomain}`
-  );
+  // Check if subdomain already exists using the utility method
+  const subdomainAlreadyExists = await subdomainUtils.get(sanitizedSubdomain);
   if (subdomainAlreadyExists) {
     return {
       subdomain,
@@ -37,9 +36,11 @@ export async function createSubdomainAction(
     };
   }
 
-  await redis.set(`subdomain:${sanitizedSubdomain}`, {
+  // Store as JSON string to ensure consistency
+  await redis.set(`subdomain:${sanitizedSubdomain}`, JSON.stringify({
+    name: sanitizedSubdomain,
     createdAt: Date.now()
-  });
+  }));
 
   redirect(`${domainConfig.protocol}://${sanitizedSubdomain}.${domainConfig.rootDomain}`);
 }
