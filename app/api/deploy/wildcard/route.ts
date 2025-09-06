@@ -181,9 +181,9 @@ export async function POST(req: Request) {
     const supabase = await createClient()
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Unauthorized', 
-        code: 'UNAUTHORIZED' 
+        details: userError?.message 
       }, { status: 401 })
     }
 
@@ -470,20 +470,36 @@ export async function POST(req: Request) {
         externalId: subdomain
       })
 
-      // Record subdomain tracking in Supabase
+      // Create subdomain tracking record with comprehensive details
       const { error: trackingError } = await supabase
         .from('subdomain_tracking')
-        .insert({
+        .upsert({
           subdomain,
           user_id: user.id,
-          workspace_id: user.id,
+          workspace_id: user.id, // Using user ID as workspace ID
           deployment_url: deploymentUrl,
           storage_path: storagePath,
           is_active: true
+        }, {
+          onConflict: 'subdomain'
         })
 
       if (trackingError) {
-        console.error('Failed to create subdomain tracking:', trackingError)
+        console.error('Failed to create/update subdomain tracking:', trackingError)
+        // Log the full error details for debugging
+        console.error('Tracking Error Details:', {
+          subdomain,
+          userId: user.id,
+          deploymentUrl,
+          storagePath,
+          fullError: trackingError
+        })
+
+        // Return a more informative error response
+        return NextResponse.json({ 
+          error: 'Failed to create subdomain tracking', 
+          details: trackingError.message 
+        }, { status: 500 })
       }
 
       // Store subdomain in Redis with detailed logging
@@ -535,23 +551,10 @@ export async function POST(req: Request) {
     }
 
   } catch (error) {
-    console.error('Wildcard deployment error:', error)
-
-    // Enhanced error handling
-    if (error instanceof SandboxError) {
+    console.error('Deployment error:', error)
       return NextResponse.json({
-        error: error.message,
-        type: error.type,
-        sandboxId: error.sandboxId,
-        code: 'SANDBOX_ERROR'
+      error: 'Deployment failed', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
       }, { status: 500 })
-    }
-
-    // Generic error response with more context
-    return NextResponse.json({ 
-      error: 'Failed to deploy to wildcard domain', 
-      code: 'DEPLOYMENT_FAILED',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
   }
 }
