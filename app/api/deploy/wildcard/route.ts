@@ -11,6 +11,7 @@ import JSZip from 'jszip'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { supabaseStorage } from '@/lib/supabase-storage'
 import { z } from 'zod'
+import { redis, domainConfig } from '@/lib/redis'  // Import redis and domainConfig
 
 // Enhanced validation schema with more flexible file type
 const FileContentSchema = z.union([
@@ -200,12 +201,6 @@ export async function POST(req: Request) {
 
     const { workspaceId, subdomain, files } = validationResult.data
 
-    // Normalize file content to ensure consistent type
-    const normalizedFiles: NormalizedFile[] = files.map(file => ({
-      path: file.path,
-      content: normalizeFileContent(file.content)
-    }))
-
     // Check if subdomain is already taken
     const { data: existingDeployment } = await supabase
       .from('subdomain_tracking')
@@ -224,7 +219,10 @@ export async function POST(req: Request) {
 
     // Initialize storage manager and get files
     await storageManager.init()
-    let projectFiles: NormalizedFile[] = normalizedFiles
+    let projectFiles: NormalizedFile[] = files.map(file => ({
+      path: file.path,
+      content: normalizeFileContent(file.content)
+    }))
 
     if (!projectFiles || !Array.isArray(projectFiles) || projectFiles.length === 0) {
       // If no files provided, try to get files from workspaceId if provided
@@ -463,7 +461,6 @@ export async function POST(req: Request) {
       console.log(`Files uploaded successfully to ${storagePath}`)
 
       // Record deployment in IndexedDB (storage-manager)
-      // Use user ID as workspaceId since we're creating a deployment for the user
       const deploymentRecord = await storageManager.createDeployment({
         workspaceId: user.id,
         url: deploymentUrl,
@@ -474,13 +471,12 @@ export async function POST(req: Request) {
       })
 
       // Record subdomain tracking in Supabase
-      // Use user ID as workspace_id since this is a user-specific deployment
       const { error: trackingError } = await supabase
         .from('subdomain_tracking')
         .insert({
           subdomain,
           user_id: user.id,
-          workspace_id: user.id, // Use user ID as workspace_id for user-specific deployments
+          workspace_id: user.id,
           deployment_url: deploymentUrl,
           storage_path: storagePath,
           is_active: true
@@ -488,7 +484,20 @@ export async function POST(req: Request) {
 
       if (trackingError) {
         console.error('Failed to create subdomain tracking:', trackingError)
-        // Don't fail the deployment, but log the error
+      }
+
+      // Store subdomain in Redis
+      try {
+        await redis.set(`subdomain:${subdomain}`, JSON.stringify({
+          name: subdomain,
+          userId: user.id,
+          createdAt: Date.now(),
+          lastActive: Date.now(),
+          deploymentUrl: deploymentUrl
+        }))
+        console.log(`Stored subdomain ${subdomain} in Redis`)
+      } catch (redisError) {
+        console.error('Failed to store subdomain in Redis:', redisError)
       }
 
       console.log(`Deployment completed successfully: ${deploymentUrl}`)
