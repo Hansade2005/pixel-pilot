@@ -20,10 +20,13 @@ const fetchProjectAssets = cache(async (subdomain: string): Promise<ProjectAsset
   };
 
   try {
-    // List all files in the project directory
+    // Specific path for project files
+    const projectPath = `${subdomain}/dist`;
+
+    // List all files in the project dist directory
     const { data: fileList, error: listError } = await supabase.storage
       .from('projects')
-      .list(subdomain, {
+      .list(projectPath, {
         limit: 1000,
         offset: 0,
         sortBy: { column: 'name', order: 'asc' }
@@ -34,10 +37,10 @@ const fetchProjectAssets = cache(async (subdomain: string): Promise<ProjectAsset
       return assets;
     }
 
-    // Download index.html first
+    // Attempt to download index.html
     const indexPaths = [
-      `${subdomain}/dist/index.html`,
-      `${subdomain}/index.html`
+      `${projectPath}/index.html`,
+      `${projectPath}/index.htm`
     ];
 
     for (const path of indexPaths) {
@@ -56,24 +59,23 @@ const fetchProjectAssets = cache(async (subdomain: string): Promise<ProjectAsset
       }
     }
 
-    // Download all other assets
+    // Download all other assets in the dist directory
     if (fileList?.length) {
       const assetDownloadPromises = fileList
         .filter(file => 
-          // Exclude directories and index.html (already downloaded)
+          // Exclude directories and index.html files
           !file.name.endsWith('/') && 
-          file.name !== 'index.html' && 
-          file.name !== 'dist/index.html'
+          !file.name.includes('index.html')
         )
         .map(async (file) => {
-          const fullPath = `${subdomain}/${file.name}`;
+          const fullPath = `${projectPath}/${file.name}`;
           try {
             const { data, error } = await supabase.storage
               .from('projects')
               .download(fullPath);
 
             if (!error && data) {
-              // Convert to base64 or ArrayBuffer for caching
+              // Convert to ArrayBuffer for caching
               const buffer = await data.arrayBuffer();
               assets.assets[file.name] = buffer;
               console.log(`[Subdomain Asset Cache] Cached asset: ${file.name}`);
@@ -85,6 +87,13 @@ const fetchProjectAssets = cache(async (subdomain: string): Promise<ProjectAsset
 
       await Promise.allSettled(assetDownloadPromises);
     }
+
+    // Log detailed asset information
+    console.log('[Subdomain Asset Cache] Asset Summary:', {
+      indexHtmlFound: !!assets.indexHtml,
+      assetCount: Object.keys(assets.assets).length,
+      assets: Object.keys(assets.assets)
+    });
 
     return assets;
   } catch (error) {
