@@ -11,6 +11,69 @@ type ProjectAssets = {
   };
 }
 
+// Utility function to detect content type
+function detectContentType(path: string): string {
+  const lower = path.toLowerCase();
+  if (lower.endsWith('.html')) return 'text/html; charset=utf-8';
+  if (lower.endsWith('.css')) return 'text/css; charset=utf-8';
+  if (lower.endsWith('.js')) return 'application/javascript; charset=utf-8';
+  if (lower.endsWith('.json')) return 'application/json; charset=utf-8';
+  if (lower.endsWith('.svg')) return 'image/svg+xml';
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.gif')) return 'image/gif';
+  if (lower.endsWith('.ico')) return 'image/x-icon';
+  return 'application/octet-stream';
+}
+
+// Cached function to fetch and serve project files
+const serveProjectFile = cache(async (subdomain: string, path: string[] = []) => {
+  const supabase = await createClient();
+  
+  // Construct the full storage path
+  const joinedPath = path.length > 0 ? path.join('/') : 'index.html';
+  const storagePath = `${subdomain}/dist/${joinedPath}`;
+
+  try {
+    // Try to download the specific file
+    const { data, error } = await supabase.storage
+      .from('projects')
+      .download(storagePath);
+
+    // If file not found and looks like an SPA route, fallback to index.html
+    if (error) {
+      console.log(`[Subdomain File Serve] File not found: ${storagePath}. Attempting index.html fallback.`);
+      
+      const fallbackPath = `${subdomain}/dist/index.html`;
+      const fallback = await supabase.storage
+        .from('projects')
+        .download(fallbackPath);
+
+      if (!fallback.error && fallback.data) {
+        console.log(`[Subdomain File Serve] Serving index.html as fallback`);
+        return {
+          data: await fallback.data.arrayBuffer(),
+          contentType: 'text/html; charset=utf-8'
+        };
+      }
+
+      // If no index.html found either
+      console.error(`[Subdomain File Serve] No fallback index.html found for ${subdomain}`);
+      return null;
+    }
+
+    // Successfully found the file
+    return {
+      data: await data.arrayBuffer(),
+      contentType: detectContentType(joinedPath)
+    };
+  } catch (error) {
+    console.error('[Subdomain File Serve] Unexpected error:', error);
+    return null;
+  }
+});
+
 // Cached function to fetch and store all project assets
 const fetchProjectAssets = cache(async (subdomain: string): Promise<ProjectAssets> => {
   const supabase = await createClient();
@@ -105,7 +168,7 @@ const fetchProjectAssets = cache(async (subdomain: string): Promise<ProjectAsset
 export default async function SubdomainPage({
   params
 }: {
-  params: { subdomain: string };
+  params: { subdomain: string, slug?: string[] };
 }) {
   console.log(`[Subdomain Debug] Attempting to serve subdomain: ${params.subdomain}`);
 
@@ -123,6 +186,17 @@ export default async function SubdomainPage({
     if (!subdomainData) {
       console.warn(`[Subdomain Warning] No subdomain found in Redis: ${params.subdomain}`);
       notFound();
+    }
+
+    // If slug is provided, attempt to serve specific file
+    if (params.slug) {
+      const fileServeResult = await serveProjectFile(params.subdomain, params.slug);
+      
+      if (fileServeResult) {
+        return new Response(Buffer.from(fileServeResult.data), {
+          headers: { 'Content-Type': fileServeResult.contentType }
+        });
+      }
     }
 
     // Fetch and cache all project assets
@@ -143,7 +217,7 @@ export default async function SubdomainPage({
             <pre className="mt-4 text-sm text-red-600">
               Debug Info:
               Subdomain: {params.subdomain}
-              Storage Path: {`projects/${params.subdomain}`}
+              Storage Path: {`projects/${params.subdomain}/dist`}
               Deployment URL: {subdomainData.deploymentUrl || `https://${params.subdomain}.${domainConfig.rootDomain}`}
               User ID: {subdomainData.userId || 'N/A'}
             </pre>
