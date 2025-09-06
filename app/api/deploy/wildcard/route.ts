@@ -122,6 +122,14 @@ async function deployToCloudflarePages(projectName: string, zipContent: Buffer):
       contentType: 'application/zip'
     })
 
+    // Create manifest for Vite build output
+    // Simple format for static site deployment
+    const manifest = {
+      "/*": "index.html"
+    }
+
+    form.append('manifest', JSON.stringify(manifest))
+
     const deployUrl = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${PROJECT_NAME}/deployments`
 
     const deployResponse = await fetch(deployUrl, {
