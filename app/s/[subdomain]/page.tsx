@@ -1,39 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
-import { domainConfig, redis, subdomainUtils } from '@/lib/redis';
-import { redirect } from 'next/navigation';
-
-export default async function SubdomainPage({
-  params
-}: {
-  params: { subdomain: string };
-}) {
-  console.log(`[Subdomain Page] Redirecting subdomain: ${params.subdomain}`);
-
-  try {
-    // Fetch subdomain metadata from Redis using the utility method
-    // This ensures we get a properly parsed plain object
-    const subdomainData = await subdomainUtils.get(params.subdomain);
-
-    console.log('[Subdomain Page] Redis Subdomain Query:', {
-      subdomain: params.subdomain,
-      redisData: subdomainData,
-      dataExists: !!subdomainData
-    });
-
-    // Handle no data found
-    if (!subdomainData) {
-      console.warn(`[Subdomain Page] No subdomain found in Redis: ${params.subdomain}`);
-      notFound();
-    }
-
-    // Redirect to the API route which will handle file serving
-    redirect(`/api/subdomain`);
-  } catch (error) {
-    console.error('[Subdomain Page Error]:', error);
-    notFound();
-  }
-}
+import { domainConfig, redis, SubdomainData } from '@/lib/redis';
+import { NextResponse } from 'next/server';
 
 // Utility function to detect content type
 function detectContentType(path: string): string {
@@ -132,4 +100,99 @@ async function serveProjectFile(subdomain: string, path: string[] = []): Promise
 
   console.error(`[Subdomain File Serve] No file found for subdomain: ${subdomain}`);
   return null;
+}
+
+export default async function SubdomainPage({
+  params
+}: {
+  params: { subdomain: string, slug?: string[] };
+}) {
+  console.log(`[Subdomain Debug] Attempting to serve subdomain: ${params.subdomain}`);
+
+  try {
+    // Fetch subdomain metadata from Redis
+    const subdomainData = await redis.get(`subdomain:${params.subdomain}`) as SubdomainData;
+
+    console.log('[Subdomain Debug] Redis Subdomain Query:', {
+      subdomain: params.subdomain,
+      redisData: subdomainData,
+      dataExists: !!subdomainData
+    });
+
+    // Handle no data found
+    if (!subdomainData) {
+      console.warn(`[Subdomain Warning] No subdomain found in Redis: ${params.subdomain}`);
+      notFound();
+    }
+
+    // Prepare subdomain metadata as a plain object
+    const subdomainMetadata = {
+      name: subdomainData.name,
+      userId: subdomainData.userId,
+      deploymentUrl: subdomainData.deploymentUrl || `https://${params.subdomain}.${domainConfig.rootDomain}`
+    };
+
+    // If slug is provided, attempt to serve specific file
+    if (params.slug) {
+      const fileServeResult = await serveProjectFile(params.subdomain, params.slug);
+      
+      if (fileServeResult) {
+        return new NextResponse(fileServeResult.data, {
+          headers: { 
+            'Content-Type': fileServeResult.contentType,
+            'X-Subdomain-Path': fileServeResult.storagePath
+          }
+        });
+      }
+    }
+
+    // Attempt to serve index.html
+    const indexFileResult = await serveProjectFile(params.subdomain);
+
+    if (indexFileResult) {
+      return new NextResponse(indexFileResult.data, {
+        headers: {
+          'Content-Type': indexFileResult.contentType,
+          'X-Subdomain': params.subdomain,
+          'X-Tenant-Deployment': subdomainMetadata.deploymentUrl
+        }
+      });
+    }
+
+    // If no index.html found, return a detailed fallback
+    console.error(`[Subdomain Debug] No index.html found for subdomain: ${params.subdomain}`);
+    return new NextResponse(`
+      <html>
+        <body>
+          <h1>Subdomain Not Found</h1>
+          <p>The requested subdomain could not be located.</p>
+          <pre>
+            Subdomain: ${params.subdomain}
+            Storage Path: projects/${params.subdomain}
+            Deployment URL: ${subdomainMetadata.deploymentUrl}
+          </pre>
+        </body>
+      </html>
+    `, {
+      status: 404,
+      headers: { 'Content-Type': 'text/html' }
+    });
+
+  } catch (error) {
+    console.error('[Subdomain Critical Error]:', error);
+
+    // Fallback error handling
+    return new NextResponse(`
+      <html>
+        <body>
+          <h1>Subdomain Error</h1>
+          <p>An unexpected error occurred while serving the subdomain.</p>
+          <pre>${error instanceof Error ? error.message : 'Unknown error'}</pre>
+        </body>
+      </html>
+    `, {
+      status: 500,
+      headers: { 'Content-Type': 'text/html' }
+    });
+  }
 }
