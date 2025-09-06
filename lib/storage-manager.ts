@@ -117,7 +117,7 @@ export interface Deployment {
   branch?: string
   environment: string
   externalId?: string
-  provider: 'vercel' | 'netlify' | 'github' | 'pipilot'
+  provider: 'vercel' | 'netlify' | 'github'
 }
 
 export interface TokenEntry {

@@ -16,7 +16,9 @@ import {
   CloudOff, 
   CheckCircle,
   AlertCircle,
-  Info
+  Info,
+  Github,
+  Unlink
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
@@ -65,6 +67,14 @@ export default function AccountSettingsPage() {
   
   // Delete account form state
   const [deleteConfirmation, setDeleteConfirmation] = useState("")
+
+  // Deployment connections state
+  const [deploymentConnections, setDeploymentConnections] = useState({
+    github: false,
+    vercel: false,
+    netlify: false
+  })
+  const [connectionChecking, setConnectionChecking] = useState(true)
 
   const supabase = createClient()
 
@@ -320,6 +330,70 @@ export default function AccountSettingsPage() {
     }
   }
 
+  // Check deployment connections
+  const checkDeploymentConnections = async () => {
+    if (!user?.id) return
+    
+    setConnectionChecking(true)
+    try {
+      await storageManager.init()
+      
+      const [githubToken, vercelToken, netlifyToken] = await Promise.all([
+        storageManager.getToken(user.id, 'github').catch(() => null),
+        storageManager.getToken(user.id, 'vercel').catch(() => null),
+        storageManager.getToken(user.id, 'netlify').catch(() => null)
+      ])
+      
+      setDeploymentConnections({
+        github: !!githubToken,
+        vercel: !!vercelToken,
+        netlify: !!netlifyToken
+      })
+    } catch (error) {
+      console.error('Error checking deployment connections:', error)
+    } finally {
+      setConnectionChecking(false)
+    }
+  }
+
+  // Disconnect from a deployment provider
+  const disconnectProvider = async (provider: 'github' | 'vercel' | 'netlify') => {
+    if (!user?.id) return
+    
+    try {
+      await storageManager.init()
+      const token = await storageManager.getToken(user.id, provider)
+      
+      if (token) {
+        await storageManager.deleteToken(token.id)
+        
+        setDeploymentConnections(prev => ({
+          ...prev,
+          [provider]: false
+        }))
+        
+        toast({
+          title: "Disconnected",
+          description: `Successfully disconnected from ${provider.charAt(0).toUpperCase() + provider.slice(1)}`
+        })
+      }
+    } catch (error) {
+      console.error(`Error disconnecting from ${provider}:`, error)
+      toast({
+        title: "Error",
+        description: `Failed to disconnect from ${provider}`,
+        variant: "destructive"
+      })
+    }
+  }
+
+  // Check deployment connections when user changes
+  useEffect(() => {
+    if (user?.id) {
+      checkDeploymentConnections()
+    }
+  }, [user])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -514,6 +588,132 @@ export default function AccountSettingsPage() {
                     </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Deployment Connections Card */}
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Unlink className="h-5 w-5" />
+                  Deployment Connections
+                </CardTitle>
+                <CardDescription>
+                  Manage your connected deployment platforms
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {connectionChecking ? (
+                  <div className="flex items-center space-x-2">
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span className="text-sm text-muted-foreground">Checking connections...</span>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* GitHub Connection */}
+                    <div className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <Github className="h-5 w-5" />
+                        <div>
+                          <p className="font-medium">GitHub</p>
+                          <p className="text-sm text-muted-foreground">
+                            {deploymentConnections.github 
+                              ? "Connected - OAuth token stored securely" 
+                              : "Not connected"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {deploymentConnections.github ? (
+                          <>
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <Button 
+                              variant="destructive" 
+                              size="sm"
+                              onClick={() => disconnectProvider('github')}
+                            >
+                              Disconnect
+                            </Button>
+                          </>
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-gray-400" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Vercel Connection */}
+                    <div className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="h-5 w-5 bg-black text-white rounded flex items-center justify-center text-xs font-bold">
+                          ▲
+                        </div>
+                        <div>
+                          <p className="font-medium">Vercel</p>
+                          <p className="text-sm text-muted-foreground">
+                            {deploymentConnections.vercel 
+                              ? "Connected - Personal access token stored" 
+                              : "Not connected"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {deploymentConnections.vercel ? (
+                          <>
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <Button 
+                              variant="destructive" 
+                              size="sm"
+                              onClick={() => disconnectProvider('vercel')}
+                            >
+                              Disconnect
+                            </Button>
+                          </>
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-gray-400" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Netlify Connection */}
+                    <div className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="h-5 w-5 bg-teal-500 text-white rounded flex items-center justify-center text-xs font-bold">
+                          N
+                        </div>
+                        <div>
+                          <p className="font-medium">Netlify</p>
+                          <p className="text-sm text-muted-foreground">
+                            {deploymentConnections.netlify 
+                              ? "Connected - Personal access token stored" 
+                              : "Not connected"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {deploymentConnections.netlify ? (
+                          <>
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <Button 
+                              variant="destructive" 
+                              size="sm"
+                              onClick={() => disconnectProvider('netlify')}
+                            >
+                              Disconnect
+                            </Button>
+                          </>
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-gray-400" />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t">
+                      <p className="text-xs text-muted-foreground">
+                        Disconnecting will remove stored tokens. You'll need to reconnect in the deployment dialog to deploy to these platforms again.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
