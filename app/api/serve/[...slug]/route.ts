@@ -82,10 +82,11 @@ export async function GET(
 
     // Possible storage paths to try
     const storagePaths = [
-      `${subdomain}/dist/${filePath}`,    // Subdomain-specific dist path
-      `sample/dist/${filePath}`,          // Fallback to sample project
-      `${subdomain}/${filePath}`,         // Subdomain root path
-      `sample/${filePath}`                // Sample project root path
+      `projects/projects/${subdomain}/dist/${filePath}`,  // Nested project path
+      `projects/${subdomain}/dist/${filePath}`,           // Alternative nested path
+      `projects/sample/dist/${filePath}`,                 // Nested sample project
+      `${subdomain}/dist/${filePath}`,                    // Fallback non-nested paths
+      `sample/dist/${filePath}`
     ]
 
     // Try each storage path
@@ -95,13 +96,43 @@ export async function GET(
         
         console.log(`[Subdomain Serve API] Attempting to fetch: ${publicUrl}`)
         
-        const response = await fetch(publicUrl)
+        const response = await fetch(publicUrl, {
+          headers: {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+          }
+        })
         
         if (response.ok) {
           const contentType = detectContentType(storagePath)
-          const data = await response.arrayBuffer()
+          let data = await response.text()
           
-          return new NextResponse(Buffer.from(data), {
+          // Special handling for HTML files to ensure proper rendering
+          if (contentType.includes('text/html')) {
+            // Modify asset paths to work with subdomain
+            const modifiedHtml = data.replace(
+              /(?:href|src)=["'](?!https?:\/\/)(\/[^"']*)/gi, 
+              (match, path) => `${match.split('=')[0]}="https://${subdomain}.pipilot.dev${path}"`
+            ).replace(
+              /<head>/i, 
+              `<head>
+                <base href="https://${subdomain}.pipilot.dev/" />
+                <script>
+                  console.log('Subdomain script initialized for ${subdomain}');
+                  console.log('Loaded from path: ${storagePath}');
+                </script>`
+            )
+
+            return new NextResponse(modifiedHtml, {
+              headers: { 
+                'Content-Type': 'text/html; charset=utf-8',
+                'Cache-Control': 'public, max-age=31536000',
+                'X-Subdomain-Path': storagePath
+              }
+            })
+          }
+
+          // For non-HTML files, return as-is
+          return new NextResponse(data, {
             headers: { 
               'Content-Type': contentType,
               'Cache-Control': 'public, max-age=31536000',

@@ -6,64 +6,89 @@ import { NextResponse } from 'next/server';
 
 // Utility function to detect content type
 function detectContentType(path: string): string {
-  const lower = path.toLowerCase();
-  if (lower.endsWith('.html')) return 'text/html; charset=utf-8';
-  if (lower.endsWith('.css')) return 'text/css; charset=utf-8';
-  if (lower.endsWith('.js')) return 'application/javascript; charset=utf-8';
-  if (lower.endsWith('.json')) return 'application/json; charset=utf-8';
-  if (lower.endsWith('.svg')) return 'image/svg+xml';
-  if (lower.endsWith('.png')) return 'image/png';
-  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
-  if (lower.endsWith('.webp')) return 'image/webp';
-  if (lower.endsWith('.gif')) return 'image/gif';
-  if (lower.endsWith('.ico')) return 'image/x-icon';
-  return 'application/octet-stream';
+  const ext = path.split('.').pop()?.toLowerCase()
+  const typeMap: Record<string, string> = {
+    'html': 'text/html; charset=utf-8',
+    'css': 'text/css; charset=utf-8',
+    'js': 'application/javascript; charset=utf-8',
+    'json': 'application/json; charset=utf-8',
+    'png': 'image/png',
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'svg': 'image/svg+xml',
+    'webp': 'image/webp',
+    'woff': 'font/woff',
+    'woff2': 'font/woff2',
+    'ttf': 'font/ttf'
+  }
+  return typeMap[ext || ''] || 'application/octet-stream'
 }
 
 // Cached function to fetch and serve project files using REST API
 const serveProjectFile = cache(async (subdomain: string, path: string[] = []) => {
   // Base URL for public Supabase storage
-  const baseUrl = 'https://lzuknbfbvpuscpammwzg.supabase.co/storage/v1/object/public/projects/';
+  const BASE_URL = 'https://lzuknbfbvpuscpammwzg.supabase.co/storage/v1/object/public/projects/';
 
   // Construct the full storage path
-  const joinedPath = path.length > 0 ? path.join('/') : 'index.html';
-  const possiblePaths = [
-    `sample/dist/${joinedPath}`,       // Exact path from screenshot
-    `${subdomain}/dist/${joinedPath}`, // Fallback to subdomain-specific path
-    `${subdomain}/${joinedPath}`,      // Root directory fallback
-    `sample/dist/index.html`,          // Hardcoded index.html fallback
-    `${subdomain}/dist/index.html`,    // Subdomain-specific index.html fallback
-    `${subdomain}/index.html`          // Final root index.html fallback
+  const filePath = path.length > 0 ? path.join('/') : 'index.html';
+  
+  // Possible storage paths to try
+  const storagePaths = [
+    `projects/projects/${subdomain}/dist/${filePath}`,  // Nested project path
+    `projects/${subdomain}/dist/${filePath}`,           // Alternative nested path
+    `projects/sample/dist/${filePath}`,                 // Nested sample project
+    `${subdomain}/dist/${filePath}`,                    // Fallback non-nested paths
+    `sample/dist/${filePath}`
   ];
 
-  for (const storagePath of possiblePaths) {
+  for (const storagePath of storagePaths) {
     try {
-      console.log(`[Subdomain File Serve] Attempting to download: ${storagePath}`);
+      const publicUrl = `${BASE_URL}${storagePath}`;
       
-      // Construct the full public URL for the file
-      const publicUrl = `${baseUrl}${storagePath}`;
+      console.log(`[Subdomain File Serve] Attempting to fetch: ${publicUrl}`);
       
-      // Fetch the file using the public URL
-      const response = await fetch(publicUrl);
+      const response = await fetch(publicUrl, {
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        }
+      });
       
-      if (!response.ok) {
-        console.warn(`[Subdomain File Serve] Failed to fetch ${storagePath}:`, {
-          status: response.status,
-          statusText: response.statusText
-        });
-        continue;
-      }
+      if (response.ok) {
+        const contentType = detectContentType(storagePath);
+        let data = await response.text();
+        
+        // Special handling for HTML files to ensure proper rendering
+        if (contentType.includes('text/html')) {
+          // Modify asset paths to work with subdomain
+          const modifiedHtml = data.replace(
+            /(?:href|src)=["'](?!https?:\/\/)(\/[^"']*)/gi, 
+            (match, path) => `${match.split('=')[0]}="https://${subdomain}.pipilot.dev${path}"`
+          ).replace(
+            /<head>/i, 
+            `<head>
+              <base href="https://${subdomain}.pipilot.dev/" />
+              <script>
+                console.log('Subdomain script initialized for ${subdomain}');
+                console.log('Loaded from path: ${storagePath}');
+              </script>`
+          );
 
-      // Convert response to ArrayBuffer
-      const data = await response.arrayBuffer();
-      
-      console.log(`[Subdomain File Serve] Successfully downloaded: ${storagePath}`);
-      return {
-        data,
-        contentType: detectContentType(storagePath)
-      };
-    } catch (error) {
-      console.error(`[Subdomain File Serve] Unexpected error downloading ${storagePath}:`, error);
+          return {
+            data: modifiedHtml,
+            contentType: 'text/html; charset=utf-8',
+            storagePath
+          };
+        }
+
+        // For non-HTML files, return as-is
+        return {
+          data,
+          contentType: detectContentType(storagePath),
+          storagePath
+        };
+      }
+    } catch (fetchError) {
+      console.error(`[Subdomain File Serve] Error fetching ${storagePath}:`, fetchError);
     }
   }
 
@@ -99,8 +124,11 @@ export default async function SubdomainPage({
       const fileServeResult = await serveProjectFile(params.subdomain, params.slug);
       
       if (fileServeResult) {
-        return new NextResponse(Buffer.from(fileServeResult.data), {
-          headers: { 'Content-Type': fileServeResult.contentType }
+        return new NextResponse(fileServeResult.data, {
+          headers: { 
+            'Content-Type': fileServeResult.contentType,
+            'X-Subdomain-Path': fileServeResult.storagePath
+          }
         });
       }
     }
@@ -109,23 +137,9 @@ export default async function SubdomainPage({
     const indexFileResult = await serveProjectFile(params.subdomain);
 
     if (indexFileResult) {
-      // Modify HTML to work with subdomain
-      let indexHtml = Buffer.from(indexFileResult.data).toString('utf-8');
-      const modifiedHtml = indexHtml.replace(
-        /<head>/i, 
-        `<head>
-          <base href="https://${params.subdomain}.${domainConfig.rootDomain}/" />
-          <script>
-            // Asset caching mechanism
-            (function() {
-              console.log('Subdomain script initialized for ${params.subdomain}');
-            })();
-          </script>`
-      );
-
-      return new NextResponse(modifiedHtml, {
+      return new NextResponse(indexFileResult.data, {
         headers: {
-          'Content-Type': 'text/html; charset=utf-8',
+          'Content-Type': indexFileResult.contentType,
           'X-Subdomain': params.subdomain,
           'X-Tenant-Deployment': subdomainData.deploymentUrl || ''
         }
