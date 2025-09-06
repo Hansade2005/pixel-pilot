@@ -30,8 +30,31 @@ export default async function SubdomainPage({
   let subdomainData: SubdomainTracking | null = null;
   try {
     const redisData = await redis.get(`subdomain:${params.subdomain}`);
+    console.log('[Redis Debug] Raw Redis data:', redisData, typeof redisData);
+
     if (redisData) {
-      subdomainData = JSON.parse(redisData as string);
+      // Handle different data formats from Redis
+      if (typeof redisData === 'string') {
+        // Check if it's the string representation of an object
+        if (redisData === '[object Object]') {
+          console.log('[Redis Debug] Data is [object Object] - clearing corrupted data');
+          // Clear the corrupted data
+          await redis.del(`subdomain:${params.subdomain}`);
+          subdomainData = null;
+        } else {
+          try {
+            subdomainData = JSON.parse(redisData);
+          } catch (parseError) {
+            console.error('[Redis Debug] JSON parse error:', parseError);
+            // Clear corrupted data
+            await redis.del(`subdomain:${params.subdomain}`);
+            subdomainData = null;
+          }
+        }
+      } else if (typeof redisData === 'object' && redisData !== null) {
+        // Redis returned the object directly
+        subdomainData = redisData as SubdomainTracking;
+      }
     }
   } catch (error) {
     console.error('[Subdomain Debug] Redis fetch error:', error);
