@@ -52,8 +52,17 @@ export default async function SubdomainPage({
           }
         }
       } else if (typeof redisData === 'object' && redisData !== null) {
-        // Redis returned the object directly
-        subdomainData = redisData as SubdomainTracking;
+        // Redis returned the object directly - ensure it's a plain object
+        const data = redisData as any;
+        subdomainData = {
+          name: data.name,
+          userId: data.userId,
+          createdAt: data.createdAt,
+          lastActive: data.lastActive,
+          deploymentUrl: data.deploymentUrl,
+          storagePath: data.storagePath,
+          isActive: data.isActive
+        };
       }
     }
   } catch (error) {
@@ -144,26 +153,74 @@ export default async function SubdomainPage({
     }
   }
 
-  // If no index.html found, return a fallback
+  // If no index.html found, return a fallback HTML page
   if (!indexHtml) {
     console.error(`[Subdomain Debug] No index.html found for subdomain: ${params.subdomain}`);
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-blue-50 to-white p-4">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold tracking-tight text-gray-900">
-            {params.subdomain}.{domainConfig.rootDomain}
-          </h1>
-          <p className="mt-3 text-lg text-gray-600">
-            No application files found
-          </p>
-          <pre className="mt-4 text-sm text-red-600">
-            Debug Info:
-            Subdomain: {params.subdomain}
-            Storage Path: {subdomainData.storagePath || `projects/${params.subdomain}`}
-          </pre>
-        </div>
-      </div>
-    );
+    const fallbackHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${params.subdomain}.${domainConfig.rootDomain}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(to bottom, #eff6ff, #ffffff);
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+        }
+        h1 {
+            font-size: 2.25rem;
+            font-weight: bold;
+            color: #111827;
+            margin-bottom: 0.75rem;
+        }
+        p {
+            font-size: 1.125rem;
+            color: #6b7280;
+            margin-bottom: 1rem;
+        }
+        pre {
+            background: #fee2e2;
+            color: #dc2626;
+            padding: 1rem;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            text-align: left;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>${params.subdomain}.${domainConfig.rootDomain}</h1>
+        <p>No application files found</p>
+        <pre>
+Debug Info:
+Subdomain: ${params.subdomain}
+Storage Path: ${subdomainData.storagePath || `projects/${params.subdomain}`}
+        </pre>
+    </div>
+</body>
+</html>`;
+
+    return new Response(fallbackHtml, {
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'X-Subdomain': params.subdomain,
+        'X-Tenant-Deployment': subdomainData.deploymentUrl || ''
+      }
+    });
   }
 
   // Modify HTML to work with subdomain
