@@ -111,15 +111,21 @@ export default async function SubdomainPage({
     notFound();
   }
 
+  // Ensure subdomain data is a plain object
+  const plainSubdomainData = JSON.parse(JSON.stringify(subdomainData));
+
   // If slug is provided, attempt to serve specific file
   if (params.slug) {
     const fileServeResult = await serveProjectFile(params.subdomain, params.slug);
     
     if (fileServeResult) {
-      return new NextResponse(fileServeResult.data, {
+      // Ensure file serve result is a plain object
+      const plainFileServeResult = JSON.parse(JSON.stringify(fileServeResult));
+      
+      return new NextResponse(plainFileServeResult.data, {
         headers: { 
-          'Content-Type': fileServeResult.contentType,
-          'X-Subdomain-Path': fileServeResult.storagePath
+          'Content-Type': plainFileServeResult.contentType,
+          'X-Subdomain-Path': plainFileServeResult.storagePath
         }
       });
     }
@@ -129,9 +135,12 @@ export default async function SubdomainPage({
   const indexFileResult = await serveProjectFile(params.subdomain);
 
   if (indexFileResult) {
-    return new NextResponse(indexFileResult.data, {
+    // Ensure index file result is a plain object
+    const plainIndexFileResult = JSON.parse(JSON.stringify(indexFileResult));
+    
+    return new NextResponse(plainIndexFileResult.data, {
       headers: {
-        'Content-Type': indexFileResult.contentType,
+        'Content-Type': plainIndexFileResult.contentType,
         'X-Subdomain': params.subdomain,
         'X-Tenant-Deployment': `https://${params.subdomain}.${domainConfig.rootDomain}`
       }
