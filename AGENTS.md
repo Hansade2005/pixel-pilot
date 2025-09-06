@@ -15,6 +15,7 @@
 - Test files are organized under the `__tests__/` directory.
 - SQL and JavaScript scripts for database setup and testing are in the `scripts/` directory.
 - The project uses TypeScript, Tailwind CSS for styling, Supabase for backend services, and integrates AI tools.
+- Key technologies: Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, Supabase backend, AI integration.
 </repository_structure>
 
 <dependencies_and_installation>
