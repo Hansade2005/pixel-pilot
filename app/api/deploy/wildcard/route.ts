@@ -10,49 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import JSZip from 'jszip'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { supabaseStorage } from '@/lib/supabase-storage'
-import { z } from 'zod'
-import { redis, domainConfig } from '@/lib/redis'  // Import redis and domainConfig
-
-// Enhanced validation schema with more flexible file type
-const FileContentSchema = z.union([
-  z.string(), 
-  z.instanceof(Buffer),
-  z.object({
-    type: z.string().optional(),
-    data: z.union([z.string(), z.instanceof(Buffer)])
-  })
-])
-
-const FileSchema = z.object({
-  path: z.string(),
-  content: FileContentSchema
-})
-
-const DeploymentSchema = z.object({
-  workspaceId: z.string().optional(),
-  subdomain: z.string()
-    .min(3, 'Subdomain must be at least 3 characters')
-    .max(63, 'Subdomain must be less than 63 characters')
-    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, 'Invalid subdomain format'),
-  files: z.array(FileSchema).nonempty('At least one file is required')
-})
-
-// Type definition for normalized files
-type NormalizedFile = {
-  path: string;
-  content: Buffer;
-}
-
-// Helper function to normalize file content
-function normalizeFileContent(content: unknown): Buffer {
-  if (content instanceof Buffer) return content
-  if (typeof content === 'string') return Buffer.from(content)
-  if (typeof content === 'object' && content !== null && 'data' in content) {
-    const data = (content as { data: string | Buffer }).data
-    return data instanceof Buffer ? data : Buffer.from(data)
-  }
-  return Buffer.from('')
-}
+import FormData from 'form-data'
 
 /**
  * Parse environment variables from .env file content
@@ -85,6 +43,62 @@ function parseEnvFile(content: string): Record<string, string> {
   }
 
   return envVars
+}
+
+/**
+ * Deploy build to Cloudflare Pages
+ */
+async function deployToCloudflarePages(projectName: string, zipContent: Buffer): Promise<string> {
+  const CF_ACCOUNT_ID = 'db96886b79e13678a20c96c5c71aeff3'
+  const CF_API_TOKEN = '_5lrwCirmktMcKoWYUOzPJznqFbC5hTHDHlLRiA_'
+  const PROJECT_NAME = projectName // Use project name as Cloudflare Pages project name
+
+  console.log(`Deploying ${projectName} to Cloudflare Pages...`)
+
+  // Create form data with the ZIP file
+  const form = new FormData()
+  form.append('file', zipContent, {
+    filename: 'dist.zip',
+    contentType: 'application/zip'
+  })
+
+  const url = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${PROJECT_NAME}/deployments`
+
+  try {
+    const fetch = (await import('node-fetch')).default
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${CF_API_TOKEN}`,
+        ...form.getHeaders(),
+      },
+      body: form,
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Cloudflare API error! status: ${response.status}, message: ${errorText}`)
+    }
+
+    const data = await response.json() as {
+      success: boolean
+      result?: { url: string }
+      errors?: unknown[]
+    }
+
+    if (data.success && data.result) {
+      const deploymentUrl = data.result.url
+      console.log(`✅ Cloudflare Pages deployment successful! URL: ${deploymentUrl}`)
+      return deploymentUrl
+    } else {
+      console.error('❌ Cloudflare Pages deployment failed:', data.errors)
+      throw new Error(`Cloudflare deployment failed: ${JSON.stringify(data.errors || 'Unknown error')}`)
+    }
+  } catch (error) {
+    console.error('Cloudflare Pages deployment error:', error)
+    throw error
+  }
 }
 
 /**
@@ -166,82 +180,37 @@ async function extractArchive(archiveBuffer: Buffer, archiveName: string): Promi
 }
 
 export async function POST(req: Request) {
-  const startTime = Date.now() // Add start time tracking
-
   try {
     const e2bApiKey = process.env.E2B_API_KEY
     if (!e2bApiKey) {
-      return NextResponse.json({ 
-        error: 'E2B API key missing', 
-        code: 'E2B_API_KEY_MISSING' 
-      }, { status: 500 })
+      return NextResponse.json({ error: 'E2B API key missing' }, { status: 500 })
     }
 
-    // Get user from Supabase auth first
-    const supabase = await createClient()
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
-      return NextResponse.json({
-        error: 'Unauthorized', 
-        code: 'UNAUTHORIZED' 
-      }, { status: 401 })
-    }
+    const { workspaceId, files, projectName } = await req.json()
 
-    // Parse and validate request body
-    const requestBody = await req.json()
-    const validationResult = DeploymentSchema.safeParse(requestBody)
-
-    if (!validationResult.success) {
+    if (!workspaceId || !files?.length) {
       return NextResponse.json({
-        error: 'Invalid deployment request',
-        details: validationResult.error.flatten().fieldErrors,
-        code: 'VALIDATION_ERROR'
+        error: 'Workspace ID and files are required'
       }, { status: 400 })
     }
 
-    const { workspaceId, subdomain, files } = validationResult.data
+    // Get authenticated user
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    // Check if subdomain is already taken
-    const { data: existingDeployment } = await supabase
-      .from('subdomain_tracking')
-      .select('subdomain')
-      .eq('subdomain', subdomain)
-      .eq('is_active', true)
-      .single()
-
-    if (existingDeployment) {
-      return NextResponse.json({
-        error: 'Subdomain is already taken',
-        code: 'SUBDOMAIN_TAKEN',
-        suggestion: `Try ${subdomain}-${Math.random().toString(36).substring(7)}`
-      }, { status: 409 })
-    }
-
-    // Initialize storage manager and get files
+    // Initialize storage manager and get files from workspace
     await storageManager.init()
-    let projectFiles: NormalizedFile[] = files.map(file => ({
-      path: file.path,
-      content: normalizeFileContent(file.content)
-    }))
+    let projectFiles = files
 
     if (!projectFiles || !Array.isArray(projectFiles) || projectFiles.length === 0) {
-      // If no files provided, try to get files from workspaceId if provided
-      if (workspaceId) {
-        const workspaceFiles = await storageManager.getFiles(workspaceId)
-        projectFiles = workspaceFiles.map(file => ({
-          path: file.path,
-          content: normalizeFileContent(file.content)
-        }))
-      }
-      if (!projectFiles || projectFiles.length === 0) {
-        return NextResponse.json({ 
-          error: 'No files found in workspace', 
-          code: 'NO_FILES_FOUND' 
-        }, { status: 400 })
+      projectFiles = await storageManager.getFiles(workspaceId)
+      if (projectFiles.length === 0) {
+        return NextResponse.json({ error: 'No files found in workspace' }, { status: 400 })
       }
     }
 
-    console.log(`Starting wildcard deployment for ${subdomain}.pipilot.dev with ${projectFiles.length} files`)
+    console.log(`Starting Cloudflare Pages deployment for ${projectName || 'unnamed project'} with ${projectFiles.length} files`)
 
     // Create E2B sandbox for build process
     const sandbox = await createEnhancedSandbox({
@@ -252,9 +221,9 @@ export async function POST(req: Request) {
 
     try {
       // Write project files to sandbox
-      const sandboxFiles: SandboxFile[] = projectFiles.map(file => ({
+      const sandboxFiles: SandboxFile[] = projectFiles.map((file: any) => ({
         path: `/project/${file.path}`,
-        content: file.content.toString('utf-8')
+        content: file.content || "",
       }))
 
       // Add package.json if missing
@@ -412,122 +381,34 @@ export async function POST(req: Request) {
       let extractedFiles: Buffer[] = []
       let filePaths: string[] = []
 
-      if (archiveName.endsWith('.tar.gz')) {
-        // Extract tar.gz in sandbox and download individual files
-        console.log('Extracting tar.gz in sandbox...')
-        const extractResult = await sandbox.executeCommand(
-          'cd /project && mkdir -p extracted && tar -xzf dist.tar.gz -C extracted/',
-          { workingDirectory: '/project' }
-        )
+      // Skip file extraction - deploy ZIP archive directly to Cloudflare Pages
 
-        if (extractResult.exitCode !== 0) {
-          throw new Error(`TAR extraction failed: ${extractResult.stderr}`)
-        }
+      console.log(`Archive downloaded successfully: ${archiveContent.length} bytes`)
 
-        // List all files in the extracted directory
-        const listResult = await sandbox.executeCommand(
-          'cd /project/extracted && find . -type f',
-          { workingDirectory: '/project' }
-        )
-
-        if (listResult.exitCode === 0) {
-          const filesList = listResult.stdout.trim().split('\n').filter(f => f.length > 0)
-
-          for (const filePath of filesList) {
-            try {
-              const cleanPath = filePath.startsWith('./') ? filePath.substring(2) : filePath
-              const fileContent = await sandbox.downloadFile(`/project/extracted/${cleanPath}`)
-              extractedFiles.push(fileContent)
-              filePaths.push(cleanPath)
-            } catch (error) {
-              console.warn(`Failed to download file ${filePath}:`, error)
-            }
-          }
-        }
-      } else {
-        // Handle ZIP files
-        const result = await extractArchive(Buffer.from(archiveContent), archiveName)
-        extractedFiles = result.files
-        filePaths = result.paths
-      }
-
-      console.log(`Extracted ${extractedFiles.length} files from archive`)
-      console.log(`File paths:`, filePaths)
-
-      // Upload to Supabase Storage
-      console.log('Uploading files to Supabase Storage...')
-      const deploymentUrl = await uploadBuildToSupabase(subdomain, extractedFiles, filePaths)
-      const storagePath = `projects/${subdomain}`
-      console.log(`Files uploaded successfully to ${storagePath}`)
+      // Deploy to Cloudflare Pages
+      console.log('Deploying to Cloudflare Pages...')
+      const deploymentUrl = await deployToCloudflarePages(projectName || `project-${Date.now()}`, archiveContent)
+      console.log(`Cloudflare Pages deployment successful: ${deploymentUrl}`)
 
       // Record deployment in IndexedDB (storage-manager)
       const deploymentRecord = await storageManager.createDeployment({
-        workspaceId: user.id,
+        workspaceId,
         url: deploymentUrl,
         status: 'ready',
         provider: 'pipilot',
         environment: 'production',
-        externalId: subdomain
+        externalId: projectName || `project-${Date.now()}`
       })
 
-      // Record subdomain tracking in Supabase
-      const { error: trackingError } = await supabase
-        .from('subdomain_tracking')
-        .insert({
-          subdomain,
-          user_id: user.id,
-          workspace_id: user.id,
-          deployment_url: deploymentUrl,
-          storage_path: storagePath,
-          is_active: true
-        })
-
-      if (trackingError) {
-        console.error('Failed to create subdomain tracking:', trackingError)
-      }
-
-      // Store subdomain in Redis with detailed logging
-      try {
-        console.log('[Redis Debug] Attempting to store subdomain:', {
-          subdomain,
-          userId: user.id,
-          deploymentUrl,
-          redisUrl: process.env.KV_URL || 'No URL found',
-          redisApiUrl: process.env.KV_REST_API_URL || 'No API URL found'
-        })
-
-        await redis.set(`subdomain:${subdomain}`, JSON.stringify({
-          name: subdomain,
-          userId: user.id,
-          createdAt: Date.now(),
-          lastActive: Date.now(),
-          deploymentUrl: deploymentUrl
-        }))
-
-        console.log(`[Redis Debug] Successfully stored subdomain ${subdomain} in Redis`)
-      } catch (redisError) {
-        console.error('[Redis Debug] Failed to store subdomain in Redis:', {
-          error: redisError,
-          errorName: redisError instanceof Error ? redisError.name : 'Unknown error',
-          errorMessage: redisError instanceof Error ? redisError.message : 'No error message'
-        })
-      }
+      // No subdomain tracking needed - using real Cloudflare Pages URLs
 
       console.log(`Deployment completed successfully: ${deploymentUrl}`)
 
       return NextResponse.json({
         url: deploymentUrl,
-        subdomain,
+        projectName: projectName || `project-${Date.now()}`,
         status: 'ready',
-        deploymentId: deploymentRecord.id,
-        metadata: {
-          fileCount: extractedFiles.length,
-          buildTime: Date.now() - startTime,
-          buildLogs: {
-            installLogs: installResult.stdout,
-            buildLogs: buildResult.stdout
-          }
-        }
+        deploymentId: deploymentRecord.id
       })
 
     } finally {
@@ -537,21 +418,14 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error('Wildcard deployment error:', error)
 
-    // Enhanced error handling
     if (error instanceof SandboxError) {
       return NextResponse.json({
         error: error.message,
         type: error.type,
-        sandboxId: error.sandboxId,
-        code: 'SANDBOX_ERROR'
+        sandboxId: error.sandboxId
       }, { status: 500 })
     }
 
-    // Generic error response with more context
-    return NextResponse.json({ 
-      error: 'Failed to deploy to wildcard domain', 
-      code: 'DEPLOYMENT_FAILED',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to deploy to wildcard domain' }, { status: 500 })
   }
 }

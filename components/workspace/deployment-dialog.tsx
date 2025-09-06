@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
+import { storageManager } from "@/lib/storage-manager"
 import { Github, Globe, Loader2, CheckCircle, AlertCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { DeploymentSetupAccordion } from "./deployment-setup-accordion"
@@ -53,15 +54,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
     subdomain: project?.name?.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '') || '',
   })
 
-  const [subdomainStatus, setSubdomainStatus] = useState<{
-    checking: boolean
-    available: boolean | null
-    error: string | null
-  }>({
-    checking: false,
-    available: null,
-    error: null
-  })
+  // Removed subdomainStatus - now using Cloudflare Pages project names
 
   const [hasGitHubToken, setHasGitHubToken] = useState(false)
   const [githubConnectionStatus, setGitHubConnectionStatus] = useState<'checking' | 'connected' | 'not_connected' | 'connecting'>('checking')
@@ -70,53 +63,8 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
   const [hasNetlifyToken, setHasNetlifyToken] = useState(false)
   const [netlifyConnectionStatus, setNetlifyConnectionStatus] = useState<'checking' | 'connected' | 'not_connected' | 'connecting'>('checking')
 
-  // Check subdomain availability
-  const checkSubdomainAvailability = async (subdomain: string) => {
-    if (!subdomain || !/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(subdomain)) {
-      setSubdomainStatus({ checking: false, available: null, error: null })
-      return
-    }
-
-    setSubdomainStatus({ checking: true, available: null, error: null })
-
-    try {
-      const response = await fetch(`/api/deploy/check-subdomain?subdomain=${encodeURIComponent(subdomain)}`)
-      const data = await response.json()
-
-      if (response.ok) {
-        setSubdomainStatus({
-          checking: false,
-          available: data.available,
-          error: null
-        })
-      } else {
-        setSubdomainStatus({
-          checking: false,
-          available: null,
-          error: data.error || 'Failed to check availability'
-        })
-      }
-    } catch (error) {
-      setSubdomainStatus({
-        checking: false,
-        available: null,
-        error: 'Network error'
-      })
-    }
-  }
-
-  // Debounced subdomain checking
-  React.useEffect(() => {
-    if (formData.subdomain) {
-      const timeoutId = setTimeout(() => {
-        checkSubdomainAvailability(formData.subdomain)
-      }, 500) // Wait 500ms after user stops typing
-
-      return () => clearTimeout(timeoutId)
-    } else {
-      setSubdomainStatus({ checking: false, available: null, error: null })
-    }
-  }, [formData.subdomain])
+  // Subdomain checking removed - now using Cloudflare Pages project names
+  // Removed subdomain availability checking
 
   // Check if user has tokens on dialog open
   React.useEffect(() => {
@@ -140,7 +88,6 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
       }
       
       // Check if token exists in IndexedDB using storageManager
-      const { storageManager } = await import('@/lib/storage-manager')
       const token = await storageManager.getToken(data.userId, 'github')
       
       setHasGitHubToken(!!token)
@@ -167,7 +114,6 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
       }
       
       // Check if token exists in IndexedDB using storageManager
-      const { storageManager } = await import('@/lib/storage-manager')
       const token = await storageManager.getToken(data.userId, 'vercel')
       
       setHasVercelToken(!!token)
@@ -194,7 +140,6 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
       }
       
       // Check if token exists in IndexedDB using storageManager
-      const { storageManager } = await import('@/lib/storage-manager')
       const token = await storageManager.getToken(data.userId, 'netlify')
       
       setHasNetlifyToken(!!token)
@@ -233,7 +178,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
       }
       
       // Store token in IndexedDB
-      const { storageManager } = await import('@/lib/storage-manager');
+;
       await storageManager.createToken({
         userId,
         provider: 'vercel',
@@ -287,7 +232,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
       }
       
       // Store token in IndexedDB
-      const { storageManager } = await import('@/lib/storage-manager');
+;
       await storageManager.createToken({
         userId,
         provider: 'netlify',
@@ -372,7 +317,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
       }
       
       // Store token in IndexedDB
-      const { storageManager } = await import('@/lib/storage-manager');
+;
       await storageManager.createToken({
         userId,
         provider: 'github',
@@ -457,7 +402,6 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
 
     try {
       // Fetch files from IndexedDB client-side
-      const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
       const files = await storageManager.getFiles(project.id)
       
@@ -537,7 +481,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
     if (!project || !formData.subdomain) {
       toast({
         title: "Missing Information",
-        description: "Please provide subdomain name",
+        description: "Please provide project name",
         variant: "destructive",
       })
       return
@@ -547,7 +491,6 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
 
     try {
       // Fetch files from IndexedDB client-side
-      const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
       const files = await storageManager.getFiles(project.id)
 
@@ -560,7 +503,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           workspaceId: project.id,
-          subdomain: formData.subdomain,
+          projectName: formData.subdomain, // Using subdomain field as project name for Cloudflare Pages
           files: files,
         }),
       })
@@ -580,7 +523,6 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
       }))
 
       // Store deployment info in IndexedDB
-      const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
 
       // Update the deployment record with the returned ID
@@ -593,7 +535,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
 
       toast({
         title: "PiPilot Deployment Successful",
-        description: `Your app is now live at ${result.subdomain}.pipilot.dev`,
+        description: `Your app is now live at ${result.url}`,
       })
 
     } catch (error) {
@@ -644,7 +586,6 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
 
     try {
       // Fetch files from IndexedDB client-side
-      const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
       const files = await storageManager.getFiles(project.id)
       
@@ -751,7 +692,6 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
       }
       
       // Get token from IndexedDB
-      const { storageManager } = await import('@/lib/storage-manager')
       let tokenToUse = formData.vercelToken
       if (tokenToUse === 'stored') {
         const token = await storageManager.getToken(userId, 'vercel')
@@ -892,15 +832,15 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
                   Deploy to PiPilot.dev Subdomain
                 </h3>
                 <p className="text-xs text-blue-700 dark:text-blue-300">
-                  Your project will be deployed to a custom subdomain on pipilot.dev (e.g., yoursite.pipilot.dev)
+                  Your project will be deployed to Cloudflare Pages with a real .pages.dev domain
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="subdomain">Subdomain Name</Label>
+                <Label htmlFor="subdomain">Project Name</Label>
                 <Input
                   id="subdomain"
-                  placeholder="yoursite"
+                  placeholder="my-awesome-project"
                   value={formData.subdomain}
                   onChange={(e) => setFormData(prev => ({
                     ...prev,
@@ -909,35 +849,10 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
                   disabled={deploymentState.isLoading}
                 />
 
-                {/* Subdomain availability status */}
-                {formData.subdomain && (
-                  <div className="flex items-center space-x-2">
-                    {subdomainStatus.checking ? (
-                      <>
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                        <span className="text-xs text-muted-foreground">Checking availability...</span>
-                      </>
-                    ) : subdomainStatus.available === true ? (
-                      <>
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span className="text-xs text-green-600">Available!</span>
-                      </>
-                    ) : subdomainStatus.available === false ? (
-                      <>
-                        <AlertCircle className="h-4 w-4 text-red-500" />
-                        <span className="text-xs text-red-600">Not available</span>
-                      </>
-                    ) : subdomainStatus.error ? (
-                      <>
-                        <AlertCircle className="h-4 w-4 text-red-500" />
-                        <span className="text-xs text-red-600">{subdomainStatus.error}</span>
-                      </>
-                    ) : null}
-                  </div>
-                )}
+                {/* Removed subdomain availability checking - using Cloudflare Pages */}
 
                 <p className="text-xs text-muted-foreground">
-                  Your site will be available at: <strong>{formData.subdomain || 'yoursite'}.pipilot.dev</strong>
+                  Your site will be available at: <strong>{formData.subdomain || 'yoursite'}.pages.dev</strong>
                 </p>
               </div>
 
@@ -946,9 +861,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
                 disabled={
                   deploymentState.isLoading ||
                   !formData.subdomain ||
-                  !/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(formData.subdomain) ||
-                  subdomainStatus.available === false ||
-                  subdomainStatus.checking
+                  !/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(formData.subdomain)
                 }
                 className="w-full"
               >

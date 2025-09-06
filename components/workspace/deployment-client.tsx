@@ -1118,6 +1118,9 @@ export default function DeploymentClient() {
       // Reload deployed repos to update dropdowns
       await loadDeployedRepos()
 
+      // Reload deployment history to update UI
+      await loadDeploymentHistory()
+
       // Save deployed repo information
       const deployedRepo: DeployedRepo = {
         id: `github_${selectedProject.id}_${Date.now()}`,
@@ -1633,7 +1636,7 @@ export default function DeploymentClient() {
                 <div className="space-y-2 text-sm text-gray-400">
                   <div className="flex items-center space-x-2">
                     <Globe className="h-4 w-4" />
-                    <span>yourproject.pipilot.dev</span>
+                    <span>yourproject.pages.dev</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Zap className="h-4 w-4" />
@@ -2180,6 +2183,9 @@ export default function DeploymentClient() {
                         // Reload deployed repos to update dropdowns
                         await loadDeployedRepos()
 
+                        // Reload deployment history to update UI
+                        await loadDeploymentHistory()
+
                         toast({
                           title: 'Deployment Successful',
                           description: `Successfully deployed to Vercel at ${deployData.url}`
@@ -2553,7 +2559,7 @@ export default function DeploymentClient() {
                 <Alert className="bg-purple-900/20 border-purple-700">
                   <Rocket className="h-4 w-4 text-purple-400" />
                   <AlertDescription className="text-purple-300">
-                    Deploy directly to your custom subdomain on pipilot.dev. No external accounts required!
+                    Deploy directly to Cloudflare Pages. Get a real .pages.dev domain!
                   </AlertDescription>
                 </Alert>
 
@@ -2602,7 +2608,7 @@ export default function DeploymentClient() {
                       </p>
                       {(pipilotForm?.subdomain || '').length > 0 && (
                         <p className="text-sm text-purple-400 mt-2">
-                          Your site will be available at: <strong>{pipilotForm?.subdomain}.pipilot.dev</strong>
+                          Your site will be available at: <strong>{pipilotForm?.subdomain}.pages.dev</strong>
                         </p>
                       )}
                     </div>
