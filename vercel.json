@@ -7,6 +7,10 @@
     {
       "source": "/s/:subdomain",
       "destination": "/s/[subdomain]"
+    },
+    {
+      "source": "/s/([^/]+)$",
+      "destination": "/s/[subdomain]"
     }
   ],
   "headers": [
@@ -39,12 +43,6 @@
           "value": "noindex, nofollow"
         }
       ]
-    }
-  ],
-  "routes": [
-    {
-      "src": "^/s/([^/]+)$",
-      "dest": "/s/[subdomain]"
     }
   ]
 }
