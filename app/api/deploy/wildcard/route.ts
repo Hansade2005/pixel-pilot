@@ -420,26 +420,71 @@ export async function POST(req: Request) {
       // Validate and log dist folder contents
       const distFiles = await validateDistFolder(sandbox)
 
-      // Compress dist folder for Cloudflare Pages (ZIP only)
+      // Compress dist folder for Cloudflare Pages deployment
       console.log('Compressing dist folder...')
       let archiveName = 'dist.zip'
+      let compressionMethod = ''
 
-      try {
-        const zipResult = await sandbox.executeCommand(
-          'cd /project && zip -r dist.zip dist/',
-          { workingDirectory: '/project' }
-        )
+      // Try multiple compression methods
+      const compressionMethods = [
+        // Method 1: Python ZIP
+        async () => {
+          try {
+            const pythonZipResult = await sandbox.executeCommand(
+              'python3 -c "import zipfile, os; ' +
+              'zipfile.ZipFile(\'dist.zip\', \'w\', zipfile.ZIP_DEFLATED) as zipf: ' +
+              'for root, dirs, files in os.walk(\'dist\'):\n' +
+              '    for file in files:\n' +
+              '        zipf.write(os.path.join(root, file), ' +
+              '                   os.path.relpath(os.path.join(root, file), \'dist\'))"',
+              { workingDirectory: '/project' }
+            )
 
-        if (zipResult.exitCode !== 0) {
-          console.error('ZIP compression failed:', zipResult.stderr)
-          throw new Error(`ZIP failed: ${zipResult.stderr}`)
+            if (pythonZipResult.exitCode === 0) {
+              compressionMethod = 'Python'
+              return true
+            }
+            return false
+          } catch (error) {
+            console.warn('Python ZIP compression failed:', error)
+            return false
+          }
+        },
+
+        // Method 2: Standard ZIP command
+        async () => {
+          try {
+            const zipResult = await sandbox.executeCommand(
+              'cd /project && zip -r dist.zip dist/',
+              { workingDirectory: '/project' }
+            )
+
+            if (zipResult.exitCode === 0) {
+              compressionMethod = 'zip command'
+              return true
+            }
+            return false
+          } catch (error) {
+            console.warn('Standard ZIP compression failed:', error)
+            return false
+          }
         }
+      ]
 
-        console.log('Dist folder compressed with zip successfully')
-      } catch (zipError) {
-        console.error('ZIP compression failed:', zipError)
-        throw new Error('Failed to compress dist folder for Cloudflare Pages deployment')
+      // Try compression methods sequentially
+      let compressionSuccess = false
+      for (const method of compressionMethods) {
+        if (await method()) {
+          compressionSuccess = true
+          break
+        }
       }
+
+      if (!compressionSuccess) {
+        throw new Error('Failed to compress dist folder with available methods')
+      }
+
+      console.log(`Dist folder compressed successfully using ${compressionMethod}`)
 
       // Download the ZIP archive file
       console.log(`Downloading ${archiveName} from sandbox...`)
