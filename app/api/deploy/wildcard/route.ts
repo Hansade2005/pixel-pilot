@@ -333,10 +333,10 @@ export async function POST(req: Request) {
 
       // Install dependencies
       console.log('Installing dependencies...')
-      const installResult = await sandbox.executeCommand('pnpm install', {
+      const installResult = await sandbox.executeCommand('npm install', {
         workingDirectory: '/project',
-        onStdout: (data) => console.log(`[pnpm Install] ${data}`),
-        onStderr: (data) => console.warn(`[pnpm Install Error] ${data}`),
+        onStdout: (data) => console.log(`[npm Install] ${data}`),
+        onStderr: (data) => console.warn(`[npm Install Error] ${data}`),
       })
 
       if (installResult.exitCode !== 0) {
