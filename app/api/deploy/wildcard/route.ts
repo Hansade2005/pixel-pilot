@@ -460,32 +460,32 @@ export async function POST(req: Request) {
       try {
         // Advanced Python ZIP creation with file filtering
         const pythonZipResult = await sandbox.executeCommand(
-          'python3 -c "' +
-          'import zipfile, os, sys\n' +
-          'try:\n' +
-          '    os.chdir("/project")\n' +
-          '    excluded_dirs = ["node_modules", ".git", ".next", "__pycache__"]\n' +
-          '    excluded_files = [".DS_Store", ".env", "*.log"]\n' +
-          '    with zipfile.ZipFile("dist.zip", "w", zipfile.ZIP_DEFLATED) as zipf:\n' +
-          '        for root, dirs, files in os.walk("dist"):\n' +
-          '            # Filter out excluded directories\n' +
-          '            dirs[:] = [d for d in dirs if d not in excluded_dirs]\n' +
-          '            \n' +
-          '            for file in files:\n' +
-          '                # Skip excluded files\n' +
-          '                if not any(file.endswith(ext) for ext in excluded_files):\n' +
-          '                    file_path = os.path.join(root, file)\n' +
-          '                    arcname = os.path.relpath(file_path, ".")\n' +
-          '                    zipf.write(file_path, arcname)\n' +
-          '\n' +
-          '    # Get file size and print\n' +
-          '    file_size = os.path.getsize("dist.zip")\n' +
-          '    print("Created dist.zip ({} bytes)".format(file_size))\n' +
-          '    sys.exit(0)\n' +
-          'except Exception as e:\n' +
-          '    print("Compression error: " + str(e), file=sys.stderr)\n' +
-          '    sys.exit(1)\n' +
-          '"',
+          `python3 -c '
+import zipfile, os, sys
+try:
+    os.chdir("/project")
+    excluded_dirs = ["node_modules", ".git", ".next", "__pycache__"]
+    excluded_files = [".DS_Store", ".env", "*.log"]
+    with zipfile.ZipFile("dist.zip", "w", zipfile.ZIP_DEFLATED) as zipf:
+        for root, dirs, files in os.walk("dist"):
+            # Filter out excluded directories
+            dirs[:] = [d for d in dirs if d not in excluded_dirs]
+            
+            for file in files:
+                # Skip excluded files
+                if not any(file.endswith(ext) for ext in excluded_files):
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, ".")
+                    zipf.write(file_path, arcname)
+
+    # Get file size and print
+    file_size = os.path.getsize("dist.zip")
+    print("Created dist.zip " + str(file_size) + " bytes")
+    sys.exit(0)
+except Exception as e:
+    print("Compression error: " + str(e), file=sys.stderr)
+    sys.exit(1)
+'`,
           { workingDirectory: '/project' }
         )
 
