@@ -20,7 +20,7 @@ export class TemplateService {
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
@@ -65,6 +65,7 @@ export class TemplateService {
     "clsx": "^2.1.1",
     "tailwind-merge": "^2.5.5",
     "cmdk": "1.0.4",
+    "next-themes": "^0.4.6",
 
     "react-hook-form": "^7.60.0",
     "zod": "3.25.67",
@@ -2261,7 +2262,7 @@ export { Skeleton }
     {
       name: 'sonner.tsx',
       path: 'src/components/ui/sonner.tsx',
-      content: `import { useTheme } from "../hooks/useTheme"
+      content: `import { useTheme } from "next-themes"
 import { Toaster as Sonner } from "sonner"
 
 type ToasterProps = React.ComponentProps<typeof Sonner>
@@ -4128,6 +4129,7 @@ export { useTheme, ThemeProvider } from './useTheme'
     "clsx": "^2.1.1",
     "tailwind-merge": "^2.5.5",
     "cmdk": "1.0.4",
+    "next-themes": "^0.4.6",
 
     "react-hook-form": "^7.60.0",
     "zod": "3.25.67",
@@ -5922,7 +5924,7 @@ export { Skeleton }`,
     {
       name: 'sonner.tsx',
       path: 'src/components/ui/sonner.tsx',
-      content: `import { useTheme } from "../hooks/useTheme"
+      content: `import { useTheme } from "next-themes"
 import { Toaster as Sonner } from "sonner"
 
 type ToasterProps = React.ComponentProps<typeof Sonner>

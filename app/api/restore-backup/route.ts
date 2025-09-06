@@ -1,9 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { restoreBackupFromCloud } from '@/lib/cloud-sync'
 
 export async function GET(request: Request) {
-  const supabase = await createClient()
+  const supabase = createRouteHandlerClient({ cookies })
   
   try {
     // Get the user

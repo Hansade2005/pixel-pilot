@@ -9,7 +9,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Wildcard subdomain serving has been deprecated - now using real Cloudflare Pages URLs
 }
 
 export default nextConfig

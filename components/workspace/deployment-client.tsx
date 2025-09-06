@@ -253,16 +253,6 @@ export default function DeploymentClient() {
     githubRepoUrl: '',
   })
 
-  const [pipilotForm, setPipilotForm] = useState({
-    subdomain: '',
-  })
-
-  const [pipilotConfig, setPipilotConfig] = useState<{
-    configured: boolean
-    message: string
-    accountName?: string
-  } | null>(null)
-
   // Enhanced state variables
   const [showWizard, setShowWizard] = useState(false)
   const [wizardStep, setWizardStep] = useState(1)
@@ -493,7 +483,6 @@ export default function DeploymentClient() {
       calculateQuickStats()
       loadDeploymentHistory()
       initializeEnvironments()
-      checkPipilotConfig() // Check PiPilot configuration
     }
   }, [currentUserId])
 
@@ -616,21 +605,6 @@ export default function DeploymentClient() {
       }
     }
   }, [projectId, projects])
-
-  // Check PiPilot configuration
-  const checkPipilotConfig = async () => {
-    try {
-      const response = await fetch('/api/deploy/config-check')
-      const data = await response.json()
-      setPipilotConfig(data)
-    } catch (error) {
-      console.error('Failed to check PiPilot configuration:', error)
-      setPipilotConfig({
-        configured: false,
-        message: 'Failed to check deployment configuration.'
-      })
-    }
-  }
 
   // Handle GitHub OAuth callback
   useEffect(() => {
@@ -851,132 +825,6 @@ export default function DeploymentClient() {
     })
   }
 
-  const handlePiPilotDeploy = async () => {
-    if (!selectedProject) {
-      toast({
-        title: "No Project Selected",
-        description: "Please select a project to deploy",
-        variant: "destructive"
-      })
-      return
-    }
-
-    if (!pipilotForm.subdomain) {
-      toast({
-        title: "Subdomain Required",
-        description: "Please enter a subdomain name",
-        variant: "destructive"
-      })
-      return
-    }
-
-    // Validate subdomain format
-    const subdomainRegex = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
-    if (!subdomainRegex.test(pipilotForm.subdomain)) {
-      toast({
-        title: "Invalid Subdomain",
-        description: "Subdomain can only contain letters, numbers, and hyphens. Cannot start or end with a hyphen.",
-        variant: "destructive"
-      })
-      return
-    }
-
-    if (pipilotForm.subdomain.length < 3 || pipilotForm.subdomain.length > 63) {
-      toast({
-        title: "Invalid Subdomain Length",
-        description: "Subdomain must be between 3 and 63 characters",
-        variant: "destructive"
-      })
-      return
-    }
-
-    setDeploymentState(prev => ({ ...prev, isDeploying: true, currentStep: 'connecting' }))
-
-    try {
-      // Get project files from storage
-      await storageManager.init()
-      const files = await storageManager.getFiles(selectedProject.id)
-
-      if (!files || files.length === 0) {
-        throw new Error('No files found in project')
-      }
-
-      // Deploy to PiPilot
-      const response = await fetch('/api/deploy/wildcard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workspaceId: selectedProject.id,
-          subdomain: pipilotForm.subdomain,
-          files: files,
-        }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to deploy to PiPilot')
-      }
-
-      const result = await response.json()
-
-      // Record deployment in local storage
-      await storageManager.createDeployment({
-        workspaceId: selectedProject.id,
-        url: result.url,
-        status: 'ready',
-        provider: 'pipilot',
-        environment: 'production',
-        externalId: pipilotForm.subdomain
-      })
-
-      // Reload deployment history
-      await loadDeploymentHistory()
-
-      // Reload Cloudflare projects list
-      await loadDeployedRepos()
-
-      toast({
-        title: 'Deployment Successful',
-        description: `Successfully deployed to PiPilot at ${result.url}`
-      })
-
-      setDeploymentState(prev => ({ ...prev, isDeploying: false, currentStep: 'complete' }))
-
-    } catch (error) {
-      console.error('PiPilot deploy error:', error)
-
-      let errorMessage = 'Failed to deploy to PiPilot'
-      let errorTitle = 'Deployment Failed'
-
-      try {
-        const errorResponse = JSON.parse((error as Error).message)
-        if (errorResponse.error) {
-          errorMessage = errorResponse.error
-        }
-      } catch (parseError) {
-        // If parsing fails, use the original error message
-        errorMessage = (error as Error).message || errorMessage
-      }
-
-      // Provide specific guidance for common configuration errors
-      if (errorMessage.includes('Cloudflare credentials not configured')) {
-        errorTitle = 'Configuration Error'
-        errorMessage = 'PiPilot deployment is not configured. Please contact the administrator to set up Cloudflare API credentials.'
-      } else if (errorMessage.includes('Cloudflare API error')) {
-        errorTitle = 'API Error'
-        errorMessage = 'Failed to connect to Cloudflare. Please try again or contact support if the issue persists.'
-      }
-
-      toast({
-        title: errorTitle,
-        description: errorMessage,
-        variant: 'destructive'
-      })
-
-      setDeploymentState(prev => ({ ...prev, isDeploying: false }))
-    }
-  }
-
   const handleGitHubDeploy = async () => {
     if (!selectedProject) {
       toast({
@@ -1151,9 +999,6 @@ export default function DeploymentClient() {
 
       // Reload deployed repos to update dropdowns
       await loadDeployedRepos()
-
-      // Reload deployment history to update UI
-      await loadDeploymentHistory()
 
       // Save deployed repo information
       const deployedRepo: DeployedRepo = {
@@ -1477,7 +1322,7 @@ export default function DeploymentClient() {
         {/* Interactive Deployment Cards */}
         <div className="mb-6">
           <h2 className="text-2xl font-bold mb-4">Choose Deployment Platform</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* GitHub Card */}
             <Card
               className={`bg-gray-800 border-gray-700 cursor-pointer transition-all duration-200 hover:shadow-lg ${
@@ -1641,52 +1486,6 @@ export default function DeploymentClient() {
                     </p>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-
-            {/* PiPilot Card */}
-            <Card
-              className={`bg-gray-800 border-gray-700 cursor-pointer transition-all duration-200 hover:shadow-lg ${
-                activeTab === 'pipilot' ? 'ring-2 ring-purple-500 shadow-lg' : ''
-              }`}
-              onClick={() => setActiveTab('pipilot')}
-            >
-              <CardHeader className="text-center">
-                <div className="flex justify-center mb-2">
-                  <div className={`p-3 rounded-full ${activeTab === 'pipilot' ? 'bg-purple-900' : 'bg-gray-700'}`}>
-                    <Rocket className={`h-8 w-8 ${activeTab === 'pipilot' ? 'text-purple-400' : 'text-gray-300'}`} />
-                  </div>
-                </div>
-                <CardTitle className="flex items-center justify-center space-x-2 text-white">
-                  <span>PiPilot</span>
-                  <Badge variant="secondary" className="text-xs bg-purple-900 text-purple-300">
-                    <Zap className="h-3 w-3 mr-1" />
-                    Fast
-                  </Badge>
-                </CardTitle>
-                <CardDescription className="text-gray-400">Deploy to custom subdomain</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 text-sm text-gray-400">
-                  <div className="flex items-center space-x-2">
-                    <Globe className="h-4 w-4" />
-                    <span>yourproject.pages.dev</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Zap className="h-4 w-4" />
-                    <span>Instant deployment</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Shield className="h-4 w-4" />
-                    <span>Free hosting</span>
-                  </div>
-                </div>
-                <div className="mt-4 p-3 bg-purple-900/20 rounded-lg border border-purple-700">
-                  <p className="text-xs text-purple-300 flex items-center">
-                    <Rocket className="h-3 w-3 mr-1" />
-                    Deploy directly to your custom subdomain
-                  </p>
-                </div>
               </CardContent>
             </Card>
           </div>
@@ -2217,9 +2016,6 @@ export default function DeploymentClient() {
                         // Reload deployed repos to update dropdowns
                         await loadDeployedRepos()
 
-                        // Reload deployment history to update UI
-                        await loadDeploymentHistory()
-
                         toast({
                           title: 'Deployment Successful',
                           description: `Successfully deployed to Vercel at ${deployData.url}`
@@ -2579,169 +2375,6 @@ export default function DeploymentClient() {
                       <>
                         <Rocket className="mr-2 h-4 w-4" />
                         Deploy to Netlify
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* PiPilot Deployment Form */}
-            {activeTab === 'pipilot' && (
-              <div className="space-y-6">
-                {/* PiPilot Info */}
-                <Alert className="bg-purple-900/20 border-purple-700">
-                  <Rocket className="h-4 w-4 text-purple-400" />
-                  <AlertDescription className="text-purple-300">
-                    Deploy directly to Cloudflare Pages. Get a real .pages.dev domain!
-                  </AlertDescription>
-                </Alert>
-
-                {/* Configuration Status */}
-                {pipilotConfig && (
-                  <Alert className={pipilotConfig.configured 
-                    ? "bg-green-900/20 border-green-700" 
-                    : "bg-red-900/20 border-red-700"
-                  }>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        {pipilotConfig.configured ? (
-                          <CheckCircle className="h-4 w-4 text-green-400 mr-2" />
-                        ) : (
-                          <AlertTriangle className="h-4 w-4 text-red-400 mr-2" />
-                        )}
-                        <AlertDescription className={pipilotConfig.configured 
-                          ? "text-green-300" 
-                          : "text-red-300"
-                        }>
-                          {pipilotConfig.message}
-                          {pipilotConfig.accountName && (
-                            <span className="ml-2 text-sm">
-                              (Account: {pipilotConfig.accountName})
-                            </span>
-                          )}
-                        </AlertDescription>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={checkPipilotConfig}
-                        className="ml-4 text-xs bg-transparent border-current"
-                      >
-                        <RefreshCw className="h-3 w-3 mr-1" />
-                        Refresh
-                      </Button>
-                    </div>
-                  </Alert>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="pipilot-subdomain" className="flex items-center space-x-2 text-gray-300">
-                        <span>Subdomain Name</span>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <HelpCircle className="h-4 w-4 text-gray-400" />
-                          </TooltipTrigger>
-                          <TooltipContent className="bg-gray-700 border-gray-600 text-white">
-                            <p>Choose your custom subdomain (e.g., myproject)</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </Label>
-                      <div className="flex space-x-2 mt-1">
-                        <Input
-                          id="pipilot-subdomain"
-                          value={pipilotForm?.subdomain || ''}
-                          onChange={(e) => setPipilotForm(prev => ({
-                            ...prev,
-                            subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '')
-                          }))}
-                          placeholder="my-awesome-project"
-                          className="flex-1 bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                        />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            if (selectedProject) {
-                              const subdomain = selectedProject.name.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '')
-                              setPipilotForm(prev => ({ ...prev, subdomain }))
-                            }
-                          }}
-                          disabled={!selectedProject}
-                          className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                        >
-                          Generate
-                        </Button>
-                      </div>
-                      <p className="text-sm text-gray-400 mt-1">
-                        Only letters, numbers, and hyphens. 3-63 characters.
-                      </p>
-                      {(pipilotForm?.subdomain || '').length > 0 && (
-                        <p className="text-sm text-purple-400 mt-2">
-                          Your site will be available at: <strong>{pipilotForm?.subdomain}.pages.dev</strong>
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="bg-purple-900/20 p-4 rounded-lg border border-purple-700">
-                      <h4 className="text-sm font-medium text-purple-300 mb-2">PiPilot Features</h4>
-                      <ul className="space-y-1 text-xs text-purple-400">
-                        <li>• Instant deployment to custom subdomain</li>
-                        <li>• No external accounts required</li>
-                        <li>• Free hosting with CDN</li>
-                        <li>• Automatic SSL certificate</li>
-                        <li>• SPA routing support</li>
-                      </ul>
-                    </div>
-
-                    {selectedProject && (
-                      <div className="bg-gray-700 p-4 rounded-lg">
-                        <h4 className="text-sm font-medium text-white mb-2">Project Details</h4>
-                        <div className="space-y-1 text-xs text-gray-300">
-                          <p><strong>Name:</strong> {selectedProject.name}</p>
-                          <p><strong>Files:</strong> Ready to deploy</p>
-                          <p><strong>Status:</strong> <span className="text-green-400">Build ready</span></p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setDeploymentState(prev => ({ ...prev, isDeploying: false }))}
-                    disabled={deploymentState.isDeploying}
-                    className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handlePiPilotDeploy}
-                    disabled={
-                      deploymentState.isDeploying ||
-                      !selectedProject ||
-                      !pipilotForm?.subdomain ||
-                      pipilotForm.subdomain.length < 3 ||
-                      pipilotForm.subdomain.length > 63 ||
-                      !/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(pipilotForm.subdomain) ||
-                      (pipilotConfig && !pipilotConfig.configured)
-                    }
-                    className="sm:ml-auto bg-purple-600 hover:bg-purple-700"
-                  >
-                    {deploymentState.isDeploying ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Deploying to PiPilot...
-                      </>
-                    ) : (
-                      <>
-                        <Rocket className="mr-2 h-4 w-4" />
-                        Deploy to PiPilot.dev
                       </>
                     )}
                   </Button>

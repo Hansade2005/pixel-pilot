@@ -12,9 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
-import { storageManager, CloudflarePagesProject } from "@/lib/storage-manager"
 import { Github, Globe, Loader2, CheckCircle, AlertCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { DeploymentSetupAccordion } from "./deployment-setup-accordion"
@@ -26,7 +24,7 @@ interface DeploymentDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-type DeploymentStep = 'github' | 'vercel' | 'netlify' | 'pipilot' | 'complete'
+type DeploymentStep = 'github' | 'vercel' | 'netlify' | 'complete'
 
 interface DeploymentState {
   step: DeploymentStep
@@ -34,7 +32,6 @@ interface DeploymentState {
   githubRepoUrl?: string
   vercelDeploymentUrl?: string
   netlifyDeploymentUrl?: string
-  pipilotDeploymentUrl?: string
   error?: string
 }
 
@@ -52,10 +49,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
     vercelToken: '',
     netlifyToken: '',
     siteName: project?.name?.toLowerCase().replace(/\s+/g, '-') || '',
-    subdomain: project?.name?.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '') || '',
   })
-
-  // Removed subdomainStatus - now using Cloudflare Pages project names
 
   const [hasGitHubToken, setHasGitHubToken] = useState(false)
   const [githubConnectionStatus, setGitHubConnectionStatus] = useState<'checking' | 'connected' | 'not_connected' | 'connecting'>('checking')
@@ -64,31 +58,12 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
   const [hasNetlifyToken, setHasNetlifyToken] = useState(false)
   const [netlifyConnectionStatus, setNetlifyConnectionStatus] = useState<'checking' | 'connected' | 'not_connected' | 'connecting'>('checking')
 
-  // Cloudflare Pages projects state
-  const [cloudflareProjects, setCloudflareProjects] = useState<CloudflarePagesProject[]>([])
-  const [selectedCloudflareProject, setSelectedCloudflareProject] = useState<string>('')
-
-  // Subdomain checking removed - now using Cloudflare Pages project names
-  // Removed subdomain availability checking
-
-  // Load Cloudflare Pages projects
-  const loadCloudflareProjects = async () => {
-    if (!project) return
-    try {
-      const projects = await storageManager.getCloudflarePagesProjects(project.id)
-      setCloudflareProjects(projects)
-    } catch (error) {
-      console.error('Failed to load Cloudflare Pages projects:', error)
-    }
-  }
-
   // Check if user has tokens on dialog open
   React.useEffect(() => {
     if (open && project) {
       checkGitHubToken()
       checkVercelToken()
       checkNetlifyToken()
-      loadCloudflareProjects()
     }
   }, [open, project])
 
@@ -105,6 +80,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
       }
       
       // Check if token exists in IndexedDB using storageManager
+      const { storageManager } = await import('@/lib/storage-manager')
       const token = await storageManager.getToken(data.userId, 'github')
       
       setHasGitHubToken(!!token)
@@ -131,6 +107,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
       }
       
       // Check if token exists in IndexedDB using storageManager
+      const { storageManager } = await import('@/lib/storage-manager')
       const token = await storageManager.getToken(data.userId, 'vercel')
       
       setHasVercelToken(!!token)
@@ -157,6 +134,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
       }
       
       // Check if token exists in IndexedDB using storageManager
+      const { storageManager } = await import('@/lib/storage-manager')
       const token = await storageManager.getToken(data.userId, 'netlify')
       
       setHasNetlifyToken(!!token)
@@ -195,7 +173,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
       }
       
       // Store token in IndexedDB
-;
+      const { storageManager } = await import('@/lib/storage-manager');
       await storageManager.createToken({
         userId,
         provider: 'vercel',
@@ -249,7 +227,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
       }
       
       // Store token in IndexedDB
-;
+      const { storageManager } = await import('@/lib/storage-manager');
       await storageManager.createToken({
         userId,
         provider: 'netlify',
@@ -334,7 +312,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
       }
       
       // Store token in IndexedDB
-;
+      const { storageManager } = await import('@/lib/storage-manager');
       await storageManager.createToken({
         userId,
         provider: 'github',
@@ -419,6 +397,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
 
     try {
       // Fetch files from IndexedDB client-side
+      const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
       const files = await storageManager.getFiles(project.id)
       
@@ -494,90 +473,9 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
     }
   }
 
-  const deployToPiPilot = async () => {
-    if (!project || !formData.subdomain) {
-      toast({
-        title: "Missing Information",
-        description: "Please provide project name",
-        variant: "destructive",
-      })
-      return
-    }
-
-    // Determine if we're creating a new project or redeploying to existing
-    const isRedeploy = selectedCloudflareProject !== '' && selectedCloudflareProject !== 'new'
-    const projectNameToUse = isRedeploy ? selectedCloudflareProject : formData.subdomain
-
-    setDeploymentState(prev => ({ ...prev, isLoading: true, error: undefined }))
-
-    try {
-      // Fetch files from IndexedDB client-side
-      await storageManager.init()
-      const files = await storageManager.getFiles(project.id)
-
-      if (!files || files.length === 0) {
-        throw new Error('No files found in project')
-      }
-
-      const response = await fetch('/api/deploy/wildcard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workspaceId: project.id,
-          projectName: projectNameToUse,
-          isRedeploy: isRedeploy,
-          files: files,
-        }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to deploy to PiPilot')
-      }
-
-      const result = await response.json()
-
-      setDeploymentState(prev => ({
-        ...prev,
-        isLoading: false,
-        pipilotDeploymentUrl: result.url,
-        step: 'complete',
-      }))
-
-      // Store deployment info in IndexedDB
-      await storageManager.init()
-
-      // Update the deployment record with the returned ID
-      if (result.deploymentId) {
-        await storageManager.updateDeployment(result.deploymentId, {
-          status: 'ready',
-          url: result.url
-        })
-      }
-
-      toast({
-        title: "PiPilot Deployment Successful",
-        description: `Your app is now live at ${result.url}`,
-      })
-
-    } catch (error) {
-      setDeploymentState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to deploy to PiPilot',
-      }))
-
-      toast({
-        title: "PiPilot Deployment Failed",
-        description: error instanceof Error ? error.message : 'Failed to deploy to PiPilot',
-        variant: "destructive",
-      })
-    }
-  }
-
   const resetState = () => {
     setDeploymentState({
-      step: 'pipilot',
+      step: 'github',
       isLoading: false,
     })
     setFormData({
@@ -587,7 +485,6 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
       vercelToken: '',
       netlifyToken: '',
       siteName: project?.name?.toLowerCase().replace(/\s+/g, '-') || '',
-      subdomain: project?.name?.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '') || '',
     })
     setGitHubConnectionStatus('checking')
     setVercelConnectionStatus('checking')
@@ -608,6 +505,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
 
     try {
       // Fetch files from IndexedDB client-side
+      const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
       const files = await storageManager.getFiles(project.id)
       
@@ -714,6 +612,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
       }
       
       // Get token from IndexedDB
+      const { storageManager } = await import('@/lib/storage-manager')
       let tokenToUse = formData.vercelToken
       if (tokenToUse === 'stored') {
         const token = await storageManager.getToken(userId, 'vercel')
@@ -788,19 +687,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
 
         <div className="space-y-6">
           {/* Step Indicator */}
-          <div className="flex items-center space-x-2">
-            <div className={`flex items-center space-x-2 ${
-              deploymentState.step === 'pipilot' ? 'text-accent' :
-              deploymentState.pipilotDeploymentUrl ? 'text-green-500' : 'text-muted-foreground'
-            }`}>
-              {deploymentState.pipilotDeploymentUrl ? (
-                <CheckCircle className="h-4 w-4" />
-              ) : (
-                <Globe className="h-4 w-4" />
-              )}
-              <span className="text-sm font-medium">PiPilot</span>
-            </div>
-            <Separator className="flex-1" />
+          <div className="flex items-center space-x-4">
             <div className={`flex items-center space-x-2 ${
               deploymentState.step === 'github' ? 'text-accent' : 
               deploymentState.githubRepoUrl ? 'text-green-500' : 'text-muted-foreground'
@@ -843,98 +730,6 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
             <div className="flex items-center space-x-2 text-destructive">
               <AlertCircle className="h-4 w-4" />
               <span className="text-sm">{deploymentState.error}</span>
-            </div>
-          )}
-
-          {/* PiPilot Step */}
-          {deploymentState.step === 'pipilot' && (
-            <div className="space-y-4">
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
-                  Deploy to PiPilot.dev Subdomain
-                </h3>
-                <p className="text-xs text-blue-700 dark:text-blue-300">
-                  Your project will be deployed to Cloudflare Pages with a real .pages.dev domain
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                {/* Existing Cloudflare Projects Dropdown */}
-                {cloudflareProjects.length > 0 && (
-                  <div className="space-y-2">
-                    <Label htmlFor="existing-project">Existing Projects (Optional)</Label>
-                    <Select value={selectedCloudflareProject} onValueChange={setSelectedCloudflareProject}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select existing project to redeploy" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="new">Create new project</SelectItem>
-                        {cloudflareProjects.map((project) => (
-                          <SelectItem key={project.id} value={project.name}>
-                            {project.name} {project.url && `(Last: ${new Date(project.lastDeployment || '').toLocaleDateString()})`}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {/* Project Name Input - only show if creating new or no existing projects */}
-                {(selectedCloudflareProject === '' || selectedCloudflareProject === 'new' || cloudflareProjects.length === 0) && (
-                  <>
-                    <Label htmlFor="subdomain">Project Name</Label>
-                    <Input
-                      id="subdomain"
-                      placeholder="my-awesome-project"
-                      value={formData.subdomain}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '')
-                      }))}
-                      disabled={deploymentState.isLoading}
-                    />
-                  </>
-                )}
-
-                {/* Removed subdomain availability checking - using Cloudflare Pages */}
-
-                <p className="text-xs text-muted-foreground">
-                  Your site will be available at: <strong>{selectedCloudflareProject && selectedCloudflareProject !== 'new' ? selectedCloudflareProject : (formData.subdomain || 'yoursite')}.pages.dev</strong>
-                </p>
-              </div>
-
-              <Button
-                onClick={deployToPiPilot}
-                disabled={
-                  deploymentState.isLoading ||
-                  (!selectedCloudflareProject && !formData.subdomain) ||
-                  (selectedCloudflareProject === '' && !/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(formData.subdomain))
-                }
-                className="w-full"
-              >
-                {deploymentState.isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Deploying to PiPilot...
-                  </>
-                ) : (
-                  <>
-                    <Globe className="h-4 w-4 mr-2" />
-                    Deploy to PiPilot.dev
-                  </>
-                )}
-              </Button>
-
-              <div className="text-center">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setDeploymentState(prev => ({ ...prev, step: 'github' }))}
-                  disabled={deploymentState.isLoading}
-                >
-                  Or deploy to other platforms →
-                </Button>
-              </div>
             </div>
           )}
 
@@ -1175,22 +970,6 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
                     View
                   </Button>
                 </div>
-
-                {deploymentState.pipilotDeploymentUrl && (
-                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <Globe className="h-4 w-4" />
-                      <span className="text-sm font-medium">PiPilot Deployment</span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => window.open(deploymentState.pipilotDeploymentUrl, '_blank')}
-                    >
-                      Visit
-                    </Button>
-                  </div>
-                )}
 
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <div className="flex items-center space-x-2">
