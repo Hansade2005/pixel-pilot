@@ -15,6 +15,13 @@ async function extractSubdomain(request: NextRequest): Promise<string | null> {
   const host = request.headers.get('host') || ''
   const hostname = host.split(':')[0]
 
+  console.log('[Middleware Debug] Subdomain Extraction:', {
+    url,
+    host,
+    hostname,
+    rootDomain: domainConfig.rootDomain
+  });
+
   // Local development environment
   if (url.includes('localhost') || url.includes('127.0.0.1')) {
     // Try to extract subdomain from the full URL
@@ -50,10 +57,20 @@ async function extractSubdomain(request: NextRequest): Promise<string | null> {
     ? hostname.replace(`.${rootDomainFormatted}`, '') 
     : null;
 
+  console.log('[Middleware Debug] Extracted Subdomain:', {
+    isSubdomain,
+    extractedSubdomain
+  });
+
   // Validate subdomain against Redis metadata
   if (extractedSubdomain) {
     const subdomainDataStr = await redis.get(`subdomain:${extractedSubdomain}`);
     
+    console.log('[Middleware Debug] Redis Subdomain Check:', {
+      subdomain: extractedSubdomain,
+      redisData: subdomainDataStr
+    });
+
     // Parse the JSON string and validate
     if (subdomainDataStr) {
       try {
@@ -61,6 +78,7 @@ async function extractSubdomain(request: NextRequest): Promise<string | null> {
         return extractedSubdomain;
       } catch {
         // Invalid JSON, treat as non-existent subdomain
+        console.log(`[Middleware Debug] Invalid JSON for subdomain: ${extractedSubdomain}`);
         return null;
       }
     }
@@ -75,12 +93,18 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const subdomain = await extractSubdomain(request);
 
+  console.log('[Middleware Debug] Middleware Processing:', {
+    pathname,
+    subdomain
+  });
+
   // Validate domain
   const isAllowedDomain = TENANT_CONFIG.domainWhitelist.some(domain => 
     request.headers.get('host')?.endsWith(domain)
   );
 
   if (!isAllowedDomain) {
+    console.log('[Middleware Debug] Domain not allowed, redirecting to pipilot.dev');
     return NextResponse.redirect(new URL('https://pipilot.dev'));
   }
 
@@ -93,6 +117,7 @@ export async function middleware(request: NextRequest) {
 
     // Rewrite root path on subdomain to specific subdomain page
     if (pathname === '/') {
+      console.log(`[Middleware Debug] Rewriting root path to /s/${subdomain}`);
       return NextResponse.rewrite(new URL(`/s/${subdomain}`, request.url));
     }
 
