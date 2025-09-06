@@ -33,45 +33,35 @@ const serveProjectFile = cache(async (subdomain: string, path: string[] = []) =>
   
   // Construct the full storage path
   const joinedPath = path.length > 0 ? path.join('/') : 'index.html';
-  const storagePath = `${subdomain}/dist/${joinedPath}`;
+  const possiblePaths = [
+    `${subdomain}/dist/${joinedPath}`,  // First, try dist directory
+    `${subdomain}/${joinedPath}`,       // Then, try root directory
+    `${subdomain}/dist/index.html`,     // Fallback to dist index.html
+    `${subdomain}/index.html`           // Final fallback to root index.html
+  ];
 
-  try {
-    // Try to download the specific file
-    const { data, error } = await supabase.storage
-      .from('projects')
-      .download(storagePath);
-
-    // If file not found and looks like an SPA route, fallback to index.html
-    if (error) {
-      console.log(`[Subdomain File Serve] File not found: ${storagePath}. Attempting index.html fallback.`);
+  for (const storagePath of possiblePaths) {
+    try {
+      console.log(`[Subdomain File Serve] Attempting to download: ${storagePath}`);
       
-      const fallbackPath = `${subdomain}/dist/index.html`;
-      const fallback = await supabase.storage
+      const { data, error } = await supabase.storage
         .from('projects')
-        .download(fallbackPath);
+        .download(storagePath);
 
-      if (!fallback.error && fallback.data) {
-        console.log(`[Subdomain File Serve] Serving index.html as fallback`);
+      if (!error && data) {
+        console.log(`[Subdomain File Serve] Successfully downloaded: ${storagePath}`);
         return {
-          data: await fallback.data.arrayBuffer(),
-          contentType: 'text/html; charset=utf-8'
+          data: await data.arrayBuffer(),
+          contentType: detectContentType(storagePath)
         };
       }
-
-      // If no index.html found either
-      console.error(`[Subdomain File Serve] No fallback index.html found for ${subdomain}`);
-      return null;
+    } catch (downloadError) {
+      console.error(`[Subdomain File Serve] Error downloading ${storagePath}:`, downloadError);
     }
-
-    // Successfully found the file
-    return {
-      data: await data.arrayBuffer(),
-      contentType: detectContentType(joinedPath)
-    };
-  } catch (error) {
-    console.error('[Subdomain File Serve] Unexpected error:', error);
-    return null;
   }
+
+  console.error(`[Subdomain File Serve] No file found for subdomain: ${subdomain}`);
+  return null;
 });
 
 // Cached function to fetch and store all project assets
@@ -83,72 +73,78 @@ const fetchProjectAssets = cache(async (subdomain: string): Promise<ProjectAsset
   };
 
   try {
-    // Specific path for project files
-    const projectPath = `${subdomain}/dist`;
-
-    // List all files in the project dist directory
-    const { data: fileList, error: listError } = await supabase.storage
-      .from('projects')
-      .list(projectPath, {
-        limit: 1000,
-        offset: 0,
-        sortBy: { column: 'name', order: 'asc' }
-      });
-
-    if (listError) {
-      console.error('[Subdomain Asset Cache] Failed to list project files:', listError);
-      return assets;
-    }
-
-    // Attempt to download index.html
-    const indexPaths = [
-      `${projectPath}/index.html`,
-      `${projectPath}/index.htm`
+    // Possible paths to check for project files
+    const projectPaths = [
+      `${subdomain}/dist`,
+      `${subdomain}`
     ];
 
-    for (const path of indexPaths) {
-      try {
-        const { data, error } = await supabase.storage
-          .from('projects')
-          .download(path);
-
-        if (!error && data) {
-          assets.indexHtml = await data.text();
-          console.log(`[Subdomain Asset Cache] Successfully downloaded index.html from ${path}`);
-          break;
-        }
-      } catch (downloadError) {
-        console.error(`[Subdomain Asset Cache] Error downloading ${path}:`, downloadError);
-      }
-    }
-
-    // Download all other assets in the dist directory
-    if (fileList?.length) {
-      const assetDownloadPromises = fileList
-        .filter(file => 
-          // Exclude directories and index.html files
-          !file.name.endsWith('/') && 
-          !file.name.includes('index.html')
-        )
-        .map(async (file) => {
-          const fullPath = `${projectPath}/${file.name}`;
-          try {
-            const { data, error } = await supabase.storage
-              .from('projects')
-              .download(fullPath);
-
-            if (!error && data) {
-              // Convert to ArrayBuffer for caching
-              const buffer = await data.arrayBuffer();
-              assets.assets[file.name] = buffer;
-              console.log(`[Subdomain Asset Cache] Cached asset: ${file.name}`);
-            }
-          } catch (assetError) {
-            console.error(`[Subdomain Asset Cache] Error downloading asset ${fullPath}:`, assetError);
-          }
+    for (const projectPath of projectPaths) {
+      // List all files in the project directory
+      const { data: fileList, error: listError } = await supabase.storage
+        .from('projects')
+        .list(projectPath, {
+          limit: 1000,
+          offset: 0,
+          sortBy: { column: 'name', order: 'asc' }
         });
 
-      await Promise.allSettled(assetDownloadPromises);
+      if (listError) {
+        console.error(`[Subdomain Asset Cache] Failed to list files in ${projectPath}:`, listError);
+        continue;
+      }
+
+      // Attempt to download index.html
+      const indexPaths = [
+        `${projectPath}/index.html`,
+        `${projectPath}/index.htm`
+      ];
+
+      for (const path of indexPaths) {
+        try {
+          const { data, error } = await supabase.storage
+            .from('projects')
+            .download(path);
+
+          if (!error && data) {
+            assets.indexHtml = await data.text();
+            console.log(`[Subdomain Asset Cache] Successfully downloaded index.html from ${path}`);
+            break;
+          }
+        } catch (downloadError) {
+          console.error(`[Subdomain Asset Cache] Error downloading ${path}:`, downloadError);
+        }
+      }
+
+      // If index.html found, download other assets
+      if (assets.indexHtml && fileList?.length) {
+        const assetDownloadPromises = fileList
+          .filter(file => 
+            // Exclude directories and index.html files
+            !file.name.endsWith('/') && 
+            !file.name.includes('index.html')
+          )
+          .map(async (file) => {
+            const fullPath = `${projectPath}/${file.name}`;
+            try {
+              const { data, error } = await supabase.storage
+                .from('projects')
+                .download(fullPath);
+
+              if (!error && data) {
+                // Convert to ArrayBuffer for caching
+                const buffer = await data.arrayBuffer();
+                assets.assets[file.name] = buffer;
+                console.log(`[Subdomain Asset Cache] Cached asset: ${file.name}`);
+              }
+            } catch (assetError) {
+              console.error(`[Subdomain Asset Cache] Error downloading asset ${fullPath}:`, assetError);
+            }
+          });
+
+        await Promise.allSettled(assetDownloadPromises);
+        break;  // Stop searching after finding files in a path
+      }
     }
 
     // Log detailed asset information
