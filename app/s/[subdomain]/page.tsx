@@ -24,8 +24,15 @@ function detectContentType(path: string): string {
   return typeMap[ext || ''] || 'application/octet-stream'
 }
 
+// Type for file serve result
+type FileServeResult = {
+  data: string;
+  contentType: string;
+  storagePath: string;
+}
+
 // Cached function to fetch and serve project files using REST API
-const serveProjectFile = cache(async (subdomain: string, path: string[] = []) => {
+const serveProjectFile = cache(async (subdomain: string, path: string[] = []): Promise<FileServeResult | null> => {
   // Base URL for public Supabase storage
   const BASE_URL = 'https://lzuknbfbvpuscpammwzg.supabase.co/storage/v1/object/public/projects/';
 
@@ -119,6 +126,13 @@ export default async function SubdomainPage({
       notFound();
     }
 
+    // Prepare subdomain metadata as a plain object
+    const subdomainMetadata = {
+      name: subdomainData.name,
+      userId: subdomainData.userId,
+      deploymentUrl: subdomainData.deploymentUrl || `https://${params.subdomain}.${domainConfig.rootDomain}`
+    };
+
     // If slug is provided, attempt to serve specific file
     if (params.slug) {
       const fileServeResult = await serveProjectFile(params.subdomain, params.slug);
@@ -141,7 +155,7 @@ export default async function SubdomainPage({
         headers: {
           'Content-Type': indexFileResult.contentType,
           'X-Subdomain': params.subdomain,
-          'X-Tenant-Deployment': subdomainData.deploymentUrl || ''
+          'X-Tenant-Deployment': subdomainMetadata.deploymentUrl
         }
       });
     }
@@ -156,7 +170,7 @@ export default async function SubdomainPage({
           <pre>
             Subdomain: ${params.subdomain}
             Storage Path: projects/${params.subdomain}
-            Deployment URL: ${subdomainData.deploymentUrl || 'N/A'}
+            Deployment URL: ${subdomainMetadata.deploymentUrl}
           </pre>
         </body>
       </html>
