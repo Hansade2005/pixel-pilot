@@ -1,7 +1,89 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { redis } from '@/lib/redis'
 
-// Base URL for public Supabase storage
-const BASE_URL = 'https://lzuknbfbvpuscpammwzg.supabase.co/storage/v1/object/public/projects/';
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { slug: string[] } }
+) {
+  try {
+    // Extract subdomain from host
+    const host = req.headers.get('host') || ''
+    const subdomain = getSubdomainFromHost(host)
+
+    if (!subdomain) {
+      return new NextResponse('Invalid subdomain', { status: 400 })
+    }
+
+    // Validate subdomain exists in Redis
+    const subdomainData = await redis.get(`subdomain:${subdomain}`)
+    if (!subdomainData) {
+      return new NextResponse('Subdomain not found', { status: 404 })
+    }
+
+    // Construct file path
+    const slug = params.slug || []
+    const filePath = slug.length > 0 ? slug.join('/') : 'index.html'
+
+    // Create Supabase client for file serving
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+
+    // Possible storage paths to try
+    // Supabase bucket URL structure:
+    // https://lzuknbfbvpuscpammwzg.supabase.co/storage/v1/object/public/projects/projects/{subdomain}/dist/{filePath}
+    // https://lzuknbfbvpuscpammwzg.supabase.co/storage/v1/object/public/projects/projects/{subdomain}/{filePath}
+    const storagePaths = [
+      `projects/${subdomain}/dist/${filePath}`,
+      `projects/${subdomain}/${filePath}`
+    ]
+
+    // Try each storage path
+    for (const storagePath of storagePaths) {
+      try {
+        const { data, error } = await supabase.storage.from('projects').download(storagePath)
+        
+        if (!error) {
+          const contentType = detectContentType(storagePath)
+          return new NextResponse(data, {
+            headers: { 
+              'Content-Type': contentType,
+              'Cache-Control': 'public, max-age=31536000'
+            }
+          })
+        }
+      } catch {}
+    }
+
+    // Fallback HTML if no file found
+    return new NextResponse(createFallbackHTML(subdomain), {
+      status: 404,
+      headers: { 
+        'Content-Type': 'text/html',
+        'Cache-Control': 'no-cache'
+      }
+    })
+
+  } catch (error) {
+    console.error('Subdomain serving error:', error)
+    return new NextResponse('Internal server error', { status: 500 })
+  }
+}
+
+// Utility function to extract subdomain
+function getSubdomainFromHost(host: string): string | null {
+  const hostParts = host.split('.')
+  const subdomain = hostParts.length > 2 ? hostParts[0] : null
+  const validSubdomains = ['www', '', 'pipilot']
+  
+  return (
+    host.endsWith('.pipilot.dev') && 
+    subdomain && 
+    !validSubdomains.includes(subdomain)
+  ) ? subdomain : null
+}
 
 // Content type detection
 function detectContentType(path: string): string {
@@ -57,117 +139,9 @@ function createFallbackHTML(subdomain: string): string {
     <div class="container">
         <h1>Welcome to ${subdomain}.pipilot.dev</h1>
         <p>This site is being set up. Please check back soon.</p>
-        <p>Debug: No files found in storage.</p>
     </div>
 </body>
 </html>`
-}
-
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { slug: string[] } }
-) {
-  try {
-    // Extract subdomain from host
-    const host = req.headers.get('host') || ''
-    const subdomain = getSubdomainFromHost(host)
-
-    if (!subdomain) {
-      return new NextResponse('Invalid subdomain', { status: 400 })
-    }
-
-    // Construct file path
-    const slug = params.slug || []
-    const filePath = slug.length > 0 ? slug.join('/') : 'index.html'
-
-    // Possible storage paths to try
-    const storagePaths = [
-      `projects/${subdomain}/dist/${filePath}`
-    ]
-
-    // Try each storage path
-    for (const storagePath of storagePaths) {
-      try {
-        const publicUrl = `${BASE_URL}${storagePath}`
-        
-        console.log(`[Subdomain Serve API] Attempting to fetch: ${publicUrl}`)
-        
-        const response = await fetch(publicUrl, {
-          headers: {
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-          }
-        })
-        
-        if (response.ok) {
-          const contentType = detectContentType(storagePath)
-          let data = await response.text()
-          
-          // Special handling for HTML files to ensure proper rendering
-          if (contentType.includes('text/html')) {
-            // Modify asset paths to work with subdomain
-            const modifiedHtml = data.replace(
-              /(?:href|src)=["'](?!https?:\/\/)(\/[^"']*)/gi, 
-              (match, path) => `${match.split('=')[0]}="https://${subdomain}.pipilot.dev${path}"`
-            ).replace(
-              /<head>/i, 
-              `<head>
-                <base href="https://${subdomain}.pipilot.dev/" />
-                <script>
-                  console.log('Subdomain script initialized for ${subdomain}');
-                  console.log('Loaded from path: ${storagePath}');
-                </script>`
-            )
-
-            return new NextResponse(modifiedHtml, {
-              headers: { 
-                'Content-Type': 'text/html; charset=utf-8',
-                'Cache-Control': 'public, max-age=31536000',
-                'X-Subdomain-Path': storagePath
-              }
-            })
-          }
-
-          // For non-HTML files, return as-is
-          return new NextResponse(data, {
-            headers: { 
-              'Content-Type': contentType,
-              'Cache-Control': 'public, max-age=31536000',
-              'X-Subdomain-Path': storagePath
-            }
-          })
-        }
-      } catch (fetchError) {
-        console.error(`[Subdomain Serve API] Error fetching ${storagePath}:`, fetchError)
-      }
-    }
-
-    // Fallback HTML if no file found
-    console.warn(`[Subdomain Serve API] No files found for subdomain: ${subdomain}`)
-    return new NextResponse(createFallbackHTML(subdomain), {
-      status: 404,
-      headers: { 
-        'Content-Type': 'text/html',
-        'Cache-Control': 'no-cache'
-      }
-    })
-
-  } catch (error) {
-    console.error('Subdomain serving error:', error)
-    return new NextResponse('Internal server error', { status: 500 })
-  }
-}
-
-// Utility function to extract subdomain
-function getSubdomainFromHost(host: string): string | null {
-  const hostParts = host.split('.')
-  const subdomain = hostParts.length > 2 ? hostParts[0] : null
-  const validSubdomains = ['www', '', 'pipilot']
-  
-  return (
-    host.endsWith('.pipilot.dev') && 
-    subdomain && 
-    !validSubdomains.includes(subdomain)
-  ) ? subdomain : null
 }
 
 // CORS support

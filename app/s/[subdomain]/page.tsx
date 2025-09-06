@@ -1,168 +1,173 @@
+import { createClient } from '@supabase/supabase-js';
 import { notFound } from 'next/navigation';
-import { getSubdomainData } from '@/lib/redis';
-import { domainConfig } from '@/lib/redis';
-import { NextResponse } from 'next/server';
+import { domainConfig, redis } from '@/lib/redis';
 
-// Utility function to detect content type
-function detectContentType(path: string): string {
-  const ext = path.split('.').pop()?.toLowerCase()
-  const typeMap: Record<string, string> = {
-    'html': 'text/html; charset=utf-8',
-    'css': 'text/css; charset=utf-8',
-    'js': 'application/javascript; charset=utf-8',
-    'json': 'application/json; charset=utf-8',
-    'png': 'image/png',
-    'jpg': 'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'svg': 'image/svg+xml',
-    'webp': 'image/webp',
-    'woff': 'font/woff',
-    'woff2': 'font/woff2',
-    'ttf': 'font/ttf'
-  }
-  return typeMap[ext || ''] || 'application/octet-stream'
+// Type for subdomain tracking
+type SubdomainTracking = {
+  name: string;
+  userId: string;
+  createdAt: number;
+  lastActive?: number;
+  deploymentUrl?: string;
+  storagePath?: string;
+  isActive?: boolean;
 }
 
-// Type for file serve result
-type FileServeResult = {
-  data: string;
-  contentType: string;
-  storagePath: string;
-}
-
-// Function to fetch and serve project files using REST API
-async function serveProjectFile(subdomain: string, path: string[] = []): Promise<FileServeResult | null> {
-  // Base URL for public Supabase storage
-  const BASE_URL = 'https://lzuknbfbvpuscpammwzg.supabase.co/storage/v1/object/public/projects/';
-
-  // Construct the full storage path
-  const filePath = path.length > 0 ? path.join('/') : 'index.html';
-  
-  // Possible storage paths to try
-  const storagePaths = [
-    `projects/${subdomain}/dist/${filePath}`
-  ];
-
-  for (const storagePath of storagePaths) {
-    try {
-      const publicUrl = `${BASE_URL}${storagePath}`;
-      
-      console.log(`[Subdomain File Serve] Attempting to fetch: ${publicUrl}`);
-      
-      const response = await fetch(publicUrl, {
-        headers: {
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-        }
-      });
-      
-      if (response.ok) {
-        const contentType = detectContentType(storagePath);
-        let data = await response.text();
-        
-        // Special handling for HTML files to ensure proper rendering
-        if (contentType.includes('text/html')) {
-          const modifiedHtml = data.replace(
-            /(?:href|src)=["'](?!https?:\/\/)(\/[^"']*)/gi,
-            (match, path) => `${match.split('=')[0]}="https://${subdomain}.pipilot.dev${path}`
-          ).replace(
-            /<head>/i,
-            `<head>
-              <base href="https://${subdomain}.pipilot.dev/" />
-              <script>
-                console.log('Subdomain script initialized for ${subdomain}');
-                console.log('Loaded from path: ${storagePath}');
-              </script>`
-          );
-
-          return {
-            data: modifiedHtml,
-            contentType: 'text/html; charset=utf-8',
-            storagePath
-          };
-        }
-
-        // For non-HTML files, return as-is
-        return {
-          data,
-          contentType: detectContentType(storagePath),
-          storagePath
-        };
-      }
-    } catch (fetchError) {
-      console.error(`[Subdomain File Serve] Error fetching ${storagePath}:`, fetchError);
-    }
-  }
-
-  console.error(`[Subdomain File Serve] No file found for subdomain: ${subdomain}`);
-  return null;
-}
+// Supabase client for file serving
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export default async function SubdomainPage({
   params
 }: {
-  params: { subdomain: string, slug?: string[] };
+  params: { subdomain: string };
 }) {
-  // Fetch subdomain metadata from Redis
-  const subdomainData = await getSubdomainData(params.subdomain);
+  console.log(`[Subdomain Debug] Attempting to serve subdomain: ${params.subdomain}`);
 
-  // Handle no data found
+  // Fetch subdomain metadata from Redis
+  let subdomainData: SubdomainTracking | null = null;
+  try {
+    const redisData = await redis.get(`subdomain:${params.subdomain}`);
+    if (redisData) {
+      subdomainData = JSON.parse(redisData as string);
+    }
+  } catch (error) {
+    console.error('[Subdomain Debug] Redis fetch error:', error);
+  }
+
+  console.log('[Subdomain Debug] Subdomain Tracking Query:', {
+    subdomain: params.subdomain,
+    error: subdomainData ? null : 'Subdomain not found',
+    data: subdomainData
+  });
+
+  // Handle non-existent subdomain
   if (!subdomainData) {
-    console.warn(`[Subdomain Warning] No subdomain found: ${params.subdomain}`);
+    console.error(`[Subdomain Debug] Subdomain not found: ${params.subdomain}`);
     notFound();
   }
 
-  // Ensure subdomain data is a plain object
-  const plainSubdomainData = JSON.parse(JSON.stringify(subdomainData));
+  // Attempt to fetch index.html
+  // Supabase bucket URL structure:
+  // https://lzuknbfbvpuscpammwzg.supabase.co/storage/v1/object/public/projects/projects/{subdomain}/dist/index.html
+  // https://lzuknbfbvpuscpammwzg.supabase.co/storage/v1/object/public/projects/projects/{subdomain}/index.html
+  const indexPaths = [
+    `projects/${params.subdomain}/dist/index.html`,
+    `projects/${params.subdomain}/index.html`
+  ];
 
-  // If slug is provided, attempt to serve specific file
-  if (params.slug) {
-    const fileServeResult = await serveProjectFile(params.subdomain, params.slug);
-    
-    if (fileServeResult) {
-      // Ensure file serve result is a plain object
-      const plainFileServeResult = JSON.parse(JSON.stringify(fileServeResult));
-      
-      return new NextResponse(plainFileServeResult.data, {
-        headers: { 
-          'Content-Type': plainFileServeResult.contentType,
-          'X-Subdomain-Path': plainFileServeResult.storagePath
-        }
+  let indexHtml = '';
+  let contentType = 'text/html; charset=utf-8';
+
+  // List all files in the projects directory for debugging
+  try {
+    const { data: fileList, error: listError } = await supabase.storage
+      .from('projects')
+      .list(`${params.subdomain}`, { 
+        limit: 100, 
+        offset: 0, 
+        sortBy: { column: 'name', order: 'asc' } 
       });
+
+    console.log('[Subdomain Debug] Files in project storage:', {
+      subdomain: params.subdomain,
+      error: listError,
+      files: fileList?.map(file => file.name)
+    });
+
+    // If dist directory exists, list its contents
+    const hasDist = fileList?.some(file => file.name === 'dist');
+    if (hasDist) {
+      const { data: distFileList, error: distListError } = await supabase.storage
+        .from('projects')
+        .list(`${params.subdomain}/dist`, { 
+          limit: 100, 
+          offset: 0, 
+          sortBy: { column: 'name', order: 'asc' } 
+        });
+
+      console.log('[Subdomain Debug] Files in dist directory:', {
+        subdomain: params.subdomain,
+        error: distListError,
+        files: distFileList?.map(file => file.name)
+      });
+    }
+  } catch (listError) {
+    console.error('[Subdomain Debug] Error listing project files:', listError);
+  }
+
+  for (const path of indexPaths) {
+    try {
+      console.log(`[Subdomain Debug] Attempting to download: ${path}`);
+      const { data, error } = await supabase.storage
+        .from('projects')
+        .download(path);
+
+      console.log(`[Subdomain Debug] Download result for ${path}:`, {
+        error,
+        dataAvailable: !!data
+      });
+
+      if (!error && data) {
+        indexHtml = await data.text();
+        contentType = 'text/html; charset=utf-8';
+        console.log(`[Subdomain Debug] Successfully downloaded index.html from ${path}`);
+        break;
+      }
+    } catch (downloadError) {
+      console.error(`[Subdomain Debug] Error downloading ${path}:`, downloadError);
     }
   }
 
-  // Attempt to serve index.html
-  const indexFileResult = await serveProjectFile(params.subdomain);
-
-  if (indexFileResult) {
-    // Ensure index file result is a plain object
-    const plainIndexFileResult = JSON.parse(JSON.stringify(indexFileResult));
-    
-    return new NextResponse(plainIndexFileResult.data, {
-      headers: {
-        'Content-Type': plainIndexFileResult.contentType,
-        'X-Subdomain': params.subdomain,
-        'X-Tenant-Deployment': `https://${params.subdomain}.${domainConfig.rootDomain}`
-      }
-    });
+  // If no index.html found, return a fallback
+  if (!indexHtml) {
+    console.error(`[Subdomain Debug] No index.html found for subdomain: ${params.subdomain}`);
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-blue-50 to-white p-4">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold tracking-tight text-gray-900">
+            {params.subdomain}.{domainConfig.rootDomain}
+          </h1>
+          <p className="mt-3 text-lg text-gray-600">
+            No application files found
+          </p>
+          <pre className="mt-4 text-sm text-red-600">
+            Debug Info:
+            Subdomain: {params.subdomain}
+            Storage Path: {subdomainData.storagePath || `projects/${params.subdomain}`}
+          </pre>
+        </div>
+      </div>
+    );
   }
 
-  // If no index.html found, return a detailed fallback
-  console.error(`[Subdomain Debug] No index.html found for subdomain: ${params.subdomain}`);
-  return new NextResponse(`
-    <html>
-      <body>
-        <h1>Subdomain Not Found</h1>
-        <p>The requested subdomain could not be located.</p>
-        <pre>
-          Subdomain: ${params.subdomain}
-          Storage Path: projects/${params.subdomain}
-          Deployment URL: https://${params.subdomain}.${domainConfig.rootDomain}
-        </pre>
-      </body>
-    </html>
-  `, {
-    status: 404,
-    headers: { 'Content-Type': 'text/html' }
+  // Modify HTML to work with subdomain
+  const modifiedHtml = indexHtml.replace(
+    /<head>/i, 
+    `<head>
+      <base href="https://${params.subdomain}.${domainConfig.rootDomain}/" />
+      <script>
+        // Ensure all relative paths are resolved correctly
+        (function() {
+          const originalFetch = window.fetch;
+          window.fetch = function(url, options) {
+            if (typeof url === 'string' && !url.startsWith('http')) {
+              url = new URL(url, window.location.href).href;
+            }
+            return originalFetch(url, options);
+          };
+        })();
+      </script>`
+  );
+
+  // Return the modified HTML directly
+  return new Response(modifiedHtml, {
+    headers: {
+      'Content-Type': contentType,
+      'X-Subdomain': params.subdomain,
+      'X-Tenant-Deployment': subdomainData.deploymentUrl || ''
+    }
   });
 }
