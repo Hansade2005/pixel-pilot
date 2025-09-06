@@ -11,20 +11,24 @@ export async function createSubdomainAction(
 ) {
   const subdomain = formData.get('subdomain') as string;
 
-  // Sanitize subdomain
+  if (!subdomain) {
+    return { success: false, error: 'Subdomain is required' };
+  }
+
   const sanitizedSubdomain = subdomain.toLowerCase().replace(/[^a-z0-9-]/g, '');
 
-  // Validate subdomain format
   if (sanitizedSubdomain !== subdomain) {
     return {
       subdomain,
       success: false,
-      error: 'Subdomain can only have lowercase letters, numbers, and hyphens. Please try again.'
+      error:
+        'Subdomain can only have lowercase letters, numbers, and hyphens. Please try again.'
     };
   }
 
-  // Check if subdomain exists
-  const subdomainAlreadyExists = await redis.get(`subdomain:${sanitizedSubdomain}`);
+  const subdomainAlreadyExists = await redis.get(
+    `subdomain:${sanitizedSubdomain}`
+  );
   if (subdomainAlreadyExists) {
     return {
       subdomain,
@@ -33,13 +37,11 @@ export async function createSubdomainAction(
     };
   }
 
-  // Create subdomain
   await redis.set(`subdomain:${sanitizedSubdomain}`, {
     createdAt: Date.now()
   });
 
-  // Redirect to the new subdomain
-  redirect(`https://${sanitizedSubdomain}.${domainConfig.rootDomain}`);
+  redirect(`${domainConfig.protocol}://${sanitizedSubdomain}.${domainConfig.rootDomain}`);
 }
 
 export async function deleteSubdomainAction(

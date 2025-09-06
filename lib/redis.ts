@@ -9,39 +9,11 @@ export type SubdomainData = {
   deploymentUrl?: string;
 }
 
-// Configuration for Redis connection
-function getRedisConfig() {
-  const url = process.env.KV_URL || 
-              process.env.KV_REST_API_URL || 
-              process.env.UPSTASH_REDIS_REST_URL || 
-              process.env.REDIS_URL
+export const redis = new Redis({
+  url: process.env.KV_REST_API_URL,
+  token: process.env.KV_REST_API_TOKEN
+})
 
-  const token = process.env.KV_REST_API_TOKEN || 
-                process.env.KV_TOKEN || 
-                process.env.UPSTASH_REDIS_REST_TOKEN
-
-  const readOnlyToken = process.env.KV_REST_API_READ_ONLY_TOKEN || 
-                        process.env.REDIS_READ_ONLY_TOKEN
-
-  if (!url) {
-    console.warn('WARNING: No Redis URL found. Using in-memory fallback.')
-    return { url: 'redis://localhost:6379', token: '' }
-  }
-
-  if (!token) {
-    console.warn('WARNING: No Redis token found. Authentication may fail.')
-  }
-
-  return { 
-    url, 
-    token: token || readOnlyToken || '',
-    readOnlyToken 
-  }
-}
-
-export const redis = new Redis(getRedisConfig())
-
-// Domain configuration
 export const domainConfig = {
   protocol: process.env.NODE_ENV === 'production' ? 'https' : 'http',
   rootDomain: process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'pipilot.dev'

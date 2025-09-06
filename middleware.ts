@@ -1,26 +1,10 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
-import { redis, domainConfig, SubdomainData } from '@/lib/redis'
+import { type NextRequest, NextResponse } from 'next/server';
+import { domainConfig } from '@/lib/redis';
 
-// Configuration for allowed subdomains and tenant settings
-const TENANT_CONFIG = {
-  allowedSubdomainPattern: /^[a-z0-9][a-z0-9-]*[a-z0-9]$/,
-  blockedSubdomains: ['www', '', 'pipilot', 'admin', 'staging'],
-  domainWhitelist: ['pipilot.dev', 'localhost:3000']
-}
-
-// Advanced subdomain extraction
-async function extractSubdomain(request: NextRequest): Promise<string | null> {
-  const url = request.url
-  const host = request.headers.get('host') || ''
-  const hostname = host.split(':')[0]
-
-  console.log('[Middleware Debug] Subdomain Extraction:', {
-    url,
-    host,
-    hostname,
-    rootDomain: domainConfig.rootDomain
-  });
+function extractSubdomain(request: NextRequest): string | null {
+  const url = request.url;
+  const host = request.headers.get('host') || '';
+  const hostname = host.split(':')[0];
 
   // Local development environment
   if (url.includes('localhost') || url.includes('127.0.0.1')) {
@@ -53,89 +37,37 @@ async function extractSubdomain(request: NextRequest): Promise<string | null> {
     hostname !== `www.${rootDomainFormatted}` &&
     hostname.endsWith(`.${rootDomainFormatted}`);
 
-  const extractedSubdomain = isSubdomain 
-    ? hostname.replace(`.${rootDomainFormatted}`, '') 
-    : null;
-
-  console.log('[Middleware Debug] Extracted Subdomain:', {
-    isSubdomain,
-    extractedSubdomain
-  });
-
-  // Validate subdomain against Redis metadata
-  if (extractedSubdomain) {
-    const subdomainDataStr = await redis.get(`subdomain:${extractedSubdomain}`);
-    
-    console.log('[Middleware Debug] Redis Subdomain Check:', {
-      subdomain: extractedSubdomain,
-      redisData: subdomainDataStr
-    });
-
-    // Parse the JSON string and validate
-    if (subdomainDataStr) {
-      try {
-        const subdomainData: SubdomainData = JSON.parse(subdomainDataStr as string);
-        return extractedSubdomain;
-      } catch {
-        // Invalid JSON, treat as non-existent subdomain
-        console.log(`[Middleware Debug] Invalid JSON for subdomain: ${extractedSubdomain}`);
-        return null;
-      }
-    }
-    
-    return null;
-  }
-
-  return null;
+  return isSubdomain ? hostname.replace(`.${rootDomainFormatted}`, '') : null;
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const subdomain = await extractSubdomain(request);
+  const subdomain = extractSubdomain(request);
 
-  console.log('[Middleware Debug] Middleware Processing:', {
-    pathname,
-    subdomain
-  });
-
-  // Validate domain
-  const isAllowedDomain = TENANT_CONFIG.domainWhitelist.some(domain => 
-    request.headers.get('host')?.endsWith(domain)
-  );
-
-  if (!isAllowedDomain) {
-    console.log('[Middleware Debug] Domain not allowed, redirecting to pipilot.dev');
-    return NextResponse.redirect(new URL('https://pipilot.dev'));
-  }
-
-  // Subdomain-specific routing
   if (subdomain) {
     // Block access to admin page from subdomains
     if (pathname.startsWith('/admin')) {
       return NextResponse.redirect(new URL('/', request.url));
     }
 
-    // Rewrite root path on subdomain to specific subdomain page
+    // For the root path on a subdomain, rewrite to the subdomain page
     if (pathname === '/') {
-      console.log(`[Middleware Debug] Rewriting root path to /s/${subdomain}`);
       return NextResponse.rewrite(new URL(`/s/${subdomain}`, request.url));
     }
-
-    // Add tenant-specific headers
-    const response = NextResponse.next();
-    response.headers.set('X-Tenant-Subdomain', subdomain);
-    response.headers.set('X-Robots-Tag', 'noindex, nofollow');
-
-    return response;
   }
 
-  // Default fallback
+  // On the root domain, allow normal access
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    // Apply to all routes except static files and API routes
-    '/((?!_next/static|_next/image|favicon.ico|api/).*)',
-  ],
-}
+    /*
+     * Match all paths except for:
+     * 1. /api routes
+     * 2. /_next (Next.js internals)
+     * 3. all root files inside /public (e.g. /favicon.ico)
+     */
+    '/((?!api|_next|[\\w-]+\\.\\w+).*)'
+  ]
+};
