@@ -420,52 +420,28 @@ export async function POST(req: Request) {
       // Validate and log dist folder contents
       const distFiles = await validateDistFolder(sandbox)
 
-      // Compress dist folder (prefer tar over zip for better compatibility)
+      // Compress dist folder for Cloudflare Pages (ZIP only)
       console.log('Compressing dist folder...')
-      let compressionSuccess = false
-      let archiveName = 'dist.tar.gz'
+      let archiveName = 'dist.zip'
 
       try {
-        // Try tar first (usually available without installation)
-        const tarResult = await sandbox.executeCommand(
-          'cd /project && tar -czf dist.tar.gz dist/',
+        const zipResult = await sandbox.executeCommand(
+          'cd /project && zip -r dist.zip dist/',
           { workingDirectory: '/project' }
         )
 
-        if (tarResult.exitCode === 0) {
-          console.log('Dist folder compressed with tar successfully')
-          compressionSuccess = true
-        } else {
-          throw new Error(`TAR failed: ${tarResult.stderr}`)
+        if (zipResult.exitCode !== 0) {
+          console.error('ZIP compression failed:', zipResult.stderr)
+          throw new Error(`ZIP failed: ${zipResult.stderr}`)
         }
-      } catch (tarError) {
-        console.warn('TAR compression failed, trying zip:', tarError)
 
-        // Fallback to zip
-        try {
-          const zipResult = await sandbox.executeCommand(
-            'cd /project && zip -r dist.zip dist/',
-            { workingDirectory: '/project' }
-          )
-
-          if (zipResult.exitCode === 0) {
-            console.log('Dist folder compressed with zip successfully')
-            archiveName = 'dist.zip'
-            compressionSuccess = true
-          } else {
-            throw new Error(`ZIP failed: ${zipResult.stderr}`)
-          }
-        } catch (zipError) {
-          console.error('Both TAR and ZIP compression failed:', zipError)
-          throw new Error('Failed to compress dist folder with both tar and zip')
-        }
+        console.log('Dist folder compressed with zip successfully')
+      } catch (zipError) {
+        console.error('ZIP compression failed:', zipError)
+        throw new Error('Failed to compress dist folder for Cloudflare Pages deployment')
       }
 
-      if (!compressionSuccess) {
-        throw new Error('Compression failed')
-      }
-
-      // Download the archive file
+      // Download the ZIP archive file
       console.log(`Downloading ${archiveName} from sandbox...`)
       const archiveContent = await sandbox.downloadFile(`/project/${archiveName}`)
       console.log(`Downloaded archive file: ${archiveContent.length} bytes`)
