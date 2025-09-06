@@ -12,8 +12,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
-import { storageManager } from "@/lib/storage-manager"
+import { storageManager, CloudflarePagesProject } from "@/lib/storage-manager"
 import { Github, Globe, Loader2, CheckCircle, AlertCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { DeploymentSetupAccordion } from "./deployment-setup-accordion"
@@ -63,8 +64,23 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
   const [hasNetlifyToken, setHasNetlifyToken] = useState(false)
   const [netlifyConnectionStatus, setNetlifyConnectionStatus] = useState<'checking' | 'connected' | 'not_connected' | 'connecting'>('checking')
 
+  // Cloudflare Pages projects state
+  const [cloudflareProjects, setCloudflareProjects] = useState<CloudflarePagesProject[]>([])
+  const [selectedCloudflareProject, setSelectedCloudflareProject] = useState<string>('')
+
   // Subdomain checking removed - now using Cloudflare Pages project names
   // Removed subdomain availability checking
+
+  // Load Cloudflare Pages projects
+  const loadCloudflareProjects = async () => {
+    if (!project) return
+    try {
+      const projects = await storageManager.getCloudflarePagesProjects(project.id)
+      setCloudflareProjects(projects)
+    } catch (error) {
+      console.error('Failed to load Cloudflare Pages projects:', error)
+    }
+  }
 
   // Check if user has tokens on dialog open
   React.useEffect(() => {
@@ -72,6 +88,7 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
       checkGitHubToken()
       checkVercelToken()
       checkNetlifyToken()
+      loadCloudflareProjects()
     }
   }, [open, project])
 
@@ -487,6 +504,10 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
       return
     }
 
+    // Determine if we're creating a new project or redeploying to existing
+    const isRedeploy = selectedCloudflareProject !== '' && selectedCloudflareProject !== 'new'
+    const projectNameToUse = isRedeploy ? selectedCloudflareProject : formData.subdomain
+
     setDeploymentState(prev => ({ ...prev, isLoading: true, error: undefined }))
 
     try {
@@ -503,7 +524,8 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           workspaceId: project.id,
-          projectName: formData.subdomain, // Using subdomain field as project name for Cloudflare Pages
+          projectName: projectNameToUse,
+          isRedeploy: isRedeploy,
           files: files,
         }),
       })
@@ -837,22 +859,47 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="subdomain">Project Name</Label>
-                <Input
-                  id="subdomain"
-                  placeholder="my-awesome-project"
-                  value={formData.subdomain}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '')
-                  }))}
-                  disabled={deploymentState.isLoading}
-                />
+                {/* Existing Cloudflare Projects Dropdown */}
+                {cloudflareProjects.length > 0 && (
+                  <div className="space-y-2">
+                    <Label htmlFor="existing-project">Existing Projects (Optional)</Label>
+                    <Select value={selectedCloudflareProject} onValueChange={setSelectedCloudflareProject}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select existing project to redeploy" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="new">Create new project</SelectItem>
+                        {cloudflareProjects.map((project) => (
+                          <SelectItem key={project.id} value={project.name}>
+                            {project.name} {project.url && `(Last: ${new Date(project.lastDeployment || '').toLocaleDateString()})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Project Name Input - only show if creating new or no existing projects */}
+                {(selectedCloudflareProject === '' || selectedCloudflareProject === 'new' || cloudflareProjects.length === 0) && (
+                  <>
+                    <Label htmlFor="subdomain">Project Name</Label>
+                    <Input
+                      id="subdomain"
+                      placeholder="my-awesome-project"
+                      value={formData.subdomain}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '')
+                      }))}
+                      disabled={deploymentState.isLoading}
+                    />
+                  </>
+                )}
 
                 {/* Removed subdomain availability checking - using Cloudflare Pages */}
 
                 <p className="text-xs text-muted-foreground">
-                  Your site will be available at: <strong>{formData.subdomain || 'yoursite'}.pages.dev</strong>
+                  Your site will be available at: <strong>{selectedCloudflareProject && selectedCloudflareProject !== 'new' ? selectedCloudflareProject : (formData.subdomain || 'yoursite')}.pages.dev</strong>
                 </p>
               </div>
 
@@ -860,8 +907,8 @@ export function DeploymentDialog({ project, open, onOpenChange }: DeploymentDial
                 onClick={deployToPiPilot}
                 disabled={
                   deploymentState.isLoading ||
-                  !formData.subdomain ||
-                  !/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(formData.subdomain)
+                  (!selectedCloudflareProject && !formData.subdomain) ||
+                  (selectedCloudflareProject === '' && !/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(formData.subdomain))
                 }
                 className="w-full"
               >

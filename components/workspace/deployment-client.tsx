@@ -910,6 +910,9 @@ export default function DeploymentClient() {
       // Reload deployment history
       await loadDeploymentHistory()
 
+      // Reload Cloudflare projects list
+      await loadDeployedRepos()
+
       toast({
         title: 'Deployment Successful',
         description: `Successfully deployed to PiPilot at ${result.url}`

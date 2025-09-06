@@ -140,6 +140,17 @@ export interface EnvironmentVariable {
   updatedAt: string
 }
 
+export interface CloudflarePagesProject {
+  id: string
+  name: string
+  workspaceId: string
+  userId: string
+  createdAt: string
+  updatedAt: string
+  lastDeployment?: string
+  url?: string
+}
+
 // Storage interface for type safety
 export interface StorageInterface {
   createWorkspace(workspace: Omit<Workspace, 'id' | 'createdAt' | 'updatedAt'>): Promise<Workspace>;
@@ -185,7 +196,14 @@ export interface StorageInterface {
   getConversationMemory(projectId: string, userId: string): Promise<ConversationMemory | null>;
   updateConversationMemory(id: string, updates: Partial<ConversationMemory>): Promise<ConversationMemory | null>;
   deleteConversationMemory(id: string): Promise<boolean>;
-  
+
+  // Cloudflare Pages project methods
+  createCloudflarePagesProject(project: Omit<CloudflarePagesProject, 'id' | 'createdAt' | 'updatedAt'>): Promise<CloudflarePagesProject>;
+  getCloudflarePagesProjects(workspaceId?: string): Promise<CloudflarePagesProject[]>;
+  getCloudflarePagesProject(id: string): Promise<CloudflarePagesProject | null>;
+  updateCloudflarePagesProject(id: string, updates: Partial<CloudflarePagesProject>): Promise<CloudflarePagesProject | null>;
+  deleteCloudflarePagesProject(id: string): Promise<boolean>;
+
   // Additional utility methods
   importTable(tableName: string, data: any[]): Promise<void>;
   
@@ -202,6 +220,7 @@ class InMemoryStorage implements StorageInterface {
   private chatSessions: Map<string, ChatSession> = new Map()
   private messages: Map<string, Message> = new Map()
   private deployments: Map<string, Deployment> = new Map()
+  private cloudflarePagesProjects: Map<string, CloudflarePagesProject> = new Map()
   private environmentVariables: Map<string, EnvironmentVariable> = new Map()
   private checkpoints: Map<string, Checkpoint> = new Map() // Add checkpoints map
   private conversationMemories: Map<string, ConversationMemory> = new Map() // Add conversation memories map
@@ -392,6 +411,48 @@ class InMemoryStorage implements StorageInterface {
 
   async deleteDeployment(id: string): Promise<boolean> {
     return this.deployments.delete(id)
+  }
+
+  // Cloudflare Pages project methods
+  async createCloudflarePagesProject(project: Omit<CloudflarePagesProject, 'id' | 'createdAt' | 'updatedAt'>): Promise<CloudflarePagesProject> {
+    const id = this.generateId()
+    const now = new Date().toISOString()
+    const newProject: CloudflarePagesProject = {
+      ...project,
+      id,
+      createdAt: now,
+      updatedAt: now
+    }
+    this.cloudflarePagesProjects.set(id, newProject)
+    return newProject
+  }
+
+  async getCloudflarePagesProjects(workspaceId?: string): Promise<CloudflarePagesProject[]> {
+    if (workspaceId) {
+      return Array.from(this.cloudflarePagesProjects.values()).filter(p => p.workspaceId === workspaceId)
+    }
+    return Array.from(this.cloudflarePagesProjects.values())
+  }
+
+  async getCloudflarePagesProject(id: string): Promise<CloudflarePagesProject | null> {
+    return this.cloudflarePagesProjects.get(id) || null
+  }
+
+  async updateCloudflarePagesProject(id: string, updates: Partial<CloudflarePagesProject>): Promise<CloudflarePagesProject | null> {
+    const project = this.cloudflarePagesProjects.get(id)
+    if (!project) return null
+
+    const updatedProject: CloudflarePagesProject = {
+      ...project,
+      ...updates,
+      updatedAt: new Date().toISOString()
+    }
+    this.cloudflarePagesProjects.set(id, updatedProject)
+    return updatedProject
+  }
+
+  async deleteCloudflarePagesProject(id: string): Promise<boolean> {
+    return this.cloudflarePagesProjects.delete(id)
   }
 
   // Environment variable methods
@@ -709,6 +770,12 @@ class IndexedDBStorage implements StorageInterface {
         if (!db.objectStoreNames.contains('deployments')) {
           const deploymentStore = db.createObjectStore('deployments', { keyPath: 'id' })
           deploymentStore.createIndex('workspaceId', 'workspaceId', { unique: false })
+        }
+
+        if (!db.objectStoreNames.contains('cloudflarePagesProjects')) {
+          const cfProjectStore = db.createObjectStore('cloudflarePagesProjects', { keyPath: 'id' })
+          cfProjectStore.createIndex('workspaceId', 'workspaceId', { unique: false })
+          cfProjectStore.createIndex('userId', 'userId', { unique: false })
         }
 
         if (!db.objectStoreNames.contains('environmentVariables')) {
@@ -1125,6 +1192,91 @@ class IndexedDBStorage implements StorageInterface {
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['deployments'], 'readwrite')
       const store = transaction.objectStore('deployments')
+      const request = store.delete(id)
+      request.onsuccess = () => resolve(true)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  // Cloudflare Pages project methods
+  async createCloudflarePagesProject(project: Omit<CloudflarePagesProject, 'id' | 'createdAt' | 'updatedAt'>): Promise<CloudflarePagesProject> {
+    if (!this.db) throw new Error('Database not initialized')
+    const id = this.generateId()
+    const now = new Date().toISOString()
+    const newProject: CloudflarePagesProject = {
+      ...project,
+      id,
+      createdAt: now,
+      updatedAt: now
+    }
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['cloudflarePagesProjects'], 'readwrite')
+      const store = transaction.objectStore('cloudflarePagesProjects')
+      const request = store.add(newProject)
+      request.onsuccess = () => resolve(newProject)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getCloudflarePagesProjects(workspaceId?: string): Promise<CloudflarePagesProject[]> {
+    if (!this.db) throw new Error('Database not initialized')
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['cloudflarePagesProjects'], 'readonly')
+      const store = transaction.objectStore('cloudflarePagesProjects')
+      let request: IDBRequest
+
+      if (workspaceId) {
+        const index = store.index('workspaceId')
+        request = index.getAll(workspaceId)
+      } else {
+        request = store.getAll()
+      }
+      request.onsuccess = () => resolve(request.result || [])
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getCloudflarePagesProject(id: string): Promise<CloudflarePagesProject | null> {
+    if (!this.db) throw new Error('Database not initialized')
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['cloudflarePagesProjects'], 'readonly')
+      const store = transaction.objectStore('cloudflarePagesProjects')
+      const request = store.get(id)
+      request.onsuccess = () => resolve(request.result || null)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async updateCloudflarePagesProject(id: string, updates: Partial<CloudflarePagesProject>): Promise<CloudflarePagesProject | null> {
+    if (!this.db) throw new Error('Database not initialized')
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['cloudflarePagesProjects'], 'readwrite')
+      const store = transaction.objectStore('cloudflarePagesProjects')
+      const getRequest = store.get(id)
+      getRequest.onsuccess = () => {
+        const project = getRequest.result
+        if (project) {
+          const updatedProject = {
+            ...project,
+            ...updates,
+            updatedAt: new Date().toISOString()
+          }
+          const putRequest = store.put(updatedProject)
+          putRequest.onsuccess = () => resolve(updatedProject)
+          putRequest.onerror = () => reject(putRequest.error)
+        } else {
+          resolve(null)
+        }
+      }
+      getRequest.onerror = () => reject(getRequest.error)
+    })
+  }
+
+  async deleteCloudflarePagesProject(id: string): Promise<boolean> {
+    if (!this.db) throw new Error('Database not initialized')
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['cloudflarePagesProjects'], 'readwrite')
+      const store = transaction.objectStore('cloudflarePagesProjects')
       const request = store.delete(id)
       request.onsuccess = () => resolve(true)
       request.onerror = () => reject(request.error)
@@ -1929,6 +2081,32 @@ class StorageManager {
   async deleteConversationMemory(id: string): Promise<boolean> {
     await this.init()
     return this.storage!.deleteConversationMemory(id)
+  }
+
+  // Cloudflare Pages project methods
+  async createCloudflarePagesProject(project: Omit<CloudflarePagesProject, 'id' | 'createdAt' | 'updatedAt'>): Promise<CloudflarePagesProject> {
+    await this.init()
+    return this.storage!.createCloudflarePagesProject(project)
+  }
+
+  async getCloudflarePagesProjects(workspaceId?: string): Promise<CloudflarePagesProject[]> {
+    await this.init()
+    return this.storage!.getCloudflarePagesProjects(workspaceId)
+  }
+
+  async getCloudflarePagesProject(id: string): Promise<CloudflarePagesProject | null> {
+    await this.init()
+    return this.storage!.getCloudflarePagesProject(id)
+  }
+
+  async updateCloudflarePagesProject(id: string, updates: Partial<CloudflarePagesProject>): Promise<CloudflarePagesProject | null> {
+    await this.init()
+    return this.storage!.updateCloudflarePagesProject(id, updates)
+  }
+
+  async deleteCloudflarePagesProject(id: string): Promise<boolean> {
+    await this.init()
+    return this.storage!.deleteCloudflarePagesProject(id)
   }
 
   /**

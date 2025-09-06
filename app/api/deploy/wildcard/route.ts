@@ -53,21 +53,78 @@ async function deployToCloudflarePages(projectName: string, zipContent: Buffer):
   const CF_API_TOKEN = '_5lrwCirmktMcKoWYUOzPJznqFbC5hTHDHlLRiA_'
   const PROJECT_NAME = projectName // Use project name as Cloudflare Pages project name
 
-  console.log(`Deploying ${projectName} to Cloudflare Pages...`)
-
-  // Create form data with the ZIP file
-  const form = new FormData()
-  form.append('file', zipContent, {
-    filename: 'dist.zip',
-    contentType: 'application/zip'
-  })
-
-  const url = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${PROJECT_NAME}/deployments`
+  console.log(`Setting up Cloudflare Pages project: ${projectName}...`)
 
   try {
     const fetch = (await import('node-fetch')).default
 
-    const response = await fetch(url, {
+    // Step 1: Check if project already exists
+    const checkProjectUrl = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${PROJECT_NAME}`
+
+    const checkResponse = await fetch(checkProjectUrl, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${CF_API_TOKEN}`,
+      },
+    })
+
+    let projectExists = false
+    if (checkResponse.ok) {
+      const checkData = await checkResponse.json() as {
+        success: boolean
+        result?: { name: string }
+        errors?: unknown[]
+      }
+      if (checkData.success && checkData.result) {
+        projectExists = true
+        console.log('✅ Cloudflare Pages project already exists:', checkData.result.name)
+      }
+    }
+
+    // Step 2: Create the Cloudflare Pages project if it doesn't exist
+    if (!projectExists) {
+      console.log(`Creating new Cloudflare Pages project: ${projectName}...`)
+      const createProjectUrl = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects`
+
+      const createResponse = await fetch(createProjectUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${CF_API_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: PROJECT_NAME,
+          production_branch: 'main'
+        }),
+      })
+
+      if (!createResponse.ok) {
+        const errorText = await createResponse.text()
+        console.error('Failed to create Cloudflare Pages project:', errorText)
+        throw new Error(`Failed to create Cloudflare Pages project: ${errorText}`)
+      } else {
+        const createData = await createResponse.json() as {
+          success: boolean
+          result?: { name: string }
+          errors?: unknown[]
+        }
+        console.log('✅ Cloudflare Pages project created successfully:', createData.result?.name)
+      }
+    }
+
+    // Step 3: Deploy to the project
+    console.log(`Deploying ${projectName} to Cloudflare Pages...`)
+
+    // Create form data with the ZIP file
+    const form = new FormData()
+    form.append('file', zipContent, {
+      filename: 'dist.zip',
+      contentType: 'application/zip'
+    })
+
+    const deployUrl = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${PROJECT_NAME}/deployments`
+
+    const deployResponse = await fetch(deployUrl, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${CF_API_TOKEN}`,
@@ -76,12 +133,12 @@ async function deployToCloudflarePages(projectName: string, zipContent: Buffer):
       body: form,
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`Cloudflare API error! status: ${response.status}, message: ${errorText}`)
+    if (!deployResponse.ok) {
+      const errorText = await deployResponse.text()
+      throw new Error(`Cloudflare API error! status: ${deployResponse.status}, message: ${errorText}`)
     }
 
-    const data = await response.json() as {
+    const data = await deployResponse.json() as {
       success: boolean
       result?: { url: string }
       errors?: unknown[]
@@ -186,7 +243,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'E2B API key missing' }, { status: 500 })
     }
 
-    const { workspaceId, files, projectName } = await req.json()
+    const { workspaceId, files, projectName, isRedeploy } = await req.json()
 
     if (!workspaceId || !files?.length) {
       return NextResponse.json({
@@ -387,8 +444,46 @@ export async function POST(req: Request) {
 
       // Deploy to Cloudflare Pages
       console.log('Deploying to Cloudflare Pages...')
-      const deploymentUrl = await deployToCloudflarePages(projectName || `project-${Date.now()}`, archiveContent)
+
+      // Handle project naming and redeployment
+      let finalProjectName: string
+
+      if (isRedeploy && projectName) {
+        // For redeployment, use the existing project name
+        finalProjectName = projectName
+        console.log(`Redeploying to existing Cloudflare Pages project: ${finalProjectName}`)
+      } else {
+        // For new deployment, generate a unique project name
+        finalProjectName = projectName
+          ? `${projectName}-${Date.now()}`
+          : `pipilot-${workspaceId.slice(0, 8)}-${Date.now()}`
+        console.log(`Creating new Cloudflare Pages project: ${finalProjectName}`)
+      }
+
+      const deploymentUrl = await deployToCloudflarePages(finalProjectName, archiveContent)
       console.log(`Cloudflare Pages deployment successful: ${deploymentUrl}`)
+
+      // Update or create Cloudflare Pages project metadata
+      if (isRedeploy) {
+        // Update existing project metadata
+        const existingProjects = await storageManager.getCloudflarePagesProjects(workspaceId)
+        const existingProject = existingProjects.find(p => p.name === projectName)
+        if (existingProject) {
+          await storageManager.updateCloudflarePagesProject(existingProject.id, {
+            lastDeployment: new Date().toISOString(),
+            url: deploymentUrl
+          })
+        }
+      } else {
+        // Create new project metadata
+        await storageManager.createCloudflarePagesProject({
+          name: finalProjectName,
+          workspaceId,
+          userId: user.id,
+          lastDeployment: new Date().toISOString(),
+          url: deploymentUrl
+        })
+      }
 
       // Record deployment in IndexedDB (storage-manager)
       const deploymentRecord = await storageManager.createDeployment({
@@ -397,7 +492,7 @@ export async function POST(req: Request) {
         status: 'ready',
         provider: 'pipilot',
         environment: 'production',
-        externalId: projectName || `project-${Date.now()}`
+        externalId: finalProjectName
       })
 
       // No subdomain tracking needed - using real Cloudflare Pages URLs
@@ -406,7 +501,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         url: deploymentUrl,
-        projectName: projectName || `project-${Date.now()}`,
+        projectName: finalProjectName,
         status: 'ready',
         deploymentId: deploymentRecord.id
       })
