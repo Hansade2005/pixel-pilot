@@ -10,6 +10,48 @@ import { NextRequest, NextResponse } from 'next/server'
 import JSZip from 'jszip'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { supabaseStorage } from '@/lib/supabase-storage'
+import { z } from 'zod'
+
+// Enhanced validation schema with more flexible file type
+const FileContentSchema = z.union([
+  z.string(), 
+  z.instanceof(Buffer),
+  z.object({
+    type: z.string().optional(),
+    data: z.union([z.string(), z.instanceof(Buffer)])
+  })
+])
+
+const FileSchema = z.object({
+  path: z.string(),
+  content: FileContentSchema
+})
+
+const DeploymentSchema = z.object({
+  workspaceId: z.string().optional(),
+  subdomain: z.string()
+    .min(3, 'Subdomain must be at least 3 characters')
+    .max(63, 'Subdomain must be less than 63 characters')
+    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, 'Invalid subdomain format'),
+  files: z.array(FileSchema).nonempty('At least one file is required')
+})
+
+// Type definition for normalized files
+type NormalizedFile = {
+  path: string;
+  content: Buffer;
+}
+
+// Helper function to normalize file content
+function normalizeFileContent(content: unknown): Buffer {
+  if (content instanceof Buffer) return content
+  if (typeof content === 'string') return Buffer.from(content)
+  if (typeof content === 'object' && content !== null && 'data' in content) {
+    const data = (content as { data: string | Buffer }).data
+    return data instanceof Buffer ? data : Buffer.from(data)
+  }
+  return Buffer.from('')
+}
 
 /**
  * Parse environment variables from .env file content
@@ -123,41 +165,46 @@ async function extractArchive(archiveBuffer: Buffer, archiveName: string): Promi
 }
 
 export async function POST(req: Request) {
+  const startTime = Date.now() // Add start time tracking
+
   try {
     const e2bApiKey = process.env.E2B_API_KEY
     if (!e2bApiKey) {
-      return NextResponse.json({ error: 'E2B API key missing' }, { status: 500 })
+      return NextResponse.json({ 
+        error: 'E2B API key missing', 
+        code: 'E2B_API_KEY_MISSING' 
+      }, { status: 500 })
     }
 
     // Get user from Supabase auth first
     const supabase = await createClient()
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ 
+        error: 'Unauthorized', 
+        code: 'UNAUTHORIZED' 
+      }, { status: 401 })
     }
 
-    const { workspaceId, subdomain, files } = await req.json()
+    // Parse and validate request body
+    const requestBody = await req.json()
+    const validationResult = DeploymentSchema.safeParse(requestBody)
 
-    if (!subdomain || !files?.length) {
+    if (!validationResult.success) {
       return NextResponse.json({
-        error: 'Subdomain and files are required'
+        error: 'Invalid deployment request',
+        details: validationResult.error.flatten().fieldErrors,
+        code: 'VALIDATION_ERROR'
       }, { status: 400 })
     }
 
-    // Validate subdomain format
-    if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(subdomain)) {
-      return NextResponse.json({
-        error: 'Subdomain contains invalid characters. Only lowercase letters, numbers, and hyphens are allowed. Cannot start or end with a hyphen.',
-        code: 'INVALID_SUBDOMAIN'
-      }, { status: 400 })
-    }
+    const { workspaceId, subdomain, files } = validationResult.data
 
-    if (subdomain.length > 63) {
-      return NextResponse.json({
-        error: 'Subdomain is too long. Maximum 63 characters allowed.',
-        code: 'SUBDOMAIN_TOO_LONG'
-      }, { status: 400 })
-    }
+    // Normalize file content to ensure consistent type
+    const normalizedFiles: NormalizedFile[] = files.map(file => ({
+      path: file.path,
+      content: normalizeFileContent(file.content)
+    }))
 
     // Check if subdomain is already taken
     const { data: existingDeployment } = await supabase
@@ -170,21 +217,29 @@ export async function POST(req: Request) {
     if (existingDeployment) {
       return NextResponse.json({
         error: 'Subdomain is already taken',
-        code: 'SUBDOMAIN_TAKEN'
+        code: 'SUBDOMAIN_TAKEN',
+        suggestion: `Try ${subdomain}-${Math.random().toString(36).substring(7)}`
       }, { status: 409 })
     }
 
-    // Initialize storage manager and get files from workspace
+    // Initialize storage manager and get files
     await storageManager.init()
-    let projectFiles = files
+    let projectFiles: NormalizedFile[] = normalizedFiles
 
     if (!projectFiles || !Array.isArray(projectFiles) || projectFiles.length === 0) {
       // If no files provided, try to get files from workspaceId if provided
       if (workspaceId) {
-        projectFiles = await storageManager.getFiles(workspaceId)
+        const workspaceFiles = await storageManager.getFiles(workspaceId)
+        projectFiles = workspaceFiles.map(file => ({
+          path: file.path,
+          content: normalizeFileContent(file.content)
+        }))
       }
       if (!projectFiles || projectFiles.length === 0) {
-        return NextResponse.json({ error: 'No files found in workspace' }, { status: 400 })
+        return NextResponse.json({ 
+          error: 'No files found in workspace', 
+          code: 'NO_FILES_FOUND' 
+        }, { status: 400 })
       }
     }
 
@@ -199,9 +254,9 @@ export async function POST(req: Request) {
 
     try {
       // Write project files to sandbox
-      const sandboxFiles: SandboxFile[] = projectFiles.map((file: any) => ({
+      const sandboxFiles: SandboxFile[] = projectFiles.map(file => ({
         path: `/project/${file.path}`,
-        content: file.content || "",
+        content: file.content.toString('utf-8')
       }))
 
       // Add package.json if missing
@@ -442,7 +497,15 @@ export async function POST(req: Request) {
         url: deploymentUrl,
         subdomain,
         status: 'ready',
-        deploymentId: deploymentRecord.id
+        deploymentId: deploymentRecord.id,
+        metadata: {
+          fileCount: extractedFiles.length,
+          buildTime: Date.now() - startTime,
+          buildLogs: {
+            installLogs: installResult.stdout,
+            buildLogs: buildResult.stdout
+          }
+        }
       })
 
     } finally {
@@ -452,14 +515,21 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error('Wildcard deployment error:', error)
 
+    // Enhanced error handling
     if (error instanceof SandboxError) {
       return NextResponse.json({
         error: error.message,
         type: error.type,
-        sandboxId: error.sandboxId
+        sandboxId: error.sandboxId,
+        code: 'SANDBOX_ERROR'
       }, { status: 500 })
     }
 
-    return NextResponse.json({ error: 'Failed to deploy to wildcard domain' }, { status: 500 })
+    // Generic error response with more context
+    return NextResponse.json({ 
+      error: 'Failed to deploy to wildcard domain', 
+      code: 'DEPLOYMENT_FAILED',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
   }
 }

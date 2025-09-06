@@ -3,6 +3,10 @@
     {
       "source": "/api/serve/:path*",
       "destination": "/api/serve/[...slug]/route"
+    },
+    {
+      "source": "/s/:subdomain",
+      "destination": "/s/[subdomain]"
     }
   ],
   "headers": [
@@ -26,6 +30,21 @@
           "value": "Content-Type"
         }
       ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "src": "^/s/([^/]+)$",
+      "dest": "/s/[subdomain]"
     }
   ]
 }
