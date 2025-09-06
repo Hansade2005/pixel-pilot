@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import { domainConfig } from '@/lib/redis';
 
@@ -14,18 +14,15 @@ type SubdomainTracking = {
   emoji?: string;
 }
 
-// Supabase client for file serving
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!, 
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
 export default async function SubdomainPage({
   params
 }: {
   params: { subdomain: string };
 }) {
   console.log(`[Subdomain Debug] Attempting to serve subdomain: ${params.subdomain}`);
+
+  // Initialize Supabase client (server-side)
+  const supabase = await createClient();
 
   try {
     // Fetch subdomain metadata from Supabase with more robust query
@@ -46,28 +43,19 @@ export default async function SubdomainPage({
       }
     });
 
-    // Comprehensive error handling
-    if (subdomainError) {
+    // Comprehensive error handling (following cloud sync pattern)
+    if (subdomainError && subdomainError.code !== 'PGRST116') {
       console.error(`[Subdomain Error] Query failed for subdomain: ${params.subdomain}`, {
         errorCode: subdomainError.code,
         errorDetails: subdomainError.details,
         errorMessage: subdomainError.message
       });
-      
-      // Different handling based on error type
-      if (subdomainError.code === 'PGRST116') {
-        // No rows returned
-        console.warn(`[Subdomain Warning] No active subdomain found: ${params.subdomain}`);
-        notFound();
-      } else {
-        // Other Supabase errors
-        throw new Error(`Subdomain query failed: ${subdomainError.message}`);
-      }
+      throw new Error(`Subdomain query failed: ${subdomainError.message}`);
     }
 
-    // Explicit null check
-    if (!subdomainData) {
-      console.warn(`[Subdomain Warning] No data found for subdomain: ${params.subdomain}`);
+    // Handle no data found (PGRST116 or null data)
+    if (subdomainError?.code === 'PGRST116' || !subdomainData) {
+      console.warn(`[Subdomain Warning] No active subdomain found: ${params.subdomain}`);
       notFound();
     }
 
