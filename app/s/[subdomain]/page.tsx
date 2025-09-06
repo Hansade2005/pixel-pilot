@@ -1,6 +1,6 @@
-import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
-import { domainConfig, redis, SubdomainData } from '@/lib/redis';
+import { getSubdomainData } from '@/lib/redis';
+import { domainConfig } from '@/lib/redis';
 import { NextResponse } from 'next/server';
 
 // Utility function to detect content type
@@ -32,32 +32,34 @@ type FileServeResult = {
 
 // Function to fetch and serve project files using REST API
 async function serveProjectFile(subdomain: string, path: string[] = []): Promise<FileServeResult | null> {
+  // Base URL for public Supabase storage
   const BASE_URL = 'https://lzuknbfbvpuscpammwzg.supabase.co/storage/v1/object/public/projects/';
-  const filePath = path.length > 0 ? path.join('/') : 'index.html';
 
+  // Construct the full storage path
+  const filePath = path.length > 0 ? path.join('/') : 'index.html';
+  
+  // Possible storage paths to try
   const storagePaths = [
-    `projects/${subdomain}/dist/${filePath}`,
-    `${subdomain}/dist/${filePath}`,
-    `sample/dist/${filePath}`,
-    `${subdomain}/${filePath}`,
-    `sample/${filePath}`
+    `projects/${subdomain}/dist/${filePath}`
   ];
 
   for (const storagePath of storagePaths) {
     try {
       const publicUrl = `${BASE_URL}${storagePath}`;
+      
       console.log(`[Subdomain File Serve] Attempting to fetch: ${publicUrl}`);
-
+      
       const response = await fetch(publicUrl, {
         headers: {
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
         }
       });
-
+      
       if (response.ok) {
         const contentType = detectContentType(storagePath);
         let data = await response.text();
-
+        
+        // Special handling for HTML files to ensure proper rendering
         if (contentType.includes('text/html')) {
           const modifiedHtml = data.replace(
             /(?:href|src)=["'](?!https?:\/\/)(\/[^"']*)/gi,
@@ -79,6 +81,7 @@ async function serveProjectFile(subdomain: string, path: string[] = []): Promise
           };
         }
 
+        // For non-HTML files, return as-is
         return {
           data,
           contentType: detectContentType(storagePath),
@@ -99,88 +102,58 @@ export default async function SubdomainPage({
 }: {
   params: { subdomain: string, slug?: string[] };
 }) {
-  console.log(`[Subdomain Debug] Attempting to serve subdomain: ${params.subdomain}`);
+  // Fetch subdomain metadata from Redis
+  const subdomainData = await getSubdomainData(params.subdomain);
 
-  try {
-    // Fetch subdomain metadata from Redis and ensure plain object
-    const rawData = await redis.get(`subdomain:${params.subdomain}`);
-    const subdomainData: SubdomainData | null = rawData
-      ? typeof rawData === "string"
-        ? JSON.parse(rawData)
-        : JSON.parse(JSON.stringify(rawData))
-      : null;
+  // Handle no data found
+  if (!subdomainData) {
+    console.warn(`[Subdomain Warning] No subdomain found: ${params.subdomain}`);
+    notFound();
+  }
 
-    console.log('[Subdomain Debug] Redis Subdomain Query:', {
-      subdomain: params.subdomain,
-      redisData: subdomainData,
-      dataExists: !!subdomainData
-    });
-
-    if (!subdomainData) {
-      console.warn(`[Subdomain Warning] No subdomain found in Redis: ${params.subdomain}`);
-      notFound();
-    }
-
-    const subdomainMetadata = {
-      name: subdomainData.name,
-      userId: subdomainData.userId,
-      deploymentUrl: subdomainData.deploymentUrl || `https://${params.subdomain}.${domainConfig.rootDomain}`
-    };
-
-    if (params.slug) {
-      const fileServeResult = await serveProjectFile(params.subdomain, params.slug);
-      if (fileServeResult) {
-        return new NextResponse(fileServeResult.data, {
-          headers: {
-            'Content-Type': fileServeResult.contentType,
-            'X-Subdomain-Path': fileServeResult.storagePath
-          }
-        });
-      }
-    }
-
-    const indexFileResult = await serveProjectFile(params.subdomain);
-    if (indexFileResult) {
-      return new NextResponse(indexFileResult.data, {
-        headers: {
-          'Content-Type': indexFileResult.contentType,
-          'X-Subdomain': params.subdomain,
-          'X-Tenant-Deployment': subdomainMetadata.deploymentUrl
+  // If slug is provided, attempt to serve specific file
+  if (params.slug) {
+    const fileServeResult = await serveProjectFile(params.subdomain, params.slug);
+    
+    if (fileServeResult) {
+      return new NextResponse(fileServeResult.data, {
+        headers: { 
+          'Content-Type': fileServeResult.contentType,
+          'X-Subdomain-Path': fileServeResult.storagePath
         }
       });
     }
+  }
 
-    console.error(`[Subdomain Debug] No index.html found for subdomain: ${params.subdomain}`);
-    return new NextResponse(`
-      <html>
-        <body>
-          <h1>Subdomain Not Found</h1>
-          <p>The requested subdomain could not be located.</p>
-          <pre>
-            Subdomain: ${params.subdomain}
-            Storage Path: projects/${params.subdomain}
-            Deployment URL: ${subdomainMetadata.deploymentUrl}
-          </pre>
-        </body>
-      </html>
-    `, {
-      status: 404,
-      headers: { 'Content-Type': 'text/html' }
-    });
+  // Attempt to serve index.html
+  const indexFileResult = await serveProjectFile(params.subdomain);
 
-  } catch (error) {
-    console.error('[Subdomain Critical Error]:', error);
-    return new NextResponse(`
-      <html>
-        <body>
-          <h1>Subdomain Error</h1>
-          <p>An unexpected error occurred while serving the subdomain.</p>
-          <pre>${error instanceof Error ? error.message : 'Unknown error'}</pre>
-        </body>
-      </html>
-    `, {
-      status: 500,
-      headers: { 'Content-Type': 'text/html' }
+  if (indexFileResult) {
+    return new NextResponse(indexFileResult.data, {
+      headers: {
+        'Content-Type': indexFileResult.contentType,
+        'X-Subdomain': params.subdomain,
+        'X-Tenant-Deployment': `https://${params.subdomain}.${domainConfig.rootDomain}`
+      }
     });
   }
+
+  // If no index.html found, return a detailed fallback
+  console.error(`[Subdomain Debug] No index.html found for subdomain: ${params.subdomain}`);
+  return new NextResponse(`
+    <html>
+      <body>
+        <h1>Subdomain Not Found</h1>
+        <p>The requested subdomain could not be located.</p>
+        <pre>
+          Subdomain: ${params.subdomain}
+          Storage Path: projects/${params.subdomain}
+          Deployment URL: https://${params.subdomain}.${domainConfig.rootDomain}
+        </pre>
+      </body>
+    </html>
+  `, {
+    status: 404,
+    headers: { 'Content-Type': 'text/html' }
+  });
 }

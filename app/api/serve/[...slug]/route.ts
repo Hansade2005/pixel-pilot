@@ -82,11 +82,7 @@ export async function GET(
 
     // Possible storage paths to try
     const storagePaths = [
-      `projects/${subdomain}/dist/${filePath}`,  // Nested project path
-      `${subdomain}/dist/${filePath}`,           // Alternative nested path
-      `sample/dist/${filePath}`,                 // Nested sample project
-      `${subdomain}/${filePath}`,                // Fallback non-nested paths
-      `sample/${filePath}`
+      `projects/${subdomain}/dist/${filePath}`
     ]
 
     // Try each storage path
