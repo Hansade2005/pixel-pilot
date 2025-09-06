@@ -428,58 +428,79 @@ export async function POST(req: Request) {
         // Advanced Python ZIP creation with file filtering
         const pythonZipResult = await sandbox.executeCommand(
           'python3 -c "' +
-          'import zipfile, os\n' +
-          'os.chdir(\'/project\')\n' +
-          'excluded_dirs = [\'node_modules\', \'.git\', \'.next\', \'__pycache__\']\n' +
-          'excluded_files = [".DS_Store", ".env", "*.log"]\n' +
-          'with zipfile.ZipFile(\'dist.zip\', \'w\', zipfile.ZIP_DEFLATED) as zipf:\n' +
-          '    for root, dirs, files in os.walk(\'dist\'):\n' +
-          '        # Filter out excluded directories\n' +
-          '        dirs[:] = [d for d in dirs if d not in excluded_dirs]\n' +
-          '        \n' +
-          '        for file in files:\n' +
-          '            # Skip excluded files\n' +
-          '            if not any(file.endswith(ext) for ext in excluded_files):\n' +
-          '                file_path = os.path.join(root, file)\n' +
-          '                arcname = os.path.relpath(file_path, \'.\')\n' +
-          '                zipf.write(file_path, arcname)\n' +
+          'import zipfile, os, sys\n' +
+          'try:\n' +
+          '    os.chdir("/project")\n' +
+          '    excluded_dirs = ["node_modules", ".git", ".next", "__pycache__"]\n' +
+          '    excluded_files = [".DS_Store", ".env", "*.log"]\n' +
+          '    with zipfile.ZipFile("dist.zip", "w", zipfile.ZIP_DEFLATED) as zipf:\n' +
+          '        for root, dirs, files in os.walk("dist"):\n' +
+          '            # Filter out excluded directories\n' +
+          '            dirs[:] = [d for d in dirs if d not in excluded_dirs]\n' +
+          '            \n' +
+          '            for file in files:\n' +
+          '                # Skip excluded files\n' +
+          '                if not any(file.endswith(ext) for ext in excluded_files):\n' +
+          '                    file_path = os.path.join(root, file)\n' +
+          '                    arcname = os.path.relpath(file_path, ".")\n' +
+          '                    zipf.write(file_path, arcname)\n' +
           '\n' +
-          '# Get file size and print\n' +
-          'file_size = os.path.getsize(\'dist.zip\')\n' +
-          'print("Created dist.zip (" + str(file_size) + " bytes)"\n' +
+          '    # Get file size and print\n' +
+          '    file_size = os.path.getsize("dist.zip")\n' +
+          '    print("Created dist.zip ({} bytes)".format(file_size))\n' +
+          '    sys.exit(0)\n' +
+          'except Exception as e:\n' +
+          '    print("Compression error: " + str(e), file=sys.stderr)\n' +
+          '    sys.exit(1)\n' +
           '"',
           { workingDirectory: '/project' }
         )
 
         if (pythonZipResult.exitCode !== 0) {
           console.error('Python ZIP compression failed:', pythonZipResult.stderr)
-          throw new Error(`Python ZIP failed: ${pythonZipResult.stderr}`)
-        }
+          
+          // Fallback to tar compression
+          try {
+            const tarResult = await sandbox.executeCommand(
+              'cd /project && tar -czf dist.tar.gz dist/',
+              { workingDirectory: '/project' }
+            )
 
-        console.log('Dist folder compressed successfully with Python ZIP')
-      } catch (zipError) {
-        console.error('ZIP compression failed:', zipError)
-        
-        // Fallback to standard zip command
-        try {
-          const zipResult = await sandbox.executeCommand(
-            'cd /project && zip -r dist.zip dist/',
-            { workingDirectory: '/project' }
-          )
+            if (tarResult.exitCode === 0) {
+              console.log('Dist folder compressed with tar successfully')
+              archiveName = 'dist.tar.gz'
+            } else {
+              throw new Error(`TAR compression failed: ${tarResult.stderr}`)
+            }
+          } catch (tarError) {
+            console.error('TAR compression failed:', tarError)
+            
+            // Last resort: manual file compression
+            try {
+              const filesResult = await sandbox.executeCommand(
+                'cd /project && mkdir -p dist_zip && cp -r dist/* dist_zip/ && cd dist_zip && python3 -m zipfile -c ../dist.zip .',
+                { workingDirectory: '/project' }
+              )
 
-          if (zipResult.exitCode !== 0) {
-            console.error('ZIP compression failed:', zipResult.stderr)
-            throw new Error(`ZIP failed: ${zipResult.stderr}`)
+              if (filesResult.exitCode !== 0) {
+                throw new Error(`Manual ZIP compression failed: ${filesResult.stderr}`)
+              }
+
+              console.log('Dist folder compressed using Python zipfile module')
+            } catch (manualZipError) {
+              console.error('All compression methods failed:', manualZipError)
+              throw new Error('Failed to compress dist folder for Cloudflare Pages deployment')
+            }
           }
-
-          console.log('Dist folder compressed successfully with zip command')
-        } catch (fallbackError) {
-          console.error('Both Python and standard ZIP compression failed:', fallbackError)
-          throw new Error('Failed to compress dist folder for Cloudflare Pages deployment')
+        } else {
+          console.log('Dist folder compressed successfully with Python ZIP')
         }
+      } catch (zipError) {
+        console.error('Compression error:', zipError)
+        throw new Error('Failed to compress dist folder for Cloudflare Pages deployment')
       }
 
-      // Download the ZIP archive file
+      // Download the archive file
       console.log(`Downloading ${archiveName} from sandbox...`)
       const archiveContent = await sandbox.downloadFile(`/project/${archiveName}`)
       console.log(`Downloaded archive file: ${archiveContent.length} bytes`)
