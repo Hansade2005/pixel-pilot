@@ -69,6 +69,24 @@ export default async function SubdomainPage({
       error: listError,
       files: fileList?.map(file => file.name)
     });
+
+    // If dist directory exists, list its contents
+    const hasDist = fileList?.some(file => file.name === 'dist');
+    if (hasDist) {
+      const { data: distFileList, error: distListError } = await supabase.storage
+        .from('projects')
+        .list(`${params.subdomain}/dist`, { 
+          limit: 100, 
+          offset: 0, 
+          sortBy: { column: 'name', order: 'asc' } 
+        });
+
+      console.log('[Subdomain Debug] Files in dist directory:', {
+        subdomain: params.subdomain,
+        error: distListError,
+        files: distFileList?.map(file => file.name)
+      });
+    }
   } catch (listError) {
     console.error('[Subdomain Debug] Error listing project files:', listError);
   }
