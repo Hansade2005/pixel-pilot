@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import { domainConfig, redis, SubdomainData } from '@/lib/redis';
-import { cache } from 'react';
 import { NextResponse } from 'next/server';
 
 // Utility function to detect content type
@@ -31,8 +30,8 @@ type FileServeResult = {
   storagePath: string;
 }
 
-// Cached function to fetch and serve project files using REST API
-const serveProjectFile = cache(async (subdomain: string, path: string[] = []): Promise<FileServeResult | null> => {
+// Function to fetch and serve project files using REST API
+async function serveProjectFile(subdomain: string, path: string[] = []): Promise<FileServeResult | null> {
   // Base URL for public Supabase storage
   const BASE_URL = 'https://lzuknbfbvpuscpammwzg.supabase.co/storage/v1/object/public/projects/';
 
@@ -101,7 +100,7 @@ const serveProjectFile = cache(async (subdomain: string, path: string[] = []): P
 
   console.error(`[Subdomain File Serve] No file found for subdomain: ${subdomain}`);
   return null;
-});
+}
 
 export default async function SubdomainPage({
   params
