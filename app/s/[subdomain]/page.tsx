@@ -1,6 +1,6 @@
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { notFound } from 'next/navigation';
-import { domainConfig, redis } from '@/lib/redis';
+import { redis } from '@/lib/redis';
 
 // Type for subdomain tracking
 type SubdomainTracking = {
@@ -19,235 +19,69 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-export default async function SubdomainPage({
-  params
-}: {
-  params: { subdomain: string };
-}) {
-  console.log(`[Subdomain Debug] Attempting to serve subdomain: ${params.subdomain}`);
-
-  // Fetch subdomain metadata from Redis
-  let subdomainData: SubdomainTracking | null = null;
+export async function GET(request: NextRequest, { params }: { params: { subdomain: string } }) {
   try {
-    const redisData = await redis.get(`subdomain:${params.subdomain}`);
-    console.log('[Redis Debug] Raw Redis data:', redisData, typeof redisData);
+    const subdomain = params.subdomain;
 
-    if (redisData) {
-      // Handle different data formats from Redis
-      if (typeof redisData === 'string') {
-        // Check if it's the string representation of an object
-        if (redisData === '[object Object]') {
-          console.log('[Redis Debug] Data is [object Object] - clearing corrupted data');
-          // Clear the corrupted data
-          await redis.del(`subdomain:${params.subdomain}`);
-          subdomainData = null;
-        } else {
-          try {
-            subdomainData = JSON.parse(redisData);
-          } catch (parseError) {
-            console.error('[Redis Debug] JSON parse error:', parseError);
-            // Clear corrupted data
-            await redis.del(`subdomain:${params.subdomain}`);
-            subdomainData = null;
-          }
-        }
-      } else if (typeof redisData === 'object' && redisData !== null) {
-        // Redis returned the object directly - ensure it's a plain object
-        const data = redisData as any;
-        subdomainData = {
-          name: data.name,
-          userId: data.userId,
-          createdAt: data.createdAt,
-          lastActive: data.lastActive,
-          deploymentUrl: data.deploymentUrl,
-          storagePath: data.storagePath,
-          isActive: data.isActive
-        };
-      }
+    // Check if subdomain exists in Redis
+    const subdomainData = await redis.get(`subdomain:${subdomain}`);
+    if (!subdomainData) {
+      return new NextResponse('Subdomain not found', { status: 404 });
     }
-  } catch (error) {
-    console.error('[Subdomain Debug] Redis fetch error:', error);
-  }
 
-  console.log('[Subdomain Debug] Subdomain Tracking Query:', {
-    subdomain: params.subdomain,
-    error: subdomainData ? null : 'Subdomain not found',
-    data: subdomainData
-  });
+    // Get the file path from the URL
+    const url = new URL(request.url);
+    const pathSegments = url.pathname.split('/').filter(Boolean);
+    // Remove the subdomain from the path segments
+    const filePath = pathSegments.slice(1).join('/') || 'index.html';
 
-  // Handle non-existent subdomain
-  if (!subdomainData) {
-    console.error(`[Subdomain Debug] Subdomain not found: ${params.subdomain}`);
-    notFound();
-  }
+    console.log(`[Subdomain Debug] Serving ${subdomain}/${filePath}`);
 
-  // Attempt to fetch index.html
-  // Supabase bucket URL structure:
-  // https://lzuknbfbvpuscpammwzg.supabase.co/storage/v1/object/public/projects/projects/{subdomain}/dist/index.html
-  // https://lzuknbfbvpuscpammwzg.supabase.co/storage/v1/object/public/projects/projects/{subdomain}/index.html
-  const indexPaths = [
-    `projects/${params.subdomain}/dist/index.html`,
-    `projects/${params.subdomain}/index.html`
-  ];
+    // Try to download the file from Supabase
+    const storagePath = `projects/${subdomain}/${filePath}`;
+    const { data, error } = await supabase.storage.from('projects').download(storagePath);
 
-  let indexHtml = '';
-  let contentType = 'text/html; charset=utf-8';
-
-  // List all files in the projects directory for debugging
-  try {
-    const { data: fileList, error: listError } = await supabase.storage
-      .from('projects')
-      .list(`${params.subdomain}`, { 
-        limit: 100, 
-        offset: 0, 
-        sortBy: { column: 'name', order: 'asc' } 
-      });
-
-    console.log('[Subdomain Debug] Files in project storage:', {
-      subdomain: params.subdomain,
-      error: listError,
-      files: fileList?.map(file => file.name)
-    });
-
-    // If dist directory exists, list its contents
-    const hasDist = fileList?.some(file => file.name === 'dist');
-    if (hasDist) {
-      const { data: distFileList, error: distListError } = await supabase.storage
-        .from('projects')
-        .list(`${params.subdomain}/dist`, { 
-          limit: 100, 
-          offset: 0, 
-          sortBy: { column: 'name', order: 'asc' } 
+    // If file not found and looks like SPA route, fallback to index.html
+    if (error) {
+      console.log(`[Subdomain Debug] File not found: ${storagePath}, trying fallback`);
+      const fallback = await supabase.storage.from('projects').download(`projects/${subdomain}/index.html`);
+      if (!fallback.error) {
+        const indexBuffer = await fallback.data.arrayBuffer();
+        return new NextResponse(Buffer.from(indexBuffer), {
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8',
+            'X-Subdomain': subdomain
+          },
         });
-
-      console.log('[Subdomain Debug] Files in dist directory:', {
-        subdomain: params.subdomain,
-        error: distListError,
-        files: distFileList?.map(file => file.name)
-      });
-    }
-  } catch (listError) {
-    console.error('[Subdomain Debug] Error listing project files:', listError);
-  }
-
-  for (const path of indexPaths) {
-    try {
-      console.log(`[Subdomain Debug] Attempting to download: ${path}`);
-      const { data, error } = await supabase.storage
-        .from('projects')
-        .download(path);
-
-      console.log(`[Subdomain Debug] Download result for ${path}:`, {
-        error,
-        dataAvailable: !!data
-      });
-
-      if (!error && data) {
-        indexHtml = await data.text();
-        contentType = 'text/html; charset=utf-8';
-        console.log(`[Subdomain Debug] Successfully downloaded index.html from ${path}`);
-        break;
       }
-    } catch (downloadError) {
-      console.error(`[Subdomain Debug] Error downloading ${path}:`, downloadError);
+      return new NextResponse('Not found', { status: 404 });
     }
-  }
 
-  // If no index.html found, return a fallback HTML page
-  if (!indexHtml) {
-    console.error(`[Subdomain Debug] No index.html found for subdomain: ${params.subdomain}`);
-    const fallbackHtml = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${params.subdomain}.${domainConfig.rootDomain}</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            margin: 0;
-            padding: 0;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(to bottom, #eff6ff, #ffffff);
-        }
-        .container {
-            text-align: center;
-            padding: 2rem;
-        }
-        h1 {
-            font-size: 2.25rem;
-            font-weight: bold;
-            color: #111827;
-            margin-bottom: 0.75rem;
-        }
-        p {
-            font-size: 1.125rem;
-            color: #6b7280;
-            margin-bottom: 1rem;
-        }
-        pre {
-            background: #fee2e2;
-            color: #dc2626;
-            padding: 1rem;
-            border-radius: 0.375rem;
-            font-size: 0.875rem;
-            text-align: left;
-            max-width: 400px;
-            margin: 0 auto;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>${params.subdomain}.${domainConfig.rootDomain}</h1>
-        <p>No application files found</p>
-        <pre>
-Debug Info:
-Subdomain: ${params.subdomain}
-Storage Path: ${subdomainData.storagePath || `projects/${params.subdomain}`}
-        </pre>
-    </div>
-</body>
-</html>`;
-
-    return new Response(fallbackHtml, {
+    const arrayBuffer = await data.arrayBuffer();
+    const contentType = detectContentType(filePath);
+    return new NextResponse(Buffer.from(arrayBuffer), {
       headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        'X-Subdomain': params.subdomain,
-        'X-Tenant-Deployment': subdomainData.deploymentUrl || ''
-      }
+        'Content-Type': contentType,
+        'X-Subdomain': subdomain
+      },
     });
+  } catch (error: any) {
+    console.error('[Subdomain Debug] Error:', error);
+    return new NextResponse(`Error: ${error.message || 'Unknown error'}`, { status: 500 });
   }
+}
 
-  // Modify HTML to work with subdomain
-  const modifiedHtml = indexHtml.replace(
-    /<head>/i, 
-    `<head>
-      <base href="https://${params.subdomain}.${domainConfig.rootDomain}/" />
-      <script>
-        // Ensure all relative paths are resolved correctly
-        (function() {
-          const originalFetch = window.fetch;
-          window.fetch = function(url, options) {
-            if (typeof url === 'string' && !url.startsWith('http')) {
-              url = new URL(url, window.location.href).href;
-            }
-            return originalFetch(url, options);
-          };
-        })();
-      </script>`
-  );
-
-  // Return the modified HTML directly
-  return new Response(modifiedHtml, {
-    headers: {
-      'Content-Type': contentType,
-      'X-Subdomain': params.subdomain,
-      'X-Tenant-Deployment': subdomainData.deploymentUrl || ''
-    }
-  });
+function detectContentType(path: string): string {
+  const lower = path.toLowerCase();
+  if (lower.endsWith('.html')) return 'text/html; charset=utf-8';
+  if (lower.endsWith('.css')) return 'text/css; charset=utf-8';
+  if (lower.endsWith('.js')) return 'application/javascript; charset=utf-8';
+  if (lower.endsWith('.json')) return 'application/json; charset=utf-8';
+  if (lower.endsWith('.svg')) return 'image/svg+xml';
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.woff')) return 'font/woff';
+  if (lower.endsWith('.woff2')) return 'font/woff2';
+  return 'application/octet-stream';
 }
