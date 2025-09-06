@@ -257,6 +257,12 @@ export default function DeploymentClient() {
     subdomain: '',
   })
 
+  const [pipilotConfig, setPipilotConfig] = useState<{
+    configured: boolean
+    message: string
+    accountName?: string
+  } | null>(null)
+
   // Enhanced state variables
   const [showWizard, setShowWizard] = useState(false)
   const [wizardStep, setWizardStep] = useState(1)
@@ -487,6 +493,7 @@ export default function DeploymentClient() {
       calculateQuickStats()
       loadDeploymentHistory()
       initializeEnvironments()
+      checkPipilotConfig() // Check PiPilot configuration
     }
   }, [currentUserId])
 
@@ -609,6 +616,21 @@ export default function DeploymentClient() {
       }
     }
   }, [projectId, projects])
+
+  // Check PiPilot configuration
+  const checkPipilotConfig = async () => {
+    try {
+      const response = await fetch('/api/deploy/config-check')
+      const data = await response.json()
+      setPipilotConfig(data)
+    } catch (error) {
+      console.error('Failed to check PiPilot configuration:', error)
+      setPipilotConfig({
+        configured: false,
+        message: 'Failed to check deployment configuration.'
+      })
+    }
+  }
 
   // Handle GitHub OAuth callback
   useEffect(() => {
@@ -934,6 +956,15 @@ export default function DeploymentClient() {
       } catch (parseError) {
         // If parsing fails, use the original error message
         errorMessage = (error as Error).message || errorMessage
+      }
+
+      // Provide specific guidance for common configuration errors
+      if (errorMessage.includes('Cloudflare credentials not configured')) {
+        errorTitle = 'Configuration Error'
+        errorMessage = 'PiPilot deployment is not configured. Please contact the administrator to set up Cloudflare API credentials.'
+      } else if (errorMessage.includes('Cloudflare API error')) {
+        errorTitle = 'API Error'
+        errorMessage = 'Failed to connect to Cloudflare. Please try again or contact support if the issue persists.'
       }
 
       toast({
@@ -2566,6 +2597,44 @@ export default function DeploymentClient() {
                   </AlertDescription>
                 </Alert>
 
+                {/* Configuration Status */}
+                {pipilotConfig && (
+                  <Alert className={pipilotConfig.configured 
+                    ? "bg-green-900/20 border-green-700" 
+                    : "bg-red-900/20 border-red-700"
+                  }>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        {pipilotConfig.configured ? (
+                          <CheckCircle className="h-4 w-4 text-green-400 mr-2" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 text-red-400 mr-2" />
+                        )}
+                        <AlertDescription className={pipilotConfig.configured 
+                          ? "text-green-300" 
+                          : "text-red-300"
+                        }>
+                          {pipilotConfig.message}
+                          {pipilotConfig.accountName && (
+                            <span className="ml-2 text-sm">
+                              (Account: {pipilotConfig.accountName})
+                            </span>
+                          )}
+                        </AlertDescription>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={checkPipilotConfig}
+                        className="ml-4 text-xs bg-transparent border-current"
+                      >
+                        <RefreshCw className="h-3 w-3 mr-1" />
+                        Refresh
+                      </Button>
+                    </div>
+                  </Alert>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <div>
@@ -2659,7 +2728,8 @@ export default function DeploymentClient() {
                       !pipilotForm?.subdomain ||
                       pipilotForm.subdomain.length < 3 ||
                       pipilotForm.subdomain.length > 63 ||
-                      !/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(pipilotForm.subdomain)
+                      !/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(pipilotForm.subdomain) ||
+                      (pipilotConfig && !pipilotConfig.configured)
                     }
                     className="sm:ml-auto bg-purple-600 hover:bg-purple-700"
                   >
