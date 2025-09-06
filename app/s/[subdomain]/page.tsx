@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { redis } from '@/lib/redis';
+import { notFound } from 'next/navigation';
 
 // Type for subdomain tracking
 type SubdomainTracking = {
@@ -19,69 +19,64 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-export async function GET(request: NextRequest, { params }: { params: { subdomain: string } }) {
+export default async function SubdomainPage({
+  params
+}: {
+  params: { subdomain: string };
+}) {
   try {
     const subdomain = params.subdomain;
 
     // Check if subdomain exists in Redis
     const subdomainData = await redis.get(`subdomain:${subdomain}`);
     if (!subdomainData) {
-      return new NextResponse('Subdomain not found', { status: 404 });
+      notFound();
     }
 
-    // Get the file path from the URL
-    const url = new URL(request.url);
-    const pathSegments = url.pathname.split('/').filter(Boolean);
-    // Remove the subdomain from the path segments
-    const filePath = pathSegments.slice(1).join('/') || 'index.html';
-
-    console.log(`[Subdomain Debug] Serving ${subdomain}/${filePath}`);
-
-    // Try to download the file from Supabase
-    const storagePath = `projects/${subdomain}/${filePath}`;
+    // Try to download index.html from Supabase
+    const storagePath = `projects/${subdomain}/index.html`;
     const { data, error } = await supabase.storage.from('projects').download(storagePath);
 
-    // If file not found and looks like SPA route, fallback to index.html
-    if (error) {
-      console.log(`[Subdomain Debug] File not found: ${storagePath}, trying fallback`);
-      const fallback = await supabase.storage.from('projects').download(`projects/${subdomain}/index.html`);
-      if (!fallback.error) {
-        const indexBuffer = await fallback.data.arrayBuffer();
-        return new NextResponse(Buffer.from(indexBuffer), {
-          headers: {
-            'Content-Type': 'text/html; charset=utf-8',
-            'X-Subdomain': subdomain
-          },
-        });
-      }
-      return new NextResponse('Not found', { status: 404 });
+    if (error || !data) {
+      console.error(`[Subdomain Debug] No index.html found for ${subdomain}`);
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-blue-50 to-white p-4">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold tracking-tight text-gray-900">
+              {subdomain}
+            </h1>
+            <p className="mt-3 text-lg text-gray-600">
+              No application files found
+            </p>
+          </div>
+        </div>
+      );
     }
 
-    const arrayBuffer = await data.arrayBuffer();
-    const contentType = detectContentType(filePath);
-    return new NextResponse(Buffer.from(arrayBuffer), {
-      headers: {
-        'Content-Type': contentType,
-        'X-Subdomain': subdomain
-      },
-    });
+    const htmlContent = await data.text();
+
+    // For Next.js pages, we need to return JSX, not Response
+    // We'll use dangerouslySetInnerHTML to inject the HTML
+    return (
+      <div
+        dangerouslySetInnerHTML={{ __html: htmlContent }}
+        style={{ height: '100vh', width: '100%' }}
+      />
+    );
+
   } catch (error: any) {
     console.error('[Subdomain Debug] Error:', error);
-    return new NextResponse(`Error: ${error.message || 'Unknown error'}`, { status: 500 });
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-blue-50 to-white p-4">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold tracking-tight text-gray-900">
+            Error
+          </h1>
+          <p className="mt-3 text-lg text-gray-600">
+            Something went wrong
+          </p>
+        </div>
+      </div>
+    );
   }
-}
-
-function detectContentType(path: string): string {
-  const lower = path.toLowerCase();
-  if (lower.endsWith('.html')) return 'text/html; charset=utf-8';
-  if (lower.endsWith('.css')) return 'text/css; charset=utf-8';
-  if (lower.endsWith('.js')) return 'application/javascript; charset=utf-8';
-  if (lower.endsWith('.json')) return 'application/json; charset=utf-8';
-  if (lower.endsWith('.svg')) return 'image/svg+xml';
-  if (lower.endsWith('.png')) return 'image/png';
-  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
-  if (lower.endsWith('.webp')) return 'image/webp';
-  if (lower.endsWith('.woff')) return 'font/woff';
-  if (lower.endsWith('.woff2')) return 'font/woff2';
-  return 'application/octet-stream';
 }
