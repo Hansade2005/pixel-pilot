@@ -35,4 +35,6 @@
 </testing_instructions>
 
 <pull_request_formatting>
+- No specific pull request formatting rules are enforced.
+- General guideline: Pull requests are welcome; for major changes, please open an issue first.
 </pull_request_formatting>
