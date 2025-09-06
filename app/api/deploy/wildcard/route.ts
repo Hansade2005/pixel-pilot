@@ -486,8 +486,16 @@ export async function POST(req: Request) {
         console.error('Failed to create subdomain tracking:', trackingError)
       }
 
-      // Store subdomain in Redis
+      // Store subdomain in Redis with detailed logging
       try {
+        console.log('[Redis Debug] Attempting to store subdomain:', {
+          subdomain,
+          userId: user.id,
+          deploymentUrl,
+          redisUrl: process.env.KV_URL || 'No URL found',
+          redisApiUrl: process.env.KV_REST_API_URL || 'No API URL found'
+        })
+
         await redis.set(`subdomain:${subdomain}`, JSON.stringify({
           name: subdomain,
           userId: user.id,
@@ -495,9 +503,14 @@ export async function POST(req: Request) {
           lastActive: Date.now(),
           deploymentUrl: deploymentUrl
         }))
-        console.log(`Stored subdomain ${subdomain} in Redis`)
+
+        console.log(`[Redis Debug] Successfully stored subdomain ${subdomain} in Redis`)
       } catch (redisError) {
-        console.error('Failed to store subdomain in Redis:', redisError)
+        console.error('[Redis Debug] Failed to store subdomain in Redis:', {
+          error: redisError,
+          errorName: redisError instanceof Error ? redisError.name : 'Unknown error',
+          errorMessage: redisError instanceof Error ? redisError.message : 'No error message'
+        })
       }
 
       console.log(`Deployment completed successfully: ${deploymentUrl}`)
