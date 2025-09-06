@@ -23,26 +23,18 @@ export default async function SubdomainPage({
 
   try {
     // Fetch subdomain metadata from Redis (faster than Supabase)
-    const subdomainDataStr = await redis.get(`subdomain:${params.subdomain}`);
+    // Note: Upstash Redis client automatically parses JSON
+    const subdomainData = await redis.get(`subdomain:${params.subdomain}`) as SubdomainData;
 
     console.log('[Subdomain Debug] Redis Subdomain Query:', {
       subdomain: params.subdomain,
-      redisData: subdomainDataStr,
-      dataExists: !!subdomainDataStr
+      redisData: subdomainData,
+      dataExists: !!subdomainData
     });
 
     // Handle no data found
-    if (!subdomainDataStr) {
+    if (!subdomainData) {
       console.warn(`[Subdomain Warning] No subdomain found in Redis: ${params.subdomain}`);
-      notFound();
-    }
-
-    // Parse Redis data
-    let subdomainData: SubdomainData;
-    try {
-      subdomainData = JSON.parse(subdomainDataStr as string);
-    } catch (parseError) {
-      console.error(`[Subdomain Error] Failed to parse Redis data for subdomain: ${params.subdomain}`, parseError);
       notFound();
     }
 
