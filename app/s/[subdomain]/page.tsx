@@ -34,11 +34,12 @@ export default async function SubdomainPage({
     }
 
     // Try to download index.html from Supabase
-    const storagePath = `projects/${subdomain}/index.html`;
+    // Based on the URL structure: projects/projects/sample/dist/index.html
+    const storagePath = `projects/${subdomain}/dist/index.html`;
     const { data, error } = await supabase.storage.from('projects').download(storagePath);
 
     if (error || !data) {
-      console.error(`[Subdomain Debug] No index.html found for ${subdomain}`);
+      console.error(`[Subdomain Debug] No index.html found for ${subdomain} at path: ${storagePath}`);
       return (
         <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-blue-50 to-white p-4">
           <div className="text-center">
