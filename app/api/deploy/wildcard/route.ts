@@ -423,68 +423,44 @@ export async function POST(req: Request) {
       // Compress dist folder for Cloudflare Pages deployment
       console.log('Compressing dist folder...')
       let archiveName = 'dist.zip'
-      let compressionMethod = ''
 
-      // Try multiple compression methods
-      const compressionMethods = [
-        // Method 1: Python ZIP
-        async () => {
-          try {
-            const pythonZipResult = await sandbox.executeCommand(
-              'python3 -c "import zipfile, os; ' +
-              'zipfile.ZipFile(\'dist.zip\', \'w\', zipfile.ZIP_DEFLATED) as zipf: ' +
-              'for root, dirs, files in os.walk(\'dist\'):\n' +
-              '    for file in files:\n' +
-              '        zipf.write(os.path.join(root, file), ' +
-              '                   os.path.relpath(os.path.join(root, file), \'dist\'))"',
-              { workingDirectory: '/project' }
-            )
+      try {
+        // Advanced Python ZIP creation with file filtering
+        const pythonZipResult = await sandbox.executeCommand(
+          'python3 -c "' +
+          'import zipfile, os, json\n' +
+          'os.chdir(\'/project\')\n' +
+          'excluded_dirs = [\'node_modules\', \'.git\', \'.next\', \'__pycache__\']\n' +
+          'excluded_files = [".DS_Store", ".env", "*.log"]\n' +
+          'with zipfile.ZipFile(\'dist.zip\', \'w\', zipfile.ZIP_DEFLATED) as zipf:\n' +
+          '    for root, dirs, files in os.walk(\'dist\'):\n' +
+          '        # Filter out excluded directories\n' +
+          '        dirs[:] = [d for d in dirs if d not in excluded_dirs]\n' +
+          '        \n' +
+          '        for file in files:\n' +
+          '            # Skip excluded files\n' +
+          '            if not any(file.endswith(ext) for ext in excluded_files):\n' +
+          '                file_path = os.path.join(root, file)\n' +
+          '                arcname = os.path.relpath(file_path, \'.\')\n' +
+          '                zipf.write(file_path, arcname)\n' +
+          '\n' +
+          '# Get file size and print\n' +
+          'file_size = os.path.getsize(\'dist.zip\')\n' +
+          'print(f\"Created dist.zip ({file_size} bytes)\")\n' +
+          '"',
+          { workingDirectory: '/project' }
+        )
 
-            if (pythonZipResult.exitCode === 0) {
-              compressionMethod = 'Python'
-              return true
-            }
-            return false
-          } catch (error) {
-            console.warn('Python ZIP compression failed:', error)
-            return false
-          }
-        },
-
-        // Method 2: Standard ZIP command
-        async () => {
-          try {
-            const zipResult = await sandbox.executeCommand(
-              'cd /project && zip -r dist.zip dist/',
-              { workingDirectory: '/project' }
-            )
-
-            if (zipResult.exitCode === 0) {
-              compressionMethod = 'zip command'
-              return true
-            }
-            return false
-          } catch (error) {
-            console.warn('Standard ZIP compression failed:', error)
-            return false
-          }
+        if (pythonZipResult.exitCode !== 0) {
+          console.error('Python ZIP compression failed:', pythonZipResult.stderr)
+          throw new Error(`Python ZIP failed: ${pythonZipResult.stderr}`)
         }
-      ]
 
-      // Try compression methods sequentially
-      let compressionSuccess = false
-      for (const method of compressionMethods) {
-        if (await method()) {
-          compressionSuccess = true
-          break
-        }
+        console.log('Dist folder compressed successfully with Python ZIP')
+      } catch (zipError) {
+        console.error('ZIP compression failed:', zipError)
+        throw new Error('Failed to compress dist folder for Cloudflare Pages deployment')
       }
-
-      if (!compressionSuccess) {
-        throw new Error('Failed to compress dist folder with available methods')
-      }
-
-      console.log(`Dist folder compressed successfully using ${compressionMethod}`)
 
       // Download the ZIP archive file
       console.log(`Downloading ${archiveName} from sandbox...`)
