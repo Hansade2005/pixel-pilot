@@ -428,7 +428,7 @@ export async function POST(req: Request) {
         // Advanced Python ZIP creation with file filtering
         const pythonZipResult = await sandbox.executeCommand(
           'python3 -c "' +
-          'import zipfile, os, json\n' +
+          'import zipfile, os\n' +
           'os.chdir(\'/project\')\n' +
           'excluded_dirs = [\'node_modules\', \'.git\', \'.next\', \'__pycache__\']\n' +
           'excluded_files = [".DS_Store", ".env", "*.log"]\n' +
@@ -446,7 +446,7 @@ export async function POST(req: Request) {
           '\n' +
           '# Get file size and print\n' +
           'file_size = os.path.getsize(\'dist.zip\')\n' +
-          'print(f\"Created dist.zip ({file_size} bytes)\")\n' +
+          'print("Created dist.zip (" + str(file_size) + " bytes)"\n' +
           '"',
           { workingDirectory: '/project' }
         )
@@ -459,7 +459,24 @@ export async function POST(req: Request) {
         console.log('Dist folder compressed successfully with Python ZIP')
       } catch (zipError) {
         console.error('ZIP compression failed:', zipError)
-        throw new Error('Failed to compress dist folder for Cloudflare Pages deployment')
+        
+        // Fallback to standard zip command
+        try {
+          const zipResult = await sandbox.executeCommand(
+            'cd /project && zip -r dist.zip dist/',
+            { workingDirectory: '/project' }
+          )
+
+          if (zipResult.exitCode !== 0) {
+            console.error('ZIP compression failed:', zipResult.stderr)
+            throw new Error(`ZIP failed: ${zipResult.stderr}`)
+          }
+
+          console.log('Dist folder compressed successfully with zip command')
+        } catch (fallbackError) {
+          console.error('Both Python and standard ZIP compression failed:', fallbackError)
+          throw new Error('Failed to compress dist folder for Cloudflare Pages deployment')
+        }
       }
 
       // Download the ZIP archive file
