@@ -101,10 +101,7 @@ async function deployToCloudflarePages(projectName: string, zipContent: Buffer):
         },
         body: JSON.stringify({ 
           name: PROJECT_NAME, 
-          production_branch: 'main',
-          source: {
-            type: 'direct_upload'
-          }
+          production_branch: 'main'
         }),
       })
 
