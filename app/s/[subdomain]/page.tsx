@@ -24,15 +24,24 @@ export default async function SubdomainPage({
 }: {
   params: { subdomain: string };
 }) {
+  console.log(`[Subdomain Debug] Attempting to serve subdomain: ${params.subdomain}`);
+
   // Fetch subdomain metadata from Supabase
-  const { data: subdomainData, error } = await supabase
+  const { data: subdomainData, error: subdomainError } = await supabase
     .from('subdomain_tracking')
     .select('*')
     .eq('subdomain', params.subdomain)
     .single<SubdomainTracking>()
 
+  console.log('[Subdomain Debug] Subdomain Tracking Query:', {
+    subdomain: params.subdomain,
+    error: subdomainError,
+    data: subdomainData
+  });
+
   // Handle non-existent subdomain
-  if (error || !subdomainData) {
+  if (subdomainError || !subdomainData) {
+    console.error(`[Subdomain Debug] Subdomain not found: ${params.subdomain}`);
     notFound();
   }
 
@@ -45,22 +54,51 @@ export default async function SubdomainPage({
   let indexHtml = '';
   let contentType = 'text/html; charset=utf-8';
 
+  // List all files in the projects directory for debugging
+  try {
+    const { data: fileList, error: listError } = await supabase.storage
+      .from('projects')
+      .list(`${params.subdomain}`, { 
+        limit: 100, 
+        offset: 0, 
+        sortBy: { column: 'name', order: 'asc' } 
+      });
+
+    console.log('[Subdomain Debug] Files in project storage:', {
+      subdomain: params.subdomain,
+      error: listError,
+      files: fileList?.map(file => file.name)
+    });
+  } catch (listError) {
+    console.error('[Subdomain Debug] Error listing project files:', listError);
+  }
+
   for (const path of indexPaths) {
     try {
+      console.log(`[Subdomain Debug] Attempting to download: ${path}`);
       const { data, error } = await supabase.storage
         .from('projects')
         .download(path);
 
+      console.log(`[Subdomain Debug] Download result for ${path}:`, {
+        error,
+        dataAvailable: !!data
+      });
+
       if (!error && data) {
         indexHtml = await data.text();
         contentType = 'text/html; charset=utf-8';
+        console.log(`[Subdomain Debug] Successfully downloaded index.html from ${path}`);
         break;
       }
-    } catch {}
+    } catch (downloadError) {
+      console.error(`[Subdomain Debug] Error downloading ${path}:`, downloadError);
+    }
   }
 
   // If no index.html found, return a fallback
   if (!indexHtml) {
+    console.error(`[Subdomain Debug] No index.html found for subdomain: ${params.subdomain}`);
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-blue-50 to-white p-4">
         <div className="text-center">
@@ -70,6 +108,11 @@ export default async function SubdomainPage({
           <p className="mt-3 text-lg text-gray-600">
             No application files found
           </p>
+          <pre className="mt-4 text-sm text-red-600">
+            Debug Info:
+            Subdomain: {params.subdomain}
+            Storage Path: {subdomainData.storage_path}
+          </pre>
         </div>
       </div>
     );
