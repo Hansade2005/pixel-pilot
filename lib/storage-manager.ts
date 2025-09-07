@@ -1,6 +1,8 @@
 // Universal storage manager that works on both client and server
 // Uses IndexedDB on client-side and in-memory storage on server-side
 
+import { emitStorageEvent, withStorageEvents } from './storage-events'
+
 // Core interfaces (same as IndexedDB)
 export interface Workspace {
   id: string
@@ -744,7 +746,7 @@ class IndexedDBStorage implements StorageInterface {
   // Workspace methods
   async createWorkspace(workspace: Omit<Workspace, 'id' | 'createdAt' | 'updatedAt'>): Promise<Workspace> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     const id = this.generateId()
     const now = new Date().toISOString()
     const newWorkspace: Workspace = {
@@ -759,7 +761,11 @@ class IndexedDBStorage implements StorageInterface {
       const store = transaction.objectStore('workspaces')
       const request = store.add(newWorkspace)
 
-      request.onsuccess = () => resolve(newWorkspace)
+      request.onsuccess = async () => {
+        // Emit event for workspace creation
+        await emitStorageEvent('workspaces', 'create', id, newWorkspace, workspace.userId)
+        resolve(newWorkspace)
+      }
       request.onerror = () => reject(request.error)
     })
   }
@@ -793,7 +799,7 @@ class IndexedDBStorage implements StorageInterface {
 
   async updateWorkspace(id: string, updates: Partial<Workspace>): Promise<Workspace | null> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     const workspace = await this.getWorkspace(id)
     if (!workspace) return null
 
@@ -808,20 +814,33 @@ class IndexedDBStorage implements StorageInterface {
       const store = transaction.objectStore('workspaces')
       const request = store.put(updatedWorkspace)
 
-      request.onsuccess = () => resolve(updatedWorkspace)
+      request.onsuccess = async () => {
+        // Emit event for workspace update
+        await emitStorageEvent('workspaces', 'update', id, updatedWorkspace, workspace.userId)
+        resolve(updatedWorkspace)
+      }
       request.onerror = () => reject(request.error)
     })
   }
 
   async deleteWorkspace(id: string): Promise<boolean> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
+    // Get workspace before deletion for event data
+    const workspace = await this.getWorkspace(id)
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['workspaces'], 'readwrite')
       const store = transaction.objectStore('workspaces')
       const request = store.delete(id)
 
-      request.onsuccess = () => resolve(true)
+      request.onsuccess = async () => {
+        // Emit event for workspace deletion
+        if (workspace) {
+          await emitStorageEvent('workspaces', 'delete', id, workspace, workspace.userId)
+        }
+        resolve(true)
+      }
       request.onerror = () => reject(request.error)
     })
   }
@@ -829,7 +848,7 @@ class IndexedDBStorage implements StorageInterface {
   // File methods
   async createFile(file: Omit<File, 'id' | 'createdAt' | 'updatedAt'>): Promise<File> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     const id = this.generateId()
     const now = new Date().toISOString()
     const newFile: File = {
@@ -844,7 +863,11 @@ class IndexedDBStorage implements StorageInterface {
       const store = transaction.objectStore('files')
       const request = store.add(newFile)
 
-      request.onsuccess = () => resolve(newFile)
+      request.onsuccess = async () => {
+        // Emit event for file creation
+        await emitStorageEvent('files', 'create', id, newFile)
+        resolve(newFile)
+      }
       request.onerror = () => reject(request.error)
     })
   }
@@ -882,7 +905,7 @@ class IndexedDBStorage implements StorageInterface {
 
   async updateFile(workspaceId: string, path: string, updates: Partial<File>): Promise<File | null> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     const file = await this.getFile(workspaceId, path)
     if (!file) return null
 
@@ -897,14 +920,18 @@ class IndexedDBStorage implements StorageInterface {
       const store = transaction.objectStore('files')
       const request = store.put(updatedFile)
 
-      request.onsuccess = () => resolve(updatedFile)
+      request.onsuccess = async () => {
+        // Emit event for file update
+        await emitStorageEvent('files', 'update', file.id, updatedFile)
+        resolve(updatedFile)
+      }
       request.onerror = () => reject(request.error)
     })
   }
 
   async deleteFile(workspaceId: string, path: string): Promise<boolean> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     const file = await this.getFile(workspaceId, path)
     if (!file) return false
 
@@ -913,7 +940,11 @@ class IndexedDBStorage implements StorageInterface {
       const store = transaction.objectStore('files')
       const request = store.delete(file.id)
 
-      request.onsuccess = () => resolve(true)
+      request.onsuccess = async () => {
+        // Emit event for file deletion
+        await emitStorageEvent('files', 'delete', file.id, file)
+        resolve(true)
+      }
       request.onerror = () => reject(request.error)
     })
   }
@@ -921,7 +952,7 @@ class IndexedDBStorage implements StorageInterface {
   // Chat session methods
   async createChatSession(session: Omit<ChatSession, 'id' | 'createdAt' | 'updatedAt'>): Promise<ChatSession> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     const id = this.generateId()
     const now = new Date().toISOString()
     const newSession: ChatSession = {
@@ -936,7 +967,11 @@ class IndexedDBStorage implements StorageInterface {
       const store = transaction.objectStore('chatSessions')
       const request = store.add(newSession)
 
-      request.onsuccess = () => resolve(newSession)
+      request.onsuccess = async () => {
+        // Emit event for chat session creation
+        await emitStorageEvent('chatSessions', 'create', id, newSession, session.userId)
+        resolve(newSession)
+      }
       request.onerror = () => reject(request.error)
     })
   }
@@ -993,7 +1028,7 @@ class IndexedDBStorage implements StorageInterface {
   // Message methods
   async createMessage(message: Omit<Message, 'id' | 'createdAt'>): Promise<Message> {
     if (!this.db) throw new Error('Database not initialized')
-    
+
     const id = this.generateId()
     const now = new Date().toISOString()
     const newMessage: Message = {
@@ -1007,7 +1042,11 @@ class IndexedDBStorage implements StorageInterface {
       const store = transaction.objectStore('messages')
       const request = store.add(newMessage)
 
-      request.onsuccess = () => resolve(newMessage)
+      request.onsuccess = async () => {
+        // Emit event for message creation
+        await emitStorageEvent('messages', 'create', id, newMessage)
+        resolve(newMessage)
+      }
       request.onerror = () => reject(request.error)
     })
   }
