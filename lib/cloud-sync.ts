@@ -52,6 +52,8 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
  */
 export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
   try {
+    console.log("restoreBackupFromCloud: Starting restore for user:", userId)
+
     // Fetch the latest backup from Supabase
     const { data, error } = await supabase
       .from('user_backups')
@@ -59,17 +61,29 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
       .eq('user_id', userId)
       .single()
 
-    if (error) throw error
-    if (!data) return false
+    console.log("restoreBackupFromCloud: Supabase backup query result - data:", !!data, "error:", error)
+
+    if (error) {
+      console.error("restoreBackupFromCloud: Supabase error:", error)
+      throw error
+    }
+    if (!data) {
+      console.log("restoreBackupFromCloud: No backup data found")
+      return false
+    }
+
+    console.log("restoreBackupFromCloud: Backup data found, initializing storage manager")
 
     // Initialize storage manager
     await storageManager.init()
-    
+
     // Clear existing data
+    console.log("restoreBackupFromCloud: Clearing existing data")
     await storageManager.clearAll()
-    
+
     // Import backup data to IndexedDB
     const backupData = data.backup_data
+    console.log("restoreBackupFromCloud: Backup data keys:", Object.keys(backupData))
     
     // Import each table's data
     for (const [tableName, tableData] of Object.entries(backupData)) {
@@ -88,6 +102,7 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
       }
     }
 
+    console.log("restoreBackupFromCloud: Restore completed successfully")
     return true
   } catch (error) {
     console.error("Error restoring backup from cloud:", error)
@@ -100,17 +115,23 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
  */
 export async function isCloudSyncEnabled(userId: string): Promise<boolean> {
   try {
+    console.log("isCloudSyncEnabled: Checking for user:", userId)
     const { data, error } = await supabase
       .from('user_settings')
       .select('cloud_sync_enabled')
       .eq('user_id', userId)
       .single()
 
+    console.log("isCloudSyncEnabled: Supabase response - data:", data, "error:", error)
+
     if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+      console.error("isCloudSyncEnabled: Supabase error:", error)
       throw error
     }
 
-    return data?.cloud_sync_enabled || false
+    const result = data?.cloud_sync_enabled || false
+    console.log("isCloudSyncEnabled: Final result:", result)
+    return result
   } catch (error) {
     console.error("Error checking cloud sync status:", error)
     return false

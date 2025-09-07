@@ -152,15 +152,19 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         console.log('WorkspaceLayout: Storage manager initialized')
 
         // Check if cloud sync is enabled and auto-restore latest backup
+        console.log('WorkspaceLayout: Checking cloud sync for user:', user.id)
         const cloudSyncEnabled = await isCloudSyncEnabled(user.id)
-        console.log('WorkspaceLayout: Cloud sync enabled:', cloudSyncEnabled)
+        console.log('WorkspaceLayout: Cloud sync enabled result:', cloudSyncEnabled)
 
         if (cloudSyncEnabled) {
           setIsAutoRestoring(true)
           console.log('WorkspaceLayout: Auto-restore enabled, attempting to restore latest backup...')
 
           try {
+            console.log('WorkspaceLayout: Calling restoreBackupFromCloud...')
             const restoreSuccess = await restoreBackupFromCloud(user.id)
+            console.log('WorkspaceLayout: restoreBackupFromCloud returned:', restoreSuccess)
+
             if (restoreSuccess) {
               console.log('WorkspaceLayout: Successfully restored latest backup from cloud')
               toast({
@@ -180,6 +184,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           } finally {
             setIsAutoRestoring(false)
           }
+        } else {
+          console.log('WorkspaceLayout: Cloud sync is disabled, skipping auto-restore')
         }
 
         const workspaces = await storageManager.getWorkspaces(user.id)
