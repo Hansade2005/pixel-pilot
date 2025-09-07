@@ -21,6 +21,7 @@ import {
   AlertCircle,
   FolderOpen,
   Search,
+  Rocket,
   Filter,
   Download,
   FileText,
@@ -664,7 +665,8 @@ export default function ManagementPage() {
                             onClick={() => router.push(`/workspace/deployment?project=${project.id}`)}
                             className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
                           >
-                            Manage
+                            <Rocket className="h-4 w-4 mr-1" />
+                            Deploy
                           </Button>
                         </div>
                       </div>

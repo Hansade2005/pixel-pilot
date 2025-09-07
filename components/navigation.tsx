@@ -99,16 +99,16 @@ export function Navigation() {
               Community
             </Link>
             <Link href="/pricing" className="text-white hover:text-gray-300 transition-colors">
-              Pricing
+              Plans
             </Link>
             <Link href="/enterprise" className="text-white hover:text-gray-300 transition-colors">
-              Enterprise
+              Business
             </Link>
             <Link href="/learn" className="text-white hover:text-gray-300 transition-colors">
-              Learn
+              Docs
             </Link>
             <Link href="/launched" className="text-white hover:text-gray-300 transition-colors">
-              Launched
+              Showcase
             </Link>
           </div>
 
@@ -150,13 +150,13 @@ export function Navigation() {
                        <Link href="/workspace/account">
                          <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
                            <User className="w-4 h-4 mr-2" />
-                           Profile
+                           Account
                          </DropdownMenuItem>
                        </Link>
                        <Link href="/workspace">
                          <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
                            <Briefcase className="w-4 h-4 mr-2" />
-                           Workspace
+                           Dashboard
                          </DropdownMenuItem>
                        </Link>
                        <Link href="/workspace/management">
@@ -168,7 +168,7 @@ export function Navigation() {
                        <Link href="/workspace/deployment">
                          <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
                            <Rocket className="w-4 h-4 mr-2" />
-                           Deployments
+                           Deploy
                          </DropdownMenuItem>
                        </Link>
                        <DropdownMenuSeparator className="bg-gray-700" />
@@ -231,28 +231,28 @@ export function Navigation() {
                 className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
                 onClick={closeMobileMenu}
               >
-                Pricing
+                Plans
               </Link>
               <Link
                 href="/enterprise"
                 className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
                 onClick={closeMobileMenu}
               >
-                Enterprise
+                Business
               </Link>
               <Link
                 href="/learn"
                 className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
                 onClick={closeMobileMenu}
               >
-                Learn
+                Docs
               </Link>
               <Link
                 href="/launched"
                 className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
                 onClick={closeMobileMenu}
               >
-                Launched
+                Showcase
               </Link>
 
               {/* Mobile Auth Section */}
@@ -292,7 +292,7 @@ export function Navigation() {
                                onClick={closeMobileMenu}
                              >
                                <User className="w-4 h-4 inline mr-2" />
-                               Profile
+                               Account
                              </Link>
                              <Link
                                href="/workspace"
@@ -300,7 +300,7 @@ export function Navigation() {
                                onClick={closeMobileMenu}
                              >
                                <Briefcase className="w-4 h-4 inline mr-2" />
-                               Workspace
+                               Dashboard
                              </Link>
                              <Link
                                href="/workspace/management"
@@ -316,7 +316,7 @@ export function Navigation() {
                                onClick={closeMobileMenu}
                              >
                                <Rocket className="w-4 h-4 inline mr-2" />
-                               Deployments
+                               Deploy
                              </Link>
                              <button
                                onClick={() => {
