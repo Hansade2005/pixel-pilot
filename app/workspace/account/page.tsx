@@ -1086,5 +1086,6 @@ export default function AccountSettingsPage() {
       {/* Footer */}
       <Footer />
     </div>
+    </div>
   )
 }
