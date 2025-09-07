@@ -108,6 +108,29 @@ import {
   Battery,
   Signal
 } from "lucide-react"
+
+// Custom SVG Icons
+const GitHubIcon = ({ className }: { className?: string }) => (
+  <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className={className}>
+    <title>GitHub</title>
+    <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+  </svg>
+)
+
+const VercelIcon = ({ className }: { className?: string }) => (
+  <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className={className}>
+    <title>Vercel</title>
+    <path d="m12 1.608 12 20.784H0Z"/>
+  </svg>
+)
+
+const NetlifyIcon = ({ className }: { className?: string }) => (
+  <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className={className}>
+    <title>Netlify</title>
+    <path d="M6.49 19.04h-.23L5.13 17.9v-.23l1.73-1.71h1.2l.15.15v1.2L6.5 19.04ZM5.13 6.31V6.1l1.13-1.13h.23L8.2 6.68v1.2l-.15.15h-1.2L5.13 6.31Zm9.96 9.09h-1.65l-.14-.13v-3.83c0-.68-.27-1.2-1.1-1.23-.42 0-.9 0-1.43.02l-.07.08v4.96l-.14.14H8.9l-.13-.14V8.73l.13-.14h3.7a2.6 2.6 0 0 1 2.61 2.6v4.08l-.13.14Zm-8.37-2.44H.14L0 12.82v-1.64l.14-.14h6.58l.14.14v1.64l-.14.14Zm17.14 0h-6.58l-.14-.14v-1.64l.14-.14h6.58l.14.14v1.64l-.14.14ZM11.05 6.55V1.64l.14-.14h1.65l.14.14v4.9l-.14.14h-1.65l-.14-.13Zm0 15.81v-4.9l.14-.14h1.65l.14.13v4.91l-.14.14h-1.65l-.14-.14Z"/>
+  </svg>
+)
+
 import { useToast } from "@/hooks/use-toast"
 import { storageManager, type Workspace as Project, type Deployment, type EnvironmentVariable } from "@/lib/storage-manager"
 import { createClient } from "@/lib/supabase/client"
@@ -1034,7 +1057,7 @@ export default function DeploymentClient() {
               <CardHeader className="text-center">
                 <div className="flex justify-center mb-2">
                   <div className={`p-3 rounded-full ${activeTab === 'github' ? 'bg-blue-900' : 'bg-gray-700'}`}>
-                    <Github className={`h-8 w-8 ${activeTab === 'github' ? 'text-blue-400' : 'text-gray-300'}`} />
+                    <GitHubIcon className={`h-8 w-8 ${activeTab === 'github' ? 'text-blue-400' : 'text-gray-300'}`} />
                   </div>
                 </div>
                 <CardTitle className="text-white">GitHub</CardTitle>
@@ -1302,7 +1325,7 @@ export default function DeploymentClient() {
                     <div className="p-4 bg-gray-800 border border-gray-600 rounded-lg">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
-                          <Github className="h-5 w-5 text-gray-400" />
+                          <GitHubIcon className="h-5 w-5 text-gray-400" />
                           <span className="text-gray-300 font-medium">GitHub Connection</span>
                         </div>
                         {storedTokens.github ? (
@@ -1376,7 +1399,7 @@ export default function DeploymentClient() {
                 {/* Git-based deployment notice */}
                 <div className="p-4 bg-blue-900/20 border border-blue-700 rounded-lg">
                   <div className="flex items-center space-x-2 mb-2">
-                    <Github className="h-4 w-4 text-blue-400" />
+                    <GitHubIcon className="h-4 w-4 text-blue-400" />
                     <span className="text-sm text-blue-300 font-medium">Git-Based Deployment</span>
                   </div>
                   <p className="text-sm text-gray-300">
@@ -1398,8 +1421,8 @@ export default function DeploymentClient() {
                       <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
                           <div className="w-5 h-5 bg-black rounded flex items-center justify-center">
-                            <span className="text-white text-xs font-bold">V</span>
-                            </div>
+                            <VercelIcon className="h-3 w-3 text-white" />
+                          </div>
                           <span className="text-gray-300 font-medium">Vercel Connection</span>
                         </div>
                         {storedTokens.vercel ? (
@@ -1678,7 +1701,7 @@ export default function DeploymentClient() {
                 {/* Git-based deployment notice */}
                 <div className="p-4 bg-green-900/20 border border-green-700 rounded-lg">
                   <div className="flex items-center space-x-2 mb-2">
-                    <Github className="h-4 w-4 text-green-400" />
+                    <GitHubIcon className="h-4 w-4 text-green-400" />
                     <span className="text-sm text-green-300 font-medium">Git-Based Deployment</span>
                   </div>
                   <p className="text-sm text-gray-300">
@@ -1699,8 +1722,8 @@ export default function DeploymentClient() {
                       <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
                           <div className="w-5 h-5 bg-green-600 rounded flex items-center justify-center">
-                            <span className="text-white text-xs font-bold">N</span>
-                            </div>
+                            <NetlifyIcon className="h-3 w-3 text-white" />
+                          </div>
                           <span className="text-gray-300 font-medium">Netlify Connection</span>
                         </div>
                         {storedTokens.netlify ? (
@@ -2046,7 +2069,7 @@ export default function DeploymentClient() {
                                 </p>
                               </div>
                               <Badge variant="secondary" className="ml-2">
-                                <Github className="h-3 w-3 mr-1" />
+                                <GitHubIcon className="h-3 w-3 mr-1" />
                                 GitHub
                               </Badge>
                             </div>
