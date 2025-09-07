@@ -162,3 +162,66 @@ export async function getLastBackupTime(userId: string): Promise<string | null> 
     return null
   }
 }
+
+/**
+ * Store deployment tokens for a user
+ */
+export async function storeDeploymentTokens(
+  userId: string, 
+  tokens: {
+    github?: string, 
+    vercel?: string, 
+    netlify?: string
+  }
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('user_settings')
+      .upsert({
+        user_id: userId,
+        github_token: tokens.github || null,
+        vercel_token: tokens.vercel || null,
+        netlify_token: tokens.netlify || null,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'user_id'
+      })
+
+    if (error) throw error
+
+    return true
+  } catch (error) {
+    console.error("Error storing deployment tokens:", error)
+    return false
+  }
+}
+
+/**
+ * Retrieve deployment tokens for a user
+ */
+export async function getDeploymentTokens(userId: string): Promise<{
+  github?: string, 
+  vercel?: string, 
+  netlify?: string
+} | null> {
+  try {
+    const { data, error } = await supabase
+      .from('user_settings')
+      .select('github_token, vercel_token, netlify_token')
+      .eq('user_id', userId)
+      .single()
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+      throw error
+    }
+
+    return data ? {
+      github: data.github_token || undefined,
+      vercel: data.vercel_token || undefined,
+      netlify: data.netlify_token || undefined
+    } : null
+  } catch (error) {
+    console.error("Error retrieving deployment tokens:", error)
+    return null
+  }
+}

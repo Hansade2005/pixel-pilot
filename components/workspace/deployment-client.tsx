@@ -111,6 +111,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { storageManager, type Workspace as Project, type Deployment, type EnvironmentVariable } from "@/lib/storage-manager"
 import { createClient } from "@/lib/supabase/client"
+import { getDeploymentTokens } from "@/lib/cloud-sync"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { DeploymentSetupAccordion } from "@/components/workspace/deployment-setup-accordion"
@@ -232,34 +233,20 @@ export default function DeploymentClient() {
 
   // Form states for each platform
   const [githubForm, setGithubForm] = useState({
-    token: '',
     repoName: '',
     repoDescription: '',
     isPrivate: false,
-    githubToken: '',
-    githubUsername: '',
-    githubAvatarUrl: '',
-    vercelToken: '',
-    vercelUsername: '',
-    vercelAvatarUrl: '',
-    netlifyToken: '',
-    netlifyUsername: '',
-    netlifyAvatarUrl: '',
   })
 
   const [vercelForm, setVercelForm] = useState({
-    token: '',
     projectName: '',
     framework: 'nextjs',
-    githubRepoUrl: '',
   })
 
   const [netlifyForm, setNetlifyForm] = useState({
-    token: '',
     siteName: '',
     buildCommand: 'npm run build',
     publishDir: 'out',
-    githubRepoUrl: '',
   })
 
   // Enhanced state variables
@@ -280,11 +267,11 @@ export default function DeploymentClient() {
   const [deploymentProgress, setDeploymentProgress] = useState(0)
   const [estimatedTime, setEstimatedTime] = useState<number | null>(null)
 
-  // Missing state variables that were removed
-  const [savedTokens, setSavedTokens] = useState<{
-    github?: { token: string }
-    vercel?: { token: string }
-    netlify?: { token: string }
+  // Stored deployment tokens from database
+  const [storedTokens, setStoredTokens] = useState<{
+    github?: string
+    vercel?: string
+    netlify?: string
   }>({})
   const [deployedRepos, setDeployedRepos] = useState<DeployedRepo[]>([])
   const [availableRepos, setAvailableRepos] = useState<GitHubRepo[]>([])
@@ -296,6 +283,27 @@ export default function DeploymentClient() {
     if (!project?.githubRepoUrl) return undefined
     const match = project.githubRepoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/)
     return match ? `${match[1]}/${match[2]}` : undefined
+  }
+
+  // Load stored deployment tokens from database
+  const loadStoredTokens = async () => {
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (!user) return
+
+      const tokens = await getDeploymentTokens(user.id)
+      if (tokens) {
+        setStoredTokens({
+          github: tokens.github || undefined,
+          vercel: tokens.vercel || undefined,
+          netlify: tokens.netlify || undefined
+        })
+      }
+    } catch (error) {
+      console.error('Error loading stored tokens:', error)
+    }
   }
 
   // Generate a valid GitHub repository name
@@ -536,13 +544,13 @@ export default function DeploymentClient() {
 
   // Load available GitHub repositories
   const loadAvailableRepos = async () => {
-    if (!githubForm.token) return
+    if (!storedTokens.github) return
 
     try {
       const response = await fetch('/api/github/repos', {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${githubForm.token}`,
+          'Authorization': `Bearer ${storedTokens.github}`,
           'Content-Type': 'application/json',
         },
       })
@@ -589,561 +597,12 @@ export default function DeploymentClient() {
     }
   }, [projectId, projects])
 
-  // GitHub token validation function
-  const validateGitHubToken = async (token: string) => {
-    try {
-      const response = await fetch('https://api.github.com/user', {
-        headers: {
-          'Authorization': `token ${token}`,
-          'Accept': 'application/vnd.github.v3+json'
-        }
-      })
 
-      if (!response.ok) {
-        throw new Error('Invalid GitHub token')
-      }
 
-      const userData = await response.json()
-      return {
-        username: userData.login,
-        avatarUrl: userData.avatar_url
-      }
-    } catch (error) {
-      console.error('GitHub token validation error:', error)
-      throw new Error('Failed to validate GitHub token')
-    }
-  }
 
-  // Vercel token validation function
-  const validateVercelToken = async (token: string) => {
-    try {
-      const response = await fetch('https://api.vercel.com/v1/user', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
 
-      if (!response.ok) {
-        throw new Error('Invalid Vercel token')
-      }
 
-      const userData = await response.json()
-      return {
-        username: userData.username || userData.name,
-        avatarUrl: userData.avatar
-      }
-    } catch (error) {
-      console.error('Vercel token validation error:', error)
-      throw new Error('Failed to validate Vercel token')
-    }
-  }
 
-  // Netlify token validation function
-  const validateNetlifyToken = async (token: string) => {
-    try {
-      const response = await fetch('https://api.netlify.com/api/v1/user', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error('Invalid Netlify token')
-      }
-
-      const userData = await response.json()
-      return {
-        username: userData.login || userData.email,
-        avatarUrl: userData.avatar_url
-      }
-    } catch (error) {
-      console.error('Netlify token validation error:', error)
-      throw new Error('Failed to validate Netlify token')
-    }
-  }
-
-  // Fetch stored tokens on component mount
-  useEffect(() => {
-    const fetchStoredTokens = async () => {
-      try {
-        const { storageManager } = await import('@/lib/storage-manager')
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-
-        if (!user) return
-
-        // Fetch and validate GitHub token
-        const storedGitHubToken = await storageManager.getToken('github', user.id)
-        if (storedGitHubToken) {
-          try {
-            const response = await fetch('https://api.github.com/user', {
-              headers: {
-                'Authorization': `token ${storedGitHubToken}`,
-                'Accept': 'application/vnd.github.v3+json'
-              }
-            })
-
-            if (response.ok) {
-              const userData = await response.json()
-              setGithubForm(prev => ({
-                ...prev,
-                githubToken: 'stored',
-                githubUsername: userData.login,
-                githubAvatarUrl: userData.avatar_url
-              }))
-              setDeploymentState(prev => ({ ...prev, githubConnected: true }))
-            }
-          } catch (error) {
-            console.error('Stored GitHub token validation failed:', error)
-          }
-        }
-
-        // Fetch and validate Vercel token
-        const storedVercelToken = await storageManager.getToken('vercel', user.id)
-        if (storedVercelToken) {
-          try {
-            const response = await fetch('https://api.vercel.com/v1/user', {
-              headers: {
-                'Authorization': `Bearer ${storedVercelToken}`,
-                'Content-Type': 'application/json'
-              }
-            })
-
-            if (response.ok) {
-              const userData = await response.json()
-              setGithubForm(prev => ({
-                ...prev,
-                vercelToken: 'stored',
-                vercelUsername: userData.username || userData.name,
-                vercelAvatarUrl: userData.avatar
-              }))
-              setDeploymentState(prev => ({ ...prev, vercelConnected: true }))
-            }
-          } catch (error) {
-            console.error('Stored Vercel token validation failed:', error)
-          }
-        }
-
-        // Fetch and validate Netlify token
-        const storedNetlifyToken = await storageManager.getToken('netlify', user.id)
-        if (storedNetlifyToken) {
-          try {
-            const response = await fetch('https://api.netlify.com/api/v1/user', {
-              headers: {
-                'Authorization': `Bearer ${storedNetlifyToken}`,
-                'Content-Type': 'application/json'
-              }
-            })
-
-            if (response.ok) {
-              const userData = await response.json()
-              setGithubForm(prev => ({
-                ...prev,
-                netlifyToken: 'stored',
-                netlifyUsername: userData.login || userData.email,
-                netlifyAvatarUrl: userData.avatar_url
-              }))
-              setDeploymentState(prev => ({ ...prev, netlifyConnected: true }))
-            }
-          } catch (error) {
-            console.error('Stored Netlify token validation failed:', error)
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching stored tokens:', error)
-      }
-    }
-
-    fetchStoredTokens()
-  }, [])
-
-  // Modify deployment logic to use stored token
-  const handleDeployment = async () => {
-    try {
-      // Check if GitHub token is stored and valid
-      if (githubForm.githubToken !== 'stored') {
-        toast({
-          title: "GitHub Token Required",
-          description: "Please save a valid GitHub token before deploying",
-          variant: "destructive"
-        })
-        return
-      }
-
-      // Retrieve the actual token for deployment
-      const { storageManager } = await import('@/lib/storage-manager')
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (!user) {
-        throw new Error('User not authenticated')
-      }
-
-      const storedToken = await storageManager.getToken('github', user.id)
-
-      if (!storedToken) {
-        throw new Error('GitHub token not found')
-      }
-
-      // Proceed with deployment using the stored token
-      setDeploymentState(prev => ({
-        ...prev,
-        isDeploying: true
-      }))
-
-      // Your existing deployment logic here, using storedToken
-      // Example:
-      // await deployToGitHub(storedToken, selectedProject)
-
-    } catch (error) {
-      console.error('Deployment error:', error)
-      toast({
-        title: "Deployment Failed",
-        description: error instanceof Error ? error.message : "Unable to deploy",
-        variant: "destructive"
-      })
-    } finally {
-      setDeploymentState(prev => ({
-        ...prev,
-        isDeploying: false
-      }))
-    }
-  }
-
-  // Add state variables for validation
-  const [isValidatingVercel, setIsValidatingVercel] = useState(false)
-  const [validationErrorVercel, setValidationErrorVercel] = useState<string | null>(null)
-  const [isValidatingNetlify, setIsValidatingNetlify] = useState(false)
-  const [validationErrorNetlify, setValidationErrorNetlify] = useState<string | null>(null)
-
-  // Vercel token save handler
-  const handleVercelTokenSave = async () => {
-    try {
-      setIsValidatingVercel(true)
-      setValidationErrorVercel(null)
-
-      const { username, avatarUrl } = await validateVercelToken(vercelForm.token)
-
-      const { storageManager } = await import('@/lib/storage-manager')
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (!user) {
-        throw new Error('User not authenticated')
-      }
-
-      await storageManager.createToken({
-        userId: user.id,
-        provider: 'vercel',
-        token: vercelForm.token
-      })
-
-      setGithubForm(prev => ({
-        ...prev,
-        vercelToken: 'stored',
-        vercelUsername: username,
-        vercelAvatarUrl: avatarUrl
-      }))
-
-      setDeploymentState(prev => ({ ...prev, vercelConnected: true }))
-
-      toast({
-        title: "Vercel Connected",
-        description: `Connected as ${username}`,
-      })
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to validate Vercel token'
-      setValidationErrorVercel(errorMessage)
-
-      toast({
-        title: "Connection Failed",
-        description: errorMessage,
-        variant: "destructive"
-      })
-    } finally {
-      setIsValidatingVercel(false)
-    }
-  }
-
-  // Vercel token disconnect handler
-  const handleVercelTokenDisconnect = async () => {
-    try {
-      const { storageManager } = await import('@/lib/storage-manager')
-      await storageManager.deleteToken('vercel')
-
-      setGithubForm(prev => ({
-        ...prev,
-        vercelToken: '',
-        vercelUsername: '',
-        vercelAvatarUrl: ''
-      }))
-
-      setDeploymentState(prev => ({ ...prev, vercelConnected: false }))
-
-      toast({
-        title: "Vercel Disconnected",
-        description: "Vercel connection has been removed",
-      })
-    } catch (error) {
-      console.error('Error disconnecting Vercel:', error)
-      toast({
-        title: "Disconnection Failed",
-        description: "Unable to disconnect Vercel",
-        variant: "destructive"
-      })
-    }
-  }
-
-  // Netlify token save handler
-  const handleNetlifyTokenSave = async () => {
-    try {
-      setIsValidatingNetlify(true)
-      setValidationErrorNetlify(null)
-
-      const { username, avatarUrl } = await validateNetlifyToken(netlifyForm.token)
-
-      const { storageManager } = await import('@/lib/storage-manager')
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (!user) {
-        throw new Error('User not authenticated')
-      }
-
-      await storageManager.createToken({
-        userId: user.id,
-        provider: 'netlify',
-        token: netlifyForm.token
-      })
-
-      setGithubForm(prev => ({
-        ...prev,
-        netlifyToken: 'stored',
-        netlifyUsername: username,
-        netlifyAvatarUrl: avatarUrl
-      }))
-
-      setDeploymentState(prev => ({ ...prev, netlifyConnected: true }))
-
-      toast({
-        title: "Netlify Connected",
-        description: `Connected as ${username}`,
-      })
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to validate Netlify token'
-      setValidationErrorNetlify(errorMessage)
-
-      toast({
-        title: "Connection Failed",
-        description: errorMessage,
-        variant: "destructive"
-      })
-    } finally {
-      setIsValidatingNetlify(false)
-    }
-  }
-
-  // Netlify token disconnect handler
-  const handleNetlifyTokenDisconnect = async () => {
-    try {
-      const { storageManager } = await import('@/lib/storage-manager')
-      await storageManager.deleteToken('netlify')
-
-      setGithubForm(prev => ({
-        ...prev,
-        netlifyToken: '',
-        netlifyUsername: '',
-        netlifyAvatarUrl: ''
-      }))
-
-      setDeploymentState(prev => ({ ...prev, netlifyConnected: false }))
-
-      toast({
-        title: "Netlify Disconnected",
-        description: "Netlify connection has been removed",
-      })
-    } catch (error) {
-      console.error('Error disconnecting Netlify:', error)
-      toast({
-        title: "Disconnection Failed",
-        description: "Unable to disconnect Netlify",
-        variant: "destructive"
-      })
-    }
-  }
-
-  // Update renderGitHubTokenInput to reflect deployment state
-  const renderGitHubTokenInput = () => {
-    const [isValidating, setIsValidating] = useState(false)
-    const [validationError, setValidationError] = useState<string | null>(null)
-
-    const handleTokenSave = async () => {
-      try {
-        setIsValidating(true)
-        setValidationError(null)
-
-        // Validate token
-        const { username, avatarUrl } = await validateGitHubToken(githubForm.githubToken)
-
-        // Store token securely
-        const { storageManager } = await import('@/lib/storage-manager')
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-
-        if (!user) {
-          throw new Error('User not authenticated')
-        }
-
-          await storageManager.createToken({
-          userId: user.id,
-            provider: 'github',
-          token: githubForm.githubToken
-          })
-
-        // Update UI state
-          setGithubForm(prev => ({
-            ...prev,
-          githubUsername: username,
-          githubAvatarUrl: avatarUrl,
-          githubToken: 'stored'
-          }))
-
-        // Update deployment state
-          setDeploymentState(prev => ({
-            ...prev,
-          githubConnected: true
-        }))
-
-        // Show success toast
-        toast({
-          title: "GitHub Connected",
-          description: `Connected as ${username}`,
-        })
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Failed to validate token'
-        setValidationError(errorMessage)
-        
-        toast({
-          title: "Connection Failed",
-          description: errorMessage,
-          variant: "destructive"
-        })
-      } finally {
-        setIsValidating(false)
-      }
-    }
-
-    const handleTokenDisconnect = async () => {
-      try {
-        const { storageManager } = await import('@/lib/storage-manager')
-        await storageManager.deleteToken('github')
-        
-        setGithubForm(prev => ({
-          ...prev,
-          githubToken: '',
-          githubUsername: '',
-          githubAvatarUrl: ''
-        }))
-
-        setDeploymentState(prev => ({
-          ...prev,
-          githubConnected: false
-        }))
-
-        toast({
-          title: "GitHub Disconnected",
-          description: "GitHub connection has been removed",
-        })
-        } catch (error) {
-        console.error('Error disconnecting GitHub:', error)
-          toast({
-          title: "Disconnection Failed",
-          description: "Unable to disconnect GitHub",
-            variant: "destructive"
-          })
-      }
-    }
-
-    // Check if GitHub is already connected
-    const isGitHubConnected = githubForm.githubToken === 'stored'
-    const isDeploying = deploymentState.isDeploying
-
-    return (
-      <div className="space-y-2">
-        <Label htmlFor="githubToken">GitHub Token</Label>
-        <div className="flex items-center space-x-2">
-          <Input
-            id="githubToken"
-            type="text"
-            placeholder="Paste your GitHub Personal Access Token"
-            value={githubForm.githubToken || ''}
-            onChange={(e) => setGithubForm(prev => ({ ...prev, githubToken: e.target.value }))}
-            disabled={isGitHubConnected || isDeploying}
-            className={`
-              ${isGitHubConnected ? "bg-gray-100 cursor-not-allowed" : ""} 
-              ${validationError ? "border-red-500" : ""} 
-              ${isDeploying ? "opacity-50 cursor-not-allowed" : ""}
-            `}
-          />
-          {!isGitHubConnected && (
-            <Button 
-              variant="secondary" 
-              onClick={handleTokenSave}
-              disabled={!githubForm.githubToken || isValidating || isDeploying}
-            >
-              {isValidating ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                "Save Token"
-              )}
-            </Button>
-          )}
-          {isGitHubConnected && (
-            <div className="flex items-center space-x-2">
-              {githubForm.githubAvatarUrl && (
-                <img 
-                  src={githubForm.githubAvatarUrl} 
-                  alt="GitHub Avatar" 
-                  className="w-8 h-8 rounded-full" 
-                />
-              )}
-              <div className="text-green-600 flex items-center">
-                <CheckCircle2 className="mr-2" />
-                Connected as {githubForm.githubUsername || 'GitHub User'}
-              </div>
-              <Button 
-                variant="destructive" 
-                size="sm"
-                onClick={handleTokenDisconnect}
-                disabled={isDeploying}
-              >
-                Disconnect
-              </Button>
-            </div>
-          )}
-        </div>
-        {validationError && (
-          <p className="text-red-500 text-sm mt-1">{validationError}</p>
-        )}
-        <p className="text-sm text-muted-foreground">
-          Create a Personal Access Token with repo and user:email scopes
-        </p>
-      </div>
-    )
-  }
-
-  // Remove the previous OAuth callback effect
-  useEffect(() => {
-    // Remove any lingering OAuth callback parameters
-    const urlParams = new URLSearchParams(window.location.search)
-    const githubOAuthSuccess = urlParams.get('github_oauth_success')
-    
-    if (githubOAuthSuccess === 'true') {
-      window.history.replaceState({}, document.title, window.location.pathname)
-    }
-  }, [])
 
   const getCurrentUser = async () => {
     try {
@@ -1168,32 +627,8 @@ export default function DeploymentClient() {
         storageManager.getEnvironmentVariables()
       ])
 
-      // Load saved tokens
-      const [githubToken, vercelToken, netlifyToken] = await Promise.all([
-        storageManager.getToken(currentUserId, 'github').catch(() => null),
-        storageManager.getToken(currentUserId, 'vercel').catch(() => null),
-        storageManager.getToken(currentUserId, 'netlify').catch(() => null),
-      ])
-
-      setSavedTokens({
-        github: githubToken ? { token: githubToken.token } : undefined,
-        vercel: vercelToken ? { token: vercelToken.token } : undefined,
-        netlify: netlifyToken ? { token: netlifyToken.token } : undefined,
-      })
-
-      // Auto-populate forms with saved tokens
-      if (githubToken) {
-        setGithubForm(prev => ({ ...prev, token: githubToken.token }))
-        setDeploymentState(prev => ({ ...prev, githubConnected: true }))
-      }
-      if (vercelToken) {
-        setVercelForm(prev => ({ ...prev, token: vercelToken.token }))
-        setDeploymentState(prev => ({ ...prev, vercelConnected: true }))
-      }
-      if (netlifyToken) {
-        setNetlifyForm(prev => ({ ...prev, token: netlifyToken.token }))
-        setDeploymentState(prev => ({ ...prev, netlifyConnected: true }))
-      }
+      // Load stored deployment tokens from database
+      await loadStoredTokens()
 
       const projectsWithData: ProjectDisplay[] = projectsData.map(project => {
         const projectDeployments = deployments.filter(d => d.workspaceId === project.id)
@@ -1237,51 +672,6 @@ export default function DeploymentClient() {
     }
   }
 
-  const handleGitHubConnect = async () => {
-    if (!selectedProject) return
-
-    setDeploymentState(prev => ({ ...prev, isDeploying: true, currentStep: 'connecting' }))
-
-    try {
-      // GitHub OAuth App configuration - Fallback credentials
-      const GITHUB_CLIENT_ID = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID || 'Ov23lihgU0dNPk4ct1Au'
-      const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_URL || 'https://dev.pixelways.co'
-
-      const redirectUri = encodeURIComponent(`${APP_DOMAIN}/api/auth/github/oauth-callback`)
-      const scope = encodeURIComponent('repo,user')
-      const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`
-
-      // Store current state in sessionStorage
-      sessionStorage.setItem('github_oauth_return_url', window.location.href)
-      sessionStorage.setItem('github_oauth_project', selectedProject.id)
-
-      window.location.href = githubAuthUrl
-
-    } catch (error) {
-      toast({
-        title: "Connection Failed",
-        description: "Failed to connect to GitHub",
-        variant: "destructive"
-      })
-      setDeploymentState(prev => ({ ...prev, isDeploying: false }))
-    }
-  }
-
-  const handleVercelConnect = async () => {
-    toast({
-      title: "Vercel OAuth Not Available",
-      description: "Please use a Personal Access Token instead. Follow the setup instructions above.",
-      variant: "default"
-    })
-  }
-
-  const handleNetlifyConnect = async () => {
-    toast({
-      title: "Netlify OAuth Not Available",
-      description: "Please use a Personal Access Token instead. Follow the setup instructions above.",
-      variant: "default"
-    })
-  }
 
   const handleGitHubDeploy = async () => {
     if (!selectedProject) {
@@ -1302,10 +692,18 @@ export default function DeploymentClient() {
       return
     }
 
-    if (!githubForm.token) {
+    // Check if GitHub token is available in stored tokens
+    if (!storedTokens.github) {
       toast({
-        title: "Token Required",
-        description: "Please provide a GitHub token",
+        title: "GitHub Token Required",
+        description: (
+          <div>
+            <p>You need to set up your GitHub token in your account settings first.</p>
+            <Link href="/workspace/account" className="text-blue-400 hover:text-blue-300 underline">
+              Go to Account Settings →
+            </Link>
+          </div>
+        ),
         variant: "destructive"
       })
       return
@@ -1342,7 +740,7 @@ export default function DeploymentClient() {
           name: githubForm.repoName,
           description: githubForm.repoDescription,
           private: githubForm.isPrivate,
-          token: githubForm.token,
+          token: storedTokens.github,
         })
       })
 
@@ -1424,7 +822,7 @@ export default function DeploymentClient() {
         body: JSON.stringify({
           repoName: githubForm.repoName,
           repoOwner: repoData.fullName.split('/')[0],
-          token: githubForm.token,
+          token: storedTokens.github,
           workspaceId: selectedProject.id,
           files: projectFiles, // Include files in the request
         })
@@ -1900,36 +1298,32 @@ export default function DeploymentClient() {
                   </div>
 
                   <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="github-token" className="flex items-center space-x-2 text-gray-300">
-                        <span>Personal Access Token</span>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <HelpCircle className="h-4 w-4 text-gray-400" />
-                          </TooltipTrigger>
-                          <TooltipContent className="bg-gray-700 border-gray-600 text-white">
-                            <p>Required for creating and managing repositories</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </Label>
-                      <Input
-                        id="github-token"
-                        type="password"
-                        value={githubForm.token}
-                        onChange={(e) => setGithubForm(prev => ({ ...prev, token: e.target.value }))}
-                        placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                        className="mt-1 bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                      />
-                      <p className="text-sm text-gray-400 mt-1">
-                        <a
-                          href="https://github.com/settings/tokens"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-400 hover:text-blue-300"
-                        >
-                          Create a Personal Access Token
-                        </a> with repo permissions
-                      </p>
+                    {/* Token status indicator */}
+                    <div className="p-4 bg-gray-800 border border-gray-600 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Github className="h-5 w-5 text-gray-400" />
+                          <span className="text-gray-300 font-medium">GitHub Connection</span>
+                        </div>
+                        {storedTokens.github ? (
+                          <div className="flex items-center space-x-2 text-green-400">
+                            <CheckCircle2 className="h-4 w-4" />
+                            <span className="text-sm">Connected</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2 text-yellow-400">
+                            <AlertCircle className="h-4 w-4" />
+                            <span className="text-sm">Not Connected</span>
+                          </div>
+                        )}
+                      </div>
+                      {!storedTokens.github && (
+                        <div className="mt-2 text-sm text-gray-400">
+                          <Link href="/workspace/account" className="text-blue-400 hover:text-blue-300 underline">
+                            Set up your GitHub token in Account Settings →
+                          </Link>
+                        </div>
+                      )}
                     </div>
 
                     {/* Smart Defaults */}
@@ -1956,33 +1350,8 @@ export default function DeploymentClient() {
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 pt-4 border-t border-gray-700">
                   <Button
-                    onClick={async () => {
-                      if (!githubForm.token) {
-                        toast({
-                          title: "Token Required",
-                          description: "Please enter your GitHub token",
-                          variant: "destructive"
-                        })
-                        return
-                      }
-                      await storageManager.createToken({ userId: currentUserId, provider: 'github', token: githubForm.token })
-                      setSavedTokens(prev => ({ ...prev, github: { token: githubForm.token } }))
-                      setDeploymentState(prev => ({ ...prev, githubConnected: true }))
-                      toast({ title: 'Saved', description: 'GitHub token saved successfully' })
-                    }}
-                    disabled={!githubForm.token}
-                    variant="outline"
-                    className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                  >
-                    Save Token
-                  </Button>
-                  <Button variant="secondary" onClick={handleGitHubConnect} className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
-                    <Github className="h-4 w-4 mr-2" />
-                    Connect via OAuth
-                  </Button>
-                  <Button
                     onClick={handleGitHubDeploy}
-                    disabled={deploymentState.isDeploying || !githubForm.repoName || !githubForm.token || !selectedProject}
+                    disabled={deploymentState.isDeploying || !githubForm.repoName || !selectedProject || !storedTokens.github}
                     className="sm:ml-auto bg-blue-600 hover:bg-blue-700"
                   >
                     {deploymentState.isDeploying ? (
@@ -2017,72 +1386,41 @@ export default function DeploymentClient() {
 
                 {/* Vercel Setup Instructions */}
                 <DeploymentSetupAccordion
+
                   platform="vercel"
                   connectionStatus={deploymentState.vercelConnected ? 'connected' : 'not_connected'}
-                  onConnect={handleVercelConnect}
                 />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="vercel-token" className="text-gray-300">Vercel Personal Token</Label>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <Input
-                          id="vercel-token"
-                          type="password"
-                          value={vercelForm.token}
-                          onChange={(e) => setVercelForm(prev => ({ ...prev, token: e.target.value }))}
-                          placeholder="vercel_xxxxxxxxxxxxxxxxxxxx"
-                          className={`flex-1 bg-gray-700 border-gray-600 text-white placeholder-gray-400 ${githubForm.vercelToken === 'stored' ? "bg-gray-100 cursor-not-allowed" : ""} ${validationErrorVercel ? "border-red-500" : ""} ${deploymentState.isDeploying ? "opacity-50 cursor-not-allowed" : ""}`}
-                          disabled={githubForm.vercelToken === 'stored' || deploymentState.isDeploying}
-                        />
-                        {githubForm.vercelToken !== 'stored' && (
-                          <Button
-                            variant="secondary"
-                            onClick={handleVercelTokenSave}
-                            disabled={!vercelForm.token || isValidatingVercel || deploymentState.isDeploying}
-                          >
-                            {isValidatingVercel ? (
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                              "Save Token"
-                            )}
-                          </Button>
-                        )}
-                        {githubForm.vercelToken === 'stored' && (
+                    {/* Vercel connection status indicator */}
+                    <div className="p-4 bg-gray-800 border border-gray-600 rounded-lg">
+                      <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
-                            {githubForm.vercelAvatarUrl && (
-                              <img
-                                src={githubForm.vercelAvatarUrl}
-                                alt="Vercel Avatar"
-                                className="w-8 h-8 rounded-full"
-                              />
-                            )}
-                            <div className="text-green-600 flex items-center">
-                              <CheckCircle2 className="mr-2" />
-                              Connected as {githubForm.vercelUsername || 'Vercel User'}
+                          <div className="w-5 h-5 bg-black rounded flex items-center justify-center">
+                            <span className="text-white text-xs font-bold">V</span>
                             </div>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={handleVercelTokenDisconnect}
-                              disabled={deploymentState.isDeploying}
-                            >
-                              Disconnect
-                            </Button>
+                          <span className="text-gray-300 font-medium">Vercel Connection</span>
+                        </div>
+                        {storedTokens.vercel ? (
+                          <div className="flex items-center space-x-2 text-green-400">
+                            <CheckCircle2 className="h-4 w-4" />
+                            <span className="text-sm">Connected</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2 text-yellow-400">
+                            <AlertCircle className="h-4 w-4" />
+                            <span className="text-sm">Not Connected</span>
                           </div>
                         )}
                       </div>
-                      <p className="text-sm text-gray-400 mt-1">
-                        <a
-                          href="https://vercel.com/account/tokens"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-400 hover:text-blue-300"
-                        >
-                          Create a Personal Access Token
-                        </a> with project permissions
-                      </p>
+                      {!storedTokens.vercel && (
+                        <div className="mt-2 text-sm text-gray-400">
+                          <Link href="/workspace/account" className="text-blue-400 hover:text-blue-300 underline">
+                            Set up your Vercel token in Account Settings →
+                          </Link>
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -2164,11 +1502,18 @@ export default function DeploymentClient() {
                     onClick={async () => {
                       if (!selectedProject) return
 
-                      // Check if Vercel token is stored
-                      if (githubForm.vercelToken !== 'stored') {
+                      // Check if Vercel token is available in stored tokens
+                      if (!storedTokens.vercel) {
                         toast({
                           title: "Vercel Token Required",
-                          description: "Please save a valid Vercel token before deploying",
+                          description: (
+                            <div>
+                              <p>You need to set up your Vercel token in your account settings first.</p>
+                              <Link href="/workspace/account" className="text-blue-400 hover:text-blue-300 underline">
+                                Go to Account Settings →
+                              </Link>
+                            </div>
+                          ),
                           variant: "destructive"
                         })
                         return
@@ -2184,19 +1529,9 @@ export default function DeploymentClient() {
                         return
                       }
 
-                      // Retrieve the actual Vercel token
-                      const { storageManager } = await import('@/lib/storage-manager')
-                      const supabase = createClient()
-                      const { data: { user } } = await supabase.auth.getUser()
-
-                      if (!user) {
-                        throw new Error('User not authenticated')
-                      }
-
-                      const vercelToken = await storageManager.getToken('vercel', user.id)
-
-                      if (!vercelToken) {
-                        throw new Error('Vercel token not found')
+                      // Check if Vercel token is available in stored tokens
+                      if (!storedTokens.vercel) {
+                        throw new Error('Vercel token not configured. Please set up your Vercel token in Account Settings.')
                       }
 
                       setDeploymentState(prev => ({ ...prev, isDeploying: true, currentStep: 'deploying' }))
@@ -2212,7 +1547,7 @@ export default function DeploymentClient() {
                           body: JSON.stringify({
                             projectName: vercelForm.projectName,
                             framework: vercelForm.framework,
-                            token: vercelToken,
+                            token: storedTokens.vercel,
                             workspaceId: selectedProject.id,
                             githubRepo: selectedRepoForVercel,
                             environmentVariables: envVars,
@@ -2318,7 +1653,7 @@ export default function DeploymentClient() {
                         setDeploymentState(prev => ({ ...prev, isDeploying: false }))
                       }
                     }}
-                    disabled={deploymentState.isDeploying || githubForm.vercelToken !== 'stored' || !selectedRepoForVercel}
+                    disabled={deploymentState.isDeploying || !storedTokens.vercel || !selectedRepoForVercel}
                     className="sm:ml-auto bg-blue-600 hover:bg-blue-700"
                   >
                     {deploymentState.isDeploying ? (
@@ -2355,70 +1690,38 @@ export default function DeploymentClient() {
                 <DeploymentSetupAccordion
                   platform="netlify"
                   connectionStatus={deploymentState.netlifyConnected ? 'connected' : 'not_connected'}
-                  onConnect={handleNetlifyConnect}
                 />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="netlify-token" className="text-gray-300">Netlify Personal Access Token</Label>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <Input
-                          id="netlify-token"
-                          type="password"
-                          value={netlifyForm.token}
-                          onChange={(e) => setNetlifyForm(prev => ({ ...prev, token: e.target.value }))}
-                          placeholder="nfp_xxxxxxxxxxxxxxxxxxxx"
-                          className={`flex-1 bg-gray-700 border-gray-600 text-white placeholder-gray-400 ${githubForm.netlifyToken === 'stored' ? "bg-gray-100 cursor-not-allowed" : ""} ${validationErrorNetlify ? "border-red-500" : ""} ${deploymentState.isDeploying ? "opacity-50 cursor-not-allowed" : ""}`}
-                          disabled={githubForm.netlifyToken === 'stored' || deploymentState.isDeploying}
-                        />
-                        {githubForm.netlifyToken !== 'stored' && (
-                          <Button
-                            variant="secondary"
-                            onClick={handleNetlifyTokenSave}
-                            disabled={!netlifyForm.token || isValidatingNetlify || deploymentState.isDeploying}
-                          >
-                            {isValidatingNetlify ? (
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                              "Save Token"
-                            )}
-                          </Button>
-                        )}
-                        {githubForm.netlifyToken === 'stored' && (
+                    {/* Netlify connection status indicator */}
+                    <div className="p-4 bg-gray-800 border border-gray-600 rounded-lg">
+                      <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
-                            {githubForm.netlifyAvatarUrl && (
-                              <img
-                                src={githubForm.netlifyAvatarUrl}
-                                alt="Netlify Avatar"
-                                className="w-8 h-8 rounded-full"
-                              />
-                            )}
-                            <div className="text-green-600 flex items-center">
-                              <CheckCircle2 className="mr-2" />
-                              Connected as {githubForm.netlifyUsername || 'Netlify User'}
+                          <div className="w-5 h-5 bg-green-600 rounded flex items-center justify-center">
+                            <span className="text-white text-xs font-bold">N</span>
                             </div>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={handleNetlifyTokenDisconnect}
-                              disabled={deploymentState.isDeploying}
-                            >
-                              Disconnect
-                            </Button>
+                          <span className="text-gray-300 font-medium">Netlify Connection</span>
+                        </div>
+                        {storedTokens.netlify ? (
+                          <div className="flex items-center space-x-2 text-green-400">
+                            <CheckCircle2 className="h-4 w-4" />
+                            <span className="text-sm">Connected</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2 text-yellow-400">
+                            <AlertCircle className="h-4 w-4" />
+                            <span className="text-sm">Not Connected</span>
                           </div>
                         )}
                       </div>
-                      <p className="text-sm text-gray-400 mt-1">
-                        <a
-                          href="https://app.netlify.com/user/applications#personal-access-tokens"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-400 hover:text-blue-300"
-                        >
-                          Create a Personal Access Token
-                        </a> with site permissions
-                      </p>
+                      {!storedTokens.netlify && (
+                        <div className="mt-2 text-sm text-gray-400">
+                          <Link href="/workspace/account" className="text-blue-400 hover:text-blue-300 underline">
+                            Set up your Netlify token in Account Settings →
+                          </Link>
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -2522,11 +1825,18 @@ export default function DeploymentClient() {
                     onClick={async () => {
                       if (!selectedProject) return
 
-                      // Check if Netlify token is stored
-                      if (githubForm.netlifyToken !== 'stored') {
+                      // Check if Netlify token is available in stored tokens
+                      if (!storedTokens.netlify) {
                         toast({
                           title: "Netlify Token Required",
-                          description: "Please save a valid Netlify token before deploying",
+                          description: (
+                            <div>
+                              <p>You need to set up your Netlify token in your account settings first.</p>
+                              <Link href="/workspace/account" className="text-blue-400 hover:text-blue-300 underline">
+                                Go to Account Settings →
+                              </Link>
+                            </div>
+                          ),
                           variant: "destructive"
                         })
                         return
@@ -2542,19 +1852,9 @@ export default function DeploymentClient() {
                         return
                       }
 
-                      // Retrieve the actual Netlify token
-                      const { storageManager } = await import('@/lib/storage-manager')
-                      const supabase = createClient()
-                      const { data: { user } } = await supabase.auth.getUser()
-
-                      if (!user) {
-                        throw new Error('User not authenticated')
-                      }
-
-                      const netlifyToken = await storageManager.getToken('netlify', user.id)
-
-                      if (!netlifyToken) {
-                        throw new Error('Netlify token not found')
+                      // Check if Netlify token is available in stored tokens
+                      if (!storedTokens.netlify) {
+                        throw new Error('Netlify token not configured. Please set up your Netlify token in Account Settings.')
                       }
 
                       setDeploymentState(prev => ({ ...prev, isDeploying: true, currentStep: 'deploying' }))
@@ -2571,7 +1871,7 @@ export default function DeploymentClient() {
                             siteName: netlifyForm.siteName,
                             buildCommand: netlifyForm.buildCommand,
                             publishDir: netlifyForm.publishDir,
-                            token: netlifyToken,
+                            token: storedTokens.netlify,
                             workspaceId: selectedProject.id,
                             githubRepo: selectedRepoForNetlify,
                             environmentVariables: envVars,
@@ -2683,7 +1983,7 @@ export default function DeploymentClient() {
                         setDeploymentState(prev => ({ ...prev, isDeploying: false }))
                       }
                     }}
-                    disabled={deploymentState.isDeploying || githubForm.netlifyToken !== 'stored' || !selectedRepoForNetlify}
+                    disabled={deploymentState.isDeploying || !storedTokens.netlify || !selectedRepoForNetlify}
                     className="sm:ml-auto bg-green-600 hover:bg-green-700"
                   >
                     {deploymentState.isDeploying ? (

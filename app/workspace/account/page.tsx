@@ -30,7 +30,9 @@ import {
   restoreBackupFromCloud,
   isCloudSyncEnabled as isCloudSyncEnabledUtil,
   setCloudSyncEnabled as setCloudSyncEnabledUtil,
-  getLastBackupTime as getLastBackupTimeUtil
+  getLastBackupTime as getLastBackupTimeUtil,
+  storeDeploymentTokens,
+  getDeploymentTokens
 } from "@/lib/cloud-sync"
 import { 
   AlertDialog,
@@ -97,94 +99,6 @@ export default function AccountSettingsPage() {
       checkConnectionStatus(user.id)
     }
   }, [user])
-
-  // Check connection status for all providers
-  const checkConnectionStatus = async (userId: string) => {
-    try {
-      // Check GitHub connection
-      const githubToken = await storageManager.getToken('github', userId)
-      if (githubToken) {
-        try {
-          const response = await fetch('https://api.github.com/user', {
-            headers: {
-              'Authorization': `token ${githubToken}`,
-              'Accept': 'application/vnd.github.v3+json'
-            }
-          })
-          if (response.ok) {
-            const userData = await response.json()
-            setConnections(prev => ({
-              ...prev,
-              github: {
-                connected: true,
-                username: userData.login,
-                avatarUrl: userData.avatar_url,
-                loading: false
-              }
-            }))
-          }
-        } catch (error) {
-          console.error('GitHub token validation failed:', error)
-        }
-      }
-
-      // Check Vercel connection
-      const vercelToken = await storageManager.getToken('vercel', userId)
-      if (vercelToken) {
-        try {
-          const response = await fetch('https://api.vercel.com/v1/user', {
-            headers: {
-              'Authorization': `Bearer ${vercelToken}`,
-              'Content-Type': 'application/json'
-            }
-          })
-          if (response.ok) {
-            const userData = await response.json()
-            setConnections(prev => ({
-              ...prev,
-              vercel: {
-                connected: true,
-                username: userData.username || userData.name,
-                avatarUrl: userData.avatar,
-                loading: false
-              }
-            }))
-          }
-        } catch (error) {
-          console.error('Vercel token validation failed:', error)
-        }
-      }
-
-      // Check Netlify connection
-      const netlifyToken = await storageManager.getToken('netlify', userId)
-      if (netlifyToken) {
-        try {
-          const response = await fetch('https://api.netlify.com/api/v1/user', {
-            headers: {
-              'Authorization': `Bearer ${netlifyToken}`,
-              'Content-Type': 'application/json'
-            }
-          })
-          if (response.ok) {
-            const userData = await response.json()
-            setConnections(prev => ({
-              ...prev,
-              netlify: {
-                connected: true,
-                username: userData.login || userData.email,
-                avatarUrl: userData.avatar_url,
-                loading: false
-              }
-            }))
-          }
-        } catch (error) {
-          console.error('Netlify token validation failed:', error)
-        }
-      }
-    } catch (error) {
-      console.error('Error checking connection status:', error)
-    }
-  }
 
   // Validate and connect to a provider
   const handleConnect = async (provider: 'github' | 'vercel' | 'netlify') => {
@@ -558,6 +472,156 @@ export default function AccountSettingsPage() {
       })
     } finally {
       setIsDeleting(false)
+    }
+  }
+
+  const validateAndStoreToken = async (provider: 'github' | 'vercel' | 'netlify', token: string) => {
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "User not authenticated",
+        variant: "destructive"
+      })
+      return false
+    }
+
+    // Reset validation state
+    setConnectionForms(prev => ({
+      ...prev,
+      [provider]: { ...prev[provider], isValidating: true, error: '' }
+    }))
+
+    try {
+      // Validate token (you'll need to implement these validation methods)
+      const isValid = await validateDeploymentToken(provider, token)
+
+      if (!isValid) {
+        throw new Error(`Invalid ${provider} token`)
+      }
+
+      // Store token
+      const tokens = { [provider]: token }
+      const success = await storeDeploymentTokens(user.id, tokens)
+
+      if (!success) {
+        throw new Error(`Failed to store ${provider} token`)
+      }
+
+      // Update connection status
+      setConnections(prev => ({
+        ...prev,
+        [provider]: { 
+          ...prev[provider], 
+          connected: true, 
+          loading: false 
+        }
+      }))
+
+      toast({
+        title: "Success",
+        description: `${provider.charAt(0).toUpperCase() + provider.slice(1)} token validated and stored`
+      })
+
+      return true
+    } catch (error: any) {
+      console.error(`Error validating ${provider} token:`, error)
+      
+      setConnectionForms(prev => ({
+        ...prev,
+        [provider]: { 
+          ...prev[provider], 
+          isValidating: false, 
+          error: error.message || `Failed to validate ${provider} token` 
+        }
+      }))
+
+      toast({
+        title: "Error",
+        description: error.message || `Failed to validate ${provider} token`,
+        variant: "destructive"
+      })
+
+      return false
+    }
+  }
+
+  // Fetch existing connection status
+  const checkConnectionStatus = async (userId: string) => {
+    try {
+      const tokens = await getDeploymentTokens(userId)
+
+      if (!tokens) return
+
+      // Update connection status based on tokens
+      setConnections(prev => ({
+        github: { 
+          ...prev.github, 
+          connected: !!tokens.github,
+          loading: false 
+        },
+        vercel: { 
+          ...prev.vercel, 
+          connected: !!tokens.vercel,
+          loading: false 
+        },
+        netlify: { 
+          ...prev.netlify, 
+          connected: !!tokens.netlify,
+          loading: false 
+        }
+      }))
+    } catch (error) {
+      console.error("Error checking connection status:", error)
+    }
+  }
+
+  // Validate deployment token (you'll need to implement this)
+  const validateDeploymentToken = async (
+    provider: 'github' | 'vercel' | 'netlify', 
+    token: string
+  ): Promise<boolean> => {
+    // Implement token validation logic for each provider
+    // This might involve making an API call to the respective provider
+    switch (provider) {
+      case 'github':
+        // Example GitHub token validation
+        try {
+          const response = await fetch('https://api.github.com/user', {
+            headers: {
+              'Authorization': `token ${token}`,
+              'Accept': 'application/vnd.github.v3+json'
+            }
+          })
+          return response.ok
+        } catch {
+          return false
+        }
+      case 'vercel':
+        // Example Vercel token validation
+        try {
+          const response = await fetch('https://api.vercel.com/v1/user', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+          return response.ok
+        } catch {
+          return false
+        }
+      case 'netlify':
+        // Example Netlify token validation
+        try {
+          const response = await fetch('https://api.netlify.com/api/v1/user', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+          return response.ok
+        } catch {
+          return false
+        }
+      default:
+        return false
     }
   }
 

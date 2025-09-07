@@ -4,6 +4,9 @@ CREATE TABLE IF NOT EXISTS user_settings (
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL UNIQUE,
   cloud_sync_enabled BOOLEAN DEFAULT false,
   last_backup TIMESTAMP WITH TIME ZONE,
+  vercel_token TEXT,
+  github_token TEXT,
+  netlify_token TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

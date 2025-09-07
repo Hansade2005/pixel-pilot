@@ -27,13 +27,13 @@ import { useToast } from "@/hooks/use-toast"
 interface DeploymentSetupAccordionProps {
   platform: 'github' | 'vercel' | 'netlify'
   connectionStatus: 'checking' | 'connected' | 'not_connected' | 'connecting'
-  onConnect: () => void
+  onConnect?: () => void
 }
 
-export function DeploymentSetupAccordion({ 
-  platform, 
-  connectionStatus, 
-  onConnect 
+export function DeploymentSetupAccordion({
+  platform,
+  connectionStatus,
+  onConnect = () => {} // Default empty function
 }: DeploymentSetupAccordionProps) {
   const { toast } = useToast()
 
@@ -45,32 +45,18 @@ export function DeploymentSetupAccordion({
       description: "Deploy to GitHub repositories with automatic workflows",
       setupSteps: [
         {
-          title: "OAuth Authentication (Recommended)",
-          description: "Connect your GitHub account securely",
+          title: "Configure GitHub Token",
+          description: "Set up your GitHub personal access token in account settings",
           steps: [
-            "Click 'Connect to GitHub' below",
-            "Authorize Pixel Builder in GitHub",
-            "Grant repository and workflow permissions",
-            "Return to this page to continue"
+            "Go to your Account Settings",
+            "Navigate to the Deployment Tokens section",
+            "Click 'Connect GitHub'",
+            "Create a personal access token with 'repo' and 'workflow' scopes",
+            "Save the token in your account settings"
           ],
           action: {
-            label: "Connect to GitHub",
-            url: null,
-            onClick: onConnect
-          }
-        },
-        {
-          title: "Personal Access Token (Alternative)",
-          description: "Use a GitHub personal access token",
-          steps: [
-            "Go to GitHub Settings → Developer settings",
-            "Click 'Personal access tokens' → 'Tokens (classic)'",
-            "Generate new token with 'repo' and 'workflow' scopes",
-            "Copy token and paste it in the deployment dialog"
-          ],
-          action: {
-            label: "Go to GitHub Settings",
-            url: "https://github.com/settings/tokens",
+            label: "Go to Account Settings",
+            url: "/workspace/account",
             onClick: null
           }
         }
@@ -90,18 +76,18 @@ export function DeploymentSetupAccordion({
       description: "Deploy to Vercel with automatic builds and CDN",
       setupSteps: [
         {
-          title: "Personal Access Token",
-          description: "Create a Vercel personal access token",
+          title: "Configure Vercel Token",
+          description: "Set up your Vercel personal access token in account settings",
           steps: [
-            "Go to Vercel Account Settings",
-            "Navigate to 'Tokens' section",
-            "Click 'Create Token'",
-            "Name it 'AI App Builder'",
-            "Copy token and paste it in the deployment dialog"
+            "Go to your Account Settings",
+            "Navigate to the Deployment Tokens section",
+            "Click 'Connect Vercel'",
+            "Create a personal access token in Vercel",
+            "Save the token in your account settings"
           ],
           action: {
-            label: "Go to Vercel Tokens",
-            url: "https://vercel.com/account/tokens",
+            label: "Go to Account Settings",
+            url: "/workspace/account",
             onClick: null
           }
         }
@@ -121,19 +107,18 @@ export function DeploymentSetupAccordion({
       description: "Deploy to Netlify with serverless functions and forms",
       setupSteps: [
         {
-          title: "Personal Access Token",
-          description: "Create a Netlify personal access token",
+          title: "Configure Netlify Token",
+          description: "Set up your Netlify personal access token in account settings",
           steps: [
-            "Go to Netlify User Settings",
-            "Navigate to 'Applications' → 'Personal access tokens'",
-            "Click 'New access token'",
-            "Name it 'AI App Builder'",
-            "Set appropriate expiration (recommend 1 year)",
-            "Copy token and paste it in the deployment dialog"
+            "Go to your Account Settings",
+            "Navigate to the Deployment Tokens section",
+            "Click 'Connect Netlify'",
+            "Create a personal access token in Netlify",
+            "Save the token in your account settings"
           ],
           action: {
-            label: "Go to Netlify Tokens",
-            url: "https://app.netlify.com/user/applications#personal-access-tokens",
+            label: "Go to Account Settings",
+            url: "/workspace/account",
             onClick: null
           }
         }
