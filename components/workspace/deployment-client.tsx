@@ -1226,23 +1226,6 @@ export default function DeploymentClient() {
             {/* GitHub Deployment Form */}
             {activeTab === 'github' && (
               <div className="space-y-6">
-                {/* Connection Status */}
-                <Alert className="bg-gray-700 border-gray-600">
-                  <Info className="h-4 w-4 text-blue-400" />
-                  <AlertDescription className="text-gray-300">
-                    {deploymentState.githubConnected ? (
-                      <span className="flex items-center">
-                        <CheckCircle2 className="h-4 w-4 text-green-400 mr-2" />
-                        Connected to GitHub
-                      </span>
-                    ) : (
-                      <span className="flex items-center">
-                        <AlertCircle className="h-4 w-4 text-yellow-400 mr-2" />
-                        Not connected to GitHub. Please provide your token below.
-                      </span>
-                    )}
-                  </AlertDescription>
-                </Alert>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
