@@ -20,6 +20,7 @@ import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useCloudSync } from '@/hooks/use-cloud-sync'
+import { restoreBackupFromCloud, isCloudSyncEnabled } from '@/lib/cloud-sync'
 import { ModelSelector } from "@/components/ui/model-selector"
 import { AiModeSelector, type AIMode } from "@/components/ui/ai-mode-selector"
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai-models"
@@ -69,6 +70,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [newProjectName, setNewProjectName] = useState("")
   const [newProjectDescription, setNewProjectDescription] = useState("")
   const [isCreating, setIsCreating] = useState(false)
+
+  // Auto-restore state
+  const [isAutoRestoring, setIsAutoRestoring] = useState(false)
   
   // Preview-related state
   const [customUrl, setCustomUrl] = useState("")
@@ -137,20 +141,51 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     }
   }, [])
 
-  // Load projects from IndexedDB on client-side
+  // Auto-restore from cloud and load projects from IndexedDB on client-side
   useEffect(() => {
     const loadClientProjects = async () => {
       try {
         setIsLoadingProjects(true)
         console.log('WorkspaceLayout: Starting to load projects from IndexedDB...')
-        
+
         await storageManager.init()
         console.log('WorkspaceLayout: Storage manager initialized')
-        
+
+        // Check if cloud sync is enabled and auto-restore latest backup
+        const cloudSyncEnabled = await isCloudSyncEnabled(user.id)
+        console.log('WorkspaceLayout: Cloud sync enabled:', cloudSyncEnabled)
+
+        if (cloudSyncEnabled) {
+          setIsAutoRestoring(true)
+          console.log('WorkspaceLayout: Auto-restore enabled, attempting to restore latest backup...')
+
+          try {
+            const restoreSuccess = await restoreBackupFromCloud(user.id)
+            if (restoreSuccess) {
+              console.log('WorkspaceLayout: Successfully restored latest backup from cloud')
+              toast({
+                title: "Auto-restore completed",
+                description: "Your latest data has been restored from the cloud.",
+              })
+            } else {
+              console.log('WorkspaceLayout: No backup found or restore failed, using local data')
+            }
+          } catch (restoreError) {
+            console.error('WorkspaceLayout: Error during auto-restore:', restoreError)
+            toast({
+              title: "Auto-restore failed",
+              description: "Could not restore from cloud. Using local data.",
+              variant: "destructive"
+            })
+          } finally {
+            setIsAutoRestoring(false)
+          }
+        }
+
         const workspaces = await storageManager.getWorkspaces(user.id)
         console.log('WorkspaceLayout: Loaded workspaces from IndexedDB:', workspaces?.length || 0)
         console.log('WorkspaceLayout: Workspace details:', workspaces?.map(w => ({ id: w.id, name: w.name, slug: w.slug })))
-        
+
         setClientProjects((prevProjects) => [...(prevProjects || []), ...(workspaces || [])])
       } catch (error) {
         console.error('Error loading client projects:', error)
@@ -491,7 +526,14 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               <div className="flex items-center justify-center p-8">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                  <p className="text-muted-foreground">Loading projects from storage...</p>
+                  <p className="text-muted-foreground">
+                    {isAutoRestoring ? 'Restoring latest data from cloud...' : 'Loading projects from storage...'}
+                  </p>
+                  {isAutoRestoring && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      This may take a moment depending on your data size
+                    </p>
+                  )}
                 </div>
               </div>
             )}

@@ -56,6 +56,7 @@ import {
   getDeploymentTokens
 } from "@/lib/cloud-sync"
 import { useCloudSync } from "@/hooks/use-cloud-sync"
+import { restoreBackupFromCloud, isCloudSyncEnabled } from "@/lib/cloud-sync"
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -84,6 +85,9 @@ export default function AccountSettingsPage() {
   const [cloudSyncEnabled, setCloudSyncEnabledState] = useState(false)
   const [lastBackup, setLastBackup] = useState<string | null>(null)
   const [backupStatus, setBackupStatus] = useState<"idle" | "syncing" | "success" | "error">("idle")
+
+  // Auto-restore state
+  const [isAutoRestoring, setIsAutoRestoring] = useState(false)
 
   // Initialize auto cloud backup when user is available
   const { triggerBackup, getSyncStatus } = useCloudSync(user?.id || null)
@@ -122,6 +126,39 @@ export default function AccountSettingsPage() {
     if (user?.id) {
       checkCloudSyncStatus(user.id)
       checkConnectionStatus(user.id)
+
+      // Auto-restore latest backup on login if cloud sync is enabled
+      const performAutoRestore = async () => {
+        try {
+          const cloudSyncEnabled = await isCloudSyncEnabled(user.id)
+          if (cloudSyncEnabled) {
+            setIsAutoRestoring(true)
+            console.log('Account page: Auto-restore enabled, attempting to restore latest backup...')
+
+            const restoreSuccess = await restoreBackupFromCloud(user.id)
+            if (restoreSuccess) {
+              console.log('Account page: Successfully restored latest backup from cloud')
+              toast({
+                title: "Auto-restore completed",
+                description: "Your latest data has been restored from the cloud.",
+              })
+            } else {
+              console.log('Account page: No backup found or restore failed')
+            }
+          }
+        } catch (restoreError) {
+          console.error('Account page: Error during auto-restore:', restoreError)
+          toast({
+            title: "Auto-restore failed",
+            description: "Could not restore from cloud. Using local data.",
+            variant: "destructive"
+          })
+        } finally {
+          setIsAutoRestoring(false)
+        }
+      }
+
+      performAutoRestore()
     }
   }, [user])
 
