@@ -46,7 +46,7 @@ const NetlifyIcon = ({ className }: { className?: string }) => (
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { storageManager } from "@/lib/storage-manager"
-import { 
+import {
   uploadBackupToCloud,
   restoreBackupFromCloud,
   isCloudSyncEnabled as isCloudSyncEnabledUtil,
@@ -55,6 +55,7 @@ import {
   storeDeploymentTokens,
   getDeploymentTokens
 } from "@/lib/cloud-sync"
+import { useCloudSync } from "@/hooks/use-cloud-sync"
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -83,6 +84,9 @@ export default function AccountSettingsPage() {
   const [cloudSyncEnabled, setCloudSyncEnabledState] = useState(false)
   const [lastBackup, setLastBackup] = useState<string | null>(null)
   const [backupStatus, setBackupStatus] = useState<"idle" | "syncing" | "success" | "error">("idle")
+
+  // Initialize auto cloud backup when user is available
+  const { triggerBackup, getSyncStatus } = useCloudSync(user?.id || null)
 
   // Connection status states
   const [connections, setConnections] = useState({

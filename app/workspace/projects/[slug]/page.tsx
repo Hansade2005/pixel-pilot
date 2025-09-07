@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
@@ -22,7 +24,8 @@ import {
   Code,
   FileText,
   GitBranch,
-  Clock
+  Clock,
+  Plus
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { storageManager, type Workspace as Project, type Deployment, type EnvironmentVariable } from "@/lib/storage-manager"
@@ -49,6 +52,13 @@ export default function ProjectPage() {
   const [project, setProject] = useState<ProjectDetails | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string>("")
+  const [newEnvVar, setNewEnvVar] = useState({
+    key: "",
+    value: "",
+    environment: "production",
+    isSecret: false
+  })
+  const [showAddEnvForm, setShowAddEnvForm] = useState(false)
 
   useEffect(() => {
     getCurrentUser()
@@ -144,6 +154,167 @@ export default function ProjectPage() {
         return <AlertCircle className="h-4 w-4 text-red-500" />
       default:
         return <Clock className="h-4 w-4 text-gray-500" />
+    }
+  }
+
+  // Handle paste event for environment variables
+  const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pastedText = e.clipboardData.getData('text').trim()
+
+    // Check if pasted text contains KEY=VALUE pairs
+    const envPairs = pastedText.split('\n').filter(line => line.includes('='))
+
+    if (envPairs.length === 1) {
+      // Single environment variable - auto-fill current fields
+      const [key, ...valueParts] = envPairs[0].split('=')
+      const value = valueParts.join('=').replace(/^["']|["']$/g, '') // Remove quotes
+
+      setNewEnvVar(prev => ({
+        ...prev,
+        key: key.trim(),
+        value: value.trim()
+      }))
+
+      toast({
+        title: "Environment Variable Detected",
+        description: `Auto-filled: ${key.trim()} = ${value.trim().substring(0, 20)}${value.trim().length > 20 ? '...' : ''}`,
+      })
+
+      e.preventDefault() // Prevent default paste behavior
+    } else if (envPairs.length > 1) {
+      // Multiple environment variables - create them all
+      if (!project?.id) {
+        toast({
+          title: "Project Not Available",
+          description: "Project information not loaded yet",
+          variant: "destructive"
+        })
+        return
+      }
+
+      e.preventDefault() // Prevent default paste behavior
+
+      try {
+        let successCount = 0
+        let errorCount = 0
+
+        for (const envPair of envPairs) {
+          const [key, ...valueParts] = envPair.split('=')
+          const value = valueParts.join('=').replace(/^["']|["']$/g, '') // Remove quotes
+
+          if (key.trim() && value.trim()) {
+            try {
+              // Check if environment variable already exists
+              const envVars = await storageManager.getEnvironmentVariables(project.id)
+              const existingVar = envVars.find(ev => ev.key === key.trim() && ev.environment === newEnvVar.environment)
+
+              if (existingVar) {
+                // Update existing variable
+                await storageManager.updateEnvironmentVariable(existingVar.id, {
+                  value: value.trim(),
+                  isSecret: newEnvVar.isSecret
+                })
+              } else {
+                // Create new variable
+                await storageManager.createEnvironmentVariable({
+                  workspaceId: project.id,
+                  key: key.trim(),
+                  value: value.trim(),
+                  environment: newEnvVar.environment,
+                  isSecret: newEnvVar.isSecret
+                })
+              }
+              successCount++
+            } catch (error) {
+              errorCount++
+              console.error(`Error creating environment variable ${key}:`, error)
+            }
+          }
+        }
+
+        // Reload project data
+        await loadProject()
+
+        if (successCount > 0) {
+          toast({
+            title: "Environment Variables Added",
+            description: `Successfully added ${successCount} environment variable${successCount > 1 ? 's' : ''}${errorCount > 0 ? ` (${errorCount} failed)` : ''}`,
+          })
+        }
+
+        if (errorCount > 0) {
+          toast({
+            title: "Some Variables Failed",
+            description: `${errorCount} environment variable${errorCount > 1 ? 's' : ''} could not be added`,
+            variant: "destructive"
+          })
+        }
+
+      } catch (error) {
+        console.error('Error processing pasted environment variables:', error)
+        toast({
+          title: "Paste Failed",
+          description: "Failed to process pasted environment variables",
+          variant: "destructive"
+        })
+      }
+    }
+    // If no KEY=VALUE pairs detected, allow normal paste behavior
+  }
+
+  const addEnvironmentVariable = async () => {
+    if (!newEnvVar.key || !newEnvVar.value || !project?.id) {
+      toast({
+        title: "Missing Information",
+        description: "Please provide key and value",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      // Check if environment variable already exists
+      const envVars = await storageManager.getEnvironmentVariables(project.id)
+      const existingVar = envVars.find(ev => ev.key === newEnvVar.key && ev.environment === newEnvVar.environment)
+
+      if (existingVar) {
+        // Update existing variable
+        await storageManager.updateEnvironmentVariable(existingVar.id, {
+          value: newEnvVar.value,
+          isSecret: newEnvVar.isSecret
+        })
+      } else {
+        // Create new variable
+        await storageManager.createEnvironmentVariable({
+          workspaceId: project.id,
+          key: newEnvVar.key,
+          value: newEnvVar.value,
+          environment: newEnvVar.environment,
+          isSecret: newEnvVar.isSecret
+        })
+      }
+
+      toast({
+        title: "Environment Variable Added",
+        description: "Variable has been added successfully"
+      })
+
+      // Reset form and reload data
+      setNewEnvVar({
+        key: "",
+        value: "",
+        environment: "production",
+        isSecret: false
+      })
+      setShowAddEnvForm(false)
+      await loadProject()
+    } catch (error) {
+      console.error('Error adding environment variable:', error)
+      toast({
+        title: "Error",
+        description: "Failed to add environment variable",
+        variant: "destructive"
+      })
     }
   }
 
@@ -386,15 +557,118 @@ export default function ProjectPage() {
               {/* Environment Variables */}
               <Card className="bg-gray-800 border-gray-700">
                 <CardHeader>
-                  <CardTitle className="flex items-center space-x-2 text-white">
-                    <Settings className="h-5 w-5" />
-                    <span>Environment Variables</span>
+                  <CardTitle className="flex items-center justify-between text-white">
+                    <div className="flex items-center space-x-2">
+                      <Settings className="h-5 w-5" />
+                      <span>Environment Variables</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAddEnvForm(!showAddEnvForm)}
+                      className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Variable
+                    </Button>
                   </CardTitle>
                   <CardDescription className="text-gray-400">
                     {project.environmentVariables.length} variables configured
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
+                  {/* Paste Instructions */}
+                  <div className="p-4 bg-green-900/20 border border-green-700 rounded-lg">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Code className="h-4 w-4 text-green-400" />
+                      <span className="text-sm text-green-300 font-medium">Quick Import from .env Files</span>
+                    </div>
+                    <p className="text-sm text-gray-300 mb-2">
+                      Copy environment variables from your local <code className="bg-gray-700 px-1 rounded">.env</code> file and paste them directly into the Value field. The system will automatically:
+                    </p>
+                    <ul className="text-xs text-gray-400 space-y-1 ml-4">
+                      <li>• Extract KEY=VALUE pairs</li>
+                      <li>• Auto-fill the Variable Name and Value fields</li>
+                      <li>• Create multiple variables when pasting multiple lines</li>
+                      <li>• Handle quoted values automatically</li>
+                    </ul>
+                  </div>
+
+                  {/* Add Environment Variable Form */}
+                  {showAddEnvForm && (
+                    <div className="space-y-4 p-4 bg-gray-700 rounded-lg">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="env-key" className="text-gray-300">Variable Name</Label>
+                          <Input
+                            id="env-key"
+                            placeholder="API_KEY"
+                            value={newEnvVar.key}
+                            onChange={(e) => setNewEnvVar(prev => ({ ...prev, key: e.target.value }))}
+                            className="bg-gray-600 border-gray-500 text-white placeholder-gray-400"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="env-value" className="text-gray-300">Value</Label>
+                          <Input
+                            id="env-value"
+                            type={newEnvVar.isSecret ? "password" : "text"}
+                            placeholder="your-value-here (or paste KEY=VALUE from .env file)"
+                            value={newEnvVar.value}
+                            onChange={(e) => setNewEnvVar(prev => ({ ...prev, value: e.target.value }))}
+                            onPaste={handlePaste}
+                            className="bg-gray-600 border-gray-500 text-white placeholder-gray-400"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="env-environment" className="text-gray-300">Environment</Label>
+                          <select
+                            id="env-environment"
+                            className="w-full px-3 py-2 h-10 border border-gray-500 bg-gray-600 text-white rounded-md"
+                            value={newEnvVar.environment}
+                            onChange={(e) => setNewEnvVar(prev => ({ ...prev, environment: e.target.value }))}
+                          >
+                            <option value="production" className="bg-gray-600">Production</option>
+                            <option value="preview" className="bg-gray-600">Preview</option>
+                            <option value="development" className="bg-gray-600">Development</option>
+                          </select>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="env-secret"
+                            checked={newEnvVar.isSecret}
+                            onChange={(e) => setNewEnvVar(prev => ({ ...prev, isSecret: e.target.checked }))}
+                            className="rounded bg-gray-600 border-gray-500 text-blue-500"
+                          />
+                          <Label htmlFor="env-secret" className="text-gray-300">Mark as secret</Label>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={addEnvironmentVariable}
+                          disabled={!newEnvVar.key || !newEnvVar.value}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Variable
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowAddEnvForm(false)}
+                          className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Display Environment Variables */}
                   {project.environmentVariables.length > 0 ? (
                     <div className="space-y-2 max-h-40 overflow-y-auto">
                       {project.environmentVariables.slice(0, 5).map((envVar, index) => (

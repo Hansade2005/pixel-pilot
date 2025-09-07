@@ -19,6 +19,7 @@ import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
+import { useCloudSync } from '@/hooks/use-cloud-sync'
 import { ModelSelector } from "@/components/ui/model-selector"
 import { AiModeSelector, type AIMode } from "@/components/ui/ai-mode-selector"
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai-models"
@@ -61,6 +62,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_CHAT_MODEL)
   const [aiMode, setAiMode] = useState<AIMode>('agent')
+
+  // Initialize auto cloud backup when user is available
+  const { triggerBackup, getSyncStatus } = useCloudSync(user?.id || null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newProjectName, setNewProjectName] = useState("")
   const [newProjectDescription, setNewProjectDescription] = useState("")

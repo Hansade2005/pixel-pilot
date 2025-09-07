@@ -256,6 +256,111 @@ export default function ManagementPage() {
 
 
 
+  // Handle paste event for environment variables
+  const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pastedText = e.clipboardData.getData('text').trim()
+
+    // Check if pasted text contains KEY=VALUE pairs
+    const envPairs = pastedText.split('\n').filter(line => line.includes('='))
+
+    if (envPairs.length === 1) {
+      // Single environment variable - auto-fill current fields
+      const [key, ...valueParts] = envPairs[0].split('=')
+      const value = valueParts.join('=').replace(/^["']|["']$/g, '') // Remove quotes
+
+      setNewEnvVar(prev => ({
+        ...prev,
+        key: key.trim(),
+        value: value.trim()
+      }))
+
+      toast({
+        title: "Environment Variable Detected",
+        description: `Auto-filled: ${key.trim()} = ${value.trim().substring(0, 20)}${value.trim().length > 20 ? '...' : ''}`,
+      })
+
+      e.preventDefault() // Prevent default paste behavior
+    } else if (envPairs.length > 1) {
+      // Multiple environment variables - create them all
+      if (!newEnvVar.selectedProjectId) {
+        toast({
+          title: "Project Required",
+          description: "Please select a project before pasting multiple environment variables",
+          variant: "destructive"
+        })
+        return
+      }
+
+      e.preventDefault() // Prevent default paste behavior
+
+      try {
+        let successCount = 0
+        let errorCount = 0
+
+        for (const envPair of envPairs) {
+          const [key, ...valueParts] = envPair.split('=')
+          const value = valueParts.join('=').replace(/^["']|["']$/g, '') // Remove quotes
+
+          if (key.trim() && value.trim()) {
+            try {
+              // Check if environment variable already exists
+              const envVars = await storageManager.getEnvironmentVariables(newEnvVar.selectedProjectId)
+              const existingVar = envVars.find(ev => ev.key === key.trim() && ev.environment === newEnvVar.environment)
+
+              if (existingVar) {
+                // Update existing variable
+                await storageManager.updateEnvironmentVariable(existingVar.id, {
+                  value: value.trim(),
+                  isSecret: newEnvVar.isSecret
+                })
+              } else {
+                // Create new variable
+                await storageManager.createEnvironmentVariable({
+                  workspaceId: newEnvVar.selectedProjectId,
+                  key: key.trim(),
+                  value: value.trim(),
+                  environment: newEnvVar.environment,
+                  isSecret: newEnvVar.isSecret
+                })
+              }
+              successCount++
+            } catch (error) {
+              errorCount++
+              console.error(`Error creating environment variable ${key}:`, error)
+            }
+          }
+        }
+
+        // Reload data
+        await loadData()
+
+        if (successCount > 0) {
+          toast({
+            title: "Environment Variables Added",
+            description: `Successfully added ${successCount} environment variable${successCount > 1 ? 's' : ''}${errorCount > 0 ? ` (${errorCount} failed)` : ''}`,
+          })
+        }
+
+        if (errorCount > 0) {
+          toast({
+            title: "Some Variables Failed",
+            description: `${errorCount} environment variable${errorCount > 1 ? 's' : ''} could not be added`,
+            variant: "destructive"
+          })
+        }
+
+      } catch (error) {
+        console.error('Error processing pasted environment variables:', error)
+        toast({
+          title: "Paste Failed",
+          description: "Failed to process pasted environment variables",
+          variant: "destructive"
+        })
+      }
+    }
+    // If no KEY=VALUE pairs detected, allow normal paste behavior
+  }
+
   const addEnvironmentVariable = async () => {
     if (!newEnvVar.key || !newEnvVar.value || !newEnvVar.selectedProjectId) {
       toast({
@@ -704,6 +809,23 @@ export default function ManagementPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* Paste Instructions */}
+                  <div className="p-4 bg-green-900/20 border border-green-700 rounded-lg">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Code className="h-4 w-4 text-green-400" />
+                      <span className="text-sm text-green-300 font-medium">Quick Import from .env Files</span>
+                    </div>
+                    <p className="text-sm text-gray-300 mb-2">
+                      Copy environment variables from your local <code className="bg-gray-700 px-1 rounded">.env</code> file and paste them directly into the Value field. The system will automatically:
+                    </p>
+                    <ul className="text-xs text-gray-400 space-y-1 ml-4">
+                      <li>• Extract KEY=VALUE pairs</li>
+                      <li>• Auto-fill the Variable Name and Value fields</li>
+                      <li>• Create multiple variables when pasting multiple lines</li>
+                      <li>• Handle quoted values automatically</li>
+                    </ul>
+                  </div>
+
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
@@ -721,9 +843,10 @@ export default function ManagementPage() {
                         <Input
                           id="env-value"
                           type={newEnvVar.isSecret ? "password" : "text"}
-                          placeholder="your-value-here"
+                          placeholder="your-value-here (or paste KEY=VALUE from .env file)"
                           value={newEnvVar.value}
                           onChange={(e) => setNewEnvVar(prev => ({ ...prev, value: e.target.value }))}
+                          onPaste={handlePaste}
                           className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                         />
                       </div>
