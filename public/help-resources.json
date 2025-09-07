@@ -1,0 +1,806 @@
+{
+  "metadata": {
+    "title": "Pixel Pilot Help Resources & Documentation",
+    "author": "Anye Happiness Ade",
+    "date_created": "09/07/2025",
+    "version": "1.0.0",
+    "description": "Comprehensive help resources for Pixel Pilot AI App Builder platform",
+    "last_updated": "09/07/2025"
+  },
+  "categories": [
+    {
+      "id": "getting-started",
+      "title": "Getting Started",
+      "description": "Essential guides to help you begin your journey with Pixel Pilot",
+      "icon": "🚀",
+      "articles": [
+        {
+          "id": "platform-overview",
+          "title": "Platform Overview",
+          "description": "Understand what Pixel Pilot is and how it can transform your app development workflow",
+          "content": {
+            "introduction": "Pixel Pilot is a revolutionary AI-powered app development platform that allows you to create web applications by simply chatting with AI. Built with Next.js, TypeScript, and integrated with powerful tools like E2B sandboxes and deployment platforms.",
+            "key_features": [
+              "AI-Powered Development through natural language conversations",
+              "Real-time Preview system with E2B sandbox environments",
+              "Instant deployment to GitHub + Vercel/Netlify",
+              "Modern tech stack with automatic template generation",
+              "Professional code editor with syntax highlighting",
+              "Secure authentication with GitHub OAuth",
+              "Cross-platform compatibility (desktop and mobile)",
+              "Real-time collaboration infrastructure"
+            ],
+            "target_audience": "Developers, entrepreneurs, designers, and anyone who wants to build web applications quickly and efficiently",
+            "use_cases": [
+              "Rapid prototyping of ideas",
+              "MVP development for startups",
+              "Personal projects and portfolios",
+              "Learning web development concepts",
+              "Building internal tools and dashboards",
+              "Creating client presentations and demos"
+            ]
+          },
+          "tags": ["overview", "introduction", "features"],
+          "difficulty": "beginner",
+          "estimated_read_time": "5 minutes",
+          "related_articles": ["quick-start-guide", "first-project-tutorial"]
+        },
+        {
+          "id": "quick-start-guide",
+          "title": "Quick Start Guide",
+          "description": "Get up and running with your first Pixel Pilot project in under 10 minutes",
+          "content": {
+            "prerequisites": [
+              "GitHub account for authentication and deployment",
+              "Basic understanding of web development concepts",
+              "Modern web browser (Chrome, Firefox, Safari, Edge)"
+            ],
+            "step_by_step_setup": [
+              {
+                "step": 1,
+                "title": "Create Your Account",
+                "description": "Sign up using GitHub OAuth for secure authentication",
+                "details": "Click the 'Get Started' button and authorize with GitHub. This provides secure access and enables deployment features."
+              },
+              {
+                "step": 2,
+                "title": "Create Your First Project",
+                "description": "Start a new project with our pre-built Vite React template",
+                "details": "Click 'New Project', enter a name, and Pixel Pilot automatically generates a complete React application with TypeScript, Tailwind CSS, and essential dependencies."
+              },
+              {
+                "step": 3,
+                "title": "Chat with AI to Build",
+                "description": "Describe your app idea in natural language",
+                "details": "In the chat panel, describe what you want to build. For example: 'Create a task management app with user authentication and real-time updates.'"
+              },
+              {
+                "step": 4,
+                "title": "Preview Your App",
+                "description": "See your app come to life instantly",
+                "details": "Click the preview tab to launch an E2B sandbox environment. Your app will be running in under 2 minutes with hot reload enabled."
+              },
+              {
+                "step": 5,
+                "title": "Deploy to Production",
+                "description": "Share your app with the world",
+                "details": "Connect your GitHub account and deploy to Vercel or Netlify with one click. Get a production URL in under 5 minutes."
+              }
+            ],
+            "tips": [
+              "Start with simple projects to learn the platform",
+              "Use the chat panel to ask questions about implementation details",
+              "Save frequently and take advantage of auto-backup features",
+              "Join the community to see examples from other users"
+            ]
+          },
+          "tags": ["setup", "tutorial", "beginner"],
+          "difficulty": "beginner",
+          "estimated_read_time": "10 minutes",
+          "related_articles": ["platform-overview", "project-management"]
+        }
+      ]
+    },
+    {
+      "id": "ai-development",
+      "title": "AI Development Features",
+      "description": "Master the AI-powered development capabilities of Pixel Pilot",
+      "icon": "🤖",
+      "articles": [
+        {
+          "id": "ai-chat-system",
+          "title": "AI Chat & Code Generation",
+          "description": "Learn how to effectively communicate with AI to generate high-quality code",
+          "content": {
+            "ai_models": [
+              {
+                "name": "Codestral",
+                "provider": "Mistral AI",
+                "capabilities": "Advanced code generation, debugging assistance, and technical explanations",
+                "use_cases": "Complex application logic, API integrations, performance optimization"
+              },
+              {
+                "name": "GPT-4",
+                "provider": "OpenAI",
+                "capabilities": "General purpose AI with strong reasoning and creative problem-solving",
+                "use_cases": "UI/UX design suggestions, feature planning, user experience optimization"
+              }
+            ],
+            "chat_best_practices": [
+              "Be specific about your requirements and constraints",
+              "Provide context about your existing codebase",
+              "Break complex requests into smaller, manageable tasks",
+              "Ask for explanations when you don't understand code",
+              "Request tests and documentation along with implementation",
+              "Use follow-up questions to refine and improve code"
+            ],
+            "effective_prompts": [
+              "Instead of 'Make a login page' say 'Create a responsive login page with email/password authentication, remember me option, and proper error handling'",
+              "Instead of 'Add a dashboard' say 'Build an admin dashboard with charts, user statistics, and real-time data updates using React and a charting library'",
+              "Instead of 'Fix this bug' say 'The login form is not validating email addresses correctly. The regex pattern needs to be updated to handle common email formats'"
+            ],
+            "advanced_features": [
+              "Context-aware code generation using your project files",
+              "Streaming responses for real-time code development",
+              "File-specific editing with precise search and replace",
+              "Dependency management and package recommendations",
+              "Code review and optimization suggestions",
+              "Automatic error detection and debugging assistance"
+            ]
+          },
+          "tags": ["ai", "chat", "code-generation", "best-practices"],
+          "difficulty": "intermediate",
+          "estimated_read_time": "15 minutes",
+          "related_articles": ["ai-agent-system", "code-editor-guide"]
+        },
+        {
+          "id": "ai-agent-system",
+          "title": "AI Agent Development System",
+          "description": "Harness the power of our advanced AI agent for autonomous development",
+          "content": {
+            "agent_modes": [
+              {
+                "name": "Plan Mode",
+                "description": "AI analyzes your requirements and creates detailed implementation plans",
+                "when_to_use": "Complex projects, multi-step implementations, team coordination",
+                "benefits": "Structured approach, comprehensive planning, clear milestones"
+              },
+              {
+                "name": "Build Mode",
+                "description": "AI executes plans and creates actual code and files",
+                "when_to_use": "Implementation phase, code generation, rapid development",
+                "benefits": "Fast execution, automated file creation, consistent code quality"
+              }
+            ],
+            "capabilities": [
+              "Request Analysis: Understands complex requirements and breaks them down",
+              "Implementation Planning: Creates step-by-step development roadmaps",
+              "File Operations: Creates, edits, deletes, and renames files automatically",
+              "Dependency Management: Adds, removes, and updates packages intelligently",
+              "Error Handling: Comprehensive error detection and recovery mechanisms",
+              "Code Quality: Follows best practices and maintains consistency"
+            ],
+            "advanced_usage": [
+              "Multi-file implementations with dependencies",
+              "Database schema design and migration scripts",
+              "API endpoint creation and integration",
+              "Testing strategy and test file generation",
+              "Documentation and README file creation",
+              "Performance optimization and code refactoring"
+            ],
+            "best_practices": [
+              "Start with clear, detailed requirements in Plan Mode",
+              "Review AI-generated plans before switching to Build Mode",
+              "Use specific technical requirements and constraints",
+              "Provide examples and reference implementations",
+              "Request comprehensive testing and error handling",
+              "Iterate on AI suggestions with follow-up requests"
+            ]
+          },
+          "tags": ["ai-agent", "automation", "planning", "development"],
+          "difficulty": "advanced",
+          "estimated_read_time": "20 minutes",
+          "related_articles": ["ai-chat-system", "project-structure"]
+        }
+      ]
+    },
+    {
+      "id": "development-tools",
+      "title": "Development Tools",
+      "description": "Master the development environment and tools within Pixel Pilot",
+      "icon": "🛠️",
+      "articles": [
+        {
+          "id": "code-editor-guide",
+          "title": "Code Editor & File Management",
+          "description": "Learn to use the professional code editor and manage your project files effectively",
+          "content": {
+            "editor_features": [
+              "Monaco Editor (same engine as VS Code) with full syntax highlighting",
+              "IntelliSense and auto-completion for JavaScript/TypeScript",
+              "Find and replace across files with regex support",
+              "Multiple cursor editing and keyboard shortcuts",
+              "Git-like diff viewing for changes",
+              "Real-time collaboration indicators",
+              "Auto-save with version history",
+              "Error highlighting and linting integration"
+            ],
+            "file_operations": [
+              "Create new files and folders with right-click context menus",
+              "Drag and drop to reorganize file structure",
+              "Bulk file operations for refactoring",
+              "File type detection and appropriate icons",
+              "Search across all files with advanced filters",
+              "Import/export project files",
+              "File size monitoring and optimization suggestions"
+            ],
+            "keyboard_shortcuts": [
+              "Ctrl+S / Cmd+S: Save current file",
+              "Ctrl+F / Cmd+F: Find in current file",
+              "Ctrl+Shift+F / Cmd+Shift+F: Find across all files",
+              "Ctrl+P / Cmd+P: Quick file navigation",
+              "Alt+Shift+F: Format document",
+              "Ctrl+/: Toggle line comment",
+              "Ctrl+D / Cmd+D: Select next occurrence",
+              "F12: Go to definition"
+            ],
+            "productivity_tips": [
+              "Use the file explorer to maintain organized project structure",
+              "Take advantage of auto-save to prevent data loss",
+              "Use search functionality to quickly navigate large codebases",
+              "Create templates for commonly used file structures",
+              "Use version control integration for change tracking",
+              "Regularly review and refactor file organization"
+            ]
+          },
+          "tags": ["editor", "files", "productivity", "shortcuts"],
+          "difficulty": "intermediate",
+          "estimated_read_time": "12 minutes",
+          "related_articles": ["project-structure", "file-organization"]
+        },
+        {
+          "id": "preview-system",
+          "title": "Live Preview & Testing",
+          "description": "Master the E2B-powered preview system for instant app testing",
+          "content": {
+            "preview_capabilities": [
+              "E2B sandbox environments for isolated testing",
+              "Hot reload for instant code changes",
+              "Multiple device viewport testing",
+              "Network throttling simulation",
+              "Console logging and debugging tools",
+              "Real-time error reporting",
+              "Performance monitoring and metrics",
+              "Cross-browser compatibility testing"
+            ],
+            "getting_started": [
+              "Click the 'Preview' tab in the main workspace",
+              "Wait for E2B sandbox initialization (typically 1-2 minutes)",
+              "Your app will automatically start and be accessible via URL",
+              "Make code changes to see instant updates",
+              "Use developer tools for debugging and inspection"
+            ],
+            "advanced_features": [
+              "Custom environment variables for different deployment stages",
+              "Database connection testing with mock data",
+              "API endpoint testing with request/response logging",
+              "Performance profiling and optimization suggestions",
+              "Security vulnerability scanning",
+              "Accessibility testing and compliance checking",
+              "Load testing with simulated user traffic"
+            ],
+            "troubleshooting": [
+              "If preview fails to start, check console for error messages",
+              "Ensure all dependencies are properly installed",
+              "Verify network connectivity for E2B services",
+              "Check browser compatibility requirements",
+              "Monitor resource usage to avoid sandbox limits",
+              "Clear cache and restart preview for persistent issues"
+            ],
+            "best_practices": [
+              "Test on multiple devices and screen sizes",
+              "Use preview for iterative development cycles",
+              "Monitor performance metrics during development",
+              "Test error scenarios and edge cases",
+              "Validate accessibility and usability",
+              "Document known issues and limitations"
+            ]
+          },
+          "tags": ["preview", "testing", "e2b", "debugging"],
+          "difficulty": "intermediate",
+          "estimated_read_time": "15 minutes",
+          "related_articles": ["deployment-guide", "troubleshooting"]
+        }
+      ]
+    },
+    {
+      "id": "deployment-integration",
+      "title": "Deployment & Integration",
+      "description": "Learn to deploy your applications and integrate with external services",
+      "icon": "🚀",
+      "articles": [
+        {
+          "id": "github-integration",
+          "title": "GitHub Integration & Version Control",
+          "description": "Connect your projects to GitHub for version control and collaboration",
+          "content": {
+            "setup_process": [
+              "Connect your GitHub account via OAuth",
+              "Authorize Pixel Pilot to access repositories",
+              "Choose repository creation or connect existing repo",
+              "Configure deployment settings and permissions",
+              "Set up automated deployment workflows"
+            ],
+            "features": [
+              "Automatic repository creation with proper structure",
+              "Git commit history and version tracking",
+              "Branch management and pull request support",
+              "Collaborative development with team members",
+              "Code review workflows and approval processes",
+              "Issue tracking and project management integration",
+              "GitHub Actions for CI/CD pipelines"
+            ],
+            "best_practices": [
+              "Use descriptive commit messages for better tracking",
+              "Create feature branches for new developments",
+              "Regularly pull changes from main branch",
+              "Use pull requests for code review and collaboration",
+              "Tag releases for version management",
+              "Document changes in commit messages and PR descriptions"
+            ],
+            "troubleshooting": [
+              "Check GitHub OAuth permissions if connection fails",
+              "Verify repository access and organization permissions",
+              "Resolve merge conflicts with AI assistance",
+              "Handle authentication token expiration",
+              "Fix repository synchronization issues",
+              "Recover from accidental file deletions"
+            ]
+          },
+          "tags": ["github", "version-control", "collaboration", "deployment"],
+          "difficulty": "intermediate",
+          "estimated_read_time": "18 minutes",
+          "related_articles": ["deployment-guide", "team-collaboration"]
+        },
+        {
+          "id": "deployment-guide",
+          "title": "Deployment to Production",
+          "description": "Deploy your applications to Vercel, Netlify, or other platforms",
+          "content": {
+            "supported_platforms": [
+              {
+                "name": "Vercel",
+                "description": "Optimized for Next.js applications with global CDN",
+                "features": "Automatic deployments, preview deployments, analytics",
+                "best_for": "Next.js apps, SPAs, API routes, edge functions"
+              },
+              {
+                "name": "Netlify",
+                "description": "Flexible deployment with form handling and functions",
+                "features": "Form processing, serverless functions, identity management",
+                "best_for": "Static sites, Jamstack applications, e-commerce"
+              },
+              {
+                "name": "GitHub Pages",
+                "description": "Free hosting for static websites and documentation",
+                "features": "Automatic deployment from GitHub, custom domains",
+                "best_for": "Documentation, portfolios, simple websites"
+              }
+            ],
+            "deployment_process": [
+              "Connect deployment platform account",
+              "Configure build settings and environment variables",
+              "Set up custom domains and SSL certificates",
+              "Configure deployment triggers and automation",
+              "Monitor deployment status and logs",
+              "Set up error tracking and monitoring"
+            ],
+            "environment_management": [
+              "Development, staging, and production environments",
+              "Environment-specific configuration and secrets",
+              "Database connections and API keys",
+              "Feature flags and A/B testing setup",
+              "Performance monitoring and analytics",
+              "Backup and disaster recovery procedures"
+            ],
+            "performance_optimization": [
+              "CDN configuration and caching strategies",
+              "Image optimization and lazy loading",
+              "Code splitting and bundle optimization",
+              "Database query optimization",
+              "Caching layers and Redis integration",
+              "Monitoring and alerting setup"
+            ]
+          },
+          "tags": ["deployment", "production", "vercel", "netlify"],
+          "difficulty": "intermediate",
+          "estimated_read_time": "20 minutes",
+          "related_articles": ["github-integration", "environment-setup"]
+        }
+      ]
+    },
+    {
+      "id": "project-management",
+      "title": "Project Management",
+      "description": "Organize and manage your projects effectively within Pixel Pilot",
+      "icon": "📁",
+      "articles": [
+        {
+          "id": "project-structure",
+          "title": "Project Organization & Structure",
+          "description": "Learn best practices for organizing your project files and folders",
+          "content": {
+            "recommended_structure": [
+              {
+                "folder": "src/components",
+                "purpose": "Reusable UI components",
+                "organization": "Group by feature or type (buttons, forms, layout)"
+              },
+              {
+                "folder": "src/pages",
+                "purpose": "Application pages and routes",
+                "organization": "Follow URL structure for easy navigation"
+              },
+              {
+                "folder": "src/hooks",
+                "purpose": "Custom React hooks",
+                "organization": "Group by functionality (auth, data, ui)"
+              },
+              {
+                "folder": "src/lib",
+                "purpose": "Utility functions and services",
+                "organization": "Separate concerns (api, utils, constants)"
+              },
+              {
+                "folder": "src/styles",
+                "purpose": "CSS and styling files",
+                "organization": "Component-specific and global styles"
+              },
+              {
+                "folder": "public",
+                "purpose": "Static assets",
+                "organization": "Images, fonts, icons by type"
+              }
+            ],
+            "file_naming_conventions": [
+              "Use kebab-case for file names (user-profile.tsx)",
+              "Use PascalCase for component files (UserProfile.tsx)",
+              "Use camelCase for utility files (apiClient.ts)",
+              "Group related files in folders",
+              "Use index.ts files for clean imports",
+              "Add file extensions for clarity"
+            ],
+            "code_organization_principles": [
+              "Single Responsibility Principle for components",
+              "DRY (Don't Repeat Yourself) for utilities",
+              "Separation of concerns across layers",
+              "Consistent naming and structure",
+              "Documentation and comments for complex logic",
+              "Type safety with TypeScript interfaces"
+            ],
+            "scaling_strategies": [
+              "Modular architecture for large applications",
+              "Feature-based folder organization",
+              "Shared component libraries",
+              "Micro-frontend approaches",
+              "State management patterns",
+              "Performance optimization techniques"
+            ]
+          },
+          "tags": ["structure", "organization", "best-practices", "architecture"],
+          "difficulty": "intermediate",
+          "estimated_read_time": "16 minutes",
+          "related_articles": ["code-editor-guide", "file-organization"]
+        },
+        {
+          "id": "team-collaboration",
+          "title": "Team Collaboration & Workflows",
+          "description": "Work effectively with teams using Pixel Pilot's collaboration features",
+          "content": {
+            "collaboration_features": [
+              "Real-time editing with conflict resolution",
+              "Comment system for code review",
+              "Shared project access with permissions",
+              "Activity feeds and change tracking",
+              "Team notifications and updates",
+              "Integrated chat and communication",
+              "Version control and branching strategies"
+            ],
+            "permission_system": [
+              "Owner: Full control over project and settings",
+              "Admin: Can manage team members and deployments",
+              "Developer: Can edit code and deploy to staging",
+              "Viewer: Read-only access to project files",
+              "Guest: Limited access for specific features"
+            ],
+            "workflow_best_practices": [
+              "Use feature branches for development",
+              "Implement code review processes",
+              "Set up automated testing and CI/CD",
+              "Maintain clear documentation and guidelines",
+              "Regular team standups and progress updates",
+              "Use project management tools integration"
+            ],
+            "communication_strategies": [
+              "Clear task assignment and ownership",
+              "Regular code reviews and feedback",
+              "Documentation of decisions and changes",
+              "Knowledge sharing and mentoring",
+              "Conflict resolution and problem-solving",
+              "Celebration of milestones and achievements"
+            ]
+          },
+          "tags": ["collaboration", "teamwork", "permissions", "workflow"],
+          "difficulty": "advanced",
+          "estimated_read_time": "18 minutes",
+          "related_articles": ["github-integration", "project-management"]
+        }
+      ]
+    },
+    {
+      "id": "troubleshooting",
+      "title": "Troubleshooting & Support",
+      "description": "Common issues and their solutions for Pixel Pilot users",
+      "icon": "🔧",
+      "articles": [
+        {
+          "id": "common-issues",
+          "title": "Common Issues & Solutions",
+          "description": "Quick fixes for frequently encountered problems",
+          "content": {
+            "authentication_issues": [
+              {
+                "problem": "GitHub OAuth connection fails",
+                "solution": "Check GitHub app permissions, clear browser cache, try different browser",
+                "prevention": "Keep GitHub tokens valid and app permissions up to date"
+              },
+              {
+                "problem": "Session expires frequently",
+                "solution": "Check browser cookie settings, ensure stable internet connection",
+                "prevention": "Use stable network connection and avoid clearing cookies"
+              }
+            ],
+            "code_generation_problems": [
+              {
+                "problem": "AI generates incorrect code",
+                "solution": "Provide more specific requirements, include code examples, break into smaller tasks",
+                "prevention": "Use detailed prompts with context and examples"
+              },
+              {
+                "problem": "Code doesn't match existing project structure",
+                "solution": "Include current file structure in prompts, request integration with existing code",
+                "prevention": "Maintain consistent project structure and naming conventions"
+              }
+            ],
+            "preview_system_issues": [
+              {
+                "problem": "Preview fails to load",
+                "solution": "Check internet connection, wait for E2B initialization, check console for errors",
+                "prevention": "Ensure stable connection and sufficient system resources"
+              },
+              {
+                "problem": "Hot reload not working",
+                "solution": "Restart preview, check file save status, verify file paths",
+                "prevention": "Save files properly and maintain correct file structure"
+              }
+            ],
+            "deployment_failures": [
+              {
+                "problem": "Build fails during deployment",
+                "solution": "Check build logs, verify dependencies, ensure correct build commands",
+                "prevention": "Test locally before deployment, keep dependencies updated"
+              },
+              {
+                "problem": "Environment variables not working",
+                "solution": "Verify variable names, check platform-specific formats, ensure proper encoding",
+                "prevention": "Document environment requirements and test configurations"
+              }
+            ]
+          },
+          "tags": ["issues", "solutions", "bugs", "fixes"],
+          "difficulty": "intermediate",
+          "estimated_read_time": "12 minutes",
+          "related_articles": ["support-resources", "faq"]
+        },
+        {
+          "id": "performance-optimization",
+          "title": "Performance Optimization Guide",
+          "description": "Improve your app's performance and user experience",
+          "content": {
+            "frontend_optimization": [
+              "Code splitting and lazy loading for faster initial load",
+              "Image optimization and modern formats (WebP, AVIF)",
+              "Bundle analysis and tree shaking to reduce bundle size",
+              "Caching strategies for static assets and API responses",
+              "Minification and compression for production builds",
+              "Critical CSS and above-the-fold optimization"
+            ],
+            "react_best_practices": [
+              "Use React.memo for expensive components",
+              "Implement useMemo and useCallback for expensive operations",
+              "Virtualize long lists with react-window",
+              "Optimize re-renders with proper key props",
+              "Use React Suspense for code splitting",
+              "Profile components with React DevTools"
+            ],
+            "backend_optimization": [
+              "Database query optimization and indexing",
+              "Caching with Redis or similar solutions",
+              "API response compression and efficient serialization",
+              "Connection pooling for database connections",
+              "Background job processing for heavy operations",
+              "CDN integration for global content delivery"
+            ],
+            "monitoring_tools": [
+              "Browser DevTools for frontend performance",
+              "Lighthouse for automated performance audits",
+              "Web Vitals for Core Web Vitals monitoring",
+              "Real User Monitoring (RUM) solutions",
+              "Server monitoring and APM tools",
+              "Error tracking and alerting systems"
+            ]
+          },
+          "tags": ["performance", "optimization", "speed", "efficiency"],
+          "difficulty": "advanced",
+          "estimated_read_time": "22 minutes",
+          "related_articles": ["code-quality", "deployment-guide"]
+        }
+      ]
+    }
+  ],
+  "faq": {
+    "title": "Frequently Asked Questions",
+    "last_updated": "09/07/2025",
+    "categories": [
+      {
+        "category": "Getting Started",
+        "questions": [
+          {
+            "question": "What is Pixel Pilot and who is it for?",
+            "answer": "Pixel Pilot is an AI-powered web development platform that allows anyone to create applications by chatting with AI. It's designed for developers, entrepreneurs, designers, and anyone who wants to build web applications quickly and efficiently, regardless of their coding experience level."
+          },
+          {
+            "question": "Do I need coding experience to use Pixel Pilot?",
+            "answer": "While some basic understanding of web development concepts is helpful, you don't need extensive coding experience. The AI assistant will guide you through the process and generate code based on your natural language descriptions. However, familiarity with HTML, CSS, and JavaScript concepts will help you get the most out of the platform."
+          },
+          {
+            "question": "What technologies does Pixel Pilot support?",
+            "answer": "Pixel Pilot supports modern web technologies including React, Next.js, TypeScript, Tailwind CSS, and Node.js. It can generate full-stack applications with databases, APIs, and deployment configurations for Vercel, Netlify, and other platforms."
+          }
+        ]
+      },
+      {
+        "category": "Features & Capabilities",
+        "questions": [
+          {
+            "question": "How does the AI code generation work?",
+            "answer": "Our AI system analyzes your natural language descriptions and generates production-ready code. It understands context from your existing project files, follows best practices, and can create everything from simple components to complex full-stack applications with proper error handling and testing."
+          },
+          {
+            "question": "Can I preview my app before deploying?",
+            "answer": "Yes! Pixel Pilot includes a powerful preview system using E2B sandboxes. You can see your app running in real-time with hot reload, test it on different devices, and debug issues before deploying to production."
+          },
+          {
+            "question": "What deployment options are available?",
+            "answer": "We support deployment to major platforms including Vercel, Netlify, and GitHub Pages. You can also export your project files for deployment to any hosting service. The deployment process is streamlined with automatic configuration and monitoring."
+          }
+        ]
+      },
+      {
+        "category": "Pricing & Plans",
+        "questions": [
+          {
+            "question": "How much does Pixel Pilot cost?",
+            "answer": "Pixel Pilot offers flexible pricing plans. We have a generous free tier for getting started, and paid plans for teams and advanced features. Visit our pricing page for current rates and feature comparisons."
+          },
+          {
+            "question": "Is there a free trial available?",
+            "answer": "Yes, we offer a free trial that includes access to core features, limited AI usage, and basic deployment options. This allows you to experience the platform and build small projects before upgrading to a paid plan."
+          },
+          {
+            "question": "What features are included in the free plan?",
+            "answer": "The free plan includes basic AI chat, project creation with templates, preview functionality, and deployment to free hosting tiers. Paid plans unlock higher AI usage limits, advanced features, team collaboration, and priority support."
+          }
+        ]
+      },
+      {
+        "category": "Technical Support",
+        "questions": [
+          {
+            "question": "How do I get help if I encounter issues?",
+            "answer": "We provide multiple support channels: comprehensive documentation, community forums, email support, and priority support for paid users. Our AI assistant can also help troubleshoot common issues within the platform."
+          },
+          {
+            "question": "Is my code and data secure?",
+            "answer": "Security is our top priority. All data is encrypted in transit and at rest. We use industry-standard security practices, regular security audits, and comply with data protection regulations. Your code remains yours, and we don't train our AI models on your private projects."
+          },
+          {
+            "question": "Can I export my projects?",
+            "answer": "Yes, you can export your complete project files at any time. This includes all code, configurations, and assets. You maintain full ownership and can use the exported files however you wish, including deploying to other platforms or continuing development elsewhere."
+          }
+        ]
+      }
+    ]
+  },
+  "glossary": {
+    "title": "Technical Glossary",
+    "terms": [
+      {
+        "term": "AI Agent",
+        "definition": "An autonomous AI system that can analyze requirements, plan implementations, and execute development tasks automatically."
+      },
+      {
+        "term": "E2B Sandbox",
+        "definition": "Isolated development environments that provide secure, instant previews of applications with full system access."
+      },
+      {
+        "term": "Hot Reload",
+        "definition": "Technology that automatically updates the running application when code changes are made, without requiring a full restart."
+      },
+      {
+        "term": "Monaco Editor",
+        "definition": "The code editor engine used by Visual Studio Code, providing professional editing features and syntax highlighting."
+      },
+      {
+        "term": "OAuth",
+        "definition": "Open Authorization protocol that allows secure third-party access to user accounts without sharing passwords."
+      },
+      {
+        "term": "TypeScript",
+        "definition": "A superset of JavaScript that adds static typing and advanced features for better code quality and developer experience."
+      },
+      {
+        "term": "Tailwind CSS",
+        "definition": "A utility-first CSS framework that provides low-level utility classes for rapid UI development."
+      },
+      {
+        "term": "Next.js",
+        "definition": "A React framework that provides server-side rendering, static site generation, and optimized performance features."
+      },
+      {
+        "term": "Vite",
+        "definition": "A fast build tool and development server that provides instant hot reload and optimized production builds."
+      }
+    ]
+  },
+  "support_resources": {
+    "title": "Support Resources",
+    "resources": [
+      {
+        "type": "documentation",
+        "title": "Official Documentation",
+        "description": "Complete guides, tutorials, and API references",
+        "url": "/docs",
+        "category": "documentation"
+      },
+      {
+        "type": "community",
+        "title": "Community Forum",
+        "description": "Connect with other users, share projects, and get help",
+        "url": "/community",
+        "category": "community"
+      },
+      {
+        "type": "tutorials",
+        "title": "Video Tutorials",
+        "description": "Step-by-step video guides for common tasks",
+        "url": "/learn",
+        "category": "tutorials"
+      },
+      {
+        "type": "examples",
+        "title": "Code Examples",
+        "description": "Browse example projects and code snippets",
+        "url": "/showcase",
+        "category": "examples"
+      },
+      {
+        "type": "contact",
+        "title": "Email Support",
+        "description": "Direct support for technical issues and questions",
+        "url": "mailto:support@pixelpilot.dev",
+        "category": "support"
+      }
+    ]
+  }
+}

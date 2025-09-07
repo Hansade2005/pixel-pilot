@@ -1,14 +1,123 @@
 "use client"
-
+import Link from "next/link"
 import { Logo } from "@/components/ui/logo"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { BookOpen, Video, Play, Users, Clock, Star, ArrowRight } from "lucide-react"
+import { BookOpen, Video, Play, Users, Clock, Star, ArrowRight, MessageSquare, Code, Rocket, Layers, Settings } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
+import { useEffect, useState } from "react"
+
+interface BlogPost {
+  id: string
+  title: string
+  slug: string
+  excerpt: string
+  content: {
+    introduction: string
+    main_content: Array<{
+      heading: string
+      body: string
+      key_points?: string[]
+      technical_highlights?: string[]
+      market_trends?: string[]
+      benefits?: string[]
+      features?: string[]
+      challenges?: string[]
+      solutions?: string[]
+    }>
+    conclusion: string
+    project_overview?: any
+    development_journey?: any
+    results_and_metrics?: any
+    lessons_learned?: any
+    case_studies?: any
+    advanced_usage?: any
+    real_world_examples?: any
+  }
+  author: string
+  published_date: string
+  last_modified: string
+  category: string
+  tags: string[]
+  featured_image: string
+  reading_time: string
+  seo_meta: {
+    title: string
+    description: string
+    keywords: string[]
+  }
+  related_posts: string[]
+  status: string
+}
+
+interface HelpResource {
+  id: string
+  title: string
+  description: string
+  tags: string[]
+  estimated_read_time: string
+}
 
 export default function LearnPage() {
+  const [blogPosts, setBlogPosts] = useState<{ posts: BlogPost[] } | null>(null)
+  const [helpResources, setHelpResources] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [blogResponse, helpResponse] = await Promise.all([
+          fetch('/blog-posts.json'),
+          fetch('/help-resources.json')
+        ])
+
+        const [blogData, helpData] = await Promise.all([
+          blogResponse.json(),
+          helpResponse.json()
+        ])
+
+        setBlogPosts(blogData)
+        setHelpResources(helpData)
+      } catch (error) {
+        console.error('Failed to load learning data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [])
+
+  const getIconForCategory = (categoryId: string) => {
+    const iconMap: Record<string, any> = {
+      "getting-started": BookOpen,
+      "ai-development": MessageSquare,
+      "development-tools": Code,
+      "deployment-integration": Rocket,
+      "project-management": Layers,
+      "troubleshooting": Settings
+    }
+    return iconMap[categoryId] || BookOpen
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen relative overflow-hidden">
+        <div className="absolute inset-0 lovable-gradient" />
+        <div className="absolute inset-0 noise-texture" />
+        <Navigation />
+        <div className="relative z-10 pt-16 pb-24 flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+            <p className="text-white">Loading learning resources...</p>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    )
+  }
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Enhanced Gradient Background */}
@@ -40,107 +149,86 @@ export default function LearnPage() {
 
           {/* Learning Paths */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-            <Card className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors">
-              <CardHeader>
-                <div className="w-12 h-12 rounded-lg bg-blue-600/20 flex items-center justify-center mb-4">
-                  <Play className="w-6 h-6 text-blue-400" />
-                </div>
-                <CardTitle className="text-white">Getting Started</CardTitle>
-                <CardDescription className="text-gray-300">
-                  Learn the basics of Pixel Pilot and build your first AI-powered app.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Clock className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-300">30 min</span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-gray-400" />
-                </div>
-              </CardContent>
-            </Card>
+            {helpResources?.categories?.slice(0, 3).map((category: any, index: number) => {
+              const IconComponent = getIconForCategory(category.id)
+              const totalArticles = category.articles.length
+              const totalReadTime = category.articles.reduce((total: number, article: HelpResource) => {
+                const minutes = parseInt(article.estimated_read_time.split(' ')[0])
+                return total + minutes
+              }, 0)
 
-            <Card className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors">
-              <CardHeader>
-                <div className="w-12 h-12 rounded-lg bg-green-600/20 flex items-center justify-center mb-4">
-                  <Users className="w-6 h-6 text-green-400" />
-                </div>
-                <CardTitle className="text-white">Advanced Features</CardTitle>
-                <CardDescription className="text-gray-300">
-                  Explore advanced features like custom components and integrations.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Clock className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-300">2 hours</span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-gray-400" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors">
-              <CardHeader>
-                <div className="w-12 h-12 rounded-lg bg-purple-600/20 flex items-center justify-center mb-4">
-                  <Star className="w-6 h-6 text-purple-400" />
-                </div>
-                <CardTitle className="text-white">Best Practices</CardTitle>
-                <CardDescription className="text-gray-300">
-                  Learn industry best practices for AI-powered development.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Clock className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-300">1.5 hours</span>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-gray-400" />
-                </div>
-              </CardContent>
-            </Card>
+              return (
+                <Card key={category.id} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors">
+                  <CardHeader>
+                    <div className="w-12 h-12 rounded-lg bg-blue-600/20 flex items-center justify-center mb-4">
+                      <IconComponent className="w-6 h-6 text-blue-400" />
+                    </div>
+                    <CardTitle className="text-white">{category.title}</CardTitle>
+                    <CardDescription className="text-gray-300">
+                      {category.description}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Clock className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-300">{totalReadTime} min</span>
+                        <span className="text-sm text-gray-400">•</span>
+                        <span className="text-sm text-gray-400">{totalArticles} articles</span>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-gray-400" />
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
 
           {/* Video Tutorials */}
           <div className="mb-16">
-            <h2 className="text-3xl font-bold text-white mb-8">Video Tutorials</h2>
+            <h2 className="text-3xl font-bold text-white mb-8">Latest Tutorials</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[
-                {
-                  title: "Building a Todo App in 5 Minutes",
-                  duration: "5:23",
-                  views: "12.5k",
-                  thumbnail: "bg-gradient-to-br from-blue-500 to-purple-600"
-                },
-                {
-                  title: "Creating Custom Components",
-                  duration: "8:45",
-                  views: "8.2k",
-                  thumbnail: "bg-gradient-to-br from-green-500 to-blue-600"
-                },
-                {
-                  title: "Deploying Your First App",
-                  duration: "6:12",
-                  views: "15.1k",
-                  thumbnail: "bg-gradient-to-br from-purple-500 to-pink-600"
-                }
-              ].map((video, index) => (
-                <Card key={index} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors">
-                  <div className={`h-32 ${video.thumbnail} rounded-t-lg flex items-center justify-center`}>
-                    <Play className="w-8 h-8 text-white" />
-                  </div>
-                  <CardContent className="p-4">
-                    <h3 className="text-white font-semibold mb-2">{video.title}</h3>
-                    <div className="flex items-center justify-between text-sm text-gray-400">
-                      <span>{video.duration}</span>
-                      <span>{video.views} views</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              {blogPosts?.posts?.slice(0, 6).map((post: BlogPost, index: number) => {
+                const thumbnailGradients = [
+                  "bg-gradient-to-br from-blue-500 to-purple-600",
+                  "bg-gradient-to-br from-green-500 to-blue-600",
+                  "bg-gradient-to-br from-purple-500 to-pink-600",
+                  "bg-gradient-to-br from-yellow-500 to-orange-600",
+                  "bg-gradient-to-br from-cyan-500 to-blue-600",
+                  "bg-gradient-to-br from-emerald-500 to-teal-600"
+                ]
+
+                return (
+                  <Link key={post.id} href={`/community/${post.slug || post.id}`}>
+                    <Card className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors cursor-pointer group h-full">
+                      <div className={`h-32 ${thumbnailGradients[index % thumbnailGradients.length]} rounded-t-lg flex items-center justify-center relative overflow-hidden`}>
+                        <Play className="w-8 h-8 text-white z-10 group-hover:scale-110 transition-transform" />
+                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div>
+                      </div>
+                      <CardContent className="p-4 flex-1 flex flex-col">
+                        <h3 className="text-white font-semibold mb-2 line-clamp-2 group-hover:text-purple-400 transition-colors leading-tight">{post.title}</h3>
+                        <p className="text-gray-300 text-sm mb-3 line-clamp-2 flex-1">{post.excerpt}</p>
+                        <div className="flex items-center justify-between text-sm text-gray-400 mt-auto">
+                          <span className="flex items-center">
+                            <Clock className="w-3 h-3 mr-1" />
+                            {post.reading_time}
+                          </span>
+                          <Badge variant="secondary" className="bg-gray-700 text-gray-300 text-xs">
+                            {post.category.replace('-', ' ')}
+                          </Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {post.tags?.slice(0, 2).map((tag: string, tagIndex: number) => (
+                            <Badge key={tagIndex} variant="outline" className="text-xs border-gray-600 text-gray-400">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                )
+              })}
             </div>
           </div>
 
@@ -148,22 +236,36 @@ export default function LearnPage() {
           <div className="mb-16">
             <h2 className="text-3xl font-bold text-white mb-8">Documentation</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {[
-                "API Reference",
-                "Component Library",
-                "Deployment Guide",
-                "Troubleshooting",
-                "Performance Tips",
-                "Security Best Practices"
-              ].map((doc, index) => (
-                <Card key={index} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-white font-semibold">{doc}</h3>
-                      <ArrowRight className="w-4 h-4 text-gray-400" />
-                    </div>
-                  </CardContent>
-                </Card>
+              {helpResources?.categories?.flatMap((category: any) =>
+                category.articles.slice(0, 2).map((article: HelpResource, index: number) => ({
+                  ...article,
+                  category: category.title,
+                  icon: getIconForCategory(category.id),
+                  categoryId: category.id
+                }))
+              ).slice(0, 6).map((doc: any, index: number) => (
+                <Link key={index} href={`/docs#${doc.categoryId}`}>
+                  <Card className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors cursor-pointer group">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3 flex-1">
+                          <doc.icon className="w-5 h-5 text-blue-400 flex-shrink-0 group-hover:scale-110 transition-transform" />
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-white font-semibold truncate group-hover:text-purple-400 transition-colors">{doc.title}</h3>
+                            <p className="text-gray-300 text-sm truncate">{doc.description}</p>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <Badge variant="outline" className="text-xs border-gray-600 text-gray-400">
+                                {doc.category}
+                              </Badge>
+                              <span className="text-xs text-gray-400">{doc.estimated_read_time}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-gray-400 flex-shrink-0 group-hover:translate-x-1 transition-transform" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
               ))}
             </div>
           </div>

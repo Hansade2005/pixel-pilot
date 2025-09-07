@@ -4,11 +4,76 @@ import { Logo } from "@/components/ui/logo"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Users, MessageCircle, Star, TrendingUp, Calendar, MapPin } from "lucide-react"
+import { Users, MessageCircle, Star, TrendingUp, Calendar, MapPin, BookOpen, Code, Zap, Shield, ExternalLink, Clock, ArrowRight } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
+import { useEffect, useState } from "react"
+import Link from "next/link"
+
+interface BlogPost {
+  id: string
+  title: string
+  excerpt: string
+  author: string
+  published_date: string
+  category: string
+  tags: string[]
+  featured_image: string
+}
+
+interface HelpResource {
+  id: string
+  title: string
+  description: string
+  tags: string[]
+}
 
 export default function CommunityPage() {
+  const [blogPosts, setBlogPosts] = useState<{ posts: any[] } | null>(null)
+  const [helpResources, setHelpResources] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [blogResponse, helpResponse] = await Promise.all([
+          fetch('/blog-posts.json'),
+          fetch('/help-resources.json')
+        ])
+
+        const [blogData, helpData] = await Promise.all([
+          blogResponse.json(),
+          helpResponse.json()
+        ])
+
+        setBlogPosts(blogData)
+        setHelpResources(helpData)
+      } catch (error) {
+        console.error('Failed to load community data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen relative overflow-hidden">
+        <div className="absolute inset-0 lovable-gradient" />
+        <div className="absolute inset-0 noise-texture" />
+        <Navigation />
+        <div className="relative z-10 pt-16 pb-24 flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+            <p className="text-white">Loading community...</p>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    )
+  }
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Enhanced Gradient Background */}
@@ -124,29 +189,15 @@ export default function CommunityPage() {
           <div className="mb-16">
             <h2 className="text-3xl font-bold text-white mb-8">Recent Discussions</h2>
             <div className="space-y-4">
-              {[
-                {
-                  title: "How to build a real-time chat app with Pixel Pilot",
-                  author: "Sarah Chen",
-                  replies: 24,
-                  views: 1.2,
-                  tags: ["React", "Real-time"]
-                },
-                {
-                  title: "Best practices for AI prompt engineering",
-                  author: "Mike Johnson",
-                  replies: 18,
-                  views: 0.8,
-                  tags: ["AI", "Tips"]
-                },
-                {
-                  title: "Showcase: My e-commerce platform built in 2 hours",
-                  author: "Alex Rodriguez",
-                  replies: 32,
-                  views: 2.1,
-                  tags: ["Showcase", "E-commerce"]
-                }
-              ].map((discussion, index) => (
+              {helpResources?.categories?.flatMap((category: any) =>
+                category.articles.slice(0, 3).map((article: HelpResource, index: number) => ({
+                  ...article,
+                  category: category.title,
+                  replies: Math.floor(Math.random() * 30) + 10,
+                  views: (Math.random() * 3).toFixed(1),
+                  author: "Community Member"
+                }))
+              ).slice(0, 6).map((discussion: any, index: number) => (
                 <Card key={index} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors">
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between">
@@ -158,7 +209,7 @@ export default function CommunityPage() {
                           <span>{discussion.views}k views</span>
                         </div>
                         <div className="flex space-x-2">
-                          {discussion.tags.map((tag, tagIndex) => (
+                          {discussion.tags?.slice(0, 3).map((tag: string, tagIndex: number) => (
                             <Badge key={tagIndex} variant="secondary" className="bg-gray-700 text-gray-300">
                               {tag}
                             </Badge>
@@ -169,6 +220,75 @@ export default function CommunityPage() {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+          </div>
+
+          {/* Featured Blog Posts */}
+          <div className="mb-16">
+            <h2 className="text-3xl font-bold text-white mb-8">Featured Articles</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {blogPosts?.posts?.slice(0, 6).map((post: any, index: number) => {
+                const thumbnailGradients = [
+                  "bg-gradient-to-br from-blue-500 to-purple-600",
+                  "bg-gradient-to-br from-green-500 to-blue-600",
+                  "bg-gradient-to-br from-purple-500 to-pink-600",
+                  "bg-gradient-to-br from-yellow-500 to-orange-600",
+                  "bg-gradient-to-br from-cyan-500 to-blue-600",
+                  "bg-gradient-to-br from-emerald-500 to-teal-600"
+                ]
+
+                return (
+                  <Link key={post.id} href={`/community/${post.slug || post.id}`}>
+                    <Card className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors cursor-pointer group h-full">
+                      <div className={`h-48 ${thumbnailGradients[index % thumbnailGradients.length]} rounded-t-lg flex items-center justify-center relative overflow-hidden`}>
+                        <BookOpen className="w-12 h-12 text-white/80" />
+                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div>
+                      </div>
+                      <CardContent className="p-6 flex-1 flex flex-col">
+                        <Badge className={`w-fit mb-3 ${
+                          post.category === 'platform-updates' ? 'bg-blue-500' :
+                          post.category === 'tutorials' ? 'bg-green-500' :
+                          post.category === 'case-studies' ? 'bg-yellow-500' :
+                          post.category === 'industry-insights' ? 'bg-purple-500' :
+                          'bg-red-500'
+                        } text-white`}>
+                          {post.category.replace('-', ' ').toUpperCase()}
+                        </Badge>
+                        <h3 className="text-lg font-semibold text-white mb-3 group-hover:text-purple-400 transition-colors line-clamp-2 leading-tight">
+                          {post.title}
+                        </h3>
+                        <p className="text-gray-300 text-sm mb-4 line-clamp-3 flex-1">
+                          {post.excerpt}
+                        </p>
+                        <div className="flex items-center justify-between text-sm text-gray-400 mt-auto">
+                          <span className="flex items-center">
+                            <Clock className="w-3 h-3 mr-1" />
+                            {post.reading_time}
+                          </span>
+                          <span>{new Date(post.published_date).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-3">
+                          {post.tags?.slice(0, 2).map((tag: string, tagIndex: number) => (
+                            <Badge key={tagIndex} variant="outline" className="text-xs border-gray-600 text-gray-400">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                )
+              })}
+            </div>
+
+            {/* View All Articles Button */}
+            <div className="text-center mt-8">
+              <Link href="/learn">
+                <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3">
+                  View All Articles
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
