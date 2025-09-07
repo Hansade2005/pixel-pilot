@@ -1,13 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { storageManager } from '@/lib/storage-manager';
 
+/**
+ * Vercel Deployment API - Git-Only Deployment
+ *
+ * This endpoint creates Vercel projects with GitHub repository integration.
+ * It does NOT support file-based deployments - only Git-based deployments are allowed.
+ *
+ * Required parameters:
+ * - projectName: Name for the Vercel project
+ * - token: Vercel personal access token
+ * - workspaceId: Project workspace ID
+ * - githubRepo: GitHub repository in "owner/repo" format
+ * - environmentVariables: Array of env vars to add to the project
+ */
+
 export async function POST(request: NextRequest) {
   try {
-    const { projectName, framework, token, workspaceId, githubRepo, files } = await request.json();
+    const { projectName, framework, token, workspaceId, githubRepo, environmentVariables } = await request.json();
 
-    if (!projectName || !token || !workspaceId) {
+    if (!projectName || !token || !workspaceId || !githubRepo) {
       return NextResponse.json({
-        error: 'Project name, token, and workspace ID are required'
+        error: 'Project name, token, workspace ID, and GitHub repository are required'
       }, { status: 400 });
     }
 
@@ -33,16 +47,12 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Use provided files or fall back to storage manager
-    let projectFiles = files;
-    if (!projectFiles || !Array.isArray(projectFiles) || projectFiles.length === 0) {
-      // Initialize storage manager and get files from workspace
-      await storageManager.init();
-      projectFiles = await storageManager.getFiles(workspaceId);
-
-      if (projectFiles.length === 0) {
-        return NextResponse.json({ error: 'No files found in workspace' }, { status: 400 });
-      }
+    // Validate GitHub repo format
+    if (!/^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+$/.test(githubRepo)) {
+      return NextResponse.json({
+        error: 'Invalid GitHub repository format. Use format: owner/repo',
+        code: 'INVALID_GITHUB_REPO'
+      }, { status: 400 });
     }
 
     // Create Vercel project
@@ -112,71 +122,31 @@ export async function POST(request: NextRequest) {
 
     const projectData = await createProjectResponse.json();
 
-    // If no GitHub repo provided, deploy files directly
-    if (!githubRepo) {
-      // Create deployment with files
-      const formData = new FormData();
-
-      // Add project files
-      for (const file of projectFiles) {
-        if (!file.isDirectory && file.content) {
-          const blob = new Blob([file.content], { type: 'text/plain' });
-          formData.append(`files[${file.path}]`, blob);
+    // Add environment variables if provided
+    if (environmentVariables && environmentVariables.length > 0) {
+      for (const envVar of environmentVariables) {
+        try {
+          await fetch(`https://api.vercel.com/v10/projects/${projectData.id}/env`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              key: envVar.key,
+              value: envVar.value,
+              type: 'plain',
+              target: ['production'],
+            }),
+          });
+        } catch (envError) {
+          console.error(`Failed to add environment variable ${envVar.key}:`, envError);
+          // Continue with deployment even if env var fails
         }
       }
-
-      // Add deployment configuration
-      formData.append('name', projectName);
-      formData.append('project', projectData.id);
-      formData.append('target', 'production');
-
-      const deployResponse = await fetch('https://api.vercel.com/v13/deployments', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      if (!deployResponse.ok) {
-        const errorData = await deployResponse.json();
-        console.error('Vercel deployment error:', errorData);
-
-        // Handle deployment-specific errors
-        if (deployResponse.status === 400) {
-          if (errorData.error?.message?.includes('build failed')) {
-            return NextResponse.json({
-              error: 'Build failed. Please check your project configuration and try again.',
-              code: 'BUILD_FAILED'
-            }, { status: 400 });
-          }
-        }
-
-        if (deployResponse.status === 413) {
-          return NextResponse.json({
-            error: 'Project files are too large. Please reduce file sizes or remove unnecessary files.',
-            code: 'PAYLOAD_TOO_LARGE'
-          }, { status: 413 });
-        }
-
-        return NextResponse.json({
-          error: errorData.error?.message || 'Failed to deploy to Vercel',
-          code: 'DEPLOYMENT_FAILED'
-        }, { status: deployResponse.status });
-      }
-
-      const deployData = await deployResponse.json();
-
-      return NextResponse.json({
-        url: deployData.url,
-        projectId: projectData.id,
-        deploymentId: deployData.id,
-        commitSha: deployData.meta?.githubCommitSha || `vercel_${Date.now()}`,
-        status: 'ready',
-      });
     }
 
-    // If GitHub repo provided, just return project info
+    // Return project info with GitHub integration
     return NextResponse.json({
       url: `https://${projectData.name}.vercel.app`,
       projectId: projectData.id,

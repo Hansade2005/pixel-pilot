@@ -1,13 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { storageManager } from '@/lib/storage-manager';
 
+/**
+ * Netlify Deployment API - Git-Only Deployment
+ *
+ * This endpoint creates Netlify sites with GitHub repository integration.
+ * It does NOT support file-based deployments - only Git-based deployments are allowed.
+ *
+ * Required parameters:
+ * - siteName: Name for the Netlify site
+ * - buildCommand: Build command (e.g., "npm run build")
+ * - publishDir: Publish directory (e.g., "dist")
+ * - token: Netlify personal access token
+ * - workspaceId: Project workspace ID
+ * - githubRepo: GitHub repository in "owner/repo" format
+ * - environmentVariables: Array of env vars to add to the site
+ */
+
 export async function POST(request: NextRequest) {
   try {
-    const { siteName, buildCommand, publishDir, token, workspaceId, githubRepo, files } = await request.json();
+    const { siteName, buildCommand, publishDir, token, workspaceId, githubRepo, environmentVariables } = await request.json();
 
-    if (!siteName || !token || !workspaceId) {
+    if (!siteName || !token || !workspaceId || !githubRepo) {
       return NextResponse.json({
-        error: 'Site name, token, and workspace ID are required'
+        error: 'Site name, token, workspace ID, and GitHub repository are required'
       }, { status: 400 });
     }
 
@@ -33,16 +49,12 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Use provided files or fall back to storage manager
-    let projectFiles = files;
-    if (!projectFiles || !Array.isArray(projectFiles) || projectFiles.length === 0) {
-      // Initialize storage manager and get files from workspace
-      await storageManager.init();
-      projectFiles = await storageManager.getFiles(workspaceId);
-
-      if (projectFiles.length === 0) {
-        return NextResponse.json({ error: 'No files found in workspace' }, { status: 400 });
-      }
+    // Validate GitHub repo format
+    if (!/^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+$/.test(githubRepo)) {
+      return NextResponse.json({
+        error: 'Invalid GitHub repository format. Use format: owner/repo',
+        code: 'INVALID_GITHUB_REPO'
+      }, { status: 400 });
     }
 
     // Create Netlify site
@@ -112,54 +124,29 @@ export async function POST(request: NextRequest) {
 
     const siteData = await createSiteResponse.json();
 
-    // If no GitHub repo provided, deploy files directly
-    if (!githubRepo) {
-      // Prepare files for deployment
-      const deployFiles: Record<string, { content: string; encoding: string }> = {};
-      for (const file of projectFiles) {
-        if (!file.isDirectory && file.content) {
-          deployFiles[file.path] = {
-            content: Buffer.from(file.content).toString('base64'),
-            encoding: 'base64',
-          };
+    // Add environment variables if provided
+    if (environmentVariables && environmentVariables.length > 0) {
+      for (const envVar of environmentVariables) {
+        try {
+          await fetch(`https://api.netlify.com/api/v1/sites/${siteData.id}/env/${envVar.key}`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              value: envVar.value,
+              scopes: ['builds', 'functions', 'runtime'],
+            }),
+          });
+        } catch (envError) {
+          console.error(`Failed to add environment variable ${envVar.key}:`, envError);
+          // Continue with deployment even if env var fails
         }
       }
-
-      // Create deployment
-      const deployResponse = await fetch(`https://api.netlify.com/api/v1/sites/${siteData.id}/deploys`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          files: deployFiles,
-          async: false,
-        }),
-      });
-
-      if (!deployResponse.ok) {
-        const errorData = await deployResponse.json();
-        console.error('Netlify deployment error:', errorData);
-        return NextResponse.json({
-          error: errorData.message || 'Failed to deploy to Netlify'
-        }, { status: deployResponse.status });
-      }
-
-      const deployData = await deployResponse.json();
-
-      return NextResponse.json({
-        url: deployData.url,
-        siteId: siteData.id,
-        deploymentId: deployData.id,
-        commitSha: deployData.commit_sha || `netlify_${Date.now()}`,
-        status: 'ready',
-        buildCommand: buildCommand || 'npm run build',
-        publishDir: publishDir || 'dist',
-      });
     }
 
-    // If GitHub repo provided, just return site info
+    // Return site info with GitHub integration
     return NextResponse.json({
       url: siteData.url,
       siteId: siteData.id,

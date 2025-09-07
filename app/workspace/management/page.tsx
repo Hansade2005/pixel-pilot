@@ -9,34 +9,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { 
-  Globe, 
-  Github, 
-  Settings, 
-  RefreshCw, 
-  RotateCcw, 
-  Plus, 
-  Trash2, 
-  ExternalLink, 
+import {
+  Globe,
+  Github,
+  Settings,
+  Plus,
+  Trash2,
+  ExternalLink,
   Loader2,
   CheckCircle,
   AlertCircle,
-  Clock,
-  GitBranch,
-  GitCommit,
-  ChevronLeft,
-  Database,
-  Rocket,
-  Calendar,
-  Server,
   FolderOpen,
   Search,
   Filter,
-  History,
-  BarChart3,
-  TrendingUp,
-  Users,
-  Shield
+  Download,
+  FileText,
+  Code
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { storageManager, type Workspace as Project, type Deployment, type EnvironmentVariable } from "@/lib/storage-manager"
@@ -46,31 +34,6 @@ import { useRouter } from "next/navigation"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 
-interface GitHubRepo {
-  id: string
-  name: string
-  fullName: string
-  url: string
-  defaultBranch: string
-  lastCommit?: {
-    sha: string
-    message: string
-    date: string
-  }
-}
-
-interface DeployedRepo {
-  id: string
-  projectId: string
-  projectName: string
-  githubUrl: string
-  githubRepo: string
-  vercelUrl?: string
-  netlifyUrl?: string
-  deployedAt: string
-  lastUpdated: string
-}
-
 // Extended project interface for display
 interface ProjectDisplay extends Project {
   url?: string
@@ -79,44 +42,22 @@ interface ProjectDisplay extends Project {
   environmentVariables: EnvironmentVariable[]
 }
 
-// Quick stats interface
-interface QuickStats {
-  projectsCount: number
-  deploymentsCount: number
-  lastActivity: string
-  activeProjects: number
-}
-
 export default function ManagementPage() {
   const { toast } = useToast()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("overview")
   const [isLoading, setIsLoading] = useState(true)
   const [projects, setProjects] = useState<ProjectDisplay[]>([])
-  const [githubRepos, setGithubRepos] = useState<GitHubRepo[]>([])
-  const [deployedRepos, setDeployedRepos] = useState<DeployedRepo[]>([])
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string>("sample-user") // Default fallback
-  const [newDeployment, setNewDeployment] = useState({
-    commitSha: "",
-    branch: "",
-    environment: "production"
-  })
   const [newEnvVar, setNewEnvVar] = useState({
     key: "",
     value: "",
     environment: "production",
     isSecret: false,
-    selectedProjectId: "" // Added selectedProjectId to track which project is selected
+    selectedProjectId: ""
   })
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
-  const [quickStats, setQuickStats] = useState<QuickStats>({
-    projectsCount: 0,
-    deploymentsCount: 0,
-    lastActivity: 'Never',
-    activeProjects: 0
-  })
 
   useEffect(() => {
     getCurrentUser()
@@ -125,6 +66,30 @@ export default function ManagementPage() {
   useEffect(() => {
     if (currentUserId) {
       loadData()
+    }
+  }, [currentUserId])
+
+  // Real-time sync listener
+  useEffect(() => {
+    const handleProjectUpdate = (event: CustomEvent) => {
+      const { projectId, action } = event.detail
+      console.log('Real-time project update received:', { projectId, action })
+
+      // Refresh data when a project is updated
+      if (action === 'deployed' || action === 'updated') {
+        loadData()
+        toast({
+          title: "Project Updated",
+          description: "Project data has been refreshed",
+        })
+      }
+    }
+
+    // Listen for project update events
+    window.addEventListener('projectUpdated', handleProjectUpdate as EventListener)
+
+    return () => {
+      window.removeEventListener('projectUpdated', handleProjectUpdate as EventListener)
     }
   }, [currentUserId])
 
@@ -232,22 +197,6 @@ export default function ManagementPage() {
     }
   }
 
-  const calculateQuickStats = async (projects: ProjectDisplay[], deployments: Deployment[]) => {
-    try {
-      const stats: QuickStats = {
-        projectsCount: projects.length,
-        deploymentsCount: deployments.length,
-        lastActivity: projects.length > 0 
-          ? new Date(Math.max(...projects.map(p => new Date(p.lastActivity).getTime()))).toLocaleString()
-          : 'Never',
-        activeProjects: projects.filter(p => p.deploymentStatus === 'deployed').length
-      }
-
-      setQuickStats(stats)
-    } catch (error) {
-      console.error('Error calculating quick stats:', error)
-    }
-  }
 
   const loadData = async () => {
     setIsLoading(true)
@@ -288,12 +237,6 @@ export default function ManagementPage() {
       
       setProjects(projectsWithData)
       
-      // Load deployed repositories
-      await loadDeployedRepos()
-      
-      // Calculate quick stats
-      await calculateQuickStats(projectsWithData, deployments)
-      
       // Initialize sample data if no projects exist
       if (projects.length === 0) {
         await initializeSampleData()
@@ -310,143 +253,7 @@ export default function ManagementPage() {
     }
   }
 
-  // Load deployed repositories from storage
-  const loadDeployedRepos = async (projectsList?: ProjectDisplay[]) => {
-    try {
-      await storageManager.init()
-      const [deployments, allProjects] = await Promise.all([
-        storageManager.getDeployments(),
-        storageManager.getWorkspaces(currentUserId)
-      ])
 
-      // Use provided projects or load all projects
-      const projectsToUse = projectsList || allProjects.map(project => ({
-        ...project,
-        url: project.vercelDeploymentUrl || project.netlifyDeploymentUrl || project.githubRepoUrl,
-        platform: (project.vercelDeploymentUrl ? 'vercel' : project.netlifyDeploymentUrl ? 'netlify' : 'github') as 'vercel' | 'netlify' | 'github',
-        lastDeployment: undefined,
-        environmentVariables: []
-      } as ProjectDisplay))
-
-      const repos: DeployedRepo[] = []
-
-      for (const deployment of deployments) {
-        const project = projectsToUse.find(p => p.id === deployment.workspaceId)
-        if (project) {
-          const existingRepo = repos.find(r => r.projectId === deployment.workspaceId)
-          if (existingRepo) {
-            // Update existing repo with new deployment info
-            if (deployment.provider === 'vercel') {
-              existingRepo.vercelUrl = deployment.url
-            } else if (deployment.provider === 'netlify') {
-              existingRepo.netlifyUrl = deployment.url
-            } else if (deployment.provider === 'github') {
-              // For GitHub deployments, the URL is the repo URL
-              existingRepo.githubUrl = deployment.url
-              existingRepo.githubRepo = deployment.url.split('/').slice(-2).join('/')
-            }
-            existingRepo.lastUpdated = deployment.createdAt || new Date().toISOString()
-          } else {
-            // Create new repo entry
-            const repoEntry: DeployedRepo = {
-              id: deployment.id,
-              projectId: deployment.workspaceId,
-              projectName: project.name,
-              githubUrl: project.githubRepoUrl || (deployment.provider === 'github' ? deployment.url : ''),
-              githubRepo: project.githubRepoUrl ? project.githubRepoUrl.split('/').slice(-2).join('/') :
-                (deployment.provider === 'github' ? deployment.url.split('/').slice(-2).join('/') : ''),
-              vercelUrl: deployment.provider === 'vercel' ? deployment.url : undefined,
-              netlifyUrl: deployment.provider === 'netlify' ? deployment.url : undefined,
-              deployedAt: deployment.createdAt || new Date().toISOString(),
-              lastUpdated: deployment.createdAt || new Date().toISOString(),
-            }
-
-            // Only add if it has GitHub repo info
-            if (repoEntry.githubUrl || deployment.provider === 'github') {
-              repos.push(repoEntry)
-            }
-          }
-        }
-      }
-
-      setDeployedRepos(repos)
-      
-      // Transform deployed repos to GitHubRepo format for display
-      const githubReposDisplay: GitHubRepo[] = repos
-        .filter(repo => repo.githubUrl)
-        .map(repo => ({
-          id: repo.id,
-          name: repo.githubRepo.split('/')[1] || repo.projectName,
-          fullName: repo.githubRepo,
-          url: repo.githubUrl,
-          defaultBranch: 'main', // Default value since we don't have this info
-        }))
-
-      setGithubRepos(githubReposDisplay)
-    } catch (error) {
-      console.error('Error loading deployed repos:', error)
-    }
-  }
-
-  const triggerDeployment = async (projectId: string) => {
-    if (!newDeployment.commitSha && !newDeployment.branch) {
-      toast({
-        title: "Missing Information",
-        description: "Please provide either a commit SHA or branch name",
-        variant: "destructive"
-      })
-      return
-    }
-
-    try {
-      // Create deployment record in IndexedDB
-      const deployment = await storageManager.createDeployment({
-        workspaceId: projectId,
-        url: '', // Will be updated when deployment completes
-        status: 'building',
-        commitSha: newDeployment.commitSha,
-        commitMessage: `Deployment triggered from management page`,
-        branch: newDeployment.branch,
-        environment: newDeployment.environment,
-        provider: 'vercel'
-      })
-
-      toast({
-        title: "Deployment Triggered",
-        description: "Your deployment has been started"
-      })
-
-      // Reset form and reload data
-      setNewDeployment({ commitSha: "", branch: "", environment: "production" })
-      loadData()
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to trigger deployment",
-        variant: "destructive"
-      })
-    }
-  }
-
-  const rollbackDeployment = async (projectId: string, deploymentId: string) => {
-    try {
-      // Update deployment status in IndexedDB
-      await storageManager.updateDeployment(deploymentId, { status: 'cancelled' })
-
-      toast({
-        title: "Rollback Successful",
-        description: "Deployment has been rolled back"
-      })
-
-      loadData()
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to rollback deployment",
-        variant: "destructive"
-      })
-    }
-  }
 
   const addEnvironmentVariable = async () => {
     if (!newEnvVar.key || !newEnvVar.value || !newEnvVar.selectedProjectId) {
@@ -508,10 +315,10 @@ export default function ManagementPage() {
       // Find the environment variable to get its ID
       const envVars = await storageManager.getEnvironmentVariables(projectId)
       const envVar = envVars.find(ev => ev.key === key && ev.environment === environment)
-      
+
       if (envVar) {
         await storageManager.deleteEnvironmentVariable(envVar.id)
-        
+
         toast({
           title: "Environment Variable Deleted",
           description: "Variable has been removed successfully"
@@ -534,82 +341,138 @@ export default function ManagementPage() {
     }
   }
 
-  const clearAllData = async () => {
-    if (confirm('Are you sure you want to clear all data? This action cannot be undone.')) {
-      try {
-        await storageManager.clearAll()
-        setProjects([])
-        setGithubRepos([])
-        
+  // Export environment variables functions
+  const exportEnvironmentVariables = async (projectId: string, format: 'dotenv' | 'json' | 'shell') => {
+    try {
+      const envVars = await storageManager.getEnvironmentVariables(projectId)
+
+      if (envVars.length === 0) {
         toast({
-          title: "Data Cleared",
-          description: "All data has been cleared successfully"
-        })
-      } catch (error) {
-        toast({
-          title: "Clear Failed",
-          description: "Failed to clear data",
+          title: "No Environment Variables",
+          description: "This project has no environment variables to export",
           variant: "destructive"
         })
+        return
       }
-    }
-  }
 
-  const exportData = async () => {
-    try {
-      const data = await storageManager.exportData()
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      let content = ''
+      let filename = `env-vars-${new Date().toISOString().split('T')[0]}`
+
+      switch (format) {
+        case 'dotenv':
+          content = envVars.map(ev => `${ev.key}=${ev.value}`).join('\n')
+          filename += '.env'
+          break
+        case 'json':
+          const jsonData = envVars.reduce((acc, ev) => {
+            acc[ev.key] = ev.value
+            return acc
+          }, {} as Record<string, string>)
+          content = JSON.stringify(jsonData, null, 2)
+          filename += '.json'
+          break
+        case 'shell':
+          content = envVars.map(ev => `export ${ev.key}="${ev.value}"`).join('\n')
+          filename += '.sh'
+          break
+      }
+
+      // Create and download file
+      const blob = new Blob([content], { type: 'text/plain' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `deployment-manager-data-${new Date().toISOString().split('T')[0]}.json`
+      a.download = filename
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
 
       toast({
-        title: "Data Exported",
-        description: "All data has been exported successfully"
+        title: "Export Successful",
+        description: `Environment variables exported as ${filename}`
       })
     } catch (error) {
+      console.error('Export error:', error)
       toast({
         title: "Export Failed",
-        description: "Failed to export data",
+        description: "Failed to export environment variables",
         variant: "destructive"
       })
     }
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'ready':
-        return <CheckCircle className="h-4 w-4 text-green-500" />
-      case 'building':
-        return <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
-      case 'error':
-        return <AlertCircle className="h-4 w-4 text-red-500" />
-      case 'cancelled':
-        return <Clock className="h-4 w-4 text-gray-500" />
-      default:
-        return <Clock className="h-4 w-4 text-gray-500" />
+  const exportAllEnvironmentVariables = async (format: 'dotenv' | 'json' | 'shell') => {
+    try {
+      // Get all environment variables from all projects
+      const allEnvVars: Array<{ project: string; key: string; value: string; environment: string }> = []
+
+      for (const project of projects) {
+        const envVars = await storageManager.getEnvironmentVariables(project.id)
+        allEnvVars.push(...envVars.map(ev => ({
+          project: project.name,
+          key: ev.key,
+          value: ev.value,
+          environment: ev.environment
+        })))
+      }
+
+      if (allEnvVars.length === 0) {
+        toast({
+          title: "No Environment Variables",
+          description: "No environment variables found across all projects",
+          variant: "destructive"
+        })
+        return
+      }
+
+      let content = ''
+      let filename = `all-env-vars-${new Date().toISOString().split('T')[0]}`
+
+      switch (format) {
+        case 'dotenv':
+          content = allEnvVars.map(ev => `${ev.key}=${ev.value}`).join('\n')
+          filename += '.env'
+          break
+        case 'json':
+          const jsonData = allEnvVars.reduce((acc, ev) => {
+            acc[ev.key] = ev.value
+            return acc
+          }, {} as Record<string, string>)
+          content = JSON.stringify(jsonData, null, 2)
+          filename += '.json'
+          break
+        case 'shell':
+          content = allEnvVars.map(ev => `export ${ev.key}="${ev.value}"`).join('\n')
+          filename += '.sh'
+          break
+      }
+
+      const blob = new Blob([content], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      toast({
+        title: "Export Successful",
+        description: `All environment variables exported as ${filename}`
+      })
+    } catch (error) {
+      console.error('Export error:', error)
+      toast({
+        title: "Export Failed",
+        description: "Failed to export environment variables",
+        variant: "destructive"
+      })
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      ready: "default",
-      building: "secondary",
-      error: "destructive",
-      cancelled: "outline"
-    }
-    
-    return (
-      <Badge variant={variants[status] || "outline"}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    )
-  }
+
 
   const filteredProjects = projects.filter(project => {
     const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -650,8 +513,8 @@ export default function ManagementPage() {
               </p>
             </div>
 
-          {/* Quick Stats Row */}
-          <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Quick Stats - Simplified */}
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="bg-gray-800 border-gray-700">
               <CardContent className="p-4">
                 <div className="flex items-center space-x-3">
@@ -659,8 +522,8 @@ export default function ManagementPage() {
                     <FolderOpen className="h-5 w-5 text-blue-400" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-400">Total Projects</p>
-                    <p className="text-2xl font-bold">{quickStats.projectsCount}</p>
+                    <p className="text-sm text-gray-400">Projects</p>
+                    <p className="text-2xl font-bold">{projects.length}</p>
                   </div>
                 </div>
               </CardContent>
@@ -672,8 +535,8 @@ export default function ManagementPage() {
                     <Rocket className="h-5 w-5 text-green-400" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-400">Deployments</p>
-                    <p className="text-2xl font-bold">{quickStats.deploymentsCount}</p>
+                    <p className="text-sm text-gray-400">Deployed</p>
+                    <p className="text-2xl font-bold">{projects.filter(p => p.deploymentStatus === 'deployed').length}</p>
                   </div>
                 </div>
               </CardContent>
@@ -682,26 +545,11 @@ export default function ManagementPage() {
               <CardContent className="p-4">
                 <div className="flex items-center space-x-3">
                   <div className="p-2 bg-purple-900 rounded-lg">
-                    <TrendingUp className="h-5 w-5 text-purple-400" />
+                    <Settings className="h-5 w-5 text-purple-400" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-400">Active Projects</p>
-                    <p className="text-2xl font-bold">{quickStats.activeProjects}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-gray-800 border-gray-700">
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-orange-900 rounded-lg">
-                    <Calendar className="h-5 w-5 text-orange-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-400">Last Activity</p>
-                    <p className="text-sm font-bold truncate">
-                      {quickStats.lastActivity === 'Never' ? 'Never' : new Date(quickStats.lastActivity).toLocaleDateString()}
-                    </p>
+                    <p className="text-sm text-gray-400">With Env Vars</p>
+                    <p className="text-2xl font-bold">{projects.filter(p => p.environmentVariables.length > 0).length}</p>
                   </div>
                 </div>
               </CardContent>
@@ -735,37 +583,15 @@ export default function ManagementPage() {
                     </select>
                   </div>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={exportData}
-                    className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                  >
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Export Data
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={clearAllData}
-                    className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Clear All
-                  </Button>
-                </div>
               </div>
             </CardContent>
           </Card>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            {/* Improved responsive tabs */}
-            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 gap-2 bg-gray-800">
-              <TabsTrigger value="overview" className="data-[state=active]:bg-gray-700 data-[state=active]:text-white">Overview</TabsTrigger>
-              <TabsTrigger value="deployments" className="data-[state=active]:bg-gray-700 data-[state=active]:text-white">Deployments</TabsTrigger>
-              <TabsTrigger value="environment" className="data-[state=active]:bg-gray-700 data-[state=active]:text-white">Environment</TabsTrigger>
-              <TabsTrigger value="github" className="data-[state=active]:bg-gray-700 data-[state=active]:text-white">GitHub</TabsTrigger>
+            {/* Simplified tabs - focus on what developers need */}
+            <TabsList className="grid w-full grid-cols-2 gap-2 bg-gray-800">
+              <TabsTrigger value="overview" className="data-[state=active]:bg-gray-700 data-[state=active]:text-white">Projects</TabsTrigger>
+              <TabsTrigger value="environment" className="data-[state=active]:bg-gray-700 data-[state=active]:text-white">Environment Variables</TabsTrigger>
             </TabsList>
 
             {/* Overview Tab */}
@@ -799,30 +625,18 @@ export default function ManagementPage() {
                     </CardHeader>
                     <CardContent>
                       {project.url ? (
-                        <div className="space-y-2">
-                          <div className="flex items-center space-x-2">
-                            <ExternalLink className="h-4 w-4 text-gray-400" />
-                            <a 
-                              href={project.url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-blue-400 hover:underline text-sm truncate"
-                            >
-                              {project.url.replace(/^https?:\/\//, '').length > 25 ? 
-                                `${project.url.replace(/^https?:\/\//, '').substring(0, 25)}...` : 
-                                project.url.replace(/^https?:\/\//, '')}
-                            </a>
-                          </div>
-                          {project.lastDeployment ? (
-                            <div className="flex items-center justify-between pt-2">
-                              <span className="text-xs text-gray-400">Last Deployment</span>
-                              {getStatusBadge(project.lastDeployment.status)}
-                            </div>
-                          ) : (
-                            <div className="text-xs text-gray-400 pt-2">
-                              No deployments yet
-                            </div>
-                          )}
+                        <div className="flex items-center space-x-2">
+                          <ExternalLink className="h-4 w-4 text-gray-400" />
+                          <a
+                            href={project.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-400 hover:underline text-sm truncate"
+                          >
+                            {project.url.replace(/^https?:\/\//, '').length > 25 ?
+                              `${project.url.replace(/^https?:\/\//, '').substring(0, 25)}...` :
+                              project.url.replace(/^https?:\/\//, '')}
+                          </a>
                         </div>
                       ) : (
                         <div className="text-sm text-gray-400">
@@ -833,14 +647,26 @@ export default function ManagementPage() {
                         <span className="text-xs text-gray-400">
                           {new Date(project.lastActivity).toLocaleDateString()}
                         </span>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => router.push(`/workspace/deployment?project=${project.id}`)}
-                          className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                        >
-                          Manage
-                        </Button>
+                        <div className="flex gap-2">
+                          <Link href={`/workspace/projects/${project.slug}`}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                            >
+                              <ExternalLink className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                          </Link>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push(`/workspace/deployment?project=${project.id}`)}
+                            className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                          >
+                            Manage
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -863,154 +689,23 @@ export default function ManagementPage() {
               </div>
             </TabsContent>
 
-            {/* Deployments Tab */}
-            <TabsContent value="deployments" className="space-y-6">
-              <Card className="bg-gray-800 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2 text-white">
-                    <Rocket className="h-5 w-5 text-blue-400" />
-                    <span>Trigger New Deployment</span>
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Deploy a specific commit or branch to your project
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <Label htmlFor="commit-sha" className="text-gray-300">Commit SHA (Optional)</Label>
-                      <Input
-                        id="commit-sha"
-                        placeholder="abc123..."
-                        value={newDeployment.commitSha}
-                        onChange={(e) => setNewDeployment(prev => ({ ...prev, commitSha: e.target.value }))}
-                        className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="branch" className="text-gray-300">Branch (Optional)</Label>
-                      <Input
-                        id="branch"
-                        placeholder="main"
-                        value={newDeployment.branch}
-                        onChange={(e) => setNewDeployment(prev => ({ ...prev, branch: e.target.value }))}
-                        className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="environment" className="text-gray-300">Environment</Label>
-                      <select
-                        id="environment"
-                        className="w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-700 text-white"
-                        value={newDeployment.environment}
-                        onChange={(e) => setNewDeployment(prev => ({ ...prev, environment: e.target.value }))}
-                      >
-                        <option value="production" className="bg-gray-700">Production</option>
-                        <option value="preview" className="bg-gray-700">Preview</option>
-                        <option value="development" className="bg-gray-700">Development</option>
-                      </select>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-2">
-                    {projects.map((project) => (
-                      <Button
-                        key={project.id}
-                        onClick={() => triggerDeployment(project.id)}
-                        disabled={!newDeployment.commitSha && !newDeployment.branch}
-                        variant="outline"
-                        className="flex-1 min-w-[150px] bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                      >
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Deploy {project.name.length > 12 ? `${project.name.substring(0, 12)}...` : project.name}
-                      </Button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="space-y-4">
-                {projects.map((project) => (
-                  <Card key={project.id} className="bg-gray-800 border-gray-700">
-                    <CardHeader>
-                      <CardTitle className="flex items-center space-x-2 text-white">
-                        {project.platform === 'vercel' ? (
-                          <Globe className="h-5 w-5 text-blue-500" />
-                        ) : (
-                          <Globe className="h-5 w-5 text-green-500" />
-                        )}
-                        <span>{project.name} Deployments</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {project.lastDeployment ? (
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
-                            <div className="flex items-center space-x-3">
-                              {getStatusIcon(project.lastDeployment.status)}
-                              <div>
-                                <div className="font-medium text-white">
-                                  {project.lastDeployment.commitMessage || 'Deployment'}
-                                </div>
-                                <div className="text-sm text-gray-400">
-                                  {project.lastDeployment.commitSha && (
-                                    <span className="font-mono text-xs">
-                                      {project.lastDeployment.commitSha.substring(0, 7)}
-                                    </span>
-                                  )}
-                                  {project.lastDeployment.branch && (
-                                    <span className="ml-2 flex items-center">
-                                      <GitBranch className="h-3 w-3 mr-1" />
-                                      {project.lastDeployment.branch}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              {getStatusBadge(project.lastDeployment.status)}
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => rollbackDeployment(project.id, project.lastDeployment!.id)}
-                                disabled={project.lastDeployment.status !== 'ready'}
-                                className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                              >
-                                <RotateCcw className="h-4 w-4 mr-1" />
-                                Rollback
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-center py-6 text-gray-400">
-                          No deployments found
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </TabsContent>
-
             {/* Environment Variables Tab */}
             <TabsContent value="environment" className="space-y-6">
               <Card className="bg-gray-800 border-gray-700">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2 text-white">
                     <Settings className="h-5 w-5" />
-                    <span>Add Environment Variable</span>
+                    <span>Environment Variables</span>
                   </CardTitle>
                   <CardDescription className="text-gray-400">
-                    Add new environment variables to your projects
+                    Manage environment variables for your projects - they'll be automatically included in Vercel and Netlify deployments
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 gap-4">
-                    {/* Improved responsive grid for environment variable form */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="env-key" className="text-gray-300">Key</Label>
+                        <Label htmlFor="env-key" className="text-gray-300">Variable Name</Label>
                         <Input
                           id="env-key"
                           placeholder="API_KEY"
@@ -1030,6 +725,9 @@ export default function ManagementPage() {
                           className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                         />
                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="env-environment" className="text-gray-300">Environment</Label>
                         <select
@@ -1054,7 +752,7 @@ export default function ManagementPage() {
                           <option value="" className="bg-gray-700">Select a project</option>
                           {projects.map(project => (
                             <option key={project.id} value={project.id} className="bg-gray-700">
-                              {project.name.length > 20 ? `${project.name.substring(0, 20)}...` : project.name}
+                              {project.name}
                             </option>
                           ))}
                         </select>
@@ -1087,34 +785,119 @@ export default function ManagementPage() {
                 </CardContent>
               </Card>
 
+              {/* Export Environment Variables Card */}
+              <Card className="bg-gray-800 border-gray-700">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2 text-white">
+                    <Download className="h-5 w-5" />
+                    <span>Export Environment Variables</span>
+                  </CardTitle>
+                  <CardDescription className="text-gray-400">
+                    Export your environment variables in different formats for local development or deployment
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="p-4 bg-blue-900/20 border border-blue-700 rounded-lg">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <CheckCircle className="h-4 w-4 text-blue-400" />
+                      <span className="text-sm text-blue-300 font-medium">Auto-Deployment Integration</span>
+                    </div>
+                    <p className="text-sm text-gray-300">
+                      Environment variables are automatically included when deploying to Vercel or Netlify through the deployment page.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="text-sm font-medium text-white mb-3">Export All Projects</h4>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => exportAllEnvironmentVariables('dotenv')}
+                          variant="outline"
+                          size="sm"
+                          className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          .env
+                        </Button>
+                        <Button
+                          onClick={() => exportAllEnvironmentVariables('json')}
+                          variant="outline"
+                          size="sm"
+                          className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                        >
+                          <Code className="h-4 w-4 mr-2" />
+                          JSON
+                        </Button>
+                        <Button
+                          onClick={() => exportAllEnvironmentVariables('shell')}
+                          variant="outline"
+                          size="sm"
+                          className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                        >
+                          <Code className="h-4 w-4 mr-2" />
+                          Shell
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="text-sm font-medium text-white mb-3">Individual Projects</h4>
+                      <p className="text-sm text-gray-400">
+                        Export options are available in each project's environment variables section below.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               <div className="space-y-4">
                 {projects.map((project) => (
                   <Card key={project.id} className="bg-gray-800 border-gray-700">
                     <CardHeader>
-                      <CardTitle className="flex items-center space-x-2 text-white">
-                        <Settings className="h-5 w-5" />
-                        <span>{project.name} Environment Variables</span>
-                      </CardTitle>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center space-x-2 text-white">
+                          <Settings className="h-5 w-5" />
+                          <span>{project.name} Environment Variables</span>
+                        </CardTitle>
+                        {project.environmentVariables.length > 0 && (
+                          <div className="flex gap-1">
+                            <Button
+                              onClick={() => exportEnvironmentVariables(project.id, 'dotenv')}
+                              variant="outline"
+                              size="sm"
+                              className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-8"
+                            >
+                              <FileText className="h-3 w-3 mr-1" />
+                              .env
+                            </Button>
+                            <Button
+                              onClick={() => exportEnvironmentVariables(project.id, 'json')}
+                              variant="outline"
+                              size="sm"
+                              className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-8"
+                            >
+                              <Code className="h-3 w-3 mr-1" />
+                              JSON
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </CardHeader>
                     <CardContent>
                       {project.environmentVariables.length > 0 ? (
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                           {project.environmentVariables.map((envVar, index) => (
-                            <div key={index} className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
-                              <div>
-                                <div className="font-medium text-white">{envVar.key}</div>
-                                <div className="text-sm text-gray-400">
-                                  {envVar.isSecret ? '••••••••' : envVar.value}
-                                </div>
-                                <Badge variant="outline" className="mt-1 bg-gray-600 text-gray-300 border-gray-500">
-                                  {envVar.environment}
-                                </Badge>
+                            <div key={index} className="flex items-center justify-between p-2 bg-gray-700 rounded">
+                              <div className="flex-1">
+                                <span className="font-medium text-white text-sm">{envVar.key}</span>
+                                <span className="text-xs text-gray-400 ml-2">({envVar.environment})</span>
                               </div>
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => deleteEnvironmentVariable(project.id, envVar.key, envVar.environment)}
-                                className="text-gray-400 hover:text-white"
+                                className="text-gray-400 hover:text-red-400 h-8 w-8 p-0"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -1122,145 +905,14 @@ export default function ManagementPage() {
                           ))}
                         </div>
                       ) : (
-                        <div className="text-center py-6 text-gray-400">
-                          No environment variables found
+                        <div className="text-center py-4 text-gray-400 text-sm">
+                          No environment variables
                         </div>
                       )}
                     </CardContent>
                   </Card>
                 ))}
               </div>
-            </TabsContent>
-
-            {/* GitHub Tab */}
-            <TabsContent value="github" className="space-y-6">
-              <Card className="bg-gray-800 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2 text-white">
-                    <Github className="h-5 w-5" />
-                    <span>Deployed Repositories</span>
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">
-                    View your deployed GitHub repositories
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {deployedRepos.length > 0 ? (
-                    <div className="space-y-3">
-                      {deployedRepos
-                        .filter(repo => repo.githubUrl)
-                        .map((repo) => (
-                        <div key={repo.id} className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
-                          <div className="flex items-center space-x-3">
-                            <Github className="h-5 w-5" />
-                            <div>
-                              <div className="font-medium text-white">{repo.projectName}</div>
-                              <div className="text-sm text-gray-400">{repo.githubRepo}</div>
-                              <div className="text-xs text-gray-400 mt-1">
-                                Deployed: {new Date(repo.deployedAt).toLocaleDateString()}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => window.open(repo.githubUrl, '_blank')}
-                              className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                            >
-                              <ExternalLink className="h-4 w-4 mr-1" />
-                              View Repo
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-6 text-gray-400">
-                      No deployed repositories found. Deploy a project to GitHub to see it listed here.
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-gray-800 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2 text-white">
-                    <FolderOpen className="h-5 w-5" />
-                    <span>All Deployed Projects</span>
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">
-                    View all your deployed projects across different platforms
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {deployedRepos.length > 0 ? (
-                    <div className="space-y-3">
-                      {deployedRepos.map((repo) => (
-                        <div key={repo.id} className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
-                          <div className="flex items-center space-x-3">
-                            <div className="flex items-center space-x-2">
-                              {repo.githubUrl && <Github className="h-5 w-5 text-gray-400" />}
-                              {repo.vercelUrl && <Globe className="h-5 w-5 text-blue-400" />}
-                              {repo.netlifyUrl && <Globe className="h-5 w-5 text-green-400" />}
-                            </div>
-                            <div>
-                              <div className="font-medium text-white">{repo.projectName}</div>
-                              <div className="text-sm text-gray-400">
-                                {repo.githubRepo && <span>GitHub: {repo.githubRepo}</span>}
-                                {repo.vercelUrl && <span>Vercel: {repo.vercelUrl.replace(/^https?:\/\//, '')}</span>}
-                                {repo.netlifyUrl && <span>Netlify: {repo.netlifyUrl.replace(/^https?:\/\//, '')}</span>}
-                              </div>
-                              <div className="text-xs text-gray-400 mt-1">
-                                Last updated: {new Date(repo.lastUpdated).toLocaleDateString()}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            {repo.githubUrl && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => window.open(repo.githubUrl, '_blank')}
-                                className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                              >
-                                <Github className="h-4 w-4 mr-1" />
-                                Repo
-                              </Button>
-                            )}
-                            {repo.vercelUrl && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => window.open(repo.vercelUrl!, '_blank')}
-                                className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                              >
-                                <Globe className="h-4 w-4 mr-1 text-blue-400" />
-                                Vercel
-                              </Button>
-                            )}
-                            {repo.netlifyUrl && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => window.open(repo.netlifyUrl!, '_blank')}
-                                className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
-                              >
-                                <Globe className="h-4 w-4 mr-1 text-green-400" />
-                                Netlify
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-6 text-gray-400">
-                      No deployed projects found.
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
             </TabsContent>
           </Tabs>
         </div>

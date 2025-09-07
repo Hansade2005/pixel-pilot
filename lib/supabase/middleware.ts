@@ -32,8 +32,9 @@ export async function updateSession(request: NextRequest) {
   // Redirect unauthenticated users to login, except for auth pages, landing page, and public pages
   const publicPages = ["/", "/community", "/pricing", "/enterprise", "/learn", "/launched"]
   const isPublicPage = publicPages.includes(request.nextUrl.pathname)
+  const isGitHubOAuthCallback = request.nextUrl.pathname.includes("/api/auth/github/oauth-callback")
   
-  if (!user && !request.nextUrl.pathname.startsWith("/auth") && !isPublicPage) {
+  if (!user && !request.nextUrl.pathname.startsWith("/auth") && !isPublicPage && !isGitHubOAuthCallback) {
     const url = request.nextUrl.clone()
     url.pathname = "/auth/login"
     return NextResponse.redirect(url)
