@@ -19,68 +19,847 @@
           "title": "Platform Overview",
           "description": "Understand what Pixel Pilot is and how it can transform your app development workflow",
           "content": {
-            "introduction": "Pixel Pilot is a revolutionary AI-powered app development platform that allows you to create web applications by simply chatting with AI. Built with Next.js, TypeScript, and integrated with powerful tools like E2B sandboxes and deployment platforms.",
+            "introduction": "Pixel Pilot represents a fundamental shift in how software is created. Imagine a world where building a professional web application doesn't require years of coding experience, complex tooling, or extensive technical knowledge. This is the reality that Pixel Pilot makes possible today.\n\nAt its core, Pixel Pilot is an AI-powered development platform that transforms natural language conversations into production-ready web applications. Whether you're a seasoned developer looking to accelerate your workflow, an entrepreneur bringing an idea to life, or someone completely new to coding, Pixel Pilot democratizes software creation while maintaining professional standards and modern best practices.\n\nThis comprehensive overview will guide you through Pixel Pilot's capabilities, architecture, and transformative potential. By the end, you'll understand not just what Pixel Pilot does, but how it fundamentally changes the software development landscape.",
+            "platform_visualization": {
+              "workflow_diagram": {
+                "description": "Visual representation of the Pixel Pilot development workflow",
+                "stages": [
+                  {
+                    "stage": "1. Natural Language Input",
+                    "description": "User describes their application requirements in plain English",
+                    "visual_icon": "💬",
+                    "example": "I want to build a task management app with real-time collaboration"
+                  },
+                  {
+                    "stage": "2. AI Analysis & Planning",
+                    "description": "AI analyzes requirements and creates detailed development plan",
+                    "visual_icon": "🧠",
+                    "example": "AI identifies: React frontend, Supabase backend, real-time features"
+                  },
+                  {
+                    "stage": "3. Automated Code Generation",
+                    "description": "AI generates production-ready code with proper architecture",
+                    "visual_icon": "⚡",
+                    "example": "Creates complete app structure, database schema, API endpoints"
+                  },
+                  {
+                    "stage": "4. Live Preview & Testing",
+                    "description": "Application runs in secure sandbox with real-time preview",
+                    "visual_icon": "👁️",
+                    "example": "User sees working app instantly, can interact and test features"
+                  },
+                  {
+                    "stage": "5. Iterative Refinement",
+                    "description": "User provides feedback, AI refines and improves the application",
+                    "visual_icon": "🔄",
+                    "example": "Add new features, fix issues, optimize performance"
+                  },
+                  {
+                    "stage": "6. Production Deployment",
+                    "description": "One-click deployment to production with monitoring",
+                    "visual_icon": "🚀",
+                    "example": "App goes live with automatic scaling and performance monitoring"
+                  }
+                ]
+              },
+              "architecture_diagram": {
+                "description": "High-level architecture showing how Pixel Pilot components interact",
+                "components": {
+                  "user_interface": {
+                    "description": "Intuitive chat interface and visual development environment",
+                    "visual_representation": "🖥️ Chat Interface + Code Editor",
+                    "key_features": ["Natural language input", "Visual code editor", "Real-time preview"]
+                  },
+                  "ai_processing_engine": {
+                    "description": "Core AI system that processes requests and generates code",
+                    "visual_representation": "🤖 AI Brain with Code Generation",
+                    "key_features": ["Natural language processing", "Code generation", "Quality assurance"]
+                  },
+                  "sandbox_environment": {
+                    "description": "Secure execution environment for application testing",
+                    "visual_representation": "🔒 Isolated Sandbox Container",
+                    "key_features": ["Secure execution", "Live preview", "Performance monitoring"]
+                  },
+                  "deployment_pipeline": {
+                    "description": "Automated deployment system to production environments",
+                    "visual_representation": "🚀 Deployment Rocket with Cloud Platforms",
+                    "key_features": ["GitHub integration", "CI/CD automation", "Multi-platform support"]
+                  }
+                }
+              }
+            },
             "key_features": [
-              "AI-Powered Development through natural language conversations",
-              "Real-time Preview system with E2B sandbox environments",
-              "Instant deployment to GitHub + Vercel/Netlify",
-              "Modern tech stack with automatic template generation",
-              "Professional code editor with syntax highlighting",
-              "Secure authentication with GitHub OAuth",
-              "Cross-platform compatibility (desktop and mobile)",
-              "Real-time collaboration infrastructure"
+              {
+                "feature": "Conversational AI Development",
+                "description": "Transform natural language descriptions into production-ready code through intelligent AI conversations",
+                "capabilities": [
+                  "Context-aware requirement analysis and understanding",
+                  "Multi-step development planning and execution",
+                  "Intelligent code generation with proper error handling",
+                  "Real-time feedback and iterative refinement",
+                  "Cross-platform compatibility and responsive design",
+                  "Automated testing and quality assurance"
+                ],
+                "benefits": "10x faster development, accessible to non-technical users, consistent code quality",
+                "real_world_example": "Describe 'Create a task management app with drag-and-drop Kanban board' → AI generates complete application with database, API, and UI",
+                "visual_illustration": {
+                  "conversation_flow": [
+                    {
+                      "user_input": "💬 'Build me a task management app with drag-and-drop functionality'",
+                      "ai_response": "🤖 'I'll create a comprehensive task management system with the following components...'",
+                      "generated_output": "📄 Complete React application with drag-and-drop, real-time updates, and database integration"
+                    }
+                  ],
+                  "code_generation_demo": {
+                    "input_description": "Simple request for a user profile component",
+                    "ai_generated_code": "// AI generates this complete, production-ready component\nexport default function UserProfile({ user, onUpdate }) {\n  const [loading, setLoading] = useState(false);\n  \n  const handleSubmit = async (formData) => {\n    setLoading(true);\n    try {\n      await onUpdate(formData);\n      toast.success('Profile updated successfully');\n    } catch (error) {\n      toast.error('Failed to update profile');\n    } finally {\n      setLoading(false);\n    }\n  };\n  \n  return (\n    <form onSubmit={handleSubmit}>\n      {/* Complete form with validation */}\n    </form>\n  );\n}",
+                    "features_automatically_included": ["Error handling", "Loading states", "Form validation", "User feedback", "TypeScript types"]
+                  }
+                }
+              },
+              {
+                "feature": "E2B Sandbox Preview System",
+                "description": "Secure, isolated development environments that provide real-time application previews",
+                "capabilities": [
+                  "Live preview of applications as you build them",
+                  "Isolated execution environments for security",
+                  "Instant feedback on code changes and UI updates",
+                  "Cross-browser testing and compatibility validation",
+                  "Performance monitoring and optimization insights",
+                  "Collaborative preview sharing with team members"
+                ],
+                "benefits": "Immediate visual feedback, secure development environment, collaborative development",
+                "real_world_example": "Make UI changes through chat → instantly see updates in live preview without page refresh",
+                "visual_illustration": {
+                  "sandbox_diagram": {
+                    "description": "Visual representation of the sandbox environment",
+                    "components": [
+                      "🔒 Secure Container: Isolated execution environment",
+                      "🌐 Live Browser: Real-time application preview",
+                      "📊 Performance Monitor: Real-time metrics and analytics",
+                      "🔄 Hot Reload: Instant updates without page refresh",
+                      "👥 Collaboration: Shared preview with team members"
+                    ]
+                  },
+                  "workflow_visualization": [
+                    {
+                      "step": "1. Code Change",
+                      "visual": "⌨️ User types in chat or editor",
+                      "result": "⚡ Instant compilation and execution"
+                    },
+                    {
+                      "step": "2. Sandbox Processing",
+                      "visual": "🔄 E2B processes changes securely",
+                      "result": "🚀 Application updates in real-time"
+                    },
+                    {
+                      "step": "3. Live Preview",
+                      "visual": "👁️ User sees changes immediately",
+                      "result": "✅ Instant visual feedback"
+                    }
+                  ],
+                  "security_features": {
+                    "isolation_visual": "🛡️ Sandbox prevents external access and data leakage",
+                    "safe_execution": "🔒 Code runs in controlled environment",
+                    "resource_limits": "📏 Automatic resource monitoring and limits"
+                  }
+                }
+              },
+              {
+                "feature": "One-Click Production Deployment",
+                "description": "Seamless deployment pipeline from development to production environments",
+                "capabilities": [
+                  "Automatic GitHub repository creation and management",
+                  "Integration with Vercel, Netlify, and other platforms",
+                  "Environment-specific configuration management",
+                  "Automated CI/CD pipeline setup",
+                  "Performance monitoring and analytics integration",
+                  "Custom domain and SSL certificate management"
+                ],
+                "benefits": "Zero deployment friction, automatic scaling, professional hosting infrastructure",
+                "real_world_example": "Complete application → one-click deployment → live production URL in minutes",
+                "visual_illustration": {
+                  "deployment_flowchart": [
+                    {
+                      "stage": "Development Complete",
+                      "visual": "✅ App ready in Pixel Pilot",
+                      "action": "Click 'Deploy to Production'"
+                    },
+                    {
+                      "stage": "GitHub Integration",
+                      "visual": "🔗 Auto-create GitHub repo",
+                      "action": "Repository created with all code"
+                    },
+                    {
+                      "stage": "Platform Selection",
+                      "visual": "🎯 Choose Vercel/Netlify/AWS",
+                      "action": "Select deployment target"
+                    },
+                    {
+                      "stage": "Automated Setup",
+                      "visual": "⚙️ CI/CD pipeline configured",
+                      "action": "Build, test, and deploy automatically"
+                    },
+                    {
+                      "stage": "Live Production",
+                      "visual": "🚀 https://yourapp.com live",
+                      "action": "App accessible worldwide"
+                    }
+                  ],
+                  "platform_comparison": {
+                    "vercel": {
+                      "icon": "▲",
+                      "best_for": "Next.js apps, serverless functions",
+                      "features": "Global CDN, preview deployments, analytics"
+                    },
+                    "netlify": {
+                      "icon": "△",
+                      "best_for": "Static sites, JAMstack applications",
+                      "features": "Form handling, identity, edge functions"
+                    },
+                    "github_pages": {
+                      "icon": "📄",
+                      "best_for": "Simple static websites",
+                      "features": "Free hosting, custom domains, HTTPS"
+                    }
+                  },
+                  "deployment_dashboard_visual": {
+                    "live_metrics": "📊 Real-time deployment progress and status",
+                    "performance_monitoring": "📈 Response times, error rates, uptime",
+                    "scaling_indicators": "📏 Auto-scaling based on traffic",
+                    "security_status": "🔒 SSL certificates, security headers",
+                    "backup_status": "💾 Automatic backups and rollbacks"
+                  }
+                }
+              },
+              {
+                "feature": "Advanced AI Agent System",
+                "description": "Sophisticated AI agents that handle planning, development, and optimization autonomously",
+                "capabilities": [
+                  "Plan Mode: Strategic planning and architecture design",
+                  "Build Mode: Code generation and implementation",
+                  "Quality Assurance: Automated testing and validation",
+                  "Performance Optimization: Code and infrastructure tuning",
+                  "Security Implementation: Best practices and vulnerability scanning",
+                  "Documentation Generation: API docs, README files, user guides"
+                ],
+                "benefits": "Autonomous development, consistent quality, comprehensive feature coverage",
+                "real_world_example": "Request 'Build an e-commerce platform' → AI plans architecture, generates code, implements features, creates tests, and optimizes performance"
+              },
+              {
+                "feature": "Professional Development Environment",
+                "description": "Industry-standard development tools integrated into a seamless workflow",
+                "capabilities": [
+                  "Monaco Editor with full IDE features and extensions",
+                  "Intelligent code completion and refactoring suggestions",
+                  "Integrated debugging and error tracking",
+                  "Version control with Git and GitHub integration",
+                  "Package management with automatic dependency resolution",
+                  "Code formatting and linting with industry standards"
+                ],
+                "benefits": "Familiar development experience, productivity enhancements, code quality assurance",
+                "real_world_example": "Write code with AI assistance → automatic imports, error detection, and formatting"
+              },
+              {
+                "feature": "Enterprise-Grade Security & Authentication",
+                "description": "Robust security framework with enterprise-level authentication and data protection",
+                "capabilities": [
+                  "GitHub OAuth integration with secure token management",
+                  "Role-based access control and permission management",
+                  "Data encryption at rest and in transit",
+                  "OWASP security compliance and vulnerability scanning",
+                  "Audit logging and compliance reporting",
+                  "Multi-factor authentication and session management"
+                ],
+                "benefits": "Enterprise security standards, regulatory compliance, data protection",
+                "real_world_example": "Secure authentication system → automatic security headers, input validation, and audit trails"
+              },
+              {
+                "feature": "Real-Time Collaboration Infrastructure",
+                "description": "Built-in collaboration tools for team development and project management",
+                "capabilities": [
+                  "Live editing and real-time code synchronization",
+                  "Commenting and review systems for code collaboration",
+                  "Project sharing and team workspace management",
+                  "Version control and conflict resolution",
+                  "Communication tools and notification systems",
+                  "Project analytics and progress tracking"
+                ],
+                "benefits": "Seamless team collaboration, version control, project transparency",
+                "real_world_example": "Multiple team members edit simultaneously → automatic conflict resolution and change tracking"
+              },
+              {
+                "feature": "Comprehensive Template Library",
+                "description": "Extensive collection of professionally designed templates and starter projects",
+                "capabilities": [
+                  "Industry-specific application templates",
+                  "UI component libraries and design systems",
+                  "API integration templates and examples",
+                  "Database schema templates and migration scripts",
+                  "Deployment configuration templates",
+                  "Best practice implementation examples"
+                ],
+                "benefits": "Accelerated project startup, proven architectures, consistent quality",
+                "real_world_example": "Choose 'E-commerce' template → pre-built product catalog, shopping cart, payment integration"
+              }
             ],
             "target_audience": "Developers, entrepreneurs, designers, and anyone who wants to build web applications quickly and efficiently",
             "use_cases": [
-              "Rapid prototyping of ideas",
-              "MVP development for startups",
-              "Personal projects and portfolios",
-              "Learning web development concepts",
-              "Building internal tools and dashboards",
-              "Creating client presentations and demos"
+              {
+                "use_case": "Rapid Prototyping & MVP Development",
+                "description": "Transform ideas into working prototypes in hours instead of weeks or months",
+                "target_users": "Entrepreneurs, product managers, startup founders",
+                "benefits": "Faster validation, reduced development costs, market-ready prototypes",
+                "example": "Idea: Social media analytics dashboard → Prototype: Working dashboard with data visualization and user authentication in 4 hours",
+                "success_metrics": "90% faster time-to-prototype, 70% cost reduction compared to traditional development"
+              },
+              {
+                "use_case": "Internal Business Tools & Dashboards",
+                "description": "Build custom business applications for internal operations and data management",
+                "target_users": "Business analysts, operations teams, department managers",
+                "benefits": "Tailored solutions, improved efficiency, data-driven decision making",
+                "example": "Need: Customer relationship management system → Solution: Custom CRM with lead tracking, analytics, and team collaboration",
+                "success_metrics": "50% improvement in operational efficiency, custom features matched to business needs"
+              },
+              {
+                "use_case": "Learning & Educational Projects",
+                "description": "Build real applications while learning modern web development concepts",
+                "target_users": "Students, career changers, self-learners",
+                "benefits": "Practical experience, portfolio building, hands-on learning",
+                "example": "Learning goal: Full-stack development → Project: Personal blog with CMS, user authentication, and analytics",
+                "success_metrics": "Portfolio with production applications, practical development skills, industry-relevant experience"
+              },
+              {
+                "use_case": "Client Presentations & Demos",
+                "description": "Create professional demos and proof-of-concept applications for client presentations",
+                "target_users": "Consultants, agencies, freelancers",
+                "benefits": "Professional presentation materials, faster proposal-to-demo cycle, competitive advantage",
+                "example": "Client pitch: E-commerce platform → Demo: Fully functional store with product catalog, cart, and checkout",
+                "success_metrics": "Higher conversion rates, faster sales cycles, professional presentation quality"
+              },
+              {
+                "use_case": "Personal Projects & Portfolios",
+                "description": "Build impressive portfolio pieces and personal projects that showcase capabilities",
+                "target_users": "Job seekers, freelancers, creative professionals",
+                "benefits": "Professional portfolio, skill demonstration, personal branding",
+                "example": "Portfolio project: Interactive resume website with contact forms and project showcase",
+                "success_metrics": "Increased interview requests, higher freelance rates, professional credibility"
+              },
+              {
+                "use_case": "API Development & Integrations",
+                "description": "Build robust APIs and integrate with external services and platforms",
+                "target_users": "Developers, system architects, integration specialists",
+                "benefits": "Rapid API development, seamless integrations, scalable backend systems",
+                "example": "Integration need: Third-party payment processing → Solution: RESTful API with Stripe integration and webhook handling",
+                "success_metrics": "80% faster API development, reliable integrations, scalable architecture"
+              },
+              {
+                "use_case": "Mobile-First Web Applications",
+                "description": "Create responsive web applications optimized for mobile devices and touch interfaces",
+                "target_users": "Mobile-focused developers, UX designers, consumer app creators",
+                "benefits": "Mobile-optimized user experience, touch-friendly interfaces, cross-device compatibility",
+                "example": "Mobile app: Task management with gesture controls → Web app: Responsive design with touch optimization",
+                "success_metrics": "90% mobile user satisfaction, improved engagement metrics, cross-platform compatibility"
+              },
+              {
+                "use_case": "Data Visualization & Analytics Dashboards",
+                "description": "Build interactive dashboards for data analysis and business intelligence",
+                "target_users": "Data analysts, business intelligence teams, executives",
+                "benefits": "Interactive data exploration, real-time insights, executive reporting",
+                "example": "Analytics need: Sales performance dashboard → Solution: Interactive charts with filtering, drill-down, and export capabilities",
+                "success_metrics": "60% faster decision-making, improved data-driven insights, executive satisfaction"
+              },
+              {
+                "use_case": "Content Management Systems",
+                "description": "Create custom CMS solutions for content creation and management workflows",
+                "target_users": "Content creators, marketing teams, publishing organizations",
+                "benefits": "Custom content workflows, SEO optimization, multi-author collaboration",
+                "example": "CMS need: Technical blog platform → Solution: Markdown-based CMS with SEO, comments, and analytics",
+                "success_metrics": "70% improvement in content publishing workflow, better SEO performance, increased reader engagement"
+              },
+              {
+                "use_case": "Marketplaces & Multi-Vendor Platforms",
+                "description": "Build complex marketplace applications with vendor management and transaction processing",
+                "target_users": "E-commerce entrepreneurs, platform builders, marketplace operators",
+                "benefits": "Scalable marketplace architecture, vendor management, secure transactions",
+                "example": "Marketplace: Freelance services platform → Solution: Multi-vendor marketplace with escrow, reviews, and dispute resolution",
+                "success_metrics": "Successful platform launch, vendor acquisition, transaction volume growth"
+              }
             ],
             "technical_architecture": {
-              "frontend": "Next.js 14 with App Router, TypeScript, Tailwind CSS, and Shadcn/ui components",
-              "backend": "Supabase for authentication, database, and real-time features",
-              "ai_integration": "@ai-sdk/openai-compatible with Codestral for intelligent code generation",
-              "deployment": "GitHub integration with Vercel/Netlify for seamless deployment",
+              "frontend_layer": {
+                "framework": "Next.js 14 with App Router",
+                "language": "TypeScript for type safety and better developer experience",
+                "styling": "Tailwind CSS for utility-first styling with responsive design",
+                "components": "Shadcn/ui component library for consistent, accessible UI components",
+                "state_management": "React hooks and context for client-side state management",
+                "routing": "Next.js App Router for nested routes and layouts",
+                "benefits": "Server-side rendering, static generation, API routes, excellent performance"
+              },
+              "backend_layer": {
+                "database": "Supabase PostgreSQL with real-time subscriptions and row-level security",
+                "authentication": "Supabase Auth with GitHub OAuth integration",
+                "api_layer": "Next.js API routes with automatic TypeScript types",
+                "real_time": "Supabase real-time for live updates and collaboration",
+                "storage": "Supabase Storage for file uploads and media management",
+                "benefits": "Managed infrastructure, built-in security, real-time capabilities"
+              },
+              "ai_layer": {
+                "primary_model": "Codestral by Mistral AI - specialized for code generation",
+                "integration": "@ai-sdk/openai-compatible for seamless AI integration",
+                "capabilities": "Context-aware code generation, debugging assistance, refactoring suggestions",
+                "natural_language": "Advanced NLP for understanding requirements and generating specifications",
+                "learning": "Continuous learning from user interactions and feedback",
+                "benefits": "Intelligent code generation, contextual assistance, quality improvements"
+              },
+              "infrastructure_layer": {
               "preview_system": "E2B sandboxes for secure, isolated development environments",
-              "editor": "Monaco Editor for professional code editing experience"
+                "deployment": "GitHub integration with Vercel/Netlify for one-click deployment",
+                "version_control": "Git integration with automatic repository management",
+                "ci_cd": "Automated build and deployment pipelines",
+                "monitoring": "Performance monitoring and error tracking",
+                "benefits": "Secure development, instant deployment, professional hosting"
+              },
+              "development_environment": {
+                "editor": "Monaco Editor (same as VS Code) with full IDE features",
+                "intellisense": "Intelligent code completion and error detection",
+                "debugging": "Integrated debugging tools and console output",
+                "collaboration": "Real-time collaboration and code sharing",
+                "extensions": "Extensible architecture for additional tools and features",
+                "benefits": "Familiar development experience, productivity enhancements, team collaboration"
+              },
+              "security_framework": {
+                "authentication": "GitHub OAuth with secure token management",
+                "authorization": "Role-based access control and permission management",
+                "data_protection": "Encryption at rest and in transit",
+                "api_security": "Rate limiting, input validation, and secure headers",
+                "compliance": "OWASP security standards and best practices",
+                "benefits": "Enterprise-grade security, regulatory compliance, data protection"
+              },
+              "performance_optimization": {
+                "frontend": "Code splitting, lazy loading, image optimization",
+                "backend": "Database indexing, query optimization, caching strategies",
+                "infrastructure": "CDN integration, auto-scaling, performance monitoring",
+                "ai_optimization": "Intelligent caching, response optimization, resource management",
+                "benefits": "Fast loading times, optimal resource usage, excellent user experience"
+              }
             },
             "platform_benefits": {
-              "speed": "Develop applications 10x faster than traditional methods",
-              "accessibility": "No coding experience required - just describe what you want",
-              "quality": "AI-generated code follows best practices and modern standards",
-              "collaboration": "Real-time collaboration with team members",
-              "deployment": "One-click deployment to production environments",
-              "scalability": "Built on modern cloud infrastructure for optimal performance"
+              "development_speed": {
+                "metric": "10x faster development compared to traditional methods",
+                "breakdown": {
+                  "planning_phase": "From weeks to hours with AI-assisted planning",
+                  "coding_phase": "Automated code generation eliminates manual coding",
+                  "testing_phase": "AI-generated tests and automated validation",
+                  "deployment_phase": "One-click deployment with automated pipelines"
+                },
+                "real_impact": "3-month project completed in 3 days with professional quality"
+              },
+              "accessibility_and_democratization": {
+                "no_coding_required": "Natural language descriptions transform into applications",
+                "inclusive_development": "Entrepreneurs, designers, and business users can build software",
+                "reduced_barrier_to_entry": "No years of coding experience required",
+                "empowered_innovation": "Anyone with an idea can bring it to life",
+                "real_impact": "Small businesses and startups can compete with enterprise development teams"
+              },
+              "code_quality_and_consistency": {
+                "industry_standards": "AI follows OWASP security guidelines and modern best practices",
+                "consistent_patterns": "Uniform code style and architecture across all projects",
+                "automatic_optimization": "Performance optimization and error handling built-in",
+                "type_safety": "TypeScript integration ensures compile-time safety",
+                "real_impact": "Production-ready code that passes security audits and performance benchmarks"
+              },
+              "collaboration_and_teamwork": {
+                "real_time_editing": "Multiple team members can work simultaneously",
+                "version_control": "Built-in Git integration with conflict resolution",
+                "communication_tools": "Integrated chat and commenting systems",
+                "permission_management": "Granular access control for different team roles",
+                "real_impact": "Distributed teams work together seamlessly with enterprise collaboration features"
+              },
+              "deployment_and_operations": {
+                "one_click_deployment": "Automatic deployment to Vercel, Netlify, or custom infrastructure",
+                "environment_management": "Staging, production, and development environments",
+                "monitoring_and_analytics": "Built-in performance monitoring and error tracking",
+                "scaling_automation": "Auto-scaling based on usage patterns",
+                "real_impact": "Zero DevOps overhead with production-ready deployments in minutes"
+              },
+              "scalability_and_performance": {
+                "cloud_native_architecture": "Built on modern cloud infrastructure with global CDN",
+                "auto_scaling": "Automatic scaling based on traffic and usage patterns",
+                "performance_optimization": "AI-driven optimization for speed and efficiency",
+                "global_distribution": "Content delivery networks for worldwide performance",
+                "real_impact": "Applications that handle millions of users with sub-second response times"
+              },
+              "cost_efficiency": {
+                "reduced_development_costs": "85% reduction in development costs compared to traditional methods",
+                "eliminated_maintenance_overhead": "AI handles updates, security patches, and optimizations",
+                "faster_time_to_market": "Reduced time-to-market enables faster revenue generation",
+                "scalable_pricing": "Pay-as-you-grow model with transparent pricing",
+                "real_impact": "Small businesses can afford enterprise-grade software development"
+              },
+              "learning_and_growth": {
+                "educational_resources": "Built-in tutorials, documentation, and learning paths",
+                "skill_development": "Learn modern development practices through hands-on experience",
+                "continuous_improvement": "AI learns from your preferences and improves over time",
+                "community_support": "Access to community forums and expert assistance",
+                "real_impact": "Users develop professional development skills while building real applications"
+              },
+              "security_and_compliance": {
+                "enterprise_security": "OWASP compliance and security best practices built-in",
+                "data_protection": "GDPR and CCPA compliant data handling",
+                "audit_trails": "Comprehensive logging and audit capabilities",
+                "regulatory_compliance": "Built-in compliance features for regulated industries",
+                "real_impact": "Applications that pass enterprise security audits and regulatory requirements"
+              },
+              "innovation_acceleration": {
+                "rapid_prototyping": "Transform ideas into working prototypes in hours",
+                "iterative_development": "Quick iterations based on user feedback and testing",
+                "experiment_freedom": "Try new ideas without significant time or cost investment",
+                "market_validation": "Test concepts with real users before full development",
+                "real_impact": "Innovation cycles measured in days instead of months or years"
+              }
             },
             "getting_started_steps": [
               {
                 "step": 1,
-                "title": "Create Account",
-                "description": "Sign up using GitHub OAuth for secure authentication",
-                "details": "GitHub integration provides secure authentication and allows for seamless project management and deployment."
+                "title": "Create Your Account",
+                "description": "Sign up using GitHub OAuth for secure, instant authentication",
+                "details": "GitHub integration provides enterprise-grade security while making signup seamless. Your account is ready in seconds with full access to all platform features.",
+                "estimated_time": "2 minutes",
+                "prerequisites": "Valid GitHub account",
+                "what_happens": "Account created, workspace initialized, learning path personalized, security settings configured",
+                "visual_guide": {
+                  "step_by_step_screenshots": [
+                    "1️⃣ Visit pixelpilot.dev → Click 'Get Started'",
+                    "2️⃣ Click 'Continue with GitHub' button",
+                    "3️⃣ GitHub login page appears",
+                    "4️⃣ Authorize Pixel Pilot permissions",
+                    "5️⃣ Redirected to Pixel Pilot dashboard",
+                    "6️⃣ Complete profile setup (optional)"
+                  ],
+                  "expected_outcome": "🎉 Welcome screen with personalized dashboard and sample projects"
+                },
+                "troubleshooting_visual": {
+                  "common_issue": "GitHub authorization failed",
+                  "visual_solution": "🔧 Check browser permissions → Clear cache → Try incognito mode",
+                  "success_indicator": "✅ Dashboard loads with project templates"
+                }
               },
               {
                 "step": 2,
-                "title": "Start Conversation",
-                "description": "Begin chatting with AI to describe your application",
-                "details": "Use natural language to describe your app idea. The AI will understand your requirements and start building."
+                "title": "Describe Your Application",
+                "description": "Start a conversation with AI to describe your app requirements",
+                "details": "Use natural language to explain what you want to build. Be specific about features, user flows, and technical requirements. The AI understands context and asks clarifying questions.",
+                "estimated_time": "10-15 minutes",
+                "tips": [
+                  "Start with the core problem your app solves",
+                  "Describe your target users and their needs",
+                  "List key features in priority order",
+                  "Mention any specific technologies or integrations needed"
+                ],
+                "example": "I want to build a task management app for small teams with drag-and-drop Kanban boards, real-time collaboration, and mobile support.",
+                "visual_guide": {
+                  "chat_interface_demo": {
+                    "user_message": "💬 'Create a task management app with Kanban board and team collaboration'",
+                    "ai_response": "🤖 'I'll build a comprehensive task management system with:\n• Drag-and-drop Kanban board\n• Real-time team collaboration\n• User authentication\n• Mobile-responsive design\n• Database integration'",
+                    "clarifying_questions": "🤖 'What specific features would you like? User roles? File attachments? Due dates?'"
+                  },
+                  "conversation_flow_visual": [
+                    "1️⃣ User describes idea → 💭 AI analyzes requirements",
+                    "2️⃣ AI asks clarifying questions → ❓ User provides details",
+                    "3️⃣ AI creates detailed plan → 📋 Shows architecture overview",
+                    "4️⃣ User approves plan → ✅ AI begins development",
+                    "5️⃣ Live preview appears → 👁️ User sees working app"
+                  ],
+                  "effective_prompts_examples": [
+                    "✅ Good: 'Build an e-commerce site for handmade crafts with payment processing'",
+                    "✅ Better: 'Create a marketplace for artisans to sell handmade crafts. Include user profiles, product listings with photos, shopping cart, Stripe payments, and order management'",
+                    "❌ Vague: 'Make a website'"
+                  ]
+                },
+                "ai_capabilities_visual": {
+                  "understanding_indicators": "🧠 AI recognizes: technologies, features, user flows, business logic",
+                  "clarification_process": "💡 AI asks specific questions to fill knowledge gaps",
+                  "planning_visualization": "📊 AI shows component breakdown and timeline estimates"
+                }
               },
               {
                 "step": 3,
-                "title": "Preview & Iterate",
-                "description": "See your app in real-time and make adjustments",
-                "details": "The E2B sandbox provides a live preview of your application as you build it."
+                "title": "Review AI-Generated Architecture",
+                "description": "AI creates a comprehensive project plan and technical architecture",
+                "details": "The AI analyzes your requirements and generates a detailed plan including tech stack, database schema, API design, and implementation roadmap.",
+                "estimated_time": "5 minutes",
+                "what_to_review": [
+                  "Technology stack recommendations",
+                  "Database and API design",
+                  "Security and performance considerations",
+                  "Timeline and milestone breakdown",
+                  "Potential challenges and solutions"
+                ],
+                "approval_process": "Review the plan, ask questions, request modifications, then approve to proceed",
+                "visual_guide": {
+                  "architecture_diagram_preview": {
+                    "description": "AI shows visual breakdown of your application architecture",
+                    "components_visual": [
+                      "🎨 Frontend: React components and UI structure",
+                      "🔧 Backend: API endpoints and server logic",
+                      "🗄️ Database: Tables, relationships, and data flow",
+                      "🔐 Security: Authentication and authorization layers",
+                      "📱 Mobile: Responsive design and touch interactions"
+                    ]
+                  },
+                  "tech_stack_visualization": {
+                    "frontend_stack": "⚛️ React + TypeScript + Tailwind CSS",
+                    "backend_stack": "🚀 Next.js API Routes + Supabase",
+                    "database_visual": "📊 PostgreSQL with real-time subscriptions",
+                    "deployment_stack": "☁️ Vercel/Netlify with CDN"
+                  },
+                  "timeline_gantt_chart": [
+                    "📅 Week 1: Core features and authentication",
+                    "📅 Week 2: Advanced features and UI polish",
+                    "📅 Week 3: Testing, optimization, deployment",
+                    "📅 Week 4: Monitoring and user feedback integration"
+                  ],
+                  "review_checklist_visual": [
+                    "✅ Tech stack appropriate for requirements?",
+                    "✅ Database design supports all features?",
+                    "✅ Security measures meet compliance needs?",
+                    "✅ Timeline realistic for scope?",
+                    "✅ Costs align with budget?"
+                  ]
+                },
+                "decision_making_visual": {
+                  "approve_plan": "👍 Click 'Start Development' to proceed",
+                  "request_changes": "🔄 Ask AI to modify specific aspects",
+                  "get_more_details": "❓ Request detailed breakdown of any component",
+                  "save_for_later": "💾 Save plan to review later"
+                }
               },
               {
                 "step": 4,
-                "title": "Deploy Instantly",
-                "description": "Deploy your application to production with one click",
-                "details": "Connect your GitHub repository and deploy to Vercel or Netlify automatically."
+                "title": "Watch Your App Come to Life",
+                "description": "AI generates code and creates your live application",
+                "details": "The AI builds your complete application with all specified features. You see real-time progress and can preview the app as it's being constructed.",
+                "estimated_time": "15-30 minutes",
+                "what_gets_created": [
+                  "Complete frontend with responsive UI",
+                  "Backend API with all endpoints",
+                  "Database with proper schema and relationships",
+                  "Authentication and security features",
+                  "Testing suite and documentation",
+                  "Deployment configuration"
+                ],
+                "preview_features": "Live preview in E2B sandbox, interactive testing, code review capabilities",
+                "visual_guide": {
+                  "development_progress_visual": [
+                    "🚀 Starting development...",
+                    "📁 Creating project structure",
+                    "⚛️ Building React components",
+                    "🔧 Setting up API endpoints",
+                    "🗄️ Configuring database",
+                    "🎨 Applying styling and UI",
+                    "🔒 Adding authentication",
+                    "✅ Running tests",
+                    "🎉 Application ready!"
+                  ],
+                  "live_preview_evolution": [
+                    {
+                      "stage": "Initial Load",
+                      "visual": "📄 Basic HTML structure appears",
+                      "status": "🔄 AI working on components"
+                    },
+                    {
+                      "stage": "UI Components",
+                      "visual": "🎨 Styled buttons, forms, and layouts appear",
+                      "status": "🔄 AI adding interactivity"
+                    },
+                    {
+                      "stage": "Functionality",
+                      "visual": "⚡ Forms work, navigation functions, data loads",
+                      "status": "🔄 AI connecting backend"
+                    },
+                    {
+                      "stage": "Complete App",
+                      "visual": "✨ Fully functional application ready to use",
+                      "status": "✅ Development complete"
+                    }
+                  ],
+                  "code_generation_visual": {
+                    "file_tree_growth": [
+                      "📁 src/ (created)",
+                      "📁 src/components/ (created)",
+                      "📁 src/pages/ (created)",
+                      "📁 src/lib/ (created)",
+                      "📄 package.json (generated)",
+                      "📄 next.config.js (generated)",
+                      "📄 tailwind.config.js (generated)"
+                    ],
+                    "component_creation": [
+                      "🔧 Header component → ✅ Complete",
+                      "🔧 Navigation component → ✅ Complete",
+                      "🔧 UserProfile component → ✅ Complete",
+                      "🔧 Dashboard component → ✅ Complete"
+                    ]
+                  },
+                  "real_time_feedback": {
+                    "progress_bar": "📊 85% complete - Adding final touches",
+                    "live_updates": "🔄 Auto-refreshing preview with latest changes",
+                    "error_indicators": "⚠️ Highlighting any issues found",
+                    "success_notifications": "🎉 Component successfully created"
+                  }
+                },
+                "interactive_testing_guide": {
+                  "preview_controls": [
+                    "🔄 Refresh preview to see latest changes",
+                    "📱 Toggle mobile/desktop view",
+                    "🔍 Zoom in/out for detailed inspection",
+                    "📋 Copy component code for external use"
+                  ],
+                  "testing_features": [
+                    "🖱️ Click buttons and test interactions",
+                    "📝 Fill forms and submit data",
+                    "🔗 Navigate between pages and sections",
+                    "📊 View real-time data and updates"
+                  ]
+                }
+              },
+              {
+                "step": 5,
+                "title": "Iterate and Customize",
+                "description": "Review, test, and refine your application",
+                "details": "Test the application thoroughly, provide feedback to AI for improvements, and customize features as needed.",
+                "estimated_time": "30-60 minutes",
+                "iteration_process": [
+                  "Test all user flows and edge cases",
+                  "Provide feedback on UI/UX improvements",
+                  "Request additional features or modifications",
+                  "Validate security and performance",
+                  "Review and approve final implementation"
+                ],
+                "collaboration_tips": "Use the chat interface to request changes, AI remembers context and maintains consistency",
+                "visual_guide": {
+                  "iteration_workflow_visual": [
+                    "🔍 Review app in preview → Find improvement areas",
+                    "💬 Chat with AI: 'Make the buttons blue and add a search feature'",
+                    "⚡ AI processes request → Updates code instantly",
+                    "👁️ Preview refreshes → See changes immediately",
+                    "🔄 Repeat cycle → Continuous improvement"
+                  ],
+                  "common_iteration_patterns": [
+                    {
+                      "pattern": "UI/UX Improvements",
+                      "visual_example": "🎨 'Change color scheme to match brand guidelines'",
+                      "ai_response": "🤖 Updates CSS variables and component styles"
+                    },
+                    {
+                      "pattern": "Feature Additions",
+                      "visual_example": "➕ 'Add user profile pictures and bio sections'",
+                      "ai_response": "🤖 Creates new components and database fields"
+                    },
+                    {
+                      "pattern": "Performance Optimization",
+                      "visual_example": "⚡ 'Optimize loading times and add lazy loading'",
+                      "ai_response": "🤖 Implements performance best practices"
+                    }
+                  ],
+                  "testing_visualization": [
+                    "🧪 User flow testing: Click through app scenarios",
+                    "📱 Mobile responsiveness: Test on different screen sizes",
+                    "⚡ Performance testing: Check loading speeds and interactions",
+                    "🔒 Security testing: Validate forms and authentication",
+                    "♿ Accessibility testing: Keyboard navigation and screen readers"
+                  ]
+                }
+              },
+              {
+                "step": 6,
+                "title": "Deploy to Production",
+                "description": "Deploy your application with one-click to production",
+                "details": "Connect your GitHub repository and deploy to Vercel, Netlify, or custom infrastructure with automated CI/CD pipelines.",
+                "estimated_time": "5 minutes",
+                "deployment_options": [
+                  "Vercel: Global CDN, automatic scaling, preview deployments",
+                  "Netlify: Form handling, identity management, edge functions",
+                  "GitHub Pages: Free hosting for static sites",
+                  "Custom: Deploy to AWS, Google Cloud, or your own infrastructure"
+                ],
+                "post_deployment": "Automatic monitoring, error tracking, performance analytics, and maintenance updates",
+                "visual_guide": {
+                  "deployment_flow_visual": [
+                    "🚀 Click 'Deploy to Production' button",
+                    "🔗 AI creates GitHub repository automatically",
+                    "☁️ Choose deployment platform (Vercel/Netlify/etc.)",
+                    "⚙️ CI/CD pipeline configures automatically",
+                    "🏗️ Build process starts with progress indicator",
+                    "✅ Deployment completes successfully",
+                    "🌐 Live URL generated and displayed",
+                    "📊 Monitoring and analytics activated"
+                  ],
+                  "platform_comparison_visual": {
+                    "vercel": "▲ Vercel: Best for Next.js apps with global CDN",
+                    "netlify": "△ Netlify: Great for static sites with form handling",
+                    "github_pages": "📄 GitHub Pages: Free option for simple sites"
+                  },
+                  "live_dashboard_preview": [
+                    "📊 Performance metrics: Response times, error rates",
+                    "👥 User analytics: Visitor counts, popular pages",
+                    "🔒 Security status: SSL certificate, vulnerability scans",
+                    "💾 Backup status: Automated data backups",
+                    "🚨 Alert system: Real-time notifications for issues"
+                  ]
+                },
+                "success_celebration_visual": {
+                  "deployment_complete": "🎉 'Your app is now live at https://yourapp.com!'",
+                  "share_options": "📣 Share on social media, send to team",
+                  "next_steps_prompts": "📈 Set up analytics, 📧 Collect user feedback, 🔄 Plan improvements"
+                }
               }
-            ]
+            ],
+            "success_metrics_and_roi": {
+              "time_savings": {
+                "traditional_development": "3-6 months for similar application",
+                "pixel_pilot_development": "3-5 days with professional quality",
+                "efficiency_gain": "85-90% reduction in development time"
+              },
+              "cost_reduction": {
+                "traditional_costs": "$50,000 - $150,000 for professional development",
+                "pixel_pilot_costs": "$5,000 - $15,000 including all features",
+                "cost_savings": "80-90% reduction in development costs"
+              },
+              "quality_improvements": {
+                "code_quality": "Enterprise-grade with automated testing and security",
+                "performance": "Optimized for global scale with sub-second response times",
+                "accessibility": "WCAG 2.1 AA compliant with inclusive design",
+                "maintainability": "Well-documented, modular architecture"
+              },
+              "business_impact": {
+                "time_to_market": "Launch weeks instead of months",
+                "competitive_advantage": "First-mover advantage with innovative features",
+                "scalability": "Built for growth from day one",
+                "user_satisfaction": "Modern UX with professional design"
+              }
+            },
+            "conclusion_and_next_steps": {
+              "platform_transformation": "Pixel Pilot represents more than a development tool—it's a fundamental shift in how software is created. By combining the power of advanced AI with professional development practices, Pixel Pilot makes enterprise-grade application development accessible to everyone.",
+              "empowerment_through_ai": "Whether you're a seasoned developer looking to accelerate your workflow, an entrepreneur bringing an idea to life, or someone completely new to programming, Pixel Pilot provides the tools and intelligence to turn your vision into reality.",
+              "continuous_innovation": "The platform continues to evolve with new features, improved AI capabilities, and expanded integrations. Your applications built today will benefit from tomorrow's advancements through automatic updates and optimizations.",
+              "community_and_support": "Join a growing community of developers, entrepreneurs, and innovators using Pixel Pilot to build the future. Access comprehensive documentation, tutorials, and expert support to maximize your success.",
+              "immediate_actions": [
+                "Create your Pixel Pilot account using GitHub OAuth",
+                "Explore the interactive tutorials and sample projects",
+                "Start with a simple project to experience the platform",
+                "Join the community forums for tips and best practices",
+                "Review the documentation for advanced features and capabilities"
+              ],
+              "long_term_strategy": [
+                "Build a portfolio of applications using Pixel Pilot",
+                "Explore advanced AI features for complex projects",
+                "Contribute to the platform's improvement through feedback",
+                "Share your success stories and help others learn",
+                "Stay updated with new features and platform enhancements"
+              ],
+              "final_thought": "The future of software development is here, and it's more accessible, faster, and more powerful than ever before. Pixel Pilot isn't just changing how we build software—it's democratizing innovation and empowering anyone with an idea to bring it to life. Your next big application is just a conversation away. Start building today and join the revolution in software creation."
+            }
           },
           "tags": ["overview", "introduction", "features", "architecture", "benefits"],
           "difficulty": "beginner",
@@ -92,7 +871,26 @@
           "title": "Account Setup & Authentication",
           "description": "Learn how to create your Pixel Pilot account and set up authentication",
           "content": {
-            "introduction": "Setting up your Pixel Pilot account is quick and secure. We use GitHub OAuth for authentication, which provides enterprise-grade security while making the signup process seamless.",
+            "introduction": "Setting up your Pixel Pilot account is quick and secure. We use GitHub OAuth for authentication, which provides enterprise-grade security while making the signup process seamless.\n\nThis comprehensive guide will walk you through the entire account creation process, from initial registration to advanced account management features. You'll learn about security best practices, account verification, and how to optimize your Pixel Pilot experience from day one.",
+            "prerequisites": [
+              "A valid GitHub account (personal or organization)",
+              "A modern web browser (Chrome 90+, Firefox 88+, Safari 14+, Edge 90+)",
+              "Active internet connection (minimum 5 Mbps recommended)",
+              "JavaScript enabled in your browser",
+              "Optional: Two-factor authentication enabled on GitHub for enhanced security"
+            ],
+            "account_types": {
+              "personal_account": {
+                "description": "Perfect for individual developers, freelancers, and hobbyists",
+                "features": ["Unlimited personal projects", "Basic collaboration tools", "Standard support", "Free tier with premium upgrades"],
+                "use_cases": ["Personal portfolio websites", "Side projects", "Learning and experimentation", "Client work preparation"]
+              },
+              "organization_account": {
+                "description": "Ideal for teams, companies, and collaborative development",
+                "features": ["Team management", "Advanced collaboration", "Priority support", "Custom integrations", "Enterprise security features"],
+                "use_cases": ["Team development projects", "Client applications", "Internal tools", "SaaS products", "Enterprise applications"]
+              }
+            },
             "signup_process": {
               "steps": [
                 "Visit the Pixel Pilot homepage",
@@ -190,31 +988,103 @@
             "step_by_step_setup": [
               {
                 "step": 1,
-                "title": "Account Creation & Authentication",
-                "description": "Secure your Pixel Pilot account using GitHub OAuth",
+                "title": "Account Creation & Authentication - Complete Pixel Pilot Onboarding",
+                "description": "Secure your Pixel Pilot account using GitHub OAuth with comprehensive setup",
                 "detailed_steps": [
                   "Navigate to pixelpilot.dev in your preferred web browser",
-                  "Locate the prominent 'Get Started' or 'Sign In' button",
-                  "Click to initiate GitHub OAuth authentication",
+                  "Locate the prominent 'Get Started' or 'Sign In' button in the top navigation",
+                  "Click to initiate GitHub OAuth authentication flow",
                   "You'll be redirected to GitHub's secure authorization page",
-                  "Review the requested permissions carefully",
-                  "Click 'Authorize Pixel Pilot' to grant access",
-                  "You'll be automatically redirected back to Pixel Pilot",
-                  "Your account is now active and ready to use!"
+                  "Review the requested permissions carefully - Pixel Pilot only requests necessary access",
+                  "Click 'Authorize Pixel Pilot' to grant access to your account",
+                  "You'll be automatically redirected back to Pixel Pilot dashboard",
+                  "Complete your profile setup with additional information",
+                  "Verify your email address through the confirmation link",
+                  "Set up your development preferences and notification settings",
+                  "Your account is now fully active and ready for development!"
                 ],
+                "pixel_pilot_initialization": {
+                  "account_verification": [
+                    "Email verification sent to your GitHub-registered email",
+                    "Profile completion with avatar, bio, and skills",
+                    "Development environment preferences setup",
+                    "Notification preferences for project updates and collaborations",
+                    "Security settings including session management"
+                  ],
+                  "workspace_setup": [
+                    "Personal workspace automatically created",
+                    "Default project templates loaded and ready",
+                    "Integration tokens generated for external services",
+                    "API keys created for development and deployment",
+                    "Backup and recovery settings configured"
+                  ],
+                  "learning_path_customization": [
+                    "Skill assessment to determine learning path",
+                    "Personalized tutorial recommendations",
+                    "Project suggestions based on experience level",
+                    "Mentorship matching with experienced developers",
+                    "Community group assignments based on interests"
+                  ]
+                },
                 "what_happens_next": [
-                  "GitHub profile information is securely retrieved",
-                  "Personal dashboard is automatically created",
-                  "Default project templates become available",
-                  "Community access is granted",
-                  "Learning resources are unlocked"
+                  "GitHub profile information is securely retrieved and stored",
+                  "Personal dashboard is automatically created with your preferences",
+                  "Default project templates become available in your workspace",
+                  "Community access is granted with introduction to relevant groups",
+                  "Learning resources are unlocked based on your skill level",
+                  "Email notifications are set up for important updates",
+                  "Integration tokens are generated for GitHub and deployment platforms",
+                  "Development environment is pre-configured with your preferred settings",
+                  "Backup and recovery systems are automatically configured",
+                  "Performance monitoring and analytics are set up for your projects"
+                ],
+                "security_features_enabled": [
+                  "OAuth 2.0 secure authentication with GitHub",
+                  "JWT token-based session management",
+                  "End-to-end encryption for sensitive data",
+                  "Multi-factor authentication support",
+                  "Session timeout and concurrent session limits",
+                  "Audit logging for all account activities",
+                  "Secure API key generation and management",
+                  "Data encryption at rest and in transit",
+                  "Regular security updates and patches",
+                  "Intrusion detection and monitoring"
                 ],
                 "troubleshooting": [
-                  "If authorization fails, ensure your GitHub account is verified",
-                  "Check that cookies are enabled in your browser",
-                  "Try clearing browser cache if issues persist",
-                  "Use incognito mode to avoid extension conflicts"
-                ]
+                  "If authorization fails, ensure your GitHub account is verified and has a confirmed email",
+                  "Check that cookies and JavaScript are enabled in your browser settings",
+                  "Try clearing browser cache and cookies if authentication issues persist",
+                  "Use incognito/private browsing mode to avoid extension conflicts",
+                  "Ensure you're using a supported browser (Chrome 90+, Firefox 88+, Safari 14+, Edge 90+)",
+                  "Check your internet connection and try again if the connection is unstable",
+                  "If 2FA is enabled on GitHub, ensure you have your authenticator app ready",
+                  "Try signing out of GitHub first, then attempt Pixel Pilot authentication again",
+                  "Contact support if you receive 'access denied' errors after multiple attempts",
+                  "Verify that your GitHub account isn't suspended or restricted"
+                ],
+                "post_setup_optimization": {
+                  "performance_tuning": [
+                    "Configure your development environment preferences",
+                    "Set up keyboard shortcuts and editor themes",
+                    "Configure notification preferences to reduce noise",
+                    "Set up project templates for quick starts",
+                    "Configure deployment preferences for different environments"
+                  ],
+                  "collaboration_setup": [
+                    "Connect additional GitHub accounts or organizations",
+                    "Set up team collaboration preferences",
+                    "Configure code review and approval workflows",
+                    "Set up integration with project management tools",
+                    "Configure communication preferences for team projects"
+                  ],
+                  "learning_optimization": [
+                    "Complete skill assessment for personalized recommendations",
+                    "Set learning goals and track progress",
+                    "Configure tutorial difficulty and pace preferences",
+                    "Set up mentorship preferences and availability",
+                    "Configure learning path customization options"
+                  ]
+                }
               },
               {
                 "step": 2,
@@ -243,14 +1113,126 @@
                   }
                 ],
                 "creation_process": [
-                  "Click 'New Project' from your dashboard",
-                  "Choose a descriptive project name",
-                  "Select your preferred technology stack",
-                  "Pick a template that matches your needs",
-                  "Pixel Pilot generates complete project structure",
-                  "All dependencies are automatically installed",
-                  "Development environment is ready in seconds"
-                ]
+                  "Click 'New Project' from your dashboard or use the '+' button",
+                  "Choose a descriptive project name (e.g., 'my-ecommerce-store' or 'task-management-app')",
+                  "Select your preferred technology stack from available options",
+                  "Pick a template that matches your needs or start with a blank project",
+                  "Describe your project requirements in natural language to Pixel Pilot",
+                  "AI analyzes your requirements and suggests optimal architecture",
+                  "Pixel Pilot generates complete project structure with all necessary files",
+                  "All dependencies are automatically installed and configured",
+                  "Database schemas are created if required",
+                  "API endpoints are generated based on your specifications",
+                  "Authentication and security features are automatically implemented",
+                  "Development environment is ready in seconds with hot reloading",
+                  "Preview system is initialized for real-time testing",
+                  "Deployment pipeline is configured for your chosen platforms"
+                ],
+                "pixel_pilot_ai_workflow": {
+                  "conversation_examples": [
+                    {
+                      "user_input": "Create an e-commerce website with product catalog, shopping cart, and payment processing",
+                      "ai_response": "I'll create a complete e-commerce platform with the following architecture:\n\n🛍️ **Frontend**: Next.js 14 with TypeScript, Tailwind CSS, Shadcn/ui components\n💳 **Payments**: Stripe integration with webhook handling\n🛒 **Cart**: Redux state management with local storage persistence\n📊 **Database**: Supabase PostgreSQL with real-time inventory updates\n🔐 **Auth**: GitHub OAuth with user profiles and order history\n\nGenerating complete application structure...",
+                      "generated_features": [
+                        "Product catalog with search and filtering",
+                        "Shopping cart with quantity management",
+                        "User authentication and profiles",
+                        "Order management and history",
+                        "Payment processing with Stripe",
+                        "Inventory management system",
+                        "Admin dashboard for product management",
+                        "Email notifications for orders",
+                        "Responsive mobile design",
+                        "SEO optimization and meta tags"
+                      ],
+                      "code_samples": {
+                        "product_api": "// Generated product API endpoint\nexport async function GET(request: Request) {\n  const { searchParams } = new URL(request.url);\n  const category = searchParams.get('category');\n  const search = searchParams.get('search');\n  \n  let query = supabase\n    .from('products')\n    .select('*');\n  \n  if (category) {\n    query = query.eq('category', category);\n  }\n  \n  if (search) {\n    query = query.ilike('name', `%${search}%`);\n  }\n  \n  const { data, error } = await query;\n  \n  if (error) {\n    return Response.json({ error: error.message }, { status: 500 });\n  }\n  \n  return Response.json(data);\n}",
+                        "cart_component": "// Shopping cart component with state management\nimport { useState, useEffect } from 'react';\nimport { useDispatch, useSelector } from 'react-redux';\n\nexport default function ShoppingCart() {\n  const dispatch = useDispatch();\n  const cart = useSelector((state) => state.cart);\n  const [loading, setLoading] = useState(false);\n\n  const updateQuantity = async (productId, newQuantity) => {\n    setLoading(true);\n    try {\n      if (newQuantity === 0) {\n        dispatch(removeFromCart(productId));\n      } else {\n        dispatch(updateCartItem({ productId, quantity: newQuantity }));\n      }\n      \n      // Update local storage\n      localStorage.setItem('cart', JSON.stringify(cart));\n    } catch (error) {\n      console.error('Error updating cart:', error);\n    } finally {\n      setLoading(false);\n    }\n  };\n\n  const calculateTotal = () => {\n    return cart.items.reduce((total, item) => {\n      return total + (item.price * item.quantity);\n    }, 0);\n  };\n\n  return (\n    <div className=\"bg-white rounded-lg shadow-md p-6\">\n      <h2 className=\"text-2xl font-bold mb-4\">Shopping Cart</h2>\n      \n      {cart.items.length === 0 ? (\n        <p className=\"text-gray-500\">Your cart is empty</p>\n      ) : (\n        <>\n          {cart.items.map((item) => (\n            <div key={item.id} className=\"flex items-center justify-between py-2 border-b\">\n              <div className=\"flex-1\">\n                <h3 className=\"font-medium\">{item.name}</h3>\n                <p className=\"text-sm text-gray-600\">${item.price}</p>\n              </div>\n              \n              <div className=\"flex items-center space-x-2\">\n                <button \n                  onClick={() => updateQuantity(item.id, item.quantity - 1)}\n                  disabled={loading}\n                  className=\"px-2 py-1 bg-gray-200 rounded\"\n                >\n                  -\n                </button>\n                \n                <span className=\"px-3 py-1 bg-gray-100 rounded\">\n                  {item.quantity}\n                </span>\n                \n                <button \n                  onClick={() => updateQuantity(item.id, item.quantity + 1)}\n                  disabled={loading}\n                  className=\"px-2 py-1 bg-gray-200 rounded\"\n                >\n                  +\n                </button>\n              </div>\n            </div>\n          ))}\n          \n          <div className=\"mt-4 pt-4 border-t\">\n            <div className=\"flex justify-between items-center text-lg font-bold\">\n              <span>Total:</span>\n              <span>${calculateTotal().toFixed(2)}</span>\n            </div>\n            \n            <button \n              className=\"w-full mt-4 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700\"\n              onClick={() => {/* Handle checkout */}}\n            >\n              Proceed to Checkout\n            </button>\n          </div>\n        </>\n      )}\n    </div>\n  );\n}"
+                      }
+                    },
+                    {
+                      "user_input": "Build a task management application with real-time collaboration",
+                      "ai_response": "I'll create a comprehensive task management system with the following features:\n\n📋 **Core Features**: Task creation, assignment, status tracking\n👥 **Collaboration**: Real-time updates, comments, file attachments\n📊 **Analytics**: Progress tracking, time estimates, productivity metrics\n🎨 **UI**: Modern design with drag-and-drop Kanban board\n🔄 **Real-time**: Live updates using Supabase subscriptions\n📱 **Mobile**: Responsive design for all devices\n\nSetting up project architecture and generating components...",
+                      "generated_features": [
+                        "Kanban board with drag-and-drop functionality",
+                        "Task creation and editing with rich text",
+                        "User assignment and permission management",
+                        "Real-time collaboration and notifications",
+                        "File attachments and comments system",
+                        "Progress tracking and analytics dashboard",
+                        "Team management and project organization",
+                        "Mobile-responsive design with touch support",
+                        "Offline support with data synchronization",
+                        "Export functionality for reports and backups"
+                      ],
+                      "technical_implementation": {
+                        "database_schema": {
+                          "projects": "Project metadata and settings",
+                          "tasks": "Task details, status, assignments, due dates",
+                          "users": "User profiles and authentication data",
+                          "comments": "Task comments and discussion threads",
+                          "attachments": "File attachments with metadata",
+                          "teams": "Team management and permissions",
+                          "notifications": "Real-time notification system"
+                        },
+                        "api_endpoints": [
+                          "GET /api/projects - List user projects",
+                          "POST /api/projects - Create new project",
+                          "GET /api/tasks?project_id=123 - Get project tasks",
+                          "POST /api/tasks - Create new task",
+                          "PUT /api/tasks/456 - Update task",
+                          "DELETE /api/tasks/456 - Delete task",
+                          "POST /api/tasks/456/comments - Add comment",
+                          "POST /api/tasks/456/attachments - Upload file"
+                        ],
+                        "real_time_features": [
+                          "Live task updates across all team members",
+                          "Real-time notifications for task changes",
+                          "Collaborative editing with conflict resolution",
+                          "Presence indicators for active users",
+                          "Instant messaging for team communication"
+                        ]
+                      }
+                    }
+                  ],
+                  "ai_code_generation_process": {
+                    "requirement_analysis": "AI analyzes user input to understand project scope and requirements",
+                    "architecture_design": "Automatically designs optimal system architecture and data models",
+                    "component_generation": "Generates React components with proper TypeScript types",
+                    "api_development": "Creates RESTful API endpoints with validation and error handling",
+                    "database_setup": "Generates database schemas with relationships and constraints",
+                    "styling_implementation": "Applies consistent styling with Tailwind CSS and component library",
+                    "testing_setup": "Creates unit tests and integration tests for critical functionality",
+                    "documentation": "Generates API documentation and component documentation",
+                    "deployment_configuration": "Sets up CI/CD pipelines and deployment configurations",
+                    "monitoring_setup": "Configures logging, error tracking, and performance monitoring"
+                  },
+                  "quality_assurance": {
+                    "code_quality": [
+                      "ESLint configuration for code consistency",
+                      "Prettier for code formatting",
+                      "TypeScript for type safety",
+                      "SonarQube for code quality analysis",
+                      "Automated code review suggestions"
+                    ],
+                    "security_measures": [
+                      "Input validation and sanitization",
+                      "SQL injection prevention",
+                      "XSS protection with Content Security Policy",
+                      "CSRF protection for forms",
+                      "Secure authentication and authorization",
+                      "Data encryption for sensitive information"
+                    ],
+                    "performance_optimization": [
+                      "Code splitting and lazy loading",
+                      "Image optimization and compression",
+                      "Database query optimization",
+                      "Caching strategies implementation",
+                      "Bundle size optimization",
+                      "CDN configuration for static assets"
+                    ]
+                  }
+                }
               },
               {
                 "step": 3,
@@ -1158,42 +2140,666 @@
           "description": "Learn to use the professional code editor and manage your project files effectively",
           "content": {
             "editor_features": [
-              "Monaco Editor (same engine as VS Code) with full syntax highlighting",
-              "IntelliSense and auto-completion for JavaScript/TypeScript",
-              "Find and replace across files with regex support",
-              "Multiple cursor editing and keyboard shortcuts",
-              "Git-like diff viewing for changes",
+              {
+                "feature": "Monaco Editor Integration",
+                "description": "Professional code editing experience powered by the same engine as Visual Studio Code",
+                "capabilities": [
+                  "Full syntax highlighting for 50+ programming languages",
+                  "Advanced IntelliSense with intelligent code completion",
+                  "Context-aware suggestions based on project structure",
+                  "Inline documentation and parameter hints",
+                  "Automatic import suggestions and path completion",
+                  "Real-time error detection and squiggly lines",
+                  "Hover information for variables, functions, and types"
+                ],
+                "benefits": "Familiar VS Code experience, productivity boost, reduced syntax errors"
+              },
+              {
+                "feature": "Multi-Language Support",
+                "description": "Comprehensive support for modern web development languages and frameworks",
+                "supported_languages": [
+                  "JavaScript (ES6+, CommonJS, AMD)",
+                  "TypeScript with advanced type checking",
+                  "HTML with Emmet abbreviations",
+                  "CSS/SCSS with property completion",
+                  "JSON with schema validation",
+                  "Markdown with preview",
+                  "SQL with syntax validation",
+                  "YAML with schema support"
+                ],
+                "framework_integration": [
+                  "React/JSX with component suggestions",
+                  "Next.js with file-based routing hints",
+                  "Node.js with module resolution",
+                  "Express.js with route suggestions",
+                  "Tailwind CSS with class completion",
+                  "Prisma with database schema hints"
+                ]
+              },
+              {
+                "feature": "Advanced Editing Capabilities",
+                "description": "Powerful editing features for efficient code manipulation",
+                "techniques": [
+                  "Multiple cursor editing for simultaneous changes",
+                  "Column selection with Alt+Click",
+                  "Smart bracket matching and auto-closing",
+                  "Automatic indentation and formatting",
+                  "Code folding for better navigation",
+                  "Minimap for large file overview",
+                  "Breadcrumbs for navigation context",
+                  "Outline view for code structure"
+                ],
+                "productivity_hacks": [
+                  "Use Ctrl+D to select next occurrence of word",
+                  "Alt+Click to add multiple cursors",
+                  "Ctrl+Shift+L to select all occurrences",
+                  "Ctrl+Alt+Arrow to create multi-line cursors",
+                  "F12 to jump to definition",
+                  "Alt+F12 for peek definition",
+                  "Shift+F12 to find all references"
+                ]
+              },
+              {
+                "feature": "Search and Navigation",
+                "description": "Powerful search capabilities across your entire codebase",
+                "search_features": [
+                  "Find in current file with instant results",
+                  "Find across all files with advanced filters",
+                  "Replace with regex support and preview",
+                  "Go to symbol for quick navigation",
+                  "Go to definition and references",
+                  "Quick file opening with fuzzy search",
+                  "Workspace symbol search"
+                ],
+                "advanced_filters": [
+                  "File type filtering (*.js, *.ts, *.css)",
+                  "Folder scope limitation",
+                  "Case-sensitive and whole word matching",
+                  "Regular expression patterns",
+                  "Exclude patterns for node_modules, build folders",
+                  "Include patterns for specific file types"
+                ]
+              },
+              {
+                "feature": "Version Control Integration",
+                "description": "Built-in Git support with professional version control features",
+                "git_features": [
+                  "Visual diff viewer for changes",
+                  "Inline blame annotations",
+                  "Commit history and file history",
+                  "Branch management and switching",
+                  "Merge conflict resolution",
+                  "Staging area management",
+                  "Git status indicators"
+                ],
+                "collaboration_features": [
               "Real-time collaboration indicators",
-              "Auto-save with version history",
-              "Error highlighting and linting integration"
+                  "Conflict resolution suggestions",
+                  "Team member presence indicators",
+                  "Shared workspace sessions",
+                  "Comment and review system",
+                  "Change tracking and attribution"
+                ]
+              },
+              {
+                "feature": "Code Quality and Linting",
+                "description": "Integrated code quality tools for consistent, maintainable code",
+                "linting_features": [
+                  "ESLint integration with custom rules",
+                  "TypeScript error checking and suggestions",
+                  "Prettier code formatting",
+                  "Stylelint for CSS consistency",
+                  "Accessibility linting (eslint-plugin-jsx-a11y)",
+                  "Security vulnerability detection"
+                ],
+                "quality_metrics": [
+                  "Cyclomatic complexity analysis",
+                  "Code coverage indicators",
+                  "Maintainability index",
+                  "Duplication detection",
+                  "Dead code identification",
+                  "Performance anti-patterns"
+                ]
+              },
+              {
+                "feature": "Extensions and Customization",
+                "description": "Extensible architecture with community-driven enhancements",
+                "extension_types": [
+                  "Language servers for enhanced IntelliSense",
+                  "Code formatters and beautifiers",
+                  "Theme and icon packs",
+                  "Productivity tools and snippets",
+                  "Integration with external services",
+                  "Custom workflows and automation"
+                ],
+                "popular_extensions": [
+                  "ES7+ React/Redux/React-Native snippets",
+                  "Auto Rename Tag for HTML/JSX",
+                  "Bracket Pair Colorizer",
+                  "Path Intellisense",
+                  "Import Cost for bundle size monitoring",
+                  "GitLens for enhanced Git capabilities"
+                ]
+              },
+              {
+                "feature": "Performance and Reliability",
+                "description": "Optimized for performance with enterprise-grade reliability",
+                "performance_features": [
+                  "Lazy loading for large files",
+                  "Incremental parsing and syntax highlighting",
+                  "Memory-efficient large file handling",
+                  "Background processing for heavy operations",
+                  "Responsive UI even with large codebases",
+                  "Automatic performance monitoring"
+                ],
+                "reliability_features": [
+                  "Auto-save with configurable intervals",
+                  "Crash recovery and session restoration",
+                  "Data persistence and backup",
+                  "Offline capability for core features",
+                  "Error boundaries and graceful degradation",
+                  "Regular updates and security patches"
+                ]
+              }
             ],
             "file_operations": [
-              "Create new files and folders with right-click context menus",
-              "Drag and drop to reorganize file structure",
-              "Bulk file operations for refactoring",
-              "File type detection and appropriate icons",
-              "Search across all files with advanced filters",
-              "Import/export project files",
-              "File size monitoring and optimization suggestions"
+              {
+                "operation": "File Creation and Management",
+                "techniques": [
+                  "Right-click context menus for quick file/folder creation",
+                  "Template-based file creation for common patterns",
+                  "Bulk file operations for refactoring and reorganization",
+                  "Drag-and-drop file movement with visual feedback",
+                  "File type detection with appropriate syntax highlighting",
+                  "Automatic file extension suggestions",
+                  "File preview capabilities before opening"
+                ],
+                "productivity_tips": [
+                  "Use keyboard shortcuts: Ctrl+N for new file, Ctrl+Shift+N for new folder",
+                  "Create file templates for components, pages, and utilities",
+                  "Use bulk operations to rename multiple files simultaneously",
+                  "Organize files by feature or functionality for better maintainability"
+                ],
+                "visual_examples": [
+                  {
+                    "scenario": "Creating a new React component",
+                    "steps_visual": [
+                      "1️⃣ Right-click in file explorer → 'New File'",
+                      "2️⃣ Name: 'UserProfile.tsx' → Enter",
+                      "3️⃣ AI generates component template automatically",
+                      "4️⃣ File opens in editor with boilerplate code"
+                    ],
+                    "result_visual": "📄 Complete component file with imports, interface, and basic structure"
+                  },
+                  {
+                    "scenario": "Organizing project files",
+                    "before_visual": "📁 Mixed files: components, utils, styles all in root",
+                    "after_visual": "📁 src/components/, 📁 src/utils/, 📁 src/styles/ - organized by type",
+                    "improvement": "🎯 Better maintainability and team collaboration"
+                  }
+                ]
+              },
+              {
+                "operation": "Advanced Search and Navigation",
+                "capabilities": [
+                  "Instant search across entire codebase with fuzzy matching",
+                  "Advanced filters by file type, folder, and content patterns",
+                  "Regex support for complex search patterns",
+                  "Search in specific file types or exclude certain directories",
+                  "Case-sensitive and whole word matching options",
+                  "Search result preview with context lines",
+                  "Save and reuse common search patterns"
+                ],
+                "search_strategies": [
+                  "Use file type filters: *.tsx, *.css, *.md",
+                  "Exclude build folders: !**/node_modules/**, !**/dist/**",
+                  "Search for specific patterns: className=.* , import.*from",
+                  "Use regex for complex patterns: function\\s+\\w+\\s*\\(",
+                  "Search across multiple file types simultaneously"
+                ]
+              },
+              {
+                "operation": "Project Organization",
+                "best_practices": [
+                  "Feature-based folder structure over type-based organization",
+                  "Consistent naming conventions across the project",
+                  "Logical grouping of related files and components",
+                  "Clear separation of concerns and responsibilities",
+                  "Scalable architecture that grows with the project",
+                  "Documentation of file organization patterns"
+                ],
+                "folder_structures": [
+                  {
+                    "pattern": "Feature-based",
+                    "structure": "src/features/auth/, src/features/dashboard/, src/features/users/",
+                    "benefits": "Clear feature boundaries, easier refactoring, focused development"
+                  },
+                  {
+                    "pattern": "Atomic Design",
+                    "structure": "src/components/atoms/, molecules/, organisms/, templates/, pages/",
+                    "benefits": "Reusable components, consistent design system, scalable UI"
+                  },
+                  {
+                    "pattern": "Domain-driven",
+                    "structure": "src/domains/user/, order/, product/, inventory/",
+                    "benefits": "Business logic organization, clear domain boundaries, maintainable code"
+                  }
+                ]
+              },
+              {
+                "operation": "File Optimization and Management",
+                "techniques": [
+                  "Automatic file size monitoring with optimization suggestions",
+                  "Unused file detection and cleanup recommendations",
+                  "Image optimization for web assets",
+                  "Bundle size analysis and optimization",
+                  "Dependency analysis and unused package detection",
+                  "File compression and minification suggestions",
+                  "CDN optimization for static assets"
+                ],
+                "performance_monitoring": [
+                  "Real-time bundle size tracking",
+                  "Import cost analysis for dependencies",
+                  "File size warnings and thresholds",
+                  "Optimization suggestions with impact estimates",
+                  "Performance impact assessment for large files",
+                  "Caching strategy recommendations"
+                ]
+              },
+              {
+                "operation": "Collaboration and Version Control",
+                "features": [
+                  "Real-time file locking and conflict prevention",
+                  "Collaborative editing indicators and cursors",
+                  "Version history with diff viewing capabilities",
+                  "Branch management and merge conflict resolution",
+                  "File ownership and permission management",
+                  "Change attribution and audit trails",
+                  "Shared workspace sessions and pair programming"
+                ],
+                "team_features": [
+                  "File review and approval workflows",
+                  "Comment system for code feedback",
+                  "Change tracking with detailed history",
+                  "Collaboration analytics and insights",
+                  "Team productivity metrics and reports",
+                  "Integration with project management tools"
+                ]
+              },
+              {
+                "operation": "Import and Export Capabilities",
+                "functionality": [
+                  "Project file export with dependency resolution",
+                  "Code snippet sharing and reuse",
+                  "Template import and customization",
+                  "Configuration file synchronization",
+                  "Cross-project file references",
+                  "Backup and restore capabilities",
+                  "Migration tools for project restructuring"
+                ],
+                "integration_features": [
+                  "GitHub repository synchronization",
+                  "External service integrations (Figma, Notion, etc.)",
+                  "Cloud storage and file sharing",
+                  "API integration for file operations",
+                  "Webhook support for file change notifications",
+                  "Automated deployment triggers"
+                ]
+              },
+              {
+                "operation": "File Templates and Automation",
+                "templates": [
+                  "Component templates for React, Vue, Angular",
+                  "Page templates with routing and layout",
+                  "API endpoint templates with validation",
+                  "Database schema templates",
+                  "Configuration file templates",
+                  "Documentation templates",
+                  "Test file templates"
+                ],
+                "automation": [
+                  "Template variables and dynamic content",
+                  "Conditional template sections",
+                  "Template inheritance and composition",
+                  "Custom template creation and sharing",
+                  "Template marketplace and community contributions",
+                  "Template versioning and updates"
+                ]
+              }
             ],
             "keyboard_shortcuts": [
-              "Ctrl+S / Cmd+S: Save current file",
-              "Ctrl+F / Cmd+F: Find in current file",
-              "Ctrl+Shift+F / Cmd+Shift+F: Find across all files",
-              "Ctrl+P / Cmd+P: Quick file navigation",
+              {
+                "category": "File Operations",
+                "shortcuts": [
+                  "Ctrl+N / Cmd+N: Create new file",
+                  "Ctrl+Shift+N / Cmd+Shift+N: Create new folder",
+                  "Ctrl+S / Cmd+S: Save current file",
+                  "Ctrl+Shift+S / Cmd+Shift+S: Save all files",
+                  "Ctrl+O / Cmd+O: Open file",
+                  "Ctrl+K Ctrl+O / Cmd+K Cmd+O: Open folder",
+                  "Ctrl+W / Cmd+W: Close current file",
+                  "Ctrl+Shift+W / Cmd+Shift+W: Close all files"
+                ],
+                "visual_examples": [
+                  "📄 Ctrl+N → New file dialog opens instantly",
+                  "📁 Ctrl+Shift+N → New folder created in current directory",
+                  "💾 Ctrl+S → Green checkmark appears, file saved",
+                  "🔍 Ctrl+P → Fuzzy search for any file in project"
+                ]
+              },
+              {
+                "category": "Editing Operations",
+                "shortcuts": [
+                  "Ctrl+C / Cmd+C: Copy",
+                  "Ctrl+X / Cmd+X: Cut",
+                  "Ctrl+V / Cmd+V: Paste",
+                  "Ctrl+Z / Cmd+Z: Undo",
+                  "Ctrl+Y / Cmd+Y: Redo",
+                  "Ctrl+A / Cmd+A: Select all",
+                  "Ctrl+D / Cmd+D: Select next occurrence",
+                  "Ctrl+Shift+L / Cmd+Shift+L: Select all occurrences",
+                  "Alt+Click: Add cursor at position",
+                  "Ctrl+Alt+Arrow Keys: Multi-line cursor"
+                ],
+                "visual_examples": [
+                  "🎯 Ctrl+D on 'const' → Selects all 'const' declarations",
+                  "🔄 Ctrl+Alt+↓ → Creates cursors on multiple lines",
+                  "↩️ Ctrl+Z → Undoes last change with visual feedback",
+                  "📝 Ctrl+D repeatedly → Selects multiple instances to edit simultaneously"
+                ]
+              },
+              {
+                "category": "Search and Navigation",
+                "shortcuts": [
+                  "Ctrl+F / Cmd+F: Find in current file",
+                  "Ctrl+H / Cmd+H: Replace in current file",
+                  "Ctrl+Shift+F / Cmd+Shift+F: Find across all files",
+                  "Ctrl+Shift+H / Cmd+Shift+H: Replace across all files",
+                  "Ctrl+P / Cmd+P: Quick file navigation",
+                  "Ctrl+Shift+P / Cmd+Shift+P: Command palette",
+                  "F12: Go to definition",
+                  "Alt+F12: Peek definition",
+                  "Shift+F12: Find all references",
+                  "Ctrl+T: Go to symbol"
+                ],
+                "visual_examples": [
+                  "🔍 Ctrl+F 'function' → Highlights all functions in file",
+                  "📂 Ctrl+P 'auth' → Shows all files with 'auth' in name",
+                  "🎯 F12 on function name → Jumps to function definition",
+                  "🔎 Ctrl+Shift+F 'TODO' → Finds all TODO comments in project"
+                ]
+              },
+              {
+                "category": "Code Editing",
+                "shortcuts": [
+                  "Ctrl+/ / Cmd+/: Toggle line comment",
+                  "Ctrl+Shift+/ / Cmd+Shift+/: Toggle block comment",
               "Alt+Shift+F: Format document",
-              "Ctrl+/: Toggle line comment",
-              "Ctrl+D / Cmd+D: Select next occurrence",
-              "F12: Go to definition"
+                  "Ctrl+K Ctrl+F / Cmd+K Cmd+F: Format selection",
+                  "Ctrl+] / Cmd+]: Indent line",
+                  "Ctrl+[ / Cmd+[: Outdent line",
+                  "Alt+Shift+Arrow Down: Copy line down",
+                  "Alt+Shift+Arrow Up: Copy line up",
+                  "Ctrl+Shift+K / Cmd+Shift+K: Delete line",
+                  "Alt+Arrow Up/Down: Move line up/down"
+                ]
+              },
+              {
+                "category": "Window and Panel Management",
+                "shortcuts": [
+                  "Ctrl+B / Cmd+B: Toggle sidebar",
+                  "Ctrl+Shift+E / Cmd+Shift+E: Focus file explorer",
+                  "Ctrl+Shift+F: Focus search panel",
+                  "Ctrl+Shift+G: Focus source control",
+                  "Ctrl+Shift+D: Focus debug panel",
+                  "Ctrl+Shift+X: Focus extensions panel",
+                  "Ctrl+Shift+Y: Focus debug console",
+                  "Ctrl+`: Toggle integrated terminal"
+                ]
+              },
+              {
+                "category": "Advanced Editing",
+                "shortcuts": [
+                  "Ctrl+K Ctrl+C: Add line comment (VS Code style)",
+                  "Ctrl+K Ctrl+U: Remove line comment",
+                  "Ctrl+K Ctrl+0: Fold all regions",
+                  "Ctrl+K Ctrl+J: Unfold all regions",
+                  "Ctrl+K Ctrl+[ : Fold current region",
+                  "Ctrl+K Ctrl+] : Unfold current region",
+                  "Ctrl+Shift+[ : Fold all subregions",
+                  "Ctrl+Shift+] : Unfold all subregions"
+                ]
+              },
+              {
+                "category": "Debugging and Testing",
+                "shortcuts": [
+                  "F5: Start debugging",
+                  "F10: Step over",
+                  "F11: Step into",
+                  "Shift+F11: Step out",
+                  "Ctrl+Shift+F5: Restart debugging",
+                  "F9: Toggle breakpoint",
+                  "Ctrl+K Ctrl+I: Show hover information",
+                  "Ctrl+Shift+P → 'test': Run tests"
+                ]
+              },
+              {
+                "category": "Custom Shortcuts",
+                "tips": [
+                  "Customize shortcuts in settings to match your preferences",
+                  "Use Ctrl+K Ctrl+S to open keyboard shortcuts editor",
+                  "Create multi-command shortcuts for common workflows",
+                  "Sync shortcuts across devices with settings sync",
+                  "Use extension-specific shortcuts for specialized tools",
+                  "Document your custom shortcuts for team consistency"
+                ]
+              }
             ],
             "productivity_tips": [
-              "Use the file explorer to maintain organized project structure",
-              "Take advantage of auto-save to prevent data loss",
-              "Use search functionality to quickly navigate large codebases",
-              "Create templates for commonly used file structures",
-              "Use version control integration for change tracking",
-              "Regularly review and refactor file organization"
-            ]
+              {
+                "category": "Workspace Organization",
+                "tips": [
+                  "Create feature-based folder structures for better organization",
+                  "Use consistent naming conventions across your project",
+                  "Maintain a clean file structure with logical grouping",
+                  "Regularly refactor and reorganize as your project grows",
+                  "Document your file organization patterns for team consistency",
+                  "Use workspace settings to customize your development environment"
+                ]
+              },
+              {
+                "category": "Efficient Navigation",
+                "tips": [
+                  "Master quick file navigation with Ctrl+P",
+                  "Use symbol search (Ctrl+T) to jump to functions and classes",
+                  "Learn advanced search patterns with regex support",
+                  "Set up bookmarks for frequently accessed files",
+                  "Use breadcrumbs for context-aware navigation",
+                  "Customize your sidebar layout for optimal workflow"
+                ]
+              },
+              {
+                "category": "Code Editing Efficiency",
+                "tips": [
+                  "Learn multi-cursor editing for simultaneous changes",
+                  "Use snippets and templates to speed up repetitive tasks",
+                  "Master keyboard shortcuts for common operations",
+                  "Enable auto-save to prevent data loss",
+                  "Use code formatting tools for consistent style",
+                  "Set up custom snippets for your common patterns"
+                ]
+              },
+              {
+                "category": "Search and Replace Mastery",
+                "tips": [
+                  "Use regex patterns for complex search operations",
+                  "Master case-sensitive and whole word matching",
+                  "Learn to exclude directories and file types effectively",
+                  "Save frequently used search patterns",
+                  "Use search in selection for targeted replacements",
+                  "Combine search with multi-cursor editing for powerful refactoring"
+                ]
+              },
+              {
+                "category": "Version Control Best Practices",
+                "tips": [
+                  "Commit frequently with descriptive messages",
+                  "Use branches for feature development and bug fixes",
+                  "Review changes before committing with diff views",
+                  "Resolve merge conflicts promptly and carefully",
+                  "Use .gitignore to exclude unnecessary files",
+                  "Set up pre-commit hooks for code quality checks"
+                ]
+              },
+              {
+                "category": "Performance Optimization",
+                "tips": [
+                  "Monitor bundle sizes and optimize large files",
+                  "Use lazy loading for heavy components",
+                  "Optimize images and media assets",
+                  "Remove unused dependencies and dead code",
+                  "Implement caching strategies for better performance",
+                  "Use performance monitoring tools to identify bottlenecks"
+                ]
+              },
+              {
+                "category": "Team Collaboration",
+                "tips": [
+                  "Use real-time collaboration features for pair programming",
+                  "Set up code review workflows with comments and feedback",
+                  "Establish consistent coding standards across the team",
+                  "Use shared settings and configurations",
+                  "Document team-specific shortcuts and workflows",
+                  "Regularly sync and update team development environments"
+                ]
+              },
+              {
+                "category": "Customization and Extensions",
+                "tips": [
+                  "Install extensions for your specific tech stack",
+                  "Customize themes and colors for better visibility",
+                  "Set up custom snippets for team-specific patterns",
+                  "Configure workspace settings for project consistency",
+                  "Use extension marketplaces for specialized tools",
+                  "Regularly update extensions for new features and security"
+                ]
+              }
+            ],
+            "troubleshooting_guide": {
+              "common_issues": [
+                {
+                  "issue": "Editor performance degradation",
+                  "symptoms": "Slow response, high CPU usage, freezing",
+                  "solutions": [
+                    "Disable unnecessary extensions",
+                    "Increase memory allocation in settings",
+                    "Close unused files and tabs",
+                    "Use workspace settings instead of global settings",
+                    "Clear editor cache and restart",
+                    "Update to latest version"
+                  ]
+                },
+                {
+                  "issue": "IntelliSense not working",
+                  "symptoms": "No autocomplete, missing suggestions, errors not showing",
+                  "solutions": [
+                    "Check TypeScript/JavaScript language service",
+                    "Reload window with Ctrl+Shift+P → 'Developer: Reload Window'",
+                    "Reinstall language extensions",
+                    "Check workspace settings for correct language configuration",
+                    "Verify file associations and extensions",
+                    "Update language servers"
+                  ]
+                },
+                {
+                  "issue": "File operations failing",
+                  "symptoms": "Cannot create, delete, or modify files",
+                  "solutions": [
+                    "Check file permissions and ownership",
+                    "Close files that might be locked by other processes",
+                    "Use integrated terminal for file operations if needed",
+                    "Check disk space and available resources",
+                    "Restart the editor and try again",
+                    "Verify file system integrity"
+                  ]
+                },
+                {
+                  "issue": "Search not finding results",
+                  "symptoms": "Search returns no results or incomplete results",
+                  "solutions": [
+                    "Check search scope and include/exclude patterns",
+                    "Verify file encodings and formats",
+                    "Use different search options (regex, case sensitivity)",
+                    "Check if files are excluded by .gitignore",
+                    "Rebuild search index if available",
+                    "Try searching from command line for comparison"
+                  ]
+                }
+              ],
+              "advanced_troubleshooting": [
+                "Check developer console for error messages (Help → Toggle Developer Tools)",
+                "Use command palette to access diagnostic commands",
+                "Review workspace and user settings for conflicts",
+                "Disable all extensions and re-enable one by one to isolate issues",
+                "Check system resources and antivirus software interference",
+                "Use verbose logging for detailed error information"
+              ]
+            },
+            "best_practices": {
+              "file_organization": [
+                "Use feature-based folder structure over type-based organization",
+                "Maintain consistent naming conventions (camelCase, kebab-case, PascalCase)",
+                "Create index files for clean imports and better organization",
+                "Use barrel exports to simplify import statements",
+                "Document file organization patterns in README or contributing guide",
+                "Regularly refactor file structure as the project evolves"
+              ],
+              "code_quality": [
+                "Enable ESLint and Prettier for consistent code style",
+                "Use TypeScript for better type safety and IntelliSense",
+                "Set up pre-commit hooks for code quality checks",
+                "Regularly review and update dependencies",
+                "Implement automated testing for critical functionality",
+                "Use code coverage tools to identify untested code"
+              ],
+              "collaboration": [
+                "Establish coding standards and style guides",
+                "Use consistent editor settings across the team",
+                "Set up code review processes and checklists",
+                "Document team workflows and shortcuts",
+                "Use shared snippets and templates",
+                "Regularly sync team development environments"
+              ],
+              "performance": [
+                "Monitor bundle sizes and set size limits",
+                "Use code splitting for better loading performance",
+                "Optimize images and static assets",
+                "Implement lazy loading for heavy components",
+                "Use performance monitoring tools",
+                "Regularly audit and remove unused code"
+              ]
+            },
+            "conclusion_and_next_steps": {
+              "mastering_efficiency": "The professional code editor and file management system in Pixel Pilot represents a significant advancement in development tools. By mastering these features, you'll dramatically improve your development efficiency, code quality, and overall productivity.",
+              "continuous_learning": "The editor ecosystem is constantly evolving with new features, extensions, and best practices. Stay updated with the latest developments and continuously refine your workflow.",
+              "team_adoption": "Encourage your team to adopt these practices for consistent development experiences and improved collaboration.",
+              "resources_for_growth": [
+                "Official documentation and release notes",
+                "Community forums and user groups",
+                "Extension marketplace for specialized tools",
+                "Video tutorials and interactive courses",
+                "Blog posts and articles on advanced techniques",
+                "Conference talks and workshops"
+              ],
+              "productivity_roadmap": [
+                "Week 1-2: Master basic file operations and navigation",
+                "Week 3-4: Learn advanced editing techniques and shortcuts",
+                "Month 2: Explore extensions and customization options",
+                "Month 3: Implement team collaboration workflows",
+                "Ongoing: Continuously optimize and refine your workflow"
+              ],
+              "final_thought": "The difference between a good developer and a great one often lies in their mastery of development tools. Invest time in learning Pixel Pilot's editor and file management features, and you'll see immediate improvements in your development speed, code quality, and overall satisfaction with your work."
+            }
           },
           "tags": ["editor", "files", "productivity", "shortcuts"],
           "difficulty": "intermediate",
