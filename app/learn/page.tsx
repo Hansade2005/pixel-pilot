@@ -6,11 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   BookOpen, Video, Play, Users, Clock, Star, ArrowRight, MessageSquare, Code, Rocket, Layers, Settings,
   Search, Filter, CheckCircle, TrendingUp, Award, Target, Lightbulb, Zap, BarChart3, X, GraduationCap,
   PlayCircle, FileText, Trophy, Calendar, User, Check, Lock, Unlock, Download, Share2,
-  ChevronDown, ChevronRight, Book, Brain, Code2, Palette, Database, Globe, Smartphone, Award as CertificateIcon
+  ChevronDown, ChevronRight, Book, Brain, Code2, Palette, Database, Globe, Smartphone, Award as CertificateIcon,
+  MessageCircle, UserCheck
 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
@@ -109,10 +112,27 @@ interface Course {
   progress: number
   completed: boolean
   certificateAvailable: boolean
+  content?: {
+    modules: any[]
+    [key: string]: any
+  }
+}
+
+interface UserProfile {
+  firstName: string
+  lastName: string
+  email: string
+  phone?: string
+  country: string
+  organization?: string
+  jobTitle?: string
+  enrollmentDate: string
+  profileImage?: string
 }
 
 interface UserProgress {
   userId: string
+  userProfile?: UserProfile
   enrolledCourses: string[]
   completedCourses: string[]
   courseProgress: { [courseId: string]: { [moduleId: string]: { [lessonId: string]: boolean } } }
@@ -133,6 +153,19 @@ export default function LearnPage() {
   const [selectedTab, setSelectedTab] = useState<"courses" | "progress" | "certificates">("courses")
   const [showCertificate, setShowCertificate] = useState(false)
   const [selectedCertificate, setSelectedCertificate] = useState<Course | null>(null)
+  const [showEnrollmentForm, setShowEnrollmentForm] = useState(false)
+  const [selectedCourseForEnrollment, setSelectedCourseForEnrollment] = useState<Course | null>(null)
+  const [enrollmentFormData, setEnrollmentFormData] = useState<UserProfile>({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    country: '',
+    organization: '',
+    jobTitle: '',
+    enrollmentDate: '',
+    profileImage: ''
+  })
 
   const categories = [
     { id: "all", name: "All Courses", icon: BookOpen },
@@ -190,6 +223,22 @@ export default function LearnPage() {
     loadData()
   }, [])
 
+  // Handle enrollment from URL parameter
+  useEffect(() => {
+    if (!loading && courses.length > 0) {
+      const urlParams = new URLSearchParams(window.location.search)
+      const enrollCourseId = urlParams.get('enroll')
+      if (enrollCourseId) {
+        const courseToEnroll = courses.find(c => c.id === enrollCourseId)
+        if (courseToEnroll && !courseToEnroll.enrolled) {
+          handleEnrollClick(courseToEnroll)
+          // Clean up URL
+          window.history.replaceState({}, '', '/learn')
+        }
+      }
+    }
+  }, [loading, courses])
+
   // Save progress to localStorage whenever it changes
   useEffect(() => {
     if (userProgress) {
@@ -223,6 +272,62 @@ export default function LearnPage() {
 
     setFilteredCourses(filtered)
   }, [searchQuery, selectedCategory, selectedLevel, courses])
+
+  const handleEnrollClick = (course: Course) => {
+    // Check if user already has a profile
+    if (userProgress?.userProfile) {
+      // User already has profile, enroll directly
+      enrollInCourse(course.id)
+    } else {
+      // Show enrollment form first
+      setSelectedCourseForEnrollment(course)
+      setShowEnrollmentForm(true)
+    }
+  }
+
+  const handleEnrollmentSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!selectedCourseForEnrollment || !userProgress) return
+
+    // Create or update user profile
+    const updatedProgress = {
+      ...userProgress,
+      userProfile: {
+        ...enrollmentFormData,
+        enrollmentDate: new Date().toISOString()
+      },
+      enrolledCourses: [...userProgress.enrolledCourses, selectedCourseForEnrollment.id],
+      courseProgress: {
+        ...userProgress.courseProgress,
+        [selectedCourseForEnrollment.id]: {}
+      },
+      lastActive: new Date().toISOString()
+    }
+
+    setUserProgress(updatedProgress)
+    localStorage.setItem('pixelPilotUserProgress', JSON.stringify(updatedProgress))
+
+    // Update course enrollment status
+    setCourses(prev => prev.map(course =>
+      course.id === selectedCourseForEnrollment.id ? { ...course, enrolled: true } : course
+    ))
+
+    // Close form and reset
+    setShowEnrollmentForm(false)
+    setSelectedCourseForEnrollment(null)
+    setEnrollmentFormData({
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      country: '',
+      organization: '',
+      jobTitle: '',
+      enrollmentDate: '',
+      profileImage: ''
+    })
+  }
 
   const enrollInCourse = (courseId: string) => {
     if (!userProgress) return
@@ -921,62 +1026,159 @@ export default function LearnPage() {
                 </Button>
               </div>
 
-              {/* Certificate Design */}
-              <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-12 border-4 border-purple-200">
+              {/* Professional Certificate Design */}
+              <div className="bg-gradient-to-br from-slate-50 via-white to-purple-50 rounded-xl p-8 border-4 border-purple-300 shadow-2xl">
                 <div className="text-center">
-                  {/* Header */}
+                  {/* Header with Logo */}
                   <div className="mb-8">
-                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center mx-auto mb-4">
-                      <CertificateIcon className="w-10 h-10 text-white" />
+                    {/* Site Logo */}
+                    <div className="flex justify-center mb-6">
+                      <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center shadow-lg">
+                        <Logo className="w-10 h-10 text-white" />
+                      </div>
                     </div>
-                    <h1 className="text-4xl font-bold text-gray-900 mb-2">Certificate of Completion</h1>
-                    <p className="text-lg text-gray-600">Pixel Pilot Learning Platform</p>
+
+                    <div className="border-t-4 border-b-4 border-purple-400 py-4 mb-6">
+                      <h1 className="text-4xl font-bold text-gray-900 mb-2 tracking-wider">CERTIFICATE</h1>
+                      <h2 className="text-2xl font-semibold text-purple-700 mb-1">OF COMPLETION</h2>
+                      <p className="text-lg text-gray-600 font-medium">Pixel Pilot Learning Platform</p>
+                    </div>
+                  </div>
+
+                  {/* Decorative Elements */}
+                  <div className="flex justify-between items-center mb-8 px-8">
+                    <div className="w-16 h-1 bg-gradient-to-r from-purple-400 to-pink-400 rounded"></div>
+                    <CertificateIcon className="w-8 h-8 text-purple-600" />
+                    <div className="w-16 h-1 bg-gradient-to-r from-pink-400 to-purple-400 rounded"></div>
                   </div>
 
                   {/* Recipient */}
                   <div className="mb-8">
-                    <p className="text-gray-600 mb-2">This is to certify that</p>
-                    <h2 className="text-3xl font-bold text-gray-900 mb-2">Student Name</h2>
-                    <p className="text-gray-600">has successfully completed the course</p>
-            </div>
-            
+                    <p className="text-gray-600 mb-4 font-medium">This certificate is proudly presented to</p>
+                    <div className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text">
+                      <h2 className="text-4xl font-bold text-transparent mb-2 tracking-wide">
+                        {userProgress?.userProfile ?
+                          `${userProgress.userProfile.firstName} ${userProgress.userProfile.lastName}` :
+                          'Student Name'
+                        }
+                      </h2>
+                    </div>
+                    <p className="text-gray-600 text-lg">for successfully completing</p>
+                  </div>
+
                   {/* Course */}
                   <div className="mb-8">
-                    <h3 className="text-2xl font-semibold text-purple-600 mb-2">
-                      {selectedCertificate.title}
-                    </h3>
-                    <p className="text-gray-600">with a score of 95%</p>
-            </div>
-            
-                  {/* Signature */}
-                  <div className="mb-8">
-                    <div className="border-t-2 border-gray-400 w-64 mx-auto mb-4"></div>
-                    <p className="text-sm text-gray-600 mb-1">Founder & CEO</p>
-                    <p className="text-lg font-semibold text-gray-900" style={{ fontFamily: 'Dancing Script, cursive' }}>
-                      Anye Happiness Ade
-                    </p>
-            </div>
-            
-                  {/* Date */}
-                  <div className="mb-8">
-                    <p className="text-gray-600">Completed on</p>
-                    <p className="text-lg font-semibold text-gray-900">
-                      {new Date().toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </p>
-            </div>
-            
-                  {/* Certificate ID */}
-                  <div className="border-t border-gray-300 pt-6">
-                    <p className="text-sm text-gray-500">
-                      Certificate ID: PP-{selectedCertificate.id.toUpperCase()}-{Date.now()}
-                    </p>
+                    <div className="bg-white rounded-lg p-4 shadow-md border border-purple-200 mx-auto max-w-md">
+                      <h3 className="text-2xl font-bold text-purple-700 mb-2 text-center">
+                        {selectedCertificate.title}
+                      </h3>
+                      <div className="flex justify-center items-center space-x-4 text-sm text-gray-600">
+                        <span className="flex items-center">
+                          <Clock className="w-4 h-4 mr-1" />
+                          {selectedCertificate.duration}
+                        </span>
+                        <span className="flex items-center">
+                          <Star className="w-4 h-4 mr-1 text-yellow-500" />
+                          {selectedCertificate.rating}/5.0
+                        </span>
+                      </div>
+                    </div>
                   </div>
-            </div>
-          </div>
+
+                  {/* Achievement Details */}
+                  <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                      <div className="text-2xl font-bold text-green-600 mb-1">100%</div>
+                      <div className="text-sm text-gray-600">Course Completion</div>
+                    </div>
+                    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                      <div className="text-2xl font-bold text-blue-600 mb-1">
+                        {selectedCertificate.content && selectedCertificate.content.modules ? selectedCertificate.content.modules.length : 0}
+                      </div>
+                      <div className="text-sm text-gray-600">Modules Completed</div>
+                    </div>
+                    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                      <div className="text-2xl font-bold text-purple-600 mb-1">A+</div>
+                      <div className="text-sm text-gray-600">Grade Achieved</div>
+                    </div>
+                  </div>
+
+                  {/* Signature Section */}
+                  <div className="mb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      {/* Student Signature */}
+                      <div className="text-center">
+                        <div className="border-t-2 border-gray-400 w-48 mx-auto mb-2"></div>
+                        <p className="text-sm text-gray-600 mb-1">Student Signature</p>
+                        <p className="text-base font-medium text-gray-900">
+                          {userProgress?.userProfile ?
+                            `${userProgress.userProfile.firstName} ${userProgress.userProfile.lastName}` :
+                            'Student Name'
+                          }
+                        </p>
+                      </div>
+
+                      {/* Instructor Signature */}
+                      <div className="text-center">
+                        <div className="border-t-2 border-gray-400 w-48 mx-auto mb-2"></div>
+                        <p className="text-sm text-gray-600 mb-1">Founder & CEO</p>
+                        <p className="text-lg font-semibold text-gray-900" style={{ fontFamily: 'Dancing Script, cursive' }}>
+                          Anye Happiness Ade
+                        </p>
+                        <p className="text-xs text-gray-500">Pixel Pilot Learning Platform</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Date and Verification */}
+                  <div className="mb-8">
+                    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200 mx-auto max-w-md">
+                      <div className="text-center">
+                        <p className="text-gray-600 text-sm mb-1">Date of Completion</p>
+                        <p className="text-lg font-bold text-gray-900">
+                          {new Date().toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Certificate ID and Verification */}
+                  <div className="border-t border-gray-300 pt-6">
+                    <div className="flex justify-between items-center mb-4">
+                      <div>
+                        <p className="text-sm text-gray-500 mb-1">Certificate ID</p>
+                        <p className="text-sm font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded">
+                          PP-{selectedCertificate.id.toUpperCase()}-{Date.now()}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-500 mb-1">Verification</p>
+                        <div className="flex items-center text-green-600">
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          <span className="text-sm font-medium">Verified</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer Branding */}
+                    <div className="text-center border-t border-gray-200 pt-4">
+                      <p className="text-xs text-gray-500 mb-2">
+                        This certificate was issued by Pixel Pilot Learning Platform
+                      </p>
+                      <div className="flex justify-center items-center space-x-4">
+                        <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
+                          <Logo className="w-4 h-4 text-white" />
+                        </div>
+                        <span className="text-sm font-medium text-gray-700">pixelpilot.dev</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
           
               {/* Action Buttons */}
               <div className="flex gap-4 mt-6">
@@ -989,6 +1191,213 @@ export default function LearnPage() {
                   Share Certificate
                 </Button>
             </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Enrollment Form Modal */}
+      {showEnrollmentForm && selectedCourseForEnrollment && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-8">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Enroll in Course</h2>
+                  <p className="text-gray-600 mt-1">Complete your profile to get started with {selectedCourseForEnrollment.title}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowEnrollmentForm(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-6 h-6" />
+                </Button>
+              </div>
+
+              <form onSubmit={handleEnrollmentSubmit} className="space-y-6">
+                {/* Course Info */}
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg border border-purple-200">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
+                      <BookOpen className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{selectedCourseForEnrollment.title}</h3>
+                      <p className="text-sm text-gray-600">by {selectedCourseForEnrollment.instructor}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Personal Information */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Personal Information</h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        First Name *
+                      </label>
+                      <Input
+                        type="text"
+                        required
+                        value={enrollmentFormData.firstName}
+                        onChange={(e) => setEnrollmentFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                        placeholder="Enter your first name"
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Last Name *
+                      </label>
+                      <Input
+                        type="text"
+                        required
+                        value={enrollmentFormData.lastName}
+                        onChange={(e) => setEnrollmentFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                        placeholder="Enter your last name"
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Email Address *
+                    </label>
+                    <Input
+                      type="email"
+                      required
+                      value={enrollmentFormData.email}
+                      onChange={(e) => setEnrollmentFormData(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder="your.email@example.com"
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Phone Number
+                    </label>
+                    <Input
+                      type="tel"
+                      value={enrollmentFormData.phone}
+                      onChange={(e) => setEnrollmentFormData(prev => ({ ...prev, phone: e.target.value }))}
+                      placeholder="+1 (555) 123-4567"
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Country *
+                    </label>
+                    <Select
+                      value={enrollmentFormData.country}
+                      onValueChange={(value) => setEnrollmentFormData(prev => ({ ...prev, country: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select your country" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="us">United States</SelectItem>
+                        <SelectItem value="uk">United Kingdom</SelectItem>
+                        <SelectItem value="ca">Canada</SelectItem>
+                        <SelectItem value="au">Australia</SelectItem>
+                        <SelectItem value="de">Germany</SelectItem>
+                        <SelectItem value="fr">France</SelectItem>
+                        <SelectItem value="jp">Japan</SelectItem>
+                        <SelectItem value="in">India</SelectItem>
+                        <SelectItem value="br">Brazil</SelectItem>
+                        <SelectItem value="mx">Mexico</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Professional Information */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Professional Information</h3>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Organization/Company
+                    </label>
+                    <Input
+                      type="text"
+                      value={enrollmentFormData.organization}
+                      onChange={(e) => setEnrollmentFormData(prev => ({ ...prev, organization: e.target.value }))}
+                      placeholder="Your company or organization"
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Job Title/Role
+                    </label>
+                    <Input
+                      type="text"
+                      value={enrollmentFormData.jobTitle}
+                      onChange={(e) => setEnrollmentFormData(prev => ({ ...prev, jobTitle: e.target.value }))}
+                      placeholder="e.g., Software Developer, Student, Manager"
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+
+                {/* Terms and Agreement */}
+                <div className="space-y-4">
+                  <div className="flex items-start space-x-3">
+                    <input
+                      type="checkbox"
+                      id="terms"
+                      required
+                      className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <label htmlFor="terms" className="text-sm text-gray-700">
+                      I agree to the <a href="/terms" className="text-purple-600 hover:text-purple-800 underline">Terms of Service</a> and
+                      <a href="/privacy" className="text-purple-600 hover:text-purple-800 underline ml-1">Privacy Policy</a>.
+                      I understand that my information will be used to generate completion certificates.
+                    </label>
+                  </div>
+
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <div className="flex items-start space-x-3">
+                      <MessageCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+                      <div>
+                        <h4 className="text-sm font-medium text-blue-900">Certificate Information</h4>
+                        <p className="text-sm text-blue-700 mt-1">
+                          Upon successful completion of this course, you'll receive a professional certificate
+                          featuring your name, completion date, and Pixel Pilot branding.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Submit Buttons */}
+                <div className="flex gap-4 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowEnrollmentForm(false)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    <UserCheck className="w-4 h-4 mr-2" />
+                    Complete Enrollment
+                  </Button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

@@ -339,7 +339,7 @@ export default function CoursePage() {
                     <Button
                       size="lg"
                       className="bg-purple-600 hover:bg-purple-700 text-white px-8"
-                      onClick={enrollInCourse}
+                      onClick={() => window.location.href = `/learn?enroll=${course.id}`}
                     >
                       <BookOpen className="w-5 h-5 mr-2" />
                       Enroll Now - {course.price}
