@@ -6,14 +6,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import {
-  User,
-  Mail,
-  Lock,
-  Trash2,
-  RefreshCw,
-  Cloud,
-  CloudOff,
+import { 
+  User, 
+  Mail, 
+  Lock, 
+  Trash2, 
+  RefreshCw, 
+  Cloud, 
+  CloudOff, 
   CheckCircle,
   AlertCircle,
   Info,
@@ -170,12 +170,11 @@ export default function AccountSettingsPage() {
         userData = await response.json()
       }
 
-      // Save token
-      await storageManager.createToken({
-        userId: user?.id,
-        provider,
-        token
-      })
+      // Save token to Supabase
+      const tokens = { [provider]: token }
+      const success = await storeDeploymentTokens(user?.id, tokens)
+
+      if (!success) throw new Error(`Failed to save ${provider} token`)
 
       // Update connection status
       setConnections(prev => ({
@@ -916,19 +915,19 @@ export default function AccountSettingsPage() {
                           : connectionForms.github.error ? "border-red-500" : ""
                         }
                       />
-                      {connections.github.connected ? (
-                        <Button
+                  {connections.github.connected ? (
+                      <Button
                           variant="destructive"
-                          onClick={() => handleDisconnect('github')}
-                          disabled={connections.github.loading}
-                        >
-                          {connections.github.loading ? (
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          ) : (
-                            <Unlink className="h-4 w-4 mr-2" />
-                          )}
-                          Disconnect
-                        </Button>
+                        onClick={() => handleDisconnect('github')}
+                        disabled={connections.github.loading}
+                      >
+                        {connections.github.loading ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Unlink className="h-4 w-4 mr-2" />
+                        )}
+                        Disconnect
+                      </Button>
                       ) : (
                         <Button
                           onClick={() => handleConnect('github')}
@@ -941,7 +940,7 @@ export default function AccountSettingsPage() {
                           )}
                         </Button>
                       )}
-                    </div>
+                      </div>
 
                     {/* Connection Status */}
                     {connections.github.connected && (
@@ -952,19 +951,19 @@ export default function AccountSettingsPage() {
                     )}
 
                     {/* Error Message */}
-                    {connectionForms.github.error && (
-                      <p className="text-sm text-red-600">{connectionForms.github.error}</p>
-                    )}
+                      {connectionForms.github.error && (
+                        <p className="text-sm text-red-600">{connectionForms.github.error}</p>
+                      )}
 
                     {/* Help Text */}
-                    <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                       {connections.github.connected ? (
                         "Your token is securely stored. Click disconnect to change it."
                       ) : (
                         <>Need a token? <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Create one here</a></>
                       )}
-                    </p>
-                  </div>
+                      </p>
+                    </div>
                 </div>
 
                 {/* Vercel Connection */}
@@ -1009,19 +1008,19 @@ export default function AccountSettingsPage() {
                           : connectionForms.vercel.error ? "border-red-500" : ""
                         }
                       />
-                      {connections.vercel.connected ? (
-                        <Button
+                  {connections.vercel.connected ? (
+                      <Button
                           variant="destructive"
-                          onClick={() => handleDisconnect('vercel')}
-                          disabled={connections.vercel.loading}
-                        >
-                          {connections.vercel.loading ? (
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          ) : (
-                            <Unlink className="h-4 w-4 mr-2" />
-                          )}
-                          Disconnect
-                        </Button>
+                        onClick={() => handleDisconnect('vercel')}
+                        disabled={connections.vercel.loading}
+                      >
+                        {connections.vercel.loading ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Unlink className="h-4 w-4 mr-2" />
+                        )}
+                        Disconnect
+                      </Button>
                       ) : (
                         <Button
                           onClick={() => handleConnect('vercel')}
@@ -1034,7 +1033,7 @@ export default function AccountSettingsPage() {
                           )}
                         </Button>
                       )}
-                    </div>
+                      </div>
 
                     {/* Connection Status */}
                     {connections.vercel.connected && (
@@ -1045,19 +1044,19 @@ export default function AccountSettingsPage() {
                     )}
 
                     {/* Error Message */}
-                    {connectionForms.vercel.error && (
-                      <p className="text-sm text-red-600">{connectionForms.vercel.error}</p>
-                    )}
+                      {connectionForms.vercel.error && (
+                        <p className="text-sm text-red-600">{connectionForms.vercel.error}</p>
+                      )}
 
                     {/* Help Text */}
-                    <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                       {connections.vercel.connected ? (
                         "Your token is securely stored. Click disconnect to change it."
                       ) : (
                         <>Need a token? <a href="https://vercel.com/account/tokens" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Create one here</a></>
                       )}
-                    </p>
-                  </div>
+                      </p>
+                    </div>
                 </div>
 
                 {/* Netlify Connection */}
@@ -1102,19 +1101,19 @@ export default function AccountSettingsPage() {
                           : connectionForms.netlify.error ? "border-red-500" : ""
                         }
                       />
-                      {connections.netlify.connected ? (
-                        <Button
+                  {connections.netlify.connected ? (
+                      <Button
                           variant="destructive"
-                          onClick={() => handleDisconnect('netlify')}
-                          disabled={connections.netlify.loading}
-                        >
-                          {connections.netlify.loading ? (
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          ) : (
-                            <Unlink className="h-4 w-4 mr-2" />
-                          )}
-                          Disconnect
-                        </Button>
+                        onClick={() => handleDisconnect('netlify')}
+                        disabled={connections.netlify.loading}
+                      >
+                        {connections.netlify.loading ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Unlink className="h-4 w-4 mr-2" />
+                        )}
+                        Disconnect
+                      </Button>
                       ) : (
                         <Button
                           onClick={() => handleConnect('netlify')}
@@ -1127,7 +1126,7 @@ export default function AccountSettingsPage() {
                           )}
                         </Button>
                       )}
-                    </div>
+                      </div>
 
                     {/* Connection Status */}
                     {connections.netlify.connected && (
@@ -1138,19 +1137,19 @@ export default function AccountSettingsPage() {
                     )}
 
                     {/* Error Message */}
-                    {connectionForms.netlify.error && (
-                      <p className="text-sm text-red-600">{connectionForms.netlify.error}</p>
-                    )}
+                      {connectionForms.netlify.error && (
+                        <p className="text-sm text-red-600">{connectionForms.netlify.error}</p>
+                      )}
 
                     {/* Help Text */}
-                    <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                       {connections.netlify.connected ? (
                         "Your token is securely stored. Click disconnect to change it."
                       ) : (
                         <>Need a token? <a href="https://app.netlify.com/user/applications#personal-access-tokens" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Create one here</a></>
                       )}
-                    </p>
-                  </div>
+                      </p>
+                    </div>
                 </div>
               </CardContent>
             </Card>

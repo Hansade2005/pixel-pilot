@@ -30,9 +30,9 @@ interface DeploymentSetupAccordionProps {
   onConnect?: () => void
 }
 
-export function DeploymentSetupAccordion({
-  platform,
-  connectionStatus,
+export function DeploymentSetupAccordion({ 
+  platform, 
+  connectionStatus, 
   onConnect = () => {} // Default empty function
 }: DeploymentSetupAccordionProps) {
   const { toast } = useToast()

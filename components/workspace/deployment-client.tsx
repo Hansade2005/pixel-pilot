@@ -1422,7 +1422,7 @@ export default function DeploymentClient() {
                           <div className="flex items-center space-x-2">
                           <div className="w-5 h-5 bg-black rounded flex items-center justify-center">
                             <VercelIcon className="h-3 w-3 text-white" />
-                          </div>
+                            </div>
                           <span className="text-gray-300 font-medium">Vercel Connection</span>
                         </div>
                         {storedTokens.vercel ? (
@@ -1723,7 +1723,7 @@ export default function DeploymentClient() {
                           <div className="flex items-center space-x-2">
                           <div className="w-5 h-5 bg-green-600 rounded flex items-center justify-center">
                             <NetlifyIcon className="h-3 w-3 text-white" />
-                          </div>
+                            </div>
                           <span className="text-gray-300 font-medium">Netlify Connection</span>
                         </div>
                         {storedTokens.netlify ? (
