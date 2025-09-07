@@ -50,13 +50,13 @@ import {
   uploadBackupToCloud,
   restoreBackupFromCloud,
   isCloudSyncEnabled as isCloudSyncEnabledUtil,
+  isCloudSyncEnabled,
   setCloudSyncEnabled as setCloudSyncEnabledUtil,
   getLastBackupTime as getLastBackupTimeUtil,
   storeDeploymentTokens,
   getDeploymentTokens
 } from "@/lib/cloud-sync"
 import { useCloudSync } from "@/hooks/use-cloud-sync"
-import { restoreBackupFromCloud, isCloudSyncEnabled } from "@/lib/cloud-sync"
 import { 
   AlertDialog,
   AlertDialogAction,
