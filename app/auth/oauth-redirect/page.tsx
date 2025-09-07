@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { storageManager } from '@/lib/storage-manager'
+import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
 
 export default function OAuthRedirectPage() {
@@ -10,69 +10,60 @@ export default function OAuthRedirectPage() {
   const { toast } = useToast()
 
   useEffect(() => {
-    const handle = async () => {
+    const handleOAuthCallback = async () => {
       try {
-        // Parse hash fragment like: #provider=github&code=...&next=/workspace
-        const hash = window.location.hash.replace(/^#/, '')
-        const params = new URLSearchParams(hash)
-        const provider = params.get('provider')
-        const code = params.get('code')
-        const next = params.get('next') || '/'
+        const supabase = createClient()
 
-        if (!provider || !code) {
-          toast({ title: 'OAuth Error', description: 'Missing provider or code in redirect.' })
+        // Get the current session to check if OAuth was successful
+        const { data: { session }, error } = await supabase.auth.getSession()
+
+        if (error) {
+          console.error('OAuth callback error:', error)
+          toast({
+            title: 'Authentication Error',
+            description: 'Failed to complete GitHub authentication.',
+            variant: 'destructive'
+          })
           router.push('/auth/login')
           return
         }
 
-        // Exchange code for token via provider-specific endpoint
-        // For simplicity, call a server proxy endpoint that performs the exchange
-        // Endpoints expected: /api/auth/exchange?provider=github (POST body: { code })
-        const exchangeResp = await fetch(`/api/auth/exchange?provider=${encodeURIComponent(provider)}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code })
-        })
-
-        if (!exchangeResp.ok) {
-          const err = await exchangeResp.text()
-          console.error('Token exchange failed', err)
-          toast({ title: 'OAuth Error', description: 'Failed to exchange code for token.' })
+        if (session?.user) {
+          toast({
+            title: 'Success',
+            description: 'Successfully signed in with GitHub!',
+          })
+          router.push('/workspace')
+        } else {
+          // No session found, redirect to login
+          toast({
+            title: 'Authentication Required',
+            description: 'Please sign in to continue.',
+            variant: 'destructive'
+          })
           router.push('/auth/login')
-          return
         }
-
-        const data = await exchangeResp.json()
-        const token = data.token
-
-        if (!token) {
-          toast({ title: 'OAuth Error', description: 'No token received from exchange.' })
-          router.push('/auth/login')
-          return
-        }
-
-        // Persist token to IndexedDB using storageManager
-        await storageManager.init()
-        // Example userId placeholder: 'local-user' - replace with actual user mapping if available
-        const userId = data.userId || 'local-user'
-        await storageManager.createToken({ userId, provider: provider!, token })
-
-        toast({ title: 'Connected', description: `${provider} connected successfully.` })
-        router.push(next)
       } catch (error) {
-        console.error('OAuth redirect handler error', error)
-        toast({ title: 'OAuth Error', description: 'Unexpected error during OAuth flow.' })
+        console.error('OAuth redirect handler error:', error)
+        toast({
+          title: 'Authentication Error',
+          description: 'An unexpected error occurred during authentication.',
+          variant: 'destructive'
+        })
         router.push('/auth/login')
       }
     }
 
-    handle()
+    handleOAuthCallback()
   }, [router, toast])
 
   return (
-    <div className="p-6">
-      <h2 className="text-lg font-semibold">Finishing OAuth flow...</h2>
-      <p className="text-sm text-muted-foreground">Please wait while we connect your account.</p>
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+        <h2 className="text-lg font-semibold mb-2">Completing sign in...</h2>
+        <p className="text-sm text-muted-foreground">Please wait while we finish setting up your account.</p>
+      </div>
     </div>
   )
 }

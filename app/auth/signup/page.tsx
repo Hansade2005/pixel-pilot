@@ -57,7 +57,7 @@ export default function SignupPage() {
         provider: 'github',
         options: {
           scopes: 'repo read:user workflow',
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: `${window.location.origin}/api/auth/callback?next=/`,
         },
       })
       if (error) throw error

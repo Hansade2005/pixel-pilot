@@ -50,7 +50,7 @@ export default function LoginPage() {
         provider: 'github',
         options: {
           scopes: 'repo read:user workflow',
-          redirectTo: `${window.location.origin}/workspace`,
+          redirectTo: `${window.location.origin}/api/auth/callback?next=/workspace`,
         },
       })
       if (error) throw error
