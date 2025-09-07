@@ -25,11 +25,11 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL('https://pixelpilot.dev'),
+  metadataBase: new URL('https://pipilot.dev'),
   openGraph: {
     title: 'Pixel Pilot - AI-Powered App Development',
     description: 'Plan, build & ship faster with AI-powered app development. Create webapps by chatting with AI.',
-    url: 'https://pixelpilot.dev',
+    url: 'https://pipilot.dev',
     siteName: 'Pixel Pilot',
     type: 'website',
     locale: 'en_US',

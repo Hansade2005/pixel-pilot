@@ -40,10 +40,10 @@ export default function RefundPolicyPage() {
             <section>
               <h2 className="text-2xl font-semibold text-white mb-4">1. Overview</h2>
               <p className="text-gray-300 leading-relaxed mb-4">
-                At Pixel Pilot, we want you to be completely satisfied with our AI-powered web application development platform. This Refund Policy outlines the circumstances under which we provide refunds for our subscription services.
+                At Pixel Pilot, Inc., we want you to be completely satisfied with our AI-powered web application development platform. This Refund Policy outlines the circumstances under which we provide refunds for our subscription services.
               </p>
               <p className="text-gray-300 leading-relaxed">
-                All refund requests are evaluated on a case-by-case basis and granted at the sole discretion of Pixel Pilot.
+                All refund requests are evaluated on a case-by-case basis and granted at the sole discretion of Pixel Pilot, Inc.
               </p>
             </section>
 
@@ -99,7 +99,7 @@ export default function RefundPolicyPage() {
                 To request a refund, please follow these steps:
               </p>
               <ol className="list-decimal list-inside text-gray-300 leading-relaxed space-y-2 ml-4">
-                <li>Contact our support team at support@pixelpilot.dev</li>
+                <li>Contact our support team at support@pipilot.dev</li>
                 <li>Include your account email and subscription details</li>
                 <li>Provide a clear explanation of the reason for your refund request</li>
                 <li>Include any relevant screenshots or documentation</li>
@@ -187,7 +187,7 @@ export default function RefundPolicyPage() {
                 If you have questions about this Refund Policy or need to request a refund, please contact us:
               </p>
               <div className="text-gray-300 leading-relaxed ml-4">
-                <p><strong>Email:</strong> support@pixelpilot.dev</p>
+                <p><strong>Email:</strong> support@pipilot.dev</p>
                 <p><strong>Subject:</strong> Refund Request</p>
                 <p><strong>Response Time:</strong> Within 24 hours</p>
               </div>

@@ -53,7 +53,7 @@ export default function TermsPage() {
                 Pixel Pilot is an AI-powered web application development platform that allows users to create, modify, and deploy web applications through natural language interactions. The Service provides AI-generated code, project management tools, and deployment capabilities.
               </p>
               <p className="text-gray-300 leading-relaxed">
-                Our Service is operated by Pixel Pilot (the "Company", "we", "us", or "our").
+                Our Service is operated by Pixel Pilot, Inc. (the "Company", "we", "us", or "our").
               </p>
             </section>
 

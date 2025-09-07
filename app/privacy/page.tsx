@@ -40,7 +40,7 @@ export default function PrivacyPage() {
             <section>
               <h2 className="text-2xl font-semibold text-white mb-4">1. Introduction</h2>
               <p className="text-gray-300 leading-relaxed mb-4">
-                Welcome to Pixel Pilot ("we," "our," or "us"). We are committed to protecting your privacy and ensuring the security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our AI-powered web application development platform.
+                Welcome to Pixel Pilot, Inc. ("we," "our," or "us"). We are committed to protecting your privacy and ensuring the security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our AI-powered web application development platform.
               </p>
               <p className="text-gray-300 leading-relaxed">
                 By using our Service, you agree to the collection and use of information in accordance with this policy.
@@ -141,7 +141,7 @@ export default function PrivacyPage() {
                 <li><strong>Opt-out:</strong> Opt out of marketing communications or data processing</li>
               </ul>
               <p className="text-gray-300 leading-relaxed">
-                To exercise these rights, please contact us at privacy@pixelpilot.dev.
+                To exercise these rights, please contact us at privacy@pipilot.dev.
               </p>
             </section>
 
