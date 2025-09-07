@@ -6,20 +6,23 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { 
-  User, 
-  Mail, 
-  Lock, 
-  Trash2, 
-  RefreshCw, 
-  Cloud, 
-  CloudOff, 
+import {
+  User,
+  Mail,
+  Lock,
+  Trash2,
+  RefreshCw,
+  Cloud,
+  CloudOff,
   CheckCircle,
   AlertCircle,
   Info,
   ExternalLink,
   Unlink,
-  Loader2
+  Loader2,
+  Check,
+  X,
+  Edit3
 } from "lucide-react"
 
 // Custom SVG Icons
@@ -88,6 +91,11 @@ export default function AccountSettingsPage() {
 
   // Auto-restore state
   const [isAutoRestoring, setIsAutoRestoring] = useState(false)
+
+  // Profile editing state
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [editingName, setEditingName] = useState("")
+  const [isUpdatingName, setIsUpdatingName] = useState(false)
 
   // Initialize auto cloud backup when user is available
   const { triggerBackup, getSyncStatus } = useCloudSync(user?.id || null)
@@ -161,6 +169,58 @@ export default function AccountSettingsPage() {
       performAutoRestore()
     }
   }, [user])
+
+  // Handle name editing
+  const handleStartEditingName = () => {
+    setEditingName(user?.user_metadata?.full_name || "")
+    setIsEditingName(true)
+  }
+
+  const handleCancelEditingName = () => {
+    setEditingName("")
+    setIsEditingName(false)
+  }
+
+  const handleSaveName = async () => {
+    if (!user || !editingName.trim()) return
+
+    try {
+      setIsUpdatingName(true)
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          full_name: editingName.trim()
+        }
+      })
+
+      if (error) throw error
+
+      // Update local user state
+      setUser({
+        ...user,
+        user_metadata: {
+          ...user.user_metadata,
+          full_name: editingName.trim()
+        }
+      })
+
+      setIsEditingName(false)
+      setEditingName("")
+
+      toast({
+        title: "Name updated",
+        description: "Your name has been successfully updated.",
+      })
+    } catch (error: any) {
+      console.error("Error updating name:", error)
+      toast({
+        title: "Failed to update name",
+        description: error.message || "An error occurred while updating your name.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsUpdatingName(false)
+    }
+  }
 
   // Validate and connect to a provider
   const handleConnect = async (provider: 'github' | 'vercel' | 'netlify') => {
@@ -747,12 +807,59 @@ export default function AccountSettingsPage() {
                     <Label htmlFor="name">Full Name</Label>
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="name"
-                        value={user?.user_metadata?.full_name || "Not set"}
-                        readOnly
-                        className="bg-muted"
-                      />
+                      {isEditingName ? (
+                        <Input
+                          id="name"
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          placeholder="Enter your full name"
+                          className="flex-1"
+                          disabled={isUpdatingName}
+                        />
+                      ) : (
+                        <Input
+                          id="name"
+                          value={user?.user_metadata?.full_name || "Not set"}
+                          readOnly
+                          className="bg-muted flex-1"
+                        />
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      {isEditingName ? (
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={handleSaveName}
+                            disabled={isUpdatingName || !editingName.trim()}
+                          >
+                            {isUpdatingName ? (
+                              <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <Check className="h-4 w-4 mr-2" />
+                            )}
+                            Save
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleCancelEditingName}
+                            disabled={isUpdatingName}
+                          >
+                            <X className="h-4 w-4 mr-2" />
+                            Cancel
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleStartEditingName}
+                        >
+                          <Edit3 className="h-4 w-4 mr-2" />
+                          Edit Name
+                        </Button>
+                      )}
                     </div>
                   </div>
                   <div className="space-y-2">
