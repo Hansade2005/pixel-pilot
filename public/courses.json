@@ -1493,29 +1493,67 @@
         ],
         "modules": [
           {
-            "id": "sql-fundamentals",
-            "title": "SQL Fundamentals",
-            "description": "Learn SQL programming basics",
-            "duration": "6 hours",
+            "id": "database-architecture",
+            "title": "Database Architecture & Design Principles",
+            "description": "Master database design fundamentals, normalization, and system architecture",
+            "duration": "8 hours",
             "completed": false,
             "unlocked": true,
             "lessons": [
               {
-                "id": "select-queries",
-                "title": "SELECT Queries and Filtering",
-                "description": "Master SELECT statements and data filtering",
-                "duration": "40 min",
-                "type": "text",
+                "id": "database-fundamentals",
+                "title": "Database Systems Architecture & Types",
+                "description": "Comprehensive understanding of database architectures, types, and fundamental concepts",
+                "duration": "75 min",
+                "type": "interactive",
                 "completed": false,
-                "content": "SELECT is the most fundamental SQL statement...",
-                "notes": "Always use WHERE clauses to filter data efficiently.",
+                "content": "## Database Systems Architecture\n\nDatabase systems form the backbone of modern applications. Understanding different database architectures and their appropriate use cases is crucial for designing efficient, scalable systems.\n\n### Database Architecture Types\n\n#### Relational Database Management Systems (RDBMS)\n```sql\n-- Relational Database Schema Example\nCREATE TABLE users (\n    user_id SERIAL PRIMARY KEY,\n    username VARCHAR(50) UNIQUE NOT NULL,\n    email VARCHAR(255) UNIQUE NOT NULL,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\nCREATE TABLE orders (\n    order_id SERIAL PRIMARY KEY,\n    user_id INTEGER REFERENCES users(user_id),\n    order_date DATE NOT NULL,\n    total_amount DECIMAL(10,2) NOT NULL,\n    status VARCHAR(20) DEFAULT 'pending'\n);\n```\n\n#### NoSQL Database Systems\n```javascript\n// MongoDB Document Structure\ndb.users.insertOne({\n  _id: ObjectId(),\n  username: \"johndoe\",\n  email: \"john@example.com\",\n  profile: {\n    firstName: \"John\",\n    lastName: \"Doe\",\n    age: 30,\n    interests: [\"technology\", \"sports\", \"music\"]\n  },\n  orders: [\n    {\n      orderId: \"ORD-001\",\n      date: new Date(),\n      items: [\n        { productId: \"PROD-001\", quantity: 2, price: 29.99 }\n      ]\n    }\n  ],\n  createdAt: new Date(),\n  lastLogin: new Date()\n});\n```\n\n### Database Design Principles\n\n#### Entity-Relationship Modeling\n```sql\n-- ERD Implementation in SQL\n-- Entities become tables, relationships become foreign keys\n\n-- One-to-One Relationship\nCREATE TABLE user_profiles (\n    profile_id SERIAL PRIMARY KEY,\n    user_id INTEGER UNIQUE REFERENCES users(user_id),\n    bio TEXT,\n    avatar_url VARCHAR(500),\n    social_links JSONB\n);\n\n-- One-to-Many Relationship\nCREATE TABLE posts (\n    post_id SERIAL PRIMARY KEY,\n    user_id INTEGER REFERENCES users(user_id),\n    title VARCHAR(200) NOT NULL,\n    content TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\n\n-- Many-to-Many Relationship\nCREATE TABLE post_tags (\n    post_id INTEGER REFERENCES posts(post_id),\n    tag_id INTEGER REFERENCES tags(tag_id),\n    PRIMARY KEY (post_id, tag_id)\n);\n```\n\n#### Normalization Theory\n```sql\n-- UNF (Unnormalized Form)\nCREATE TABLE orders_denormalized (\n    order_id INTEGER,\n    customer_name VARCHAR(100),\n    customer_address VARCHAR(200),\n    product_name VARCHAR(100),\n    product_price DECIMAL(10,2),\n    quantity INTEGER,\n    order_date DATE\n);\n\n-- 1NF (First Normal Form) - Eliminate repeating groups\nCREATE TABLE orders_1nf (\n    order_id INTEGER,\n    customer_name VARCHAR(100),\n    customer_address VARCHAR(200),\n    order_date DATE,\n    product_name VARCHAR(100),\n    product_price DECIMAL(10,2),\n    quantity INTEGER\n);\n\n-- 2NF (Second Normal Form) - Remove partial dependencies\nCREATE TABLE customers (\n    customer_id SERIAL PRIMARY KEY,\n    customer_name VARCHAR(100),\n    customer_address VARCHAR(200)\n);\n\nCREATE TABLE products (\n    product_id SERIAL PRIMARY KEY,\n    product_name VARCHAR(100),\n    product_price DECIMAL(10,2)\n);\n\nCREATE TABLE orders_2nf (\n    order_id SERIAL PRIMARY KEY,\n    customer_id INTEGER REFERENCES customers(customer_id),\n    order_date DATE\n);\n\nCREATE TABLE order_items (\n    order_id INTEGER REFERENCES orders_2nf(order_id),\n    product_id INTEGER REFERENCES products(product_id),\n    quantity INTEGER,\n    PRIMARY KEY (order_id, product_id)\n);\n\n-- 3NF (Third Normal Form) - Remove transitive dependencies\n-- (Already in 3NF in this example)\n```\n\n### Database Indexing Strategies\n\n#### B-Tree Indexes\n```sql\n-- Single Column Index\nCREATE INDEX idx_users_email ON users(email);\n\n-- Composite Index\nCREATE INDEX idx_orders_user_date ON orders(user_id, order_date);\n\n-- Partial Index\nCREATE INDEX idx_active_users ON users(user_id) WHERE active = true;\n\n-- Unique Index\nCREATE UNIQUE INDEX idx_unique_username ON users(LOWER(username));\n```\n\n#### Index Usage Analysis\n```sql\n-- Analyze index usage\nEXPLAIN ANALYZE\nSELECT * FROM users\nWHERE email = 'john@example.com';\n\n-- Index maintenance\nREINDEX INDEX idx_users_email;\n\n-- Index statistics\nSELECT\n    schemaname,\n    tablename,\n    indexname,\n    idx_scan,\n    idx_tup_read,\n    idx_tup_fetch\nFROM pg_stat_user_indexes\nORDER BY idx_scan DESC;\n```\n\n### Database Performance Optimization\n\n#### Query Optimization\n```sql\n-- Inefficient query\nSELECT * FROM orders o\nJOIN customers c ON o.customer_id = c.customer_id\nWHERE o.order_date >= '2023-01-01';\n\n-- Optimized with proper indexing\nCREATE INDEX idx_orders_date ON orders(order_date);\nCREATE INDEX idx_orders_customer ON orders(customer_id);\n\n-- Efficient query\nSELECT\n    o.order_id,\n    c.customer_name,\n    o.order_date,\n    o.total_amount\nFROM orders o\nJOIN customers c ON o.customer_id = c.customer_id\nWHERE o.order_date >= '2023-01-01'\nORDER BY o.order_date DESC;\n```\n\n#### Connection Pooling\n```javascript\n// Node.js Connection Pooling\nconst mysql = require('mysql2');\nconst pool = mysql.createPool({\n  host: 'localhost',\n  user: 'dbuser',\n  password: 'dbpass',\n  database: 'myapp',\n  waitForConnections: true,\n  connectionLimit: 10,\n  queueLimit: 0\n});\n\n// Usage\npool.execute('SELECT * FROM users WHERE id = ?', [userId], (err, results) => {\n  if (err) throw err;\n  console.log(results);\n});\n```\n\n### Advanced Database Patterns\n\n#### Database Sharding\n```sql\n-- Horizontal partitioning strategy\n-- Shard by user_id ranges\nCREATE TABLE users_shard_1 (CHECK (user_id >= 1 AND user_id < 1000000))\nINHERITS (users);\n\nCREATE TABLE users_shard_2 (CHECK (user_id >= 1000000 AND user_id < 2000000))\nINHERITS (users);\n\n-- Shard routing function\nCREATE OR REPLACE FUNCTION users_insert_trigger()\nRETURNS TRIGGER AS $$\nBEGIN\n    IF (NEW.user_id >= 1 AND NEW.user_id < 1000000) THEN\n        INSERT INTO users_shard_1 VALUES (NEW.*);\n    ELSIF (NEW.user_id >= 1000000 AND NEW.user_id < 2000000) THEN\n        INSERT INTO users_shard_2 VALUES (NEW.*);\n    ELSE\n        RAISE EXCEPTION 'User ID out of range';\n    END IF;\n    RETURN NULL;\nEND;\n$$ LANGUAGE plpgsql;\n```\n\n#### Read Replicas & High Availability\n```sql\n-- PostgreSQL streaming replication setup\n-- Primary server configuration\nwal_level = replica\nmax_wal_senders = 3\nwal_keep_segments = 64\n\n-- Replica server configuration\nhot_standby = on\nprimary_conninfo = 'host=primary.example.com port=5432 user=replicator'\n```\n\n### Database Security Fundamentals\n\n#### Access Control\n```sql\n-- Role-based access control\nCREATE ROLE readonly_user;\nGRANT CONNECT ON DATABASE myapp TO readonly_user;\nGRANT USAGE ON SCHEMA public TO readonly_user;\nGRANT SELECT ON ALL TABLES IN SCHEMA public TO readonly_user;\n\n-- Row-level security\nCREATE POLICY user_data_policy ON users\nFOR ALL\nUSING (user_id = current_user_id());\n\n-- Column-level encryption\nCREATE EXTENSION IF NOT EXISTS pgcrypto;\n\n-- Encrypt sensitive data\nUPDATE users\nSET encrypted_ssn = pgp_sym_encrypt(ssn, 'encryption_key')\nWHERE ssn IS NOT NULL;\n```\n\n#### SQL Injection Prevention\n```javascript\n// Vulnerable code\nconst query = `SELECT * FROM users WHERE username = '${username}'`;\n\n// Secure parameterized query\nconst mysql = require('mysql2');\nconst query = 'SELECT * FROM users WHERE username = ?';\nconnection.execute(query, [username], (err, results) => {\n  // Safe from SQL injection\n});\n\n// Prepared statements\nconst stmt = connection.prepare('SELECT * FROM users WHERE id = ?');\nstmt.execute([userId], (err, results) => {\n  // Pre-compiled and safe\n});\n```",
+                "notes": "### Database Design Best Practices\n\n#### 1. Naming Conventions\n- **Tables**: Use lowercase, plural nouns (users, orders, products)\n- **Columns**: Use snake_case (user_id, created_at, is_active)\n- **Primary Keys**: Use singular table name + '_id' (user_id, order_id)\n- **Foreign Keys**: Reference primary key names directly\n- **Indexes**: Use 'idx_' prefix (idx_users_email, idx_orders_date)\n\n#### 2. Data Integrity\n- **Primary Keys**: Always use surrogate keys for complex relationships\n- **Foreign Keys**: Implement referential integrity constraints\n- **Check Constraints**: Validate data at database level\n- **Triggers**: Use for complex business rules (sparingly)\n- **Transactions**: Ensure ACID properties for critical operations\n\n#### 3. Performance Optimization\n- **Indexing Strategy**: Index foreign keys and frequently queried columns\n- **Query Optimization**: Use EXPLAIN to analyze query performance\n- **Connection Pooling**: Reuse database connections efficiently\n- **Caching Layer**: Implement Redis or similar for frequently accessed data\n- **Read Replicas**: Offload read operations from primary database\n\n#### 4. Scalability Considerations\n- **Vertical Scaling**: Increase server resources (CPU, RAM, storage)\n- **Horizontal Scaling**: Distribute load across multiple servers\n- **Database Sharding**: Split large tables across multiple databases\n- **Microservices**: Break monolithic databases into focused services\n- **Caching Strategies**: Implement multi-level caching (memory, Redis, CDN)\n\n### Database Evolution & Migration\n\n#### Schema Versioning\n```sql\n-- Semantic versioning for schema changes\n-- v1.0.0: Initial schema\n-- v1.1.0: Add email verification (backward compatible)\n-- v2.0.0: User authentication refactor (breaking changes)\n\n-- Migration tracking table\nCREATE TABLE schema_migrations (\n    version VARCHAR(20) PRIMARY KEY,\n    description TEXT,\n    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    success BOOLEAN DEFAULT false\n);\n```\n\n#### Migration Scripts\n```sql\n-- Up migration: Add user roles\nBEGIN;\n\nCREATE TYPE user_role AS ENUM ('admin', 'moderator', 'user');\n\nALTER TABLE users ADD COLUMN role user_role DEFAULT 'user';\n\nINSERT INTO schema_migrations (version, description, success)\nVALUES ('1.2.0', 'Add user roles system', true);\n\nCOMMIT;\n\n-- Down migration: Remove user roles\nBEGIN;\n\nALTER TABLE users DROP COLUMN role;\n\nDROP TYPE user_role;\n\nDELETE FROM schema_migrations WHERE version = '1.2.0';\n\nCOMMIT;\n```",
                 "examples": [
-                  "Example 1: Basic SELECT statement",
-                  "Example 2: Using WHERE conditions"
+                  "Example 1: Complete e-commerce database schema with all relationships",
+                  "Example 2: Social media platform database design with performance optimizations",
+                  "Example 3: Multi-tenant SaaS application database architecture",
+                  "Example 4: Real-time analytics system database design",
+                  "Example 5: IoT data collection and storage system architecture"
                 ],
                 "exercises": [
-                  "Exercise 1: Write basic SELECT queries",
-                  "Exercise 2: Filter data with WHERE clauses"
+                  "Exercise 1: Design a database schema for a library management system",
+                  "Exercise 2: Normalize a denormalized dataset to 3NF",
+                  "Exercise 3: Create optimal indexing strategy for a high-traffic application",
+                  "Exercise 4: Implement row-level security for a multi-tenant application",
+                  "Exercise 5: Design database sharding strategy for a social media platform",
+                  "Exercise 6: Optimize slow queries using EXPLAIN and indexing",
+                  "Exercise 7: Implement database backup and recovery procedures"
+                ],
+                "resources": [
+                  "Database Design for Mere Mortals by Michael Hernandez",
+                  "SQL and Relational Theory by C.J. Date",
+                  "PostgreSQL Documentation: Database Design",
+                  "MySQL Reference Manual: Optimization",
+                  "MongoDB Database Design Best Practices"
+                ],
+                "assignments": [
+                  {
+                    "title": "Enterprise Database Design Project",
+                    "description": "Design a complete database system for a complex business application",
+                    "requirements": [
+                      "Analyze business requirements and create ERD",
+                      "Design normalized database schema (3NF)",
+                      "Implement proper indexing strategy",
+                      "Create data access layer with security",
+                      "Implement backup and recovery procedures",
+                      "Document design decisions and trade-offs",
+                      "Create performance monitoring and optimization plan"
+                    ],
+                    "gradingCriteria": [
+                      "Design Quality (25%)",
+                      "Normalization (20%)",
+                      "Performance Optimization (20%)",
+                      "Security Implementation (15%)",
+                      "Documentation (10%)",
+                      "Innovation (10%)"
+                    ]
+                  }
                 ]
               }
             ]
@@ -1537,13 +1575,28 @@
         ],
         "tutoring": {
           "available": true,
+          "tutor": {
+            "name": "Hans Ade",
+            "phone": "+237679719353",
+            "specialization": "Database Design & SQL",
+            "experience": "5+ years"
+          },
           "sessions": [
             {
               "id": "sql-help",
               "title": "SQL Query Help",
-              "duration": "30 min",
+              "duration": "45 min",
               "type": "1-on-1",
-              "available": true
+              "available": true,
+              "price": "$40"
+            },
+            {
+              "id": "database-design",
+              "title": "Database Design Consultation",
+              "duration": "60 min",
+              "type": "1-on-1",
+              "available": true,
+              "price": "$55"
             }
           ]
         }
@@ -1579,30 +1632,40 @@
         ],
         "modules": [
           {
-            "id": "cloud-fundamentals",
-            "title": "Cloud Computing Fundamentals",
-            "description": "Learn cloud computing basics",
-            "duration": "4 hours",
+            "id": "aws-cloud-architecture",
+            "title": "AWS Cloud Architecture & Core Services",
+            "description": "Master AWS cloud architecture, core services, and infrastructure design patterns",
+            "duration": "12 hours",
             "completed": false,
             "unlocked": true,
             "lessons": [
               {
-                "id": "iaas-paas-saas",
-                "title": "IaaS, PaaS, and SaaS",
-                "description": "Understanding cloud service models",
-                "duration": "30 min",
-                "type": "text",
+                "id": "cloud-architecture-design",
+                "title": "Cloud Architecture Design Principles & AWS Global Infrastructure",
+                "description": "Comprehensive guide to designing scalable, secure, and cost-effective cloud architectures",
+                "duration": "90 min",
+                "type": "interactive",
                 "completed": false,
-                "content": "Cloud computing offers three main service models...",
-                "notes": "Choose the right service model for your needs.",
+                "content": "## AWS Cloud Architecture Fundamentals\n\nCloud architecture design is both an art and a science that requires understanding business requirements, technical constraints, and AWS service capabilities. This comprehensive guide covers everything you need to design world-class cloud solutions.\n\n### AWS Global Infrastructure Deep Dive\n\n#### Regions, Availability Zones & Edge Locations\n```bash\n# AWS CLI: List all regions\naws ec2 describe-regions --output table\n\n# Get current region information\naws configure get region\n\n# List availability zones in current region\naws ec2 describe-availability-zones --region us-east-1\n```\n\n#### Regional Services Distribution\n```json\n{\n  \"global-services\": [\n    \"IAM (Identity & Access Management)\",\n    \"Route 53 (DNS)\",\n    \"CloudFront (CDN)\",\n    \"WAF & Shield (Security)\"\n  ],\n  \"regional-services\": [\n    \"EC2 (Compute)\",\n    \"RDS (Database)\",\n    \"Lambda (Serverless)\",\n    \"S3 (Storage)\"\n  ],\n  \"availability-zone-services\": [\n    \"EBS (Block Storage)\",\n    \"ELB (Load Balancing)\",\n    \"NAT Gateway\"\n  ]\n}\n```\n\n### Well-Architected Framework Pillars\n\n#### 1. Operational Excellence\n```yaml\n# CloudFormation template for operational excellence\nAWSTemplateFormatVersion: '2010-09-09'\nDescription: 'Operational Excellence Stack'\n\nResources:\n  CloudWatchDashboard:\n    Type: AWS::CloudWatch::Dashboard\n    Properties:\n      DashboardName: !Sub '${AWS::StackName}-Dashboard'\n      DashboardBody: !Sub |\n        {\n          \"widgets\": [\n            {\n              \"type\": \"metric\",\n              \"x\": 0, \"y\": 0, \"width\": 12, \"height\": 6,\n              \"properties\": {\n                \"metrics\": [\n                  [\"AWS/EC2\", \"CPUUtilization\", \"InstanceId\", \"${Instance}\", {\"label\": \"Web Server 1\"}],\n                  [\".\", \".\", \".\", \"${WebServer2}\", {\"label\": \"Web Server 2\"}]\n                ],\n                \"view\": \"timeSeries\",\n                \"stacked\": false,\n                \"region\": \"${AWS::Region}\",\n                \"title\": \"EC2 CPU Utilization\",\n                \"period\": 300,\n                \"stat\": \"Average\"\n              }\n            }\n          ]\n        }\n\n  CloudWatchAlarm:\n    Type: AWS::CloudWatch::Alarm\n    Properties:\n      AlarmName: !Sub '${AWS::StackName}-HighCPU'\n      ComparisonOperator: GreaterThanThreshold\n      EvaluationPeriods: 2\n      MetricName: CPUUtilization\n      Namespace: AWS/EC2\n      Period: 300\n      Statistic: Average\n      Threshold: 80\n      AlarmActions:\n        - !Ref SNSTopic\n\n  SNSTopic:\n    Type: AWS::SNS::Topic\n    Properties:\n      TopicName: !Sub '${AWS::StackName}-Alerts'\n```",
+                "notes": "### AWS Cloud Architecture Best Practices\n\n#### 1. Design for Failure\n- **Multi-AZ Deployment**: Always deploy across multiple availability zones\n- **Auto Scaling**: Implement automatic scaling based on demand\n- **Health Checks**: Configure proper health checks for all services\n- **Circuit Breakers**: Implement circuit breaker patterns for resilient services\n- **Graceful Degradation**: Design systems to degrade gracefully under load\n\n#### 2. Security First Approach\n- **Defense in Depth**: Implement multiple layers of security controls\n- **Least Privilege**: Grant minimum required permissions\n- **Encryption**: Encrypt data at rest and in transit\n- **Regular Audits**: Conduct regular security assessments and penetration testing\n- **Compliance**: Ensure compliance with relevant standards (GDPR, HIPAA, etc.)\n\n#### 3. Cost Optimization\n- **Right Sizing**: Choose appropriate instance types and sizes\n- **Reserved Instances**: Use reserved instances for predictable workloads\n- **Spot Instances**: Leverage spot instances for fault-tolerant workloads\n- **Auto Scaling**: Scale resources based on actual demand\n- **Storage Optimization**: Use appropriate storage classes and lifecycle policies\n\n#### 4. Performance & Scalability\n- **Caching**: Implement multiple levels of caching (CloudFront, ElastiCache, DAX)\n- **CDN**: Use CloudFront for global content distribution\n- **Database Optimization**: Implement read replicas, connection pooling, and query optimization\n- **Microservices**: Break monolithic applications into smaller, scalable services\n- **Event-Driven Architecture**: Use serverless functions and event-driven patterns\n\n#### 5. Monitoring & Observability\n- **CloudWatch**: Comprehensive monitoring and alerting\n- **X-Ray**: Distributed tracing for microservices\n- **CloudTrail**: Audit logging for all AWS API calls\n- **Config**: Configuration compliance and change tracking\n- **Systems Manager**: Centralized management and automation",
                 "examples": [
-                  "Example 1: IaaS - EC2 instances",
-                  "Example 2: PaaS - Elastic Beanstalk",
-                  "Example 3: SaaS - Gmail"
+                  "Example 1: Complete 3-tier web application architecture with AWS services",
+                  "Example 2: Serverless data processing pipeline with Lambda and S3",
+                  "Example 3: Multi-region disaster recovery setup with Route 53 and CloudFront",
+                  "Example 4: IoT data collection and analytics platform",
+                  "Example 5: Machine learning model training and deployment pipeline"
                 ],
                 "exercises": [
-                  "Exercise 1: Compare service models",
-                  "Exercise 2: Choose appropriate model for use case"
+                  "Exercise 1: Design a highly available web application architecture",
+                  "Exercise 2: Implement auto-scaling for a web application",
+                  "Exercise 3: Set up a CI/CD pipeline with CodePipeline",
+                  "Exercise 4: Configure VPC with public and private subnets",
+                  "Exercise 5: Implement serverless functions with API Gateway"
+                ],
+                "resources": [
+                  "AWS Well-Architected Framework Documentation",
+                  "AWS Architecture Center - Reference Architectures",
+                  "AWS Solutions Library - Production-ready Solutions"
                 ]
               }
             ]
@@ -1666,30 +1729,40 @@
         ],
         "modules": [
           {
-            "id": "security-basics",
-            "title": "Security Fundamentals",
-            "description": "Learn basic security concepts",
-            "duration": "4 hours",
+            "id": "cybersecurity-architecture",
+            "title": "Cybersecurity Architecture & Defense Strategies",
+            "description": "Master cybersecurity principles, threat modeling, and comprehensive defense strategies",
+            "duration": "10 hours",
             "completed": false,
             "unlocked": true,
             "lessons": [
               {
-                "id": "cia-triad",
-                "title": "CIA Triad: Confidentiality, Integrity, Availability",
-                "description": "Understanding the three pillars of information security",
-                "duration": "25 min",
-                "type": "text",
+                "id": "security-frameworks-methodology",
+                "title": "Security Frameworks, Risk Management & Threat Modeling",
+                "description": "Comprehensive guide to cybersecurity frameworks, risk assessment, and threat modeling methodologies",
+                "duration": "85 min",
+                "type": "interactive",
                 "completed": false,
-                "content": "The CIA triad forms the foundation of information security...",
-                "notes": "All security measures should support one or more of these principles.",
+                "content": "## Cybersecurity Architecture Fundamentals\n\nCybersecurity is a complex field that requires systematic approaches to protect digital assets, identify threats, and respond to incidents. This comprehensive guide covers essential frameworks and methodologies used by security professionals worldwide.\n\n### NIST Cybersecurity Framework (CSF)\n\n#### Core Functions\n```json\n{\n  \"identify\": {\n    \"description\": \"Develop understanding of business context and resources\",\n    \"categories\": [\n      \"Asset Management\",\n      \"Business Environment\",\n      \"Governance\",\n      \"Risk Assessment\",\n      \"Risk Management Strategy\",\n      \"Supply Chain Risk Management\"\n    ]\n  },\n  \"protect\": {\n    \"description\": \"Implement safeguards to ensure delivery of critical services\",\n    \"categories\": [\n      \"Access Control\",\n      \"Awareness and Training\",\n      \"Data Security\",\n      \"Information Protection Processes\",\n      \"Maintenance\",\n      \"Protective Technology\"\n    ]\n  },\n  \"detect\": {\n    \"description\": \"Identify occurrence of cybersecurity events\",\n    \"categories\": [\n      \"Anomalies and Events\",\n      \"Security Continuous Monitoring\",\n      \"Detection Processes\"\n    ]\n  },\n  \"respond\": {\n    \"description\": \"Contain impact of potential cybersecurity events\",\n    \"categories\": [\n      \"Response Planning\",\n      \"Communications\",\n      \"Analysis\",\n      \"Mitigation\",\n      \"Improvements\"\n    ]\n  },\n  \"recover\": {\n    \"description\": \"Restore capabilities and services impaired due to event\",\n    \"categories\": [\n      \"Recovery Planning\",\n      \"Improvements\",\n      \"Communications\"\n    ]\n  }\n}\n```\n\n#### Implementation Tiers\n```yaml\n# Tier 1: Partial - Informal security practices\n# Tier 2: Risk Informed - Approved security practices\n# Tier 3: Repeatable - Documented security practices\n# Tier 4: Adaptive - Continuously improving security practices\n\n# Risk Assessment Matrix\nrisk_matrix:\n  likelihood:\n    - very_low: 1\n    - low: 2\n    - moderate: 3\n    - high: 4\n    - very_high: 5\n  impact:\n    - very_low: 1\n    - low: 2\n    - moderate: 3\n    - high: 4\n    - very_high: 5\n  \n  # Risk Score = Likelihood × Impact\n  # Risk Level: Low (1-4), Medium (5-9), High (10-16), Critical (17-25)\n```",
+                "notes": "### Cybersecurity Best Practices & Standards\n\n#### Security Control Frameworks\n- **ISO 27001**: Information Security Management Systems\n- **NIST SP 800-53**: Security and Privacy Controls for Federal Systems\n- **CIS Controls**: Center for Internet Security Critical Security Controls\n- **COBIT**: Control Objectives for Information and Related Technologies\n- **ITIL**: Information Technology Infrastructure Library\n\n#### Risk Management Methodologies\n- **OCTAVE**: Operationally Critical Threat, Asset, and Vulnerability Evaluation\n- **FAIR**: Factor Analysis of Information Risk\n- **NIST RMF**: Risk Management Framework\n- **ISO 31000**: Risk Management Principles and Guidelines\n\n#### Compliance & Regulatory Requirements\n- **GDPR**: General Data Protection Regulation (EU)\n- **HIPAA**: Health Insurance Portability and Accountability Act (US)\n- **PCI DSS**: Payment Card Industry Data Security Standard\n- **SOX**: Sarbanes-Oxley Act (Financial Reporting)\n- **FISMA**: Federal Information Security Management Act",
                 "examples": [
-                  "Example 1: Confidentiality - encryption",
-                  "Example 2: Integrity - hashing",
-                  "Example 3: Availability - redundancy"
+                  "Example 1: Complete threat modeling exercise for a web application",
+                  "Example 2: Incident response simulation and documentation",
+                  "Example 3: Cryptographic system implementation with digital signatures",
+                  "Example 4: Network security assessment and vulnerability analysis",
+                  "Example 5: Digital forensics investigation case study"
                 ],
                 "exercises": [
-                  "Exercise 1: Identify CIA violations",
-                  "Exercise 2: Design security controls"
+                  "Exercise 1: Conduct STRIDE threat modeling on a sample application",
+                  "Exercise 2: Implement AES encryption/decryption in Python",
+                  "Exercise 3: Create digital signatures for document authentication",
+                  "Exercise 4: Set up a basic SIEM system for log analysis",
+                  "Exercise 5: Perform incident response simulation"
+                ],
+                "resources": [
+                  "NIST Cybersecurity Framework",
+                  "OWASP Top 10 Security Risks",
+                  "MITRE ATT&CK Framework"
                 ]
               }
             ]
@@ -1711,13 +1784,28 @@
         ],
         "tutoring": {
           "available": true,
+          "tutor": {
+            "name": "Hans Ade",
+            "phone": "+237679719353",
+            "specialization": "Cybersecurity & Ethical Hacking",
+            "experience": "5+ years"
+          },
           "sessions": [
             {
               "id": "security-consultation",
               "title": "Security Assessment Help",
               "duration": "45 min",
               "type": "1-on-1",
-              "available": true
+              "available": true,
+              "price": "$45"
+            },
+            {
+              "id": "penetration-testing",
+              "title": "Penetration Testing Guidance",
+              "duration": "60 min",
+              "type": "1-on-1",
+              "available": true,
+              "price": "$60"
             }
           ]
         }
@@ -1761,21 +1849,32 @@
             "unlocked": true,
             "lessons": [
               {
-                "id": "blockchain-concept",
-                "title": "What is Blockchain?",
-                "description": "Understanding blockchain technology",
-                "duration": "35 min",
-                "type": "text",
+                "id": "blockchain-cryptography",
+                "title": "Cryptographic Foundations of Blockchain",
+                "description": "Comprehensive guide to cryptography, consensus mechanisms, and blockchain security",
+                "duration": "90 min",
+                "type": "interactive",
                 "completed": false,
-                "content": "Blockchain is a distributed ledger technology...",
-                "notes": "Focus on decentralization and immutability.",
+                "content": "## Blockchain Cryptographic Foundations\n\nBlockchain technology is built upon sophisticated cryptographic principles that ensure security, immutability, and trust. Understanding these foundations is crucial for developing secure blockchain applications.\n\n### Cryptographic Hash Functions\n\n#### SHA-256 Implementation\n```python\n# SHA-256 Hash Function Implementation\nimport hashlib\nimport os\n\nclass Block:\n    def __init__(self, index, timestamp, data, previous_hash):\n        self.index = index\n        self.timestamp = timestamp\n        self.data = data\n        self.previous_hash = previous_hash\n        self.nonce = 0\n        self.hash = self.calculate_hash()\n    \n    def calculate_hash(self):\n        block_string = f\"{self.index}{self.timestamp}{self.data}{self.previous_hash}{self.nonce}\"\n        return hashlib.sha256(block_string.encode()).hexdigest()\n    \n    def mine_block(self, difficulty):\n        target = \"0\" * difficulty\n        while self.hash[:difficulty] != target:\n            self.nonce += 1\n            self.hash = self.calculate_hash()\n        print(f\"Block mined: {self.hash}\")\n        return self.hash\n\n# Usage example\nblock = Block(1, \"2023-12-01 10:00:00\", \"Transaction data\", \"0\")\nprint(f\"Block hash: {block.hash}\")\n\n# Mine block with difficulty 4\nblock.mine_block(4)\nprint(f\"Mined hash: {block.hash}\")\n```\n\n### Digital Signatures & Wallet Implementation\n\n#### ECDSA Digital Signatures\n```python\n# Elliptic Curve Digital Signature Algorithm\nfrom ecdsa import SigningKey, VerifyingKey, SECP256k1\nimport hashlib\nimport binascii\n\nclass BlockchainWallet:\n    def __init__(self):\n        # Generate ECDSA key pair\n        self.private_key = SigningKey.generate(curve=SECP256k1)\n        self.public_key = self.private_key.verifying_key\n        self.address = self.generate_address()\n    \n    def generate_address(self):\n        pub_key_bytes = self.public_key.to_string(\"compressed\")\n        sha = hashlib.sha256(pub_key_bytes).digest()\n        rip = hashlib.new('ripemd160')\n        rip.update(sha)\n        version_rip = b'\\x00' + rip.digest()\n        checksum = hashlib.sha256(hashlib.sha256(version_rip).digest()).digest()[:4]\n        address_bytes = version_rip + checksum\n        return self.base58_encode(address_bytes)\n    \n    def sign_transaction(self, transaction_data):\n        message = str(transaction_data).encode()\n        signature = self.private_key.sign(message)\n        return binascii.hexlify(signature).decode()\n    \n    def verify_signature(self, transaction_data, signature, public_key=None):\n        if public_key is None:\n            public_key = self.public_key\n        message = str(transaction_data).encode()\n        sig_bytes = binascii.unhexlify(signature)\n        try:\n            public_key.verify(sig_bytes, message)\n            return True\n        except:\n            return False\n    \n    def base58_encode(self, data):\n        alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'\n        leading_zeros = 0\n        for byte in data:\n            if byte == 0:\n                leading_zeros += 1\n            else:\n                break\n        num = int.from_bytes(data, 'big')\n        encoded = ''\n        while num > 0:\n            num, rem = divmod(num, 58)\n            encoded = alphabet[rem] + encoded\n        return '1' * leading_zeros + encoded\n\n# Usage example\nwallet = BlockchainWallet()\nprint(f\"Wallet Address: {wallet.address}\")\nprint(f\"Public Key: {binascii.hexlify(wallet.public_key.to_string('compressed')).decode()}\")\n\n# Sign transaction\ntransaction = {\n    'from': wallet.address,\n    'to': '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',\n    'amount': 0.001,\n    'timestamp': 1638360000\n}\n\nsignature = wallet.sign_transaction(transaction)\nprint(f\"Transaction Signature: {signature}\")\n\n# Verify signature\nis_valid = wallet.verify_signature(transaction, signature)\nprint(f\"Signature Valid: {is_valid}\")\n```\n\n### Consensus Mechanisms\n\n#### Proof of Work (PoW)\n```python\n# Proof of Work Consensus\nimport hashlib\nimport time\n\nclass ProofOfWork:\n    def __init__(self, difficulty=4):\n        self.difficulty = difficulty\n        self.target = \"0\" * difficulty\n    \n    def mine(self, block_data):\n        nonce = 0\n        start_time = time.time()\n        while True:\n            block_string = f\"{block_data}{nonce}\"\n            hash_result = hashlib.sha256(block_string.encode()).hexdigest()\n            if hash_result[:self.difficulty] == self.target:\n                end_time = time.time()\n                return {\n                    'nonce': nonce,\n                    'hash': hash_result,\n                    'time_taken': end_time - start_time\n                }\n            nonce += 1\n            if nonce > 1000000:\n                return None\n    \n    def validate(self, block_data, nonce):\n        block_string = f\"{block_data}{nonce}\"\n        hash_result = hashlib.sha256(block_string.encode()).hexdigest()\n        return hash_result[:self.difficulty] == self.target\n\n# Usage example\npow = ProofOfWork(difficulty=4)\nblock_data = \"Block data with transactions\"\n\nresult = pow.mine(block_data)\nif result:\n    print(f\"Block mined with nonce: {result['nonce']}\")\n    print(f\"Hash: {result['hash']}\")\n    print(f\"Time taken: {result['time_taken']:.2f} seconds\")\n    is_valid = pow.validate(block_data, result['nonce'])\n    print(f\"Proof of work valid: {is_valid}\")\nelse:\n    print(\"Could not mine block within limit\")\n```",
+                "notes": "### Blockchain Development Best Practices\n\n#### Smart Contract Development\n- **Use established libraries**: OpenZeppelin for secure, audited contracts\n- **Follow Solidity style guide**: Consistent naming, documentation, and structure\n- **Implement comprehensive testing**: Unit tests, integration tests, and fuzzing\n- **Use formal verification**: Tools like Certora for mathematical proof of correctness\n- **Implement upgrade patterns**: Proxy contracts for upgradeable smart contracts\n\n#### Security Considerations\n- **Access control**: Implement role-based access control (RBAC)\n- **Input validation**: Validate all inputs to prevent injection attacks\n- **Gas optimization**: Optimize contract size and execution cost\n- **Event logging**: Log all important state changes for transparency\n- **Emergency mechanisms**: Circuit breakers and pause functionality\n\n#### Scalability Solutions\n- **Layer 2 solutions**: Optimistic rollups, zk-rollups, and sidechains\n- **State channels**: Off-chain transaction processing\n- **Plasma chains**: Scalable child chains for high-throughput applications\n- **Sharding**: Horizontal partitioning of blockchain state\n- **Cross-chain bridges**: Interoperability between different blockchains",
                 "examples": [
-                  "Example 1: Bitcoin blockchain",
-                  "Example 2: Ethereum network"
+                  "Example 1: Complete cryptocurrency wallet implementation",
+                  "Example 2: Decentralized exchange (DEX) smart contracts",
+                  "Example 3: NFT marketplace with auction functionality",
+                  "Example 4: DeFi lending protocol implementation",
+                  "Example 5: Supply chain tracking system on blockchain"
                 ],
                 "exercises": [
-                  "Exercise 1: Explain blockchain to a beginner",
-                  "Exercise 2: Compare blockchain vs traditional databases"
+                  "Exercise 1: Implement basic blockchain with proof-of-work",
+                  "Exercise 2: Create ERC-20 token smart contract",
+                  "Exercise 3: Build decentralized voting system",
+                  "Exercise 4: Develop NFT minting and trading platform",
+                  "Exercise 5: Implement cross-chain token bridge"
+                ],
+                "resources": [
+                  "Ethereum Documentation - Official Ethereum docs",
+                  "Solidity Documentation - Smart contract programming",
+                  "OpenZeppelin Contracts - Secure smart contract library"
                 ]
               }
             ]
@@ -1839,10 +1938,10 @@
         ],
         "modules": [
           {
-            "id": "devops-culture",
-            "title": "DevOps Culture and Practices",
-            "description": "Learn DevOps fundamentals",
-            "duration": "3 hours",
+            "id": "infrastructure-automation-devops",
+            "title": "Infrastructure Automation & DevOps Engineering",
+            "description": "Master infrastructure automation, configuration management, and DevOps practices",
+            "duration": "12 hours",
             "completed": false,
             "unlocked": true,
             "lessons": [
@@ -1925,10 +2024,10 @@
         ],
         "modules": [
           {
-            "id": "ml-fundamentals",
-            "title": "Machine Learning Fundamentals",
-            "description": "Learn ML basics",
-            "duration": "6 hours",
+            "id": "ml-ai-comprehensive",
+            "title": "Machine Learning & AI Fundamentals",
+            "description": "Master ML algorithms, deep learning, and AI applications",
+            "duration": "15 hours",
             "completed": false,
             "unlocked": true,
             "lessons": [
@@ -1970,13 +2069,36 @@
         ],
         "tutoring": {
           "available": true,
+          "tutor": {
+            "name": "Hans Ade",
+            "phone": "+237679719353",
+            "specialization": "Machine Learning & AI",
+            "experience": "5+ years"
+          },
           "sessions": [
             {
               "id": "ml-project-help",
               "title": "ML Project Consultation",
               "duration": "60 min",
               "type": "1-on-1",
-              "available": true
+              "available": true,
+              "price": "$50"
+            },
+            {
+              "id": "code-review",
+              "title": "Code Review & Optimization",
+              "duration": "45 min",
+              "type": "1-on-1",
+              "available": true,
+              "price": "$35"
+            },
+            {
+              "id": "career-guidance",
+              "title": "Career Guidance & Interview Prep",
+              "duration": "30 min",
+              "type": "1-on-1",
+              "available": true,
+              "price": "$25"
             }
           ]
         }

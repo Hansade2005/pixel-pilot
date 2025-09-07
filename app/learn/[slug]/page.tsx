@@ -11,7 +11,7 @@ import {
   Search, Filter, CheckCircle, TrendingUp, Award, Target, Lightbulb, Zap, BarChart3, X, GraduationCap,
   PlayCircle, FileText, Trophy, Calendar, User, Check, Lock, Unlock, Download, Share2,
   ChevronDown, ChevronRight, Book, Brain, Code2, Palette, Database, Globe, Smartphone, Award as CertificateIcon,
-  ArrowLeft, ExternalLink, UserCheck, MessageCircle
+  ArrowLeft, ExternalLink, UserCheck, MessageCircle, Phone, DollarSign
 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
@@ -78,6 +78,33 @@ export default function CoursePage() {
   const [activeModule, setActiveModule] = useState(0)
   const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set([0]))
   const [showCertificate, setShowCertificate] = useState(false)
+
+  // WhatsApp booking function
+  const handleWhatsAppBooking = (session: any, tutor: any) => {
+    const userPhone = "+237679719353" // User's WhatsApp number
+    const tutorPhone = tutor.phone.replace(/[^0-9]/g, '') // Clean tutor's phone number
+
+    const message = encodeURIComponent(
+      `Hi ${tutor.name}!\n\n` +
+      `I'm interested in booking a ${session.title} session.\n\n` +
+      `Session Details:\n` +
+      `• Duration: ${session.duration}\n` +
+      `• Type: ${session.type}\n` +
+      `• Price: ${session.price}\n\n` +
+      `My WhatsApp number: ${userPhone}\n\n` +
+      `Course: ${course?.title}\n` +
+      `Please let me know the available time slots and next steps for booking.\n\n` +
+      `Thank you!`
+    )
+
+    const whatsappUrl = `https://wa.me/${tutorPhone}?text=${message}`
+
+    // Open WhatsApp in new tab
+    window.open(whatsappUrl, '_blank')
+
+    // Show success message (you could add a toast notification here)
+    alert(`Opening WhatsApp chat with ${tutor.name}. Please complete your booking there.`)
+  }
 
   // Image API utility function
   const getCourseThumbnail = (courseTitle: string, seed: number) => {
@@ -697,29 +724,73 @@ export default function CoursePage() {
           {course.content.tutoring && course.content.tutoring.available && (
             <Card className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle className="text-white">Personal Tutoring</CardTitle>
+                <CardTitle className="text-white flex items-center space-x-2">
+                  <MessageCircle className="w-6 h-6 text-green-400" />
+                  <span>Personal Tutoring</span>
+                </CardTitle>
                 <CardDescription className="text-gray-400">
-                  Get personalized help from our expert tutors
+                  Get personalized help from our expert tutors via WhatsApp
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {/* Tutor Information */}
+                {course.content.tutoring.tutor && (
+                  <div className="mb-6 p-4 bg-gradient-to-r from-green-900/20 to-blue-900/20 rounded-lg border border-green-500/20">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <User className="w-5 h-5 text-green-400" />
+                      <h4 className="text-white font-medium">{course.content.tutoring.tutor.name}</h4>
+                      <Badge variant="secondary" className="bg-green-600/20 text-green-400">
+                        {course.content.tutoring.tutor.specialization}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center space-x-4 text-sm text-gray-400">
+                      <span className="flex items-center space-x-1">
+                        <Phone className="w-4 h-4" />
+                        <span>WhatsApp Available</span>
+                      </span>
+                      <span>{course.content.tutoring.tutor.experience} Experience</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Available Sessions */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {course.content.tutoring.sessions.map((session: any, index: number) => (
-                    <div key={index} className="p-4 bg-gray-700/30 rounded-lg">
+                    <div key={index} className="p-4 bg-gray-700/30 rounded-lg border border-gray-600/30">
                       <div className="flex items-center space-x-3 mb-3">
                         <UserCheck className="w-5 h-5 text-green-400" />
                         <h5 className="text-white font-medium">{session.title}</h5>
                       </div>
-                      <p className="text-gray-400 text-sm mb-3">{session.duration} • {session.type}</p>
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-gray-400 text-sm">{session.duration} • {session.type}</p>
+                        <div className="flex items-center space-x-1 text-green-400">
+                          <DollarSign className="w-4 h-4" />
+                          <span className="font-medium">{session.price}</span>
+                        </div>
+                      </div>
                       <Button
                         size="sm"
-                        className="w-full bg-green-600 hover:bg-green-700"
+                        className="w-full bg-green-600 hover:bg-green-700 text-white font-medium"
                         disabled={!session.available}
+                        onClick={() => handleWhatsAppBooking(session, course.content.tutoring.tutor)}
                       >
-                        {session.available ? 'Book Session' : 'Unavailable'}
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        {session.available ? 'Book via WhatsApp' : 'Unavailable'}
                       </Button>
                     </div>
                   ))}
+                </div>
+
+                {/* Booking Instructions */}
+                <div className="mt-6 p-4 bg-blue-900/20 rounded-lg border border-blue-500/20">
+                  <h5 className="text-white font-medium mb-2">How to Book:</h5>
+                  <ol className="text-gray-400 text-sm space-y-1">
+                    <li>1. Click "Book via WhatsApp" on your preferred session</li>
+                    <li>2. WhatsApp will open with a pre-filled booking message</li>
+                    <li>3. Send the message to start your booking process</li>
+                    <li>4. Your tutor will confirm available time slots</li>
+                    <li>5. Complete payment and get your session link</li>
+                  </ol>
                 </div>
               </CardContent>
             </Card>
