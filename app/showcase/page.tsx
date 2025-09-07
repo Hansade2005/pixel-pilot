@@ -174,8 +174,8 @@ export default function ShowcasePage() {
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center space-x-3 mb-4">
-                      <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white text-sm font-semibold">
-                        {project.avatar}
+                      <div className="w-8 h-8 rounded-full overflow-hidden">
+                        <img src="/hans.png" alt={project.author} className="w-full h-full object-cover" />
                       </div>
                       <div>
                         <p className="text-white text-sm font-medium">{project.author}</p>
@@ -233,8 +233,8 @@ export default function ShowcasePage() {
                       <div className="flex-1">
                         <h3 className="text-lg font-semibold text-white mb-2">{project.title}</h3>
                         <div className="flex items-center space-x-3 mb-3">
-                          <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center text-white text-xs font-semibold">
-                            {project.avatar}
+                          <div className="w-6 h-6 rounded-full overflow-hidden">
+                            <img src="/hans.png" alt={project.author} className="w-full h-full object-cover" />
                           </div>
                           <span className="text-gray-300 text-sm">{project.author}</span>
                           <div className="flex items-center space-x-3 text-xs text-gray-400">

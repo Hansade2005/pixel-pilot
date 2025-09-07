@@ -650,7 +650,7 @@ export default function BlogPostPage() {
               <CardContent className="p-6">
                 <div className="flex items-start space-x-4">
                   <Avatar className="w-16 h-16">
-                    <AvatarImage src={`https://api.a0.dev/assets/image?text=${encodeURIComponent(blogPost.author + ' profile photo')}&aspect=1:1&seed=${blogPost.author.length}`} />
+                    <AvatarImage src="/hans.png" />
                     <AvatarFallback className="bg-purple-500 text-white text-xl">
                       {blogPost.author.charAt(0)}
                     </AvatarFallback>
