@@ -104,6 +104,9 @@ export function Navigation() {
             <Link href="/enterprise" className="text-white hover:text-gray-300 transition-colors">
               Business
             </Link>
+            <Link href="/blog" className="text-white hover:text-gray-300 transition-colors">
+              Blog
+            </Link>
             <Link href="/docs" className="text-white hover:text-gray-300 transition-colors">
               Docs
             </Link>
@@ -239,6 +242,13 @@ export function Navigation() {
                 onClick={closeMobileMenu}
               >
                 Business
+              </Link>
+              <Link
+                href="/blog"
+                className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
+                onClick={closeMobileMenu}
+              >
+                Blog
               </Link>
               <Link
                 href="/docs"

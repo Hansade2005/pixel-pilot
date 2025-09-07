@@ -2273,13 +2273,112 @@
                   "Custom workflows and automation"
                 ],
                 "popular_extensions": [
-                  "ES7+ React/Redux/React-Native snippets",
-                  "Auto Rename Tag for HTML/JSX",
-                  "Bracket Pair Colorizer",
-                  "Path Intellisense",
-                  "Import Cost for bundle size monitoring",
-                  "GitLens for enhanced Git capabilities"
-                ]
+                  {
+                    "extension": "ES7+ React/Redux/React-Native snippets",
+                    "purpose": "Code snippets for React development",
+                    "features": [
+                      "rafce → React Arrow Function Component Export",
+                      "rfc → React Functional Component",
+                      "useState → State hook snippet",
+                      "useEffect → Effect hook snippet",
+                      "imp → Import statement",
+                      "clg → Console log"
+                    ],
+                    "visual_demo": "Type 'rafce' + Tab → Creates complete component structure"
+                  },
+                  {
+                    "extension": "Auto Rename Tag",
+                    "purpose": "Automatically rename paired HTML/JSX tags",
+                    "features": [
+                      "Change opening tag → closing tag updates automatically",
+                      "Works with HTML, JSX, XML",
+                      "Preserves tag structure",
+                      "Multi-cursor support",
+                      "No manual synchronization needed"
+                    ],
+                    "visual_demo": "Change <div> to <section> → </section> updates automatically"
+                  },
+                  {
+                    "extension": "Bracket Pair Colorizer",
+                    "purpose": "Color-code matching brackets and parentheses",
+                    "features": [
+                      "Different colors for nested brackets",
+                      "Visual connection between pairs",
+                      "Supports all bracket types: (), [], {}",
+                      "Configurable color schemes",
+                      "Improves code readability"
+                    ],
+                    "visual_demo": "function test() { if (true) { return 'hello'; } } → Color-coded nesting"
+                  },
+                  {
+                    "extension": "Path Intellisense",
+                    "purpose": "Autocomplete file paths in import statements",
+                    "features": [
+                      "Auto-complete relative paths",
+                      "File and folder suggestions",
+                      "Works with all import types",
+                      "Handles file extensions automatically",
+                      "Supports workspace-relative paths"
+                    ],
+                    "visual_demo": "import './ → Shows all files in current directory"
+                  },
+                  {
+                    "extension": "Import Cost",
+                    "purpose": "Show bundle size impact of imports",
+                    "features": [
+                      "Real-time bundle size calculation",
+                      "Gzip compression estimates",
+                      "Tree-shaking analysis",
+                      "Package size warnings",
+                      "Optimization suggestions"
+                    ],
+                    "visual_demo": "import lodash → Shows '2.1K (gzipped: 886)' in gray text"
+                  },
+                  {
+                    "extension": "GitLens",
+                    "purpose": "Enhanced Git capabilities and visualization",
+                    "features": [
+                      "Blame annotations in editor",
+                      "Git history exploration",
+                      "Commit details and diffs",
+                      "Branch and tag management",
+                      "File history tracking",
+                      "Interactive rebase support"
+                    ],
+                    "visual_demo": "Hover over code → Shows 'Last modified by John 2 days ago'"
+                  }
+                ],
+                "productivity_workflow": {
+                  "description": "Complete workflow using multiple extensions together",
+                  "steps": [
+                    {
+                      "step": 1,
+                      "action": "Create component with snippets",
+                      "extensions": ["ES7+ React snippets"],
+                      "result": "Complete component structure in seconds"
+                    },
+                    {
+                      "step": 2,
+                      "action": "Add imports with path completion",
+                      "extensions": ["Path Intellisense"],
+                      "result": "Accurate import paths without typing full paths"
+                    },
+                    {
+                      "step": 3,
+                      "action": "Check bundle impact",
+                      "extensions": ["Import Cost"],
+                      "result": "Optimize imports to reduce bundle size"
+                    },
+                    {
+                      "step": 4,
+                      "action": "Review code changes",
+                      "extensions": ["GitLens"],
+                      "result": "Understand change history and context"
+                    }
+                  ],
+                  "time_savings": "Up to 60% reduction in repetitive coding tasks",
+                  "quality_improvements": "Fewer typos, consistent code, better performance"
+                }
               },
               {
                 "feature": "Performance and Reliability",
@@ -2473,7 +2572,7 @@
                 "shortcuts": [
                   "Ctrl+N / Cmd+N: Create new file",
                   "Ctrl+Shift+N / Cmd+Shift+N: Create new folder",
-                  "Ctrl+S / Cmd+S: Save current file",
+              "Ctrl+S / Cmd+S: Save current file",
                   "Ctrl+Shift+S / Cmd+Shift+S: Save all files",
                   "Ctrl+O / Cmd+O: Open file",
                   "Ctrl+K Ctrl+O / Cmd+K Cmd+O: Open folder",
@@ -2511,11 +2610,11 @@
               {
                 "category": "Search and Navigation",
                 "shortcuts": [
-                  "Ctrl+F / Cmd+F: Find in current file",
+              "Ctrl+F / Cmd+F: Find in current file",
                   "Ctrl+H / Cmd+H: Replace in current file",
-                  "Ctrl+Shift+F / Cmd+Shift+F: Find across all files",
+              "Ctrl+Shift+F / Cmd+Shift+F: Find across all files",
                   "Ctrl+Shift+H / Cmd+Shift+H: Replace across all files",
-                  "Ctrl+P / Cmd+P: Quick file navigation",
+              "Ctrl+P / Cmd+P: Quick file navigation",
                   "Ctrl+Shift+P / Cmd+Shift+P: Command palette",
                   "F12: Go to definition",
                   "Alt+F12: Peek definition",
@@ -2872,37 +2971,497 @@
           "title": "GitHub Integration & Version Control",
           "description": "Connect your projects to GitHub for version control and collaboration",
           "content": {
+            "integration_overview": {
+              "description": "Seamless GitHub integration for professional version control and team collaboration",
+              "key_benefits": [
+                "Automatic repository creation with proper project structure",
+                "Real-time synchronization between Pixel Pilot and GitHub",
+                "Collaborative development with pull requests and code reviews",
+                "Automated deployment workflows with GitHub Actions",
+                "Issue tracking and project management integration",
+                "Version history and rollback capabilities"
+              ],
+              "supported_features": [
+                "OAuth-based authentication with GitHub",
+                "Public and private repository support",
+                "Organization and personal account integration",
+                "Branch protection and merge strategies",
+                "Webhook integration for automated workflows",
+                "GitHub Apps and personal access tokens"
+              ]
+            },
             "setup_process": [
-              "Connect your GitHub account via OAuth",
-              "Authorize Pixel Pilot to access repositories",
-              "Choose repository creation or connect existing repo",
-              "Configure deployment settings and permissions",
-              "Set up automated deployment workflows"
+              {
+                "step": 1,
+                "title": "Connect GitHub Account",
+                "description": "Link your GitHub account to Pixel Pilot",
+                "actions": [
+                  "Click 'Connect to GitHub' button in settings",
+                  "Authorize Pixel Pilot OAuth application",
+                  "Grant repository access permissions",
+                  "Verify successful connection"
+                ],
+                "visual_guide": [
+                  "1️⃣ Settings → Integrations → GitHub",
+                  "2️⃣ Click 'Connect Account' button",
+                  "3️⃣ GitHub login page opens",
+                  "4️⃣ Authorize Pixel Pilot permissions",
+                  "5️⃣ Return to Pixel Pilot dashboard",
+                  "6️⃣ ✅ Connection successful message"
+                ],
+                "permissions_required": [
+                  "Read access to user profile",
+                  "Read/write access to repositories",
+                  "Access to organization repositories (if applicable)",
+                  "Webhook creation and management"
+                ]
+              },
+              {
+                "step": 2,
+                "title": "Repository Configuration",
+                "description": "Set up your repository structure and settings",
+                "options": [
+                  {
+                    "option": "Create New Repository",
+                    "description": "Pixel Pilot creates a new GitHub repository automatically",
+                    "benefits": "Proper project structure, README, .gitignore, and license files",
+                    "process": [
+                      "Choose repository name and visibility (public/private)",
+                      "Select .gitignore template for your tech stack",
+                      "Add repository description and topics",
+                      "Configure branch protection rules"
+                    ]
+                  },
+                  {
+                    "option": "Connect Existing Repository",
+                    "description": "Link an existing GitHub repository to your Pixel Pilot project",
+                    "benefits": "Preserve existing history and collaborators",
+                    "process": [
+                      "Select repository from your GitHub account",
+                      "Choose target branch for synchronization",
+                      "Configure file sync settings",
+                      "Set up webhook for automatic updates"
+                    ]
+                  }
+                ],
+                "repository_structure": {
+                  "auto_generated_files": [
+                    "📄 README.md - Project documentation",
+                    "📄 .gitignore - Files to exclude from version control",
+                    "📄 package.json - Dependencies and scripts",
+                    "📄 .github/workflows/ - CI/CD pipelines",
+                    "📄 LICENSE - Open source license",
+                    "📄 CONTRIBUTING.md - Contribution guidelines"
+                  ],
+                  "recommended_structure": [
+                    "📁 src/ - Source code",
+                    "📁 public/ - Static assets",
+                    "📁 tests/ - Test files",
+                    "📁 docs/ - Documentation",
+                    "📁 .github/ - GitHub configuration"
+                  ]
+                }
+              },
+              {
+                "step": 3,
+                "title": "Branch and Workflow Setup",
+                "description": "Configure branching strategy and development workflows",
+                "branching_strategies": [
+                  {
+                    "strategy": "GitHub Flow",
+                    "description": "Simple workflow with main branch and feature branches",
+                    "process": [
+                      "Create feature branch from main",
+                      "Develop and test changes",
+                      "Create pull request for review",
+                      "Merge to main after approval"
+                    ],
+                    "best_for": "Small teams, simple projects"
+                  },
+                  {
+                    "strategy": "Git Flow",
+                    "description": "Advanced workflow with multiple branches",
+                    "branches": [
+                      "main - Production-ready code",
+                      "develop - Integration branch",
+                      "feature/* - Feature development",
+                      "release/* - Release preparation",
+                      "hotfix/* - Emergency fixes"
+                    ],
+                    "best_for": "Large teams, complex projects"
+                  }
+                ],
+                "pull_request_workflow": {
+                  "creating_pr": [
+                    "Push feature branch to GitHub",
+                    "Navigate to repository on GitHub",
+                    "Click 'Compare & pull request'",
+                    "Add title and description",
+                    "Assign reviewers and labels",
+                    "Link related issues"
+                  ],
+                  "code_review_process": [
+                    "Reviewers examine code changes",
+                    "Leave comments and suggestions",
+                    "Request changes if needed",
+                    "Approve when requirements met",
+                    "Merge or squash and merge"
+                  ]
+                }
+              }
             ],
-            "features": [
-              "Automatic repository creation with proper structure",
-              "Git commit history and version tracking",
-              "Branch management and pull request support",
-              "Collaborative development with team members",
-              "Code review workflows and approval processes",
-              "Issue tracking and project management integration",
-              "GitHub Actions for CI/CD pipelines"
+            "collaboration_features": [
+              {
+                "feature": "Team Collaboration",
+                "capabilities": [
+                  "Invite team members to repository",
+                  "Role-based permissions (admin, write, read)",
+                  "Collaborative code reviews",
+                  "Mention team members in comments",
+                  "Assign issues and pull requests",
+                  "Project boards and milestones"
+                ],
+                "best_practices": [
+                  "Use clear naming conventions for branches",
+                  "Write descriptive commit messages",
+                  "Keep pull requests focused and small",
+                  "Use labels for categorization",
+                  "Set up code owners for critical files",
+                  "Enable branch protection rules"
+                ]
+              },
+              {
+                "feature": "Code Review Workflows",
+                "process": [
+                  "Automated code quality checks",
+                  "Peer review requirements",
+                  "Continuous integration testing",
+                  "Security vulnerability scanning",
+                  "Performance regression testing",
+                  "Documentation updates"
+                ],
+                "review_guidelines": [
+                  "Review code for functionality and correctness",
+                  "Check for security vulnerabilities",
+                  "Verify adherence to coding standards",
+                  "Test edge cases and error handling",
+                  "Review documentation and comments",
+                  "Consider performance implications"
+                ]
+              }
+            ],
+            "automation_features": [
+              {
+                "feature": "GitHub Actions Integration",
+                "description": "Automated workflows for CI/CD and project management",
+                "workflows": [
+                  {
+                    "workflow": "Continuous Integration",
+                    "triggers": "Push to main/develop branches",
+                    "actions": [
+                      "Install dependencies",
+                      "Run linting and type checking",
+                      "Execute test suite",
+                      "Build application",
+                      "Generate test coverage reports"
+                    ]
+                  },
+                  {
+                    "workflow": "Continuous Deployment",
+                    "triggers": "Merge to main branch",
+                    "actions": [
+                      "Deploy to staging environment",
+                      "Run integration tests",
+                      "Deploy to production",
+                      "Update documentation",
+                      "Send deployment notifications"
+                    ]
+                  },
+                  {
+                    "workflow": "Pull Request Automation",
+                    "triggers": "Pull request creation/updates",
+                    "actions": [
+                      "Label pull request",
+                      "Assign reviewers automatically",
+                      "Run preliminary checks",
+                      "Update project status",
+                      "Generate preview deployments"
+                    ]
+                  }
+                ]
+              },
+              {
+                "feature": "Webhook Integration",
+                "description": "Real-time synchronization and notifications",
+                "webhook_events": [
+                  "Push events for code synchronization",
+                  "Pull request events for status updates",
+                  "Issue events for project tracking",
+                  "Release events for deployment triggers",
+                  "Deployment events for status monitoring"
+                ],
+                "integration_benefits": [
+                  "Real-time project status updates",
+                  "Automated deployment triggers",
+                  "Team notification systems",
+                  "Integration with external tools",
+                  "Audit trail and activity monitoring"
+                ]
+              }
+            ],
+            "advanced_features": [
+              {
+                "feature": "Repository Templates",
+                "description": "Pre-configured repository structures for different project types",
+                "templates": [
+                  {
+                    "template": "Next.js Application",
+                    "includes": [
+                      "Next.js project structure",
+                      "TypeScript configuration",
+                      "Tailwind CSS setup",
+                      "Testing framework (Jest)",
+                      "ESLint and Prettier configuration",
+                      "GitHub Actions for CI/CD"
+                    ]
+                  },
+                  {
+                    "template": "React SPA",
+                    "includes": [
+                      "Create React App setup",
+                      "React Router configuration",
+                      "State management (Redux/Zustand)",
+                      "API integration setup",
+                      "Component library integration",
+                      "Build and deployment scripts"
+                    ]
+                  },
+                  {
+                    "template": "Full-Stack Application",
+                    "includes": [
+                      "Frontend framework setup",
+                      "Backend API structure",
+                      "Database integration",
+                      "Authentication system",
+                      "File upload handling",
+                      "Email service integration"
+                    ]
+                  }
+                ]
+              },
+              {
+                "feature": "Security and Compliance",
+                "capabilities": [
+                  "Dependabot for automated dependency updates",
+                  "Code scanning for security vulnerabilities",
+                  "Secret scanning for exposed credentials",
+                  "Branch protection rules",
+                  "Required status checks",
+                  "Signed commits verification"
+                ],
+                "compliance_features": [
+                  "GDPR compliance tools",
+                  "Audit logs and activity tracking",
+                  "Data retention policies",
+                  "Access control and permissions",
+                  "Security advisories and alerts",
+                  "Compliance reporting tools"
+                ]
+              }
             ],
             "best_practices": [
-              "Use descriptive commit messages for better tracking",
-              "Create feature branches for new developments",
-              "Regularly pull changes from main branch",
-              "Use pull requests for code review and collaboration",
-              "Tag releases for version management",
-              "Document changes in commit messages and PR descriptions"
+              {
+                "category": "Commit Practices",
+                "practices": [
+                  "Write clear, descriptive commit messages",
+                  "Keep commits focused and atomic",
+                  "Use conventional commit format",
+                  "Reference issues in commit messages",
+                  "Avoid committing sensitive data",
+                  "Review changes before committing"
+                ],
+                "commit_message_format": {
+                  "structure": "type(scope): description",
+                  "types": [
+                    "feat: New feature",
+                    "fix: Bug fix",
+                    "docs: Documentation",
+                    "style: Formatting",
+                    "refactor: Code restructuring",
+                    "test: Testing",
+                    "chore: Maintenance"
+                  ],
+                  "examples": [
+                    "feat(auth): add Google OAuth login",
+                    "fix(ui): resolve mobile layout issue",
+                    "docs(api): update endpoint documentation"
+                  ]
+                }
+              },
+              {
+                "category": "Branch Management",
+                "practices": [
+                  "Use descriptive branch names",
+                  "Keep branches short-lived",
+                  "Regularly sync with main branch",
+                  "Delete merged branches",
+                  "Use protected branches for production",
+                  "Implement branch naming conventions"
+                ],
+                "branch_naming": {
+                  "feature_branches": "feature/description-of-feature",
+                  "bugfix_branches": "fix/description-of-fix",
+                  "hotfix_branches": "hotfix/critical-issue-description",
+                  "examples": [
+                    "feature/user-authentication",
+                    "fix/login-validation-error",
+                    "hotfix/payment-processing-crash"
+                  ]
+                }
+              },
+              {
+                "category": "Code Review",
+                "practices": [
+                  "Review code for functionality and correctness",
+                  "Check for security vulnerabilities",
+                  "Verify adherence to coding standards",
+                  "Test edge cases and error handling",
+                  "Review documentation and comments",
+                  "Consider performance implications",
+                  "Provide constructive feedback",
+                  "Approve only when requirements are met"
+                ]
+              }
             ],
             "troubleshooting": [
-              "Check GitHub OAuth permissions if connection fails",
-              "Verify repository access and organization permissions",
-              "Resolve merge conflicts with AI assistance",
-              "Handle authentication token expiration",
-              "Fix repository synchronization issues",
-              "Recover from accidental file deletions"
+              {
+                "category": "Connection Issues",
+                "problems": [
+                  {
+                    "issue": "GitHub OAuth connection fails",
+                    "symptoms": "Unable to authenticate, authorization denied",
+                    "solutions": [
+                      "Check GitHub app permissions in account settings",
+                      "Clear browser cache and cookies",
+                      "Try different browser or incognito mode",
+                      "Verify GitHub account status and 2FA settings",
+                      "Check firewall and network restrictions",
+                      "Contact GitHub support if account is suspended"
+                    ],
+                    "prevention": "Keep OAuth tokens valid, monitor account status"
+                  },
+                  {
+                    "issue": "Repository access denied",
+                    "symptoms": "Cannot push/pull, permission errors",
+                    "solutions": [
+                      "Verify repository ownership and permissions",
+                      "Check organization membership status",
+                      "Confirm branch protection rules allow access",
+                      "Ensure SSH keys are properly configured",
+                      "Check repository visibility settings",
+                      "Contact repository admin for access"
+                    ],
+                    "prevention": "Regularly review and update permissions"
+                  }
+                ]
+              },
+              {
+                "category": "Synchronization Problems",
+                "problems": [
+                  {
+                    "issue": "Files not syncing between Pixel Pilot and GitHub",
+                    "symptoms": "Changes not reflected, sync errors",
+                    "solutions": [
+                      "Check webhook configuration and status",
+                      "Verify repository connection settings",
+                      "Confirm file paths and ignore patterns",
+                      "Check for file conflicts and resolve them",
+                      "Restart synchronization process",
+                      "Review sync logs for detailed errors"
+                    ],
+                    "prevention": "Monitor webhook health, regular manual syncs"
+                  },
+                  {
+                    "issue": "Merge conflicts preventing updates",
+                    "symptoms": "Cannot merge branches, conflict errors",
+                    "solutions": [
+                      "Pull latest changes from target branch",
+                      "Resolve conflicts manually in editor",
+                      "Use Pixel Pilot's conflict resolution tools",
+                      "Create backup branch before resolving",
+                      "Test resolved code thoroughly",
+                      "Consider rebasing instead of merging"
+                    ],
+                    "prevention": "Keep branches updated, communicate with team"
+                  }
+                ]
+              },
+              {
+                "category": "Authentication Problems",
+                "problems": [
+                  {
+                    "issue": "Authentication token expired",
+                    "symptoms": "Access denied, need to re-authenticate",
+                    "solutions": [
+                      "Reconnect GitHub account in settings",
+                      "Generate new personal access token if needed",
+                      "Update OAuth application permissions",
+                      "Check token expiration policies",
+                      "Use GitHub CLI for authentication",
+                      "Set up SSH key authentication as backup"
+                    ],
+                    "prevention": "Monitor token expiration, use long-lived tokens"
+                  },
+                  {
+                    "issue": "Two-factor authentication issues",
+                    "symptoms": "Cannot complete authentication flow",
+                    "solutions": [
+                      "Ensure authenticator app is configured",
+                      "Check time synchronization on device",
+                      "Use backup codes if available",
+                      "Try SMS authentication as alternative",
+                      "Contact GitHub support for account recovery",
+                      "Set up multiple 2FA methods"
+                    ],
+                    "prevention": "Test 2FA regularly, keep backup codes safe"
+                  }
+                ]
+              }
+            ],
+            "performance_optimization": [
+              {
+                "area": "Repository Management",
+                "optimizations": [
+                  "Use .gitignore to exclude unnecessary files",
+                  "Regularly clean up merged branches",
+                  "Optimize repository size with Git LFS for large files",
+                  "Archive old repositories to reduce clutter",
+                  "Use shallow clones for faster repository operations",
+                  "Implement repository size limits and monitoring"
+                ]
+              },
+              {
+                "area": "Workflow Efficiency",
+                "optimizations": [
+                  "Automate repetitive tasks with GitHub Actions",
+                  "Use templates for common repository structures",
+                  "Implement automated code review processes",
+                  "Set up continuous integration pipelines",
+                  "Configure automated testing and quality checks",
+                  "Use project boards for workflow visualization"
+                ]
+              },
+              {
+                "area": "Team Productivity",
+                "optimizations": [
+                  "Establish clear contribution guidelines",
+                  "Use issue and project templates",
+                  "Implement code review checklists",
+                  "Set up automated notifications and alerts",
+                  "Create documentation for common processes",
+                  "Regularly review and optimize workflows"
+                ]
+              }
             ]
           },
           "tags": ["github", "version-control", "collaboration", "deployment"],
@@ -2915,33 +3474,247 @@
           "title": "Deployment to Production",
           "description": "Deploy your applications to Vercel, Netlify, or other platforms",
           "content": {
+            "deployment_overview": {
+              "description": "Comprehensive guide to deploying your Pixel Pilot applications to production environments",
+              "key_concepts": [
+                "One-click deployment from Pixel Pilot interface",
+                "Automated build and deployment pipelines",
+                "Environment management and configuration",
+                "Performance monitoring and optimization",
+                "Rollback capabilities and version management",
+                "Custom domain setup and SSL certificates"
+              ],
+              "deployment_benefits": [
+                "Zero manual server configuration",
+                "Automatic scaling based on traffic",
+                "Built-in CDN for global performance",
+                "SSL certificates included",
+                "Real-time monitoring and analytics",
+                "Instant rollback capabilities"
+              ]
+            },
             "supported_platforms": [
               {
                 "name": "Vercel",
                 "description": "Optimized for Next.js applications with global CDN",
-                "features": "Automatic deployments, preview deployments, analytics",
-                "best_for": "Next.js apps, SPAs, API routes, edge functions"
+                "features": [
+                  "Automatic deployments from Git",
+                  "Preview deployments for every PR",
+                  "Global CDN with 300+ edge locations",
+                  "Serverless functions and API routes",
+                  "Real-time analytics and monitoring",
+                  "Custom domain support with SSL",
+                  "Environment variables and secrets management",
+                  "Team collaboration and access control"
+                ],
+                "best_for": "Next.js apps, SPAs, API routes, edge functions",
+                "pricing": "Hobby plan free, Pro plan from $20/month",
+                "deployment_speed": "30-90 seconds",
+                "visual_workflow": [
+                  "1️⃣ Connect Vercel account",
+                  "2️⃣ Import project from GitHub",
+                  "3️⃣ Configure build settings",
+                  "4️⃣ Set environment variables",
+                  "5️⃣ Deploy automatically",
+                  "6️⃣ Get live URL instantly"
+                ]
               },
               {
                 "name": "Netlify",
                 "description": "Flexible deployment with form handling and functions",
-                "features": "Form processing, serverless functions, identity management",
-                "best_for": "Static sites, Jamstack applications, e-commerce"
+                "features": [
+                  "Drag-and-drop deployment",
+                  "Form processing and spam filtering",
+                  "Serverless functions (Netlify Functions)",
+                  "Identity management and authentication",
+                  "Large file hosting with Netlify Large Media",
+                  "Split testing and A/B testing",
+                  "Custom domains with one-click SSL",
+                  "Deploy previews for every commit",
+                  "Git integration with multiple providers",
+                  "Team collaboration and site management"
+                ],
+                "best_for": "Static sites, Jamstack applications, e-commerce",
+                "pricing": "Starter plan free, Pro plan from $19/month",
+                "deployment_speed": "20-60 seconds",
+                "visual_workflow": [
+                  "1️⃣ Connect Netlify account",
+                  "2️⃣ Choose deployment method",
+                  "3️⃣ Configure build settings",
+                  "4️⃣ Set up forms and functions",
+                  "5️⃣ Deploy and get live URL",
+                  "6️⃣ Configure custom domain"
+                ]
               },
               {
                 "name": "GitHub Pages",
                 "description": "Free hosting for static websites and documentation",
-                "features": "Automatic deployment from GitHub, custom domains",
-                "best_for": "Documentation, portfolios, simple websites"
+                "features": [
+                  "Free hosting for public repositories",
+                  "Automatic deployment from GitHub Actions",
+                  "Custom domain support",
+                  "HTTPS included",
+                  "Jekyll static site generator integration",
+                  "GitHub Actions for CI/CD",
+                  "No build minutes or bandwidth limits",
+                  "Perfect for documentation and portfolios"
+                ],
+                "best_for": "Documentation, portfolios, simple websites",
+                "pricing": "Completely free",
+                "deployment_speed": "60-120 seconds",
+                "visual_workflow": [
+                  "1️⃣ Enable GitHub Pages in repository",
+                  "2️⃣ Choose source branch or GitHub Actions",
+                  "3️⃣ Configure build settings if needed",
+                  "4️⃣ Deploy automatically on push",
+                  "5️⃣ Access via github.io subdomain",
+                  "6️⃣ Set up custom domain (optional)"
+                ]
+              },
+              {
+                "name": "Railway",
+                "description": "Modern cloud platform for full-stack applications",
+                "features": [
+                  "Database hosting included",
+                  "Automatic HTTPS and custom domains",
+                  "Environment variables and secrets",
+                  "Real-time logs and monitoring",
+                  "Automatic scaling and zero-downtime deploys",
+                  "Git integration with automatic deployments",
+                  "Database backups and point-in-time recovery",
+                  "Team collaboration and access control"
+                ],
+                "best_for": "Full-stack apps, databases, API servers",
+                "pricing": "Hobby plan from $5/month, Pro from $10/month",
+                "deployment_speed": "45-90 seconds"
+              },
+              {
+                "name": "Render",
+                "description": "Cloud platform for static sites and web services",
+                "features": [
+                  "Static site hosting with global CDN",
+                  "Web service hosting for APIs",
+                  "PostgreSQL and Redis databases",
+                  "Automatic HTTPS and custom domains",
+                  "Free tier with usage limits",
+                  "Git integration and auto-deploys",
+                  "Environment management",
+                  "Real-time logging and monitoring"
+                ],
+                "best_for": "APIs, static sites, background jobs",
+                "pricing": "Free tier available, paid plans from $7/month",
+                "deployment_speed": "30-75 seconds"
               }
             ],
             "deployment_process": [
-              "Connect deployment platform account",
-              "Configure build settings and environment variables",
-              "Set up custom domains and SSL certificates",
-              "Configure deployment triggers and automation",
-              "Monitor deployment status and logs",
-              "Set up error tracking and monitoring"
+              {
+                "step": 1,
+                "title": "Platform Selection and Account Setup",
+                "description": "Choose the right deployment platform and connect your account",
+                "actions": [
+                  "Evaluate application requirements and platform features",
+                  "Sign up for chosen platform account",
+                  "Connect platform to Pixel Pilot (OAuth integration)",
+                  "Verify account permissions and billing setup",
+                  "Configure team access if applicable"
+                ],
+                "decision_factors": [
+                  {
+                    "factor": "Application Type",
+                    "considerations": [
+                      "Static site → Netlify or Vercel",
+                      "Next.js app → Vercel (optimized)",
+                      "Full-stack with database → Railway or Render",
+                      "Simple portfolio → GitHub Pages (free)"
+                    ]
+                  },
+                  {
+                    "factor": "Budget",
+                    "considerations": [
+                      "Free tier needed → GitHub Pages or free tiers",
+                      "Small budget → Netlify or Vercel hobby plans",
+                      "Enterprise features → Paid plans with advanced features"
+                    ]
+                  }
+                ],
+                "visual_guide": [
+                  "🎯 Assess your app requirements",
+                  "💰 Compare pricing and features",
+                  "🔗 Sign up and connect account",
+                  "✅ Verify successful integration",
+                  "🚀 Ready for deployment"
+                ]
+              },
+              {
+                "step": 2,
+                "title": "Project Configuration",
+                "description": "Set up your project for deployment with proper configuration",
+                "configuration_steps": [
+                  {
+                    "config": "Build Settings",
+                    "details": [
+                      "Specify build command (npm run build)",
+                      "Set output directory (build/, dist/, .next/)",
+                      "Configure Node.js version if needed",
+                      "Set up build environment variables"
+                    ]
+                  },
+                  {
+                    "config": "Environment Variables",
+                    "details": [
+                      "API keys and database URLs",
+                      "Authentication secrets",
+                      "Third-party service credentials",
+                      "Feature flags and configuration"
+                    ]
+                  }
+                ],
+                "configuration_templates": {
+                  "nextjs_vercel": {
+                    "build_command": "npm run build",
+                    "output_directory": ".next",
+                    "install_command": "npm install"
+                  },
+                  "react_netlify": {
+                    "build_command": "npm run build",
+                    "publish_directory": "build",
+                    "command": "npm install"
+                  }
+                }
+              },
+              {
+                "step": 3,
+                "title": "Deployment Execution",
+                "description": "Execute the deployment and monitor the process",
+                "deployment_methods": [
+                  {
+                    "method": "One-Click Deployment",
+                    "description": "Deploy directly from Pixel Pilot interface",
+                    "process": [
+                      "Click 'Deploy to Production' button",
+                      "Select target platform",
+                      "Review deployment configuration",
+                      "Confirm and initiate deployment",
+                      "Monitor deployment progress"
+                    ],
+                    "benefits": "Simplest method, no manual configuration"
+                  }
+                ],
+                "deployment_monitoring": {
+                  "real_time_updates": [
+                    "Build status and progress",
+                    "Error messages and warnings",
+                    "Build time and resource usage",
+                    "Deployment logs and output"
+                  ],
+                  "success_indicators": [
+                    "✅ Build completed successfully",
+                    "✅ All tests passed",
+                    "✅ Deployment finished",
+                    "🌐 Live URL accessible"
+                  ]
+                }
+              }
             ],
             "environment_management": [
               "Development, staging, and production environments",
@@ -2978,45 +3751,190 @@
           "title": "Project Organization & Structure",
           "description": "Learn best practices for organizing your project files and folders",
           "content": {
+            "project_overview": {
+              "description": "Comprehensive guide to organizing and managing your Pixel Pilot projects effectively",
+              "key_principles": [
+                "Clear folder structure for maintainability",
+                "Consistent naming conventions across files",
+                "Logical separation of concerns",
+                "Scalable architecture for future growth",
+                "Team collaboration best practices"
+              ],
+              "benefits": [
+                "Faster development and debugging",
+                "Easier onboarding for new team members",
+                "Reduced code conflicts and merge issues",
+                "Better maintainability and scalability",
+                "Improved code quality and consistency"
+              ]
+            },
             "recommended_structure": [
               {
-                "folder": "src/components",
-                "purpose": "Reusable UI components",
-                "organization": "Group by feature or type (buttons, forms, layout)"
+                "folder": "src/",
+                "purpose": "Main source code directory",
+                "subfolders": [
+                  {
+                    "name": "components/",
+                    "purpose": "Reusable UI components",
+                    "structure": [
+                      "ui/ - Basic UI elements (Button, Input, Card)",
+                      "layout/ - Layout components (Header, Sidebar, Footer)",
+                      "forms/ - Form components and validation",
+                      "features/ - Feature-specific components"
+                    ],
+                    "organization": "Group by feature or type for easy discovery",
+                    "naming": "PascalCase for component files (UserProfile.tsx)"
+                  },
+                  {
+                    "name": "pages/",
+                    "purpose": "Application pages and routes",
+                    "structure": [
+                      "index.tsx - Home page",
+                      "auth/ - Authentication pages",
+                      "dashboard/ - Dashboard and main views",
+                      "settings/ - User settings and preferences"
+                    ],
+                    "organization": "Follow URL structure for intuitive navigation",
+                    "naming": "kebab-case for route files (user-profile.tsx)"
+                  },
+                  {
+                    "name": "hooks/",
+                    "purpose": "Custom React hooks for state and side effects",
+                    "structure": [
+                      "useAuth.ts - Authentication logic",
+                      "useApi.ts - API calls and data fetching",
+                      "useLocalStorage.ts - Browser storage utilities",
+                      "useDebounce.ts - Performance optimization hooks"
+                    ],
+                    "organization": "Group by functionality for reusability",
+                    "naming": "camelCase with 'use' prefix (useAuth.ts)"
+                  },
+                  {
+                    "name": "lib/",
+                    "purpose": "Utility functions and shared services",
+                    "structure": [
+                      "api/ - API client and endpoints",
+                      "utils/ - Helper functions and utilities",
+                      "constants/ - Application constants and config",
+                      "types/ - TypeScript type definitions",
+                      "validation/ - Form validation schemas"
+                    ],
+                    "organization": "Separate concerns for better maintainability",
+                    "naming": "camelCase for utility files (formatDate.ts)"
+                  },
+                  {
+                    "name": "styles/",
+                    "purpose": "CSS and styling files",
+                    "structure": [
+                      "globals.css - Global styles and resets",
+                      "components/ - Component-specific styles",
+                      "themes/ - Theme definitions and variables",
+                      "utilities/ - Utility classes and helpers"
+                    ],
+                    "organization": "Modular approach for scalable styling",
+                    "naming": "kebab-case for style files (button-styles.css)"
+                  },
+                  {
+                    "name": "contexts/",
+                    "purpose": "React context providers for global state",
+                    "structure": [
+                      "AuthContext.tsx - Authentication state",
+                      "ThemeContext.tsx - Theme preferences",
+                      "NotificationContext.tsx - App notifications"
+                    ],
+                    "organization": "Centralized state management",
+                    "naming": "PascalCase for context files (UserContext.tsx)"
+                  }
+                ],
+                "visual_structure": [
+                  "📁 src/",
+                  "  📁 components/",
+                  "    📁 ui/ (Button, Input, Modal)",
+                  "    📁 layout/ (Header, Sidebar)",
+                  "    📁 forms/ (LoginForm, ContactForm)",
+                  "  📁 pages/ (Home, Dashboard, Settings)",
+                  "  📁 hooks/ (useAuth, useApi)",
+                  "  📁 lib/ (api, utils, types)",
+                  "  📁 styles/ (globals, themes)",
+                  "  📁 contexts/ (Auth, Theme)"
+                ]
               },
               {
-                "folder": "src/pages",
-                "purpose": "Application pages and routes",
-                "organization": "Follow URL structure for easy navigation"
+                "folder": "public/",
+                "purpose": "Static assets served directly by the web server",
+                "structure": [
+                  "images/ - Application images and graphics",
+                  "icons/ - Icon files and favicons",
+                  "fonts/ - Custom font files",
+                  "documents/ - Static documents and PDFs",
+                  "data/ - Static JSON data files"
+                ],
+                "organization": "Organize by asset type for easy management",
+                "optimization": "Compress images, use WebP format, optimize file sizes"
               },
               {
-                "folder": "src/hooks",
-                "purpose": "Custom React hooks",
-                "organization": "Group by functionality (auth, data, ui)"
-              },
-              {
-                "folder": "src/lib",
-                "purpose": "Utility functions and services",
-                "organization": "Separate concerns (api, utils, constants)"
-              },
-              {
-                "folder": "src/styles",
-                "purpose": "CSS and styling files",
-                "organization": "Component-specific and global styles"
-              },
-              {
-                "folder": "public",
-                "purpose": "Static assets",
-                "organization": "Images, fonts, icons by type"
+                "folder": "tests/",
+                "purpose": "Test files and testing utilities",
+                "structure": [
+                  "__tests__/ - Unit and integration tests",
+                  "__mocks__/ - Mock data and functions",
+                  "utils/ - Testing utilities and helpers",
+                  "fixtures/ - Test data and scenarios"
+                ],
+                "organization": "Mirror source structure for easy test discovery",
+                "coverage": "Aim for >80% code coverage"
               }
             ],
             "file_naming_conventions": [
-              "Use kebab-case for file names (user-profile.tsx)",
-              "Use PascalCase for component files (UserProfile.tsx)",
-              "Use camelCase for utility files (apiClient.ts)",
-              "Group related files in folders",
-              "Use index.ts files for clean imports",
-              "Add file extensions for clarity"
+              {
+                "convention": "Case Styles",
+                "rules": [
+                  {
+                    "style": "PascalCase",
+                    "usage": "React components, classes, interfaces",
+                    "examples": [
+                      "UserProfile.tsx",
+                      "LoginForm.tsx",
+                      "ApiService.ts",
+                      "UserInterface.ts"
+                    ],
+                    "reason": "Follows React and TypeScript conventions"
+                  },
+                  {
+                    "style": "camelCase",
+                    "usage": "Functions, variables, hooks, utilities",
+                    "examples": [
+                      "useAuth.ts",
+                      "apiClient.ts",
+                      "formatDate.ts",
+                      "validateEmail.ts"
+                    ],
+                    "reason": "JavaScript standard for identifiers"
+                  },
+                  {
+                    "style": "kebab-case",
+                    "usage": "File names, directories, CSS classes",
+                    "examples": [
+                      "user-profile.tsx",
+                      "login-form.tsx",
+                      "api-client.ts",
+                      "user-settings.tsx"
+                    ],
+                    "reason": "URL-friendly and filesystem compatible"
+                  }
+                ]
+              },
+              {
+                "convention": "File Organization",
+                "rules": [
+                  "Group related files in folders",
+                  "Use index.ts files for clean imports",
+                  "Include file extensions (.tsx, .ts, .js)",
+                  "Use descriptive names that explain purpose",
+                  "Avoid generic names like 'utils.js'",
+                  "Mirror folder structure in tests"
+                ]
+              }
             ],
             "code_organization_principles": [
               "Single Responsibility Principle for components",
@@ -3045,38 +3963,466 @@
           "title": "Team Collaboration & Workflows",
           "description": "Work effectively with teams using Pixel Pilot's collaboration features",
           "content": {
-            "collaboration_features": [
-              "Real-time editing with conflict resolution",
-              "Comment system for code review",
-              "Shared project access with permissions",
-              "Activity feeds and change tracking",
-              "Team notifications and updates",
-              "Integrated chat and communication",
-              "Version control and branching strategies"
-            ],
+            "collaboration_overview": {
+              "description": "Comprehensive guide to effective team collaboration in Pixel Pilot",
+              "key_benefits": [
+                "Accelerated development through shared expertise",
+                "Consistent code quality through peer reviews",
+                "Knowledge sharing and team learning",
+                "Faster problem resolution",
+                "Better project visibility and tracking",
+                "Improved team communication and coordination"
+              ],
+              "collaboration_features": [
+                {
+                  "feature": "Real-time Collaborative Editing",
+                  "description": "Multiple team members can edit the same file simultaneously",
+                  "capabilities": [
+                    "Live cursor tracking and user identification",
+                    "Conflict-free simultaneous editing",
+                    "Automatic merge conflict resolution",
+                    "Real-time synchronization across all users",
+                    "Visual indicators for active collaborators"
+                  ],
+                  "visual_workflow": [
+                    "👤 User A edits component",
+                    "👤 User B sees changes instantly",
+                    "🔄 Both users' cursors visible",
+                    "✅ Changes merged automatically"
+                  ]
+                },
+                {
+                  "feature": "Advanced Comment System",
+                  "description": "Contextual commenting for code review and discussion",
+                  "capabilities": [
+                    "Line-specific code comments",
+                    "Threaded conversations",
+                    "Mention team members (@username)",
+                    "Attach files and screenshots",
+                    "Comment resolution tracking",
+                    "Integration with pull requests"
+                  ],
+                  "use_cases": [
+                    "Code review feedback",
+                    "Design discussion",
+                    "Bug reporting",
+                    "Feature requests",
+                    "Knowledge sharing"
+                  ]
+                },
+                {
+                  "feature": "Shared Project Access",
+                  "description": "Granular permission system for team access control",
+                  "capabilities": [
+                    "Role-based access control",
+                    "Project-level permissions",
+                    "File/folder-specific restrictions",
+                    "Time-limited guest access",
+                    "Audit logs for access tracking",
+                    "Permission inheritance"
+                  ],
+                  "visual_hierarchy": [
+                    "👑 Owner - Full project control",
+                    "⚙️ Admin - Team and deployment management",
+                    "👨‍💻 Developer - Code editing and staging deployment",
+                    "👁️ Viewer - Read-only project access",
+                    "🎯 Guest - Limited feature access"
+                  ]
+                },
+                {
+                  "feature": "Activity Feeds & Notifications",
+                  "description": "Real-time updates on project activities and changes",
+                  "capabilities": [
+                    "Real-time activity streams",
+                    "Customizable notification preferences",
+                    "Email and in-app notifications",
+                    "Project milestone tracking",
+                    "Team member activity monitoring",
+                    "Integration with external tools"
+                  ],
+                  "notification_types": [
+                    "Code changes and commits",
+                    "Pull request updates",
+                    "Comment mentions",
+                    "Deployment status changes",
+                    "Team member actions",
+                    "Project milestone achievements"
+                  ]
+                }
+              ]
+            },
             "permission_system": [
-              "Owner: Full control over project and settings",
-              "Admin: Can manage team members and deployments",
-              "Developer: Can edit code and deploy to staging",
-              "Viewer: Read-only access to project files",
-              "Guest: Limited access for specific features"
+              {
+                "role": "Owner",
+                "description": "Full control over project and billing",
+                "permissions": [
+                  "Invite and remove team members",
+                  "Change team member roles",
+                  "Modify project settings",
+                  "Delete project",
+                  "Manage billing and subscriptions",
+                  "Configure integrations",
+                  "Access all project features"
+                ],
+                "visual_icon": "👑",
+                "best_for": "Project founders, technical leads"
+              },
+              {
+                "role": "Admin",
+                "description": "Team and deployment management",
+                "permissions": [
+                  "Invite and manage team members",
+                  "Configure deployment settings",
+                  "Set up CI/CD pipelines",
+                  "Manage project integrations",
+                  "Access deployment logs",
+                  "Configure security settings",
+                  "Monitor project analytics"
+                ],
+                "visual_icon": "⚙️",
+                "best_for": "Team leads, DevOps engineers"
+              },
+              {
+                "role": "Developer",
+                "description": "Full development access",
+                "permissions": [
+                  "Edit all project files",
+                  "Create and manage branches",
+                  "Submit pull requests",
+                  "Deploy to staging environment",
+                  "Access development tools",
+                  "View project analytics",
+                  "Participate in code reviews"
+                ],
+                "visual_icon": "👨‍💻",
+                "best_for": "Frontend/backend developers, designers"
+              },
+              {
+                "role": "Viewer",
+                "description": "Read-only project access",
+                "permissions": [
+                  "View all project files",
+                  "Access project documentation",
+                  "View deployment status",
+                  "Read project discussions",
+                  "View project analytics",
+                  "Download project assets"
+                ],
+                "visual_icon": "👁️",
+                "best_for": "Stakeholders, QA testers, clients"
+              },
+              {
+                "role": "Guest",
+                "description": "Limited access for specific features",
+                "permissions": [
+                  "Access specific files or folders",
+                  "Comment on assigned items",
+                  "View limited project sections",
+                  "Time-limited access",
+                  "No code editing permissions"
+                ],
+                "visual_icon": "🎯",
+                "best_for": "Contractors, consultants, auditors"
+              }
             ],
-            "workflow_best_practices": [
-              "Use feature branches for development",
-              "Implement code review processes",
-              "Set up automated testing and CI/CD",
-              "Maintain clear documentation and guidelines",
-              "Regular team standups and progress updates",
-              "Use project management tools integration"
-            ],
+            "team_workflows": {
+              "description": "Structured workflows for efficient team collaboration",
+              "workflow_types": [
+                {
+                  "workflow": "Agile Development",
+                  "description": "Iterative development with sprints and standups",
+                  "process": [
+                    "Sprint planning with task breakdown",
+                    "Daily standup meetings",
+                    "Feature development in branches",
+                    "Code review and testing",
+                    "Sprint review and retrospective"
+                  ],
+                  "tools_integration": [
+                    "Project boards for task tracking",
+                    "Automated testing pipelines",
+                    "Deployment to staging environments",
+                    "Sprint burndown charts",
+                    "Team velocity tracking"
+                  ]
+                },
+                {
+                  "workflow": "GitHub Flow",
+                  "description": "Simplified workflow with feature branches",
+                  "process": [
+                    "Create feature branch from main",
+                    "Develop and test feature",
+                    "Create pull request for review",
+                    "Code review and feedback",
+                    "Merge to main after approval"
+                  ],
+                  "branch_strategy": [
+                    "main - Production-ready code",
+                    "feature/* - Feature development",
+                    "hotfix/* - Emergency fixes",
+                    "release/* - Release preparation"
+                  ]
+                },
+                {
+                  "workflow": "Continuous Integration",
+                  "description": "Automated testing and integration",
+                  "process": [
+                    "Automated code quality checks",
+                    "Unit and integration testing",
+                    "Security vulnerability scanning",
+                    "Performance testing",
+                    "Automated deployment",
+                    "Monitoring and alerting"
+                  ],
+                  "benefits": [
+                    "Early bug detection",
+                    "Consistent code quality",
+                    "Faster feedback cycles",
+                    "Reduced integration issues",
+                    "Automated deployment reliability"
+                  ]
+                }
+              ]
+            },
+            "code_review_process": {
+              "description": "Structured approach to code review and quality assurance",
+              "review_process": [
+                {
+                  "stage": "Preparation",
+                  "activities": [
+                    "Review pull request description",
+                    "Understand the feature or fix",
+                    "Check related issues and documentation",
+                    "Set up local testing environment",
+                    "Review code changes overview"
+                  ],
+                  "time_estimate": "15-30 minutes"
+                },
+                {
+                  "stage": "Technical Review",
+                  "activities": [
+                    "Check code functionality and logic",
+                    "Review code structure and organization",
+                    "Verify adherence to coding standards",
+                    "Test edge cases and error handling",
+                    "Check performance implications",
+                    "Review security considerations"
+                  ],
+                  "checklist": [
+                    "✅ Code follows established patterns",
+                    "✅ Proper error handling implemented",
+                    "✅ Unit tests included and passing",
+                    "✅ Documentation updated",
+                    "✅ No security vulnerabilities",
+                    "✅ Performance optimized"
+                  ]
+                },
+                {
+                  "stage": "Feedback and Discussion",
+                  "activities": [
+                    "Leave constructive comments",
+                    "Suggest improvements and alternatives",
+                    "Ask clarifying questions",
+                    "Discuss design decisions",
+                    "Request changes when necessary",
+                    "Approve when requirements met"
+                  ],
+                  "best_practices": [
+                    "Be specific and actionable",
+                    "Explain reasoning for suggestions",
+                    "Focus on code quality, not personal style",
+                    "Acknowledge good practices",
+                    "Offer to help with implementation"
+                  ]
+                },
+                {
+                  "stage": "Resolution",
+                  "activities": [
+                    "Address reviewer feedback",
+                    "Make requested changes",
+                    "Update tests and documentation",
+                    "Re-request review when ready",
+                    "Merge approved changes",
+                    "Close related issues"
+                  ]
+                }
+              ]
+            },
             "communication_strategies": [
-              "Clear task assignment and ownership",
-              "Regular code reviews and feedback",
-              "Documentation of decisions and changes",
-              "Knowledge sharing and mentoring",
-              "Conflict resolution and problem-solving",
-              "Celebration of milestones and achievements"
-            ]
+              {
+                "strategy": "Clear Task Assignment",
+                "practices": [
+                  "Use descriptive task titles",
+                  "Include detailed descriptions",
+                  "Set clear acceptance criteria",
+                  "Assign appropriate team members",
+                  "Set realistic deadlines",
+                  "Track progress and updates"
+                ],
+                "visual_tools": [
+                  "📋 Task boards with clear status",
+                  "👥 Team member assignments",
+                  "📅 Timeline and milestone tracking",
+                  "📊 Progress indicators",
+                  "🔄 Status updates and notifications"
+                ]
+              },
+              {
+                "strategy": "Regular Communication",
+                "practices": [
+                  "Daily standup meetings",
+                  "Weekly progress reviews",
+                  "Monthly planning sessions",
+                  "Ad-hoc problem-solving discussions",
+                  "Knowledge sharing sessions",
+                  "Feedback and recognition"
+                ],
+                "communication_channels": [
+                  "💬 In-app chat and comments",
+                  "📧 Email notifications",
+                  "📹 Video calls for complex discussions",
+                  "📝 Documentation and wikis",
+                  "🎯 Project management tools",
+                  "📊 Status reports and dashboards"
+                ]
+              },
+              {
+                "strategy": "Knowledge Sharing",
+                "practices": [
+                  "Document important decisions",
+                  "Create reusable components",
+                  "Share coding patterns and best practices",
+                  "Conduct code reviews as learning opportunities",
+                  "Maintain comprehensive documentation",
+                  "Mentor junior team members"
+                ],
+                "tools": [
+                  "📚 Internal documentation",
+                  "🔧 Shared component libraries",
+                  "🎓 Training sessions and workshops",
+                  "📖 Code review guidelines",
+                  "💡 Best practices documentation",
+                  "👨‍🏫 Mentoring programs"
+                ]
+              }
+            ],
+            "conflict_resolution": {
+              "description": "Strategies for handling team conflicts and technical disagreements",
+              "common_conflicts": [
+                {
+                  "conflict": "Technical Approach Disagreements",
+                  "resolution_strategy": [
+                    "Present pros and cons of each approach",
+                    "Consider business requirements and constraints",
+                    "Prototype or spike solutions when needed",
+                    "Consult with technical leads or architects",
+                    "Document decision rationale",
+                    "Agree on implementation timeline"
+                  ]
+                },
+                {
+                  "conflict": "Code Review Feedback",
+                  "resolution_strategy": [
+                    "Focus on code quality, not personal style",
+                    "Provide specific, actionable feedback",
+                    "Explain reasoning for suggestions",
+                    "Be open to alternative solutions",
+                    "Escalate to team lead if needed",
+                    "Learn from differing perspectives"
+                  ]
+                },
+                {
+                  "conflict": "Timeline and Priority Issues",
+                  "resolution_strategy": [
+                    "Review project priorities with stakeholders",
+                    "Assess technical complexity accurately",
+                    "Break large tasks into smaller deliverables",
+                    "Communicate trade-offs clearly",
+                    "Adjust timelines based on new information",
+                    "Focus on highest business value first"
+                  ]
+                }
+              ]
+            },
+            "productivity_tools": {
+              "description": "Integrated tools for enhanced team productivity",
+              "project_management": [
+                {
+                  "tool": "Task Boards",
+                  "features": [
+                    "Visual task tracking with drag-and-drop",
+                    "Custom workflow stages",
+                    "Task assignment and ownership",
+                    "Progress visualization",
+                    "Deadline tracking",
+                    "Team workload balancing"
+                  ],
+                  "visual_workflow": [
+                    "📝 Backlog → In Progress → Review → Done",
+                    "👥 Assign tasks to team members",
+                    "📊 Track progress with burndown charts",
+                    "🎯 Meet sprint goals and deadlines"
+                  ]
+                },
+                {
+                  "tool": "Time Tracking",
+                  "features": [
+                    "Automatic time logging",
+                    "Task duration tracking",
+                    "Productivity analytics",
+                    "Team utilization reports",
+                    "Project profitability analysis",
+                    "Resource planning insights"
+                  ]
+                },
+                {
+                  "tool": "Reporting & Analytics",
+                  "features": [
+                    "Team performance metrics",
+                    "Project progress reports",
+                    "Code quality analytics",
+                    "Deployment success rates",
+                    "Issue resolution times",
+                    "Team collaboration insights"
+                  ]
+                }
+              ]
+            },
+            "remote_collaboration": {
+              "description": "Best practices for distributed and remote teams",
+              "communication_practices": [
+                {
+                  "practice": "Asynchronous Communication",
+                  "tools": [
+                    "Detailed documentation and updates",
+                    "Recorded meetings and demos",
+                    "Written feedback and reviews",
+                    "Clear task descriptions and requirements",
+                    "Regular status updates and check-ins"
+                  ]
+                },
+                {
+                  "practice": "Regular Sync Points",
+                  "schedule": [
+                    "Daily async standups",
+                    "Weekly team meetings",
+                    "Bi-weekly one-on-one check-ins",
+                    "Monthly all-hands meetings",
+                    "Quarterly planning sessions"
+                  ]
+                },
+                {
+                  "practice": "Timezone Considerations",
+                  "strategies": [
+                    "Flexible meeting times",
+                    "Recorded sessions for different time zones",
+                    "Overlapping work hours for collaboration",
+                    "Clear communication about availability",
+                    "Respect for different working cultures"
+                  ]
+                }
+              ]
+            }
           },
           "tags": ["collaboration", "teamwork", "permissions", "workflow"],
           "difficulty": "advanced",
@@ -3099,49 +4445,768 @@
             "authentication_issues": [
               {
                 "problem": "GitHub OAuth connection fails",
-                "solution": "Check GitHub app permissions, clear browser cache, try different browser",
-                "prevention": "Keep GitHub tokens valid and app permissions up to date"
+                "symptoms": [
+                  "Unable to authenticate with GitHub",
+                  "Authorization denied message",
+                  "Login redirects fail",
+                  "OAuth permission errors"
+                ],
+                "visual_diagnosis": [
+                  "🔴 Red error message on login page",
+                  "🚫 'Access denied' notification",
+                  "🔄 Infinite redirect loop",
+                  "⚠️ GitHub permission warning"
+                ],
+                "solutions": [
+                  {
+                    "solution": "Check GitHub App Permissions",
+                    "steps": [
+                      "Go to GitHub Settings → Applications → Authorized OAuth Apps",
+                      "Find Pixel Pilot in the list",
+                      "Verify permissions include repository access",
+                      "Re-authorize if permissions are missing"
+                    ],
+                    "visual_steps": [
+                      "1️⃣ GitHub Settings → Applications",
+                      "2️⃣ Find Pixel Pilot OAuth App",
+                      "3️⃣ Check granted permissions",
+                      "4️⃣ Re-authorize if needed"
+                    ]
+                  },
+                  {
+                    "solution": "Clear Browser Cache and Cookies",
+                    "steps": [
+                      "Open browser developer tools (F12)",
+                      "Go to Application/Storage tab",
+                      "Clear all cookies and local storage",
+                      "Hard refresh the page (Ctrl+Shift+R)",
+                      "Try logging in again"
+                    ],
+                    "visual_steps": [
+                      "1️⃣ F12 → Application tab",
+                      "2️⃣ Clear storage → Cookies",
+                      "3️⃣ Clear storage → Local Storage",
+                      "4️⃣ Ctrl+Shift+R to refresh"
+                    ]
+                  },
+                  {
+                    "solution": "Try Different Browser or Incognito Mode",
+                    "steps": [
+                      "Open incognito/private browsing window",
+                      "Navigate to Pixel Pilot login",
+                      "Attempt GitHub authentication",
+                      "If successful, clear main browser cache"
+                    ],
+                    "visual_steps": [
+                      "1️⃣ Open incognito window",
+                      "2️⃣ Navigate to pixelpilot.dev",
+                      "3️⃣ Click 'Continue with GitHub'",
+                      "4️⃣ Complete authentication"
+                    ]
+                  }
+                ],
+                "prevention": [
+                  "Keep GitHub OAuth tokens valid",
+                  "Monitor app permissions regularly",
+                  "Use stable internet connection",
+                  "Avoid clearing cookies unnecessarily",
+                  "Keep browser updated"
+                ],
+                "escalation_steps": [
+                  "Contact Pixel Pilot support if issue persists",
+                  "Provide browser console error messages",
+                  "Include GitHub account type (personal/org)",
+                  "Share network environment details"
+                ]
               },
               {
                 "problem": "Session expires frequently",
-                "solution": "Check browser cookie settings, ensure stable internet connection",
-                "prevention": "Use stable network connection and avoid clearing cookies"
+                "symptoms": [
+                  "Unexpected logout after short time",
+                  "Need to re-authenticate multiple times",
+                  "Session timeout warnings",
+                  "Lost work due to session expiry"
+                ],
+                "visual_diagnosis": [
+                  "⏰ 'Session expired' popup",
+                  "🔄 Automatic redirect to login",
+                  "💾 Unsaved changes lost",
+                  "⚠️ Session timeout countdown"
+                ],
+                "root_causes": [
+                  "Browser cookie settings too restrictive",
+                  "Network connection instability",
+                  "Browser extensions interfering",
+                  "System sleep/wake cycles",
+                  "Multiple tabs with different sessions"
+                ],
+                "solutions": [
+                  {
+                    "solution": "Adjust Browser Cookie Settings",
+                    "steps": [
+                      "Go to browser settings → Privacy & Security",
+                      "Find cookie settings",
+                      "Allow cookies for pixelpilot.dev",
+                      "Disable 'Block third-party cookies' temporarily",
+                      "Test session persistence"
+                    ],
+                    "visual_steps": [
+                      "1️⃣ Browser Settings → Privacy",
+                      "2️⃣ Cookies → Allow for pixelpilot.dev",
+                      "3️⃣ Disable third-party blocking",
+                      "4️⃣ Test session duration"
+                    ]
+                  },
+                  {
+                    "solution": "Check Network Connection Stability",
+                    "steps": [
+                      "Test internet connection speed",
+                      "Check for VPN or proxy interference",
+                      "Disable browser extensions temporarily",
+                      "Try different network (mobile hotspot)",
+                      "Monitor for connection drops"
+                    ],
+                    "visual_steps": [
+                      "1️⃣ Speed test: fast.com",
+                      "2️⃣ Disable VPN temporarily",
+                      "3️⃣ Test on mobile network",
+                      "4️⃣ Monitor connection stability"
+                    ]
+                  },
+                  {
+                    "solution": "Browser Extension Conflicts",
+                    "steps": [
+                      "Open browser extensions page",
+                      "Disable privacy/security extensions",
+                      "Test Pixel Pilot session persistence",
+                      "Re-enable extensions one by one",
+                      "Identify conflicting extension"
+                    ],
+                    "visual_steps": [
+                      "1️⃣ chrome://extensions/",
+                      "2️⃣ Disable privacy extensions",
+                      "3️⃣ Test Pixel Pilot login",
+                      "4️⃣ Re-enable one by one",
+                      "5️⃣ Identify the culprit"
+                    ]
+                  }
+                ],
+                "prevention": [
+                  "Use stable internet connection",
+                  "Keep browser updated",
+                  "Avoid overly restrictive cookie settings",
+                  "Use single browser tab when possible",
+                  "Save work frequently",
+                  "Enable auto-save features"
+                ],
+                "workarounds": [
+                  "Use 'Remember me' option during login",
+                  "Save work in progress frequently",
+                  "Use browser bookmarks for quick access",
+                  "Enable browser password manager",
+                  "Consider using desktop app if available"
+                ]
               }
             ],
             "code_generation_problems": [
               {
                 "problem": "AI generates incorrect code",
-                "solution": "Provide more specific requirements, include code examples, break into smaller tasks",
-                "prevention": "Use detailed prompts with context and examples"
+                "symptoms": [
+                  "Code doesn't compile or run",
+                  "Logic errors in generated code",
+                  "Missing imports or dependencies",
+                  "Type errors in TypeScript",
+                  "Inconsistent code style"
+                ],
+                "visual_diagnosis": [
+                  "🔴 Red squiggly lines in editor",
+                  "❌ Build/compilation errors",
+                  "🐛 Runtime errors in console",
+                  "⚠️ TypeScript type errors",
+                  "🔍 Missing import statements"
+                ],
+                "root_causes": [
+                  "Insufficient context provided",
+                  "Ambiguous or incomplete requirements",
+                  "Complex multi-step requests",
+                  "Missing technical specifications",
+                  "Inconsistent naming conventions"
+                ],
+                "solutions": [
+                  {
+                    "solution": "Provide More Specific Requirements",
+                    "techniques": [
+                      "Include exact function signatures",
+                      "Specify data types and interfaces",
+                      "Provide example inputs/outputs",
+                      "Mention framework versions",
+                      "Include existing code patterns"
+                    ],
+                    "examples": [
+                      "❌ 'Create a login form'",
+                      "✅ 'Create a React login form with email/password fields, form validation using react-hook-form, TypeScript interfaces, and Tailwind CSS styling'"
+                    ]
+                  },
+                  {
+                    "solution": "Break Complex Requests into Smaller Tasks",
+                    "approach": [
+                      "Split large features into smaller components",
+                      "Request one functionality at a time",
+                      "Build incrementally with testing",
+                      "Review and refine each piece",
+                      "Combine tested components"
+                    ],
+                    "workflow": [
+                      "1️⃣ Request basic component structure",
+                      "2️⃣ Add props and TypeScript types",
+                      "3️⃣ Implement core functionality",
+                      "4️⃣ Add styling and interactions",
+                      "5️⃣ Integrate with existing code"
+                    ]
+                  },
+                  {
+                    "solution": "Include Code Examples and Context",
+                    "best_practices": [
+                      "Share existing similar components",
+                      "Provide API response examples",
+                      "Include database schema information",
+                      "Share styling patterns",
+                      "Mention integration requirements"
+                    ]
+                  }
+                ],
+                "prevention": [
+                  "Use detailed, specific prompts",
+                  "Provide comprehensive context",
+                  "Include code examples when possible",
+                  "Break complex tasks into smaller steps",
+                  "Review and test generated code",
+                  "Maintain clear project documentation"
+                ],
+                "proactive_approaches": [
+                  "Create reusable prompt templates",
+                  "Document successful prompt patterns",
+                  "Build a component library for reference",
+                  "Establish coding standards and conventions",
+                  "Regular code reviews and feedback sessions"
+                ]
               },
               {
                 "problem": "Code doesn't match existing project structure",
-                "solution": "Include current file structure in prompts, request integration with existing code",
-                "prevention": "Maintain consistent project structure and naming conventions"
+                "symptoms": [
+                  "Import paths don't resolve",
+                  "File organization doesn't match project",
+                  "Naming conventions are inconsistent",
+                  "Integration points are missing",
+                  "Dependencies conflict with existing code"
+                ],
+                "visual_diagnosis": [
+                  "🔴 'Module not found' errors",
+                  "📁 Files in wrong directories",
+                  "🏷️ Inconsistent naming patterns",
+                  "🔗 Broken import/export statements",
+                  "⚠️ Dependency conflicts"
+                ],
+                "root_causes": [
+                  "AI unaware of project structure",
+                  "Missing context about existing files",
+                  "Different naming conventions used",
+                  "Outdated project information",
+                  "Complex project architecture"
+                ],
+                "solutions": [
+                  {
+                    "solution": "Include Current File Structure in Prompts",
+                    "techniques": [
+                      "Share project directory structure",
+                      "Provide existing file names and paths",
+                      "Include import/export patterns",
+                      "Share component organization",
+                      "Mention folder naming conventions"
+                    ],
+                    "prompt_example": "Our project uses: src/components/ for UI components, src/lib/ for utilities, src/hooks/ for custom hooks. Please follow this structure."
+                  },
+                  {
+                    "solution": "Request Integration with Existing Code",
+                    "approach": [
+                      "Specify integration points clearly",
+                      "Provide existing component examples",
+                      "Mention shared utilities to use",
+                      "Include styling patterns to follow",
+                      "Specify data flow requirements"
+                    ],
+                    "integration_patterns": [
+                      "🔗 'Integrate with existing AuthContext'",
+                      "🎨 'Use our established Tailwind color palette'",
+                      "📊 'Connect to existing API endpoints'",
+                      "🔧 'Reuse our custom form validation hooks'"
+                    ]
+                  },
+                  {
+                    "solution": "Use Consistent Naming Conventions",
+                    "standards": [
+                      "PascalCase for components (UserProfile.tsx)",
+                      "camelCase for utilities (apiClient.ts)",
+                      "kebab-case for files (user-profile.tsx)",
+                      "UPPER_CASE for constants (API_BASE_URL)"
+                    ],
+                    "enforcement": [
+                      "Share naming convention document",
+                      "Provide examples of existing patterns",
+                      "Request adherence to established rules",
+                      "Review generated code for consistency"
+                    ]
+                  }
+                ],
+                "prevention": [
+                  "Maintain up-to-date project documentation",
+                  "Share project structure with AI requests",
+                  "Establish clear naming conventions",
+                  "Create component and utility libraries",
+                  "Regular code reviews for consistency",
+                  "Document integration patterns"
+                ],
+                "maintenance_strategies": [
+                  "Update project documentation regularly",
+                  "Create template files for common patterns",
+                  "Establish code review checklists",
+                  "Document architectural decisions",
+                  "Create onboarding guides for new team members"
+                ]
               }
             ],
             "preview_system_issues": [
               {
                 "problem": "Preview fails to load",
-                "solution": "Check internet connection, wait for E2B initialization, check console for errors",
-                "prevention": "Ensure stable connection and sufficient system resources"
+                "symptoms": [
+                  "Blank preview pane",
+                  "Loading spinner never completes",
+                  "Error messages in preview area",
+                  "Preview shows connection issues",
+                  "Sandbox initialization fails"
+                ],
+                "visual_diagnosis": [
+                  "🔄 Spinning loading indicator",
+                  "📄 Blank white screen",
+                  "❌ 'Connection failed' message",
+                  "⚠️ 'Sandbox error' notification",
+                  "🔌 Network error indicators"
+                ],
+                "root_causes": [
+                  "Slow or unstable internet connection",
+                  "E2B sandbox initialization timeout",
+                  "Browser security restrictions",
+                  "Resource limitations",
+                  "Network proxy or firewall issues"
+                ],
+                "solutions": [
+                  {
+                    "solution": "Check Internet Connection Stability",
+                    "steps": [
+                      "Test connection speed (aim for 10+ Mbps)",
+                      "Check for network interruptions",
+                      "Disable VPN temporarily if used",
+                      "Try different network (WiFi vs Ethernet)",
+                      "Monitor connection stability"
+                    ],
+                    "visual_steps": [
+                      "1️⃣ Test speed at fast.com",
+                      "2️⃣ Check network stability",
+                      "3️⃣ Disable VPN/proxy",
+                      "4️⃣ Switch network connection",
+                      "5️⃣ Retry preview load"
+                    ]
+                  },
+                  {
+                    "solution": "Wait for E2B Sandbox Initialization",
+                    "understanding": [
+                      "E2B sandbox needs time to start",
+                      "First load can take 30-60 seconds",
+                      "Subsequent loads are faster",
+                      "Resource allocation may vary",
+                      "Cold starts take longer than warm starts"
+                    ],
+                    "progress_indicators": [
+                      "🚀 'Initializing sandbox environment'",
+                      "📦 'Installing dependencies'",
+                      "⚙️ 'Configuring development server'",
+                      "🌐 'Starting preview server'",
+                      "✅ 'Preview ready'"
+                    ]
+                  },
+                  {
+                    "solution": "Check Browser Console for Errors",
+                    "steps": [
+                      "Open browser developer tools (F12)",
+                      "Go to Console tab",
+                      "Look for error messages",
+                      "Check Network tab for failed requests",
+                      "Note any CORS or security errors"
+                    ],
+                    "common_errors": [
+                      "🔒 CORS policy blocking requests",
+                      "🚫 Mixed content warnings",
+                      "📡 Network request failures",
+                      "💾 Local storage quota exceeded",
+                      "🔐 Security policy violations"
+                    ]
+                  },
+                  {
+                    "solution": "Clear Browser Cache and Reload",
+                    "steps": [
+                      "Hard refresh the page (Ctrl+Shift+R)",
+                      "Clear browser cache for pixelpilot.dev",
+                      "Disable browser extensions temporarily",
+                      "Try incognito/private browsing mode",
+                      "Check for browser updates"
+                    ]
+                  }
+                ],
+                "prevention": [
+                  "Use stable, fast internet connection",
+                  "Keep browser updated",
+                  "Disable problematic extensions",
+                  "Clear cache regularly",
+                  "Monitor resource usage",
+                  "Use supported browsers (Chrome, Firefox, Safari, Edge)"
+                ],
+                "performance_tips": [
+                  "Close unused browser tabs",
+                  "Free up system memory",
+                  "Disable unnecessary browser extensions",
+                  "Use latest browser version",
+                  "Ensure adequate RAM (8GB+ recommended)"
+                ]
               },
               {
                 "problem": "Hot reload not working",
-                "solution": "Restart preview, check file save status, verify file paths",
-                "prevention": "Save files properly and maintain correct file structure"
+                "symptoms": [
+                  "Changes not reflected in preview",
+                  "Preview shows old version of code",
+                  "Manual refresh required to see updates",
+                  "Hot reload indicator not appearing",
+                  "File changes not triggering updates"
+                ],
+                "visual_diagnosis": [
+                  "📄 Stale content in preview",
+                  "🔄 Manual refresh needed",
+                  "⚪ No hot reload indicator",
+                  "📝 Changes saved but not reflected",
+                  "⏰ Delayed updates"
+                ],
+                "root_causes": [
+                  "File not properly saved",
+                  "Hot reload service disconnected",
+                  "File path issues",
+                  "Syntax errors preventing reload",
+                  "Browser cache interference"
+                ],
+                "solutions": [
+                  {
+                    "solution": "Restart Preview Environment",
+                    "steps": [
+                      "Click 'Restart Preview' button",
+                      "Wait for sandbox to reinitialize",
+                      "Check if hot reload resumes",
+                      "Verify file synchronization",
+                      "Test with a simple file change"
+                    ],
+                    "visual_steps": [
+                      "1️⃣ Click 🔄 'Restart Preview'",
+                      "2️⃣ Wait for initialization",
+                      "3️⃣ Check hot reload status",
+                      "4️⃣ Make test file change",
+                      "5️⃣ Verify instant update"
+                    ]
+                  },
+                  {
+                    "solution": "Check File Save Status",
+                    "verification_steps": [
+                      "Look for unsaved changes indicator",
+                      "Check file modification timestamp",
+                      "Verify file is not read-only",
+                      "Ensure sufficient disk space",
+                      "Check for file system permissions"
+                    ],
+                    "save_indicators": [
+                      "💾 Green checkmark = saved",
+                      "📝 Pencil icon = unsaved changes",
+                      "🔒 Lock icon = read-only file",
+                      "⚠️ Warning = save failed"
+                    ]
+                  },
+                  {
+                    "solution": "Verify File Paths and Structure",
+                    "checks": [
+                      "Ensure files are in correct directories",
+                      "Check import/export path accuracy",
+                      "Verify file extensions match content",
+                      "Confirm no circular dependencies",
+                      "Validate file naming conventions"
+                    ],
+                    "common_issues": [
+                      "📁 Wrong directory structure",
+                      "🔗 Broken import paths",
+                      "🏷️ Incorrect file extensions",
+                      "🔄 Circular dependency loops",
+                      "📝 Case sensitivity issues"
+                    ]
+                  },
+                  {
+                    "solution": "Clear Browser Cache",
+                    "steps": [
+                      "Hard refresh (Ctrl+Shift+R)",
+                      "Open DevTools → Network tab",
+                      "Check 'Disable cache' option",
+                      "Clear storage and cookies",
+                      "Test hot reload functionality"
+                    ]
+                  }
+                ],
+                "prevention": [
+                  "Save files automatically or frequently",
+                  "Maintain correct file structure",
+                  "Fix syntax errors promptly",
+                  "Keep browser cache cleared",
+                  "Monitor hot reload status",
+                  "Use supported file types only"
+                ],
+                "troubleshooting_workflow": [
+                  "1️⃣ Save current file changes",
+                  "2️⃣ Check for syntax errors",
+                  "3️⃣ Verify file paths and imports",
+                  "4️⃣ Restart preview if needed",
+                  "5️⃣ Clear browser cache",
+                  "6️⃣ Test with simple file change"
+                ]
               }
             ],
             "deployment_failures": [
               {
                 "problem": "Build fails during deployment",
-                "solution": "Check build logs, verify dependencies, ensure correct build commands",
-                "prevention": "Test locally before deployment, keep dependencies updated"
+                "symptoms": [
+                  "Build process stops with errors",
+                  "Compilation failures",
+                  "Dependency installation issues",
+                  "Type checking errors",
+                  "Asset optimization failures"
+                ],
+                "visual_diagnosis": [
+                  "❌ Red 'Build Failed' status",
+                  "📋 Error logs in deployment console",
+                  "🔴 Build pipeline failure indicators",
+                  "⚠️ Dependency conflict warnings",
+                  "🚫 TypeScript compilation errors"
+                ],
+                "common_causes": [
+                  "Missing or incompatible dependencies",
+                  "TypeScript type errors",
+                  "Build command misconfiguration",
+                  "Environment variable issues",
+                  "Resource limitations",
+                  "Platform-specific compatibility issues"
+                ],
+                "solutions": [
+                  {
+                    "solution": "Review Build Logs Carefully",
+                    "analysis_steps": [
+                      "Locate the specific error message",
+                      "Identify which step failed (install, build, test)",
+                      "Check error stack trace for clues",
+                      "Search for known issues online",
+                      "Compare with successful builds"
+                    ],
+                    "error_patterns": [
+                      "🔍 'Module not found' → Missing dependency",
+                      "⚠️ 'Type error' → TypeScript issue",
+                      "❌ 'Command failed' → Build script problem",
+                      "📦 'Package not found' → Registry issue",
+                      "💾 'Out of memory' → Resource limits"
+                    ]
+                  },
+                  {
+                    "solution": "Verify Dependencies and Compatibility",
+                    "checks": [
+                      "Check package.json for correct versions",
+                      "Ensure all peer dependencies are installed",
+                      "Verify Node.js version compatibility",
+                      "Check for security vulnerabilities",
+                      "Update outdated packages",
+                      "Resolve dependency conflicts"
+                    ],
+                    "dependency_commands": [
+                      "npm ls --depth=0 (check installed packages)",
+                      "npm audit (security vulnerabilities)",
+                      "npm outdated (update recommendations)",
+                      "npm ci (clean install for CI/CD)"
+                    ]
+                  },
+                  {
+                    "solution": "Test Build Locally First",
+                    "local_testing": [
+                      "Run build command locally: npm run build",
+                      "Check for same errors in local environment",
+                      "Verify all environment variables are set",
+                      "Test on same Node.js version as deployment",
+                      "Ensure build artifacts are generated correctly"
+                    ],
+                    "local_vs_remote_differences": [
+                      "Different Node.js versions",
+                      "Missing environment variables",
+                      "Different build cache state",
+                      "Platform-specific dependencies",
+                      "Local file system differences"
+                    ]
+                  },
+                  {
+                    "solution": "Fix Common Build Issues",
+                    "typescript_fixes": [
+                      "Check for type definition files (@types/*)",
+                      "Fix strict type checking errors",
+                      "Add missing type annotations",
+                      "Update TypeScript configuration",
+                      "Resolve import path issues"
+                    ],
+                    "dependency_fixes": [
+                      "Clear npm cache: npm cache clean --force",
+                      "Delete node_modules and package-lock.json",
+                      "Fresh install: npm install",
+                      "Use exact versions in package.json",
+                      "Check for conflicting peer dependencies"
+                    ]
+                  }
+                ],
+                "prevention": [
+                  "Test builds locally before deployment",
+                  "Keep dependencies updated regularly",
+                  "Use specific package versions (avoid ^ and ~)",
+                  "Set up automated build testing",
+                  "Monitor build success rates",
+                  "Document build requirements and setup"
+                ],
+                "build_optimization": [
+                  "Use build caching when possible",
+                  "Minimize bundle size with code splitting",
+                  "Optimize images and assets",
+                  "Enable tree shaking for unused code",
+                  "Use efficient build tools and configurations",
+                  "Monitor build times and resource usage"
+                ]
               },
               {
                 "problem": "Environment variables not working",
-                "solution": "Verify variable names, check platform-specific formats, ensure proper encoding",
-                "prevention": "Document environment requirements and test configurations"
+                "symptoms": [
+                  "Application crashes due to missing config",
+                  "Features don't work as expected",
+                  "API calls fail with authentication errors",
+                  "Database connections fail",
+                  "Third-party integrations break"
+                ],
+                "visual_diagnosis": [
+                  "🔴 'Environment variable not found' errors",
+                  "🚫 API authentication failures",
+                  "📡 Database connection errors",
+                  "⚠️ Configuration warnings",
+                  "🔒 Missing secret values"
+                ],
+                "root_causes": [
+                  "Variables not set in deployment platform",
+                  "Incorrect variable names or values",
+                  "Platform-specific variable formats",
+                  "Variable scope issues",
+                  "Encoding or formatting problems"
+                ],
+                "solutions": [
+                  {
+                    "solution": "Verify Variable Configuration",
+                    "platform_checks": {
+                      "vercel": [
+                        "Go to Project Settings → Environment Variables",
+                        "Check variable names match code expectations",
+                        "Verify values are correctly entered",
+                        "Ensure proper environment scopes (Production, Preview, Development)",
+                        "Check for variable expansion syntax"
+                      ],
+                      "netlify": [
+                        "Go to Site Settings → Environment Variables",
+                        "Verify variable names and values",
+                        "Check deployment context (All Deployments, Production, Deploy Previews)",
+                        "Ensure variables are properly scoped",
+                        "Check for build command variable usage"
+                      ],
+                      "railway": [
+                        "Go to Project Settings → Variables",
+                        "Verify variable names and values",
+                        "Check environment selection (Production, Development)",
+                        "Ensure variables are properly referenced",
+                        "Check for variable interpolation"
+                      ]
+                    }
+                  },
+                  {
+                    "solution": "Check Variable Naming and Format",
+                    "common_issues": [
+                      "Variable names don't match code (API_KEY vs REACT_APP_API_KEY)",
+                      "Special characters in values need escaping",
+                      "Case sensitivity differences",
+                      "Platform-specific prefixes required",
+                      "URL encoding issues with special characters"
+                    ],
+                    "naming_conventions": [
+                      "REACT_APP_* prefix for client-side variables",
+                      "NEXT_PUBLIC_* prefix for Next.js public variables",
+                      "UPPER_CASE for all environment variables",
+                      "Consistent naming across all environments",
+                      "Document all required variables"
+                    ]
+                  },
+                  {
+                    "solution": "Test Variable Access in Code",
+                    "debugging_steps": [
+                      "Add console.log for variable values (remove in production)",
+                      "Check browser DevTools for client-side variables",
+                      "Verify server logs for server-side variables",
+                      "Test API endpoints that use variables",
+                      "Use environment variable inspection tools"
+                    ],
+                    "testing_code": [
+                      "console.log('API_URL:', process.env.REACT_APP_API_URL);",
+                      "console.log('NODE_ENV:', process.env.NODE_ENV);",
+                      "Check Network tab for API calls with variables"
+                    ]
+                  },
+                  {
+                    "solution": "Handle Missing Variables Gracefully",
+                    "fallback_strategies": [
+                      "Provide default values in code",
+                      "Use environment-specific configurations",
+                      "Implement feature flags for missing variables",
+                      "Add validation and error handling",
+                      "Create environment setup documentation"
+                    ],
+                    "code_patterns": [
+                      "const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';",
+                      "const isProduction = process.env.NODE_ENV === 'production';",
+                      "const featureEnabled = process.env.FEATURE_FLAG === 'true';"
+                    ]
+                  }
+                ],
+                "prevention": [
+                  "Document all required environment variables",
+                  "Use consistent naming conventions",
+                  "Test deployments with different environments",
+                  "Implement variable validation in code",
+                  "Create environment setup checklists",
+                  "Use environment-specific configuration files"
+                ],
+                "security_best_practices": [
+                  "Never commit secrets to version control",
+                  "Use different values for different environments",
+                  "Rotate secrets regularly",
+                  "Limit variable scope to necessary environments",
+                  "Monitor variable usage and access",
+                  "Use secret management services when possible"
+                ]
               }
             ]
           },
