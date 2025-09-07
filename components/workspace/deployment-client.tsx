@@ -20,7 +20,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
-  Github,
   Globe,
   Settings,
   RefreshCw,
@@ -47,7 +46,6 @@ import {
   Moon,
   Search,
   Filter,
-  History,
   Play,
   Pause,
   SkipForward,
@@ -1030,9 +1028,11 @@ export default function DeploymentClient() {
                 {selectedProject && (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="outline" size="sm" className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
-                        <Settings className="h-4 w-4" />
-                      </Button>
+                      <Link href={`/workspace/projects/${selectedProject.slug}`}>
+                        <Button variant="outline" size="sm" className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                      </Link>
                     </TooltipTrigger>
                     <TooltipContent className="bg-gray-700 border-gray-600 text-white">
                       <p>Project Settings</p>
@@ -1210,16 +1210,6 @@ export default function DeploymentClient() {
                     <SelectItem value="in_progress" className="text-gray-300 hover:bg-gray-600">In Progress</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Button variant="outline" size="sm" className="w-full sm:w-auto bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
-                  <History className="h-4 w-4 mr-2" />
-                  Deployment History
-                </Button>
-                <Button variant="outline" size="sm" className="w-full sm:w-auto bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Environments
-                </Button>
               </div>
             </div>
 
