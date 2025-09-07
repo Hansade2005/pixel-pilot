@@ -298,10 +298,13 @@ export default function BlogPostPage() {
                 Benefits
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {section.benefits.map((benefit: string, idx: number) => (
+                {(Array.isArray(section.benefits)
+                  ? section.benefits
+                  : section.benefits.split(', ')
+                ).map((benefit: string, idx: number) => (
                   <div key={idx} className="flex items-start space-x-3">
                     <Check className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
-                    <span className="text-gray-300">{benefit}</span>
+                    <span className="text-gray-300">{benefit.trim()}</span>
                   </div>
                 ))}
               </div>
@@ -541,9 +544,12 @@ export default function BlogPostPage() {
                       <div>
                         <h3 className="text-lg font-semibold text-white mb-3">Technologies</h3>
                         <div className="flex flex-wrap gap-2">
-                          {blogPost.content.project_overview.technologies.map((tech: string, idx: number) => (
+                          {(Array.isArray(blogPost.content.project_overview.technologies)
+                            ? blogPost.content.project_overview.technologies
+                            : blogPost.content.project_overview.technologies.split(', ')
+                          ).map((tech: string, idx: number) => (
                             <Badge key={idx} variant="secondary" className="bg-purple-500/20 text-purple-300">
-                              {tech}
+                              {tech.trim()}
                             </Badge>
                           ))}
                         </div>

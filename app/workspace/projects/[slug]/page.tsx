@@ -425,8 +425,24 @@ export default function ProjectPage() {
                   Back
                 </Button>
                 <div>
-                  <h1 className="text-3xl font-bold text-white">{project.name}</h1>
-                  <p className="text-gray-400">{project.description || 'No description'}</p>
+                  <h1 className="text-3xl font-bold text-white">
+                    <span className="block sm:hidden">
+                      {project.name?.slice(0, 3) ?? ''}
+                      {project.name && project.name.length > 3 ? '…' : ''}
+                    </span>
+                    <span className="hidden sm:inline">
+                      {project.name}
+                    </span>
+                  </h1>
+                  <p className="text-gray-400">
+                    <span className="block sm:hidden">
+                      {(project.description || 'No description')?.slice(0, 3)}
+                      {(project.description || 'No description').length > 3 ? '…' : ''}
+                    </span>
+                    <span className="hidden sm:inline">
+                      {project.description || 'No description'}
+                    </span>
+                  </p>
                 </div>
               </div>
               <div className="flex items-center space-x-2">

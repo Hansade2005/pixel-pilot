@@ -366,6 +366,22 @@ export default function LearnPage() {
       },
       lastActive: new Date().toISOString()
     }
+
+    // Check if course is completed
+    const course = courses.find(c => c.id === courseId)
+    if (course) {
+      const totalLessons = course.content?.modules?.reduce((total, module) =>
+        total + module.lessons.length, 0) || 0
+
+      const completedLessons = Object.values(updatedProgress.courseProgress[courseId] || {})
+        .reduce((total, module: any) => total + Object.values(module).filter(Boolean).length, 0)
+
+      if (completedLessons === totalLessons && !updatedProgress.completedCourses.includes(courseId)) {
+        updatedProgress.completedCourses = [...updatedProgress.completedCourses, courseId]
+        updatedProgress.certificates = [...updatedProgress.certificates, courseId]
+      }
+    }
+
     setUserProgress(updatedProgress)
   }
 

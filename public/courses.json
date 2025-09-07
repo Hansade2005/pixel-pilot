@@ -38,45 +38,140 @@
           {
             "id": "getting-started",
             "title": "Getting Started with Pixel Pilot",
-            "description": "Learn the basics of AI-powered development",
-            "duration": "2 hours",
+            "description": "Master the fundamentals of AI-powered development and establish a solid foundation",
+            "duration": "4 hours",
             "completed": false,
             "unlocked": true,
             "lessons": [
               {
                 "id": "welcome",
-                "title": "Welcome to Pixel Pilot",
-                "description": "Introduction to AI-powered development",
-                "duration": "15 min",
-                "type": "text",
+                "title": "Welcome to Pixel Pilot - Revolutionizing Development",
+                "description": "Comprehensive introduction to AI-powered development paradigm",
+                "duration": "25 min",
+                "type": "video",
                 "completed": false,
-                "content": "Welcome to Pixel Pilot! This course will guide you through the fundamentals of AI-powered development...",
-                "notes": "Take notes on the key concepts introduced in this lesson.",
+                "content": "## Welcome to the Future of Development\n\nPixel Pilot represents a paradigm shift in how we approach software development. This course will transform you from a traditional developer into an AI-augmented development expert.\n\n### What You'll Learn\n- The evolution of AI in software development\n- How Pixel Pilot accelerates development workflows\n- Real-world case studies of AI-powered applications\n- The future of development with AI assistance\n\n### Course Structure\nThis comprehensive program includes:\n- **5 Major Modules** covering all aspects of AI development\n- **Hands-on Projects** with real-world applications\n- **Industry Best Practices** from leading tech companies\n- **Certification** upon completion\n\n### Prerequisites\n- Basic computer literacy\n- No prior coding experience required\n- Curiosity and willingness to learn\n\n### Learning Outcomes\nBy the end of this course, you will:\n- Build AI-powered applications from scratch\n- Implement machine learning models in production\n- Deploy scalable applications with confidence\n- Join the next generation of AI developers",
+                "notes": "### Key Takeaways\n1. **AI-First Development**: Modern applications start with AI capabilities\n2. **Rapid Prototyping**: From idea to MVP in hours, not weeks\n3. **Scalable Architecture**: Build for millions from day one\n4. **Continuous Learning**: Stay ahead in the AI revolution\n\n### Important Concepts\n- **Large Language Models (LLMs)**: The backbone of AI assistance\n- **Prompt Engineering**: Crafting effective AI interactions\n- **API Integration**: Connecting AI services seamlessly\n- **Ethical AI**: Responsible development practices",
                 "examples": [
-                  "Example 1: Basic project setup",
-                  "Example 2: First AI interaction"
+                  "Example 1: Traditional vs AI-Powered Development Workflow",
+                  "Example 2: Real-world AI application case studies (Netflix, Spotify, Tesla)",
+                  "Example 3: Before/After productivity comparison",
+                  "Example 4: Industry adoption statistics and growth projections"
                 ],
                 "exercises": [
-                  "Exercise 1: Set up your development environment",
-                  "Exercise 2: Create your first Pixel Pilot project"
-                ]
+                  "Exercise 1: Write a 500-word reflection on how AI will impact your development career",
+                  "Exercise 2: Research and document 3 real-world AI applications in your industry",
+                  "Exercise 3: Set up your learning environment and development tools",
+                  "Exercise 4: Join Pixel Pilot community forums and introduce yourself"
+                ],
+                "videoUrl": "https://example.com/welcome-video",
+                "readingMaterials": [
+                  "Chapter 1: The AI Development Revolution (30 pages)",
+                  "Case Study: How AI Transformed Netflix's Recommendation System",
+                  "Research Paper: The Future of Software Development (2024)"
+                ],
+                "quiz": {
+                  "questions": [
+                    {
+                      "question": "What is the primary advantage of AI-powered development?",
+                      "options": ["Faster deployment", "Lower costs", "Better user experience", "All of the above"],
+                      "correct": 3,
+                      "explanation": "AI-powered development offers all these benefits and more"
+                    }
+                  ]
+                }
               },
               {
                 "id": "setup",
-                "title": "Setting Up Your Environment",
-                "description": "Get started with your first project",
-                "duration": "20 min",
-                "type": "text",
+                "title": "Setting Up Your Development Environment",
+                "description": "Configure your workspace for optimal AI development productivity",
+                "duration": "35 min",
+                "type": "interactive",
                 "completed": false,
-                "content": "Setting up your development environment is crucial for success...",
-                "notes": "Remember to install all required dependencies.",
+                "content": "## Development Environment Setup\n\nA properly configured development environment is crucial for efficient AI-powered development. This comprehensive guide will walk you through setting up everything you need.\n\n### System Requirements\n**Minimum Hardware:**\n- 8GB RAM (16GB recommended)\n- 4-core CPU (8-core recommended)\n- 50GB free storage\n- Stable internet connection\n\n**Supported Operating Systems:**\n- macOS 12.0+\n- Windows 10/11 (64-bit)\n- Ubuntu 20.04+ / CentOS 8+\n\n### Software Installation\n\n#### 1. Node.js and npm\n```bash\n# Install Node.js (Latest LTS)\ncurl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -\nsudo apt-get install -y nodejs\n\n# Verify installation\nnode --version\nnpm --version\n```\n\n#### 2. Git Version Control\n```bash\n# Install Git\ngit --version\n# If not installed:\nsudo apt-get install git\n\n# Configure Git\ngit config --global user.name \"Your Name\"\ngit config --global user.email \"your.email@example.com\"\n```\n\n#### 3. Code Editor (VS Code)\n- Download from https://code.visualstudio.com/\n- Essential extensions:\n  - ES7+ React/Redux/React-Native snippets\n  - Prettier - Code formatter\n  - ESLint\n  - GitLens\n  - Auto Rename Tag\n\n#### 4. Pixel Pilot CLI\n```bash\nnpm install -g @pixelpilot/cli\npixelpilot --version\n```\n\n### Environment Configuration\n\n#### API Keys Setup\n```bash\n# Create .env file\necho \"OPENAI_API_KEY=your_key_here\" > .env\necho \"PIXELPILOT_API_KEY=your_key_here\" >> .env\n```\n\n#### IDE Configuration\n- Theme: Dark mode for reduced eye strain\n- Font: Fira Code or JetBrains Mono (14pt)\n- Line numbers: Enabled\n- Auto-save: Enabled\n- Format on save: Enabled",
+                "notes": "### Best Practices\n1. **Version Control**: Always use Git for project management\n2. **Environment Variables**: Never commit API keys to repositories\n3. **Documentation**: Keep setup instructions updated\n4. **Backup**: Regular backups of your development environment\n\n### Troubleshooting Common Issues\n- **Node.js Installation Issues**: Use Node Version Manager (nvm)\n- **Permission Errors**: Avoid using sudo with npm install\n- **Port Conflicts**: Check for running processes on ports 3000, 8000\n- **Memory Issues**: Monitor RAM usage during development\n\n### Performance Optimization\n- Use SSD storage for faster file operations\n- Configure IDE for optimal performance\n- Keep Node.js and npm updated\n- Use package managers effectively (npm vs yarn vs pnpm)",
                 "examples": [
-                  "Example 1: Installing Node.js",
-                  "Example 2: Configuring your IDE"
+                  "Example 1: Complete development environment setup walkthrough",
+                  "Example 2: Troubleshooting guide for common installation issues",
+                  "Example 3: Performance optimization checklist",
+                  "Example 4: Multi-environment setup (development, staging, production)"
                 ],
                 "exercises": [
-                  "Exercise 1: Install development tools",
-                  "Exercise 2: Verify your setup"
+                  "Exercise 1: Install and configure Node.js, Git, and VS Code",
+                  "Exercise 2: Set up Pixel Pilot CLI and verify installation",
+                  "Exercise 3: Create a sample project and initialize Git repository",
+                  "Exercise 4: Configure environment variables and API keys securely",
+                  "Exercise 5: Optimize your IDE settings for maximum productivity"
+                ],
+                "resources": [
+                  "Download: Complete Environment Setup Checklist (PDF)",
+                  "Video: Step-by-step Installation Guide",
+                  "Template: .gitignore file for AI projects",
+                  "Script: Automated environment setup script"
+                ],
+                "practicalTasks": [
+                  {
+                    "title": "Environment Validation",
+                    "description": "Verify all components are working correctly",
+                    "steps": [
+                      "Check Node.js and npm versions",
+                      "Test Git configuration",
+                      "Verify VS Code extensions",
+                      "Test Pixel Pilot CLI",
+                      "Validate API key configuration"
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "first-project",
+                "title": "Your First AI-Powered Project",
+                "description": "Build and deploy your first AI application",
+                "duration": "45 min",
+                "type": "interactive",
+                "completed": false,
+                "content": "## Building Your First AI Application\n\nLet's create a practical AI-powered application from scratch. We'll build a smart task management system that uses AI to prioritize and categorize tasks.\n\n### Project Overview\n**Smart Task Manager** - An AI-powered task management application that:\n- Automatically categorizes tasks using natural language processing\n- Suggests optimal task priorities based on deadlines and importance\n- Generates task completion estimates using historical data\n- Provides intelligent reminders and scheduling\n\n### Step-by-Step Implementation\n\n#### Step 1: Project Initialization\n```bash\n# Create new Pixel Pilot project\npixelpilot create smart-task-manager\ncd smart-task-manager\n\n# Install dependencies\nnpm install\n\n# Start development server\nnpm run dev\n```\n\n#### Step 2: Basic Structure\n```jsx\n// src/App.jsx\nimport React, { useState } from 'react';\n\nfunction App() {\n  const [tasks, setTasks] = useState([]);\n  const [newTask, setNewTask] = useState('');\n\n  return (\n    <div className=\"app\">\n      <h1>Smart Task Manager</h1>\n      <TaskForm />\n      <TaskList />\n    </div>\n  );\n}\n\nexport default App;\n```\n\n#### Step 3: AI Integration\n```javascript\n// AI-powered task categorization\nimport { pixelpilot } from '@pixelpilot/ai';\n\nconst categorizeTask = async (taskText) => {\n  const response = await pixelpilot.analyze({\n    text: taskText,\n    task: 'categorize',\n    categories: ['work', 'personal', 'urgent', 'long-term']\n  });\n  \n  return response.category;\n};\n```\n\n#### Step 4: Smart Prioritization\n```javascript\n// AI-powered task prioritization\nconst prioritizeTask = async (task) => {\n  const priority = await pixelpilot.analyze({\n    text: task.description,\n    deadline: task.deadline,\n    task: 'prioritize'\n  });\n  \n  return priority.score;\n};\n```\n\n### Advanced Features\n\n#### Natural Language Processing\n- Task description analysis\n- Context understanding\n- Intent recognition\n\n#### Machine Learning Integration\n- Task completion prediction\n- User behavior analysis\n- Performance optimization\n\n#### Real-time AI Assistance\n- Instant task suggestions\n- Smart scheduling\n- Progress tracking",
+                "notes": "### Project Architecture\n1. **Frontend**: React with modern hooks\n2. **AI Layer**: Pixel Pilot AI services\n3. **Data Layer**: Local storage with sync capabilities\n4. **UX Layer**: Intuitive drag-and-drop interface\n\n### Best Practices Applied\n- **Component Composition**: Reusable, focused components\n- **State Management**: Efficient state updates\n- **Error Handling**: Graceful error recovery\n- **Performance**: Optimized re-renders\n- **Accessibility**: WCAG compliance\n\n### Deployment Considerations\n- **Build Optimization**: Code splitting and lazy loading\n- **CDN Integration**: Fast asset delivery\n- **Monitoring**: Error tracking and analytics\n- **Scalability**: Cloud-ready architecture",
+                "examples": [
+                  "Example 1: Complete Smart Task Manager application code",
+                  "Example 2: AI categorization logic walkthrough",
+                  "Example 3: Real-time AI suggestions implementation",
+                  "Example 4: Performance optimization techniques",
+                  "Example 5: User testing and feedback incorporation"
+                ],
+                "exercises": [
+                  "Exercise 1: Create project structure and basic components",
+                  "Exercise 2: Implement AI-powered task categorization",
+                  "Exercise 3: Add smart prioritization algorithm",
+                  "Exercise 4: Build user interface with drag-and-drop",
+                  "Exercise 5: Deploy application and test in production",
+                  "Exercise 6: Add user authentication and data persistence",
+                  "Exercise 7: Implement real-time notifications and reminders"
+                ],
+                "resources": [
+                  "Download: Complete project source code",
+                  "Guide: AI Integration Best Practices",
+                  "Template: Project documentation structure",
+                  "Video: Live coding session walkthrough"
+                ],
+                "assignments": [
+                  {
+                    "title": "Project Enhancement",
+                    "description": "Add advanced features to your task manager",
+                    "requirements": [
+                      "Implement user authentication",
+                      "Add data persistence (localStorage/cloud)",
+                      "Create task templates",
+                      "Add collaboration features",
+                      "Implement data export/import"
+                    ],
+                    "gradingCriteria": [
+                      "Functionality (40%)",
+                      "Code quality (30%)",
+                      "User experience (20%)",
+                      "Innovation (10%)"
+                    ]
+                  }
                 ]
               }
             ]
@@ -84,8 +179,8 @@
           {
             "id": "ai-chat-system",
             "title": "Mastering the AI Chat System",
-            "description": "Learn to communicate effectively with AI",
-            "duration": "3 hours",
+            "description": "Master advanced AI communication techniques and prompt engineering",
+            "duration": "6 hours",
             "completed": false,
             "unlocked": false,
             "lessons": [
@@ -109,20 +204,288 @@
               },
               {
                 "id": "effective-prompts",
-                "title": "Writing Effective Prompts",
-                "description": "How to get the best results from AI",
+                "title": "Advanced Prompt Engineering",
+                "description": "Master the art of crafting effective AI prompts",
+                "duration": "60 min",
+                "type": "interactive",
+                "completed": false,
+                "content": "## Advanced Prompt Engineering Techniques\n\nPrompt engineering is both an art and a science. Master these techniques to get consistently excellent results from AI systems.\n\n### Fundamental Principles\n\n#### 1. Clarity and Specificity\n**Bad Prompt:** \"Write code for a button\"\n\n**Good Prompt:** \"Create a React component for a primary action button that:\n- Uses Tailwind CSS for styling\n- Has hover and focus states\n- Supports loading states\n- Includes proper accessibility attributes\n- Follows the design system guidelines\n\nComponent should be reusable and well-documented.\"\n\n#### 2. Context Provision\nAlways provide relevant context:\n- **Technical Context**: Framework, language, architecture\n- **Business Context**: Use case, requirements, constraints\n- **User Context**: Target audience, experience level\n- **Project Context**: Existing codebase, patterns, conventions\n\n#### 3. Task Decomposition\nBreak complex tasks into manageable steps:\n- Design the product data structure\n- Create the main product component\n- Implement image gallery\n- Add product variants selector\n- Create reviews section\n- Add to cart functionality\n- Implement related products\n\n### Advanced Techniques\n\n#### Chain of Thought Prompting\nGuide the AI through step-by-step reasoning:\n\"Solve this step by step:\n1. Analyze the problem\n2. Break down requirements\n3. Design the solution\n4. Implement the code\n5. Test and validate\n\nProblem: Create a user authentication system...\"\n\n#### Few-Shot Learning\nProvide examples within the prompt:\n\"Generate React components like these examples:\n\nExample 1 - Button:\nconst Button = ({ children, variant }) => <button className={'btn btn-' + variant}>{children}</button>\n\nExample 2 - Input:\nconst Input = ({ type, placeholder }) => <input type={type} placeholder={placeholder} />\n\nNow create a Card component:\"\n\n### Industry-Specific Prompting\n\n#### Web Development\n\"As a senior React developer, create a modern, accessible, and performant component that handles [specific requirement]. Use:\n- TypeScript for type safety\n- React hooks for state management\n- Tailwind CSS for styling\n- Proper error handling\n- Loading states\n- Accessibility features\"\n\n#### Data Science\n\"As a data scientist, analyze this dataset and:\n1. Perform exploratory data analysis\n2. Identify key patterns and insights\n3. Build a predictive model\n4. Evaluate model performance\n5. Provide recommendations\n\nDataset: [dataset description]\"",
+                "notes": "### Prompt Engineering Best Practices\n\n#### 1. Structure and Format\n- **Clear Instructions**: Be explicit about requirements\n- **Logical Flow**: Organize information systematically\n- **Actionable Tasks**: Specify concrete deliverables\n- **Success Criteria**: Define what good output looks like\n\n#### 2. Context Management\n- **Relevant Information**: Include only necessary context\n- **Current State**: Reference existing codebase/project\n- **Constraints**: Specify limitations and requirements\n- **Goals**: Clearly state objectives and priorities\n\n#### 3. Error Prevention\n- **Edge Cases**: Anticipate potential issues\n- **Validation**: Include validation requirements\n- **Fallbacks**: Provide backup approaches\n- **Recovery**: Specify error handling procedures\n\n#### 4. Continuous Improvement\n- **Feedback Loop**: Collect and analyze results\n- **Pattern Recognition**: Identify successful patterns\n- **Template Creation**: Build reusable prompt templates\n- **Team Sharing**: Distribute effective prompts with team",
+                "examples": [
+                  "Example 1: Complete prompt engineering toolkit",
+                  "Example 2: Industry-specific prompt templates",
+                  "Example 3: A/B testing framework for prompts",
+                  "Example 4: Prompt optimization case studies",
+                  "Example 5: Advanced prompting techniques demonstration"
+                ],
+                "exercises": [
+                  "Exercise 1: Analyze and improve poorly written prompts",
+                  "Exercise 2: Create prompt templates for common development tasks",
+                  "Exercise 3: A/B test different prompting strategies",
+                  "Exercise 4: Build a prompt optimization system",
+                  "Exercise 5: Create role-based prompts for different scenarios",
+                  "Exercise 6: Develop a prompt library for your team",
+                  "Exercise 7: Measure and analyze prompt performance metrics"
+                ],
+                "resources": [
+                  "Download: Complete Prompt Engineering Guide (PDF)",
+                  "Template: Prompt Template Library",
+                  "Tool: Prompt Testing and Analysis Framework",
+                  "Case Study: Enterprise Prompt Optimization",
+                  "Video: Advanced Prompt Engineering Masterclass"
+                ],
+                "assignments": [
+                  {
+                    "title": "Prompt Engineering Challenge",
+                    "description": "Optimize prompts for a complex development task",
+                    "requirements": [
+                      "Choose a complex development task",
+                      "Create multiple prompt variations",
+                      "Test and compare results",
+                      "Document optimization process",
+                      "Create reusable templates",
+                      "Present findings and recommendations"
+                    ],
+                    "gradingCriteria": [
+                      "Prompt Quality (25%)",
+                      "Testing Methodology (25%)",
+                      "Analysis and Insights (25%)",
+                      "Documentation (15%)",
+                      "Practical Application (10%)"
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "ai-agents",
+                "title": "Building Custom AI Agents",
+                "description": "Create specialized AI agents for specific development tasks",
+                "duration": "50 min",
+                "type": "interactive",
+                "completed": false,
+                "content": "## Custom AI Agent Development\n\nAI agents are specialized AI systems designed to excel at specific tasks. Learn to build, deploy, and manage custom AI agents for development workflows.\n\n### Agent Architecture Fundamentals\n\n#### Core Components\n1. **Perception Layer**: Input processing and understanding\n2. **Reasoning Engine**: Decision making and problem solving\n3. **Action Layer**: Task execution and output generation\n4. **Learning System**: Continuous improvement and adaptation\n5. **Memory System**: Context preservation and knowledge retention\n\n### Agent Types\n\n#### Code Review Agent\n```javascript\nclass CodeReviewAgent {\n  constructor() {\n    this.specialization = 'code-review';\n    this.capabilities = [\n      'security-analysis',\n      'performance-optimization',\n      'code-quality-assessment',\n      'best-practices-compliance'\n    ];\n  }\n}\n```\n\n#### Testing Agent\n```javascript\nclass TestingAgent {\n  constructor() {\n    this.specialization = 'testing';\n    this.capabilities = [\n      'unit-test-generation',\n      'integration-test-creation',\n      'performance-test-design',\n      'test-coverage-analysis'\n    ];\n  }\n}\n```\n\n### Advanced Agent Features\n\n#### Multi-Agent Collaboration\n```javascript\nclass AgentOrchestrator {\n  constructor() {\n    this.agents = {\n      reviewer: new CodeReviewAgent(),\n      tester: new TestingAgent(),\n      documenter: new DocumentationAgent()\n    };\n  }\n}\n```\n\n#### Learning and Adaptation\n- **Feedback Integration**: Learn from user corrections\n- **Performance Tracking**: Monitor agent effectiveness\n- **Model Updates**: Continuous improvement through training\n- **Personalization**: Adapt to user preferences and patterns",
+                "notes": "### Agent Development Best Practices\n\n#### 1. Specialization Principle\n- **Focus**: Each agent should excel at specific tasks\n- **Scope**: Clearly define agent capabilities and limitations\n- **Boundaries**: Know when to delegate or seek human assistance\n\n#### 2. Modularity and Reusability\n- **Components**: Build reusable agent components\n- **APIs**: Well-defined interfaces for agent interaction\n- **Configuration**: Flexible configuration options\n- **Extensibility**: Easy to add new capabilities\n\n#### 3. Performance Optimization\n- **Caching**: Implement intelligent caching strategies\n- **Batching**: Process multiple requests efficiently\n- **Async Processing**: Handle long-running tasks asynchronously\n- **Resource Management**: Optimize memory and CPU usage\n\n#### 4. Error Handling and Recovery\n- **Graceful Degradation**: Continue operation with reduced functionality\n- **Retry Logic**: Automatic retry for transient failures\n- **Fallback Strategies**: Alternative approaches when primary methods fail\n- **User Communication**: Clear error messages and recovery instructions",
+                "examples": [
+                  "Example 1: Complete code review agent implementation",
+                  "Example 2: Multi-agent collaboration system",
+                  "Example 3: Agent performance monitoring dashboard",
+                  "Example 4: Custom agent development framework",
+                  "Example 5: Enterprise agent deployment and management"
+                ],
+                "exercises": [
+                  "Exercise 1: Build a specialized code review agent",
+                  "Exercise 2: Create a testing agent for unit test generation",
+                  "Exercise 3: Develop a documentation agent",
+                  "Exercise 4: Implement multi-agent collaboration",
+                  "Exercise 5: Add monitoring and analytics to agents",
+                  "Exercise 6: Deploy and manage agents in production",
+                  "Exercise 7: Create an agent marketplace interface"
+                ],
+                "resources": [
+                  "Download: Agent Development Framework",
+                  "Template: Agent Architecture Patterns",
+                  "Guide: Agent Deployment and Management",
+                  "Case Study: Enterprise Agent Implementation",
+                  "Video: Building Custom AI Agents Masterclass"
+                ],
+                "assignments": [
+                  {
+                    "title": "Custom Agent Development Project",
+                    "description": "Build and deploy a complete AI agent system",
+                    "requirements": [
+                      "Design agent architecture and capabilities",
+                      "Implement core agent functionality",
+                      "Add learning and adaptation features",
+                      "Create monitoring and management system",
+                      "Deploy agent to production environment",
+                      "Document agent usage and maintenance procedures"
+                    ],
+                    "gradingCriteria": [
+                      "Architecture Design (20%)",
+                      "Functionality Implementation (25%)",
+                      "Learning Features (15%)",
+                      "Monitoring System (15%)",
+                      "Deployment and Documentation (15%)",
+                      "Innovation and Creativity (10%)"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "building-first-app",
+            "title": "Building Your First AI-Powered Application",
+            "description": "Create production-ready AI applications with modern architecture",
+            "duration": "8 hours",
+            "completed": false,
+            "unlocked": false,
+            "lessons": [
+              {
+                "id": "project-planning",
+                "title": "AI Application Architecture & Planning",
+                "description": "Design scalable AI-powered applications from the ground up",
+                "duration": "75 min",
+                "type": "interactive",
+                "completed": false,
+                "content": "## AI-First Application Design\n\nDesigning AI-powered applications requires a fundamentally different approach than traditional software development. This comprehensive guide covers the essential principles and patterns.\n\n### AI Application Architecture Patterns\n\n#### 1. Microservices with AI Integration\n```javascript\n// AI Service Layer Architecture\nconst AIServiceLayer = {\n  // Natural Language Processing Service\n  nlpService: {\n    endpoint: '/api/nlp',\n    capabilities: ['sentiment-analysis', 'entity-extraction', 'intent-recognition'],\n    fallback: 'local-processing'\n  },\n  \n  // Machine Learning Service\n  mlService: {\n    endpoint: '/api/ml',\n    models: ['classification', 'regression', 'clustering'],\n    cache: 'redis',\n    monitoring: 'prometheus'\n  },\n  \n  // Recommendation Engine\n  recommendationService: {\n    endpoint: '/api/recommendations',\n    algorithm: 'collaborative-filtering',\n    dataSource: 'user-behavior',\n    personalization: true\n  }\n};\n```\n\n#### 2. Event-Driven AI Processing\n```javascript\n// Event-driven AI processing architecture\nconst AIEventProcessor = {\n  events: {\n    'user-interaction': handleUserInteraction,\n    'data-upload': processDataUpload,\n    'model-update': updateAIModel,\n    'prediction-request': generatePrediction\n  },\n  \n  async processEvent(eventType, data) {\n    const handler = this.events[eventType];\n    if (handler) {\n      const result = await handler(data);\n      await this.updateMetrics(eventType, result);\n      return result;\n    }\n  }\n};\n```\n\n### Advanced Features\n\n#### Intelligent Code Completion\n```javascript\n// Smart code suggestions\nconst getSmartSuggestions = async (code, cursorPosition) => {\n  const suggestions = await pixelpilot.code.complete({\n    code: code,\n    position: cursorPosition,\n    context: {\n      language: 'javascript',\n      framework: 'react',\n      project: 'web-app'\n    },\n    style: 'modern',\n    bestPractices: true\n  });\n  \n  return suggestions;\n};\n```\n\n#### Automated Code Review\n- **Security Analysis**: Vulnerability detection\n- **Performance Optimization**: Bottleneck identification\n- **Code Quality**: Best practices compliance\n- **Maintainability**: Technical debt assessment\n\n#### Real-time Debugging\n```javascript\n// AI-powered debugging\nconst debugCode = async (code, error) => {\n  const diagnosis = await pixelpilot.debug.analyze({\n    code: code,\n    error: error,\n    context: 'runtime',\n    suggestions: true,\n    fixes: true\n  });\n  \n  return {\n    diagnosis: diagnosis.problem,\n    suggestions: diagnosis.solutions,\n    fixes: diagnosis.codeFixes\n  };\n};\n```",
+                "notes": "### Advanced Architecture Considerations\n\n#### 1. AI Ethics and Bias Mitigation\n- **Fairness**: Ensure AI decisions don't discriminate\n- **Transparency**: Explain AI decision-making processes\n- **Accountability**: Track and audit AI actions\n- **Privacy**: Protect sensitive user data\n\n#### 2. Reliability and Resilience\n- **Fallback Systems**: Function without AI when needed\n- **Error Handling**: Graceful degradation strategies\n- **Monitoring**: Comprehensive AI performance tracking\n- **Recovery**: Automatic system recovery mechanisms\n\n#### 3. Cost Optimization\n- **Resource Management**: Optimize cloud resource usage\n- **Model Selection**: Balance accuracy vs computational cost\n- **Caching Strategies**: Cache expensive AI operations\n- **Usage Monitoring**: Track and optimize AI API costs\n\n#### 4. Security Considerations\n- **Data Protection**: Secure AI training and inference data\n- **Model Security**: Protect against adversarial attacks\n- **Access Control**: Fine-grained permission management\n- **Audit Trails**: Comprehensive activity tracking",
+                "examples": [
+                  "Example 1: Complete e-commerce personalization system architecture",
+                  "Example 2: Healthcare diagnostic assistant implementation",
+                  "Example 3: Real-time recommendation engine design",
+                  "Example 4: AI-powered content management system",
+                  "Example 5: Predictive analytics dashboard architecture",
+                  "Example 6: Multi-tenant AI SaaS platform design"
+                ],
+                "exercises": [
+                  "Exercise 1: Design architecture for an AI-powered learning management system",
+                  "Exercise 2: Create data flow diagrams for a recommendation engine",
+                  "Exercise 3: Plan scalability strategy for an AI chatbot platform",
+                  "Exercise 4: Design monitoring and alerting system for AI services",
+                  "Exercise 5: Create cost optimization strategy for AI infrastructure",
+                  "Exercise 6: Design security framework for AI-powered healthcare application",
+                  "Exercise 7: Plan deployment strategy for AI model updates"
+                ],
+                "resources": [
+                  "Download: AI Application Architecture Templates",
+                  "Guide: Scalable AI System Design Patterns",
+                  "Case Study: Netflix AI Architecture Evolution",
+                  "Template: AI System Requirements Specification",
+                  "Video: Building Scalable AI Applications Masterclass"
+                ],
+                "assignments": [
+                  {
+                    "title": "AI Application Architecture Design",
+                    "description": "Design a complete AI-powered application architecture",
+                    "requirements": [
+                      "Define application requirements and AI capabilities",
+                      "Design system architecture with all components",
+                      "Create data flow and processing diagrams",
+                      "Plan scalability and performance strategies",
+                      "Design security and monitoring frameworks",
+                      "Create cost optimization plan",
+                      "Document deployment and maintenance procedures"
+                    ],
+                    "gradingCriteria": [
+                      "Architecture Completeness (20%)",
+                      "AI Integration Design (25%)",
+                      "Scalability Planning (15%)",
+                      "Security Considerations (15%)",
+                      "Documentation Quality (15%)",
+                      "Innovation and Creativity (10%)"
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "basic-components",
+                "title": "Building Basic Components",
+                "description": "Create reusable UI components",
+                "duration": "40 min",
+                "type": "text",
+                "completed": false,
+                "content": "Components are the building blocks of modern web applications...",
+                "notes": "Focus on reusability and maintainability.",
+                "examples": [
+                  "Example 1: Button component",
+                  "Example 2: Form input component"
+                ],
+                "exercises": [
+                  "Exercise 1: Create a reusable button",
+                  "Exercise 2: Build a form component"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "ai-integration",
+            "title": "AI Integration and APIs",
+            "description": "Connect your app with AI services",
+            "duration": "3 hours",
+            "completed": false,
+            "unlocked": false,
+            "lessons": [
+              {
+                "id": "api-basics",
+                "title": "API Fundamentals",
+                "description": "Understanding REST APIs and HTTP",
                 "duration": "30 min",
                 "type": "text",
                 "completed": false,
-                "content": "Effective prompting is an art that improves with practice...",
-                "notes": "Be specific and provide context in your prompts.",
+                "content": "APIs allow different applications to communicate with each other...",
+                "notes": "Learn HTTP methods: GET, POST, PUT, DELETE.",
                 "examples": [
-                  "Example 1: Good vs bad prompts",
-                  "Example 2: Context-rich requests"
+                  "Example 1: Fetching data from an API",
+                  "Example 2: Sending data to a server"
                 ],
                 "exercises": [
-                  "Exercise 1: Rewrite poor prompts",
-                  "Exercise 2: Create detailed requests"
+                  "Exercise 1: Make a GET request",
+                  "Exercise 2: Create a POST request"
+                ]
+              },
+              {
+                "id": "ai-services",
+                "title": "Integrating AI Services",
+                "description": "Connect with AI APIs and services",
+                "duration": "35 min",
+                "type": "text",
+                "completed": false,
+                "content": "AI services provide powerful capabilities to enhance your applications...",
+                "notes": "Choose the right AI service for your needs.",
+                "examples": [
+                  "Example 1: Text analysis API",
+                  "Example 2: Image recognition service"
+                ],
+                "exercises": [
+                  "Exercise 1: Integrate a text analysis API",
+                  "Exercise 2: Add image processing"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "deployment-production",
+            "title": "Deployment and Production",
+            "description": "Deploy your AI app to production",
+            "duration": "2.5 hours",
+            "completed": false,
+            "unlocked": false,
+            "lessons": [
+              {
+                "id": "deployment-basics",
+                "title": "Deployment Fundamentals",
+                "description": "Understanding deployment concepts",
+                "duration": "25 min",
+                "type": "text",
+                "completed": false,
+                "content": "Deployment is the process of making your application available to users...",
+                "notes": "Consider scalability and performance.",
+                "examples": [
+                  "Example 1: Static site deployment",
+                  "Example 2: Server deployment"
+                ],
+                "exercises": [
+                  "Exercise 1: Deploy to Vercel",
+                  "Exercise 2: Set up a production build"
+                ]
+              },
+              {
+                "id": "monitoring-maintenance",
+                "title": "Monitoring and Maintenance",
+                "description": "Keep your app running smoothly",
+                "duration": "30 min",
+                "type": "text",
+                "completed": false,
+                "content": "Monitoring your application ensures it performs well and stays reliable...",
+                "notes": "Set up alerts for critical issues.",
+                "examples": [
+                  "Example 1: Error tracking",
+                  "Example 2: Performance monitoring"
+                ],
+                "exercises": [
+                  "Exercise 1: Set up error tracking",
+                  "Exercise 2: Monitor app performance"
                 ]
               }
             ]
@@ -193,47 +556,305 @@
         ],
         "modules": [
           {
-            "id": "react-basics",
-            "title": "React Fundamentals",
-            "description": "Learn the core concepts of React",
-            "duration": "4 hours",
+            "id": "react-core-concepts",
+            "title": "React Core Concepts & Architecture",
+            "description": "Master the fundamental principles of React development and component architecture",
+            "duration": "6 hours",
             "completed": false,
             "unlocked": true,
             "lessons": [
               {
-                "id": "jsx-syntax",
-                "title": "JSX and Component Basics",
-                "description": "Understanding JSX syntax and component structure",
-                "duration": "20 min",
-                "type": "text",
+                "id": "jsx-architecture",
+                "title": "JSX & Component Architecture Deep Dive",
+                "description": "Comprehensive understanding of JSX syntax, component design patterns, and React architecture",
+                "duration": "45 min",
+                "type": "interactive",
                 "completed": false,
-                "content": "JSX is a syntax extension for JavaScript that allows you to write HTML-like code...",
-                "notes": "JSX must be compiled to JavaScript before execution.",
+                "content": "## JSX & Component Architecture\n\nJSX represents a paradigm shift in how we think about building user interfaces. This comprehensive lesson explores the deep connection between JSX and React's component architecture.\n\n### JSX Fundamentals\n\n#### What is JSX?\nJSX is a syntax extension for JavaScript that allows you to write HTML-like code within JavaScript. It's not magic - it's compiled to regular JavaScript function calls.\n\n#### Compilation Process\n```javascript\n// What you write:\nconst element = <h1>Hello, World!</h1>;\n\n// What JSX compiles to:\nconst element = React.createElement('h1', null, 'Hello, World!');\n```\n\n### Component Design Patterns\n\n#### 1. Functional Components\n```javascript\nfunction Welcome(props) {\n  return <h1>Hello, {props.name}!</h1>;\n}\n```\n\n#### 2. Class Components (Legacy)\n```javascript\nclass Welcome extends React.Component {\n  render() {\n    return <h1>Hello, {this.props.name}!</h1>;\n  }\n}\n```\n\n#### 3. Higher-Order Components (HOC)\n```javascript\nfunction withAuth(WrappedComponent) {\n  return class extends React.Component {\n    render() {\n      if (this.props.isAuthenticated) {\n        return <WrappedComponent {...this.props} />;\n      }\n      return <LoginPrompt />;\n    }\n  };\n}\n```\n\n### Advanced JSX Features\n\n#### Conditional Rendering\n```javascript\nfunction Greeting(props) {\n  const isLoggedIn = props.isLoggedIn;\n  if (isLoggedIn) {\n    return <h1>Welcome back!</h1>;\n  }\n  return <h1>Please sign up.</h1>;\n}\n\n// Or using ternary operator:\nreturn (\n  <div>\n    {isLoggedIn ? <h1>Welcome back!</h1> : <h1>Please sign up.</h1>}\n  </div>\n);\n```\n\n#### Lists and Keys\n```javascript\nfunction NumberList(props) {\n  const numbers = props.numbers;\n  const listItems = numbers.map((number) =>\n    <li key={number.toString()}>{number}</li>\n  );\n  return <ul>{listItems}</ul>;\n}\n```\n\n#### Event Handling\n```javascript\nfunction ActionButton() {\n  function handleClick(e) {\n    e.preventDefault();\n    console.log('The button was clicked.');\n  }\n\n  return (\n    <button onClick={handleClick}>\n      Click me\n    </button>\n  );\n}\n```\n\n### Component Composition Patterns\n\n#### Container vs Presentational Components\n```javascript\n// Presentational Component (dumb)\nfunction UserProfile(props) {\n  return (\n    <div>\n      <h1>{props.name}</h1>\n      <p>{props.bio}</p>\n    </div>\n  );\n}\n\n// Container Component (smart)\nfunction UserProfileContainer() {\n  const [user, setUser] = useState(null);\n  \n  useEffect(() => {\n    fetchUser().then(setUser);\n  }, []);\n  \n  return <UserProfile {...user} />;\n}\n```\n\n#### Render Props Pattern\n```javascript\nfunction MouseTracker({ render }) {\n  const [position, setPosition] = useState({ x: 0, y: 0 });\n\n  const handleMouseMove = (event) => {\n    setPosition({ x: event.clientX, y: event.clientY });\n  };\n\n  return (\n    <div onMouseMove={handleMouseMove}>\n      {render(position)}\n    </div>\n  );\n}\n\n// Usage:\n<MouseTracker render={({ x, y }) => (\n  <h1>The mouse position is ({x}, {y})</h1>\n)} />\n```",
+                "notes": "### Best Practices for JSX & Components\n\n#### 1. Component Naming\n- Use PascalCase for component names\n- File names should match component names\n- Use descriptive, specific names\n\n#### 2. Props Handling\n- Always validate props with PropTypes or TypeScript\n- Provide sensible defaults for optional props\n- Avoid mutating props directly\n- Use destructuring for cleaner code\n\n#### 3. JSX Best Practices\n- Always wrap multiline JSX in parentheses\n- Use self-closing tags for elements without children\n- Keep JSX readable with proper indentation\n- Extract complex JSX into separate components\n\n#### 4. Performance Considerations\n- Use React.memo for expensive components\n- Implement shouldComponentUpdate when necessary\n- Avoid inline functions in render\n- Use keys properly for list rendering\n\n### Common JSX Patterns\n\n#### 1. Conditional Classes\n```javascript\nfunction Button({ variant, disabled }) {\n  const className = [\n    'btn',\n    variant && `btn-${variant}`,\n    disabled && 'btn-disabled'\n  ].filter(Boolean).join(' ');\n  \n  return <button className={className} disabled={disabled} />;\n}\n```\n\n#### 2. Dynamic Attributes\n```javascript\nfunction Input({ type = 'text', ...props }) {\n  const inputProps = {\n    type,\n    ...props,\n    className: `input input-${type}`\n  };\n  \n  return <input {...inputProps} />;\n}\n```\n\n#### 3. Children as Functions\n```javascript\nfunction DataProvider({ children, data }) {\n  return children(data);\n}\n\n// Usage:\n<DataProvider data={userData}>\n  {(data) => <UserProfile user={data} />}\n</DataProvider>\n```",
                 "examples": [
-                  "Example 1: Basic JSX syntax",
-                  "Example 2: Component structure"
+                  "Example 1: Complete e-commerce product card component with variants",
+                  "Example 2: Social media feed with infinite scroll and real-time updates",
+                  "Example 3: Complex form with validation and error handling",
+                  "Example 4: Dashboard with multiple data visualizations",
+                  "Example 5: Real-time chat application with message threading"
                 ],
                 "exercises": [
-                  "Exercise 1: Create your first JSX component",
-                  "Exercise 2: Practice JSX expressions"
+                  "Exercise 1: Build a reusable Card component with different variants",
+                  "Exercise 2: Create a complex form with validation using controlled components",
+                  "Exercise 3: Implement a data table with sorting, filtering, and pagination",
+                  "Exercise 4: Build a modal system with portal rendering",
+                  "Exercise 5: Create a responsive navigation component with mobile menu",
+                  "Exercise 6: Implement a toast notification system",
+                  "Exercise 7: Build a reusable data fetching hook with error handling"
+                ],
+                "resources": [
+                  "React Official Documentation: JSX in Depth",
+                  "Advanced React Patterns by Kent C. Dodds",
+                  "React Component Patterns by Michael Chan",
+                  "JavaScript Info: JSX",
+                  "MDN: Template Literals"
+                ],
+                "assignments": [
+                  {
+                    "title": "Component Library Challenge",
+                    "description": "Build a comprehensive component library for a design system",
+                    "requirements": [
+                      "Create 5 reusable UI components",
+                      "Implement proper TypeScript types",
+                      "Add comprehensive documentation",
+                      "Include unit tests",
+                      "Follow accessibility guidelines",
+                      "Create Storybook documentation"
+                    ],
+                    "gradingCriteria": [
+                      "Code Quality (25%)",
+                      "TypeScript Implementation (20%)",
+                      "Accessibility (15%)",
+                      "Documentation (15%)",
+                      "Testing (10%)",
+                      "Design System Consistency (15%)"
+                    ]
+                  }
                 ]
               },
               {
-                "id": "state-props",
-                "title": "State and Props",
-                "description": "Managing component state and passing data",
+                "id": "state-management-advanced",
+                "title": "Advanced State Management & Data Flow",
+                "description": "Master complex state management patterns and data flow in React applications",
+                "duration": "60 min",
+                "type": "interactive",
+                "completed": false,
+                "content": "## Advanced State Management Patterns\n\nState management in React applications can become complex as your app grows. This comprehensive lesson covers advanced patterns for managing state effectively.\n\n### Local State vs Global State\n\n#### When to Use Local State\n- Component-specific data\n- Temporary UI state\n- Form input values\n- Component lifecycle data\n\n#### When to Use Global State\n- User authentication status\n- Application settings\n- Cached API data\n- Multi-component shared state\n\n### Advanced useState Patterns\n\n#### 1. State as an Object\n```javascript\nfunction UserProfile() {\n  const [user, setUser] = useState({\n    name: '',\n    email: '',\n    preferences: {}\n  });\n\n  const updateUser = (updates) => {\n    setUser(prevUser => ({\n      ...prevUser,\n      ...updates\n    }));\n  };\n\n  return (\n    <div>\n      <input\n        value={user.name}\n        onChange={(e) => updateUser({ name: e.target.value })}\n      />\n    </div>\n  );\n}\n```\n\n#### 2. State with Complex Logic\n```javascript\nfunction useCustomState(initialValue) {\n  const [value, setValue] = useState(initialValue);\n\n  const increment = useCallback(() => {\n    setValue(prev => prev + 1);\n  }, []);\n\n  const decrement = useCallback(() => {\n    setValue(prev => prev - 1);\n  }, []);\n\n  const reset = useCallback(() => {\n    setValue(initialValue);\n  }, [initialValue]);\n\n  return { value, increment, decrement, reset };\n}\n```\n\n### useReducer for Complex State\n\n#### Basic useReducer\n```javascript\nfunction counterReducer(state, action) {\n  switch (action.type) {\n    case 'INCREMENT':\n      return { count: state.count + 1 };\n    case 'DECREMENT':\n      return { count: state.count - 1 };\n    case 'RESET':\n      return { count: 0 };\n    default:\n      return state;\n  }\n}\n\nfunction Counter() {\n  const [state, dispatch] = useReducer(counterReducer, { count: 0 });\n\n  return (\n    <div>\n      <p>Count: {state.count}</p>\n      <button onClick={() => dispatch({ type: 'INCREMENT' })}>+</button>\n      <button onClick={() => dispatch({ type: 'DECREMENT' })}>-</button>\n      <button onClick={() => dispatch({ type: 'RESET' })}>Reset</button>\n    </div>\n  );\n}\n```\n\n#### Complex State with useReducer\n```javascript\nconst todoReducer = (state, action) => {\n  switch (action.type) {\n    case 'ADD_TODO':\n      return {\n        ...state,\n        todos: [...state.todos, {\n          id: Date.now(),\n          text: action.payload,\n          completed: false\n        }]\n      };\n    case 'TOGGLE_TODO':\n      return {\n        ...state,\n        todos: state.todos.map(todo =>\n          todo.id === action.payload\n            ? { ...todo, completed: !todo.completed }\n            : todo\n        )\n      };\n    case 'DELETE_TODO':\n      return {\n        ...state,\n        todos: state.todos.filter(todo => todo.id !== action.payload)\n      };\n    case 'FILTER_TODOS':\n      return {\n        ...state,\n        filter: action.payload\n      };\n    default:\n      return state;\n  }\n};\n```\n\n### Context API for Global State\n\n#### Creating Context\n```javascript\nconst ThemeContext = createContext({\n  theme: 'light',\n  toggleTheme: () => {}\n});\n\nexport function ThemeProvider({ children }) {\n  const [theme, setTheme] = useState('light');\n\n  const toggleTheme = useCallback(() => {\n    setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');\n  }, []);\n\n  const value = {\n    theme,\n    toggleTheme\n  };\n\n  return (\n    <ThemeContext.Provider value={value}>\n      {children}\n    </ThemeContext.Provider>\n  );\n}\n```\n\n#### Using Context\n```javascript\nfunction ThemedButton() {\n  const { theme, toggleTheme } = useContext(ThemeContext);\n\n  return (\n    <button\n      className={`btn btn-${theme}`}\n      onClick={toggleTheme}\n    >\n      Toggle Theme\n    </button>\n  );\n}\n```\n\n### Custom Hooks for State Management\n\n#### Data Fetching Hook\n```javascript\nfunction useApi(endpoint) {\n  const [data, setData] = useState(null);\n  const [loading, setLoading] = useState(true);\n  const [error, setError] = useState(null);\n\n  useEffect(() => {\n    let isMounted = true;\n\n    const fetchData = async () => {\n      try {\n        setLoading(true);\n        const response = await fetch(endpoint);\n        const result = await response.json();\n        \n        if (isMounted) {\n          setData(result);\n          setError(null);\n        }\n      } catch (err) {\n        if (isMounted) {\n          setError(err.message);\n          setData(null);\n        }\n      } finally {\n        if (isMounted) {\n          setLoading(false);\n        }\n      }\n    };\n\n    fetchData();\n\n    return () => {\n      isMounted = false;\n    };\n  }, [endpoint]);\n\n  return { data, loading, error, refetch: () => fetchData() };\n}\n```\n\n#### Form State Hook\n```javascript\nfunction useForm(initialValues, validate) {\n  const [values, setValues] = useState(initialValues);\n  const [errors, setErrors] = useState({});\n  const [touched, setTouched] = useState({});\n\n  const handleChange = useCallback((name, value) => {\n    setValues(prev => ({ ...prev, [name]: value }));\n    \n    if (touched[name]) {\n      const validationErrors = validate({ ...values, [name]: value });\n      setErrors(validationErrors);\n    }\n  }, [values, touched, validate]);\n\n  const handleBlur = useCallback((name) => {\n    setTouched(prev => ({ ...prev, [name]: true }));\n    const validationErrors = validate(values);\n    setErrors(validationErrors);\n  }, [values, validate]);\n\n  const reset = useCallback(() => {\n    setValues(initialValues);\n    setErrors({});\n    setTouched({});\n  }, [initialValues]);\n\n  return {\n    values,\n    errors,\n    touched,\n    handleChange,\n    handleBlur,\n    reset,\n    isValid: Object.keys(errors).length === 0\n  };\n}\n```",
+                "notes": "### State Management Best Practices\n\n#### 1. State Colocation\n- Keep state as close as possible to where it's used\n- Lift state up only when necessary\n- Use local state for component-specific data\n\n#### 2. State Updates\n- Always use functional updates for state based on previous state\n- Avoid direct state mutations\n- Batch state updates when possible\n- Use useCallback for event handlers\n\n#### 3. Performance Optimization\n- Use useMemo for expensive computations\n- Use useCallback for functions passed as props\n- Implement proper dependency arrays\n- Avoid unnecessary re-renders\n\n#### 4. State Persistence\n- Use localStorage for client-side persistence\n- Consider server state with libraries like React Query\n- Implement proper loading and error states\n- Handle offline scenarios gracefully\n\n### Common State Management Patterns\n\n#### 1. Lifting State Up\n```javascript\nfunction ParentComponent() {\n  const [sharedState, setSharedState] = useState(initialValue);\n\n  return (\n    <div>\n      <ChildA state={sharedState} onStateChange={setSharedState} />\n      <ChildB state={sharedState} onStateChange={setSharedState} />\n    </div>\n  );\n}\n```\n\n#### 2. State Reducer Pattern\n```javascript\nconst complexStateReducer = (state, action) => {\n  switch (action.type) {\n    case 'UPDATE_FIELD':\n      return {\n        ...state,\n        [action.field]: action.value\n      };\n    case 'ADD_ITEM':\n      return {\n        ...state,\n        items: [...state.items, action.item]\n      };\n    case 'REMOVE_ITEM':\n      return {\n        ...state,\n        items: state.items.filter(item => item.id !== action.id)\n      };\n    default:\n      return state;\n  }\n};\n```\n\n#### 3. Compound Components\n```javascript\nfunction Tabs({ children }) {\n  const [activeTab, setActiveTab] = useState(0);\n\n  return React.Children.map(children, (child, index) =>\n    React.cloneElement(child, {\n      isActive: index === activeTab,\n      onClick: () => setActiveTab(index)\n    })\n  );\n}\n\nfunction Tab({ isActive, onClick, children }) {\n  return (\n    <button\n      className={isActive ? 'active' : ''}\n      onClick={onClick}\n    >\n      {children}\n    </button>\n  );\n}\n\n// Usage:\n<Tabs>\n  <Tab>Tab 1</Tab>\n  <Tab>Tab 2</Tab>\n</Tabs>\n```",
+                "examples": [
+                  "Example 1: Complete task management app with complex state",
+                  "Example 2: Real-time chat application with multiple state sources",
+                  "Example 3: E-commerce cart with inventory management",
+                  "Example 4: Multi-step form with validation and progress tracking",
+                  "Example 5: Social media dashboard with real-time data"
+                ],
+                "exercises": [
+                  "Exercise 1: Build a complex form with validation using useReducer",
+                  "Exercise 2: Create a global state management system with Context",
+                  "Exercise 3: Implement a data fetching hook with caching",
+                  "Exercise 4: Build a multi-step wizard with state persistence",
+                  "Exercise 5: Create a real-time collaborative editor",
+                  "Exercise 6: Implement undo/redo functionality",
+                  "Exercise 7: Build a state management library from scratch"
+                ],
+                "resources": [
+                  "React Official Docs: State and Lifecycle",
+                  "useReducer documentation",
+                  "Context API Guide",
+                  "Advanced React Patterns",
+                  "JavaScript Info: Closures and Scope"
+                ],
+                "assignments": [
+                  {
+                    "title": "State Management System Implementation",
+                    "description": "Build a comprehensive state management solution for a complex application",
+                    "requirements": [
+                      "Implement multiple state management patterns",
+                      "Create custom hooks for common state operations",
+                      "Build a context-based global state system",
+                      "Add state persistence and synchronization",
+                      "Implement proper error handling and loading states",
+                      "Create comprehensive documentation and tests"
+                    ],
+                    "gradingCriteria": [
+                      "Architecture Design (25%)",
+                      "Functionality Implementation (25%)",
+                      "Performance Optimization (15%)",
+                      "Error Handling (10%)",
+                      "Testing and Documentation (15%)",
+                      "Code Quality (10%)"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "react-hooks",
+            "title": "React Hooks Deep Dive",
+            "description": "Master modern React hooks",
+            "duration": "5 hours",
+            "completed": false,
+            "unlocked": false,
+            "lessons": [
+              {
+                "id": "useeffect-lifecycle",
+                "title": "useEffect and Component Lifecycle",
+                "description": "Managing side effects and lifecycle methods",
+                "duration": "35 min",
+                "type": "text",
+                "completed": false,
+                "content": "useEffect allows you to perform side effects in functional components...",
+                "notes": "Remember to clean up subscriptions and timers.",
+                "examples": [
+                  "Example 1: Data fetching with useEffect",
+                  "Example 2: Event listener cleanup"
+                ],
+                "exercises": [
+                  "Exercise 1: Fetch data on component mount",
+                  "Exercise 2: Set up and clean up event listeners"
+                ]
+              },
+              {
+                "id": "custom-hooks",
+                "title": "Custom Hooks",
+                "description": "Creating reusable hook logic",
+                "duration": "30 min",
+                "type": "text",
+                "completed": false,
+                "content": "Custom hooks allow you to extract component logic into reusable functions...",
+                "notes": "Custom hooks must start with 'use'.",
+                "examples": [
+                  "Example 1: useLocalStorage hook",
+                  "Example 2: useFetch hook"
+                ],
+                "exercises": [
+                  "Exercise 1: Create a custom hook",
+                  "Exercise 2: Refactor component to use custom hook"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "nextjs-routing",
+            "title": "Next.js Routing and Pages",
+            "description": "Master Next.js routing system",
+            "duration": "3.5 hours",
+            "completed": false,
+            "unlocked": false,
+            "lessons": [
+              {
+                "id": "pages-router",
+                "title": "Pages Router",
+                "description": "Understanding Next.js file-based routing",
                 "duration": "25 min",
                 "type": "text",
                 "completed": false,
-                "content": "State and props are fundamental concepts in React...",
-                "notes": "State is mutable, props are immutable.",
+                "content": "Next.js uses file-based routing where each file in the pages directory becomes a route...",
+                "notes": "Dynamic routes use square brackets.",
                 "examples": [
-                  "Example 1: Using useState hook",
-                  "Example 2: Passing props to components"
+                  "Example 1: Static route",
+                  "Example 2: Dynamic route with [id]"
                 ],
                 "exercises": [
-                  "Exercise 1: Create a stateful component",
-                  "Exercise 2: Pass data between components"
+                  "Exercise 1: Create a new page",
+                  "Exercise 2: Build a dynamic route"
+                ]
+              },
+              {
+                "id": "navigation-linking",
+                "title": "Navigation and Linking",
+                "description": "Client-side navigation in Next.js",
+                "duration": "30 min",
+                "type": "text",
+                "completed": false,
+                "content": "Next.js provides Link component for client-side navigation...",
+                "notes": "Use Link for internal navigation, regular <a> for external.",
+                "examples": [
+                  "Example 1: Basic Link usage",
+                  "Example 2: Programmatic navigation"
+                ],
+                "exercises": [
+                  "Exercise 1: Create navigation menu",
+                  "Exercise 2: Implement breadcrumbs"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "data-fetching",
+            "title": "Data Fetching Patterns",
+            "description": "Server-side and client-side data fetching",
+            "duration": "4 hours",
+            "completed": false,
+            "unlocked": false,
+            "lessons": [
+              {
+                "id": "ssr-ssg",
+                "title": "SSR vs SSG vs ISR",
+                "description": "Understanding Next.js rendering strategies",
+                "duration": "35 min",
+                "type": "text",
+                "completed": false,
+                "content": "Next.js offers different rendering strategies for optimal performance...",
+                "notes": "Choose the right strategy based on your data requirements.",
+                "examples": [
+                  "Example 1: Static generation",
+                  "Example 2: Server-side rendering"
+                ],
+                "exercises": [
+                  "Exercise 1: Implement getStaticProps",
+                  "Exercise 2: Use getServerSideProps"
+                ]
+              },
+              {
+                "id": "api-routes",
+                "title": "API Routes",
+                "description": "Building API endpoints in Next.js",
+                "duration": "40 min",
+                "type": "text",
+                "completed": false,
+                "content": "Next.js allows you to create API routes using the pages/api directory...",
+                "notes": "API routes run on the server, not in the browser.",
+                "examples": [
+                  "Example 1: Simple API endpoint",
+                  "Example 2: CRUD operations"
+                ],
+                "exercises": [
+                  "Exercise 1: Create a REST API",
+                  "Exercise 2: Handle form submissions"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "deployment-optimization",
+            "title": "Deployment and Optimization",
+            "description": "Deploy and optimize Next.js applications",
+            "duration": "3 hours",
+            "completed": false,
+            "unlocked": false,
+            "lessons": [
+              {
+                "id": "build-deployment",
+                "title": "Build and Deployment",
+                "description": "Preparing your app for production",
+                "duration": "30 min",
+                "type": "text",
+                "completed": false,
+                "content": "Next.js provides optimized production builds...",
+                "notes": "Use environment variables for sensitive data.",
+                "examples": [
+                  "Example 1: Vercel deployment",
+                  "Example 2: Custom server deployment"
+                ],
+                "exercises": [
+                  "Exercise 1: Deploy to Vercel",
+                  "Exercise 2: Set up environment variables"
+                ]
+              },
+              {
+                "id": "performance-optimization",
+                "title": "Performance Optimization",
+                "description": "Optimize your Next.js app performance",
+                "duration": "35 min",
+                "type": "text",
+                "completed": false,
+                "content": "Performance is crucial for user experience...",
+                "notes": "Use Next.js built-in optimization features.",
+                "examples": [
+                  "Example 1: Image optimization",
+                  "Example 2: Code splitting"
+                ],
+                "exercises": [
+                  "Exercise 1: Optimize images",
+                  "Exercise 2: Implement lazy loading"
                 ]
               }
             ]
@@ -297,29 +918,268 @@
         ],
         "modules": [
           {
-            "id": "python-basics",
-            "title": "Python Programming Basics",
-            "description": "Learn Python fundamentals",
-            "duration": "6 hours",
+            "id": "python-fundamentals",
+            "title": "Python Programming Fundamentals",
+            "description": "Master Python syntax, data structures, and programming paradigms",
+            "duration": "8 hours",
             "completed": false,
             "unlocked": true,
             "lessons": [
               {
-                "id": "variables-data-types",
-                "title": "Variables and Data Types",
-                "description": "Understanding Python data types and variables",
-                "duration": "30 min",
-                "type": "text",
+                "id": "python-syntax-variables",
+                "title": "Python Syntax, Variables & Data Types",
+                "description": "Comprehensive understanding of Python syntax, variable management, and built-in data types",
+                "duration": "60 min",
+                "type": "interactive",
                 "completed": false,
-                "content": "Python is a dynamically typed language with several built-in data types...",
-                "notes": "Python variables don't need explicit type declarations.",
+                "content": "## Python Syntax & Variable Management\n\nPython's elegant syntax and dynamic typing system form the foundation of modern data science. This comprehensive lesson covers everything from basic syntax to advanced variable management techniques.\n\n### Python Syntax Fundamentals\n\n#### Variable Declaration & Assignment\n```python\n# Basic variable assignment\nname = \"Alice\"\nage = 30\nheight = 5.8\nis_student = True\n\n# Multiple assignment\nx, y, z = 1, 2, 3\n\n# Chained assignment\na = b = c = 0\n\n# Swapping variables\na, b = b, a\n```\n\n#### Dynamic Typing & Type Inference\n```python\n# Python infers types automatically\nvariable = 42          # int\nvariable = 42.0        # float\nvariable = \"42\"        # str\nvariable = True        # bool\n\n# Type checking\nprint(type(variable))   # <class 'int'>\nprint(isinstance(variable, int))  # True\n```\n\n### Built-in Data Types\n\n#### Numeric Types\n```python\n# Integers\ninteger_num = 42\nlarge_num = 1_000_000  # Underscore for readability\nbinary = 0b1010       # Binary\noctal = 0o52          # Octal\nhexadecimal = 0x2A    # Hexadecimal\n\n# Floating Point\nfloat_num = 3.14159\nscientific = 1.23e-4  # Scientific notation\ncomplex_num = 3 + 4j # Complex numbers\n\n# Type conversions\nint_to_float = float(42)\nfloat_to_int = int(3.7)  # Truncates, not rounds\nstring_to_int = int(\"123\")\n```\n\n#### String Operations\n```python\n# String creation\nsingle_quotes = 'Hello World'\ndouble_quotes = \"Hello World\"\ntriple_quotes = \"\"\"Multi-line\nstring\"\"\"\n\n# String methods\ntext = \"Hello, World!\"\nprint(text.upper())        # 'HELLO, WORLD!'\nprint(text.lower())        # 'hello, world!'\nprint(text.title())        # 'Hello, World!'\nprint(text.split(','))     # ['Hello', ' World!']\nprint(text.replace('World', 'Python'))  # 'Hello, Python!'\n\n# String formatting\nname = \"Alice\"\nage = 30\n\n# f-strings (Python 3.6+)\nprint(f\"{name} is {age} years old\")\n\n# format() method\nprint(\"{} is {} years old\".format(name, age))\n\n# % formatting\nprint(\"%s is %d years old\" % (name, age))\n```",
+                "notes": "### Python Variable Best Practices\n\n#### 1. Naming Conventions\n- Use descriptive, meaningful names\n- Follow PEP 8 style guide\n- Use snake_case for variables and functions\n- Use UPPER_CASE for constants\n- Avoid single-letter names (except in loops)\n\n#### 2. Type Safety\n- Use type hints for better code documentation\n- Leverage static type checkers like mypy\n- Consider gradual typing adoption\n- Document complex type relationships\n\n#### 3. Memory Efficiency\n- Be aware of object references vs copies\n- Use appropriate data structures for your use case\n- Consider memory usage in large datasets\n- Implement proper cleanup for resources\n\n#### 4. Scope Management\n- Minimize global variables\n- Use local scope when possible\n- Understand closure behavior\n- Avoid variable shadowing\n\n### Common Python Idioms\n\n#### 1. Truth Value Testing\n```python\n# Instead of:\nif len(my_list) > 0:\n    # do something\n\n# Use:\nif my_list:\n    # do something\n\n# But be careful with falsy values:\nif my_list is not None:  # More explicit\n    # do something\n```\n\n#### 2. Multiple Assignment\n```python\n# Unpacking\nx, y, z = coordinates\n\n# Extended unpacking\na, *rest, b = [1, 2, 3, 4, 5]\nprint(rest)  # [2, 3, 4]\n\n# Swapping\nx, y = y, x\n```",
                 "examples": [
-                  "Example 1: Integer and float variables",
-                  "Example 2: String manipulation"
+                  "Example 1: Complete data type manipulation script with all Python types",
+                  "Example 2: Advanced string processing pipeline for text data",
+                  "Example 3: Memory-efficient data processing for large datasets",
+                  "Example 4: Type-safe function implementations with comprehensive type hints",
+                  "Example 5: Performance optimization techniques for data processing"
                 ],
                 "exercises": [
-                  "Exercise 1: Create different variable types",
-                  "Exercise 2: Practice string operations"
+                  "Exercise 1: Implement a type-safe data validation system",
+                  "Exercise 2: Build a memory-efficient data processing pipeline",
+                  "Exercise 3: Create a comprehensive string manipulation library",
+                  "Exercise 4: Implement advanced variable scoping patterns",
+                  "Exercise 5: Build a performance monitoring system for Python code",
+                  "Exercise 6: Create a custom context manager for resource management",
+                  "Exercise 7: Implement efficient algorithms for large data processing"
+                ],
+                "resources": [
+                  "Python Official Documentation: Data Types",
+                  "PEP 8 Style Guide",
+                  "Real Python: Python Data Types",
+                  "Python Type Checking Guide",
+                  "Memory Management in Python"
+                ],
+                "assignments": [
+                  {
+                    "title": "Python Data Processing Library",
+                    "description": "Build a comprehensive data processing library with proper typing",
+                    "requirements": [
+                      "Implement type-safe data structures",
+                      "Create efficient data processing functions",
+                      "Add comprehensive error handling",
+                      "Include performance optimizations",
+                      "Provide detailed documentation",
+                      "Write unit tests with high coverage"
+                    ],
+                    "gradingCriteria": [
+                      "Type Safety (20%)",
+                      "Functionality (25%)",
+                      "Performance (20%)",
+                      "Documentation (15%)",
+                      "Testing (10%)",
+                      "Code Quality (10%)"
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "control-structures",
+                "title": "Control Structures",
+                "description": "Learn loops and conditional statements",
+                "duration": "35 min",
+                "type": "text",
+                "completed": false,
+                "content": "Control structures allow you to control the flow of your program...",
+                "notes": "Indentation is crucial in Python for control structures.",
+                "examples": [
+                  "Example 1: if-elif-else statements",
+                  "Example 2: for and while loops"
+                ],
+                "exercises": [
+                  "Exercise 1: Write conditional logic",
+                  "Exercise 2: Implement loops"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "data-structures",
+            "title": "Data Structures and Algorithms",
+            "description": "Master Python data structures",
+            "duration": "7 hours",
+            "completed": false,
+            "unlocked": false,
+            "lessons": [
+              {
+                "id": "lists-tuples",
+                "title": "Lists and Tuples",
+                "description": "Working with Python sequences",
+                "duration": "40 min",
+                "type": "text",
+                "completed": false,
+                "content": "Lists and tuples are fundamental data structures in Python...",
+                "notes": "Lists are mutable, tuples are immutable.",
+                "examples": [
+                  "Example 1: List operations",
+                  "Example 2: Tuple unpacking"
+                ],
+                "exercises": [
+                  "Exercise 1: Manipulate lists",
+                  "Exercise 2: Work with tuples"
+                ]
+              },
+              {
+                "id": "dictionaries-sets",
+                "title": "Dictionaries and Sets",
+                "description": "Advanced data structures",
+                "duration": "45 min",
+                "type": "text",
+                "completed": false,
+                "content": "Dictionaries and sets provide efficient data storage and retrieval...",
+                "notes": "Dictionaries use key-value pairs, sets store unique elements.",
+                "examples": [
+                  "Example 1: Dictionary operations",
+                  "Example 2: Set operations"
+                ],
+                "exercises": [
+                  "Exercise 1: Create and manipulate dictionaries",
+                  "Exercise 2: Use sets for unique data"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "pandas-fundamentals",
+            "title": "Pandas for Data Manipulation",
+            "description": "Learn data manipulation with Pandas",
+            "duration": "8 hours",
+            "completed": false,
+            "unlocked": false,
+            "lessons": [
+              {
+                "id": "pandas-series",
+                "title": "Pandas Series and DataFrames",
+                "description": "Introduction to Pandas data structures",
+                "duration": "45 min",
+                "type": "text",
+                "completed": false,
+                "content": "Pandas provides powerful data structures for data analysis...",
+                "notes": "Series is 1D, DataFrame is 2D.",
+                "examples": [
+                  "Example 1: Creating Series",
+                  "Example 2: DataFrame operations"
+                ],
+                "exercises": [
+                  "Exercise 1: Create Pandas Series",
+                  "Exercise 2: Work with DataFrames"
+                ]
+              },
+              {
+                "id": "data-cleaning",
+                "title": "Data Cleaning and Preprocessing",
+                "description": "Clean and prepare data for analysis",
+                "duration": "50 min",
+                "type": "text",
+                "completed": false,
+                "content": "Data cleaning is crucial for accurate analysis...",
+                "notes": "Handle missing values and outliers appropriately.",
+                "examples": [
+                  "Example 1: Handling missing data",
+                  "Example 2: Data transformation"
+                ],
+                "exercises": [
+                  "Exercise 1: Clean missing data",
+                  "Exercise 2: Transform data types"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "data-visualization",
+            "title": "Data Visualization with Matplotlib",
+            "description": "Create compelling data visualizations",
+            "duration": "6 hours",
+            "completed": false,
+            "unlocked": false,
+            "lessons": [
+              {
+                "id": "matplotlib-basics",
+                "title": "Matplotlib Fundamentals",
+                "description": "Basic plotting with Matplotlib",
+                "duration": "35 min",
+                "type": "text",
+                "completed": false,
+                "content": "Matplotlib is the foundation for data visualization in Python...",
+                "notes": "Understand the figure and axes objects.",
+                "examples": [
+                  "Example 1: Line plots",
+                  "Example 2: Bar charts"
+                ],
+                "exercises": [
+                  "Exercise 1: Create basic plots",
+                  "Exercise 2: Customize plot appearance"
+                ]
+              },
+              {
+                "id": "advanced-visualization",
+                "title": "Advanced Visualization Techniques",
+                "description": "Create complex visualizations",
+                "duration": "40 min",
+                "type": "text",
+                "completed": false,
+                "content": "Advanced visualization techniques help uncover insights...",
+                "notes": "Choose the right visualization for your data.",
+                "examples": [
+                  "Example 1: Scatter plots",
+                  "Example 2: Heatmaps"
+                ],
+                "exercises": [
+                  "Exercise 1: Create scatter plots",
+                  "Exercise 2: Build complex visualizations"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "machine-learning-intro",
+            "title": "Introduction to Machine Learning",
+            "description": "Basic machine learning concepts",
+            "duration": "9 hours",
+            "completed": false,
+            "unlocked": false,
+            "lessons": [
+              {
+                "id": "ml-concepts",
+                "title": "Machine Learning Concepts",
+                "description": "Understanding ML fundamentals",
+                "duration": "45 min",
+                "type": "text",
+                "completed": false,
+                "content": "Machine learning is a subset of artificial intelligence...",
+                "notes": "Focus on supervised vs unsupervised learning.",
+                "examples": [
+                  "Example 1: Classification problems",
+                  "Example 2: Regression problems"
+                ],
+                "exercises": [
+                  "Exercise 1: Identify ML problem types",
+                  "Exercise 2: Choose appropriate algorithms"
+                ]
+              },
+              {
+                "id": "scikit-learn",
+                "title": "Scikit-learn for ML",
+                "description": "Implement ML algorithms with scikit-learn",
+                "duration": "50 min",
+                "type": "text",
+                "completed": false,
+                "content": "Scikit-learn provides efficient tools for machine learning...",
+                "notes": "Follow the standard ML workflow.",
+                "examples": [
+                  "Example 1: Linear regression",
+                  "Example 2: Decision trees"
+                ],
+                "exercises": [
+                  "Exercise 1: Train a model",
+                  "Exercise 2: Evaluate model performance"
                 ]
               }
             ]
@@ -383,29 +1243,68 @@
         ],
         "modules": [
           {
-            "id": "design-principles",
-            "title": "Design Principles",
-            "description": "Learn fundamental design principles",
-            "duration": "3 hours",
+            "id": "design-fundamentals",
+            "title": "Design Fundamentals & Visual Principles",
+            "description": "Master core design principles, color theory, typography, and visual hierarchy",
+            "duration": "6 hours",
             "completed": false,
             "unlocked": true,
             "lessons": [
               {
-                "id": "color-theory",
-                "title": "Color Theory and Psychology",
-                "description": "Understanding color in design",
-                "duration": "25 min",
-                "type": "text",
+                "id": "color-theory-psychology",
+                "title": "Color Theory & Psychological Impact",
+                "description": "Master color theory, psychology, and strategic color application in digital design",
+                "duration": "60 min",
+                "type": "interactive",
                 "completed": false,
-                "content": "Color theory is fundamental to effective visual communication...",
-                "notes": "Colors evoke emotions and influence user behavior.",
+                "content": "## Color Theory & Psychological Design\n\nColor is the most powerful tool in a designer's arsenal. Understanding color theory and psychology allows you to create designs that not only look beautiful but also evoke specific emotions and drive user behavior.\n\n### Color Theory Fundamentals\n\n#### The Color Wheel & Color Relationships\n```css\n/* Primary Colors - Cannot be created by mixing other colors */\n.primary-red { color: #FF0000; }      /* Red */\n.primary-blue { color: #0000FF; }    /* Blue */\n.primary-yellow { color: #FFFF00; }  /* Yellow */\n\n/* Secondary Colors - Created by mixing primary colors */\n.secondary-green { color: #00FF00; } /* Blue + Yellow */\n.secondary-orange { color: #FFA500; } /* Red + Yellow */\n.secondary-purple { color: #800080; } /* Red + Blue */\n```\n\n#### Color Harmony Systems\n\n**1. Complementary Colors**\n```css\n/* Colors opposite each other on the color wheel */\n.complementary {\n  background: linear-gradient(45deg, #FF6B6B, #4ECDC4);\n  /* Red and Teal - High contrast, energetic */\n}\n\n/* Usage: Call-to-action buttons, alerts, important notifications */\n.cta-button {\n  background: #FF6B6B;\n  color: #4ECDC4;\n  border: 2px solid #4ECDC4;\n}\n```\n\n**2. Analogous Colors**\n```css\n/* Colors adjacent on the color wheel */\n.analogous {\n  background: linear-gradient(to right,\n    #FF6B6B, /* Red */\n    #FFA500, /* Orange */\n    #FFFF00  /* Yellow */\n  );\n}\n\n/* Usage: Natural, harmonious designs, food industry */\n```\n\n**3. Triadic Colors**\n```css\n/* Three colors equally spaced on the color wheel */\n.triadic {\n  background: linear-gradient(120deg,\n    #FF6B6B, /* Red */\n    #4ECDC4, /* Teal */\n    #45B7D1  /* Blue */\n  );\n}\n\n/* Usage: Vibrant, playful designs, creative industries */\n```\n\n### Color Psychology & User Experience\n\n#### Emotional Color Associations\n```javascript\n// Color Psychology Mapping\nconst colorPsychology = {\n  red: {\n    emotions: ['passion', 'energy', 'urgency'],\n    associations: ['love', 'danger', 'power'],\n    usage: ['call-to-action', 'warnings', 'food'],\n    hex: '#FF6B6B'\n  },\n  \n  blue: {\n    emotions: ['trust', 'calm', 'reliability'],\n    associations: ['security', 'peace', 'professionalism'],\n    usage: ['corporate', 'healthcare', 'finance'],\n    hex: '#4ECDC4'\n  },\n  \n  green: {\n    emotions: ['growth', 'harmony', 'freshness'],\n    associations: ['nature', 'money', 'health'],\n    usage: ['environment', 'finance', 'wellness'],\n    hex: '#45B7D1'\n  },\n  \n  yellow: {\n    emotions: ['optimism', 'creativity', 'attention'],\n    associations: ['sunshine', 'caution', 'happiness'],\n    usage: ['children', 'warnings', 'energy'],\n    hex: '#FFA500'\n  }\n};\n```\n\n#### Cultural Color Considerations\n```javascript\n// Cultural Color Interpretations\nconst culturalColors = {\n  white: {\n    western: 'purity, cleanliness',\n    eastern: 'death, mourning',\n    middleEast: 'purity, peace'\n  },\n  \n  red: {\n    china: 'good fortune, joy',\n    western: 'danger, passion',\n    india: 'purity, marriage',\n    japan: 'anger, danger'\n  },\n  \n  green: {\n    islam: 'paradise, peace',\n    western: 'nature, growth',\n    ireland: 'national identity'\n  }\n};\n```\n\n### Practical Color Application\n\n#### Color Contrast & Accessibility\n```css\n/* WCAG AA Compliant Color Combinations */\n.accessible-text {\n  /* Normal text: 4.5:1 contrast ratio */\n  color: #333333; /* Dark gray on white */\n  background: #FFFFFF;\n}\n\n.accessible-button {\n  /* Large text: 3:1 contrast ratio */\n  background: #0066CC; /* Blue */\n  color: #FFFFFF; /* White text */\n  border: 2px solid #004499;\n}\n\n/* Color Blind Friendly Palettes */\n.colorblind-safe {\n  background: #FFFFFF;\n  color: #000000;\n}\n\n.colorblind-safe-accent {\n  background: #0072B2; /* Blue */\n  color: #FFFFFF;\n}\n```\n\n#### Color in UI Components\n```css\n/* Button Variants with Semantic Colors */\n.btn-primary {\n  background: #007BFF;\n  color: white;\n  border: 1px solid #007BFF;\n}\n\n.btn-secondary {\n  background: #6C757D;\n  color: white;\n  border: 1px solid #6C757D;\n}\n\n.btn-success {\n  background: #28A745;\n  color: white;\n  border: 1px solid #28A745;\n}\n\n.btn-danger {\n  background: #DC3545;\n  color: white;\n  border: 1px solid #DC3545;\n}\n\n.btn-warning {\n  background: #FFC107;\n  color: #212529;\n  border: 1px solid #FFC107;\n}\n```\n\n### Advanced Color Techniques\n\n#### Color Temperature & Mood\n```css\n/* Warm vs Cool Color Schemes */\n.warm-scheme {\n  /* Warm colors: Reds, oranges, yellows */\n  background: linear-gradient(135deg, #FF6B6B, #FFA500, #FFFF00);\n}\n\n.cool-scheme {\n  /* Cool colors: Blues, greens, purples */\n  background: linear-gradient(135deg, #4ECDC4, #45B7D1, #9B59B6);\n}\n\n.neutral-scheme {\n  /* Neutral grays and beiges */\n  background: linear-gradient(135deg, #F8F9FA, #E9ECEF, #DEE2E6);\n}\n```\n\n#### Dynamic Color Systems\n```javascript\n// Dynamic color generation based on user preferences\nconst dynamicColors = {\n  generatePalette: (baseColor, mood) => {\n    const palettes = {\n      energetic: [baseColor, lighten(baseColor, 20), darken(baseColor, 20)],\n      calm: [baseColor, desaturate(baseColor, 30), lighten(baseColor, 40)],\n      professional: [baseColor, '#FFFFFF', '#F8F9FA']\n    };\n    return palettes[mood] || [baseColor];\n  },\n  \n  applyTheme: (theme) => {\n    document.documentElement.style.setProperty('--primary-color', theme.primary);\n    document.documentElement.style.setProperty('--secondary-color', theme.secondary);\n    document.documentElement.style.setProperty('--accent-color', theme.accent);\n  }\n};\n```\n\n### Color Management Tools & Systems\n\n#### Design Tokens\n```javascript\n// Design Token System\nconst designTokens = {\n  colors: {\n    primary: {\n      50: '#EFF6FF',\n      100: '#DBEAFE',\n      500: '#3B82F6',\n      600: '#2563EB',\n      900: '#1E3A8A'\n    },\n    \n    semantic: {\n      success: '#10B981',\n      warning: '#F59E0B',\n      error: '#EF4444',\n      info: '#3B82F6'\n    }\n  },\n  \n  spacing: {\n    1: '0.25rem',\n    2: '0.5rem',\n    4: '1rem',\n    8: '2rem'\n  }\n};\n```\n\n#### Color Accessibility Tools\n```javascript\n// Color Contrast Checker\nconst contrastChecker = {\n  calculateRatio: (color1, color2) => {\n    const l1 = getLuminance(color1);\n    const l2 = getLuminance(color2);\n    const ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);\n    return Math.round(ratio * 100) / 100;\n  },\n  \n  isAccessible: (ratio, size) => {\n    const thresholds = {\n      normal: 4.5,\n      large: 3.0\n    };\n    return ratio >= thresholds[size];\n  }\n};\n```\n\n### Real-World Color Strategy\n\n#### Brand Color Implementation\n```css\n/* Consistent brand color usage */\n.brand-colors {\n  --brand-primary: #FF6B6B;\n  --brand-secondary: #4ECDC4;\n  --brand-accent: #45B7D1;\n  \n  --text-on-primary: #FFFFFF;\n  --text-on-secondary: #FFFFFF;\n  --text-on-light: #333333;\n}\n\n/* Usage across components */\n.header {\n  background: var(--brand-primary);\n  color: var(--text-on-primary);\n}\n\n.button-primary {\n  background: var(--brand-primary);\n  color: var(--text-on-primary);\n}\n\n.link-accent {\n  color: var(--brand-accent);\n}\n```\n\n#### A/B Testing Color Variations\n```javascript\n// Color A/B testing framework\nconst colorTesting = {\n  variations: {\n    A: { primary: '#FF6B6B', secondary: '#4ECDC4' },\n    B: { primary: '#3B82F6', secondary: '#10B981' },\n    C: { primary: '#8B5CF6', secondary: '#F59E0B' }\n  },\n  \n  assignVariation: (userId) => {\n    const hash = simpleHash(userId);\n    const variation = Object.keys(this.variations)[hash % 3];\n    return variation;\n  },\n  \n  trackConversion: (variation, action) => {\n    analytics.track('color_test', {\n      variation: variation,\n      action: action,\n      timestamp: Date.now()\n    });\n  }\n};\n```",
+                "notes": "### Color Theory Best Practices\n\n#### 1. Color Accessibility Standards\n- **WCAG AA**: 4.5:1 contrast ratio for normal text\n- **WCAG AAA**: 7:1 contrast ratio for enhanced accessibility\n- **Color Blind Considerations**: Avoid red/green combinations\n- **High Contrast Mode**: Support system preferences\n\n#### 2. Color Consistency\n- **Design Systems**: Maintain consistent color palettes\n- **Brand Guidelines**: Follow established brand colors\n- **Component Libraries**: Standardize color usage across components\n- **Theme Support**: Light/dark mode compatibility\n\n#### 3. Performance Considerations\n- **CSS Custom Properties**: Efficient color management\n- **Color Calculations**: Minimize runtime color computations\n- **Image Optimization**: Compress color-heavy assets\n- **Caching**: Cache color calculations and palettes\n\n#### 4. Cultural Sensitivity\n- **International Audiences**: Research color meanings in target markets\n- **Inclusive Design**: Consider diverse user backgrounds\n- **Contextual Appropriateness**: Match colors to content and purpose\n- **A/B Testing**: Validate color choices with real users\n\n### Advanced Color Techniques\n\n#### 1. Color Harmonies\n- **Monochromatic**: Variations of a single hue\n- **Analogous**: Adjacent colors on the color wheel\n- **Complementary**: Opposite colors for maximum contrast\n- **Split-Complementary**: Base color + two adjacent to its complement\n- **Triadic**: Three equally spaced colors\n- **Tetradic**: Four colors forming a rectangle on the color wheel\n\n#### 2. Color Psychology Applications\n- **Trust & Security**: Blue tones for financial services\n- **Energy & Action**: Red tones for CTAs and alerts\n- **Growth & Health**: Green tones for wellness and environment\n- **Creativity & Innovation**: Purple and orange combinations\n- **Calm & Reliability**: Cool blue and gray palettes\n\n#### 3. Color in User Experience\n- **Visual Hierarchy**: Use color to guide attention\n- **Status Indication**: Colors for success, warning, error states\n- **Interactive Elements**: Hover and focus state colors\n- **Brand Recognition**: Consistent color application across touchpoints\n\n### Color Management Workflow\n\n#### 1. Research & Planning\n- **Target Audience Analysis**: Understand user preferences and demographics\n- **Competitor Analysis**: Research industry color standards\n- **Brand Alignment**: Ensure colors match brand personality\n- **Accessibility Audit**: Test color combinations for compliance\n\n#### 2. Design & Implementation\n- **Color Palette Creation**: Primary, secondary, and accent colors\n- **Design Token System**: Consistent color application across platforms\n- **Component Styling**: Systematic color usage in UI components\n- **Theme Development**: Light and dark mode implementations\n\n#### 3. Testing & Optimization\n- **User Testing**: Validate color choices with target users\n- **A/B Testing**: Test color variations for performance impact\n- **Analytics Tracking**: Monitor user engagement with color choices\n- **Iterative Refinement**: Continuously improve color strategy\n\n### Tools & Resources\n\n#### Color Design Tools\n- **Adobe Color**: Professional color wheel and palette generation\n- **Coolors**: AI-powered color palette generator\n- **Color Hunt**: Curated color palette collections\n- **Material Color Tool**: Google's material design color system\n- **Contrast Checker**: WebAIM contrast ratio analyzer\n\n#### Color Accessibility Resources\n- **WCAG Guidelines**: Web Content Accessibility Guidelines\n- **Color Blind Web**: Resources for color blind design\n- **Stark Plugin**: Contrast checking for design tools\n- **Color Oracle**: Color blindness simulator\n\n#### Color Psychology Research\n- **Color Matters**: Research on color psychology\n- **Pantone Color Institute**: Industry color trends and insights\n- **Color Association of the United States**: Color meaning studies\n- **Journal of Color Research**: Academic research on color perception",
                 "examples": [
-                  "Example 1: Color wheel basics",
-                  "Example 2: Color psychology in branding"
+                  "Example 1: Complete brand color palette with accessibility compliance",
+                  "Example 2: A/B testing framework for color variations",
+                  "Example 3: Dynamic color theme system implementation",
+                  "Example 4: Cultural color adaptation for global audiences",
+                  "Example 5: Color psychology application in e-commerce design"
                 ],
                 "exercises": [
-                  "Exercise 1: Create a color palette",
-                  "Exercise 2: Analyze color usage in apps"
+                  "Exercise 1: Create an accessible color palette for a healthcare application",
+                  "Exercise 2: Design color schemes for different industries (finance, food, tech)",
+                  "Exercise 3: Implement a dynamic color theme system",
+                  "Exercise 4: Conduct color accessibility audit for existing websites",
+                  "Exercise 5: Create culturally appropriate color schemes for global markets",
+                  "Exercise 6: Build a color contrast testing tool",
+                  "Exercise 7: Design A/B tests for color optimization"
+                ],
+                "resources": [
+                  "Adobe Color: Professional Color Tools",
+                  "Coolors: AI-Powered Palette Generator",
+                  "WCAG Color Contrast Guidelines",
+                  "Color Psychology Research Papers",
+                  "Material Design Color System",
+                  "Pantone Color Trends Report"
+                ],
+                "assignments": [
+                  {
+                    "title": "Brand Color System Design",
+                    "description": "Create a comprehensive color system for a brand with accessibility and cultural considerations",
+                    "requirements": [
+                      "Research target audience and industry color standards",
+                      "Create primary, secondary, and accent color palettes",
+                      "Ensure WCAG AA accessibility compliance",
+                      "Design light and dark mode variants",
+                      "Create design tokens and usage guidelines",
+                      "Document color psychology rationale",
+                      "Provide implementation examples in CSS and design tools"
+                    ],
+                    "gradingCriteria": [
+                      "Color Theory Application (20%)",
+                      "Accessibility Compliance (25%)",
+                      "Brand Alignment (15%)",
+                      "Documentation Quality (15%)",
+                      "Implementation Examples (15%)",
+                      "Innovation & Creativity (10%)"
+                    ]
+                  }
                 ]
               }
             ]
@@ -470,28 +1369,67 @@
         "modules": [
           {
             "id": "react-native-basics",
-            "title": "React Native Fundamentals",
-            "description": "Learn React Native basics",
-            "duration": "5 hours",
+            "title": "Mobile Development Core Concepts",
+            "description": "Master mobile development fundamentals, React Native architecture, and cross-platform development",
+            "duration": "8 hours",
             "completed": false,
             "unlocked": true,
             "lessons": [
               {
-                "id": "components-layout",
-                "title": "Components and Layout",
-                "description": "Understanding React Native components",
-                "duration": "35 min",
-                "type": "text",
+                "id": "mobile-architecture",
+                "title": "Mobile Architecture & Platform Fundamentals",
+                "description": "Comprehensive understanding of mobile platforms, architectures, and development approaches",
+                "duration": "75 min",
+                "type": "interactive",
                 "completed": false,
-                "content": "React Native uses components similar to React for web...",
-                "notes": "Mobile layout uses Flexbox, not CSS Grid.",
+                "content": "## Mobile Development Ecosystem\n\nMobile development has evolved from native-only approaches to sophisticated cross-platform solutions. Understanding the mobile ecosystem is crucial for building successful applications that reach users across all platforms.\n\n### Platform Architecture Overview\n\n#### iOS Architecture Layers\n```swift\n// iOS Architecture Stack\n┌─────────────────────────────────┐\n│         Cocoa Touch Layer       │ ← UIKit, Foundation\n├─────────────────────────────────┤\n│          Media Layer            │ ← Core Graphics, Core Animation\n├─────────────────────────────────┤\n│         Core Services           │ ← Core Foundation, Core Data\n├─────────────────────────────────┤\n│        Core OS Layer            │ ← Kernel, Drivers, Security\n└─────────────────────────────────┘\n```\n\n#### Android Architecture Components\n```kotlin\n// Android Architecture Components\nclass UserRepository {\n    private val userDao = UserDatabase.getDatabase(context).userDao()\n    private val webservice = Retrofit.Builder()\n        .baseUrl(\"https://api.example.com\")\n        .build()\n        .create(UserService::class.java)\n\n    // Repository with offline-first approach\n    suspend fun getUser(userId: String): User {\n        return try {\n            // Try network first\n            val user = webservice.getUser(userId)\n            userDao.insert(user)\n            user\n        } catch (e: Exception) {\n            // Fallback to local data\n            userDao.getUser(userId)\n        }\n    }\n}\n```",
+                "notes": "### Mobile Development Best Practices\n\n#### 1. Performance Optimization\n- **Image Optimization**: Use appropriate image sizes and formats\n- **List Virtualization**: Use FlatList with proper keyExtractor\n- **Memoization**: Use React.memo and useMemo for expensive operations\n- **Bundle Splitting**: Code splitting for faster initial load\n- **Memory Management**: Proper cleanup of event listeners and timers\n\n#### 2. Platform-Specific Considerations\n- **iOS vs Android Differences**: Handle platform-specific APIs gracefully\n- **Safe Area**: Account for notches, home indicators, and status bars\n- **Permissions**: Handle runtime permissions properly\n- **Background Processing**: Platform-specific background task handling\n\n#### 3. User Experience Patterns\n- **Pull to Refresh**: Implement swipe-down refresh gestures\n- **Infinite Scroll**: Load more content as user scrolls\n- **Offline Support**: Handle network connectivity gracefully\n- **Push Notifications**: Implement local and remote notifications\n- **Haptic Feedback**: Use device vibration for user feedback",
                 "examples": [
-                  "Example 1: Basic View and Text components",
-                  "Example 2: Flexbox layout in mobile"
+                  "Example 1: Complete authentication flow with secure storage",
+                  "Example 2: Real-time chat application with offline support",
+                  "Example 3: E-commerce app with payment integration",
+                  "Example 4: Social media app with camera and media processing",
+                  "Example 5: Productivity app with local database and synchronization"
                 ],
                 "exercises": [
-                  "Exercise 1: Create a basic mobile layout",
-                  "Exercise 2: Style components for mobile"
+                  "Exercise 1: Build a complete authentication system with biometric support",
+                  "Exercise 2: Create a real-time messaging app with push notifications",
+                  "Exercise 3: Implement offline-first architecture with data synchronization",
+                  "Exercise 4: Develop a camera app with image processing and filters",
+                  "Exercise 5: Build a task management app with local storage and cloud sync",
+                  "Exercise 6: Create a music player with background playback and controls",
+                  "Exercise 7: Implement a navigation system with maps and location services"
+                ],
+                "resources": [
+                  "React Native Official Documentation",
+                  "Expo Documentation and Guides",
+                  "React Navigation Documentation",
+                  "Native Base Component Library",
+                  "React Native Testing Library"
+                ],
+                "assignments": [
+                  {
+                    "title": "Cross-Platform Mobile Application",
+                    "description": "Build a complete mobile application with advanced features",
+                    "requirements": [
+                      "Implement user authentication with secure storage",
+                      "Create multiple screens with complex navigation",
+                      "Add offline support with data synchronization",
+                      "Integrate platform-specific features (camera, GPS, etc.)",
+                      "Implement push notifications",
+                      "Add comprehensive error handling and loading states",
+                      "Create responsive UI with proper styling",
+                      "Add unit tests and integration tests"
+                    ],
+                    "gradingCriteria": [
+                      "Functionality (25%)",
+                      "User Experience (20%)",
+                      "Code Quality (20%)",
+                      "Testing (15%)",
+                      "Performance (10%)",
+                      "Platform Optimization (10%)"
+                    ]
+                  }
                 ]
               }
             ]

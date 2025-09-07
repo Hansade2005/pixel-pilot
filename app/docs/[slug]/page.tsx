@@ -142,9 +142,12 @@ export default function DocPage() {
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-white mb-3">Benefits</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {section.benefits.map((benefit: string, benefitIndex: number) => (
+                  {(Array.isArray(section.benefits)
+                    ? section.benefits
+                    : section.benefits.split(', ')
+                  ).map((benefit: string, benefitIndex: number) => (
                     <div key={benefitIndex} className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
-                      <span className="text-green-300">{benefit}</span>
+                      <span className="text-green-300">{benefit.trim()}</span>
                     </div>
                   ))}
                 </div>

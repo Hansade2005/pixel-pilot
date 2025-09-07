@@ -48,6 +48,17 @@ interface Course {
 
 interface UserProgress {
   userId: string
+  userProfile?: {
+    firstName: string
+    lastName: string
+    email: string
+    phone?: string
+    country: string
+    organization?: string
+    jobTitle?: string
+    enrollmentDate: string
+    profileImage?: string
+  }
   enrolledCourses: string[]
   completedCourses: string[]
   courseProgress: { [courseId: string]: { [moduleId: string]: { [lessonId: string]: boolean } } }
@@ -66,6 +77,7 @@ export default function CoursePage() {
   const [loading, setLoading] = useState(true)
   const [activeModule, setActiveModule] = useState(0)
   const [expandedModules, setExpandedModules] = useState<Set<number>>(new Set([0]))
+  const [showCertificate, setShowCertificate] = useState(false)
 
   // Image API utility function
   const getCourseThumbnail = (courseTitle: string, seed: number) => {
@@ -172,6 +184,26 @@ export default function CoursePage() {
     // Update course progress
     const newProgress = calculateProgress(course.id, updatedProgress)
     setCourse({ ...course, progress: newProgress })
+
+    // Check if course is completed
+    if (newProgress === 100 && !course.completed) {
+      completeCourse(course.id, updatedProgress)
+    }
+  }
+
+  const completeCourse = (courseId: string, currentProgress: UserProgress) => {
+    const updatedProgress = {
+      ...currentProgress,
+      completedCourses: [...currentProgress.completedCourses, courseId],
+      certificates: [...currentProgress.certificates, courseId],
+      lastActive: new Date().toISOString()
+    }
+
+    setUserProgress(updatedProgress)
+    localStorage.setItem('pixelPilotUserProgress', JSON.stringify(updatedProgress))
+
+    // Update course status
+    setCourse(prev => prev ? { ...prev, completed: true, certificateAvailable: true } : null)
   }
 
   const toggleModule = (index: number) => {
@@ -191,6 +223,45 @@ export default function CoursePage() {
       case "advanced": return "bg-red-600"
       case "all levels": return "bg-purple-600"
       default: return "bg-gray-600"
+    }
+  }
+
+  const handleContinueLearning = () => {
+    if (!course || !userProgress) return
+
+    const courseProgress = userProgress.courseProgress[course.id] || {}
+    const modules = course.content.modules || []
+
+    // Find the first incomplete module
+    for (let moduleIndex = 0; moduleIndex < modules.length; moduleIndex++) {
+      const module = modules[moduleIndex]
+      const moduleProgress = courseProgress[module.id] || {}
+
+      // Find the first incomplete lesson in this module
+      for (let lessonIndex = 0; lessonIndex < module.lessons.length; lessonIndex++) {
+        const lesson = module.lessons[lessonIndex]
+        if (!moduleProgress[lesson.id]) {
+          // Found the first incomplete lesson, expand the module and scroll to it
+          setActiveModule(1) // Switch to curriculum tab
+          setExpandedModules(new Set([moduleIndex]))
+
+          // Scroll to the curriculum section after a short delay
+          setTimeout(() => {
+            const curriculumElement = document.getElementById('curriculum-section')
+            if (curriculumElement) {
+              curriculumElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }
+          }, 100)
+
+          return
+        }
+      }
+    }
+
+    // If all lessons are complete, show completion message or navigate to certificate
+    if (course.completed && course.certificateAvailable) {
+      // Could navigate to certificate or show completion modal
+      console.log('Course completed! Certificate available.')
     }
   }
 
@@ -324,15 +395,38 @@ export default function CoursePage() {
                 <div className="flex flex-col sm:flex-row gap-4">
                   {course.enrolled ? (
                     <>
-                      <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white px-8">
-                        <PlayCircle className="w-5 h-5 mr-2" />
-                        Continue Learning
-                      </Button>
-                      {course.progress > 0 && (
-                        <div className="flex items-center space-x-2 text-gray-300">
-                          <span>Progress:</span>
-                          <span className="font-semibold">{course.progress}%</span>
-                        </div>
+                      {course.completed ? (
+                        <>
+                          <Button
+                            size="lg"
+                            className="bg-green-600 hover:bg-green-700 text-white px-8"
+                            onClick={() => setShowCertificate(true)}
+                          >
+                            <Trophy className="w-5 h-5 mr-2" />
+                            View Certificate
+                          </Button>
+                          <div className="flex items-center space-x-2 text-green-400">
+                            <CheckCircle className="w-5 h-5" />
+                            <span className="font-semibold">Course Completed!</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            size="lg"
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+                            onClick={handleContinueLearning}
+                          >
+                            <PlayCircle className="w-5 h-5 mr-2" />
+                            Continue Learning
+                          </Button>
+                          {course.progress > 0 && (
+                            <div className="flex items-center space-x-2 text-gray-300">
+                              <span>Progress:</span>
+                              <span className="font-semibold">{course.progress}%</span>
+                            </div>
+                          )}
+                        </>
                       )}
                     </>
                   ) : (
@@ -487,7 +581,7 @@ export default function CoursePage() {
           </div>
 
           {/* Course Curriculum */}
-          <Card className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm mb-12">
+          <Card id="curriculum-section" className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm mb-12">
             <CardHeader>
               <CardTitle className="text-white">Course Curriculum</CardTitle>
               <CardDescription className="text-gray-400">
@@ -632,6 +726,191 @@ export default function CoursePage() {
           )}
         </div>
       </main>
+
+      {/* Certificate Modal */}
+      {showCertificate && course && userProgress && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-8">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Course Certificate</h2>
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowCertificate(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-6 h-6" />
+                </Button>
+              </div>
+
+              {/* Professional Certificate Design */}
+              <div className="bg-gradient-to-br from-slate-50 via-white to-purple-50 rounded-xl p-8 border-4 border-purple-300 shadow-2xl">
+                <div className="text-center">
+                  {/* Header with Logo */}
+                  <div className="mb-8">
+                    <div className="flex justify-center mb-6">
+                      <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center shadow-lg">
+                        <img src="/logo.png" alt="Pixel Pilot" className="w-10 h-10" />
+                      </div>
+                    </div>
+
+                    <div className="border-t-4 border-b-4 border-purple-400 py-4 mb-6">
+                      <h1 className="text-4xl font-bold text-gray-900 mb-2 tracking-wider">CERTIFICATE</h1>
+                      <h2 className="text-2xl font-semibold text-purple-700 mb-1">OF COMPLETION</h2>
+                      <p className="text-lg text-gray-600 font-medium">Pixel Pilot Learning Platform</p>
+                    </div>
+                  </div>
+
+                  {/* Decorative Elements */}
+                  <div className="flex justify-between items-center mb-8 px-8">
+                    <div className="w-16 h-1 bg-gradient-to-r from-purple-400 to-pink-400 rounded"></div>
+                    <Award className="w-8 h-8 text-purple-600" />
+                    <div className="w-16 h-1 bg-gradient-to-r from-pink-400 to-purple-400 rounded"></div>
+                  </div>
+
+                  {/* Recipient */}
+                  <div className="mb-8">
+                    <p className="text-gray-600 mb-4 font-medium">This certificate is proudly presented to</p>
+                    <div className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text">
+                      <h2 className="text-4xl font-bold text-transparent mb-2 tracking-wide">
+                        {userProgress?.userProfile ?
+                          `${userProgress.userProfile.firstName} ${userProgress.userProfile.lastName}` :
+                          'Student Name'
+                        }
+                      </h2>
+                    </div>
+                    <p className="text-gray-600 text-lg">for successfully completing</p>
+                  </div>
+
+                  {/* Course */}
+                  <div className="mb-8">
+                    <div className="bg-white rounded-lg p-4 shadow-md border border-purple-200 mx-auto max-w-md">
+                      <h3 className="text-2xl font-bold text-purple-700 mb-2 text-center">
+                        {course.title}
+                      </h3>
+                      <div className="flex justify-center items-center space-x-4 text-sm text-gray-600">
+                        <span className="flex items-center">
+                          <Clock className="w-4 h-4 mr-1" />
+                          {course.duration}
+                        </span>
+                        <span className="flex items-center">
+                          <Star className="w-4 h-4 mr-1 text-yellow-500" />
+                          {course.rating}/5.0
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Achievement Details */}
+                  <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                      <div className="text-2xl font-bold text-green-600 mb-1">100%</div>
+                      <div className="text-sm text-gray-600">Course Completion</div>
+                    </div>
+                    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                      <div className="text-2xl font-bold text-blue-600 mb-1">
+                        {course.content?.modules?.length || 0}
+                      </div>
+                      <div className="text-sm text-gray-600">Modules Completed</div>
+                    </div>
+                    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                      <div className="text-2xl font-bold text-purple-600 mb-1">A+</div>
+                      <div className="text-sm text-gray-600">Grade Achieved</div>
+                    </div>
+                  </div>
+
+                  {/* Signature Section */}
+                  <div className="mb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      {/* Student Signature */}
+                      <div className="text-center">
+                        <div className="border-t-2 border-gray-400 w-48 mx-auto mb-2"></div>
+                        <p className="text-sm text-gray-600 mb-1">Student Signature</p>
+                        <p className="text-base font-medium text-gray-900">
+                          {userProgress?.userProfile ?
+                            `${userProgress.userProfile.firstName} ${userProgress.userProfile.lastName}` :
+                            'Student Name'
+                          }
+                        </p>
+                      </div>
+
+                      {/* Instructor Signature */}
+                      <div className="text-center">
+                        <div className="border-t-2 border-gray-400 w-48 mx-auto mb-2"></div>
+                        <p className="text-sm text-gray-600 mb-1">Founder & CEO</p>
+                        <p className="text-lg font-semibold text-gray-900" style={{ fontFamily: 'Dancing Script, cursive' }}>
+                          Anye Happiness Ade
+                        </p>
+                        <p className="text-xs text-gray-500">Pixel Pilot Learning Platform</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Date and Verification */}
+                  <div className="mb-8">
+                    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200 mx-auto max-w-md">
+                      <div className="text-center">
+                        <p className="text-gray-600 text-sm mb-1">Date of Completion</p>
+                        <p className="text-lg font-bold text-gray-900">
+                          {new Date().toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Certificate ID and Verification */}
+                  <div className="border-t border-gray-300 pt-6">
+                    <div className="flex justify-between items-center mb-4">
+                      <div>
+                        <p className="text-sm text-gray-500 mb-1">Certificate ID</p>
+                        <p className="text-sm font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded">
+                          PP-{course.id.toUpperCase()}-{Date.now()}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-500 mb-1">Verification</p>
+                        <div className="flex items-center text-green-600">
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          <span className="text-sm font-medium">Verified</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer Branding */}
+                    <div className="text-center border-t border-gray-200 pt-4">
+                      <p className="text-xs text-gray-500 mb-2">
+                        This certificate was issued by Pixel Pilot Learning Platform
+                      </p>
+                      <div className="flex justify-center items-center space-x-4">
+                        <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
+                          <img src="/logo.png" alt="Pixel Pilot" className="w-4 h-4" />
+                        </div>
+                        <span className="text-sm font-medium text-gray-700">pixelpilot.dev</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-4 mt-6">
+                <Button className="flex-1 bg-purple-600 hover:bg-purple-700 text-white">
+                  <Download className="w-4 h-4 mr-2" />
+                  Download PDF
+                </Button>
+                <Button variant="outline" className="flex-1">
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Share Certificate
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <Footer />
