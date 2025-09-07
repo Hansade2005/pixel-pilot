@@ -66,9 +66,90 @@ interface HelpResource {
 }
 
 export default function LearnPage() {
-  const [blogPosts, setBlogPosts] = useState<{ posts: BlogPost[] } | null>(null)
-  const [helpResources, setHelpResources] = useState<any>(null)
+  const [allBlogPosts, setAllBlogPosts] = useState<BlogPost[]>([])
+  const [allHelpResources, setAllHelpResources] = useState<any>(null)
+  const [filteredPosts, setFilteredPosts] = useState<BlogPost[]>([])
+  const [filteredResources, setFilteredResources] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState<string>("all")
+  const [selectedContentType, setSelectedContentType] = useState<string>("all")
+  const [selectedDifficulty, setSelectedDifficulty] = useState<string>("all")
+
+  const learningPaths = [
+    {
+      id: "beginner",
+      title: "AI Development Fundamentals",
+      description: "Start your journey with the basics of AI-powered development",
+      duration: "2-3 weeks",
+      level: "Beginner",
+      courses: 8,
+      icon: Target,
+      color: "blue",
+      skills: ["Basic AI concepts", "Simple app building", "Deployment basics"]
+    },
+    {
+      id: "intermediate",
+      title: "Advanced AI Development",
+      description: "Master complex AI features and advanced development techniques",
+      duration: "4-6 weeks",
+      level: "Intermediate",
+      courses: 12,
+      icon: Zap,
+      color: "purple",
+      skills: ["Complex AI features", "Advanced integrations", "Performance optimization"]
+    },
+    {
+      id: "expert",
+      title: "Enterprise AI Solutions",
+      description: "Build enterprise-grade applications with advanced AI capabilities",
+      duration: "6-8 weeks",
+      level: "Expert",
+      courses: 15,
+      icon: Award,
+      color: "gold",
+      skills: ["Enterprise architecture", "Advanced security", "Team collaboration"]
+    }
+  ]
+
+  const quickStartCourses = [
+    {
+      title: "Build Your First AI App",
+      description: "Create a simple task management app with AI assistance",
+      duration: "45 min",
+      difficulty: "Beginner",
+      students: "12.5K",
+      rating: 4.8,
+      icon: Rocket
+    },
+    {
+      title: "AI-Powered Chatbots",
+      description: "Design and deploy intelligent conversational interfaces",
+      duration: "1.5 hours",
+      difficulty: "Intermediate",
+      students: "8.2K",
+      rating: 4.9,
+      icon: MessageSquare
+    },
+    {
+      title: "Database Integration with AI",
+      description: "Connect your apps to databases using AI-driven queries",
+      duration: "2 hours",
+      difficulty: "Intermediate",
+      students: "6.8K",
+      rating: 4.7,
+      icon: BarChart3
+    },
+    {
+      title: "API Development & Testing",
+      description: "Build robust APIs with automated testing and AI assistance",
+      duration: "3 hours",
+      difficulty: "Advanced",
+      students: "4.1K",
+      rating: 4.9,
+      icon: Code
+    }
+  ]
 
   useEffect(() => {
     const loadData = async () => {
@@ -83,8 +164,10 @@ export default function LearnPage() {
           helpResponse.json()
         ])
 
-        setBlogPosts(blogData)
-        setHelpResources(helpData)
+        setAllBlogPosts(blogData.posts || [])
+        setAllHelpResources(helpData)
+        setFilteredPosts(blogData.posts || [])
+        setFilteredResources(helpData)
       } catch (error) {
         console.error('Failed to load learning data:', error)
       } finally {
@@ -94,6 +177,59 @@ export default function LearnPage() {
 
     loadData()
   }, [])
+
+  // Live search and filtering
+  useEffect(() => {
+    let filteredBlogPosts = allBlogPosts
+    let filteredHelp = { ...allHelpResources }
+
+    // Search filter
+    if (searchQuery) {
+      filteredBlogPosts = filteredBlogPosts.filter(post =>
+        post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        post.excerpt.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        post.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+
+      // Filter help resources
+      if (filteredHelp?.categories) {
+        filteredHelp.categories = filteredHelp.categories.map((category: any) => ({
+          ...category,
+          articles: category.articles.filter((article: HelpResource) =>
+            article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            article.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            article.tags.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+          )
+        })).filter((category: any) => category.articles.length > 0)
+      }
+    }
+
+    // Category filter for blog posts
+    if (selectedCategory !== "all") {
+      filteredBlogPosts = filteredBlogPosts.filter(post => post.category === selectedCategory)
+    }
+
+    // Content type filter
+    if (selectedContentType !== "all") {
+      if (selectedContentType === "tutorials") {
+        filteredBlogPosts = filteredBlogPosts.filter(post =>
+          post.category === "tutorials" || post.tags.includes("tutorial")
+        )
+      } else if (selectedContentType === "documentation") {
+        // Keep all for documentation
+      }
+    }
+
+    setFilteredPosts(filteredBlogPosts)
+    setFilteredResources(filteredHelp)
+  }, [searchQuery, selectedCategory, selectedContentType, allBlogPosts, allHelpResources])
+
+  const clearFilters = () => {
+    setSearchQuery("")
+    setSelectedCategory("all")
+    setSelectedContentType("all")
+    setSelectedDifficulty("all")
+  }
 
   const getIconForCategory = (categoryId: string) => {
     const iconMap: Record<string, any> = {
@@ -105,6 +241,15 @@ export default function LearnPage() {
       "troubleshooting": Settings
     }
     return iconMap[categoryId] || BookOpen
+  }
+
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty.toLowerCase()) {
+      case "beginner": return "bg-green-600"
+      case "intermediate": return "bg-yellow-600"
+      case "advanced": return "bg-red-600"
+      default: return "bg-gray-600"
+    }
   }
 
   if (loading) {
