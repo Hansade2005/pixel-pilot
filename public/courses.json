@@ -1,0 +1,1048 @@
+{
+  "metadata": {
+    "author": "Anye Happiness Ade",
+    "alsoKnownAs": "Hans Ade",
+    "role": "Founder & CEO",
+    "description": "All courses are authored by Anye Happiness Ade (also known as Hans Ade), Founder and CEO of Pixel Pilot."
+  },
+  "courses": [
+    {
+      "id": "pixel-pilot-mastery",
+      "title": "Pixel Pilot Mastery Course",
+      "description": "Master AI-powered development with comprehensive training",
+      "longDescription": "This comprehensive course takes you from beginner to expert in AI-powered development using Pixel Pilot. Learn to build professional web applications, deploy them instantly, and master advanced AI development techniques.",
+      "instructor": "Anye Happiness Ade",
+      "duration": "8 weeks",
+      "level": "All Levels",
+      "category": "AI Development",
+      "rating": 4.9,
+      "students": 15420,
+      "price": "Free",
+      "featured": true,
+      "enrolled": false,
+      "progress": 0,
+      "completed": false,
+      "certificateAvailable": false,
+      "skills": ["AI Development", "Web Applications", "Deployment", "UI/UX Design", "Database Integration"],
+      "prerequisites": ["Basic computer skills", "No coding experience required"],
+      "content": {
+        "overview": "This course provides a complete journey through AI-powered development, covering everything from basic concepts to advanced techniques. Authored by Anye Happiness Ade (Hans Ade), Founder and CEO of Pixel Pilot.",
+        "learningObjectives": [
+          "Understand AI-powered development principles",
+          "Master Pixel Pilot's core features",
+          "Build professional web applications",
+          "Implement advanced AI integrations",
+          "Deploy applications with confidence"
+        ],
+        "modules": [
+          {
+            "id": "getting-started",
+            "title": "Getting Started with Pixel Pilot",
+            "description": "Learn the basics of AI-powered development",
+            "duration": "2 hours",
+            "completed": false,
+            "unlocked": true,
+            "lessons": [
+              {
+                "id": "welcome",
+                "title": "Welcome to Pixel Pilot",
+                "description": "Introduction to AI-powered development",
+                "duration": "15 min",
+                "type": "text",
+                "completed": false,
+                "content": "Welcome to Pixel Pilot! This course will guide you through the fundamentals of AI-powered development...",
+                "notes": "Take notes on the key concepts introduced in this lesson.",
+                "examples": [
+                  "Example 1: Basic project setup",
+                  "Example 2: First AI interaction"
+                ],
+                "exercises": [
+                  "Exercise 1: Set up your development environment",
+                  "Exercise 2: Create your first Pixel Pilot project"
+                ]
+              },
+              {
+                "id": "setup",
+                "title": "Setting Up Your Environment",
+                "description": "Get started with your first project",
+                "duration": "20 min",
+                "type": "text",
+                "completed": false,
+                "content": "Setting up your development environment is crucial for success...",
+                "notes": "Remember to install all required dependencies.",
+                "examples": [
+                  "Example 1: Installing Node.js",
+                  "Example 2: Configuring your IDE"
+                ],
+                "exercises": [
+                  "Exercise 1: Install development tools",
+                  "Exercise 2: Verify your setup"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "ai-chat-system",
+            "title": "Mastering the AI Chat System",
+            "description": "Learn to communicate effectively with AI",
+            "duration": "3 hours",
+            "completed": false,
+            "unlocked": false,
+            "lessons": [
+              {
+                "id": "chat-basics",
+                "title": "Chat Interface Basics",
+                "description": "Understanding the AI conversation system",
+                "duration": "25 min",
+                "type": "text",
+                "completed": false,
+                "content": "The AI chat system is your primary tool for development...",
+                "notes": "Focus on clear, specific communication with AI.",
+                "examples": [
+                  "Example 1: Simple code generation",
+                  "Example 2: Debugging assistance"
+                ],
+                "exercises": [
+                  "Exercise 1: Write clear prompts",
+                  "Exercise 2: Practice AI conversations"
+                ]
+              },
+              {
+                "id": "effective-prompts",
+                "title": "Writing Effective Prompts",
+                "description": "How to get the best results from AI",
+                "duration": "30 min",
+                "type": "text",
+                "completed": false,
+                "content": "Effective prompting is an art that improves with practice...",
+                "notes": "Be specific and provide context in your prompts.",
+                "examples": [
+                  "Example 1: Good vs bad prompts",
+                  "Example 2: Context-rich requests"
+                ],
+                "exercises": [
+                  "Exercise 1: Rewrite poor prompts",
+                  "Exercise 2: Create detailed requests"
+                ]
+              }
+            ]
+          }
+        ],
+        "resources": [
+          {
+            "title": "Pixel Pilot Documentation",
+            "type": "documentation",
+            "url": "/docs/getting-started",
+            "description": "Official documentation for Pixel Pilot"
+          },
+          {
+            "title": "AI Development Best Practices",
+            "type": "guide",
+            "url": "/docs/best-practices",
+            "description": "Learn industry best practices"
+          }
+        ],
+        "tutoring": {
+          "available": true,
+          "sessions": [
+            {
+              "id": "intro-session",
+              "title": "Introduction to AI Development",
+              "duration": "30 min",
+              "type": "1-on-1",
+              "available": true
+            },
+            {
+              "id": "advanced-session",
+              "title": "Advanced AI Integration",
+              "duration": "45 min",
+              "type": "group",
+              "available": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "react-nextjs-fundamentals",
+      "title": "React & Next.js Fundamentals",
+      "description": "Build modern React applications with Next.js framework",
+      "longDescription": "Master the fundamentals of React and Next.js to build scalable, modern web applications with server-side rendering and optimal performance.",
+      "instructor": "Anye Happiness Ade",
+      "duration": "6 weeks",
+      "level": "Beginner",
+      "category": "Web Development",
+      "rating": 4.8,
+      "students": 8750,
+      "price": "Free",
+      "featured": false,
+      "enrolled": false,
+      "progress": 0,
+      "completed": false,
+      "certificateAvailable": false,
+      "skills": ["React", "Next.js", "JavaScript", "Component Architecture", "Server-Side Rendering"],
+      "prerequisites": ["Basic HTML/CSS", "JavaScript fundamentals"],
+      "content": {
+        "overview": "Learn to build modern web applications using React and Next.js, focusing on component-based architecture and server-side rendering.",
+        "learningObjectives": [
+          "Understand React component lifecycle",
+          "Master Next.js routing and data fetching",
+          "Build responsive user interfaces",
+          "Implement server-side rendering",
+          "Deploy Next.js applications"
+        ],
+        "modules": [
+          {
+            "id": "react-basics",
+            "title": "React Fundamentals",
+            "description": "Learn the core concepts of React",
+            "duration": "4 hours",
+            "completed": false,
+            "unlocked": true,
+            "lessons": [
+              {
+                "id": "jsx-syntax",
+                "title": "JSX and Component Basics",
+                "description": "Understanding JSX syntax and component structure",
+                "duration": "20 min",
+                "type": "text",
+                "completed": false,
+                "content": "JSX is a syntax extension for JavaScript that allows you to write HTML-like code...",
+                "notes": "JSX must be compiled to JavaScript before execution.",
+                "examples": [
+                  "Example 1: Basic JSX syntax",
+                  "Example 2: Component structure"
+                ],
+                "exercises": [
+                  "Exercise 1: Create your first JSX component",
+                  "Exercise 2: Practice JSX expressions"
+                ]
+              },
+              {
+                "id": "state-props",
+                "title": "State and Props",
+                "description": "Managing component state and passing data",
+                "duration": "25 min",
+                "type": "text",
+                "completed": false,
+                "content": "State and props are fundamental concepts in React...",
+                "notes": "State is mutable, props are immutable.",
+                "examples": [
+                  "Example 1: Using useState hook",
+                  "Example 2: Passing props to components"
+                ],
+                "exercises": [
+                  "Exercise 1: Create a stateful component",
+                  "Exercise 2: Pass data between components"
+                ]
+              }
+            ]
+          }
+        ],
+        "resources": [
+          {
+            "title": "React Documentation",
+            "type": "documentation",
+            "url": "https://react.dev",
+            "description": "Official React documentation"
+          },
+          {
+            "title": "Next.js Guide",
+            "type": "guide",
+            "url": "https://nextjs.org/docs",
+            "description": "Next.js official documentation"
+          }
+        ],
+        "tutoring": {
+          "available": true,
+          "sessions": [
+            {
+              "id": "react-basics",
+              "title": "React Basics Tutoring",
+              "duration": "30 min",
+              "type": "1-on-1",
+              "available": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "python-data-science",
+      "title": "Python for Data Science",
+      "description": "Master Python for data analysis and machine learning",
+      "longDescription": "Learn Python programming with a focus on data science applications, including data manipulation, visualization, and machine learning basics.",
+      "instructor": "Anye Happiness Ade",
+      "duration": "10 weeks",
+      "level": "Intermediate",
+      "category": "Data Science",
+      "rating": 4.7,
+      "students": 12800,
+      "price": "Free",
+      "featured": false,
+      "enrolled": false,
+      "progress": 0,
+      "completed": false,
+      "certificateAvailable": false,
+      "skills": ["Python", "Pandas", "NumPy", "Data Visualization", "Machine Learning"],
+      "prerequisites": ["Basic programming knowledge", "Mathematics fundamentals"],
+      "content": {
+        "overview": "Comprehensive Python programming course focused on data science applications and machine learning techniques.",
+        "learningObjectives": [
+          "Master Python programming fundamentals",
+          "Work with data using Pandas and NumPy",
+          "Create compelling data visualizations",
+          "Apply machine learning algorithms",
+          "Build data science projects"
+        ],
+        "modules": [
+          {
+            "id": "python-basics",
+            "title": "Python Programming Basics",
+            "description": "Learn Python fundamentals",
+            "duration": "6 hours",
+            "completed": false,
+            "unlocked": true,
+            "lessons": [
+              {
+                "id": "variables-data-types",
+                "title": "Variables and Data Types",
+                "description": "Understanding Python data types and variables",
+                "duration": "30 min",
+                "type": "text",
+                "completed": false,
+                "content": "Python is a dynamically typed language with several built-in data types...",
+                "notes": "Python variables don't need explicit type declarations.",
+                "examples": [
+                  "Example 1: Integer and float variables",
+                  "Example 2: String manipulation"
+                ],
+                "exercises": [
+                  "Exercise 1: Create different variable types",
+                  "Exercise 2: Practice string operations"
+                ]
+              }
+            ]
+          }
+        ],
+        "resources": [
+          {
+            "title": "Python Documentation",
+            "type": "documentation",
+            "url": "https://docs.python.org",
+            "description": "Official Python documentation"
+          },
+          {
+            "title": "Pandas User Guide",
+            "type": "guide",
+            "url": "https://pandas.pydata.org/docs",
+            "description": "Pandas documentation and guides"
+          }
+        ],
+        "tutoring": {
+          "available": true,
+          "sessions": [
+            {
+              "id": "python-help",
+              "title": "Python Programming Help",
+              "duration": "45 min",
+              "type": "1-on-1",
+              "available": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ui-ux-design-fundamentals",
+      "title": "UI/UX Design Fundamentals",
+      "description": "Master user interface and user experience design principles",
+      "longDescription": "Learn the fundamental principles of UI/UX design, including user research, wireframing, prototyping, and design systems.",
+      "instructor": "Anye Happiness Ade",
+      "duration": "8 weeks",
+      "level": "Beginner",
+      "category": "Design",
+      "rating": 4.8,
+      "students": 9200,
+      "price": "Free",
+      "featured": false,
+      "enrolled": false,
+      "progress": 0,
+      "completed": false,
+      "certificateAvailable": false,
+      "skills": ["UI Design", "UX Research", "Wireframing", "Prototyping", "Design Systems"],
+      "prerequisites": ["No design experience required", "Basic computer skills"],
+      "content": {
+        "overview": "Comprehensive introduction to UI/UX design principles and practices for creating user-centered digital experiences.",
+        "learningObjectives": [
+          "Understand UI/UX design principles",
+          "Conduct user research and testing",
+          "Create wireframes and prototypes",
+          "Design intuitive user interfaces",
+          "Build and maintain design systems"
+        ],
+        "modules": [
+          {
+            "id": "design-principles",
+            "title": "Design Principles",
+            "description": "Learn fundamental design principles",
+            "duration": "3 hours",
+            "completed": false,
+            "unlocked": true,
+            "lessons": [
+              {
+                "id": "color-theory",
+                "title": "Color Theory and Psychology",
+                "description": "Understanding color in design",
+                "duration": "25 min",
+                "type": "text",
+                "completed": false,
+                "content": "Color theory is fundamental to effective visual communication...",
+                "notes": "Colors evoke emotions and influence user behavior.",
+                "examples": [
+                  "Example 1: Color wheel basics",
+                  "Example 2: Color psychology in branding"
+                ],
+                "exercises": [
+                  "Exercise 1: Create a color palette",
+                  "Exercise 2: Analyze color usage in apps"
+                ]
+              }
+            ]
+          }
+        ],
+        "resources": [
+          {
+            "title": "Material Design Guidelines",
+            "type": "guide",
+            "url": "https://material.io/design",
+            "description": "Google's design system guidelines"
+          },
+          {
+            "title": "Human Interface Guidelines",
+            "type": "guide",
+            "url": "https://developer.apple.com/design/human-interface-guidelines",
+            "description": "Apple's design guidelines"
+          }
+        ],
+        "tutoring": {
+          "available": true,
+          "sessions": [
+            {
+              "id": "design-review",
+              "title": "Design Review Session",
+              "duration": "30 min",
+              "type": "1-on-1",
+              "available": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "mobile-app-development",
+      "title": "Mobile App Development",
+      "description": "Build native and cross-platform mobile applications",
+      "longDescription": "Learn to develop mobile applications for iOS and Android using React Native, covering UI components, navigation, and app deployment.",
+      "instructor": "Anye Happiness Ade",
+      "duration": "12 weeks",
+      "level": "Intermediate",
+      "category": "Mobile Development",
+      "rating": 4.6,
+      "students": 6800,
+      "price": "Free",
+      "featured": false,
+      "enrolled": false,
+      "progress": 0,
+      "completed": false,
+      "certificateAvailable": false,
+      "skills": ["React Native", "Mobile UI", "App Navigation", "API Integration", "App Deployment"],
+      "prerequisites": ["JavaScript knowledge", "React basics"],
+      "content": {
+        "overview": "Learn to build cross-platform mobile applications using React Native, covering everything from basic components to advanced features.",
+        "learningObjectives": [
+          "Understand React Native fundamentals",
+          "Build responsive mobile interfaces",
+          "Implement navigation and routing",
+          "Integrate with APIs and databases",
+          "Deploy apps to app stores"
+        ],
+        "modules": [
+          {
+            "id": "react-native-basics",
+            "title": "React Native Fundamentals",
+            "description": "Learn React Native basics",
+            "duration": "5 hours",
+            "completed": false,
+            "unlocked": true,
+            "lessons": [
+              {
+                "id": "components-layout",
+                "title": "Components and Layout",
+                "description": "Understanding React Native components",
+                "duration": "35 min",
+                "type": "text",
+                "completed": false,
+                "content": "React Native uses components similar to React for web...",
+                "notes": "Mobile layout uses Flexbox, not CSS Grid.",
+                "examples": [
+                  "Example 1: Basic View and Text components",
+                  "Example 2: Flexbox layout in mobile"
+                ],
+                "exercises": [
+                  "Exercise 1: Create a basic mobile layout",
+                  "Exercise 2: Style components for mobile"
+                ]
+              }
+            ]
+          }
+        ],
+        "resources": [
+          {
+            "title": "React Native Documentation",
+            "type": "documentation",
+            "url": "https://reactnative.dev/docs",
+            "description": "Official React Native docs"
+          },
+          {
+            "title": "Expo Documentation",
+            "type": "guide",
+            "url": "https://docs.expo.dev",
+            "description": "Expo framework documentation"
+          }
+        ],
+        "tutoring": {
+          "available": true,
+          "sessions": [
+            {
+              "id": "mobile-dev-help",
+              "title": "Mobile Development Support",
+              "duration": "45 min",
+              "type": "1-on-1",
+              "available": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "database-design-administration",
+      "title": "Database Design & Administration",
+      "description": "Master database design, SQL, and administration",
+      "longDescription": "Learn database design principles, SQL programming, and database administration for relational and NoSQL databases.",
+      "instructor": "Anye Happiness Ade",
+      "duration": "10 weeks",
+      "level": "Intermediate",
+      "category": "Database",
+      "rating": 4.7,
+      "students": 5600,
+      "price": "Free",
+      "featured": false,
+      "enrolled": false,
+      "progress": 0,
+      "completed": false,
+      "certificateAvailable": false,
+      "skills": ["SQL", "Database Design", "MySQL", "PostgreSQL", "MongoDB"],
+      "prerequisites": ["Basic programming knowledge", "Understanding of data structures"],
+      "content": {
+        "overview": "Comprehensive database course covering design principles, SQL programming, and modern database technologies.",
+        "learningObjectives": [
+          "Understand database design principles",
+          "Master SQL programming",
+          "Learn database administration",
+          "Work with different database systems",
+          "Implement data security and optimization"
+        ],
+        "modules": [
+          {
+            "id": "sql-fundamentals",
+            "title": "SQL Fundamentals",
+            "description": "Learn SQL programming basics",
+            "duration": "6 hours",
+            "completed": false,
+            "unlocked": true,
+            "lessons": [
+              {
+                "id": "select-queries",
+                "title": "SELECT Queries and Filtering",
+                "description": "Master SELECT statements and data filtering",
+                "duration": "40 min",
+                "type": "text",
+                "completed": false,
+                "content": "SELECT is the most fundamental SQL statement...",
+                "notes": "Always use WHERE clauses to filter data efficiently.",
+                "examples": [
+                  "Example 1: Basic SELECT statement",
+                  "Example 2: Using WHERE conditions"
+                ],
+                "exercises": [
+                  "Exercise 1: Write basic SELECT queries",
+                  "Exercise 2: Filter data with WHERE clauses"
+                ]
+              }
+            ]
+          }
+        ],
+        "resources": [
+          {
+            "title": "SQLZoo",
+            "type": "interactive",
+            "url": "https://sqlzoo.net",
+            "description": "Interactive SQL learning platform"
+          },
+          {
+            "title": "PostgreSQL Documentation",
+            "type": "documentation",
+            "url": "https://www.postgresql.org/docs",
+            "description": "PostgreSQL official documentation"
+          }
+        ],
+        "tutoring": {
+          "available": true,
+          "sessions": [
+            {
+              "id": "sql-help",
+              "title": "SQL Query Help",
+              "duration": "30 min",
+              "type": "1-on-1",
+              "available": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cloud-computing-aws",
+      "title": "Cloud Computing with AWS",
+      "description": "Master Amazon Web Services for cloud computing",
+      "longDescription": "Learn cloud computing fundamentals and AWS services including EC2, S3, Lambda, and serverless architecture.",
+      "instructor": "Anye Happiness Ade",
+      "duration": "12 weeks",
+      "level": "Intermediate",
+      "category": "Cloud Computing",
+      "rating": 4.8,
+      "students": 7200,
+      "price": "Free",
+      "featured": false,
+      "enrolled": false,
+      "progress": 0,
+      "completed": false,
+      "certificateAvailable": false,
+      "skills": ["AWS", "Cloud Computing", "Serverless", "Infrastructure as Code", "DevOps"],
+      "prerequisites": ["Basic programming knowledge", "Understanding of networking"],
+      "content": {
+        "overview": "Comprehensive AWS course covering cloud fundamentals, core services, and best practices for cloud architecture.",
+        "learningObjectives": [
+          "Understand cloud computing concepts",
+          "Master core AWS services",
+          "Design scalable cloud architectures",
+          "Implement security best practices",
+          "Deploy applications on AWS"
+        ],
+        "modules": [
+          {
+            "id": "cloud-fundamentals",
+            "title": "Cloud Computing Fundamentals",
+            "description": "Learn cloud computing basics",
+            "duration": "4 hours",
+            "completed": false,
+            "unlocked": true,
+            "lessons": [
+              {
+                "id": "iaas-paas-saas",
+                "title": "IaaS, PaaS, and SaaS",
+                "description": "Understanding cloud service models",
+                "duration": "30 min",
+                "type": "text",
+                "completed": false,
+                "content": "Cloud computing offers three main service models...",
+                "notes": "Choose the right service model for your needs.",
+                "examples": [
+                  "Example 1: IaaS - EC2 instances",
+                  "Example 2: PaaS - Elastic Beanstalk",
+                  "Example 3: SaaS - Gmail"
+                ],
+                "exercises": [
+                  "Exercise 1: Compare service models",
+                  "Exercise 2: Choose appropriate model for use case"
+                ]
+              }
+            ]
+          }
+        ],
+        "resources": [
+          {
+            "title": "AWS Documentation",
+            "type": "documentation",
+            "url": "https://docs.aws.amazon.com",
+            "description": "Official AWS documentation"
+          },
+          {
+            "title": "AWS Free Tier",
+            "type": "guide",
+            "url": "https://aws.amazon.com/free",
+            "description": "AWS free tier services"
+          }
+        ],
+        "tutoring": {
+          "available": true,
+          "sessions": [
+            {
+              "id": "aws-support",
+              "title": "AWS Architecture Consultation",
+              "duration": "45 min",
+              "type": "1-on-1",
+              "available": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cybersecurity-fundamentals",
+      "title": "Cybersecurity Fundamentals",
+      "description": "Learn essential cybersecurity concepts and practices",
+      "longDescription": "Master cybersecurity fundamentals including encryption, network security, ethical hacking, and security best practices.",
+      "instructor": "Anye Happiness Ade",
+      "duration": "10 weeks",
+      "level": "Beginner",
+      "category": "Cybersecurity",
+      "rating": 4.9,
+      "students": 9800,
+      "price": "Free",
+      "featured": false,
+      "enrolled": false,
+      "progress": 0,
+      "completed": false,
+      "certificateAvailable": false,
+      "skills": ["Network Security", "Encryption", "Ethical Hacking", "Risk Assessment", "Security Auditing"],
+      "prerequisites": ["Basic computer knowledge", "Understanding of networks"],
+      "content": {
+        "overview": "Comprehensive cybersecurity course covering essential security concepts, tools, and best practices for protecting digital assets.",
+        "learningObjectives": [
+          "Understand cybersecurity principles",
+          "Learn encryption and cryptography",
+          "Master network security concepts",
+          "Practice ethical hacking techniques",
+          "Implement security best practices"
+        ],
+        "modules": [
+          {
+            "id": "security-basics",
+            "title": "Security Fundamentals",
+            "description": "Learn basic security concepts",
+            "duration": "4 hours",
+            "completed": false,
+            "unlocked": true,
+            "lessons": [
+              {
+                "id": "cia-triad",
+                "title": "CIA Triad: Confidentiality, Integrity, Availability",
+                "description": "Understanding the three pillars of information security",
+                "duration": "25 min",
+                "type": "text",
+                "completed": false,
+                "content": "The CIA triad forms the foundation of information security...",
+                "notes": "All security measures should support one or more of these principles.",
+                "examples": [
+                  "Example 1: Confidentiality - encryption",
+                  "Example 2: Integrity - hashing",
+                  "Example 3: Availability - redundancy"
+                ],
+                "exercises": [
+                  "Exercise 1: Identify CIA violations",
+                  "Exercise 2: Design security controls"
+                ]
+              }
+            ]
+          }
+        ],
+        "resources": [
+          {
+            "title": "OWASP Top 10",
+            "type": "guide",
+            "url": "https://owasp.org/www-project-top-ten",
+            "description": "Web application security risks"
+          },
+          {
+            "title": "NIST Cybersecurity Framework",
+            "type": "documentation",
+            "url": "https://www.nist.gov/cyberframework",
+            "description": "NIST security framework"
+          }
+        ],
+        "tutoring": {
+          "available": true,
+          "sessions": [
+            {
+              "id": "security-consultation",
+              "title": "Security Assessment Help",
+              "duration": "45 min",
+              "type": "1-on-1",
+              "available": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "blockchain-development",
+      "title": "Blockchain Development",
+      "description": "Build decentralized applications with blockchain technology",
+      "longDescription": "Learn blockchain fundamentals, smart contract development, and decentralized application (dApp) creation using Ethereum and Solidity.",
+      "instructor": "Anye Happiness Ade",
+      "duration": "14 weeks",
+      "level": "Advanced",
+      "category": "Blockchain",
+      "rating": 4.5,
+      "students": 4200,
+      "price": "Free",
+      "featured": false,
+      "enrolled": false,
+      "progress": 0,
+      "completed": false,
+      "certificateAvailable": false,
+      "skills": ["Solidity", "Smart Contracts", "Ethereum", "Web3.js", "dApp Development"],
+      "prerequisites": ["JavaScript programming", "Understanding of cryptography"],
+      "content": {
+        "overview": "Advanced blockchain development course covering smart contracts, decentralized applications, and blockchain architecture.",
+        "learningObjectives": [
+          "Understand blockchain fundamentals",
+          "Master Solidity programming",
+          "Develop smart contracts",
+          "Build decentralized applications",
+          "Work with Web3 technologies"
+        ],
+        "modules": [
+          {
+            "id": "blockchain-basics",
+            "title": "Blockchain Fundamentals",
+            "description": "Learn blockchain basics",
+            "duration": "5 hours",
+            "completed": false,
+            "unlocked": true,
+            "lessons": [
+              {
+                "id": "blockchain-concept",
+                "title": "What is Blockchain?",
+                "description": "Understanding blockchain technology",
+                "duration": "35 min",
+                "type": "text",
+                "completed": false,
+                "content": "Blockchain is a distributed ledger technology...",
+                "notes": "Focus on decentralization and immutability.",
+                "examples": [
+                  "Example 1: Bitcoin blockchain",
+                  "Example 2: Ethereum network"
+                ],
+                "exercises": [
+                  "Exercise 1: Explain blockchain to a beginner",
+                  "Exercise 2: Compare blockchain vs traditional databases"
+                ]
+              }
+            ]
+          }
+        ],
+        "resources": [
+          {
+            "title": "Ethereum Documentation",
+            "type": "documentation",
+            "url": "https://ethereum.org/en/developers/docs",
+            "description": "Ethereum developer documentation"
+          },
+          {
+            "title": "Solidity Documentation",
+            "type": "guide",
+            "url": "https://docs.soliditylang.org",
+            "description": "Solidity programming language docs"
+          }
+        ],
+        "tutoring": {
+          "available": true,
+          "sessions": [
+            {
+              "id": "smart-contract-help",
+              "title": "Smart Contract Development",
+              "duration": "45 min",
+              "type": "1-on-1",
+              "available": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "devops-engineering",
+      "title": "DevOps Engineering",
+      "description": "Master DevOps practices and CI/CD pipelines",
+      "longDescription": "Learn DevOps principles, CI/CD pipelines, containerization with Docker, orchestration with Kubernetes, and infrastructure automation.",
+      "instructor": "Anye Happiness Ade",
+      "duration": "12 weeks",
+      "level": "Advanced",
+      "category": "DevOps",
+      "rating": 4.7,
+      "students": 6100,
+      "price": "Free",
+      "featured": false,
+      "enrolled": false,
+      "progress": 0,
+      "completed": false,
+      "certificateAvailable": false,
+      "skills": ["Docker", "Kubernetes", "CI/CD", "Infrastructure as Code", "Monitoring"],
+      "prerequisites": ["Programming knowledge", "Linux/Unix basics", "Networking concepts"],
+      "content": {
+        "overview": "Comprehensive DevOps course covering modern development practices, automation, and infrastructure management.",
+        "learningObjectives": [
+          "Understand DevOps culture and practices",
+          "Master CI/CD pipeline development",
+          "Learn containerization with Docker",
+          "Implement Kubernetes orchestration",
+          "Automate infrastructure deployment"
+        ],
+        "modules": [
+          {
+            "id": "devops-culture",
+            "title": "DevOps Culture and Practices",
+            "description": "Learn DevOps fundamentals",
+            "duration": "3 hours",
+            "completed": false,
+            "unlocked": true,
+            "lessons": [
+              {
+                "id": "devops-principles",
+                "title": "DevOps Principles",
+                "description": "Understanding DevOps culture",
+                "duration": "30 min",
+                "type": "text",
+                "completed": false,
+                "content": "DevOps is a cultural and professional movement...",
+                "notes": "DevOps bridges development and operations teams.",
+                "examples": [
+                  "Example 1: Waterfall vs Agile vs DevOps",
+                  "Example 2: Continuous Integration example"
+                ],
+                "exercises": [
+                  "Exercise 1: Identify DevOps practices in your organization",
+                  "Exercise 2: Plan a DevOps transformation"
+                ]
+              }
+            ]
+          }
+        ],
+        "resources": [
+          {
+            "title": "Docker Documentation",
+            "type": "documentation",
+            "url": "https://docs.docker.com",
+            "description": "Docker container platform docs"
+          },
+          {
+            "title": "Kubernetes Documentation",
+            "type": "guide",
+            "url": "https://kubernetes.io/docs",
+            "description": "Kubernetes orchestration docs"
+          }
+        ],
+        "tutoring": {
+          "available": true,
+          "sessions": [
+            {
+              "id": "devops-consultation",
+              "title": "DevOps Pipeline Help",
+              "duration": "45 min",
+              "type": "1-on-1",
+              "available": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "machine-learning-ai",
+      "title": "Machine Learning & AI",
+      "description": "Master machine learning algorithms and AI techniques",
+      "longDescription": "Learn machine learning fundamentals, neural networks, deep learning, and AI applications using Python and popular ML libraries.",
+      "instructor": "Anye Happiness Ade",
+      "duration": "16 weeks",
+      "level": "Advanced",
+      "category": "AI/ML",
+      "rating": 4.8,
+      "students": 8900,
+      "price": "Free",
+      "featured": false,
+      "enrolled": false,
+      "progress": 0,
+      "completed": false,
+      "certificateAvailable": false,
+      "skills": ["Machine Learning", "Neural Networks", "Deep Learning", "Python", "TensorFlow"],
+      "prerequisites": ["Python programming", "Linear algebra", "Statistics", "Calculus"],
+      "content": {
+        "overview": "Advanced machine learning course covering algorithms, neural networks, deep learning, and practical AI applications.",
+        "learningObjectives": [
+          "Understand machine learning fundamentals",
+          "Master supervised and unsupervised learning",
+          "Build neural networks and deep learning models",
+          "Apply ML to real-world problems",
+          "Deploy ML models in production"
+        ],
+        "modules": [
+          {
+            "id": "ml-fundamentals",
+            "title": "Machine Learning Fundamentals",
+            "description": "Learn ML basics",
+            "duration": "6 hours",
+            "completed": false,
+            "unlocked": true,
+            "lessons": [
+              {
+                "id": "ml-overview",
+                "title": "What is Machine Learning?",
+                "description": "Understanding ML concepts and types",
+                "duration": "40 min",
+                "type": "text",
+                "completed": false,
+                "content": "Machine learning is a subset of artificial intelligence...",
+                "notes": "Focus on the three main types: supervised, unsupervised, and reinforcement learning.",
+                "examples": [
+                  "Example 1: Supervised learning - email spam detection",
+                  "Example 2: Unsupervised learning - customer segmentation",
+                  "Example 3: Reinforcement learning - game playing AI"
+                ],
+                "exercises": [
+                  "Exercise 1: Classify ML problem types",
+                  "Exercise 2: Identify real-world ML applications"
+                ]
+              }
+            ]
+          }
+        ],
+        "resources": [
+          {
+            "title": "Scikit-learn Documentation",
+            "type": "documentation",
+            "url": "https://scikit-learn.org/stable/user_guide.html",
+            "description": "Scikit-learn ML library docs"
+          },
+          {
+            "title": "TensorFlow Guide",
+            "type": "guide",
+            "url": "https://www.tensorflow.org/guide",
+            "description": "TensorFlow deep learning framework"
+          }
+        ],
+        "tutoring": {
+          "available": true,
+          "sessions": [
+            {
+              "id": "ml-project-help",
+              "title": "ML Project Consultation",
+              "duration": "60 min",
+              "type": "1-on-1",
+              "available": true
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -124,6 +124,7 @@ interface UserProgress {
 export default function LearnPage() {
   const [courses, setCourses] = useState<Course[]>([])
   const [filteredCourses, setFilteredCourses] = useState<Course[]>([])
+  const [coursesData, setCoursesData] = useState<any>(null)
   const [userProgress, setUserProgress] = useState<UserProgress | null>(null)
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -132,129 +133,6 @@ export default function LearnPage() {
   const [selectedTab, setSelectedTab] = useState<"courses" | "progress" | "certificates">("courses")
   const [showCertificate, setShowCertificate] = useState(false)
   const [selectedCertificate, setSelectedCertificate] = useState<Course | null>(null)
-
-  // Sample courses data
-  const allCourses: Course[] = [
-    {
-      id: "pixel-pilot-mastery",
-      title: "Pixel Pilot Mastery Course",
-      description: "Master AI-powered development with comprehensive training",
-      longDescription: "This comprehensive course takes you from beginner to expert in AI-powered development using Pixel Pilot. Learn to build professional web applications, deploy them instantly, and master advanced AI development techniques.",
-      instructor: "Anye Happiness Ade",
-      avatar: "/hans.png",
-      duration: "8 weeks",
-      level: "All Levels",
-      category: "AI Development",
-      rating: 4.9,
-      students: 15420,
-      price: "Free",
-      featured: true,
-      enrolled: false,
-      progress: 0,
-      completed: false,
-      certificateAvailable: false,
-      skills: ["AI Development", "Web Applications", "Deployment", "UI/UX Design", "Database Integration"],
-      prerequisites: ["Basic computer skills", "No coding experience required"],
-      modules: [
-        {
-          id: "getting-started",
-          title: "Getting Started with Pixel Pilot",
-          description: "Learn the basics of AI-powered development",
-          duration: "2 hours",
-          completed: false,
-          unlocked: true,
-          lessons: [
-            {
-              id: "welcome",
-              title: "Welcome to Pixel Pilot",
-              description: "Introduction to AI-powered development",
-              duration: "15 min",
-              type: "video",
-              completed: false
-            },
-            {
-              id: "setup",
-              title: "Setting Up Your Environment",
-              description: "Get started with your first project",
-              duration: "20 min",
-              type: "interactive",
-              completed: false
-            }
-          ]
-        },
-        {
-          id: "ai-chat-system",
-          title: "Mastering the AI Chat System",
-          description: "Learn to communicate effectively with AI",
-          duration: "3 hours",
-          completed: false,
-          unlocked: false,
-          lessons: [
-            {
-              id: "chat-basics",
-              title: "Chat Interface Basics",
-              description: "Understanding the AI conversation system",
-              duration: "25 min",
-              type: "video",
-              completed: false
-            },
-            {
-              id: "effective-prompts",
-              title: "Writing Effective Prompts",
-              description: "How to get the best results from AI",
-              duration: "30 min",
-              type: "interactive",
-              completed: false
-            }
-          ]
-        }
-      ]
-    },
-    {
-      id: "react-nextjs-ai",
-      title: "React & Next.js with AI",
-      description: "Build modern React applications using AI assistance",
-      longDescription: "Learn to build professional React and Next.js applications with the help of AI. This course covers modern web development practices, component architecture, and deployment strategies.",
-      instructor: "Sarah Johnson",
-      avatar: "/hans.png",
-      duration: "6 weeks",
-      level: "Intermediate",
-      category: "Web Development",
-      rating: 4.8,
-      students: 8750,
-      price: "Free",
-      featured: false,
-      enrolled: false,
-      progress: 0,
-      completed: false,
-      certificateAvailable: false,
-      skills: ["React", "Next.js", "JavaScript", "TypeScript", "Modern Web Dev"],
-      prerequisites: ["Basic JavaScript", "HTML/CSS knowledge"],
-      modules: []
-    },
-    {
-      id: "ai-ui-ux-design",
-      title: "AI-Powered UI/UX Design",
-      description: "Create beautiful user interfaces with AI assistance",
-      longDescription: "Master the art of UI/UX design using AI tools. Learn design principles, create stunning interfaces, and implement them using modern web technologies.",
-      instructor: "Mike Chen",
-      avatar: "/hans.png",
-      duration: "5 weeks",
-      level: "Beginner",
-      category: "Design",
-      rating: 4.7,
-      students: 6230,
-      price: "Free",
-      featured: false,
-      enrolled: false,
-      progress: 0,
-      completed: false,
-      certificateAvailable: false,
-      skills: ["UI Design", "UX Principles", "Design Systems", "Prototyping"],
-      prerequisites: ["No design experience required"],
-      modules: []
-    }
-  ]
 
   const categories = [
     { id: "all", name: "All Courses", icon: BookOpen },
@@ -267,15 +145,25 @@ export default function LearnPage() {
 
   const levels = ["All Levels", "Beginner", "Intermediate", "Advanced"]
 
-  // Load user progress from localStorage
+  // Image API utility function
+  const getCourseThumbnail = (courseTitle: string, seed: number) => {
+    const description = `${courseTitle} course thumbnail, professional educational content`
+    return `https://api.a0.dev/assets/image?text=${encodeURIComponent(description)}&aspect=1:1&seed=${seed}`
+  }
+
+  // Load courses and user progress
   useEffect(() => {
-    const loadUserProgress = () => {
+    const loadData = async () => {
       try {
+        // Load courses from JSON
+        const coursesResponse = await fetch('/courses.json')
+        const coursesData = await coursesResponse.json()
+
+        // Load user progress
         const progress = localStorage.getItem('pixelPilotUserProgress')
         if (progress) {
           setUserProgress(JSON.parse(progress))
         } else {
-          // Initialize default progress
           const defaultProgress: UserProgress = {
             userId: 'user_' + Date.now(),
             enrolledCourses: [],
@@ -288,15 +176,18 @@ export default function LearnPage() {
           setUserProgress(defaultProgress)
           localStorage.setItem('pixelPilotUserProgress', JSON.stringify(defaultProgress))
         }
+
+        setCourses(coursesData.courses)
+        setFilteredCourses(coursesData.courses)
+        setCoursesData(coursesData)
       } catch (error) {
-        console.error('Failed to load user progress:', error)
+        console.error('Failed to load data:', error)
+      } finally {
+        setLoading(false)
       }
     }
 
-    loadUserProgress()
-    setCourses(allCourses)
-    setFilteredCourses(allCourses)
-    setLoading(false)
+    loadData()
   }, [])
 
   // Save progress to localStorage whenever it changes
@@ -622,7 +513,7 @@ export default function LearnPage() {
                     </div>
                   )}
                 </div>
-              </div>
+                </div>
 
               {/* Featured Course */}
               {filteredCourses.find(course => course.featured) && (
@@ -640,71 +531,89 @@ export default function LearnPage() {
                     if (!featuredCourse) return null
 
                     return (
-                      <Card className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/20 backdrop-blur-sm">
-                        <CardContent className="p-8">
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-                            <div>
-                              <Badge className="bg-purple-600 text-white mb-4">
-                                {featuredCourse.category}
-                              </Badge>
-                              <h3 className="text-3xl font-bold text-white mb-4">
-                                {featuredCourse.title}
-                              </h3>
-                              <p className="text-gray-300 text-lg mb-6">
-                                {featuredCourse.longDescription}
-                              </p>
-
-                              <div className="grid grid-cols-2 gap-4 mb-6">
-                                <div className="flex items-center space-x-2">
-                                  <Clock className="w-5 h-5 text-gray-400" />
-                                  <span className="text-gray-300">{featuredCourse.duration}</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  <Users className="w-5 h-5 text-gray-400" />
-                                  <span className="text-gray-300">{featuredCourse.students.toLocaleString()} students</span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  <Star className="w-5 h-5 text-yellow-400 fill-current" />
-                                  <span className="text-gray-300">{featuredCourse.rating} rating</span>
-                                </div>
-                                <Badge className={getDifficultyColor(featuredCourse.level)}>
-                                  {featuredCourse.level}
+                      <Link href={`/learn/${featuredCourse.id}`}>
+                        <Card className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/20 backdrop-blur-sm hover:bg-purple-500/20 transition-colors cursor-pointer">
+                          <CardContent className="p-8">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                              <div>
+                                <Badge className="bg-purple-600 text-white mb-4">
+                                  {featuredCourse.category}
                                 </Badge>
-                              </div>
+                                <h3 className="text-3xl font-bold text-white mb-4">
+                                  {featuredCourse.title}
+                                </h3>
+                                <p className="text-gray-300 text-lg mb-6">
+                                  {featuredCourse.longDescription}
+                                </p>
 
-                              <div className="flex flex-wrap gap-2 mb-6">
-                                {featuredCourse.skills.slice(0, 4).map((skill, index) => (
-                                  <Badge key={index} variant="outline" className="border-gray-600 text-gray-400">
-                                    {skill}
+                                <div className="grid grid-cols-2 gap-4 mb-6">
+                                  <div className="flex items-center space-x-2">
+                                    <Clock className="w-5 h-5 text-gray-400" />
+                                    <span className="text-gray-300">{featuredCourse.duration}</span>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Users className="w-5 h-5 text-gray-400" />
+                                    <span className="text-gray-300">{featuredCourse.students.toLocaleString()} students</span>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Star className="w-5 h-5 text-yellow-400 fill-current" />
+                                    <span className="text-gray-300">{featuredCourse.rating} rating</span>
+                                  </div>
+                                  <Badge className={getDifficultyColor(featuredCourse.level)}>
+                                    {featuredCourse.level}
                                   </Badge>
-                                ))}
+                                </div>
+
+                                <div className="flex flex-wrap gap-2 mb-6">
+                                  {featuredCourse.skills.slice(0, 4).map((skill, index) => (
+                                    <Badge key={index} variant="outline" className="border-gray-600 text-gray-400">
+                                      {skill}
+                                    </Badge>
+                                  ))}
+                                </div>
+
+                                <Button
+                                  size="lg"
+                                  className="bg-purple-600 hover:bg-purple-700 text-white px-8"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    enrollInCourse(featuredCourse.id)
+                                  }}
+                                >
+                                  {featuredCourse.enrolled ? "Continue Learning" : "Start Course"}
+                                  <ArrowRight className="w-5 h-5 ml-2" />
+                                </Button>
                               </div>
 
-                              <Button
-                                size="lg"
-                                className="bg-purple-600 hover:bg-purple-700 text-white px-8"
-                                onClick={() => enrollInCourse(featuredCourse.id)}
-                              >
-                                {featuredCourse.enrolled ? "Continue Learning" : "Start Course"}
-                                <ArrowRight className="w-5 h-5 ml-2" />
-                              </Button>
-                            </div>
-
-                            <div className="relative">
-                              <div className="w-full h-64 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
-                                <GraduationCap className="w-16 h-16 text-white" />
-                              </div>
-                              {featuredCourse.enrolled && (
-                                <div className="absolute top-4 right-4">
-                                  <div className="bg-green-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                                    Enrolled
+                              <div className="relative">
+                                <div className="w-full h-64 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl overflow-hidden">
+                                  <img
+                                    src={getCourseThumbnail(featuredCourse.title, featuredCourse.students)}
+                                    alt={featuredCourse.title}
+                                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                                    onError={(e) => {
+                                      const target = e.currentTarget as HTMLElement
+                                      target.style.display = 'none'
+                                      const sibling = target.nextElementSibling as HTMLElement
+                                      if (sibling) sibling.style.display = 'flex'
+                                    }}
+                                  />
+                                  <div className="w-full h-full flex items-center justify-center" style={{ display: 'none' }}>
+                                    <GraduationCap className="w-16 h-16 text-white" />
                                   </div>
                                 </div>
-                              )}
+                                {featuredCourse.enrolled && (
+                                  <div className="absolute top-4 right-4">
+                                    <div className="bg-green-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                                      Enrolled
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                </div>
-              </CardContent>
-            </Card>
+                          </CardContent>
+                        </Card>
+                      </Link>
                     )
                   })()}
                 </div>
@@ -716,120 +625,122 @@ export default function LearnPage() {
                   const IconComponent = categories.find(c => c.id === course.category.toLowerCase().replace(/\s+/g, '-'))?.icon || BookOpen
 
                   return (
-                    <Card key={course.id} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors group">
-                      <CardHeader className="pb-4">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <IconComponent className="w-6 h-6 text-purple-400" />
+                    <Link key={course.id} href={`/learn/${course.id}`}>
+                      <Card className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors group cursor-pointer">
+                        {/* Course Thumbnail */}
+                        <div className="aspect-video bg-gradient-to-br from-purple-500 to-pink-600 rounded-t-lg overflow-hidden">
+                          <img
+                            src={getCourseThumbnail(course.title, course.students)}
+                            alt={course.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            onError={(e) => {
+                              const target = e.currentTarget as HTMLElement
+                              target.style.display = 'none'
+                              const sibling = target.nextElementSibling as HTMLElement
+                              if (sibling) sibling.style.display = 'flex'
+                            }}
+                          />
+                          <div className="w-full h-full flex items-center justify-center" style={{ display: 'none' }}>
+                            <IconComponent className="w-12 h-12 text-white/80" />
                           </div>
                           {course.featured && (
-                            <Badge className="bg-yellow-600 text-white">
-                              <Star className="w-3 h-3 mr-1" />
-                              Featured
-                            </Badge>
+                            <div className="absolute top-3 right-3">
+                              <Badge className="bg-yellow-600 text-white">
+                                <Star className="w-3 h-3 mr-1" />
+                                Featured
+                              </Badge>
+                            </div>
                           )}
                         </div>
 
-                        <CardTitle className="text-white text-lg mb-2 group-hover:text-purple-400 transition-colors">
-                          {course.title}
-                        </CardTitle>
-                        <CardDescription className="text-gray-300 line-clamp-2">
-                          {course.description}
+                        <CardHeader className="pb-4">
+                          <div className="flex items-start justify-between mb-4">
+                            <Badge className="bg-purple-600 text-white">
+                              {course.category}
+                            </Badge>
+                            {course.enrolled && (
+                              <Badge className="bg-green-600 text-white">
+                                <Check className="w-3 h-3 mr-1" />
+                                Enrolled
+                              </Badge>
+                            )}
+                          </div>
+
+                          <CardTitle className="text-white text-lg mb-2 group-hover:text-purple-400 transition-colors line-clamp-2">
+                            {course.title}
+                          </CardTitle>
+                          <CardDescription className="text-gray-300 line-clamp-2">
+                            {course.description}
                 </CardDescription>
               </CardHeader>
 
               <CardContent>
-                        <div className="space-y-4">
-                          {/* Course Meta */}
-                          <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div className="space-y-4">
+                            {/* Course Meta */}
+                            <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="flex items-center space-x-2">
                     <Clock className="w-4 h-4 text-gray-400" />
-                              <span className="text-gray-300">{course.duration}</span>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Users className="w-4 h-4 text-gray-400" />
-                              <span className="text-gray-300">{course.students.toLocaleString()}</span>
-                            </div>
-                          </div>
-
-                          {/* Rating */}
-                          <div className="flex items-center space-x-2">
-                            <div className="flex items-center">
-                              <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                              <span className="text-white ml-1">{course.rating}</span>
-                            </div>
-                            <Badge className={getDifficultyColor(course.level)}>
-                              {course.level}
-                            </Badge>
-                          </div>
-
-                          {/* Instructor */}
-                          <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 rounded-full overflow-hidden">
-                              <img src={course.avatar} alt={course.instructor} className="w-full h-full object-cover" />
-                            </div>
-                            <span className="text-gray-300 text-sm">by {course.instructor}</span>
-                          </div>
-
-                          {/* Progress Bar (if enrolled) */}
-                          {course.enrolled && (
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-400">Progress</span>
-                                <span className="text-white">{course.progress}%</span>
+                                <span className="text-gray-300">{course.duration}</span>
                               </div>
-                              <Progress value={course.progress} className="h-2" />
+                              <div className="flex items-center space-x-2">
+                                <Users className="w-4 h-4 text-gray-400" />
+                                <span className="text-gray-300">{course.students.toLocaleString()}</span>
+                              </div>
                             </div>
-                          )}
 
-                          {/* Skills */}
-                          <div className="flex flex-wrap gap-1">
-                            {course.skills.slice(0, 2).map((skill, skillIndex) => (
-                              <Badge key={skillIndex} variant="outline" className="text-xs border-gray-600 text-gray-400">
-                                {skill}
+                            {/* Rating */}
+                            <div className="flex items-center space-x-2">
+                              <div className="flex items-center">
+                                <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                                <span className="text-white ml-1">{course.rating}</span>
+                              </div>
+                              <Badge className={getDifficultyColor(course.level)}>
+                                {course.level}
                               </Badge>
-                            ))}
-                            {course.skills.length > 2 && (
-                              <Badge variant="outline" className="text-xs border-gray-600 text-gray-400">
-                                +{course.skills.length - 2} more
-                              </Badge>
+                            </div>
+
+                            {/* Instructor */}
+                            <div className="flex items-center space-x-3">
+                              <div className="w-8 h-8 rounded-full overflow-hidden">
+                                <img src="/hans.png" alt={course.instructor} className="w-full h-full object-cover" />
+                              </div>
+                              <div className="text-xs text-gray-300">
+                                <div>by {course.instructor}</div>
+                                <div className="text-gray-500">Founder & CEO</div>
+                              </div>
+                            </div>
+
+                            {/* Progress Bar (if enrolled) */}
+                            {course.enrolled && (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-gray-400">Progress</span>
+                                  <span className="text-white">{course.progress}%</span>
+                                </div>
+                                <Progress value={course.progress} className="h-2" />
+                              </div>
                             )}
+
+                            {/* Skills */}
+                            <div className="flex flex-wrap gap-1">
+                              {course.skills.slice(0, 2).map((skill, skillIndex) => (
+                                <Badge key={skillIndex} variant="outline" className="text-xs border-gray-600 text-gray-400">
+                                  {skill}
+                                </Badge>
+                              ))}
+                              {course.skills.length > 2 && (
+                                <Badge variant="outline" className="text-xs border-gray-600 text-gray-400">
+                                  +{course.skills.length - 2} more
+                                </Badge>
+                              )}
+                            </div>
                           </div>
-
-                          {/* Action Button */}
-                          <Button
-                            className={`w-full ${
-                              course.enrolled
-                                ? course.completed
-                                  ? "bg-green-600 hover:bg-green-700"
-                                  : "bg-blue-600 hover:bg-blue-700"
-                                : "bg-purple-600 hover:bg-purple-700"
-                            } text-white`}
-                            onClick={() => course.enrolled ? null : enrollInCourse(course.id)}
-                          >
-                            {course.completed ? (
-                              <>
-                                <CertificateIcon className="w-4 h-4 mr-2" />
-                                View Certificate
-                              </>
-                            ) : course.enrolled ? (
-                              <>
-                                <Play className="w-4 h-4 mr-2" />
-                                Continue Learning
-                              </>
-                            ) : (
-                              <>
-                                <BookOpen className="w-4 h-4 mr-2" />
-                                Enroll Now
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
+                        </CardContent>
+                      </Card>
+                    </Link>
                   )
                 })}
-              </div>
+                  </div>
 
               {filteredCourses.length === 0 && (
                 <div className="text-center py-16">
@@ -882,9 +793,9 @@ export default function LearnPage() {
                     <TrendingUp className="w-8 h-8 text-orange-400 mx-auto mb-4" />
                     <div className="text-2xl font-bold text-white mb-2">{Math.round(userProgress.totalTimeSpent / 60)}h</div>
                     <div className="text-gray-400">Time Spent Learning</div>
-                  </CardContent>
-                </Card>
-              </div>
+              </CardContent>
+            </Card>
+          </div>
 
               {/* Enrolled Courses Progress */}
               {userProgress.enrolledCourses.length > 0 && (
@@ -922,10 +833,10 @@ export default function LearnPage() {
                                 <Button size="sm" className="bg-purple-600 hover:bg-purple-700">
                                   Continue
                                 </Button>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
+                  </div>
+                    </div>
+                  </CardContent>
+                </Card>
                       )
                     })}
                   </div>
@@ -940,7 +851,7 @@ export default function LearnPage() {
               <div className="text-center mb-12">
                 <h2 className="text-3xl font-bold text-white mb-4">My Certificates</h2>
                 <p className="text-gray-300">Celebrate your learning achievements</p>
-              </div>
+          </div>
 
               {userProgress.certificates.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -968,9 +879,9 @@ export default function LearnPage() {
                             <Button size="sm" variant="outline" className="border-gray-600">
                               <Share2 className="w-4 h-4" />
                             </Button>
-                </div>
-              </CardContent>
-            </Card>
+                    </div>
+                  </CardContent>
+                </Card>
                     )
                   })}
                 </div>
@@ -1025,18 +936,18 @@ export default function LearnPage() {
                   {/* Recipient */}
                   <div className="mb-8">
                     <p className="text-gray-600 mb-2">This is to certify that</p>
-                    <h2 className="text-3xl font-bold text-gray-900 mb-2">John Doe</h2>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-2">Student Name</h2>
                     <p className="text-gray-600">has successfully completed the course</p>
-                  </div>
-
+            </div>
+            
                   {/* Course */}
                   <div className="mb-8">
                     <h3 className="text-2xl font-semibold text-purple-600 mb-2">
                       {selectedCertificate.title}
                     </h3>
                     <p className="text-gray-600">with a score of 95%</p>
-                  </div>
-
+            </div>
+            
                   {/* Signature */}
                   <div className="mb-8">
                     <div className="border-t-2 border-gray-400 w-64 mx-auto mb-4"></div>
@@ -1044,8 +955,8 @@ export default function LearnPage() {
                     <p className="text-lg font-semibold text-gray-900" style={{ fontFamily: 'Dancing Script, cursive' }}>
                       Anye Happiness Ade
                     </p>
-                  </div>
-
+            </div>
+            
                   {/* Date */}
                   <div className="mb-8">
                     <p className="text-gray-600">Completed on</p>
@@ -1056,17 +967,17 @@ export default function LearnPage() {
                         day: 'numeric'
                       })}
                     </p>
-                  </div>
-
+            </div>
+            
                   {/* Certificate ID */}
                   <div className="border-t border-gray-300 pt-6">
                     <p className="text-sm text-gray-500">
                       Certificate ID: PP-{selectedCertificate.id.toUpperCase()}-{Date.now()}
                     </p>
                   </div>
-                </div>
-              </div>
-
+            </div>
+          </div>
+          
               {/* Action Buttons */}
               <div className="flex gap-4 mt-6">
                 <Button className="flex-1 bg-purple-600 hover:bg-purple-700 text-white">
@@ -1077,7 +988,7 @@ export default function LearnPage() {
                   <Share2 className="w-4 h-4 mr-2" />
                   Share Certificate
                 </Button>
-              </div>
+            </div>
             </div>
           </div>
         </div>
