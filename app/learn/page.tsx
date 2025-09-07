@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Progress } from "@/components/ui/progress"
 import {
   BookOpen, Video, Play, Users, Clock, Star, ArrowRight, MessageSquare, Code, Rocket, Layers, Settings,
   Search, Filter, CheckCircle, TrendingUp, Award, Target, Lightbulb, Zap, BarChart3, X, GraduationCap,
-  PlayCircle, FileText, Trophy, Calendar, User
+  PlayCircle, FileText, Trophy, Calendar, User, Check, Lock, Unlock, Download, Share2,
+  ChevronDown, ChevronRight, Book, Brain, Code2, Palette, Database, Globe, Smartphone, Award as CertificateIcon
 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
@@ -65,189 +67,346 @@ interface HelpResource {
   estimated_read_time: string
 }
 
+interface Lesson {
+  id: string
+  title: string
+  description: string
+  duration: string
+  type: "video" | "text" | "interactive" | "quiz"
+  content?: string
+  videoUrl?: string
+  completed: boolean
+}
+
+interface Module {
+  id: string
+  title: string
+  description: string
+  lessons: Lesson[]
+  duration: string
+  completed: boolean
+  unlocked: boolean
+}
+
+interface Course {
+  id: string
+  title: string
+  description: string
+  longDescription: string
+  instructor: string
+  avatar: string
+  duration: string
+  level: string
+  category: string
+  rating: number
+  students: number
+  price: string
+  modules: Module[]
+  skills: string[]
+  prerequisites: string[]
+  featured: boolean
+  enrolled: boolean
+  progress: number
+  completed: boolean
+  certificateAvailable: boolean
+}
+
+interface UserProgress {
+  userId: string
+  enrolledCourses: string[]
+  completedCourses: string[]
+  courseProgress: { [courseId: string]: { [moduleId: string]: { [lessonId: string]: boolean } } }
+  certificates: string[]
+  totalTimeSpent: number
+  lastActive: string
+}
+
 export default function LearnPage() {
-  const [allBlogPosts, setAllBlogPosts] = useState<BlogPost[]>([])
-  const [allHelpResources, setAllHelpResources] = useState<any>(null)
-  const [filteredPosts, setFilteredPosts] = useState<BlogPost[]>([])
-  const [filteredResources, setFilteredResources] = useState<any>(null)
+  const [courses, setCourses] = useState<Course[]>([])
+  const [filteredCourses, setFilteredCourses] = useState<Course[]>([])
+  const [userProgress, setUserProgress] = useState<UserProgress | null>(null)
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
-  const [selectedContentType, setSelectedContentType] = useState<string>("all")
-  const [selectedDifficulty, setSelectedDifficulty] = useState<string>("all")
+  const [selectedLevel, setSelectedLevel] = useState<string>("all")
+  const [selectedTab, setSelectedTab] = useState<"courses" | "progress" | "certificates">("courses")
+  const [showCertificate, setShowCertificate] = useState(false)
+  const [selectedCertificate, setSelectedCertificate] = useState<Course | null>(null)
 
-  const learningPaths = [
+  // Sample courses data
+  const allCourses: Course[] = [
     {
-      id: "beginner",
-      title: "AI Development Fundamentals",
-      description: "Start your journey with the basics of AI-powered development",
-      duration: "2-3 weeks",
-      level: "Beginner",
-      courses: 8,
-      icon: Target,
-      color: "blue",
-      skills: ["Basic AI concepts", "Simple app building", "Deployment basics"]
+      id: "pixel-pilot-mastery",
+      title: "Pixel Pilot Mastery Course",
+      description: "Master AI-powered development with comprehensive training",
+      longDescription: "This comprehensive course takes you from beginner to expert in AI-powered development using Pixel Pilot. Learn to build professional web applications, deploy them instantly, and master advanced AI development techniques.",
+      instructor: "Anye Happiness Ade",
+      avatar: "/hans.png",
+      duration: "8 weeks",
+      level: "All Levels",
+      category: "AI Development",
+      rating: 4.9,
+      students: 15420,
+      price: "Free",
+      featured: true,
+      enrolled: false,
+      progress: 0,
+      completed: false,
+      certificateAvailable: false,
+      skills: ["AI Development", "Web Applications", "Deployment", "UI/UX Design", "Database Integration"],
+      prerequisites: ["Basic computer skills", "No coding experience required"],
+      modules: [
+        {
+          id: "getting-started",
+          title: "Getting Started with Pixel Pilot",
+          description: "Learn the basics of AI-powered development",
+          duration: "2 hours",
+          completed: false,
+          unlocked: true,
+          lessons: [
+            {
+              id: "welcome",
+              title: "Welcome to Pixel Pilot",
+              description: "Introduction to AI-powered development",
+              duration: "15 min",
+              type: "video",
+              completed: false
+            },
+            {
+              id: "setup",
+              title: "Setting Up Your Environment",
+              description: "Get started with your first project",
+              duration: "20 min",
+              type: "interactive",
+              completed: false
+            }
+          ]
+        },
+        {
+          id: "ai-chat-system",
+          title: "Mastering the AI Chat System",
+          description: "Learn to communicate effectively with AI",
+          duration: "3 hours",
+          completed: false,
+          unlocked: false,
+          lessons: [
+            {
+              id: "chat-basics",
+              title: "Chat Interface Basics",
+              description: "Understanding the AI conversation system",
+              duration: "25 min",
+              type: "video",
+              completed: false
+            },
+            {
+              id: "effective-prompts",
+              title: "Writing Effective Prompts",
+              description: "How to get the best results from AI",
+              duration: "30 min",
+              type: "interactive",
+              completed: false
+            }
+          ]
+        }
+      ]
     },
     {
-      id: "intermediate",
-      title: "Advanced AI Development",
-      description: "Master complex AI features and advanced development techniques",
-      duration: "4-6 weeks",
+      id: "react-nextjs-ai",
+      title: "React & Next.js with AI",
+      description: "Build modern React applications using AI assistance",
+      longDescription: "Learn to build professional React and Next.js applications with the help of AI. This course covers modern web development practices, component architecture, and deployment strategies.",
+      instructor: "Sarah Johnson",
+      avatar: "/hans.png",
+      duration: "6 weeks",
       level: "Intermediate",
-      courses: 12,
-      icon: Zap,
-      color: "purple",
-      skills: ["Complex AI features", "Advanced integrations", "Performance optimization"]
-    },
-    {
-      id: "expert",
-      title: "Enterprise AI Solutions",
-      description: "Build enterprise-grade applications with advanced AI capabilities",
-      duration: "6-8 weeks",
-      level: "Expert",
-      courses: 15,
-      icon: Award,
-      color: "gold",
-      skills: ["Enterprise architecture", "Advanced security", "Team collaboration"]
-    }
-  ]
-
-  const quickStartCourses = [
-    {
-      title: "Build Your First AI App",
-      description: "Create a simple task management app with AI assistance",
-      duration: "45 min",
-      difficulty: "Beginner",
-      students: "12.5K",
+      category: "Web Development",
       rating: 4.8,
-      icon: Rocket
+      students: 8750,
+      price: "Free",
+      featured: false,
+      enrolled: false,
+      progress: 0,
+      completed: false,
+      certificateAvailable: false,
+      skills: ["React", "Next.js", "JavaScript", "TypeScript", "Modern Web Dev"],
+      prerequisites: ["Basic JavaScript", "HTML/CSS knowledge"],
+      modules: []
     },
     {
-      title: "AI-Powered Chatbots",
-      description: "Design and deploy intelligent conversational interfaces",
-      duration: "1.5 hours",
-      difficulty: "Intermediate",
-      students: "8.2K",
-      rating: 4.9,
-      icon: MessageSquare
-    },
-    {
-      title: "Database Integration with AI",
-      description: "Connect your apps to databases using AI-driven queries",
-      duration: "2 hours",
-      difficulty: "Intermediate",
-      students: "6.8K",
+      id: "ai-ui-ux-design",
+      title: "AI-Powered UI/UX Design",
+      description: "Create beautiful user interfaces with AI assistance",
+      longDescription: "Master the art of UI/UX design using AI tools. Learn design principles, create stunning interfaces, and implement them using modern web technologies.",
+      instructor: "Mike Chen",
+      avatar: "/hans.png",
+      duration: "5 weeks",
+      level: "Beginner",
+      category: "Design",
       rating: 4.7,
-      icon: BarChart3
-    },
-    {
-      title: "API Development & Testing",
-      description: "Build robust APIs with automated testing and AI assistance",
-      duration: "3 hours",
-      difficulty: "Advanced",
-      students: "4.1K",
-      rating: 4.9,
-      icon: Code
+      students: 6230,
+      price: "Free",
+      featured: false,
+      enrolled: false,
+      progress: 0,
+      completed: false,
+      certificateAvailable: false,
+      skills: ["UI Design", "UX Principles", "Design Systems", "Prototyping"],
+      prerequisites: ["No design experience required"],
+      modules: []
     }
   ]
 
+  const categories = [
+    { id: "all", name: "All Courses", icon: BookOpen },
+    { id: "ai-development", name: "AI Development", icon: Brain },
+    { id: "web-development", name: "Web Development", icon: Code2 },
+    { id: "design", name: "Design", icon: Palette },
+    { id: "database", name: "Database", icon: Database },
+    { id: "mobile", name: "Mobile Development", icon: Smartphone }
+  ]
+
+  const levels = ["All Levels", "Beginner", "Intermediate", "Advanced"]
+
+  // Load user progress from localStorage
   useEffect(() => {
-    const loadData = async () => {
+    const loadUserProgress = () => {
       try {
-        const [blogResponse, helpResponse] = await Promise.all([
-          fetch('/blog-posts.json'),
-          fetch('/help-resources.json')
-        ])
-
-        const [blogData, helpData] = await Promise.all([
-          blogResponse.json(),
-          helpResponse.json()
-        ])
-
-        setAllBlogPosts(blogData.posts || [])
-        setAllHelpResources(helpData)
-        setFilteredPosts(blogData.posts || [])
-        setFilteredResources(helpData)
+        const progress = localStorage.getItem('pixelPilotUserProgress')
+        if (progress) {
+          setUserProgress(JSON.parse(progress))
+        } else {
+          // Initialize default progress
+          const defaultProgress: UserProgress = {
+            userId: 'user_' + Date.now(),
+            enrolledCourses: [],
+            completedCourses: [],
+            courseProgress: {},
+            certificates: [],
+            totalTimeSpent: 0,
+            lastActive: new Date().toISOString()
+          }
+          setUserProgress(defaultProgress)
+          localStorage.setItem('pixelPilotUserProgress', JSON.stringify(defaultProgress))
+        }
       } catch (error) {
-        console.error('Failed to load learning data:', error)
-      } finally {
-        setLoading(false)
+        console.error('Failed to load user progress:', error)
       }
     }
 
-    loadData()
+    loadUserProgress()
+    setCourses(allCourses)
+    setFilteredCourses(allCourses)
+    setLoading(false)
   }, [])
+
+  // Save progress to localStorage whenever it changes
+  useEffect(() => {
+    if (userProgress) {
+      localStorage.setItem('pixelPilotUserProgress', JSON.stringify(userProgress))
+    }
+  }, [userProgress])
 
   // Live search and filtering
   useEffect(() => {
-    let filteredBlogPosts = allBlogPosts
-    let filteredHelp = { ...allHelpResources }
+    let filtered = courses
 
     // Search filter
     if (searchQuery) {
-      filteredBlogPosts = filteredBlogPosts.filter(post =>
-        post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        post.excerpt.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        post.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+      filtered = filtered.filter(course =>
+        course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        course.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        course.skills.some(skill => skill.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        course.instructor.toLowerCase().includes(searchQuery.toLowerCase())
       )
-
-      // Filter help resources
-      if (filteredHelp?.categories) {
-        filteredHelp.categories = filteredHelp.categories.map((category: any) => ({
-          ...category,
-          articles: category.articles.filter((article: HelpResource) =>
-            article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            article.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            article.tags.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
-          )
-        })).filter((category: any) => category.articles.length > 0)
-      }
     }
 
-    // Category filter for blog posts
+    // Category filter
     if (selectedCategory !== "all") {
-      filteredBlogPosts = filteredBlogPosts.filter(post => post.category === selectedCategory)
+      filtered = filtered.filter(course => course.category.toLowerCase().replace(/\s+/g, '-') === selectedCategory)
     }
 
-    // Content type filter
-    if (selectedContentType !== "all") {
-      if (selectedContentType === "tutorials") {
-        filteredBlogPosts = filteredBlogPosts.filter(post =>
-          post.category === "tutorials" || post.tags.includes("tutorial")
-        )
-      } else if (selectedContentType === "documentation") {
-        // Keep all for documentation
-      }
+    // Level filter
+    if (selectedLevel !== "all") {
+      filtered = filtered.filter(course => course.level === selectedLevel)
     }
 
-    setFilteredPosts(filteredBlogPosts)
-    setFilteredResources(filteredHelp)
-  }, [searchQuery, selectedCategory, selectedContentType, allBlogPosts, allHelpResources])
+    setFilteredCourses(filtered)
+  }, [searchQuery, selectedCategory, selectedLevel, courses])
+
+  const enrollInCourse = (courseId: string) => {
+    if (!userProgress) return
+
+    const updatedProgress = {
+      ...userProgress,
+      enrolledCourses: [...userProgress.enrolledCourses, courseId],
+      courseProgress: {
+        ...userProgress.courseProgress,
+        [courseId]: {}
+      },
+      lastActive: new Date().toISOString()
+    }
+    setUserProgress(updatedProgress)
+
+    // Update course enrollment status
+    setCourses(prev => prev.map(course =>
+      course.id === courseId ? { ...course, enrolled: true } : course
+    ))
+  }
+
+  const completeLesson = (courseId: string, moduleId: string, lessonId: string) => {
+    if (!userProgress) return
+
+    const updatedProgress = {
+      ...userProgress,
+      courseProgress: {
+        ...userProgress.courseProgress,
+        [courseId]: {
+          ...userProgress.courseProgress[courseId],
+          [moduleId]: {
+            ...userProgress.courseProgress[courseId]?.[moduleId],
+            [lessonId]: true
+          }
+        }
+      },
+      lastActive: new Date().toISOString()
+    }
+    setUserProgress(updatedProgress)
+  }
+
+  const completeCourse = (courseId: string) => {
+    if (!userProgress) return
+
+    const updatedProgress = {
+      ...userProgress,
+      completedCourses: [...userProgress.completedCourses, courseId],
+      certificates: [...userProgress.certificates, courseId],
+      lastActive: new Date().toISOString()
+    }
+    setUserProgress(updatedProgress)
+
+    // Update course completion status
+    setCourses(prev => prev.map(course =>
+      course.id === courseId ? { ...course, completed: true, certificateAvailable: true } : course
+    ))
+  }
+
+  const generateCertificate = (course: Course) => {
+    setSelectedCertificate(course)
+    setShowCertificate(true)
+  }
 
   const clearFilters = () => {
     setSearchQuery("")
     setSelectedCategory("all")
-    setSelectedContentType("all")
-    setSelectedDifficulty("all")
+    setSelectedLevel("all")
   }
 
-  const getIconForCategory = (categoryId: string) => {
-    const iconMap: Record<string, any> = {
-      "getting-started": BookOpen,
-      "ai-development": MessageSquare,
-      "development-tools": Code,
-      "deployment-integration": Rocket,
-      "project-management": Layers,
-      "troubleshooting": Settings
-    }
-    return iconMap[categoryId] || BookOpen
-  }
-
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty.toLowerCase()) {
+  const getDifficultyColor = (level: string) => {
+    switch (level.toLowerCase()) {
       case "beginner": return "bg-green-600"
       case "intermediate": return "bg-yellow-600"
       case "advanced": return "bg-red-600"
+      case "all levels": return "bg-purple-600"
       default: return "bg-gray-600"
     }
   }
@@ -261,7 +420,7 @@ export default function LearnPage() {
         <div className="relative z-10 pt-16 pb-24 flex items-center justify-center min-h-screen">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-            <p className="text-white">Loading learning resources...</p>
+            <p className="text-white">Loading learning platform...</p>
           </div>
         </div>
         <Footer />
@@ -273,7 +432,7 @@ export default function LearnPage() {
     <div className="min-h-screen relative overflow-hidden">
       {/* Enhanced Gradient Background */}
       <div className="absolute inset-0 lovable-gradient" />
-
+      
       {/* Noise Texture Overlay */}
       <div className="absolute inset-0 noise-texture" />
 
@@ -291,34 +450,40 @@ export default function LearnPage() {
               </div>
             </div>
             <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
-              Master
+              Pixel Pilot
               <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
-                AI Development
+                Learning Hub
               </span>
             </h1>
             <p className="text-xl text-white/80 max-w-4xl mx-auto mb-8 leading-relaxed">
-              From beginner to expert, learn everything you need to build amazing applications
-              with AI-powered development tools. Join thousands of developers mastering the future.
+              Master AI-powered development with comprehensive courses, interactive tutorials,
+              and hands-on projects. Track your progress and earn professional certificates.
             </p>
 
             {/* Key Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12 max-w-4xl mx-auto">
               <div className="text-center">
-                <div className="text-3xl font-bold text-white mb-2">25+</div>
-                <div className="text-gray-400">Learning Modules</div>
+                <div className="text-3xl font-bold text-white mb-2">{filteredCourses.length}+</div>
+                <div className="text-gray-400">Available Courses</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-white mb-2">50K+</div>
-                <div className="text-gray-400">Students Learning</div>
+                <div className="text-3xl font-bold text-white mb-2">
+                  {userProgress?.enrolledCourses.length || 0}
+                </div>
+                <div className="text-gray-400">Courses Enrolled</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-white mb-2">4.9</div>
-                <div className="text-gray-400">Average Rating</div>
+                <div className="text-3xl font-bold text-white mb-2">
+                  {userProgress?.completedCourses.length || 0}
+                </div>
+                <div className="text-gray-400">Courses Completed</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-white mb-2">24/7</div>
-                <div className="text-gray-400">Learning Support</div>
+                <div className="text-3xl font-bold text-white mb-2">
+                  {userProgress?.certificates.length || 0}
+                </div>
+                <div className="text-gray-400">Certificates Earned</div>
               </div>
             </div>
 
@@ -327,430 +492,600 @@ export default function LearnPage() {
                 <PlayCircle className="w-5 h-5 mr-2" />
                 Start Learning Now
               </Button>
-              <Button size="lg" variant="outline" className="border-gray-600 text-white hover:bg-gray-700 px-8 py-4 text-lg">
-                <BookOpen className="w-5 h-5 mr-2" />
-                Browse Courses
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-gray-600 text-white hover:bg-gray-700 px-8 py-4 text-lg"
+                onClick={() => setSelectedTab("progress")}
+              >
+                <Trophy className="w-5 h-5 mr-2" />
+                View My Progress
               </Button>
             </div>
           </div>
 
-          {/* Search and Filter Section */}
-          <div className="mb-16">
-            <div className="max-w-4xl mx-auto">
-              {/* Search Bar */}
-              <div className="relative mb-6">
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <Input
-                    type="text"
-                    placeholder="Search courses, tutorials, and documentation..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-12 pr-4 py-4 text-lg bg-gray-800/50 border-gray-700/50 text-white placeholder-gray-400 focus:border-purple-500 focus:ring-purple-500 rounded-xl"
-                  />
-                  {(searchQuery || selectedCategory !== "all" || selectedContentType !== "all" || selectedDifficulty !== "all") && (
-                    <Button
-                      onClick={clearFilters}
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  )}
+          {/* Tab Navigation */}
+          <div className="mb-12">
+            <div className="flex justify-center">
+              <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-2 border border-gray-700/50">
+                <div className="flex space-x-2">
+                  {[
+                    { id: "courses", label: "Courses", icon: BookOpen },
+                    { id: "progress", label: "My Progress", icon: Target },
+                    { id: "certificates", label: "Certificates", icon: CertificateIcon }
+                  ].map((tab) => {
+                    const IconComponent = tab.icon
+                    return (
+                      <Button
+                        key={tab.id}
+                        variant={selectedTab === tab.id ? "default" : "ghost"}
+                        onClick={() => setSelectedTab(tab.id as any)}
+                        className={`flex items-center space-x-2 px-6 py-3 ${
+                          selectedTab === tab.id
+                            ? "bg-purple-600 hover:bg-purple-700"
+                            : "text-gray-300 hover:text-white hover:bg-gray-700/50"
+                        }`}
+                      >
+                        <IconComponent className="w-4 h-4" />
+                        <span>{tab.label}</span>
+                      </Button>
+                    )
+                  })}
                 </div>
               </div>
-
-              {/* Filters */}
-              <div className="flex flex-wrap gap-4 items-center justify-center">
-                {/* Category Filter */}
-                <div className="flex items-center space-x-2">
-                  <Filter className="w-4 h-4 text-gray-400" />
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm focus:border-purple-500 focus:ring-purple-500"
-                  >
-                    <option value="all">All Categories</option>
-                    <option value="platform-updates">Platform Updates</option>
-                    <option value="tutorials">Tutorials</option>
-                    <option value="case-studies">Case Studies</option>
-                    <option value="industry-insights">Industry Insights</option>
-                    <option value="best-practices">Best Practices</option>
-                  </select>
-                </div>
-
-                {/* Content Type Filter */}
-                <div className="flex items-center space-x-2">
-                  <span className="text-gray-400 text-sm">Type:</span>
-                  <select
-                    value={selectedContentType}
-                    onChange={(e) => setSelectedContentType(e.target.value)}
-                    className="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm focus:border-purple-500 focus:ring-purple-500"
-                  >
-                    <option value="all">All Content</option>
-                    <option value="tutorials">Tutorials</option>
-                    <option value="documentation">Documentation</option>
-                  </select>
-                </div>
-
-                {/* Difficulty Filter */}
-                <div className="flex items-center space-x-2">
-                  <span className="text-gray-400 text-sm">Level:</span>
-                  <select
-                    value={selectedDifficulty}
-                    onChange={(e) => setSelectedDifficulty(e.target.value)}
-                    className="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm focus:border-purple-500 focus:ring-purple-500"
-                  >
-                    <option value="all">All Levels</option>
-                    <option value="beginner">Beginner</option>
-                    <option value="intermediate">Intermediate</option>
-                    <option value="advanced">Advanced</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Active Filters Display */}
-              {(searchQuery || selectedCategory !== "all" || selectedContentType !== "all" || selectedDifficulty !== "all") && (
-                <div className="mt-4 flex flex-wrap gap-2 justify-center">
-                  {searchQuery && (
-                    <Badge variant="secondary" className="bg-purple-600 text-white">
-                      Search: "{searchQuery}"
-                    </Badge>
-                  )}
-                  {selectedCategory !== "all" && (
-                    <Badge variant="secondary" className="bg-blue-600 text-white">
-                      Category: {selectedCategory.replace('-', ' ')}
-                    </Badge>
-                  )}
-                  {selectedContentType !== "all" && (
-                    <Badge variant="secondary" className="bg-green-600 text-white">
-                      Type: {selectedContentType}
-                    </Badge>
-                  )}
-                  {selectedDifficulty !== "all" && (
-                    <Badge variant="secondary" className="bg-orange-600 text-white">
-                      Level: {selectedDifficulty}
-                    </Badge>
-                  )}
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Learning Paths */}
-          <div className="mb-20">
-            <div className="text-center mb-16">
-              <h2 className="text-4xl font-bold text-white mb-4">Learning Paths</h2>
-              <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-                Structured learning journeys to take you from beginner to expert in AI development.
-              </p>
-            </div>
+          {/* Courses Tab */}
+          {selectedTab === "courses" && (
+            <>
+              {/* Search and Filter Section */}
+              <div className="mb-16">
+                <div className="max-w-4xl mx-auto">
+                  {/* Search Bar */}
+                  <div className="relative mb-6">
+                    <div className="relative">
+                      <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <Input
+                        type="text"
+                        placeholder="Search courses, skills, or instructors..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-12 pr-4 py-4 text-lg bg-gray-800/50 border-gray-700/50 text-white placeholder-gray-400 focus:border-purple-500 focus:ring-purple-500 rounded-xl"
+                      />
+                      {(searchQuery || selectedCategory !== "all" || selectedLevel !== "all") && (
+                        <Button
+                          onClick={clearFilters}
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {learningPaths.map((path, index) => {
-                const IconComponent = path.icon
-                return (
-                  <Card key={path.id} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors group cursor-pointer">
-                    <CardHeader className="text-center pb-6">
-                      <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                        <IconComponent className="w-8 h-8 text-purple-400" />
-                      </div>
-                      <CardTitle className="text-white text-xl mb-2">{path.title}</CardTitle>
-                      <Badge variant="secondary" className={`${path.color === 'gold' ? 'bg-yellow-600' : path.color === 'purple' ? 'bg-purple-600' : 'bg-blue-600'} text-white mb-3`}>
-                        {path.level}
-                      </Badge>
-                      <CardDescription className="text-gray-300">
-                        {path.description}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-400">Duration:</span>
-                          <span className="text-white">{path.duration}</span>
+                  {/* Filters */}
+                  <div className="flex flex-wrap gap-4 items-center justify-center">
+                    {/* Category Filter */}
+                    <div className="flex items-center space-x-2">
+                      <Filter className="w-4 h-4 text-gray-400" />
+                      <select
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm focus:border-purple-500 focus:ring-purple-500"
+                      >
+                        {categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Level Filter */}
+                  <div className="flex items-center space-x-2">
+                      <span className="text-gray-400 text-sm">Level:</span>
+                      <select
+                        value={selectedLevel}
+                        onChange={(e) => setSelectedLevel(e.target.value)}
+                        className="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white text-sm focus:border-purple-500 focus:ring-purple-500"
+                      >
+                        {levels.map((level) => (
+                          <option key={level} value={level}>
+                            {level}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Active Filters Display */}
+                  {(searchQuery || selectedCategory !== "all" || selectedLevel !== "all") && (
+                    <div className="mt-4 flex flex-wrap gap-2 justify-center">
+                      {searchQuery && (
+                        <Badge variant="secondary" className="bg-purple-600 text-white">
+                          Search: "{searchQuery}"
+                        </Badge>
+                      )}
+                      {selectedCategory !== "all" && (
+                        <Badge variant="secondary" className="bg-blue-600 text-white">
+                          Category: {categories.find(c => c.id === selectedCategory)?.name}
+                        </Badge>
+                      )}
+                      {selectedLevel !== "all" && (
+                        <Badge variant="secondary" className="bg-green-600 text-white">
+                          Level: {selectedLevel}
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Featured Course */}
+              {filteredCourses.find(course => course.featured) && (
+                <div className="mb-16">
+                  <div className="text-center mb-8">
+                    <h2 className="text-3xl font-bold text-white mb-4">Featured Course</h2>
+                    <Badge className="bg-yellow-600 text-white px-4 py-2">
+                      <Star className="w-4 h-4 mr-2" />
+                      Recommended for New Learners
+                    </Badge>
+                  </div>
+
+                  {(() => {
+                    const featuredCourse = filteredCourses.find(course => course.featured)
+                    if (!featuredCourse) return null
+
+                    return (
+                      <Card className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/20 backdrop-blur-sm">
+                        <CardContent className="p-8">
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                            <div>
+                              <Badge className="bg-purple-600 text-white mb-4">
+                                {featuredCourse.category}
+                              </Badge>
+                              <h3 className="text-3xl font-bold text-white mb-4">
+                                {featuredCourse.title}
+                              </h3>
+                              <p className="text-gray-300 text-lg mb-6">
+                                {featuredCourse.longDescription}
+                              </p>
+
+                              <div className="grid grid-cols-2 gap-4 mb-6">
+                                <div className="flex items-center space-x-2">
+                                  <Clock className="w-5 h-5 text-gray-400" />
+                                  <span className="text-gray-300">{featuredCourse.duration}</span>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <Users className="w-5 h-5 text-gray-400" />
+                                  <span className="text-gray-300">{featuredCourse.students.toLocaleString()} students</span>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <Star className="w-5 h-5 text-yellow-400 fill-current" />
+                                  <span className="text-gray-300">{featuredCourse.rating} rating</span>
+                                </div>
+                                <Badge className={getDifficultyColor(featuredCourse.level)}>
+                                  {featuredCourse.level}
+                                </Badge>
+                              </div>
+
+                              <div className="flex flex-wrap gap-2 mb-6">
+                                {featuredCourse.skills.slice(0, 4).map((skill, index) => (
+                                  <Badge key={index} variant="outline" className="border-gray-600 text-gray-400">
+                                    {skill}
+                                  </Badge>
+                                ))}
+                              </div>
+
+                              <Button
+                                size="lg"
+                                className="bg-purple-600 hover:bg-purple-700 text-white px-8"
+                                onClick={() => enrollInCourse(featuredCourse.id)}
+                              >
+                                {featuredCourse.enrolled ? "Continue Learning" : "Start Course"}
+                                <ArrowRight className="w-5 h-5 ml-2" />
+                              </Button>
+                            </div>
+
+                            <div className="relative">
+                              <div className="w-full h-64 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
+                                <GraduationCap className="w-16 h-16 text-white" />
+                              </div>
+                              {featuredCourse.enrolled && (
+                                <div className="absolute top-4 right-4">
+                                  <div className="bg-green-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                                    Enrolled
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                </div>
+              </CardContent>
+            </Card>
+                    )
+                  })()}
+                </div>
+              )}
+
+              {/* Course Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
+                {filteredCourses.map((course, index) => {
+                  const IconComponent = categories.find(c => c.id === course.category.toLowerCase().replace(/\s+/g, '-'))?.icon || BookOpen
+
+                  return (
+                    <Card key={course.id} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors group">
+                      <CardHeader className="pb-4">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <IconComponent className="w-6 h-6 text-purple-400" />
+                          </div>
+                          {course.featured && (
+                            <Badge className="bg-yellow-600 text-white">
+                              <Star className="w-3 h-3 mr-1" />
+                              Featured
+                            </Badge>
+                          )}
                         </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-400">Courses:</span>
-                          <span className="text-white">{path.courses}</span>
-                        </div>
-                        <div className="pt-2 border-t border-gray-700/50">
-                          <p className="text-xs text-gray-400 mb-2">You'll learn:</p>
+
+                        <CardTitle className="text-white text-lg mb-2 group-hover:text-purple-400 transition-colors">
+                          {course.title}
+                        </CardTitle>
+                        <CardDescription className="text-gray-300 line-clamp-2">
+                          {course.description}
+                </CardDescription>
+              </CardHeader>
+
+              <CardContent>
+                        <div className="space-y-4">
+                          {/* Course Meta */}
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <Clock className="w-4 h-4 text-gray-400" />
+                              <span className="text-gray-300">{course.duration}</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Users className="w-4 h-4 text-gray-400" />
+                              <span className="text-gray-300">{course.students.toLocaleString()}</span>
+                            </div>
+                          </div>
+
+                          {/* Rating */}
+                          <div className="flex items-center space-x-2">
+                            <div className="flex items-center">
+                              <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                              <span className="text-white ml-1">{course.rating}</span>
+                            </div>
+                            <Badge className={getDifficultyColor(course.level)}>
+                              {course.level}
+                            </Badge>
+                          </div>
+
+                          {/* Instructor */}
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 rounded-full overflow-hidden">
+                              <img src={course.avatar} alt={course.instructor} className="w-full h-full object-cover" />
+                            </div>
+                            <span className="text-gray-300 text-sm">by {course.instructor}</span>
+                          </div>
+
+                          {/* Progress Bar (if enrolled) */}
+                          {course.enrolled && (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-gray-400">Progress</span>
+                                <span className="text-white">{course.progress}%</span>
+                              </div>
+                              <Progress value={course.progress} className="h-2" />
+                            </div>
+                          )}
+
+                          {/* Skills */}
                           <div className="flex flex-wrap gap-1">
-                            {path.skills.map((skill, skillIndex) => (
+                            {course.skills.slice(0, 2).map((skill, skillIndex) => (
                               <Badge key={skillIndex} variant="outline" className="text-xs border-gray-600 text-gray-400">
                                 {skill}
                               </Badge>
                             ))}
+                            {course.skills.length > 2 && (
+                              <Badge variant="outline" className="text-xs border-gray-600 text-gray-400">
+                                +{course.skills.length - 2} more
+                              </Badge>
+                            )}
                           </div>
-                        </div>
-                        <Button className="w-full bg-purple-600 hover:bg-purple-700 group-hover:bg-purple-700">
-                          Start Path
-                          <ArrowRight className="w-4 h-4 ml-2" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          </div>
 
-          {/* Quick Start Courses */}
-          <div className="mb-20">
-            <div className="text-center mb-16">
-              <h2 className="text-4xl font-bold text-white mb-4">Quick Start Courses</h2>
-              <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-                Jump right in with our most popular beginner-friendly courses.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {quickStartCourses.map((course, index) => {
-                const IconComponent = course.icon
-                return (
-                  <Card key={index} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors cursor-pointer group">
-                    <CardHeader className="text-center pb-4">
-                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-green-500/20 to-blue-500/20 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                        <IconComponent className="w-6 h-6 text-green-400" />
-                      </div>
-                      <CardTitle className="text-white text-lg mb-2">{course.title}</CardTitle>
-                      <Badge variant="secondary" className={getDifficultyColor(course.difficulty)}>
-                        {course.difficulty}
-                      </Badge>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-gray-300 text-sm mb-4 line-clamp-3">
-                        {course.description}
-                      </p>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="flex items-center text-gray-400">
-                            <Clock className="w-4 h-4 mr-1" />
-                            {course.duration}
-                          </span>
-                          <span className="flex items-center text-gray-400">
-                            <User className="w-4 h-4 mr-1" />
-                            {course.students}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-1">
-                            <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                            <span className="text-white text-sm">{course.rating}</span>
-                          </div>
-                          <Button size="sm" className="bg-purple-600 hover:bg-purple-700">
-                            Start
+                          {/* Action Button */}
+                          <Button
+                            className={`w-full ${
+                              course.enrolled
+                                ? course.completed
+                                  ? "bg-green-600 hover:bg-green-700"
+                                  : "bg-blue-600 hover:bg-blue-700"
+                                : "bg-purple-600 hover:bg-purple-700"
+                            } text-white`}
+                            onClick={() => course.enrolled ? null : enrollInCourse(course.id)}
+                          >
+                            {course.completed ? (
+                              <>
+                                <CertificateIcon className="w-4 h-4 mr-2" />
+                                View Certificate
+                              </>
+                            ) : course.enrolled ? (
+                              <>
+                                <Play className="w-4 h-4 mr-2" />
+                                Continue Learning
+                              </>
+                            ) : (
+                              <>
+                                <BookOpen className="w-4 h-4 mr-2" />
+                                Enroll Now
+                              </>
+                            )}
                           </Button>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Latest Content */}
-          <div className="mb-20">
-            <div className="text-center mb-16">
-              <h2 className="text-4xl font-bold text-white mb-4">Latest Content</h2>
-              <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-                Stay updated with the latest tutorials, insights, and platform updates.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
-              {filteredPosts.slice(0, 6).map((post, index) => {
-                const thumbnailGradients = [
-                  "bg-gradient-to-br from-blue-500 to-purple-600",
-                  "bg-gradient-to-br from-green-500 to-blue-600",
-                  "bg-gradient-to-br from-purple-500 to-pink-600",
-                  "bg-gradient-to-br from-yellow-500 to-orange-600",
-                  "bg-gradient-to-br from-cyan-500 to-blue-600",
-                  "bg-gradient-to-br from-emerald-500 to-teal-600"
-                ]
-
-                return (
-                  <Link key={post.id} href={`/community/${post.slug || post.id}`}>
-                    <Card className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors cursor-pointer group h-full">
-                      <div className={`h-48 ${thumbnailGradients[index % thumbnailGradients.length]} rounded-t-lg flex items-center justify-center relative overflow-hidden`}>
-                        <BookOpen className="w-12 h-12 text-white/80" />
-                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div>
-                      </div>
-                      <CardContent className="p-6 flex-1 flex flex-col">
-                        <Badge className={`w-fit mb-3 ${
-                          post.category === 'platform-updates' ? 'bg-blue-500' :
-                          post.category === 'tutorials' ? 'bg-green-500' :
-                          post.category === 'case-studies' ? 'bg-yellow-500' :
-                          post.category === 'industry-insights' ? 'bg-purple-500' :
-                          post.category === 'best-practices' ? 'bg-orange-500' :
-                          'bg-red-500'
-                        } text-white`}>
-                          {post.category.replace('-', ' ').toUpperCase()}
-                        </Badge>
-                        <h3 className="text-lg font-semibold text-white mb-3 group-hover:text-purple-400 transition-colors line-clamp-2 leading-tight">
-                          {post.title}
-                        </h3>
-                        <p className="text-gray-300 text-sm mb-4 line-clamp-3 flex-1">
-                          {post.excerpt}
-                        </p>
-                        <div className="flex items-center justify-between text-sm text-gray-400 mt-auto">
-                          <span className="flex items-center">
-                            <Clock className="w-3 h-3 mr-1" />
-                            {post.reading_time}
-                          </span>
-                          <span>{new Date(post.published_date).toLocaleDateString()}</span>
-                        </div>
-                        <div className="flex flex-wrap gap-1 mt-3">
-                          {post.tags?.slice(0, 2).map((tag: string, tagIndex: number) => (
-                            <Badge key={tagIndex} variant="outline" className="text-xs border-gray-600 text-gray-400">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
                       </CardContent>
                     </Card>
-                  </Link>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
 
-            <div className="text-center">
-              <Link href="/community">
-                <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-4">
-                  View All Content
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </Button>
-              </Link>
-            </div>
-          </div>
+              {filteredCourses.length === 0 && (
+                <div className="text-center py-16">
+                  <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-white mb-2">No courses found</h3>
+                  <p className="text-gray-400 mb-4">
+                    Try adjusting your search terms or filters to find what you're looking for.
+                  </p>
+                  <Button onClick={clearFilters} variant="outline" className="border-gray-600 text-white hover:bg-gray-700">
+                    Clear Filters
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
 
-          {/* Documentation Hub */}
-          <div className="mb-20">
-            <div className="text-center mb-16">
-              <h2 className="text-4xl font-bold text-white mb-4">Documentation Hub</h2>
-              <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-                Comprehensive guides and references for every aspect of Pixel Pilot.
-              </p>
-            </div>
+          {/* Progress Tab */}
+          {selectedTab === "progress" && userProgress && (
+            <div className="space-y-8">
+              <div className="text-center mb-12">
+                <h2 className="text-3xl font-bold text-white mb-4">My Learning Progress</h2>
+                <p className="text-gray-300">Track your journey and achievements</p>
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {filteredResources?.categories?.slice(0, 6).map((category: any, index: number) => {
-                const IconComponent = getIconForCategory(category.id)
-                const totalArticles = category.articles.length
-                const totalReadTime = category.articles.reduce((total: number, article: HelpResource) => {
-                  const minutes = parseInt(article.estimated_read_time.split(' ')[0])
-                  return total + minutes
-                }, 0)
+              {/* Progress Overview */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+                <Card className="bg-gray-800/50 border-gray-700/50">
+                  <CardContent className="p-6 text-center">
+                    <BookOpen className="w-8 h-8 text-purple-400 mx-auto mb-4" />
+                    <div className="text-2xl font-bold text-white mb-2">{userProgress.enrolledCourses.length}</div>
+                    <div className="text-gray-400">Enrolled Courses</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gray-800/50 border-gray-700/50">
+                  <CardContent className="p-6 text-center">
+                    <CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-4" />
+                    <div className="text-2xl font-bold text-white mb-2">{userProgress.completedCourses.length}</div>
+                    <div className="text-gray-400">Completed Courses</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gray-800/50 border-gray-700/50">
+                  <CardContent className="p-6 text-center">
+                    <CertificateIcon className="w-8 h-8 text-blue-400 mx-auto mb-4" />
+                    <div className="text-2xl font-bold text-white mb-2">{userProgress.certificates.length}</div>
+                    <div className="text-gray-400">Certificates Earned</div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gray-800/50 border-gray-700/50">
+                  <CardContent className="p-6 text-center">
+                    <TrendingUp className="w-8 h-8 text-orange-400 mx-auto mb-4" />
+                    <div className="text-2xl font-bold text-white mb-2">{Math.round(userProgress.totalTimeSpent / 60)}h</div>
+                    <div className="text-gray-400">Time Spent Learning</div>
+                  </CardContent>
+                </Card>
+              </div>
 
-                return (
-                  <Link key={category.id} href={`/docs#${category.id}`}>
-                    <Card className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors cursor-pointer group">
-                      <CardHeader>
-                        <div className="flex items-start space-x-4">
-                          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                            <IconComponent className="w-7 h-7 text-blue-400" />
-                          </div>
-                          <div className="flex-1">
-                            <CardTitle className="text-white text-xl mb-2">{category.title}</CardTitle>
-                            <CardDescription className="text-gray-300 leading-relaxed">
-                              {category.description}
-                            </CardDescription>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center space-x-4 text-sm text-gray-400">
-                            <span className="flex items-center">
-                              <FileText className="w-4 h-4 mr-1" />
-                              {totalArticles} articles
-                            </span>
-                            <span className="flex items-center">
-                              <Clock className="w-4 h-4 mr-1" />
-                              {totalReadTime}min
-                            </span>
-                          </div>
-                          <ArrowRight className="w-5 h-5 text-gray-400 group-hover:translate-x-1 transition-transform" />
-                        </div>
-                        <div className="space-y-2">
-                          {category.articles.slice(0, 3).map((article: HelpResource, articleIndex: number) => (
-                            <div key={articleIndex} className="flex items-center justify-between p-2 rounded hover:bg-gray-700/50">
-                              <span className="text-gray-300 text-sm truncate">{article.title}</span>
-                              <span className="text-gray-400 text-xs">{article.estimated_read_time}</span>
+              {/* Enrolled Courses Progress */}
+              {userProgress.enrolledCourses.length > 0 && (
+                <div>
+                  <h3 className="text-2xl font-bold text-white mb-6">Current Learning</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {userProgress.enrolledCourses.map(courseId => {
+                      const course = courses.find(c => c.id === courseId)
+                      if (!course) return null
+
+                      return (
+                        <Card key={courseId} className="bg-gray-800/50 border-gray-700/50">
+                          <CardHeader>
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <CardTitle className="text-white text-lg">{course.title}</CardTitle>
+                                <CardDescription className="text-gray-300">{course.instructor}</CardDescription>
+                              </div>
+                              <Badge className={getDifficultyColor(course.level)}>
+                                {course.level}
+                              </Badge>
                             </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                )
-              })}
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-4">
+                              <div>
+                                <div className="flex items-center justify-between text-sm mb-2">
+                                  <span className="text-gray-400">Progress</span>
+                                  <span className="text-white">{course.progress}%</span>
+                                </div>
+                                <Progress value={course.progress} className="h-2" />
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-gray-400 text-sm">Next: Module 1, Lesson 2</span>
+                                <Button size="sm" className="bg-purple-600 hover:bg-purple-700">
+                                  Continue
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
-          {/* Learning Progress & Achievements */}
-          <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-3xl p-12 backdrop-blur-sm border border-purple-500/20 mb-20">
-            <div className="text-center mb-12">
-              <h2 className="text-4xl font-bold text-white mb-4">Track Your Progress</h2>
-              <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-                Monitor your learning journey with personalized progress tracking and achievements.
-              </p>
+          {/* Certificates Tab */}
+          {selectedTab === "certificates" && userProgress && (
+            <div className="space-y-8">
+              <div className="text-center mb-12">
+                <h2 className="text-3xl font-bold text-white mb-4">My Certificates</h2>
+                <p className="text-gray-300">Celebrate your learning achievements</p>
+              </div>
+
+              {userProgress.certificates.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {userProgress.certificates.map(courseId => {
+                    const course = courses.find(c => c.id === courseId)
+                    if (!course) return null
+
+                    return (
+                      <Card key={courseId} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors cursor-pointer group">
+                        <CardContent className="p-6 text-center">
+                          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                            <CertificateIcon className="w-8 h-8 text-yellow-400" />
+                          </div>
+                          <h3 className="text-white font-semibold mb-2">{course.title}</h3>
+                          <p className="text-gray-400 text-sm mb-4">Completed on {new Date().toLocaleDateString()}</p>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              className="flex-1 bg-yellow-600 hover:bg-yellow-700"
+                              onClick={() => generateCertificate(course)}
+                            >
+                              <Download className="w-4 h-4 mr-2" />
+                              View
+                            </Button>
+                            <Button size="sm" variant="outline" className="border-gray-600">
+                              <Share2 className="w-4 h-4" />
+                            </Button>
+                </div>
+              </CardContent>
+            </Card>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-16">
+                  <CertificateIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-white mb-2">No certificates yet</h3>
+                  <p className="text-gray-400 mb-6">
+                    Complete your first course to earn your professional certificate!
+                  </p>
+                  <Button
+                    className="bg-purple-600 hover:bg-purple-700"
+                    onClick={() => setSelectedTab("courses")}
+                  >
+                    Browse Courses
+                  </Button>
+                </div>
+              )}
             </div>
+          )}
+        </div>
+      </main>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <Card className="bg-gray-800/50 border-gray-700/50">
-                <CardContent className="p-6 text-center">
-                  <div className="w-12 h-12 rounded-lg bg-blue-600/20 flex items-center justify-center mx-auto mb-4">
-                    <Target className="w-6 h-6 text-blue-400" />
-                  </div>
-                  <h3 className="text-white font-semibold mb-2">Learning Goals</h3>
-                  <p className="text-gray-300 text-sm mb-4">
-                    Set personalized learning objectives and track your progress towards mastery.
-                  </p>
-                  <Button variant="outline" className="border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white">
-                    Set Goals
-                  </Button>
-                </CardContent>
-              </Card>
+      {/* Certificate Modal */}
+      {showCertificate && selectedCertificate && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-8">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Course Certificate</h2>
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowCertificate(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-6 h-6" />
+                </Button>
+              </div>
 
-              <Card className="bg-gray-800/50 border-gray-700/50">
-                <CardContent className="p-6 text-center">
-                  <div className="w-12 h-12 rounded-lg bg-green-600/20 flex items-center justify-center mx-auto mb-4">
-                    <Trophy className="w-6 h-6 text-green-400" />
+              {/* Certificate Design */}
+              <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-12 border-4 border-purple-200">
+                <div className="text-center">
+                  {/* Header */}
+                  <div className="mb-8">
+                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center mx-auto mb-4">
+                      <CertificateIcon className="w-10 h-10 text-white" />
+                    </div>
+                    <h1 className="text-4xl font-bold text-gray-900 mb-2">Certificate of Completion</h1>
+                    <p className="text-lg text-gray-600">Pixel Pilot Learning Platform</p>
                   </div>
-                  <h3 className="text-white font-semibold mb-2">Achievements</h3>
-                  <p className="text-gray-300 text-sm mb-4">
-                    Unlock badges and certificates as you complete courses and reach milestones.
-                  </p>
-                  <Button variant="outline" className="border-green-600 text-green-400 hover:bg-green-600 hover:text-white">
-                    View Badges
-                  </Button>
-                </CardContent>
-              </Card>
 
-              <Card className="bg-gray-800/50 border-gray-700/50">
-                <CardContent className="p-6 text-center">
-                  <div className="w-12 h-12 rounded-lg bg-purple-600/20 flex items-center justify-center mx-auto mb-4">
-                    <BarChart3 className="w-6 h-6 text-purple-400" />
+                  {/* Recipient */}
+                  <div className="mb-8">
+                    <p className="text-gray-600 mb-2">This is to certify that</p>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-2">John Doe</h2>
+                    <p className="text-gray-600">has successfully completed the course</p>
                   </div>
-                  <h3 className="text-white font-semibold mb-2">Analytics</h3>
-                  <p className="text-gray-300 text-sm mb-4">
-                    Detailed insights into your learning patterns and areas for improvement.
-                  </p>
-                  <Button variant="outline" className="border-purple-600 text-purple-400 hover:bg-purple-600 hover:text-white">
-                    View Stats
-                  </Button>
-                </CardContent>
-              </Card>
+
+                  {/* Course */}
+                  <div className="mb-8">
+                    <h3 className="text-2xl font-semibold text-purple-600 mb-2">
+                      {selectedCertificate.title}
+                    </h3>
+                    <p className="text-gray-600">with a score of 95%</p>
+                  </div>
+
+                  {/* Signature */}
+                  <div className="mb-8">
+                    <div className="border-t-2 border-gray-400 w-64 mx-auto mb-4"></div>
+                    <p className="text-sm text-gray-600 mb-1">Founder & CEO</p>
+                    <p className="text-lg font-semibold text-gray-900" style={{ fontFamily: 'Dancing Script, cursive' }}>
+                      Anye Happiness Ade
+                    </p>
+                  </div>
+
+                  {/* Date */}
+                  <div className="mb-8">
+                    <p className="text-gray-600">Completed on</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {new Date().toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </p>
+                  </div>
+
+                  {/* Certificate ID */}
+                  <div className="border-t border-gray-300 pt-6">
+                    <p className="text-sm text-gray-500">
+                      Certificate ID: PP-{selectedCertificate.id.toUpperCase()}-{Date.now()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-4 mt-6">
+                <Button className="flex-1 bg-purple-600 hover:bg-purple-700 text-white">
+                  <Download className="w-4 h-4 mr-2" />
+                  Download PDF
+                </Button>
+                <Button variant="outline" className="flex-1">
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Share Certificate
+                </Button>
+              </div>
             </div>
           </div>
         </div>
-      </main>
+      )}
 
       {/* Footer */}
       <Footer />
     </div>
   )
+
 }
