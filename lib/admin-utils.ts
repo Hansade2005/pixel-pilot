@@ -54,7 +54,7 @@ export const ADMIN_MENU_ITEMS = [
   {
     id: 'analytics',
     label: 'Analytics',
-    icon: 'TrendingUp',
+    icon: 'BarChart3',
     href: '/admin/analytics',
     permission: ADMIN_PERMISSIONS.VIEW_ANALYTICS
   },

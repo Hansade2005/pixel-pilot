@@ -223,7 +223,21 @@ export default function AdminPanel() {
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
           {ADMIN_MENU_ITEMS.map((item) => (
-            <Card key={item.id} className="cursor-pointer hover:shadow-md transition-shadow">
+            <Card
+              key={item.id}
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => {
+                if (item.id === 'users') {
+                  router.push('/admin/users')
+                } else if (item.id === 'billing') {
+                  router.push('/admin/billing')
+                } else if (item.id === 'analytics') {
+                  router.push('/admin/analytics')
+                } else if (item.id === 'system') {
+                  router.push('/admin/system')
+                }
+              }}
+            >
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-primary/10 rounded-lg">
@@ -390,7 +404,7 @@ export default function AdminPanel() {
         </div>
 
         {/* System Settings */}
-        <div className="mt-8">
+        <div id="system-settings" className="mt-8">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -484,19 +498,35 @@ export default function AdminPanel() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Button variant="outline" className="h-20 flex-col gap-2">
+                <Button
+                  variant="outline"
+                  className="h-20 flex-col gap-2"
+                  onClick={() => alert('Add User functionality coming soon!')}
+                >
                   <UserPlus className="h-6 w-6" />
                   <span className="text-xs">Add User</span>
                 </Button>
-                <Button variant="outline" className="h-20 flex-col gap-2">
+                <Button
+                  variant="outline"
+                  className="h-20 flex-col gap-2"
+                  onClick={() => router.push('/admin/billing')}
+                >
                   <CreditCard className="h-6 w-6" />
                   <span className="text-xs">Process Refund</span>
                 </Button>
-                <Button variant="outline" className="h-20 flex-col gap-2">
+                <Button
+                  variant="outline"
+                  className="h-20 flex-col gap-2"
+                  onClick={() => router.push('/admin/system')}
+                >
                   <Settings className="h-6 w-6" />
                   <span className="text-xs">System Config</span>
                 </Button>
-                <Button variant="outline" className="h-20 flex-col gap-2">
+                <Button
+                  variant="outline"
+                  className="h-20 flex-col gap-2"
+                  onClick={() => router.push('/admin/analytics')}
+                >
                   <BarChart3 className="h-6 w-6" />
                   <span className="text-xs">View Reports</span>
                 </Button>
