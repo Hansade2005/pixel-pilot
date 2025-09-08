@@ -871,7 +871,7 @@ export default function AccountSettingsPage() {
       {/* Navigation */}
       <Navigation />
 
-      <div className="relative z-10 pt-16 pb-24">
+      <div className="relative z-10 pt-16 pb-12">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-4xl mx-auto">
             <div className="flex flex-col space-y-2 mb-6">
@@ -970,7 +970,7 @@ export default function AccountSettingsPage() {
               </CardContent>
             </Card>
 
-            {/* Change Password Card */}
+            {/* Change Password Card (Security) */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1290,7 +1290,7 @@ export default function AccountSettingsPage() {
               </CardContent>
             </Card>
 
-            {/* Cloud Sync Card */}
+            {/* Cloud Sync Card - move adjacent to Security */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
