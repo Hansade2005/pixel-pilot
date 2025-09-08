@@ -268,10 +268,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "You cannot delete another admin" }, { status: 403 })
     }
 
-    // Best-effort cleanup of related rows (RLS must allow admin to perform these)
+    // Best-effort cleanup of related rows using service role (bypass RLS)
     const cleanupResults = await Promise.all([
-      supabase.from('profiles').delete().eq('id', userId),
-      supabase.from('user_settings').delete().eq('user_id', userId)
+      adminSupabase.from('profiles').delete().eq('id', userId),
+      adminSupabase.from('user_settings').delete().eq('user_id', userId)
     ])
 
     const cleanupError = cleanupResults.find(r => (r as any)?.error)
