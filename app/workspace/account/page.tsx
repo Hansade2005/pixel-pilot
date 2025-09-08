@@ -861,7 +861,7 @@ export default function AccountSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="min-h-screen flex flex-col relative overflow-hidden">
       {/* Enhanced Gradient Background */}
       <div className="absolute inset-0 lovable-gradient" />
 
@@ -871,7 +871,7 @@ export default function AccountSettingsPage() {
       {/* Navigation */}
       <Navigation />
 
-      <div className="relative z-10 pt-16 pb-12">
+      <div className="relative z-10 pt-16 pb-24 flex-grow">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-4xl mx-auto">
             <div className="flex flex-col space-y-2 mb-6">
@@ -1010,6 +1010,95 @@ export default function AccountSettingsPage() {
                   </Button>
                 </CardFooter>
               </form>
+            </Card>
+
+            {/* Cloud Sync Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {cloudSyncEnabled ? (
+                      <Cloud className="h-5 w-5 text-blue-500" />
+                    ) : (
+                      <CloudOff className="h-5 w-5 text-muted-foreground" />
+                    )}
+                    Cloud Sync
+                  </div>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Automatically backup your projects to the cloud</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </CardTitle>
+                <CardDescription>
+                  Sync your projects across devices
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Auto Backup</p>
+                    <p className="text-sm text-muted-foreground">
+                      {cloudSyncEnabled 
+                        ? "Enabled - Backups created automatically" 
+                        : "Disabled - Enable to sync across devices"}
+                    </p>
+                  </div>
+                  <Button
+                    variant={cloudSyncEnabled ? "destructive" : "default"}
+                    onClick={toggleCloudSync}
+                  >
+                    {cloudSyncEnabled ? "Disable" : "Enable"}
+                  </Button>
+                </div>
+                
+                <Separator />
+                
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium">Manual Backup</p>
+                      {backupStatus === "syncing" && (
+                        <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
+                      )}
+                      {backupStatus === "success" && (
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      )}
+                      {backupStatus === "error" && (
+                        <AlertCircle className="h-4 w-4 text-red-500" />
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {lastBackup 
+                        ? `Last backup: ${new Date(lastBackup).toLocaleString()}` 
+                        : "No backups yet"}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        onClick={triggerManualBackup}
+                        disabled={backupStatus === "syncing"}
+                        className="flex-1"
+                      >
+                        {backupStatus === "syncing" ? "Backing up..." : "Create Backup"}
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={handleRestoreBackup}
+                        disabled={backupStatus === "syncing"}
+                        className="flex-1"
+                      >
+                        {backupStatus === "syncing" ? "Restoring..." : "Restore Backup"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
             </Card>
 
             {/* Current Subscription Card */}
@@ -1287,95 +1376,6 @@ export default function AccountSettingsPage() {
                     </Button>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-
-            {/* Cloud Sync Card - move adjacent to Security */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {cloudSyncEnabled ? (
-                      <Cloud className="h-5 w-5 text-blue-500" />
-                    ) : (
-                      <CloudOff className="h-5 w-5 text-muted-foreground" />
-                    )}
-                    Cloud Sync
-                  </div>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Automatically backup your projects to the cloud</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </CardTitle>
-                <CardDescription>
-                  Sync your projects across devices
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Auto Backup</p>
-                    <p className="text-sm text-muted-foreground">
-                      {cloudSyncEnabled 
-                        ? "Enabled - Backups created automatically" 
-                        : "Disabled - Enable to sync across devices"}
-                    </p>
-                  </div>
-                  <Button
-                    variant={cloudSyncEnabled ? "destructive" : "default"}
-                    onClick={toggleCloudSync}
-                  >
-                    {cloudSyncEnabled ? "Disable" : "Enable"}
-                  </Button>
-                </div>
-                
-                <Separator />
-                
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium">Manual Backup</p>
-                      {backupStatus === "syncing" && (
-                        <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
-                      )}
-                      {backupStatus === "success" && (
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                      )}
-                      {backupStatus === "error" && (
-                        <AlertCircle className="h-4 w-4 text-red-500" />
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {lastBackup 
-                        ? `Last backup: ${new Date(lastBackup).toLocaleString()}` 
-                        : "No backups yet"}
-                    </p>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        onClick={triggerManualBackup}
-                        disabled={backupStatus === "syncing"}
-                        className="flex-1"
-                      >
-                        {backupStatus === "syncing" ? "Backing up..." : "Create Backup"}
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        onClick={handleRestoreBackup}
-                        disabled={backupStatus === "syncing"}
-                        className="flex-1"
-                      >
-                        {backupStatus === "syncing" ? "Restoring..." : "Restore Backup"}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
               </CardContent>
             </Card>
 
