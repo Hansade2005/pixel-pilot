@@ -52,14 +52,22 @@ import {
 interface UserData {
   id: string
   email: string
-  full_name: string | null
-  avatar_url: string | null
-  created_at: string
-  subscription_plan: string
-  subscription_status: string
-  credits_remaining: number
-  credits_used_this_month: number
-  last_payment_date: string | null
+  emailConfirmed: boolean
+  createdAt: string
+  lastSignIn: string | null
+  fullName: string | null
+  avatarUrl: string | null
+  subscriptionPlan: string
+  subscriptionStatus: string
+  creditsRemaining: number
+  creditsUsedThisMonth: number
+  stripeCustomerId: string | null
+  stripeSubscriptionId: string | null
+  lastPaymentDate: string | null
+  cancelAtPeriodEnd: boolean
+  isAdmin: boolean
+  hasProfile: boolean
+  hasSettings: boolean
 }
 
 export default function AdminUsersPage() {
@@ -102,53 +110,24 @@ export default function AdminUsersPage() {
 
   const loadUsers = async () => {
     try {
-      // Fetch users with their subscription data
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*')
+      // Fetch all users from admin API
+      const response = await fetch('/api/admin/users')
 
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError)
-        return
+      if (!response.ok) {
+        throw new Error(`Failed to fetch users: ${response.status}`)
       }
 
-      // Fetch subscription data for all users
-      const userIds = profiles?.map(p => p.id) || []
-      const { data: userSettings, error: settingsError } = await supabase
-        .from('user_settings')
-        .select('*')
-        .in('user_id', userIds)
-
-      if (settingsError) {
-        console.error('Error fetching user settings:', settingsError)
-      }
-
-      // Combine profile and subscription data
-      const usersWithSettings = profiles?.map(profile => {
-        const settings = userSettings?.find(s => s.user_id === profile.id)
-        return {
-          id: profile.id,
-          email: profile.email,
-          full_name: profile.full_name,
-          avatar_url: profile.avatar_url,
-          created_at: profile.created_at,
-          subscription_plan: settings?.subscription_plan || 'free',
-          subscription_status: settings?.subscription_status || 'inactive',
-          credits_remaining: settings?.credits_remaining || 25,
-          credits_used_this_month: settings?.credits_used_this_month || 0,
-          last_payment_date: settings?.last_payment_date
-        }
-      }) || []
-
-      setUsers(usersWithSettings)
+      const data = await response.json()
+      setUsers(data.users || [])
     } catch (error) {
       console.error('Error loading users:', error)
+      setUsers([])
     }
   }
 
   const filteredUsers = users.filter(user =>
     user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (user.full_name && user.full_name.toLowerCase().includes(searchQuery.toLowerCase()))
+    (user.fullName && user.fullName.toLowerCase().includes(searchQuery.toLowerCase()))
   )
 
   const getStatusBadge = (status: string) => {
@@ -273,7 +252,7 @@ export default function AdminUsersPage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">
-                    {users.filter(u => u.subscription_status === 'active').length}
+                    {users.filter(u => u.subscriptionStatus === 'active').length}
                   </p>
                   <p className="text-xs text-muted-foreground">Active Subscribers</p>
                 </div>
@@ -289,7 +268,7 @@ export default function AdminUsersPage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">
-                    {users.filter(u => u.subscription_plan !== 'free').length}
+                    {users.filter(u => u.subscriptionPlan !== 'free').length}
                   </p>
                   <p className="text-xs text-muted-foreground">Paid Users</p>
                 </div>
@@ -305,7 +284,7 @@ export default function AdminUsersPage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">
-                    {users.reduce((sum, u) => sum + u.credits_used_this_month, 0)}
+                    {users.reduce((sum, u) => sum + u.creditsUsedThisMonth, 0)}
                   </p>
                   <p className="text-xs text-muted-foreground">Credits Used (Month)</p>
                 </div>
@@ -331,6 +310,7 @@ export default function AdminUsersPage() {
                   <TableHead>Status</TableHead>
                   <TableHead>Credits</TableHead>
                   <TableHead>Joined</TableHead>
+                  <TableHead>Profile</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -340,30 +320,58 @@ export default function AdminUsersPage() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-8 w-8">
-                          <AvatarImage src={userData.avatar_url || undefined} />
+                          <AvatarImage src={userData.avatarUrl || undefined} />
                           <AvatarFallback>
                             {userData.email.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="font-medium">{userData.full_name || 'No name'}</p>
+                          <p className="font-medium">{userData.fullName || 'No name set'}</p>
                           <p className="text-sm text-muted-foreground">{userData.email}</p>
+                          {userData.isAdmin && (
+                            <Badge variant="secondary" className="text-xs mt-1">
+                              Admin
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>{getPlanBadge(userData.subscription_plan)}</TableCell>
-                    <TableCell>{getStatusBadge(userData.subscription_status)}</TableCell>
+                    <TableCell>{getPlanBadge(userData.subscriptionPlan)}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        {getStatusBadge(userData.subscriptionStatus)}
+                        {!userData.emailConfirmed && (
+                          <Badge variant="outline" className="text-xs">
+                            Email not confirmed
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        <span className="font-medium">{userData.credits_remaining}</span>
-                        <span className="text-muted-foreground"> / 500</span>
+                        <span className="font-medium">{userData.creditsRemaining}</span>
+                        <div className="text-xs text-muted-foreground">
+                          Used: {userData.creditsUsedThisMonth}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm">
-                          {new Date(userData.created_at).toLocaleDateString()}
+                          {new Date(userData.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {userData.hasProfile ? (
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                        )}
+                        <span className="text-xs">
+                          {userData.hasProfile ? 'Complete' : 'Incomplete'}
                         </span>
                       </div>
                     </TableCell>
@@ -386,7 +394,126 @@ export default function AdminUsersPage() {
                             Send Email
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600">
+                          {!userData.hasProfile && (
+                            <DropdownMenuItem
+                              onClick={async () => {
+                                try {
+                                  const response = await fetch('/api/admin/users', {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      userId: userData.id,
+                                      action: 'create_profile',
+                                      data: { fullName: userData.email.split('@')[0] }
+                                    })
+                                  })
+
+                                  if (response.ok) {
+                                    alert('Profile created successfully!')
+                                    await loadUsers()
+                                  } else {
+                                    alert('Failed to create profile')
+                                  }
+                                } catch (error) {
+                                  console.error('Error creating profile:', error)
+                                  alert('Error creating profile')
+                                }
+                              }}
+                            >
+                              <UserPlus className="h-4 w-4 mr-2" />
+                              Create Profile
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem
+                            onClick={async () => {
+                              const newCredits = prompt('Enter new credit amount:', userData.creditsRemaining.toString())
+                              if (newCredits && !isNaN(Number(newCredits))) {
+                                try {
+                                  const response = await fetch('/api/admin/users', {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      userId: userData.id,
+                                      action: 'update_credits',
+                                      data: { credits: Number(newCredits) }
+                                    })
+                                  })
+
+                                  if (response.ok) {
+                                    alert('Credits updated successfully!')
+                                    await loadUsers()
+                                  } else {
+                                    alert('Failed to update credits')
+                                  }
+                                } catch (error) {
+                                  console.error('Error updating credits:', error)
+                                  alert('Error updating credits')
+                                }
+                              }
+                            }}
+                          >
+                            <Zap className="h-4 w-4 mr-2" />
+                            Update Credits
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={async () => {
+                              const newPlan = prompt('Enter new plan (free/pro/teams/enterprise):', userData.subscriptionPlan)
+                              if (newPlan && ['free', 'pro', 'teams', 'enterprise'].includes(newPlan)) {
+                                try {
+                                  const response = await fetch('/api/admin/users', {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      userId: userData.id,
+                                      action: 'update_plan',
+                                      data: { plan: newPlan }
+                                    })
+                                  })
+
+                                  if (response.ok) {
+                                    alert('Plan updated successfully!')
+                                    await loadUsers()
+                                  } else {
+                                    alert('Failed to update plan')
+                                  }
+                                } catch (error) {
+                                  console.error('Error updating plan:', error)
+                                  alert('Error updating plan')
+                                }
+                              }
+                            }}
+                          >
+                            <CreditCard className="h-4 w-4 mr-2" />
+                            Change Plan
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-red-600"
+                            onClick={async () => {
+                              if (confirm(`Are you sure you want to suspend user ${userData.email}?`)) {
+                                try {
+                                  const response = await fetch('/api/admin/users', {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      userId: userData.id,
+                                      action: 'suspend_user'
+                                    })
+                                  })
+
+                                  if (response.ok) {
+                                    alert('User suspended successfully!')
+                                    await loadUsers()
+                                  } else {
+                                    alert('Failed to suspend user')
+                                  }
+                                } catch (error) {
+                                  console.error('Error suspending user:', error)
+                                  alert('Error suspending user')
+                                }
+                              }
+                            }}
+                          >
                             <Ban className="h-4 w-4 mr-2" />
                             Suspend User
                           </DropdownMenuItem>
@@ -415,21 +542,62 @@ export default function AdminUsersPage() {
                 {/* User Info */}
                 <div className="flex items-center gap-4">
                   <Avatar className="h-16 w-16">
-                    <AvatarImage src={selectedUser.avatar_url || undefined} />
+                    <AvatarImage src={selectedUser.avatarUrl || undefined} />
                     <AvatarFallback className="text-lg">
                       {selectedUser.email.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div>
                     <h3 className="text-lg font-semibold">
-                      {selectedUser.full_name || 'No name set'}
+                      {selectedUser.fullName || 'No name set'}
                     </h3>
                     <p className="text-muted-foreground">{selectedUser.email}</p>
                     <div className="flex items-center gap-2 mt-2">
-                      {getPlanBadge(selectedUser.subscription_plan)}
-                      {getStatusBadge(selectedUser.subscription_status)}
+                      {getPlanBadge(selectedUser.subscriptionPlan)}
+                      {getStatusBadge(selectedUser.subscriptionStatus)}
+                      {selectedUser.isAdmin && (
+                        <Badge variant="secondary" className="bg-red-100 text-red-800">
+                          Admin
+                        </Badge>
+                      )}
                     </div>
                   </div>
+                </div>
+
+                {/* Account Details */}
+                <div className="grid grid-cols-2 gap-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Mail className="h-4 w-4 text-blue-500" />
+                        <span className="text-sm font-medium">Email Status</span>
+                      </div>
+                      <p className="text-lg font-semibold">
+                        {selectedUser.emailConfirmed ? 'Verified' : 'Unverified'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Last sign in: {selectedUser.lastSignIn
+                          ? new Date(selectedUser.lastSignIn).toLocaleDateString()
+                          : 'Never'
+                        }
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <UserPlus className="h-4 w-4 text-green-500" />
+                        <span className="text-sm font-medium">Profile Status</span>
+                      </div>
+                      <p className="text-lg font-semibold">
+                        {selectedUser.hasProfile ? 'Complete' : 'Incomplete'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Settings: {selectedUser.hasSettings ? 'Configured' : 'Not set'}
+                      </p>
+                    </CardContent>
+                  </Card>
                 </div>
 
                 {/* Subscription Details */}
@@ -440,9 +608,9 @@ export default function AdminUsersPage() {
                         <Zap className="h-4 w-4 text-yellow-500" />
                         <span className="text-sm font-medium">Credits</span>
                       </div>
-                      <p className="text-2xl font-bold">{selectedUser.credits_remaining}</p>
+                      <p className="text-2xl font-bold">{selectedUser.creditsRemaining}</p>
                       <p className="text-xs text-muted-foreground">
-                        Used this month: {selectedUser.credits_used_this_month}
+                        Used this month: {selectedUser.creditsUsedThisMonth}
                       </p>
                     </CardContent>
                   </Card>
@@ -454,14 +622,38 @@ export default function AdminUsersPage() {
                         <span className="text-sm font-medium">Member Since</span>
                       </div>
                       <p className="text-lg font-semibold">
-                        {new Date(selectedUser.created_at).toLocaleDateString()}
+                        {new Date(selectedUser.createdAt).toLocaleDateString()}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {Math.floor((Date.now() - new Date(selectedUser.created_at).getTime()) / (1000 * 60 * 60 * 24))} days ago
+                        {Math.floor((Date.now() - new Date(selectedUser.createdAt).getTime()) / (1000 * 60 * 60 * 24))} days ago
                       </p>
                     </CardContent>
                   </Card>
                 </div>
+
+                {/* Billing Information */}
+                {selectedUser.stripeCustomerId && (
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CreditCard className="h-4 w-4 text-purple-500" />
+                        <span className="text-sm font-medium">Stripe Information</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <p>Customer ID: {selectedUser.stripeCustomerId}</p>
+                        {selectedUser.stripeSubscriptionId && (
+                          <p>Subscription ID: {selectedUser.stripeSubscriptionId}</p>
+                        )}
+                        {selectedUser.lastPaymentDate && (
+                          <p>Last Payment: {new Date(selectedUser.lastPaymentDate).toLocaleDateString()}</p>
+                        )}
+                        {selectedUser.cancelAtPeriodEnd && (
+                          <p className="text-red-600">Cancels at period end</p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex gap-2">
