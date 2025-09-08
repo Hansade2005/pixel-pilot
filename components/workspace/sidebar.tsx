@@ -57,6 +57,8 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+import { useCredits } from "@/hooks/use-credits"
+import { Zap, TrendingUp, AlertTriangle, Shield, CheckCircle } from "lucide-react"
 
 interface SidebarProps {
   user: User
@@ -89,6 +91,9 @@ export function Sidebar({
   const [cloneProject, setCloneProject] = useState<Project | null>(null)
   const [cloneName, setCloneName] = useState("")
   const router = useRouter()
+
+  // Credit status hook
+  const { creditStatus, loading: creditsLoading, isLowOnCredits, isOutOfCredits, usagePercentage } = useCredits(user.id)
 
   // Advanced filter and sort projects
   const filteredAndSortedProjects = React.useMemo(() => {
@@ -319,6 +324,91 @@ export function Sidebar({
           </div>
         )}
       </div>
+
+      {/* Credit Status Section */}
+      {!creditsLoading && creditStatus && (
+        <div className="px-4 py-3 border-b bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-green-500" />
+              <span className="text-sm font-medium">
+                {creditStatus.plan === 'admin' ? 'Admin Access' : 'Credits'}
+              </span>
+            </div>
+            {creditStatus.plan !== 'admin' && isOutOfCredits && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-xs"
+                onClick={() => router.push('/pricing')}
+              >
+                Upgrade
+              </Button>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            {creditStatus.plan === 'admin' ? (
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-green-600" />
+                <span className="text-xs text-green-600 font-medium">
+                  Unlimited credits
+                </span>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    {creditStatus.remaining} / {creditStatus.limit}
+                  </span>
+                  <span className="text-xs font-medium">
+                    {usagePercentage}%
+                  </span>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                  <div
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      isOutOfCredits ? 'bg-red-500' :
+                      isLowOnCredits ? 'bg-yellow-500' : 'bg-green-500'
+                    }`}
+                    style={{ width: `${Math.min(usagePercentage, 100)}%` }}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Status Messages */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">
+                {creditStatus.plan} plan
+              </span>
+              {creditStatus.plan === 'admin' ? (
+                <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                  <CheckCircle className="h-3 w-3" />
+                  <span className="text-xs">Admin</span>
+                </div>
+              ) : (
+                <>
+                  {isLowOnCredits && (
+                    <div className="flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
+                      <AlertTriangle className="h-3 w-3" />
+                      <span className="text-xs">Low</span>
+                    </div>
+                  )}
+                  {isOutOfCredits && (
+                    <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
+                      <AlertTriangle className="h-3 w-3" />
+                      <span className="text-xs">Empty</span>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Search and Sort */}
       <div className="p-4 border-b space-y-3">

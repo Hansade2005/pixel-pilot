@@ -1,12 +1,27 @@
--- Create user_settings table
+-- Create user_settings table with subscription tracking
 CREATE TABLE IF NOT EXISTS user_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL UNIQUE,
   cloud_sync_enabled BOOLEAN DEFAULT false,
   last_backup TIMESTAMP WITH TIME ZONE,
+
+  -- External service tokens
   vercel_token TEXT,
   github_token TEXT,
   netlify_token TEXT,
+
+  -- Stripe subscription fields
+  stripe_customer_id TEXT UNIQUE,
+  stripe_subscription_id TEXT UNIQUE,
+  subscription_status TEXT DEFAULT 'inactive' CHECK (subscription_status IN ('active', 'inactive', 'canceled', 'past_due', 'trialing')),
+  subscription_plan TEXT DEFAULT 'free' CHECK (subscription_plan IN ('free', 'pro', 'teams', 'enterprise')),
+  credits_remaining INTEGER DEFAULT 25,
+  credits_used_this_month INTEGER DEFAULT 0,
+  subscription_start_date TIMESTAMP WITH TIME ZONE,
+  subscription_end_date TIMESTAMP WITH TIME ZONE,
+  last_payment_date TIMESTAMP WITH TIME ZONE,
+  cancel_at_period_end BOOLEAN DEFAULT false,
+
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

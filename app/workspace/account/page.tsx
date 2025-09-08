@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 import {
   User,
   Mail,
@@ -22,7 +24,17 @@ import {
   Loader2,
   Check,
   X,
-  Edit3
+  Edit3,
+  CreditCard,
+  TrendingUp,
+  Zap,
+  Calendar,
+  Download,
+  Settings,
+  Crown,
+  BarChart3,
+  Receipt,
+  AlertTriangle
 } from "lucide-react"
 
 // Custom SVG Icons
@@ -49,6 +61,7 @@ const NetlifyIcon = ({ className }: { className?: string }) => (
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { storageManager } from "@/lib/storage-manager"
+import { PRODUCT_CONFIGS, getLimits } from "@/lib/stripe-config"
 import {
   uploadBackupToCloud,
   restoreBackupFromCloud,
@@ -120,7 +133,17 @@ export default function AccountSettingsPage() {
     newPassword: "",
     confirmPassword: ""
   })
-  
+
+  // Subscription state
+  const [subscription, setSubscription] = useState<any>(null)
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false)
+  const [usageStats, setUsageStats] = useState({
+    creditsUsed: 0,
+    creditsRemaining: 25,
+    deploymentsThisMonth: 0,
+    storageUsed: 0
+  })
+
   // Delete account form state
   const [deleteConfirmation, setDeleteConfirmation] = useState("")
 
@@ -134,6 +157,7 @@ export default function AccountSettingsPage() {
     if (user?.id) {
       checkCloudSyncStatus(user.id)
       checkConnectionStatus(user.id)
+      fetchSubscriptionStatus(user.id)
 
       // Auto-restore latest backup on login if cloud sync is enabled
       const performAutoRestore = async () => {
@@ -637,24 +661,74 @@ export default function AccountSettingsPage() {
 
       // Update connection status based on tokens
       setConnections(prev => ({
-        github: { 
-          ...prev.github, 
+        github: {
+          ...prev.github,
           connected: !!tokens.github,
-          loading: false 
+          loading: false
         },
-        vercel: { 
-          ...prev.vercel, 
+        vercel: {
+          ...prev.vercel,
           connected: !!tokens.vercel,
-          loading: false 
+          loading: false
         },
-        netlify: { 
-          ...prev.netlify, 
+        netlify: {
+          ...prev.netlify,
           connected: !!tokens.netlify,
-          loading: false 
+          loading: false
         }
       }))
     } catch (error) {
       console.error("Error checking connection status:", error)
+    }
+  }
+
+  const fetchSubscriptionStatus = async (userId: string) => {
+    try {
+      setSubscriptionLoading(true)
+      const response = await fetch('/api/stripe/check-subscription', {
+        method: 'POST',
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setSubscription(data)
+
+        // Update usage stats based on subscription
+        const limits = getLimits(data.plan)
+        setUsageStats(prev => ({
+          ...prev,
+          creditsRemaining: data.creditsRemaining,
+          creditsUsed: prev.creditsRemaining - data.creditsRemaining
+        }))
+      }
+    } catch (error) {
+      console.error("Error fetching subscription status:", error)
+    } finally {
+      setSubscriptionLoading(false)
+    }
+  }
+
+  const handleUpgradePlan = (planType: string) => {
+    // Redirect to pricing page with plan selection
+    window.location.href = `/pricing?upgrade=${planType}`
+  }
+
+  const handleCancelSubscription = async () => {
+    if (!subscription?.plan || subscription.plan === 'free') return
+
+    try {
+      // Here you would implement cancellation logic
+      toast({
+        title: "Subscription Management",
+        description: "Please contact support to cancel your subscription.",
+      })
+    } catch (error) {
+      console.error("Error cancelling subscription:", error)
+      toast({
+        title: "Error",
+        description: "Failed to cancel subscription. Please contact support.",
+        variant: "destructive"
+      })
     }
   }
 
@@ -918,6 +992,284 @@ export default function AccountSettingsPage() {
                   </Button>
                 </CardFooter>
               </form>
+            </Card>
+
+            {/* Current Subscription Card */}
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Crown className="h-5 w-5" />
+                  Current Subscription
+                </CardTitle>
+                <CardDescription>
+                  Manage your subscription plan and billing
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {subscriptionLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                    <span className="ml-2">Loading subscription...</span>
+                  </div>
+                ) : subscription ? (
+                  <>
+                    {/* Plan Status */}
+                    <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-3 h-3 rounded-full ${
+                          subscription.status === 'active' ? 'bg-green-500' :
+                          subscription.status === 'trialing' ? 'bg-blue-500' :
+                          subscription.status === 'past_due' ? 'bg-yellow-500' : 'bg-red-500'
+                        }`} />
+                        <div>
+                          <p className="font-medium capitalize">{subscription.plan} Plan</p>
+                          <p className="text-sm text-muted-foreground">
+                            Status: {subscription.status === 'active' ? 'Active' :
+                                   subscription.status === 'trialing' ? 'Trial' :
+                                   subscription.status === 'past_due' ? 'Payment Due' : 'Inactive'}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant={subscription.status === 'active' ? 'default' : 'secondary'}>
+                        {subscription.status}
+                      </Badge>
+                    </div>
+
+                    {/* Credits Usage */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Credits Remaining</span>
+                        <span className="text-sm text-muted-foreground">
+                          {subscription.creditsRemaining} / {getLimits(subscription.plan).credits}
+                        </span>
+                      </div>
+                      <Progress
+                        value={(subscription.creditsRemaining / getLimits(subscription.plan).credits) * 100}
+                        className="h-2"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Resets monthly • {usageStats.creditsUsed} used this month
+                      </p>
+                    </div>
+
+                    {/* Billing Information */}
+                    {subscription.subscriptionEndDate && (
+                      <div className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">Next billing date</span>
+                        </div>
+                        <span className="text-sm font-medium">
+                          {new Date(subscription.subscriptionEndDate).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                      {subscription.plan !== 'enterprise' && (
+                        <Button
+                          variant="outline"
+                          onClick={() => handleUpgradePlan('enterprise')}
+                          className="flex-1"
+                        >
+                          <TrendingUp className="h-4 w-4 mr-2" />
+                          Upgrade to Enterprise
+                        </Button>
+                      )}
+                      {subscription.plan !== 'free' && (
+                        <Button
+                          variant="outline"
+                          onClick={handleCancelSubscription}
+                          className="flex-1 text-red-600 hover:text-red-700"
+                        >
+                          <AlertTriangle className="h-4 w-4 mr-2" />
+                          Cancel Subscription
+                        </Button>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-8">
+                    <Crown className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground mb-4">No active subscription</p>
+                    <Button asChild>
+                      <a href="/pricing">Choose a Plan</a>
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Usage Statistics Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Usage Statistics
+                </CardTitle>
+                <CardDescription>
+                  Your current usage and limits
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-yellow-500" />
+                      <span className="text-sm">AI Credits</span>
+                    </div>
+                    <span className="text-sm font-medium">
+                      {usageStats.creditsUsed} / {usageStats.creditsRemaining + usageStats.creditsUsed}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Download className="h-4 w-4 text-blue-500" />
+                      <span className="text-sm">Deployments</span>
+                    </div>
+                    <span className="text-sm font-medium">
+                      {usageStats.deploymentsThisMonth} / {getLimits(subscription?.plan || 'free').appDeploys}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Cloud className="h-4 w-4 text-green-500" />
+                      <span className="text-sm">Storage</span>
+                    </div>
+                    <span className="text-sm font-medium">
+                      {usageStats.storageUsed}GB / {getLimits(subscription?.plan || 'free').storage || '10GB'}
+                    </span>
+                  </div>
+                </div>
+
+                <Button variant="outline" className="w-full">
+                  <Settings className="h-4 w-4 mr-2" />
+                  View Detailed Usage
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Billing History Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Receipt className="h-5 w-5" />
+                  Billing History
+                </CardTitle>
+                <CardDescription>
+                  View your past invoices and payments
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {/* This would be populated with actual billing history */}
+                  <div className="text-center py-8">
+                    <Receipt className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">
+                      No billing history available
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Invoices will appear here after your first payment
+                    </p>
+                  </div>
+                </div>
+
+                <Button variant="outline" className="w-full mt-4">
+                  <Download className="h-4 w-4 mr-2" />
+                  Download All Invoices
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Billing Information Card */}
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Billing Information
+                </CardTitle>
+                <CardDescription>
+                  Manage your payment methods and billing details
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {subscription && subscription.plan !== 'free' ? (
+                  <>
+                    {/* Payment Method */}
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium">Payment Method</h4>
+                      <div className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-6 bg-blue-600 rounded flex items-center justify-center">
+                            <CreditCard className="h-3 w-3 text-white" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">•••• •••• •••• 4242</p>
+                            <p className="text-xs text-muted-foreground">Expires 12/26</p>
+                          </div>
+                        </div>
+                        <Badge variant="secondary">Primary</Badge>
+                      </div>
+                      <Button variant="outline" size="sm">
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Update Payment Method
+                      </Button>
+                    </div>
+
+                    {/* Billing Address */}
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium">Billing Address</h4>
+                      <div className="p-4 border rounded-lg">
+                        <p className="text-sm">John Doe</p>
+                        <p className="text-sm text-muted-foreground">
+                          123 Main Street<br />
+                          San Francisco, CA 94102<br />
+                          United States
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm">
+                        Update Billing Address
+                      </Button>
+                    </div>
+
+                    {/* Billing Preferences */}
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium">Billing Preferences</h4>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Email receipts</span>
+                          <input type="checkbox" defaultChecked className="rounded" />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Auto-renewal</span>
+                          <input
+                            type="checkbox"
+                            defaultChecked={!subscription.cancelAtPeriodEnd}
+                            className="rounded"
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">Usage alerts</span>
+                          <input type="checkbox" defaultChecked className="rounded" />
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-8">
+                    <CreditCard className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground mb-4">
+                      Billing information will be available once you subscribe to a plan
+                    </p>
+                    <Button asChild>
+                      <a href="/pricing">Choose a Plan</a>
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
             </Card>
 
             {/* Cloud Sync Card */}

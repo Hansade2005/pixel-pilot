@@ -2817,13 +2817,49 @@ export async function POST(req: Request) {
     // Get user from Supabase
     const supabase = await createClient()
     const { data: { user }, error: userError } = await supabase.auth.getUser()
-    
+
     if (userError || !user) {
       return new Response('Unauthorized', { status: 401 })
     }
 
     // Set global user ID for tool access
     global.currentUserId = user.id
+
+    // CREDIT MANAGEMENT: Initialize credit tracking variables
+    const { checkCredits, deductCredits, calculateCredits } = await import('@/lib/credit-manager')
+
+    // Calculate credits needed for this chat message
+    const lastMessage = messages[messages.length - 1]
+    const requiredCredits = calculateCredits('chat_message', {
+      message: lastMessage?.content || '',
+      modelId: modelId || 'default'
+    })
+
+    // Initialize variables for credit deduction (will be set later)
+    let toolCallsCount = 0
+    let hasToolCalls = false
+
+    console.log(`[CREDITS] Checking credits for user ${user.id}: need ${requiredCredits} credits`)
+
+    const creditCheck = await checkCredits(user.id, requiredCredits)
+
+    if (!creditCheck.hasCredits) {
+      console.log(`[CREDITS] Insufficient credits for user ${user.id}: ${creditCheck.remainingCredits} remaining, ${requiredCredits} needed`)
+
+      return new Response(JSON.stringify({
+        error: 'Insufficient credits',
+        message: `You need ${requiredCredits} credits for this request, but only have ${creditCheck.remainingCredits} remaining.`,
+        creditsNeeded: requiredCredits,
+        creditsRemaining: creditCheck.remainingCredits,
+        plan: creditCheck.creditStatus.plan,
+        upgradeUrl: '/pricing'
+      }), {
+        status: 402, // Payment Required status
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+
+    console.log(`[CREDITS] Credits available for user ${user.id}: ${creditCheck.remainingCredits} remaining`)
 
     // CRITICAL: Sync client-side files to server-side InMemoryStorage
     // This ensures AI tools can access the files that exist in IndexedDB
@@ -3914,7 +3950,11 @@ Project context: ${projectContext || 'Vite + React + TypeScript project - Multi-
 
       // Prepare tool calls for storage if any
       let processedToolCalls = undefined
-      
+
+      // Update credit tracking variables
+      toolCallsCount = allToolResults.length
+      hasToolCalls = allToolResults.length > 0
+
       if (allToolResults.length > 0) {
         processedToolCalls = allToolResults.map(toolResult => {
           // Extract tool call info from the AI SDK step structure
@@ -4209,6 +4249,34 @@ I have successfully completed your request.`
         status: hasToolErrors ? 207 : 200, // 207 Multi-Status for partial success
         headers: { 'Content-Type': 'application/json' },
       })
+
+      // CREDIT DEDUCTION: Deduct credits after successful AI response
+      try {
+        console.log(`[CREDITS] Deducting ${requiredCredits} credits from user ${user.id}`)
+        const deductionResult = await deductCredits(
+          user.id,
+          requiredCredits,
+          'chat_message',
+          {
+            messageLength: lastMessage?.content?.length || 0,
+            modelId: modelId || 'default',
+            projectId: projectId,
+            hasToolCalls: hasToolCalls,
+            toolCallsCount: toolCallsCount
+          }
+        )
+
+        if (deductionResult.success) {
+          console.log(`[CREDITS] Successfully deducted credits. New balance: ${deductionResult.newBalance}`)
+        } else {
+          console.error(`[CREDITS] Failed to deduct credits: ${deductionResult.error}`)
+          // Note: We don't fail the request here as the AI response was successful
+          // But we should log this for monitoring
+        }
+      } catch (creditError) {
+        console.error(`[CREDITS] Error deducting credits:`, creditError)
+        // Don't fail the request, but log the error
+      }
 
       // Save both user message and AI response to database in background (now handled client-side)
       const latestUserMessage = messages[messages.length - 1]
