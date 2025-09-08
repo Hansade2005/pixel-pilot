@@ -3,6 +3,14 @@ import { createClient } from "@/lib/supabase/server"
 import { stripe } from "@/lib/stripe"
 import { getPriceId } from "@/lib/stripe-config"
 
+// Helper function to get Stripe instance safely
+function getStripe() {
+  if (!stripe) {
+    throw new Error("Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.")
+  }
+  return stripe
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -34,9 +42,11 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (userSettings?.stripe_customer_id) {
-      customer = await stripe.customers.retrieve(userSettings.stripe_customer_id)
+      const stripeInstance = getStripe()
+      customer = await stripeInstance.customers.retrieve(userSettings.stripe_customer_id)
     } else {
-      customer = await stripe.customers.create({
+      const stripeInstance = getStripe()
+      customer = await stripeInstance.customers.create({
         email: user.email,
         name: user.user_metadata?.full_name || user.email,
         metadata: {
@@ -54,7 +64,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Create checkout session
-    const session = await stripe.checkout.sessions.create({
+    const stripeInstance = getStripe()
+    const session = await stripeInstance.checkout.sessions.create({
       customer: customer.id,
       payment_method_types: ['card'],
       line_items: [

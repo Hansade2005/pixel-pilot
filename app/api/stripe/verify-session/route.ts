@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { stripe, PLAN_LIMITS } from "@/lib/stripe"
 
+// Helper function to get Stripe instance safely
+function getStripe() {
+  if (!stripe) {
+    throw new Error("Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.")
+  }
+  return stripe
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -18,7 +26,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Retrieve the checkout session from Stripe
-    const session = await stripe.checkout.sessions.retrieve(sessionId)
+    const stripeInstance = getStripe()
+    const session = await stripeInstance.checkout.sessions.retrieve(sessionId)
 
     if (session.payment_status !== 'paid') {
       return NextResponse.json({ error: "Payment not completed" }, { status: 400 })
@@ -56,7 +65,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine plan from the session
-    const lineItems = await stripe.checkout.sessions.listLineItems(sessionId)
+    const lineItems = await stripeInstance.checkout.sessions.listLineItems(sessionId)
     const priceId = lineItems.data[0]?.price?.id
 
     let planType = 'free'

@@ -1,21 +1,26 @@
 import Stripe from "stripe"
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error("STRIPE_SECRET_KEY environment variable is required")
+// Only initialize Stripe if environment variables are available
+// This prevents build-time errors when STRIPE_SECRET_KEY is not set
+let stripeInstance: Stripe | null = null
+
+try {
+  if (process.env.STRIPE_SECRET_KEY) {
+    stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: "2025-08-27.basil",
+      typescript: true,
+    })
+  }
+} catch (error) {
+  console.warn("Failed to initialize Stripe:", error)
+  stripeInstance = null
 }
 
-if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
-  throw new Error("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY environment variable is required")
-}
-
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2025-08-27.basil",
-  typescript: true,
-})
+export const stripe = stripeInstance
 
 export const stripeConfig = {
-  publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
-  secretKey: process.env.STRIPE_SECRET_KEY,
+  publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "",
+  secretKey: process.env.STRIPE_SECRET_KEY || "",
 }
 
 // Price IDs for different plans (you'll need to create these in Stripe)

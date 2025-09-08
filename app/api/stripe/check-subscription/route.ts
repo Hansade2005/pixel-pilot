@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { stripe, PLAN_LIMITS } from "@/lib/stripe"
 
+// Helper function to get Stripe instance safely
+function getStripe() {
+  if (!stripe) {
+    throw new Error("Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.")
+  }
+  return stripe
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -29,7 +37,8 @@ export async function POST(request: NextRequest) {
     // If user has a Stripe subscription ID, check its status
     if (userSettings.stripe_subscription_id) {
       try {
-        const subscription = await stripe.subscriptions.retrieve(userSettings.stripe_subscription_id)
+        const stripeInstance = getStripe()
+        const subscription = await stripeInstance.subscriptions.retrieve(userSettings.stripe_subscription_id)
 
         // Update local status based on Stripe subscription
         const status = subscription.status === 'active' ? 'active' :
