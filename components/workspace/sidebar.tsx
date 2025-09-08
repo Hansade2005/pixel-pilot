@@ -332,7 +332,9 @@ export function Sidebar({
             <div className="flex items-center gap-2">
               <Zap className="h-4 w-4 text-green-500" />
               <span className="text-sm font-medium">
-                {creditStatus.plan === 'admin' ? 'Admin Access' : 'Credits'}
+                {creditStatus.plan === 'admin' ? 'Admin Access' :
+                 creditStatus.plan === 'free_mode' ? 'Free Mode' :
+                 'Credits'}
               </span>
             </div>
             {creditStatus.plan !== 'admin' && isOutOfCredits && (
@@ -352,7 +354,14 @@ export function Sidebar({
               <div className="flex items-center gap-2">
                 <Shield className="h-4 w-4 text-green-600" />
                 <span className="text-xs text-green-600 font-medium">
-                  Unlimited credits
+                  Unlimited credits (Admin)
+                </span>
+              </div>
+            ) : creditStatus.plan === 'free_mode' ? (
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-blue-600" />
+                <span className="text-xs text-blue-600 font-medium">
+                  Unlimited credits (Free Mode)
                 </span>
               </div>
             ) : (

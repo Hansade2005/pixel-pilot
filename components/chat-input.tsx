@@ -115,7 +115,9 @@ export function ChatInput({ onAuthRequired }: ChatInputProps) {
                 <div className="flex items-center gap-2">
                   <Zap className="h-4 w-4 text-green-400" />
                   <span className="text-sm text-gray-300">
-                    {creditStatus.plan === 'admin' ? 'Unlimited credits' : `${creditStatus.remaining} credits remaining`}
+                    {creditStatus.plan === 'admin' ? 'Unlimited credits (Admin)' :
+                     creditStatus.plan === 'free_mode' ? 'Unlimited credits (Free Mode)' :
+                     `${creditStatus.remaining} credits remaining`}
                   </span>
                   {requiredCredits > 0 && creditStatus.plan !== 'admin' && (
                     <span className="text-xs text-gray-500">
@@ -147,7 +149,7 @@ export function ChatInput({ onAuthRequired }: ChatInputProps) {
                     </>
                   )}
                   <span className="text-xs text-gray-500 capitalize">
-                    {creditStatus.plan} plan
+                    {creditStatus.plan === 'free_mode' ? 'Free Mode' : `${creditStatus.plan} plan`}
                   </span>
                 </div>
               </div>

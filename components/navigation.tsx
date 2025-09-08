@@ -132,7 +132,9 @@ export function Navigation() {
                   <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
                     <Zap className="w-4 h-4 text-green-400" />
                     <span className="text-sm font-medium text-white">
-                      {creditStatus.plan === 'admin' ? 'Unlimited' : creditStatus.remaining}
+                      {creditStatus.plan === 'admin' ? 'Unlimited' :
+                       creditStatus.plan === 'free_mode' ? 'Unlimited' :
+                       creditStatus.remaining}
                     </span>
                     {creditStatus.plan === 'admin' ? (
                       <span className="text-xs text-green-400 font-medium">
@@ -320,7 +322,9 @@ export function Navigation() {
                       <div className="flex items-center space-x-2">
                         <Zap className="w-4 h-4 text-green-400" />
                         <span className="text-sm font-medium text-white">
-                          {creditStatus.plan === 'admin' ? 'Unlimited Credits' : `${creditStatus.remaining} Credits`}
+                          {creditStatus.plan === 'admin' ? 'Unlimited Credits (Admin)' :
+                           creditStatus.plan === 'free_mode' ? 'Unlimited Credits (Free Mode)' :
+                           `${creditStatus.remaining} Credits`}
                         </span>
                       </div>
                       {creditStatus.plan === 'admin' ? (
@@ -345,6 +349,8 @@ export function Navigation() {
                     <div className="mt-2 text-xs text-gray-400">
                       {creditStatus.plan === 'admin'
                         ? 'Unlimited usage • Admin plan'
+                        : creditStatus.plan === 'free_mode'
+                        ? 'Unlimited usage • Free Mode'
                         : `${creditStatus.used} used this month • ${creditStatus.plan} plan`
                       }
                     </div>

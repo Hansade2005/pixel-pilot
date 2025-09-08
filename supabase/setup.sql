@@ -26,6 +26,16 @@ CREATE TABLE IF NOT EXISTS user_settings (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Create system_settings table for global system configuration
+CREATE TABLE IF NOT EXISTS system_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  key TEXT UNIQUE NOT NULL,
+  value JSONB NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Create user_backups table
 CREATE TABLE IF NOT EXISTS user_backups (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -37,10 +47,12 @@ CREATE TABLE IF NOT EXISTS user_backups (
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_user_settings_user_id ON user_settings(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_backups_user_id ON user_backups(user_id);
+CREATE INDEX IF NOT EXISTS idx_system_settings_key ON system_settings(key);
 
 -- Set up Row Level Security (RLS)
 ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_backups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for user_settings
 CREATE POLICY "Users can view their own settings" ON user_settings
@@ -65,9 +77,20 @@ CREATE POLICY "Users can update their own backups" ON user_backups
 CREATE POLICY "Users can delete their own backups" ON user_backups
   FOR DELETE USING (auth.uid() = user_id);
 
+-- Create policies for system_settings
+CREATE POLICY "Authenticated users can view system settings" ON system_settings
+  FOR SELECT USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated users can insert system settings" ON system_settings
+  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated users can update system settings" ON system_settings
+  FOR UPDATE USING (auth.role() = 'authenticated');
+
 -- Grant necessary permissions
 GRANT ALL ON user_settings TO authenticated;
 GRANT ALL ON user_backups TO authenticated;
+GRANT ALL ON system_settings TO authenticated;
 
 -- Create function to automatically update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -79,7 +102,13 @@ END;
 $$ language 'plpgsql';
 
 -- Create trigger to automatically update updated_at for user_settings
-CREATE TRIGGER update_user_settings_updated_at 
-  BEFORE UPDATE ON user_settings 
-  FOR EACH ROW 
+CREATE TRIGGER update_user_settings_updated_at
+  BEFORE UPDATE ON user_settings
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- Create trigger to automatically update updated_at for system_settings
+CREATE TRIGGER update_system_settings_updated_at
+  BEFORE UPDATE ON system_settings
+  FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();

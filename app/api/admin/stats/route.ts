@@ -2,6 +2,26 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { checkAdminAccess } from "@/lib/admin-utils"
 
+async function isSubscriptionSystemEnabled(): Promise<boolean> {
+  try {
+    const supabase = await createClient()
+    const { data: setting, error } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'subscription_system_enabled')
+      .single()
+
+    if (error || !setting) {
+      return true // Default to enabled if no setting exists
+    }
+
+    return setting.value?.enabled === true
+  } catch (error) {
+    console.error('Error checking subscription system status:', error)
+    return true // Default to enabled on error
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -49,22 +69,31 @@ export async function GET(request: NextRequest) {
 
     const totalSubscriptions = subscriptions?.length || 0
 
-    // Calculate revenue (simplified - in real app you'd track actual payments)
-    const paidUsers = subscriptions?.filter(sub =>
-      sub.subscription_plan !== 'free' &&
-      (sub.subscription_status === 'active' || sub.subscription_status === 'trialing')
-    ) || []
+    // Check if subscription system is enabled
+    const subscriptionEnabled = await isSubscriptionSystemEnabled()
 
+    // Calculate revenue (simplified - in real app you'd track actual payments)
     let totalRevenue = 0
     let monthlyRevenue = 0
 
-    paidUsers.forEach(user => {
-      const planMultiplier = user.subscription_plan === 'pro' ? 15 :
-                            user.subscription_plan === 'teams' ? 30 :
-                            user.subscription_plan === 'enterprise' ? 60 : 0
-      totalRevenue += planMultiplier
-      monthlyRevenue += planMultiplier
-    })
+    if (subscriptionEnabled) {
+      const paidUsers = subscriptions?.filter(sub =>
+        sub.subscription_plan !== 'free' &&
+        (sub.subscription_status === 'active' || sub.subscription_status === 'trialing')
+      ) || []
+
+      paidUsers.forEach(user => {
+        const planMultiplier = user.subscription_plan === 'pro' ? 15 :
+                              user.subscription_plan === 'teams' ? 30 :
+                              user.subscription_plan === 'enterprise' ? 60 : 0
+        totalRevenue += planMultiplier
+        monthlyRevenue += planMultiplier
+      })
+    } else {
+      // In free mode, revenue is $0
+      totalRevenue = 0
+      monthlyRevenue = 0
+    }
 
     // Calculate credit usage
     const totalCreditUsage = userSettings?.reduce((sum, user) =>
@@ -83,7 +112,8 @@ export async function GET(request: NextRequest) {
       totalSubscriptions,
       activeSubscriptions,
       creditUsage: totalCreditUsage,
-      systemHealth
+      systemHealth,
+      subscriptionSystemEnabled: subscriptionEnabled
     }
 
     return NextResponse.json(stats)
