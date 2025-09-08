@@ -230,3 +230,70 @@ export async function PATCH(request: NextRequest) {
     )
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = await createClient()
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    if (!checkAdminAccess(user)) {
+      return NextResponse.json({ error: "Admin access required" }, { status: 403 })
+    }
+
+    const body = await request.json()
+    const { userId } = body || {}
+
+    if (!userId) {
+      return NextResponse.json({ error: "Missing userId" }, { status: 400 })
+    }
+
+    if (userId === user.id) {
+      return NextResponse.json({ error: "You cannot delete your own account" }, { status: 400 })
+    }
+
+    // Fetch target user to prevent deleting other admins
+    const adminSupabase = createAdminSupabaseClient()
+    const { data: targetUserData, error: getUserError } = await adminSupabase.auth.admin.getUserById(userId)
+
+    if (getUserError || !targetUserData?.user) {
+      return NextResponse.json({ error: "Target user not found" }, { status: 404 })
+    }
+
+    const targetEmail = targetUserData.user.email || undefined
+    if (checkAdminAccess({ email: targetEmail })) {
+      return NextResponse.json({ error: "You cannot delete another admin" }, { status: 403 })
+    }
+
+    // Best-effort cleanup of related rows (RLS must allow admin to perform these)
+    const cleanupResults = await Promise.all([
+      supabase.from('profiles').delete().eq('id', userId),
+      supabase.from('user_settings').delete().eq('user_id', userId)
+    ])
+
+    const cleanupError = cleanupResults.find(r => (r as any)?.error)
+    if (cleanupError && (cleanupError as any).error) {
+      console.warn('Warning: cleanup error before user deletion:', (cleanupError as any).error)
+    }
+
+    // Delete from auth.users using service role
+    const { error: deleteError } = await adminSupabase.auth.admin.deleteUser(userId)
+    if (deleteError) {
+      console.error('Error deleting auth user:', deleteError)
+      return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 })
+    }
+
+    console.log(`[ADMIN] ${user.email} deleted user ${userId}`)
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error in admin users DELETE API:', error)
+    return NextResponse.json(
+      { error: 'Failed to delete user' },
+      { status: 500 }
+    )
+  }
+}

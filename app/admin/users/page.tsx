@@ -403,6 +403,33 @@ export default function AdminUsersPage() {
                             Send Email
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-red-600"
+                            onClick={async () => {
+                              if (confirm(`Permanently delete user ${userData.email}? This cannot be undone.`)) {
+                                try {
+                                  const response = await fetch('/api/admin/users', {
+                                    method: 'DELETE',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ userId: userData.id })
+                                  })
+
+                                  if (response.ok) {
+                                    alert('User deleted successfully!')
+                                    await loadUsers()
+                                  } else {
+                                    const err = await response.json().catch(() => ({}))
+                                    alert(err.error || 'Failed to delete user')
+                                  }
+                                } catch (error) {
+                                  console.error('Error deleting user:', error)
+                                  alert('Error deleting user')
+                                }
+                              }
+                            }}
+                          >
+                            Delete User
+                          </DropdownMenuItem>
                           {!userData.hasProfile && (
                             <DropdownMenuItem
                               onClick={async () => {
