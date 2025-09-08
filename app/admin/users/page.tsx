@@ -114,7 +114,8 @@ export default function AdminUsersPage() {
       const response = await fetch('/api/admin/users')
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch users: ${response.status}`)
+        const errorData = await response.json()
+        throw new Error(errorData.error || `Failed to fetch users: ${response.status}`)
       }
 
       const data = await response.json()
@@ -122,6 +123,14 @@ export default function AdminUsersPage() {
     } catch (error) {
       console.error('Error loading users:', error)
       setUsers([])
+
+      // Show user-friendly error message
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      if (errorMessage.includes('service role')) {
+        alert('Admin user management requires Supabase service role configuration. Please check SUPABASE_SERVICE_ROLE_SETUP.md for setup instructions.')
+      } else {
+        alert(`Failed to load users: ${errorMessage}`)
+      }
     }
   }
 

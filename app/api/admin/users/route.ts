@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { checkAdminAccess } from "@/lib/admin-utils"
+import { createClient as createAdminClient } from "@supabase/supabase-js"
+
+// Helper function to create admin Supabase client with service role
+function createAdminSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error("Supabase service role configuration missing. Please set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.")
+  }
+
+  return createAdminClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  })
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,12 +33,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 })
     }
 
-    // Fetch all users from auth.users (admin only)
-    const { data: allUsers, error: usersError } = await supabase.auth.admin.listUsers()
+    // Fetch all users from auth.users using service role
+    const adminSupabase = createAdminSupabaseClient()
+    const { data: allUsers, error: usersError } = await adminSupabase.auth.admin.listUsers()
 
     if (usersError) {
       console.error('Error fetching all users:', usersError)
-      return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 })
+      return NextResponse.json({
+        error: "Failed to fetch users",
+        details: usersError.message
+      }, { status: 500 })
     }
 
     // Get user settings for all users
