@@ -64,6 +64,19 @@ CREATE POLICY "Users can insert their own settings" ON user_settings
 CREATE POLICY "Users can update their own settings" ON user_settings
   FOR UPDATE USING (auth.uid() = user_id);
 
+-- Admin policies for user_settings (allow admin to manage all users)
+CREATE POLICY "Admin can view all user settings" ON user_settings
+  FOR SELECT USING (auth.jwt() ->> 'email' = 'hanscadx8@gmail.com');
+
+CREATE POLICY "Admin can insert all user settings" ON user_settings
+  FOR INSERT WITH CHECK (auth.jwt() ->> 'email' = 'hanscadx8@gmail.com');
+
+CREATE POLICY "Admin can update all user settings" ON user_settings
+  FOR UPDATE USING (auth.jwt() ->> 'email' = 'hanscadx8@gmail.com');
+
+CREATE POLICY "Admin can delete all user settings" ON user_settings
+  FOR DELETE USING (auth.jwt() ->> 'email' = 'hanscadx8@gmail.com');
+
 -- Create policies for user_backups
 CREATE POLICY "Users can view their own backups" ON user_backups
   FOR SELECT USING (auth.uid() = user_id);
@@ -76,6 +89,32 @@ CREATE POLICY "Users can update their own backups" ON user_backups
 
 CREATE POLICY "Users can delete their own backups" ON user_backups
   FOR DELETE USING (auth.uid() = user_id);
+
+-- Enable RLS for profiles table
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+-- Create policies for profiles
+CREATE POLICY "Users can view their own profile" ON profiles
+  FOR SELECT USING (auth.uid() = id);
+
+CREATE POLICY "Users can insert their own profile" ON profiles
+  FOR INSERT WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Users can update their own profile" ON profiles
+  FOR UPDATE USING (auth.uid() = id);
+
+-- Admin policies for profiles (allow admin to manage all profiles)
+CREATE POLICY "Admin can view all profiles" ON profiles
+  FOR SELECT USING (auth.jwt() ->> 'email' = 'hanscadx8@gmail.com');
+
+CREATE POLICY "Admin can insert all profiles" ON profiles
+  FOR INSERT WITH CHECK (auth.jwt() ->> 'email' = 'hanscadx8@gmail.com');
+
+CREATE POLICY "Admin can update all profiles" ON profiles
+  FOR UPDATE USING (auth.jwt() ->> 'email' = 'hanscadx8@gmail.com');
+
+CREATE POLICY "Admin can delete all profiles" ON profiles
+  FOR DELETE USING (auth.jwt() ->> 'email' = 'hanscadx8@gmail.com');
 
 -- Create policies for system_settings
 CREATE POLICY "Authenticated users can view system settings" ON system_settings

@@ -210,13 +210,31 @@ export default function AccountSettingsPage() {
 
     try {
       setIsUpdatingName(true)
-      const { error } = await supabase.auth.updateUser({
+
+      // Update auth user metadata
+      const { error: authError } = await supabase.auth.updateUser({
         data: {
           full_name: editingName.trim()
         }
       })
 
-      if (error) throw error
+      if (authError) throw authError
+
+      // Also update the profiles table
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          full_name: editingName.trim(),
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'id'
+        })
+
+      if (profileError) {
+        console.error("Error updating profile:", profileError)
+        // Don't throw here, auth update was successful
+      }
 
       // Update local user state
       setUser({
