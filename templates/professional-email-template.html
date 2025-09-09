@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Pilot - {{EMAIL_SUBJECT}}</title>
+    <meta name="x-apple-disable-message-reformatting">
+    <meta name="color-scheme" content="light dark">
+    <meta name="supported-color-schemes" content="light dark">
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:AllowPNG/>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style>
+        /* Reset and base styles */
+        body, table, td, p, a, li, blockquote {
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+        }
+        table, td {
+            mso-table-lspace: 0pt;
+            mso-table-rspace: 0pt;
+        }
+        img {
+            -ms-interpolation-mode: bicubic;
+        }
+        /* Mobile styles */
+        @media only screen and (max-width: 600px) {
+            .mobile-wrapper {
+                width: 100% !important;
+            }
+            .mobile-padding {
+                padding-left: 20px !important;
+                padding-right: 20px !important;
+            }
+            .mobile-text-center {
+                text-align: center !important;
+            }
+            .mobile-full-width {
+                width: 100% !important;
+                height: auto !important;
+            }
+        }
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            .dark-mode-bg {
+                background-color: #1a1a1a !important;
+            }
+            .dark-mode-text {
+                color: #ffffff !important;
+            }
+            .dark-mode-border {
+                border-color: #333333 !important;
+            }
+        }
+    </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #334155;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <!-- Main container -->
+                <table role="presentation" class="mobile-wrapper" width="600" cellspacing="0" cellpadding="0" border="0" style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); overflow: hidden;">
+                    <!-- Header with logo and gradient -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%); padding: 40px 30px; text-align: center;">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td align="center">
+                                        <!-- Logo -->
+                                        <img src="{{LOGO_URL}}" alt="Pixel Pilot" width="64" height="64" style="display: block; margin: 0 auto 16px auto; border-radius: 8px; background-color: rgba(255, 255, 255, 0.1); padding: 8px;">
+                                        <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #ffffff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+                                            Pixel Pilot
+                                        </h1>
+                                        <p style="margin: 8px 0 0 0; font-size: 16px; color: rgba(255, 255, 255, 0.9); font-weight: 400;">
+                                            AI-Powered App Development
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Main content -->
+                    <tr>
+                        <td class="mobile-padding" style="padding: 40px 30px;">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <!-- Greeting -->
+                                <tr>
+                                    <td style="padding-bottom: 24px;">
+                                        <h2 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 600; color: #1e293b; line-height: 1.3;">
+                                            {{GREETING}}
+                                        </h2>
+                                        <p style="margin: 0; font-size: 16px; color: #64748b;">
+                                            {{SUBTITLE}}
+                                        </p>
+                                    </td>
+                                </tr>
+
+                                <!-- Hero content -->
+                                <tr>
+                                    <td style="padding-bottom: 32px;">
+                                        <div style="background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); border-radius: 8px; padding: 24px; border-left: 4px solid #3b82f6;">
+                                            <h3 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 600; color: #1e293b;">
+                                                {{HERO_TITLE}}
+                                            </h3>
+                                            <p style="margin: 0; font-size: 16px; color: #475569; line-height: 1.6;">
+                                                {{HERO_CONTENT}}
+                                            </p>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <!-- Main content sections -->
+                                <tr>
+                                    <td style="padding-bottom: 32px;">
+                                        <div style="font-size: 16px; color: #334155; line-height: 1.6;">
+                                            {{MAIN_CONTENT}}
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <!-- Feature highlights -->
+                                <tr>
+                                    <td style="padding-bottom: 32px;">
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td style="padding-bottom: 16px;">
+                                                    <h3 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 600; color: #1e293b;">
+                                                        {{FEATURES_TITLE}}
+                                                    </h3>
+                                                </td>
+                                            </tr>
+                                            <!-- Feature 1 -->
+                                            <tr>
+                                                <td style="padding-bottom: 16px;">
+                                                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                                        <tr>
+                                                            <td width="60" valign="top" style="padding-right: 16px;">
+                                                                <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                                                    <span style="font-size: 20px; color: white;">✨</span>
+                                                                </div>
+                                                            </td>
+                                                            <td valign="top">
+                                                                <h4 style="margin: 0 0 4px 0; font-size: 16px; font-weight: 600; color: #1e293b;">
+                                                                    {{FEATURE_1_TITLE}}
+                                                                </h4>
+                                                                <p style="margin: 0; font-size: 14px; color: #64748b; line-height: 1.5;">
+                                                                    {{FEATURE_1_DESCRIPTION}}
+                                                                </p>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                            <!-- Feature 2 -->
+                                            <tr>
+                                                <td style="padding-bottom: 16px;">
+                                                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                                        <tr>
+                                                            <td width="60" valign="top" style="padding-right: 16px;">
+                                                                <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #8b5cf6, #06b6d4); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                                                    <span style="font-size: 20px; color: white;">🚀</span>
+                                                                </div>
+                                                            </td>
+                                                            <td valign="top">
+                                                                <h4 style="margin: 0 0 4px 0; font-size: 16px; font-weight: 600; color: #1e293b;">
+                                                                    {{FEATURE_2_TITLE}}
+                                                                </h4>
+                                                                <p style="margin: 0; font-size: 14px; color: #64748b; line-height: 1.5;">
+                                                                    {{FEATURE_2_DESCRIPTION}}
+                                                                </p>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                            <!-- Feature 3 -->
+                                            <tr>
+                                                <td>
+                                                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                                        <tr>
+                                                            <td width="60" valign="top" style="padding-right: 16px;">
+                                                                <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #06b6d4, #3b82f6); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                                                    <span style="font-size: 20px; color: white;">🎯</span>
+                                                                </div>
+                                                            </td>
+                                                            <td valign="top">
+                                                                <h4 style="margin: 0 0 4px 0; font-size: 16px; font-weight: 600; color: #1e293b;">
+                                                                    {{FEATURE_3_TITLE}}
+                                                                </h4>
+                                                                <p style="margin: 0; font-size: 14px; color: #64748b; line-height: 1.5;">
+                                                                    {{FEATURE_3_DESCRIPTION}}
+                                                                </p>
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+
+                                <!-- Call to action -->
+                                <tr>
+                                    <td style="padding-bottom: 32px; text-align: center;">
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td align="center">
+                                                    <a href="{{CTA_URL}}" style="display: inline-block; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%); color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px; padding: 16px 32px; border-radius: 8px; box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.4); transition: all 0.2s ease;">
+                                                        {{CTA_TEXT}}
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td align="center" style="padding-top: 16px;">
+                                                    <p style="margin: 0; font-size: 14px; color: #64748b;">
+                                                        {{CTA_SUBTEXT}}
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+
+                                <!-- Additional content -->
+                                <tr>
+                                    <td style="padding-bottom: 24px;">
+                                        <div style="background-color: #f8fafc; border-radius: 8px; padding: 20px; border: 1px solid #e2e8f0;">
+                                            <h4 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: #1e293b;">
+                                                {{ADDITIONAL_TITLE}}
+                                            </h4>
+                                            <p style="margin: 0; font-size: 14px; color: #64748b; line-height: 1.5;">
+                                                {{ADDITIONAL_CONTENT}}
+                                            </p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f8fafc; padding: 30px; border-top: 1px solid #e2e8f0;">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td align="center" style="padding-bottom: 20px;">
+                                        <img src="{{LOGO_URL}}" alt="Pixel Pilot" width="32" height="32" style="display: block; margin: 0 auto; opacity: 0.8;">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="padding-bottom: 16px;">
+                                        <p style="margin: 0; font-size: 14px; color: #64748b; text-align: center; line-height: 1.5;">
+                                            Build amazing apps with AI-powered development.<br>
+                                            Join thousands of developers creating the future.
+                                        </p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="padding-bottom: 20px;">
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
+                                            <tr>
+                                                <td style="padding: 0 8px;">
+                                                    <a href="{{WEBSITE_URL}}" style="color: #3b82f6; text-decoration: none; font-size: 14px; font-weight: 500;">Website</a>
+                                                </td>
+                                                <td style="padding: 0 8px; color: #cbd5e1;">|</td>
+                                                <td style="padding: 0 8px;">
+                                                    <a href="{{BLOG_URL}}" style="color: #3b82f6; text-decoration: none; font-size: 14px; font-weight: 500;">Blog</a>
+                                                </td>
+                                                <td style="padding: 0 8px; color: #cbd5e1;">|</td>
+                                                <td style="padding: 0 8px;">
+                                                    <a href="{{SUPPORT_URL}}" style="color: #3b82f6; text-decoration: none; font-size: 14px; font-weight: 500;">Support</a>
+                                                </td>
+                                                <td style="padding: 0 8px; color: #cbd5e1;">|</td>
+                                                <td style="padding: 0 8px;">
+                                                    <a href="{{UNSUBSCRIBE_URL}}" style="color: #64748b; text-decoration: none; font-size: 14px;">Unsubscribe</a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center">
+                                        <p style="margin: 0; font-size: 12px; color: #94a3b8; text-align: center; line-height: 1.4;">
+                                            © {{CURRENT_YEAR}} Pixel Pilot. All rights reserved.<br>
+                                            123 Innovation Drive, Tech Valley, CA 94043<br>
+                                            <a href="mailto:hello@pixelpilot.dev" style="color: #94a3b8; text-decoration: none;">hello@pixelpilot.dev</a>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Email client compatibility footer -->
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; margin: 20px auto 0 auto;">
+                    <tr>
+                        <td align="center">
+                            <p style="margin: 0; font-size: 11px; color: #94a3b8; text-align: center;">
+                                This email was sent to {{USER_EMAIL}}.<br>
+                                If you no longer wish to receive these emails, you can <a href="{{UNSUBSCRIBE_URL}}" style="color: #94a3b8; text-decoration: underline;">unsubscribe here</a>.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

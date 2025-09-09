@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { Heart, Check, Info, ChevronDown, Star, Users, Loader2 } from "lucide-react"
+import { Heart, Check, Info, ChevronDown, Star, Users, Loader2, X } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { createClient } from "@/lib/supabase/client"
 import { PRODUCT_CONFIGS, getPrice, getSavings } from "@/lib/stripe-config"
+import { ClientCheckout } from "@/components/client-checkout"
 
 export default function PricingPage() {
   const [isAnnual, setIsAnnual] = useState(false)
@@ -18,6 +19,8 @@ export default function PricingPage() {
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
   const [user, setUser] = useState<any>(null)
   const [currentPlan, setCurrentPlan] = useState<string>('free')
+  const [showCheckout, setShowCheckout] = useState(false)
+  const [checkoutPlan, setCheckoutPlan] = useState<string>('')
 
   const supabase = createClient()
 
@@ -99,32 +102,22 @@ export default function PricingPage() {
       return
     }
 
-    setLoadingPlan(planType)
+    // Open client checkout modal instead of redirecting
+    setCheckoutPlan(planType)
+    setShowCheckout(true)
+  }
 
-    try {
-      const response = await fetch('/api/stripe/create-checkout-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          planType,
-          isAnnual,
-        }),
-      })
+  const handleCheckoutSuccess = () => {
+    setShowCheckout(false)
+    setCheckoutPlan('')
+    // Refresh current plan
+    setCurrentPlan(checkoutPlan)
+    alert(`Welcome to Pixel Pilot ${checkoutPlan}! Your subscription is now active.`)
+  }
 
-      if (!response.ok) {
-        throw new Error('Failed to create checkout session')
-      }
-
-      const { url } = await response.json()
-      window.location.href = url
-    } catch (error) {
-      console.error('Error creating checkout session:', error)
-      alert('Failed to start checkout. Please try again.')
-    } finally {
-      setLoadingPlan(null)
-    }
+  const handleCheckoutCancel = () => {
+    setShowCheckout(false)
+    setCheckoutPlan('')
   }
 
   const faqData = [
@@ -370,6 +363,26 @@ export default function PricingPage() {
 
       {/* Footer */}
       <Footer />
+
+      {/* Checkout Modal */}
+      {showCheckout && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="relative max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={handleCheckoutCancel}
+              className="absolute top-4 right-4 z-10 text-gray-400 hover:text-white transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <ClientCheckout
+              planType={checkoutPlan}
+              isAnnual={isAnnual}
+              onSuccess={handleCheckoutSuccess}
+              onCancel={handleCheckoutCancel}
+            />
+          </div>
+        </div>
+      )}
     </div>
     </>
   )

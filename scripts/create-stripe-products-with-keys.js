@@ -10,10 +10,10 @@ const stripe = new Stripe(stripeSecretKey, {
 
 // Product definition for Pixel Pilot Pro
 const productConfig = {
-  name: 'Pixel Pilot Pro',
+  name: 'Pixel Pilot Enterprisee',
   description: 'Professional AI development for serious developers',
-  monthlyPrice: 29, // $29/month
-  yearlyPrice: 279, // $279/year (20% savings)
+  monthlyPrice: 99, // $29/month
+  yearlyPrice: 379, // $279/year (20% savings)
 }
 
 async function createStripeProducts() {
@@ -28,8 +28,8 @@ async function createStripeProducts() {
       name: productConfig.name,
       description: productConfig.description,
       metadata: {
-        app: 'pixel-pilot',
-        plan_type: 'pro'
+        app: 'pixel-pilot-plus',
+        plan_type: 'plus'
       }
     })
 
