@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { stripe } from "@/lib/stripe"
 import { headers } from "next/headers"
+import Stripe from "stripe"
+
+// Fallback Stripe API key
+const FALLBACK_STRIPE_SECRET_KEY = "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"
 
 // Helper function to get Stripe instance safely
 function getStripe() {
@@ -11,10 +15,49 @@ function getStripe() {
   return stripe
 }
 
+// Helper function to create Stripe instance with fallback
+function createStripeInstance(secretKey: string): Stripe {
+  return new Stripe(secretKey, {
+    apiVersion: "2025-08-27.basil",
+    typescript: true,
+  })
+}
+
+// Helper function to handle Stripe authentication errors and try fallback
+function getStripeWithFallback(): Stripe {
+  const primaryKey = process.env.STRIPE_SECRET_KEY
+  const fallbackKey = FALLBACK_STRIPE_SECRET_KEY
+
+  // Try primary key first
+  if (primaryKey) {
+    try {
+      const stripeInstance = createStripeInstance(primaryKey)
+      console.log("Using primary Stripe key")
+      return stripeInstance
+    } catch (error: any) {
+      console.warn("Primary Stripe key initialization failed:", error.message)
+    }
+  }
+
+  // Try fallback key
+  if (fallbackKey) {
+    try {
+      const stripeInstance = createStripeInstance(fallbackKey)
+      console.log("Using fallback Stripe key")
+      return stripeInstance
+    } catch (error: any) {
+      console.error("Fallback Stripe key also failed:", error.message)
+      throw new Error("Both Stripe API keys are invalid or expired")
+    }
+  }
+
+  throw new Error("No valid Stripe API keys available")
+}
+
 // Helper function to verify webhook signature
 async function verifyWebhookSignature(body: string, signature: string, secret: string) {
-  const stripeInstance = getStripe()
   try {
+    const stripeInstance = getStripeWithFallback()
     return stripeInstance.webhooks.constructEvent(body, signature, secret)
   } catch (error) {
     console.error('Webhook signature verification failed:', error)
@@ -175,7 +218,7 @@ export async function POST(request: NextRequest) {
 
           // Retrieve the subscription from Stripe
           if (session.subscription) {
-            const stripeInstance = getStripe()
+            const stripeInstance = await getStripeWithFallback()
             const subscription = await stripeInstance.subscriptions.retrieve(session.subscription as string)
 
             // Update user subscription in database with duplicate prevention

@@ -1,26 +1,60 @@
 import Stripe from "stripe"
 
+// Fallback Stripe API key
+const FALLBACK_STRIPE_SECRET_KEY = "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"
+
 // Only initialize Stripe if environment variables are available
 // This prevents build-time errors when STRIPE_SECRET_KEY is not set
 let stripeInstance: Stripe | null = null
 
-try {
-  if (process.env.STRIPE_SECRET_KEY) {
-    stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: "2025-08-27.basil",
-      typescript: true,
-    })
+function initializeStripe() {
+  const primaryKey = process.env.STRIPE_SECRET_KEY
+  const fallbackKey = FALLBACK_STRIPE_SECRET_KEY
+
+  // Try primary key first
+  if (primaryKey) {
+    try {
+      console.log("Initializing Stripe with primary key...")
+      stripeInstance = new Stripe(primaryKey, {
+        apiVersion: "2025-08-27.basil",
+        typescript: true,
+      })
+
+      console.log("Stripe primary key initialized successfully")
+      return
+    } catch (error) {
+      console.warn("Primary Stripe key failed, trying fallback:", error)
+    }
   }
-} catch (error) {
-  console.warn("Failed to initialize Stripe:", error)
+
+  // Try fallback key if primary fails
+  if (fallbackKey) {
+    try {
+      console.log("Initializing Stripe with fallback key...")
+      stripeInstance = new Stripe(fallbackKey, {
+        apiVersion: "2025-08-27.basil",
+        typescript: true,
+      })
+
+      console.log("Stripe fallback key initialized successfully")
+      return
+    } catch (error) {
+      console.error("Fallback Stripe key also failed:", error)
+    }
+  }
+
+  console.error("Both primary and fallback Stripe keys failed to initialize")
   stripeInstance = null
 }
+
+// Initialize Stripe on module load
+initializeStripe()
 
 export const stripe = stripeInstance
 
 export const stripeConfig = {
   publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "",
-  secretKey: process.env.STRIPE_SECRET_KEY || "",
+  secretKey: process.env.STRIPE_SECRET_KEY || FALLBACK_STRIPE_SECRET_KEY,
 }
 
 // Price IDs for different plans (you'll need to create these in Stripe)
