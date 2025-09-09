@@ -2,23 +2,26 @@
 
 import React from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Bot } from 'lucide-react'
+import { Bot, Lock, Crown } from 'lucide-react'
 import { chatModels, type ChatModel, getModelById } from '@/lib/ai-models'
+import { getLimits } from '@/lib/stripe-config'
 
 interface ModelSelectorProps {
   selectedModel: string
   onModelChange: (modelId: string) => void
+  userPlan?: string
   className?: string
   compact?: boolean
 }
 
   // No visual badges/colors needed — keep data simple (provider groups and model names)
 
-export function ModelSelector({ 
-  selectedModel, 
-  onModelChange, 
-  className = '', 
-  compact = true 
+export function ModelSelector({
+  selectedModel,
+  onModelChange,
+  userPlan = 'free',
+  className = '',
+  compact = true
 }: ModelSelectorProps) {
   const currentModel = getModelById(selectedModel)
   
@@ -30,6 +33,13 @@ export function ModelSelector({
     acc[model.provider].push(model)
     return acc
   }, {} as Record<string, ChatModel[]>)
+
+  // Get allowed models for user's plan
+  const userLimits = getLimits(userPlan)
+  const allowedModels = userLimits.allowedModels || []
+
+  // Helper function to check if model is allowed
+  const isModelAllowed = (modelId: string) => allowedModels.includes(modelId)
 
   // Function to truncate text to 3 characters for all models
   const truncateModelName = (text: string | undefined) => {
@@ -63,15 +73,25 @@ export function ModelSelector({
                 <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   {provider}
                 </div>
-                {models.map((model) => (
-                  <SelectItem
-                    key={model.id}
-                    value={model.id}
-                    className="text-sm px-3 py-1"
-                  >
-                    {model.name}
-                  </SelectItem>
-                ))}
+                {models.map((model) => {
+                  const allowed = isModelAllowed(model.id)
+                  return (
+                    <SelectItem
+                      key={model.id}
+                      value={model.id}
+                      disabled={!allowed}
+                      className={`text-sm px-3 py-1 ${!allowed ? 'opacity-50' : ''}`}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span>{model.name}</span>
+                        {!allowed && <Lock className="h-3 w-3 text-muted-foreground ml-2" />}
+                        {allowed && userPlan === 'free' && model.id === 'auto' && (
+                          <Crown className="h-3 w-3 text-yellow-500 ml-2" />
+                        )}
+                      </div>
+                    </SelectItem>
+                  )
+                })}
               </div>
             ))}
           </SelectContent>
@@ -103,15 +123,30 @@ export function ModelSelector({
               <div className="px-3 py-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide border-b">
                 {provider}
               </div>
-              {models.map((model) => (
-                <SelectItem 
-                  key={model.id} 
-                  value={model.id}
-                  className="p-3 text-sm"
-                >
-                  {model.name}
-                </SelectItem>
-              ))}
+              {models.map((model) => {
+                const allowed = isModelAllowed(model.id)
+                return (
+                  <SelectItem
+                    key={model.id}
+                    value={model.id}
+                    disabled={!allowed}
+                    className={`p-3 text-sm ${!allowed ? 'opacity-50' : ''}`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div>
+                        <div className="font-medium">{model.name}</div>
+                        <div className="text-xs text-muted-foreground">{model.description}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {!allowed && <Lock className="h-4 w-4 text-muted-foreground" />}
+                        {allowed && userPlan === 'free' && model.id === 'auto' && (
+                          <Crown className="h-4 w-4 text-yellow-500" />
+                        )}
+                      </div>
+                    </div>
+                  </SelectItem>
+                )
+              })}
             </div>
           ))}
         </SelectContent>

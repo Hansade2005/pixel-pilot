@@ -22,7 +22,8 @@ import {
   DollarSign,
   Activity,
   UserPlus,
-  Zap
+  Zap,
+  Webhook
 } from "lucide-react"
 
 interface SystemStats {
@@ -32,7 +33,8 @@ interface SystemStats {
   monthlyRevenue: number
   totalSubscriptions: number
   activeSubscriptions: number
-  creditUsage: number
+  deploymentCount: number
+  githubPushCount: number
   systemHealth: 'healthy' | 'warning' | 'critical'
   subscriptionSystemEnabled: boolean
 }
@@ -48,6 +50,7 @@ export default function AdminPanel() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<SystemStats | null>(null)
+  const [webhookStatus, setWebhookStatus] = useState<any>(null)
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null)
   const [settingsLoading, setSettingsLoading] = useState(false)
   const router = useRouter()
@@ -73,11 +76,24 @@ export default function AdminPanel() {
 
       setUser(user)
       const statsData = await loadSystemStats()
+
+      // Load webhook status
+      try {
+        const webhookResponse = await fetch('/api/admin/webhook-status')
+        if (webhookResponse.ok) {
+          const webhookData = await webhookResponse.json()
+          setWebhookStatus(webhookData)
+        }
+      } catch (webhookError) {
+        console.error('Error loading webhook status:', webhookError)
+        setWebhookStatus({ health: { status: 'error' }, statistics: { lastHour: 0 } })
+      }
+
       // System settings are now included in stats, so we can set them from there
       if (statsData?.subscriptionSystemEnabled !== undefined) {
         setSystemSettings({
           subscriptionSystemEnabled: statsData.subscriptionSystemEnabled,
-          freeModeDescription: statsData.subscriptionSystemEnabled ? 'Subscription system is active' : 'Free usage mode - no credit charges',
+          freeModeDescription: statsData.subscriptionSystemEnabled ? 'Subscription system is active' : 'Free usage mode - no subscription charges',
           lastUpdated: new Date().toISOString(),
           updatedBy: user?.email || 'system'
         })
@@ -157,7 +173,7 @@ export default function AdminPanel() {
         if (updatedStats?.subscriptionSystemEnabled !== undefined) {
           setSystemSettings({
             subscriptionSystemEnabled: updatedStats.subscriptionSystemEnabled,
-            freeModeDescription: updatedStats.subscriptionSystemEnabled ? 'Subscription system is active' : 'Free usage mode - no credit charges',
+            freeModeDescription: updatedStats.subscriptionSystemEnabled ? 'Subscription system is active' : 'Free usage mode - no subscription charges',
             lastUpdated: new Date().toISOString(),
             updatedBy: user?.email || 'system'
           })
@@ -281,7 +297,7 @@ export default function AdminPanel() {
               <p className="text-xs text-muted-foreground">
                 {stats?.subscriptionSystemEnabled
                   ? `+$${stats?.monthlyRevenue || 0} this month`
-                  : 'Free mode - no charges'
+                  : 'Free mode - no subscription charges'
                 }
               </p>
             </CardContent>
@@ -299,7 +315,7 @@ export default function AdminPanel() {
               <p className="text-xs text-muted-foreground">
                 {stats?.subscriptionSystemEnabled
                   ? `of ${stats?.totalSubscriptions || 0} total`
-                  : 'Free mode - no subscriptions'
+                  : 'Free mode - no paid subscriptions'
                 }
               </p>
             </CardContent>
@@ -317,6 +333,37 @@ export default function AdminPanel() {
               <div className="text-2xl font-bold capitalize">{stats?.systemHealth || 'Unknown'}</div>
               <p className="text-xs text-muted-foreground">
                 All systems operational
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Webhook Status</CardTitle>
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${
+                  webhookStatus?.health?.status === 'healthy' ? 'bg-green-500' :
+                  webhookStatus?.health?.status === 'warning' ? 'bg-yellow-500' :
+                  webhookStatus?.health?.status === 'error' ? 'bg-red-500' :
+                  'bg-gray-500'
+                }`} />
+                <Webhook className={`h-4 w-4 ${
+                  webhookStatus?.health?.status === 'healthy' ? 'text-green-500' :
+                  webhookStatus?.health?.status === 'warning' ? 'text-yellow-500' :
+                  webhookStatus?.health?.status === 'error' ? 'text-red-500' :
+                  'text-muted-foreground'
+                }`} />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {webhookStatus?.health?.successRate !== undefined
+                  ? `${webhookStatus.health.successRate}%`
+                  : 'Unknown'
+                }
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {webhookStatus?.statistics?.lastHour || 0} events/hour
               </p>
             </CardContent>
           </Card>
@@ -430,8 +477,8 @@ export default function AdminPanel() {
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {systemSettings?.subscriptionSystemEnabled
-                        ? "Users are charged credits for usage. Normal subscription system active."
-                        : "Free usage mode: All users get unlimited credits. No charges applied."
+                        ? "Users are charged for subscriptions and usage. Normal subscription system active."
+                        : "Free usage mode: All users get unlimited access. No subscription charges applied."
                       }
                     </p>
                     {systemSettings && (
@@ -462,7 +509,7 @@ export default function AdminPanel() {
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {systemSettings?.subscriptionSystemEnabled
-                        ? "Credit charges active"
+                        ? "Subscription charges active"
                         : "Unlimited usage for all users"
                       }
                     </p>

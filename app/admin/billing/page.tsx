@@ -58,8 +58,8 @@ interface SubscriptionData {
   subscription_status: string
   stripe_customer_id: string | null
   stripe_subscription_id: string | null
-  credits_remaining: number
-  credits_used_this_month: number
+  deployments_this_month: number
+  github_pushes_this_month: number
   subscription_start_date: string | null
   subscription_end_date: string | null
   last_payment_date: string | null
@@ -131,8 +131,8 @@ export default function AdminBillingPage() {
         subscription_status: setting.subscription_status,
         stripe_customer_id: setting.stripe_customer_id,
         stripe_subscription_id: setting.stripe_subscription_id,
-        credits_remaining: setting.credits_remaining,
-        credits_used_this_month: setting.credits_used_this_month,
+        deployments_this_month: setting.deployments_this_month || 0,
+        github_pushes_this_month: setting.github_pushes_this_month || 0,
         subscription_start_date: setting.subscription_start_date,
         subscription_end_date: setting.subscription_end_date,
         last_payment_date: setting.last_payment_date,
@@ -336,7 +336,7 @@ export default function AdminBillingPage() {
                   <TableHead>Customer</TableHead>
                   <TableHead>Plan</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Credits</TableHead>
+                  <TableHead>Usage</TableHead>
                   <TableHead>Next Billing</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -363,9 +363,11 @@ export default function AdminBillingPage() {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        <span className="font-medium">{subscription.credits_remaining}</span>
                         <div className="text-xs text-muted-foreground">
-                          Used: {subscription.credits_used_this_month}
+                          Deployments: {subscription.deployments_this_month}/{subscription.subscription_plan === 'pro' ? 10 : 5}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          GitHub: {subscription.github_pushes_this_month}/2
                         </div>
                       </div>
                     </TableCell>
@@ -490,25 +492,25 @@ export default function AdminBillingPage() {
                   <Card>
                     <CardContent className="p-4 text-center">
                       <div className="text-2xl font-bold text-blue-600">
-                        {selectedSubscription.credits_remaining}
+                        {selectedSubscription.deployments_this_month}
                       </div>
-                      <p className="text-xs text-muted-foreground">Credits Remaining</p>
+                      <p className="text-xs text-muted-foreground">Deployments (Month)</p>
                     </CardContent>
                   </Card>
 
                   <Card>
                     <CardContent className="p-4 text-center">
                       <div className="text-2xl font-bold text-purple-600">
-                        {selectedSubscription.credits_used_this_month}
+                        {selectedSubscription.github_pushes_this_month}
                       </div>
-                      <p className="text-xs text-muted-foreground">Credits Used (Month)</p>
+                      <p className="text-xs text-muted-foreground">GitHub Pushes (Month)</p>
                     </CardContent>
                   </Card>
 
                   <Card>
                     <CardContent className="p-4 text-center">
                       <div className="text-2xl font-bold text-green-600">
-                        {selectedSubscription.subscription_plan === 'pro' ? 15 :
+                        {selectedSubscription.subscription_plan === 'pro' ? 29 :
                          selectedSubscription.subscription_plan === 'teams' ? 30 :
                          selectedSubscription.subscription_plan === 'enterprise' ? 60 : 0}
                       </div>

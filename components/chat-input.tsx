@@ -14,8 +14,7 @@ import {
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "react-toastify"
-import { useCredits } from "@/hooks/use-credits"
-import { calculateCredits } from "@/lib/credit-manager"
+import { useSubscription } from "@/hooks/use-subscription"
 
 interface ChatInputProps {
   onAuthRequired: () => void
@@ -28,11 +27,8 @@ export function ChatInput({ onAuthRequired }: ChatInputProps) {
   const router = useRouter()
   const supabase = createClient()
 
-  // Credit status hook
-  const { creditStatus, loading: creditsLoading, isLowOnCredits, isOutOfCredits } = useCredits()
-
-  // Calculate credits needed for current prompt
-  const requiredCredits = prompt.trim() ? calculateCredits('chat_message', { message: prompt }) : 0
+  // Subscription status hook
+  const { subscription, loading: subscriptionLoading } = useSubscription()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -46,16 +42,9 @@ export function ChatInput({ onAuthRequired }: ChatInputProps) {
       return
     }
 
-    // Check credit status
-    if (isOutOfCredits || (creditStatus && creditStatus.remaining < requiredCredits)) {
-      toast.error(`Insufficient credits! You need ${requiredCredits} credits but only have ${creditStatus?.remaining || 0} remaining.`)
-      router.push('/pricing')
-      return
-    }
-
-    // Warn user about low credits
-    if (isLowOnCredits) {
-      toast.warning(`You have ${creditStatus?.remaining || 0} credits remaining. Consider upgrading your plan.`)
+    // Check subscription status for Free users
+    if (subscription?.plan === 'free') {
+      toast.info('You\'re on the Free plan. Upgrade to Pro for unlimited prompts and full features!')
     }
 
     setIsLoading(true)
@@ -108,89 +97,58 @@ export function ChatInput({ onAuthRequired }: ChatInputProps) {
       {/* Main Chat Input */}
       <div className="relative">
         <div className="bg-gray-800/80 chat-input-container border border-gray-700/50 rounded-2xl p-4 shadow-2xl">
-          {/* Credit Status Display */}
-          {!creditsLoading && creditStatus && (
+          {/* Subscription Status Display */}
+          {!subscriptionLoading && subscription && (
             <div className="mb-4 p-3 rounded-lg bg-gray-700/30 border border-gray-600/30">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Zap className="h-4 w-4 text-green-400" />
+                  <Crown className="h-4 w-4 text-purple-400" />
                   <span className="text-sm text-gray-300">
-                    {creditStatus.plan === 'admin' ? 'Unlimited credits (Admin)' :
-                     creditStatus.plan === 'free_mode' ? 'Unlimited credits (Free Mode)' :
-                     `${creditStatus.remaining} credits remaining`}
+                    {subscription.plan === 'pro' ? 'Unlimited prompts (Pro)' :
+                     subscription.plan === 'enterprise' ? 'Unlimited prompts (Enterprise)' :
+                     'Limited prompts (Free)'}
                   </span>
-                  {requiredCredits > 0 && creditStatus.plan !== 'admin' && (
-                    <span className="text-xs text-gray-500">
-                      ({requiredCredits} needed for this request)
-                    </span>
-                  )}
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {creditStatus.plan === 'admin' ? (
-                    <div className="flex items-center gap-1 text-green-400">
+                  {subscription.plan === 'pro' ? (
+                    <div className="flex items-center gap-1 text-purple-400">
                       <Crown className="h-3 w-3" />
-                      <span className="text-xs">Admin</span>
+                      <span className="text-xs">Pro</span>
+                    </div>
+                  ) : subscription.plan === 'enterprise' ? (
+                    <div className="flex items-center gap-1 text-blue-400">
+                      <Crown className="h-3 w-3" />
+                      <span className="text-xs">Enterprise</span>
                     </div>
                   ) : (
-                    <>
-                      {isOutOfCredits && (
-                        <div className="flex items-center gap-1 text-red-400">
-                          <AlertTriangle className="h-3 w-3" />
-                          <span className="text-xs">No credits</span>
+                    <div className="flex items-center gap-1 text-gray-400">
+                      <Crown className="h-3 w-3" />
+                      <span className="text-xs">Free</span>
                         </div>
-                      )}
-                      {isLowOnCredits && !isOutOfCredits && (
-                        <div className="flex items-center gap-1 text-yellow-400">
-                          <AlertTriangle className="h-3 w-3" />
-                          <span className="text-xs">Low credits</span>
-                        </div>
-                      )}
-                    </>
                   )}
                   <span className="text-xs text-gray-500 capitalize">
-                    {creditStatus.plan === 'free_mode' ? 'Free Mode' : `${creditStatus.plan} plan`}
+                    {subscription.plan} plan
                   </span>
                 </div>
               </div>
 
-              {/* Warning messages - only show for non-admin users */}
-              {creditStatus.plan !== 'admin' && (
-                <>
-                  {isOutOfCredits && (
-                    <div className="mt-2 p-2 bg-red-900/20 border border-red-700/30 rounded text-sm text-red-300">
+              {/* Free plan limitations warning */}
+              {subscription.plan === 'free' && (
+                <div className="mt-2 p-2 bg-blue-900/20 border border-blue-700/30 rounded text-sm text-blue-300">
                       <div className="flex items-center gap-2">
                         <AlertTriangle className="h-4 w-4" />
-                        <span>You're out of credits! Upgrade to continue using Pixel Pilot.</span>
+                    <span>Free plan: Limited prompts and GitHub pushes. Upgrade for unlimited access!</span>
                         <Button
                           size="sm"
                           variant="outline"
-                          className="ml-auto text-red-300 border-red-700/50 hover:bg-red-900/30"
+                      className="ml-auto text-blue-300 border-blue-700/50 hover:bg-blue-900/30"
                           onClick={() => router.push('/pricing')}
                         >
                           Upgrade
                         </Button>
                       </div>
                     </div>
-                  )}
-
-                  {isLowOnCredits && !isOutOfCredits && (
-                    <div className="mt-2 p-2 bg-yellow-900/20 border border-yellow-700/30 rounded text-sm text-yellow-300">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4" />
-                        <span>You're running low on credits. Consider upgrading your plan.</span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="ml-auto text-yellow-300 border-yellow-700/50 hover:bg-yellow-900/30"
-                          onClick={() => router.push('/pricing')}
-                        >
-                          View Plans
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </>
               )}
             </div>
           )}

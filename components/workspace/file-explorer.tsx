@@ -16,14 +16,14 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { 
-  Folder, 
-  FolderOpen, 
-  FileText, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  ChevronRight, 
+import {
+  Folder,
+  FolderOpen,
+  FileText,
+  Plus,
+  Edit,
+  Trash2,
+  ChevronRight,
   ChevronDown,
   Search,
   FileCode,
@@ -34,7 +34,9 @@ import {
   Package,
   FileDown,
   File,
-  Upload
+  Upload,
+  Download,
+  Archive
 } from "lucide-react"
 import type { Workspace as Project, File as FileItem } from "@/lib/storage-manager"
 import { dbManager } from '@/lib/indexeddb';
@@ -74,6 +76,7 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadInFolder, setUploadInFolder] = useState<string | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
 
   const { toast } = useToast()
 
@@ -1223,6 +1226,100 @@ enabled = false`
     }
   }
 
+  // Export functions
+  const handleExportProject = async () => {
+    if (!project) return
+
+    setIsExporting(true)
+    try {
+      const response = await fetch('/api/export-to-disk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          projectId: project.id,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Export failed: ${response.status}`)
+      }
+
+      // Create download link
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `project-${project.name || project.id}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+
+      toast({
+        title: "Export Complete",
+        description: `Project exported as ${project.name || project.id}.zip`,
+      })
+    } catch (error) {
+      console.error('Export error:', error)
+      toast({
+        title: "Export Failed",
+        description: "Failed to export project. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const handleExportSelected = async (filePaths: string[]) => {
+    if (!project || filePaths.length === 0) return
+
+    setIsExporting(true)
+    try {
+      const response = await fetch('/api/export-to-disk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          projectId: project.id,
+          filePaths,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Export failed: ${response.status}`)
+      }
+
+      // Create download link
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `selected-files-${project.name || project.id}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+
+      toast({
+        title: "Export Complete",
+        description: `${filePaths.length} file(s) exported as zip`,
+      })
+    } catch (error) {
+      console.error('Export error:', error)
+      toast({
+        title: "Export Failed",
+        description: "Failed to export files. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   const renderFileNode = (node: FileNode, depth = 0) => {
     const isSelected = selectedFile?.id === node.file?.id
     const isSearchMatch = searchQuery && node.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -1287,6 +1384,10 @@ enabled = false`
                     <Edit className="mr-2 h-4 w-4" />
                     Rename
                   </ContextMenuItem>
+                <ContextMenuItem onClick={() => handleExportSelected([node.path])}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download File
+                </ContextMenuItem>
                 <ContextMenuItem onClick={() => handleDeleteFile(node.file!)} className="text-destructive">
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete
@@ -1322,6 +1423,14 @@ enabled = false`
                     </>
                   )}
                 </ContextMenuItem>
+                <ContextMenuItem onClick={() => {
+                  // Get all files in this folder
+                  const folderFiles = fileTree.filter(f => f.path.startsWith(node.path + '/')).map(f => f.path)
+                  handleExportSelected(folderFiles)
+                }}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download Folder
+                </ContextMenuItem>
                 <ContextMenuItem onClick={() => handleDeleteFolder(node.path)} className="text-destructive">
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete Folder
@@ -1341,6 +1450,11 @@ enabled = false`
                   </ContextMenuItem>
               </>
             )}
+            <ContextMenuItem onClick={() => handleExportProject()}>
+              <Download className="mr-2 h-4 w-4" />
+              Export All as ZIP
+            </ContextMenuItem>
+            <ContextMenuSeparator />
             <ContextMenuItem onClick={() => {
               setNewFileType("folder")
               setIsCreateDialogOpen(true)
@@ -1389,6 +1503,7 @@ enabled = false`
             size="sm"
             onClick={() => setIsCreateDialogOpen(true)}
             className="h-8 w-8 p-0"
+            title="New File/Folder"
           >
             <Plus className="h-4 w-4" />
           </Button>
@@ -1397,8 +1512,23 @@ enabled = false`
             size="sm"
             onClick={() => setShowSearch(!showSearch)}
             className="h-8 w-8 p-0"
+            title="Search Files"
           >
             <Search className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleExportProject}
+            disabled={isExporting}
+            className="h-8 w-8 p-0"
+            title="Export Project as ZIP"
+          >
+            {isExporting ? (
+              <Archive className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
           </Button>
         </div>
       </div>

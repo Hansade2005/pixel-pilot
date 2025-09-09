@@ -208,12 +208,10 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
       case 'read_file': return Eye
       case 'list_files': return FolderOpen
       case 'delete_file': return X
-      case 'tool_results_summary': return Check
       case 'web_search': return Globe
       case 'web_extract': return FileSearch
       case 'search_knowledge': return BookOpen
       case 'get_knowledge_item': return BookOpen
-      case 'get_project_summary': return Database
       case 'recall_context': return User
       case 'analyze_dependencies': return Zap
       case 'scan_code_imports': return AlertTriangle
@@ -229,12 +227,10 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
       case 'read_file': return 'Read'
       case 'list_files': return 'Listed'
       case 'delete_file': return 'Deleted'
-      case 'tool_results_summary': return 'Summary Generated'
       case 'web_search': return 'Searched'
       case 'web_extract': return 'Extracted'
       case 'search_knowledge': return 'Knowledge Searched'
       case 'get_knowledge_item': return 'Knowledge Retrieved'
-      case 'get_project_summary': return 'Project Summarized'
       case 'recall_context': return 'Context Recalled'
       case 'analyze_dependencies': return 'Dependencies Analyzed'
       case 'scan_code_imports': return 'Imports Scanned'
@@ -254,70 +250,6 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
 
   const IconComponent = getToolIcon(toolCall.name)
 
-  // Special handling for tool_results_summary
-  if (toolCall.name === 'tool_results_summary') {
-    const isIntroduction = toolCall.result?.phase === 'introduction'
-    const phaseIcon = isIntroduction ? '🚀' : '📊'
-    const phaseTitle = isIntroduction ? 'Development Plan' : 'Session Summary'
-    const [isExpanded, setIsExpanded] = useState(false)
-    
-    return (
-      <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
-          {/* Header - Clickable to toggle */}
-          <div
-            className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
-              isSuccess
-              ? `bg-muted border-border`
-              : 'bg-red-900/30 border-red-700'
-            }`}
-            onClick={() => setIsExpanded(!isExpanded)}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-full ${
-                isSuccess
-                ? `bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white`
-                  : 'bg-red-500'
-              }`}>
-                <IconComponent className="w-4 h-4" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                <span className="font-semibold text-sm text-foreground">{phaseIcon} {phaseTitle}</span>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                    isSuccess
-                    ? `bg-primary text-primary-foreground`
-                      : 'bg-red-900/50 text-red-300'
-                  }`}>
-                    {isSuccess ? (isIntroduction ? 'Planned' : 'Generated') : ' Failed'}
-                  </span>
-                </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                  {toolCall.result?.session_title && (
-                    <span className="font-medium">{toolCall.result.session_title} • </span>
-                  )}
-                  {toolCall.result?.changes_count || 0} changes • {toolCall.result?.suggestions_count || 0} {isIntroduction ? 'questions' : 'suggestions'} • {toolCall.result?.completeness || 0}% complete
-                </div>
-              </div>
-              {/* Chevron indicator */}
-              <div className="ml-2">
-                {isExpanded ? (
-                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                )}
-              </div>
-            </div>
-          </div>
-          
-          {/* Summary Content - Collapsible */}
-          {isSuccess && toolCall.result?.summary && isExpanded && (
-          <div className="p-4 bg-background border-t">
-              <ExpandableAISummary content={toolCall.result.summary} />
-            </div>
-          )}
-      </div>
-    )
-  }
   
   // Special handling for web_search tool
   if (toolCall.name === 'web_search') {
@@ -1039,93 +971,6 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
     )
   }
 
-  // Special handling for analyze_project tool
-  if (toolCall.name === 'analyze_project') {
-    const [isExpanded, setIsExpanded] = useState(false)
-    const analysis = toolCall.result || {}
-    
-    return (
-      <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
-        {/* Header - Clickable to toggle */}
-        <div
-          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
-            isSuccess
-              ? 'bg-muted border-l-4 border-l-primary'
-              : 'bg-red-900/20 border-l-4 border-l-red-500'
-          }`}
-          onClick={() => setIsExpanded(!isExpanded)}
-        >
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-full ${
-              isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
-            }`}>
-              <IconComponent className="w-4 h-4" />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-foreground">Project Analysis</span>
-                <span className="text-xs text-muted-foreground">({analysis.totalFiles || 0} files)</span>
-              </div>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <span>{getToolAction(toolCall.name)}</span>
-                <span>•</span>
-                <span>{isSuccess ? 'Completed' : 'Failed'}</span>
-              </div>
-            </div>
-            {/* Chevron indicator */}
-            <div className="ml-2">
-              {isExpanded ? (
-                <ChevronUp className="w-4 h-4 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-              )}
-            </div>
-          </div>
-        </div>
-        
-        {/* Project Analysis - Collapsible */}
-        {isSuccess && isExpanded && (
-          <div className="p-4 bg-background border-t">
-            <div className="max-h-96 overflow-y-auto">
-              <div className="prose prose-sm max-w-none">
-                <ReactMarkdown 
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    h1: ({ children }) => (
-                      <h1 className="text-lg font-bold mb-3 text-white">{children}</h1>
-                    ),
-                    h2: ({ children }) => (
-                      <h2 className="text-base font-bold mb-2 text-white">{children}</h2>
-                    ),
-                    h3: ({ children }) => (
-                      <h3 className="text-sm font-bold mb-2 text-white">{children}</h3>
-                    ),
-                    p: ({ children }) => (
-                      <p className="text-white leading-[1.5] mb-2 font-medium">{children}</p>
-                    ),
-                    ul: ({ children }) => (
-                      <ul className="list-none space-y-1 text-white mb-3">{children}</ul>
-                    ),
-                    li: ({ children }) => (
-                      <li className="text-white">{children}</li>
-                    ),
-                    code: ({ children }) => (
-                      <code className="bg-gray-600 px-1 py-0.5 rounded text-xs font-mono text-white">{children}</code>
-                    ),
-                    hr: () => (
-                      <hr className="my-4 border-gray-600" />
-                    )
-                  }}
-                >
-                  {toolCall.result?.message || 'Project analysis completed successfully.'}
-                </ReactMarkdown>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    )
-  }
 
   // Special handling for write_file and edit_file tools
   if (toolCall.name === 'write_file' || toolCall.name === 'edit_file') {
@@ -2135,13 +1980,31 @@ export function ChatPanel({
           throw new Error(jsonResponse.error)
         }
         
+        // Check if there's a tool_results_summary that should be displayed as assistant message
+        let finalMessageContent = jsonResponse.message || ''
+
+        if (jsonResponse.toolCalls && jsonResponse.toolCalls.length > 0) {
+          const summaryTool = jsonResponse.toolCalls.find((tc: any) =>
+            tc.name === 'tool_results_summary' &&
+            tc.result &&
+            tc.result.displayType === 'assistant_bubble' &&
+            tc.result.summary
+          )
+
+          if (summaryTool) {
+            // Use the summary as the main message content
+            finalMessageContent = summaryTool.result.summary
+            console.log('[DEBUG] Using tool_results_summary as assistant message:', finalMessageContent.substring(0, 100) + '...')
+          }
+        }
+
         // CRITICAL: Prevent empty assistant messages from being rendered
         // Only create and display the message if there's actual content
-        if (jsonResponse.message && jsonResponse.message.trim()) {
+        if (finalMessageContent && finalMessageContent.trim()) {
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-            content: jsonResponse.message,
+            content: finalMessageContent,
           createdAt: new Date().toISOString(),
           metadata: {
             toolCalls: jsonResponse.toolCalls || [],
@@ -2158,7 +2021,7 @@ export function ChatPanel({
         setMessages(prev => [...prev, assistantMessage])
         await saveMessageToIndexedDB(assistantMessage)
           
-          console.log('[DEBUG] Added assistant message with content:', jsonResponse.message.substring(0, 100) + '...')
+          console.log('[DEBUG] Added assistant message with content:', finalMessageContent.substring(0, 100) + '...')
         } else {
           console.log('[DEBUG] Skipped empty assistant message, content was empty or whitespace only')
         }
@@ -2358,7 +2221,7 @@ export function ChatPanel({
             content: assistantContent,
             createdAt: new Date().toISOString(),
           }
-          
+
           await saveMessageToIndexedDB(finalAssistantMessage)
         }
         }
@@ -3001,12 +2864,15 @@ export function ChatPanel({
                               />
                             )}
                             
-                            {/* Tool execution results */}
-                            {msg.metadata?.toolCalls && msg.metadata.toolCalls.length > 0 && (
+                            {/* Tool execution results - exclude tool_results_summary as it displays in assistant bubble */}
+                            {msg.metadata?.toolCalls && msg.metadata.toolCalls.filter(tc => tc.name !== 'tool_results_summary').length > 0 && (
                               <div className="space-y-2 mb-4">
-                                {msg.metadata.toolCalls.map((toolCall, toolIndex) => (
-                                  <ToolPill key={toolIndex} toolCall={toolCall} />
-                                ))}
+                                {msg.metadata.toolCalls
+                                  .filter(tc => tc.name !== 'tool_results_summary')
+                                  .map((toolCall, toolIndex) => (
+                                    <ToolPill key={toolIndex} toolCall={toolCall} />
+                                  ))
+                                }
                               </div>
                             )}
                             

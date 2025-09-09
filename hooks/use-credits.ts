@@ -1,47 +1,64 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { getCreditStatus, CreditStatus } from '@/lib/credit-manager'
+
+interface SubscriptionData {
+  plan: string
+  status: string
+  deploymentsThisMonth: number
+  githubPushesThisMonth: number
+  subscriptionEndDate?: string
+  cancelAtPeriodEnd?: boolean
+}
 
 export function useCredits(userId?: string) {
-  const [creditStatus, setCreditStatus] = useState<CreditStatus | null>(null)
+  const [subscription, setSubscription] = useState<SubscriptionData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const supabase = createClient()
 
-  const fetchCreditStatus = useCallback(async () => {
+  const fetchSubscription = useCallback(async () => {
     if (!userId) return
 
     try {
       setLoading(true)
       setError(null)
 
-      const status = await getCreditStatus(userId)
-      setCreditStatus(status)
+      // Fetch subscription status from API
+      const response = await fetch('/api/stripe/check-subscription', {
+        method: 'POST',
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setSubscription(data)
+      } else {
+        throw new Error('Failed to fetch subscription')
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch credit status')
-      console.error('Error fetching credit status:', err)
+      setError(err instanceof Error ? err.message : 'Failed to fetch subscription')
+      console.error('Error fetching subscription:', err)
     } finally {
       setLoading(false)
     }
   }, [userId])
 
-  const refreshCredits = useCallback(() => {
-    fetchCreditStatus()
-  }, [fetchCreditStatus])
+  const refreshSubscription = useCallback(() => {
+    fetchSubscription()
+  }, [fetchSubscription])
 
   useEffect(() => {
     if (userId) {
-      fetchCreditStatus()
+      fetchSubscription()
     }
-  }, [userId, fetchCreditStatus])
+  }, [userId, fetchSubscription])
 
-  // Set up real-time subscription for credit updates
+  // Set up real-time subscription for subscription updates
   useEffect(() => {
     if (!userId) return
 
     const channel = supabase
-      .channel(`credit-updates-${userId}`)
+      .channel(`subscription-updates-${userId}`)
       .on(
         'postgres_changes',
         {
@@ -51,9 +68,9 @@ export function useCredits(userId?: string) {
           filter: `user_id=eq.${userId}`
         },
         (payload) => {
-          console.log('Credit status updated:', payload)
-          // Refresh credit status when user_settings table changes
-          fetchCreditStatus()
+          console.log('Subscription updated:', payload)
+          // Refresh subscription when user_settings table changes
+          fetchSubscription()
         }
       )
       .subscribe()
@@ -61,18 +78,20 @@ export function useCredits(userId?: string) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [userId, supabase, fetchCreditStatus])
+  }, [userId, supabase, fetchSubscription])
 
   return {
-    creditStatus,
+    subscription,
     loading,
     error,
-    refreshCredits,
+    refreshSubscription,
     // Helper computed values
-    hasCredits: creditStatus ? creditStatus.remaining > 0 : false,
-    isLowOnCredits: creditStatus ? creditStatus.status === 'low' : false,
-    isOutOfCredits: creditStatus ? creditStatus.status === 'exhausted' : false,
-    usagePercentage: creditStatus ?
-      Math.round((creditStatus.used / creditStatus.limit) * 100) : 0
+    isActive: subscription?.status === 'active' || subscription?.status === 'trialing',
+    isTrialing: subscription?.status === 'trialing',
+    isCancelled: subscription?.cancelAtPeriodEnd,
+    plan: subscription?.plan || 'free',
+    deploymentsUsed: subscription?.deploymentsThisMonth || 0,
+    githubPushesUsed: subscription?.githubPushesThisMonth || 0,
+    subscriptionEndDate: subscription?.subscriptionEndDate
   }
 }

@@ -21,7 +21,7 @@ toolCallsCount: 19, outputTokens: 7836, inputTokens: 33515
 ```
 - AI is making 19 tool calls in a single request
 - Each tool call includes the full context + previous tool results
-- `analyze_project` tool reads all files and includes them in responses
+- AI tools read all files and include them in responses
 
 #### 2. **Conversation Memory Accumulation**
 - Previous conversation context is included in each request
@@ -54,7 +54,7 @@ toolCallsCount: 19, outputTokens: 7836, inputTokens: 33515
 - Only keep essential tool results in context
 - Clear conversation context periodically
 
-### 2. **Optimize analyze_project Tool**
+### 2. **Optimize AI Tools**
 ```typescript
 // Current: Returns full enhanced context (6307 characters)
 const enhancedContext = await buildEnhancedProjectContext(projectId, storageManager)
@@ -88,17 +88,17 @@ const projectSummary = await buildProjectSummary(projectId, storageManager)
 
 ## Immediate Fix Needed
 
-The `analyze_project` tool is likely the main culprit:
+AI tools are likely the main culprit:
 ```
-[DEBUG] analyze_project: Built enhanced context with 6307 characters
-[DEBUG] analyze_project: Available files count: 66
+[DEBUG] AI tools: Built enhanced context with 6307 characters
+[DEBUG] AI tools: Available files count: 66
 ```
 
-This tool is reading all 66 files and including their analysis in the response, which then gets passed to subsequent tool calls.
+These tools are reading all 66 files and including their analysis in the response, which then gets passed to subsequent tool calls.
 
 ## Recommendation
 
-1. **Modify analyze_project tool** to return only essential summary
+1. **Modify AI tools** to return only essential summary
 2. **Implement context truncation** after each tool call
 3. **Add conversation memory limits**
 4. **Monitor token usage** per tool call

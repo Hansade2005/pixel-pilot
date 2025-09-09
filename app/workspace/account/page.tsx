@@ -138,9 +138,8 @@ export default function AccountSettingsPage() {
   const [subscription, setSubscription] = useState<any>(null)
   const [subscriptionLoading, setSubscriptionLoading] = useState(false)
   const [usageStats, setUsageStats] = useState({
-    creditsUsed: 0,
-    creditsRemaining: 25,
     deploymentsThisMonth: 0,
+    githubPushesThisMonth: 0,
     storageUsed: 0
   })
 
@@ -712,11 +711,10 @@ export default function AccountSettingsPage() {
         setSubscription(data)
 
         // Update usage stats based on subscription
-        const limits = getLimits(data.plan)
         setUsageStats(prev => ({
           ...prev,
-          creditsRemaining: data.creditsRemaining,
-          creditsUsed: prev.creditsRemaining - data.creditsRemaining
+          deploymentsThisMonth: data.deploymentsThisMonth || 0,
+          githubPushesThisMonth: data.githubPushesThisMonth || 0
         }))
       }
     } catch (error) {
@@ -1142,20 +1140,20 @@ export default function AccountSettingsPage() {
                       </Badge>
                     </div>
 
-                    {/* Credits Usage */}
+                    {/* Usage Limits */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Credits Remaining</span>
+                        <span className="text-sm font-medium">Deployments This Month</span>
                         <span className="text-sm text-muted-foreground">
-                          {subscription.creditsRemaining} / {getLimits(subscription.plan).credits}
+                          {subscription.deploymentsThisMonth || 0} / {getLimits(subscription.plan).deploymentsPerMonth}
                         </span>
                       </div>
                       <Progress
-                        value={(subscription.creditsRemaining / getLimits(subscription.plan).credits) * 100}
+                        value={((subscription.deploymentsThisMonth || 0) / getLimits(subscription.plan).deploymentsPerMonth) * 100}
                         className="h-2"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Resets monthly • {usageStats.creditsUsed} used this month
+                        Resets monthly • {subscription.githubPushesThisMonth || 0} GitHub pushes used
                       </p>
                     </div>
 
@@ -1223,21 +1221,21 @@ export default function AccountSettingsPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Zap className="h-4 w-4 text-yellow-500" />
-                      <span className="text-sm">AI Credits</span>
+                      <Download className="h-4 w-4 text-blue-500" />
+                      <span className="text-sm">Deployments</span>
                     </div>
                     <span className="text-sm font-medium">
-                      {usageStats.creditsUsed} / {usageStats.creditsRemaining + usageStats.creditsUsed}
+                      {usageStats.deploymentsThisMonth} / {getLimits(subscription?.plan || 'free').deploymentsPerMonth}
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Download className="h-4 w-4 text-blue-500" />
-                      <span className="text-sm">Deployments</span>
+                      <GitHubIcon className="h-4 w-4 text-gray-700" />
+                      <span className="text-sm">GitHub Pushes</span>
                     </div>
                     <span className="text-sm font-medium">
-                      {usageStats.deploymentsThisMonth} / {getLimits(subscription?.plan || 'free').appDeploys}
+                      {usageStats.githubPushesThisMonth} / {subscription?.plan === 'free' ? 2 : 'Unlimited'}
                     </span>
                   </div>
 
@@ -1247,7 +1245,7 @@ export default function AccountSettingsPage() {
                       <span className="text-sm">Storage</span>
                     </div>
                     <span className="text-sm font-medium">
-                      {usageStats.storageUsed}GB / {getLimits(subscription?.plan || 'free').storage || '10GB'}
+                      {usageStats.storageUsed}GB / Unlimited
                     </span>
                   </div>
                 </div>

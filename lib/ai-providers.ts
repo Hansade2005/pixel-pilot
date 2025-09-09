@@ -15,7 +15,7 @@ const codestral = createOpenAICompatible({
 
 // Create provider instances with fallback API keys
 const openaiProvider = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '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',
+  apiKey: process.env.OPENAI_API_KEY || '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',
 });
 
 const mistralProvider = createMistral({

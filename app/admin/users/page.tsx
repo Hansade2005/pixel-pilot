@@ -46,7 +46,21 @@ import {
   Ban,
   CheckCircle,
   AlertTriangle,
-  ArrowLeft
+  ArrowLeft,
+  Users,
+  UserCheck,
+  UserX,
+  Crown,
+  RotateCcw,
+  CheckSquare,
+  Square,
+  Download,
+  Upload,
+  TrendingUp,
+  TrendingDown,
+  Eye,
+  Edit,
+  Trash2
 } from "lucide-react"
 
 interface UserData {
@@ -59,8 +73,8 @@ interface UserData {
   avatarUrl: string | null
   subscriptionPlan: string
   subscriptionStatus: string
-  creditsRemaining: number
-  creditsUsedThisMonth: number
+  deploymentsThisMonth: number
+  githubPushesThisMonth: number
   stripeCustomerId: string | null
   stripeSubscriptionId: string | null
   lastPaymentDate: string | null
@@ -77,6 +91,15 @@ export default function AdminUsersPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null)
   const [showUserDialog, setShowUserDialog] = useState(false)
+
+  // Bulk selection state
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
+  const [bulkActionLoading, setBulkActionLoading] = useState(false)
+
+  // Filter states
+  const [planFilter, setPlanFilter] = useState<string>("all")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+
   const router = useRouter()
   const supabase = createClient()
 
@@ -134,10 +157,92 @@ export default function AdminUsersPage() {
     }
   }
 
-  const filteredUsers = users.filter(user =>
-    user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (user.fullName && user.fullName.toLowerCase().includes(searchQuery.toLowerCase()))
-  )
+  // Bulk selection functions
+  const handleSelectAll = () => {
+    if (selectedUsers.size === filteredUsers.length) {
+      setSelectedUsers(new Set())
+    } else {
+      setSelectedUsers(new Set(filteredUsers.map(u => u.id)))
+    }
+  }
+
+  const handleSelectUser = (userId: string) => {
+    const newSelected = new Set(selectedUsers)
+    if (newSelected.has(userId)) {
+      newSelected.delete(userId)
+    } else {
+      newSelected.add(userId)
+    }
+    setSelectedUsers(newSelected)
+  }
+
+  // Bulk actions
+  const performBulkAction = async (action: string, targetPlan?: string) => {
+    if (selectedUsers.size === 0) {
+      alert('Please select users first')
+      return
+    }
+
+    const confirmMessage = `Are you sure you want to ${action} ${selectedUsers.size} user(s)?`
+    if (!confirm(confirmMessage)) return
+
+    setBulkActionLoading(true)
+
+    try {
+      const userIds = Array.from(selectedUsers)
+      const results = []
+
+      for (const userId of userIds) {
+        const response = await fetch('/api/admin/users', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            action,
+            data: targetPlan ? { plan: targetPlan } : {}
+          })
+        })
+
+        if (response.ok) {
+          results.push({ userId, success: true })
+        } else {
+          const error = await response.json()
+          results.push({ userId, success: false, error: error.error })
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length
+      const failureCount = results.filter(r => !r.success).length
+
+      if (successCount > 0) {
+        alert(`✅ Successfully ${action} ${successCount} user(s)`)
+      }
+      if (failureCount > 0) {
+        alert(`❌ Failed to ${action} ${failureCount} user(s)`)
+      }
+
+      // Clear selection and reload
+      setSelectedUsers(new Set())
+      await loadUsers()
+
+    } catch (error) {
+      console.error('Bulk action error:', error)
+      alert('Error performing bulk action')
+    } finally {
+      setBulkActionLoading(false)
+    }
+  }
+
+  // Enhanced filtering
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (user.fullName && user.fullName.toLowerCase().includes(searchQuery.toLowerCase()))
+
+    const matchesPlan = planFilter === "all" || user.subscriptionPlan === planFilter
+    const matchesStatus = statusFilter === "all" || user.subscriptionStatus === statusFilter
+
+    return matchesSearch && matchesPlan && matchesStatus
+  })
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -293,10 +398,67 @@ export default function AdminUsersPage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">
-                    {users.reduce((sum, u) => sum + u.creditsUsedThisMonth, 0)}
+                    {users.reduce((sum, u) => sum + u.deploymentsThisMonth, 0)}
                   </p>
-                  <p className="text-xs text-muted-foreground">Credits Used (Month)</p>
+                  <p className="text-xs text-muted-foreground">Deployments (Month)</p>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick Actions Summary */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Total Users
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{users.length}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Crown className="h-4 w-4 text-yellow-500" />
+                Pro Users
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {users.filter(u => u.subscriptionPlan === 'pro').length}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <UserCheck className="h-4 w-4 text-green-500" />
+                Active
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {users.filter(u => u.subscriptionStatus === 'active').length}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+                Past Due
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {users.filter(u => u.subscriptionStatus === 'past_due').length}
               </div>
             </CardContent>
           </Card>
@@ -307,17 +469,112 @@ export default function AdminUsersPage() {
           <CardHeader>
             <CardTitle>Users ({filteredUsers.length})</CardTitle>
             <CardDescription>
-              Manage user accounts, subscriptions, and access levels
+              Manage user accounts, subscriptions, and access levels with powerful bulk operations
             </CardDescription>
+
+            {/* Bulk Actions Toolbar */}
+            {selectedUsers.size > 0 && (
+              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <span className="text-sm font-medium text-blue-900">
+                  {selectedUsers.size} user(s) selected
+                </span>
+
+                <div className="flex gap-2 ml-auto">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => performBulkAction('upgrade_to_pro')}
+                    disabled={bulkActionLoading}
+                    className="text-green-700 border-green-300 hover:bg-green-50"
+                  >
+                    <TrendingUp className="h-4 w-4 mr-2" />
+                    {bulkActionLoading ? 'Upgrading...' : 'Upgrade to Pro'}
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => performBulkAction('downgrade_to_free')}
+                    disabled={bulkActionLoading}
+                    className="text-orange-700 border-orange-300 hover:bg-orange-50"
+                  >
+                    <TrendingDown className="h-4 w-4 mr-2" />
+                    {bulkActionLoading ? 'Downgrading...' : 'Downgrade to Free'}
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => performBulkAction('reset_usage')}
+                    disabled={bulkActionLoading}
+                    className="text-blue-700 border-blue-300 hover:bg-blue-50"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    {bulkActionLoading ? 'Resetting...' : 'Reset Usage'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Filters and Search */}
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search users by email or name..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              <select
+                value={planFilter}
+                onChange={(e) => setPlanFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              >
+                <option value="all">All Plans</option>
+                <option value="free">Free</option>
+                <option value="pro">Pro</option>
+              </select>
+
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="trialing">Trial</option>
+                <option value="past_due">Past Due</option>
+              </select>
+            </div>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleSelectAll}
+                      className="p-0 h-auto"
+                    >
+                      {selectedUsers.size === filteredUsers.length && filteredUsers.length > 0 ? (
+                        <CheckSquare className="h-4 w-4" />
+                      ) : (
+                        <Square className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TableHead>
                   <TableHead>User</TableHead>
                   <TableHead>Plan</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Credits</TableHead>
+                  <TableHead>Usage</TableHead>
                   <TableHead>Joined</TableHead>
                   <TableHead>Profile</TableHead>
                   <TableHead>Actions</TableHead>
@@ -326,6 +583,20 @@ export default function AdminUsersPage() {
               <TableBody>
                 {filteredUsers.map((userData) => (
                   <TableRow key={userData.id}>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleSelectUser(userData.id)}
+                        className="p-0 h-auto"
+                      >
+                        {selectedUsers.has(userData.id) ? (
+                          <CheckSquare className="h-4 w-4" />
+                        ) : (
+                          <Square className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-8 w-8">
@@ -358,9 +629,11 @@ export default function AdminUsersPage() {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        <span className="font-medium">{userData.creditsRemaining}</span>
                         <div className="text-xs text-muted-foreground">
-                          Used: {userData.creditsUsedThisMonth}
+                          Deployments: {userData.deploymentsThisMonth}/{userData.subscriptionPlan === 'pro' ? 10 : 5}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          GitHub: {userData.githubPushesThisMonth}/2
                         </div>
                       </div>
                     </TableCell>
@@ -402,6 +675,109 @@ export default function AdminUsersPage() {
                             <Mail className="h-4 w-4 mr-2" />
                             Send Email
                           </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+
+                          {/* Subscription Management */}
+                          {userData.subscriptionPlan !== 'pro' && (
+                            <DropdownMenuItem
+                              onClick={async () => {
+                                if (confirm(`Upgrade ${userData.email} to Pro plan?`)) {
+                                  try {
+                                    const response = await fetch('/api/admin/users', {
+                                      method: 'PATCH',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        userId: userData.id,
+                                        action: 'upgrade_to_pro'
+                                      })
+                                    })
+
+                                    if (response.ok) {
+                                      alert('User upgraded to Pro successfully!')
+                                      await loadUsers()
+                                    } else {
+                                      const err = await response.json()
+                                      alert(err.error || 'Failed to upgrade user')
+                                    }
+                                  } catch (error) {
+                                    console.error('Error upgrading user:', error)
+                                    alert('Error upgrading user')
+                                  }
+                                }
+                              }}
+                              className="text-green-600"
+                            >
+                              <TrendingUp className="h-4 w-4 mr-2" />
+                              Upgrade to Pro
+                            </DropdownMenuItem>
+                          )}
+
+                          {userData.subscriptionPlan === 'pro' && (
+                            <DropdownMenuItem
+                              onClick={async () => {
+                                if (confirm(`Downgrade ${userData.email} to Free plan?`)) {
+                                  try {
+                                    const response = await fetch('/api/admin/users', {
+                                      method: 'PATCH',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        userId: userData.id,
+                                        action: 'downgrade_to_free'
+                                      })
+                                    })
+
+                                    if (response.ok) {
+                                      alert('User downgraded to Free successfully!')
+                                      await loadUsers()
+                                    } else {
+                                      const err = await response.json()
+                                      alert(err.error || 'Failed to downgrade user')
+                                    }
+                                  } catch (error) {
+                                    console.error('Error downgrading user:', error)
+                                    alert('Error downgrading user')
+                                  }
+                                }
+                              }}
+                              className="text-orange-600"
+                            >
+                              <TrendingDown className="h-4 w-4 mr-2" />
+                              Downgrade to Free
+                            </DropdownMenuItem>
+                          )}
+
+                          <DropdownMenuItem
+                            onClick={async () => {
+                              if (confirm(`Reset usage counters for ${userData.email}?`)) {
+                                try {
+                                  const response = await fetch('/api/admin/users', {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      userId: userData.id,
+                                      action: 'reset_usage'
+                                    })
+                                  })
+
+                                  if (response.ok) {
+                                    alert('Usage counters reset successfully!')
+                                    await loadUsers()
+                                  } else {
+                                    const err = await response.json()
+                                    alert(err.error || 'Failed to reset usage')
+                                  }
+                                } catch (error) {
+                                  console.error('Error resetting usage:', error)
+                                  alert('Error resetting usage')
+                                }
+                              }
+                            }}
+                            className="text-blue-600"
+                          >
+                            <RotateCcw className="h-4 w-4 mr-2" />
+                            Reset Usage
+                          </DropdownMenuItem>
+
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-red-600"
@@ -462,34 +838,34 @@ export default function AdminUsersPage() {
                           )}
                           <DropdownMenuItem
                             onClick={async () => {
-                              const newCredits = prompt('Enter new credit amount:', userData.creditsRemaining.toString())
-                              if (newCredits && !isNaN(Number(newCredits))) {
+                              const action = confirm('Reset monthly usage counters for this user?')
+                              if (action) {
                                 try {
                                   const response = await fetch('/api/admin/users', {
                                     method: 'PATCH',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({
                                       userId: userData.id,
-                                      action: 'update_credits',
-                                      data: { credits: Number(newCredits) }
+                                      action: 'reset_usage',
+                                      data: {}
                                     })
                                   })
 
                                   if (response.ok) {
-                                    alert('Credits updated successfully!')
+                                    alert('Usage counters reset successfully!')
                                     await loadUsers()
                                   } else {
-                                    alert('Failed to update credits')
+                                    alert('Failed to reset usage counters')
                                   }
                                 } catch (error) {
-                                  console.error('Error updating credits:', error)
-                                  alert('Error updating credits')
+                                  console.error('Error resetting usage counters:', error)
+                                  alert('Error resetting usage counters')
                                 }
                               }
                             }}
                           >
                             <Zap className="h-4 w-4 mr-2" />
-                            Update Credits
+                            Reset Usage
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={async () => {
@@ -636,17 +1012,30 @@ export default function AdminUsersPage() {
                   </Card>
                 </div>
 
-                {/* Subscription Details */}
+                {/* Usage Details */}
                 <div className="grid grid-cols-2 gap-4">
                   <Card>
                     <CardContent className="p-4">
                       <div className="flex items-center gap-2 mb-2">
                         <Zap className="h-4 w-4 text-yellow-500" />
-                        <span className="text-sm font-medium">Credits</span>
+                        <span className="text-sm font-medium">Deployments</span>
                       </div>
-                      <p className="text-2xl font-bold">{selectedUser.creditsRemaining}</p>
+                      <p className="text-2xl font-bold">{selectedUser.deploymentsThisMonth}</p>
                       <p className="text-xs text-muted-foreground">
-                        Used this month: {selectedUser.creditsUsedThisMonth}
+                        Limit: {selectedUser.subscriptionPlan === 'pro' ? 10 : 5}/month
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CreditCard className="h-4 w-4 text-purple-500" />
+                        <span className="text-sm font-medium">GitHub Pushes</span>
+                      </div>
+                      <p className="text-2xl font-bold">{selectedUser.githubPushesThisMonth}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Limit: 2/month
                       </p>
                     </CardContent>
                   </Card>

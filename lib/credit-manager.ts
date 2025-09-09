@@ -1,56 +1,66 @@
 import { getLimits } from '@/lib/stripe-config'
 
-export interface CreditUsage {
+export interface UsageRecord {
   userId: string
-  creditsUsed: number
   operation: string
+  platform?: string
   metadata?: any
+  timestamp: Date
 }
 
-export interface CreditStatus {
-  remaining: number
-  used: number
-  limit: number
+export interface PlanStatus {
   plan: string
-  status: 'ok' | 'low' | 'exhausted'
+  canUseVercel: boolean
+  canUseNetlify: boolean
+  canUseGitHub: boolean
+  deploymentsThisMonth: number
+  deploymentsLimit: number
+  githubPushesThisMonth: number
+  githubPushesLimit: number
+  unlimitedPrompts: boolean
+  status: 'ok' | 'deployment_limit_reached' | 'github_limit_reached' | 'upgrade_required'
 }
 
 
 /**
- * Check if user has sufficient credits for an operation
+ * Check if user can perform an operation based on their plan
  */
-export async function checkCredits(userId: string, requiredCredits: number): Promise<{
-  hasCredits: boolean
-  remainingCredits: number
-  creditStatus: CreditStatus
+export async function checkPlanLimits(userId: string, operation: string, platform?: string): Promise<{
+  canPerform: boolean
+  planStatus: PlanStatus
+  reason?: string
 }> {
   try {
-    const response = await fetch('/api/credits/check', {
+    const response = await fetch('/api/limits/check', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ requiredCredits }),
+      body: JSON.stringify({ operation, platform }),
     })
 
     if (!response.ok) {
-      throw new Error(`Credit check failed: ${response.status}`)
+      throw new Error(`Plan check failed: ${response.status}`)
     }
 
     const data = await response.json()
     return data
   } catch (error) {
-    console.error('Error checking credits:', error)
+    console.error('Error checking plan limits:', error)
     // Return free tier defaults on error
     const freeLimits = getLimits('free')
     return {
-      hasCredits: requiredCredits <= freeLimits.credits,
-      remainingCredits: freeLimits.credits,
-      creditStatus: {
-        remaining: freeLimits.credits,
-        used: 0,
-        limit: freeLimits.credits,
+      canPerform: operation !== 'deploy' || platform === 'netlify',
+      planStatus: {
         plan: 'free',
+        canUseVercel: freeLimits.canUseVercel,
+        canUseNetlify: freeLimits.canUseNetlify,
+        canUseGitHub: freeLimits.canUseGitHub,
+        deploymentsThisMonth: 0,
+        deploymentsLimit: freeLimits.deploymentsPerMonth,
+        githubPushesThisMonth: 0,
+        githubPushesLimit: freeLimits.githubPushesPerMonth || 2,
+        unlimitedPrompts: freeLimits.unlimitedPrompts,
         status: 'ok'
       }
     }
@@ -58,23 +68,23 @@ export async function checkCredits(userId: string, requiredCredits: number): Pro
 }
 
 /**
- * Deduct credits from user's balance
+ * Record usage for tracking and limits
  */
-export async function deductCredits(
+export async function recordUsage(
   userId: string,
-  creditsToDeduct: number,
   operation: string,
+  platform?: string,
   metadata?: any
-): Promise<{ success: boolean; error?: string; newBalance?: number }> {
+): Promise<{ success: boolean; error?: string }> {
   try {
-    const response = await fetch('/api/credits/deduct', {
+    const response = await fetch('/api/limits/record', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        creditsToDeduct,
         operation,
+        platform,
         metadata
       }),
     })
@@ -83,64 +93,71 @@ export async function deductCredits(
       const errorData = await response.json()
       return {
         success: false,
-        error: errorData.error || `Deduction failed: ${response.status}`
+        error: errorData.error || `Usage recording failed: ${response.status}`
       }
     }
 
     const data = await response.json()
     return data
   } catch (error) {
-    console.error('Error in deductCredits:', error)
+    console.error('Error in recordUsage:', error)
     return {
       success: false,
-      error: 'Credit deduction failed'
+      error: 'Usage recording failed'
     }
   }
 }
 
 /**
- * Get user's current credit status
+ * Get user's current plan status
  */
-export async function getCreditStatus(userId: string): Promise<CreditStatus | null> {
+export async function getPlanStatus(userId: string): Promise<PlanStatus | null> {
   try {
-    const response = await fetch('/api/credits/status')
+    const response = await fetch('/api/limits/status')
 
     if (!response.ok) {
-      throw new Error(`Credit status fetch failed: ${response.status}`)
+      throw new Error(`Plan status fetch failed: ${response.status}`)
     }
 
     const data = await response.json()
     return data
   } catch (error) {
-    console.error('Error getting credit status:', error)
+    console.error('Error getting plan status:', error)
     return null
   }
 }
 
 /**
- * Calculate credits needed for different operations
+ * Check if a deployment platform is available for the user's plan
  */
-export function calculateCredits(operation: string, data?: any): number {
-  switch (operation) {
-    case 'chat_message':
-      // Base cost for chat messages (can vary by model)
-      const messageLength = data?.message?.length || 100
-      return Math.ceil(messageLength / 100) // 1 credit per 100 characters
+export function canUsePlatform(planId: string, platform: string): boolean {
+  const limits = getLimits(planId)
 
-    case 'code_generation':
-      return 5 // Fixed cost for code generation
-
-    case 'file_analysis':
-      return 2 // Fixed cost for file analysis
-
-    case 'deployment':
-      return 10 // Fixed cost for deployment
-
-    case 'image_generation':
-      return 8 // Fixed cost for image generation
-
+  switch (platform.toLowerCase()) {
+    case 'vercel':
+      return limits.canUseVercel
+    case 'netlify':
+      return limits.canUseNetlify
+    case 'github':
+      return limits.canUseGitHub
     default:
-      return 1 // Default cost
+      return false
   }
+}
+
+/**
+ * Get deployment limit for a user's plan
+ */
+export function getDeploymentLimit(planId: string): number {
+  const limits = getLimits(planId)
+  return limits.deploymentsPerMonth
+}
+
+/**
+ * Check if a plan has unlimited prompts
+ */
+export function hasUnlimitedPrompts(planId: string): boolean {
+  const limits = getLimits(planId)
+  return limits.unlimitedPrompts
 }
 

@@ -83,8 +83,8 @@ export async function GET(request: NextRequest) {
         // Settings data
         subscriptionPlan: settings?.subscription_plan || 'free',
         subscriptionStatus: settings?.subscription_status || 'inactive',
-        creditsRemaining: settings?.credits_remaining || 25,
-        creditsUsedThisMonth: settings?.credits_used_this_month || 0,
+        deploymentsThisMonth: settings?.deployments_this_month || 0,
+        githubPushesThisMonth: settings?.github_pushes_this_month || 0,
         stripeCustomerId: settings?.stripe_customer_id || null,
         stripeSubscriptionId: settings?.stripe_subscription_id || null,
         lastPaymentDate: settings?.last_payment_date || null,
@@ -142,16 +142,43 @@ export async function PATCH(request: NextRequest) {
     let result
 
     switch (action) {
-      case 'update_credits':
-        if (typeof data.credits !== 'number') {
-          return NextResponse.json({ error: "Invalid credits value" }, { status: 400 })
-        }
-
+      case 'upgrade_to_pro':
         result = await supabase
           .from('user_settings')
           .upsert({
             user_id: userId,
-            credits_remaining: data.credits,
+            subscription_plan: 'pro',
+            subscription_status: 'active',
+            deployments_this_month: 0,
+            github_pushes_this_month: 0,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id'
+          })
+        break
+
+      case 'downgrade_to_free':
+        result = await supabase
+          .from('user_settings')
+          .upsert({
+            user_id: userId,
+            subscription_plan: 'free',
+            subscription_status: 'active',
+            deployments_this_month: 0,
+            github_pushes_this_month: 0,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id'
+          })
+        break
+
+      case 'reset_usage':
+        result = await supabase
+          .from('user_settings')
+          .upsert({
+            user_id: userId,
+            deployments_this_month: 0,
+            github_pushes_this_month: 0,
             updated_at: new Date().toISOString()
           }, {
             onConflict: 'user_id'

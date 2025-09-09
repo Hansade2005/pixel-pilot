@@ -20,6 +20,7 @@ import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useCloudSync } from '@/hooks/use-cloud-sync'
+import { useCredits as useSubscription } from '@/hooks/use-credits'
 import { restoreBackupFromCloud, isCloudSyncEnabled } from '@/lib/cloud-sync'
 import { ModelSelector } from "@/components/ui/model-selector"
 import { AiModeSelector, type AIMode } from "@/components/ui/ai-mode-selector"
@@ -48,6 +49,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const router = useRouter()
   const searchParams = useSearchParams()
   const [selectedProject, setSelectedProject] = useState<Workspace | null>(null)
+
+  // Get user subscription information
+  const { plan: userPlan } = useSubscription(user?.id)
   const [activeTab, setActiveTab] = useState<"code" | "preview">("code")
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true) // Changed from false to true
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -491,10 +495,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           {/* Main Content */}
           <div className="flex-1 flex flex-col min-w-0">
             {/* Project Header */}
-            <ProjectHeader 
+            <ProjectHeader
               project={selectedProject}
               selectedModel={selectedModel}
               onModelChange={setSelectedModel}
+              userPlan={userPlan}
               onShare={(_shareUrl?: string) => {
                 toast({ title: 'Link Copied', description: 'Project link copied to clipboard' })
               }}
@@ -855,9 +860,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             {/* Model Selector with label */}
             <div className="flex-1 max-w-60 mx-4 flex items-center gap-2">
               <span className="text-xs font-medium text-muted-foreground">Model:</span>
-              <ModelSelector 
+              <ModelSelector
                 selectedModel={selectedModel}
                 onModelChange={setSelectedModel}
+                userPlan={userPlan}
                 compact={true}
                 className="flex-1"
               />

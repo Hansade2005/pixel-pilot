@@ -49,12 +49,12 @@ export async function GET(request: NextRequest) {
       // Subscription data
       supabase
         .from('user_settings')
-        .select('subscription_status, subscription_plan, credits_used_this_month'),
+        .select('subscription_status, subscription_plan, deployments_this_month'),
 
       // User settings for revenue calculation
       supabase
         .from('user_settings')
-        .select('subscription_plan, credits_used_this_month')
+        .select('subscription_plan, deployments_this_month, github_pushes_this_month')
     ])
 
     if (usersError || subsError || settingsError) {
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
       ) || []
 
       paidUsers.forEach(user => {
-        const planMultiplier = user.subscription_plan === 'pro' ? 15 :
+        const planMultiplier = user.subscription_plan === 'pro' ? 29 :
                               user.subscription_plan === 'teams' ? 30 :
                               user.subscription_plan === 'enterprise' ? 60 : 0
         totalRevenue += planMultiplier
@@ -95,9 +95,13 @@ export async function GET(request: NextRequest) {
       monthlyRevenue = 0
     }
 
-    // Calculate credit usage
-    const totalCreditUsage = userSettings?.reduce((sum, user) =>
-      sum + (user.credits_used_this_month || 0), 0
+    // Calculate usage metrics
+    const totalDeployments = userSettings?.reduce((sum, user) =>
+      sum + (user.deployments_this_month || 0), 0
+    ) || 0
+
+    const totalGitHubPushes = userSettings?.reduce((sum, user) =>
+      sum + (user.github_pushes_this_month || 0), 0
     ) || 0
 
     // System health check (simplified)
@@ -111,7 +115,8 @@ export async function GET(request: NextRequest) {
       monthlyRevenue,
       totalSubscriptions,
       activeSubscriptions,
-      creditUsage: totalCreditUsage,
+      deploymentCount: totalDeployments,
+      githubPushCount: totalGitHubPushes,
       systemHealth,
       subscriptionSystemEnabled: subscriptionEnabled
     }

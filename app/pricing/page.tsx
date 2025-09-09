@@ -81,7 +81,7 @@ export default function PricingPage() {
         window.history.replaceState({}, '', url.toString())
 
         // You could show a success toast here
-        alert(`Welcome to Pixel Pilot ${result.plan}! You now have ${result.credits} credits.`)
+        alert(`Welcome to Pixel Pilot ${result.plan}! Your subscription is now active.`)
       } else {
         console.error('Payment verification failed')
         alert('There was an issue verifying your payment. Please contact support.')
@@ -134,19 +134,23 @@ export default function PricingPage() {
     },
     {
       question: "What does the free plan include?",
-      answer: "The free plan includes 25 prompt credits per month, access to our Auto model, 2-week Pro trial, and basic project features. It's perfect for trying out Pixel Pilot and building small projects."
+      answer: "The free plan includes GitHub repository creation with 2 pushes per month, deployment to Netlify only (5 deployments per month), basic project templates, and community support. It's perfect for trying out Pixel Pilot and building small projects."
     },
     {
-      question: "What is a credit?",
-      answer: "A credit is used each time you make a request to our AI system. This includes generating code, making modifications, or deploying projects. Credits are consumed based on the complexity of your request and the AI model used."
+      question: "What deployment platforms are available?",
+      answer: "Free users can deploy to Netlify only. Pro users get access to both Vercel and Netlify for maximum flexibility. Enterprise users will have additional deployment options coming soon."
     },
     {
       question: "What AI models are available?",
-      answer: "Pixel Pilot supports leading AI models including OpenAI GPT, Claude, Gemini, xAI, and our specialized Auto model. Pro and higher plans include access to premium models and our SWE-1 coding specialist."
+      answer: "Pixel Pilot supports leading AI models including OpenAI GPT, Claude, Gemini, and xAI. Pro users get unlimited access to all premium models, while free users have basic access with reasonable limits."
     },
     {
-      question: "What is the SWE-1 model?",
-      answer: "SWE-1 is our specialized coding AI model trained for software engineering tasks. It's available at promotional pricing of 0 credits per prompt on Pro and higher plans."
+      question: "What are the deployment limits?",
+      answer: "Free users can make up to 5 deployments per month to Netlify and only 2 GitHub repository pushes per month. Pro users can make up to 10 deployments per month across both Vercel and Netlify combined, with unlimited GitHub access. Enterprise users will have higher limits when available."
+    },
+    {
+      question: "What does 'GitHub repository pushes' mean?",
+      answer: "GitHub repository pushes refer to creating or updating repositories on GitHub through Pixel Pilot. This includes initial repository creation and subsequent code pushes. Free users are limited to 2 pushes per month to encourage upgrading to Pro for unlimited development."
     },
     {
       question: "Who owns the projects and code?",
@@ -154,11 +158,11 @@ export default function PricingPage() {
     },
     {
       question: "How much does it cost to use?",
-      answer: "Pixel Pilot offers a free tier with 25 credits per month. Paid plans start at $15/month for Pro (500 credits) and $30/month for Teams (500 credits per user with team features). Enterprise plans start at $60/month."
+      answer: "Pixel Pilot offers a free tier with limited deployment access. The Pro plan is $29/month ($279/year) with unlimited prompts and full deployment access - saving 20% with annual billing. Enterprise plans are coming soon."
     },
     {
-      question: "Can I purchase additional credits?",
-      answer: "Yes! Add-on credits are available at $10 for 250 credits on Pro, and $40 for 1,000 credits on Teams and Enterprise plans. Additional credits never expire."
+      question: "Can I upgrade or downgrade my plan?",
+      answer: "Yes! You can upgrade from Free to Pro at any time. Your billing will be prorated accordingly. Enterprise plans will be available soon for teams with advanced needs."
     },
     {
       question: "Where can I find out more?",
@@ -177,12 +181,12 @@ export default function PricingPage() {
     return {
       name: config.name,
       description: config.description,
-      price: currentPrice === 0 ? "$0" : (config.id === 'enterprise' ? "starting at" : `$${currentPrice}`),
-      priceAmount: config.id === 'enterprise' ? `$${currentPrice}` : undefined,
+      price: config.id === 'enterprise' ? "Coming Soon" : (currentPrice === 0 ? "$0" : `$${currentPrice}`),
+      priceAmount: config.id === 'enterprise' ? undefined : (config.id === 'enterprise' ? `$${currentPrice}` : undefined),
       originalPrice: originalPrice,
-      period: isAnnual ? "per user / year" : "per user / month",
+      period: config.id === 'enterprise' ? undefined : (isAnnual ? "per user / year" : "per user / month"),
       savings: savings,
-      note: config.id === 'pro' ? "Popular" : (config.id === 'free' ? "Grok Code Fast 1 is available for free for a limited time!" : undefined),
+      note: config.id === 'pro' ? "Most Popular" : (config.id === 'free' ? "Perfect for getting started" : (config.id === 'enterprise' ? "Coming Soon" : undefined)),
       buttonText: currentPlan === config.id ? "Current Plan" : (config.id === 'free' ? "Get Started" : (config.id === 'enterprise' ? "Contact Sales" : "Select plan")),
       buttonVariant: "default" as const,
       isPopular: config.id === 'pro',
@@ -218,10 +222,10 @@ export default function PricingPage() {
               </div>
             </div>
             <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
-              Choose the perfect plan for your journey
+              Professional AI Development Made Simple
             </h1>
             <p className="text-xl text-white/80 max-w-3xl mx-auto">
-              Pixel Pilot is available for free for a limited time!
+              Transform ideas into production apps with AI. From concept to deployment in minutes.
             </p>
           </div>
 
@@ -324,9 +328,6 @@ export default function PricingPage() {
                       <div key={featureIndex} className="flex items-start space-x-3">
                         <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
                         <span className="text-sm text-gray-300">{feature}</span>
-                        {(feature.includes('credits') || feature.includes('SWE-1')) && (
-                          <Info className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
-                        )}
                       </div>
                     ))}
                   </div>

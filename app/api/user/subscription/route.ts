@@ -15,8 +15,8 @@ export async function GET(request: NextRequest) {
       .select(`
         subscription_plan,
         subscription_status,
-        credits_remaining,
-        credits_used_this_month,
+        deployments_this_month,
+        github_pushes_this_month,
         subscription_start_date,
         subscription_end_date,
         last_payment_date,
@@ -30,8 +30,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         plan: 'free',
         status: 'active',
-        creditsRemaining: 25,
-        creditsUsedThisMonth: 0,
+        deploymentsThisMonth: 0,
+        githubPushesThisMonth: 0,
         subscriptionStartDate: null,
         subscriptionEndDate: null,
         lastPaymentDate: null,
@@ -42,8 +42,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       plan: userSettings.subscription_plan,
       status: userSettings.subscription_status,
-      creditsRemaining: userSettings.credits_remaining,
-      creditsUsedThisMonth: userSettings.credits_used_this_month,
+      deploymentsThisMonth: userSettings.deployments_this_month || 0,
+      githubPushesThisMonth: userSettings.github_pushes_this_month || 0,
       subscriptionStartDate: userSettings.subscription_start_date,
       subscriptionEndDate: userSettings.subscription_end_date,
       lastPaymentDate: userSettings.last_payment_date,

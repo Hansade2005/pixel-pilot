@@ -57,8 +57,8 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import { useCredits } from "@/hooks/use-credits"
-import { Zap, TrendingUp, AlertTriangle, Shield, CheckCircle } from "lucide-react"
+import { useSubscription } from "@/hooks/use-subscription"
+import { Crown, TrendingUp, AlertTriangle, Shield, CheckCircle, Globe, Github } from "lucide-react"
 
 interface SidebarProps {
   user: User
@@ -92,8 +92,8 @@ export function Sidebar({
   const [cloneName, setCloneName] = useState("")
   const router = useRouter()
 
-  // Credit status hook
-  const { creditStatus, loading: creditsLoading, isLowOnCredits, isOutOfCredits, usagePercentage } = useCredits(user.id)
+  // Subscription status hook
+  const { subscription, loading: subscriptionLoading } = useSubscription()
 
   // Advanced filter and sort projects
   const filteredAndSortedProjects = React.useMemo(() => {
@@ -325,19 +325,19 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Credit Status Section */}
-      {!creditsLoading && creditStatus && (
+      {/* Subscription Status Section */}
+      {!subscriptionLoading && subscription && (
         <div className="px-4 py-3 border-b bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <Zap className="h-4 w-4 text-green-500" />
+              <Crown className="h-4 w-4 text-purple-500" />
               <span className="text-sm font-medium">
-                {creditStatus.plan === 'admin' ? 'Admin Access' :
-                 creditStatus.plan === 'free_mode' ? 'Free Mode' :
-                 'Credits'}
+                {subscription.plan === 'pro' ? 'Pro Plan' :
+                 subscription.plan === 'enterprise' ? 'Enterprise Plan' :
+                 'Free Plan'}
               </span>
             </div>
-            {creditStatus.plan !== 'admin' && isOutOfCredits && (
+            {subscription.plan === 'free' && (
               <Button
                 size="sm"
                 variant="outline"
@@ -350,69 +350,63 @@ export function Sidebar({
           </div>
 
           <div className="space-y-2">
-            {creditStatus.plan === 'admin' ? (
+            {/* Deployment Limits */}
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Shield className="h-4 w-4 text-green-600" />
-                <span className="text-xs text-green-600 font-medium">
-                  Unlimited credits (Admin)
+                <Globe className="h-3 w-3 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">
+                  Deployments: {subscription.deploymentsThisMonth || 0} / {subscription.plan === 'pro' ? 10 : 5}
                 </span>
               </div>
-            ) : creditStatus.plan === 'free_mode' ? (
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-blue-600" />
-                <span className="text-xs text-blue-600 font-medium">
-                  Unlimited credits (Free Mode)
-                </span>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">
-                    {creditStatus.remaining} / {creditStatus.limit}
-                  </span>
-                  <span className="text-xs font-medium">
-                    {usagePercentage}%
-                  </span>
-                </div>
+            </div>
 
-                {/* Progress Bar */}
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
-                  <div
-                    className={`h-1.5 rounded-full transition-all duration-300 ${
-                      isOutOfCredits ? 'bg-red-500' :
-                      isLowOnCredits ? 'bg-yellow-500' : 'bg-green-500'
-                    }`}
-                    style={{ width: `${Math.min(usagePercentage, 100)}%` }}
-                  />
+            {/* GitHub Push Limits for Free users */}
+            {subscription.plan === 'free' && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Github className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">
+                    GitHub Pushes: {subscription.githubPushesThisMonth || 0} / 2
+                  </span>
                 </div>
-              </>
+              </div>
             )}
+
+            {/* Plan Features */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">
+                {subscription.plan === 'pro' ? 'Full Access' :
+                 subscription.plan === 'enterprise' ? 'Enterprise Features' :
+                 'Limited Access'}
+              </span>
+              {subscription.plan === 'pro' ? (
+                <div className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
+                  <Crown className="h-3 w-3" />
+                  <span className="text-xs">Pro</span>
+                </div>
+              ) : subscription.plan === 'enterprise' ? (
+                <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                  <Shield className="h-3 w-3" />
+                  <span className="text-xs">Enterprise</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
+                  <CheckCircle className="h-3 w-3" />
+                  <span className="text-xs">Free</span>
+                </div>
+              )}
+            </div>
 
             {/* Status Messages */}
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
-                {creditStatus.plan} plan
+                {subscription.status === 'active' ? 'Active' : subscription.status}
               </span>
-              {creditStatus.plan === 'admin' ? (
-                <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                  <CheckCircle className="h-3 w-3" />
-                  <span className="text-xs">Admin</span>
+              {subscription.plan === 'free' && (subscription.githubPushesThisMonth || 0) >= 2 && (
+                <div className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
+                  <AlertTriangle className="h-3 w-3" />
+                  <span className="text-xs">Limit Reached</span>
                 </div>
-              ) : (
-                <>
-                  {isLowOnCredits && (
-                    <div className="flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
-                      <AlertTriangle className="h-3 w-3" />
-                      <span className="text-xs">Low</span>
-                    </div>
-                  )}
-                  {isOutOfCredits && (
-                    <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
-                      <AlertTriangle className="h-3 w-3" />
-                      <span className="text-xs">Empty</span>
-                    </div>
-                  )}
-                </>
               )}
             </div>
           </div>

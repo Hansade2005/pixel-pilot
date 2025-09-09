@@ -28,17 +28,19 @@ interface ProjectHeaderProps {
   onDeploy?: () => void
   selectedModel?: string
   onModelChange?: (modelId: string) => void
+  userPlan?: string
   user?: any
   onProjectCreated?: (newProject: Project) => Promise<void>
 }
 
-export function ProjectHeader({ 
-  project, 
-  onShare, 
-  onSettings, 
+export function ProjectHeader({
+  project,
+  onShare,
+  onSettings,
   onDeploy,
   selectedModel,
   onModelChange,
+  userPlan,
   user,
   onProjectCreated
 }: ProjectHeaderProps) {
@@ -170,9 +172,10 @@ export function ProjectHeader({
         {selectedModel && onModelChange && (
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-muted-foreground">Model:</span>
-            <ModelSelector 
+            <ModelSelector
               selectedModel={selectedModel}
               onModelChange={onModelChange}
+              userPlan={userPlan}
               compact={true}
             />
           </div>

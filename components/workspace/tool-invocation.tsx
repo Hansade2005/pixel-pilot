@@ -509,9 +509,6 @@ function getToolIconAndColor(toolName: string): { icon: any; color: string } {
   }
   
   // Project and context tools
-  if (toolName === 'get_project_summary') {
-    return { icon: Database, color: 'text-green-500' }
-  }
   
   if (toolName === 'recall_context') {
     return { icon: User, color: 'text-yellow-500' }
@@ -522,7 +519,7 @@ function getToolIconAndColor(toolName: string): { icon: any; color: string } {
   }
   
   // Planning and analysis tools
-  if (toolName.includes('plan') || toolName.includes('analyze') || toolName.includes('results_summary')) {
+  if (toolName.includes('plan') || toolName.includes('analyze')) {
     return { icon: Lightbulb, color: 'text-yellow-500' }
   }
   

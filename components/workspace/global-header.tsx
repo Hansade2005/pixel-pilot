@@ -16,26 +16,20 @@ interface GlobalHeaderProps {
   showSettingsButton?: boolean
   selectedModel?: string
   onModelChange?: (model: string) => void
+  userPlan?: string
   aiMode?: AIMode
   onAiModeChange?: (mode: AIMode) => void
 }
 
-interface GlobalHeaderProps {
-  title?: string
-  onBack?: () => void
-  onSettings?: () => void
-  showBackButton?: boolean
-  showSettingsButton?: boolean
-}
-
-export function GlobalHeader({ 
-  title = "Workspace", 
-  onBack, 
+export function GlobalHeader({
+  title = "Workspace",
+  onBack,
   onSettings,
   showBackButton = true,
   showSettingsButton = true,
   selectedModel,
   onModelChange,
+  userPlan,
   aiMode,
   onAiModeChange
 }: GlobalHeaderProps) {
@@ -95,6 +89,7 @@ export function GlobalHeader({
           <ModelSelector
             selectedModel={selectedModel}
             onModelChange={onModelChange}
+            userPlan={userPlan}
             compact={true}
             className="min-w-[60px]"
           />

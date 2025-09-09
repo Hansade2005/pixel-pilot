@@ -141,7 +141,7 @@ The chat panel now provides comprehensive visual feedback for all AI tools:
 - 📄 write_file, ✏️ edit_file, 👁️ read_file, 📁 list_files, ❌ delete_file
 
 ### **AI Analysis:**
-- 🔧 analyze_project, ⚡ analyze_dependencies, ⚠️ scan_code_imports, ↩️ learn_patterns
+- ⚡ analyze_dependencies, ⚠️ scan_code_imports, ↩️ learn_patterns
 
 ### **Knowledge & Context:**
 - 📚 search_knowledge, 📖 get_knowledge_item, 👤 recall_context

@@ -4,7 +4,8 @@ import { createClient } from '@/lib/supabase/client'
 interface SubscriptionData {
   plan: string
   status: string
-  creditsRemaining: number
+  deploymentsThisMonth: number
+  githubPushesThisMonth: number
   subscriptionEndDate?: string
   cancelAtPeriodEnd?: boolean
 }
@@ -19,13 +20,34 @@ export function useSubscription(pollInterval = 300000) { // 5 minutes default
   const fetchSubscription = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/stripe/check-subscription', {
-        method: 'POST',
-      })
 
-      if (response.ok) {
-        const data = await response.json()
-        setSubscription(data)
+      // Get subscription data from limits API (which includes all plan information)
+      const limitsResponse = await fetch('/api/limits/status')
+
+      if (limitsResponse.ok) {
+        const limitsData = await limitsResponse.json()
+
+        // Get subscription status from Stripe API
+        const stripeResponse = await fetch('/api/stripe/check-subscription', {
+          method: 'POST',
+        })
+
+        let stripeData = {}
+        if (stripeResponse.ok) {
+          stripeData = await stripeResponse.json()
+        }
+
+        // Combine both data sources
+        const combinedData = {
+          plan: limitsData.plan,
+          status: stripeData.status || 'active',
+          deploymentsThisMonth: limitsData.deploymentsThisMonth || 0,
+          githubPushesThisMonth: limitsData.githubPushesThisMonth || 0,
+          subscriptionEndDate: stripeData.subscriptionEndDate,
+          cancelAtPeriodEnd: stripeData.cancelAtPeriodEnd
+        }
+
+        setSubscription(combinedData)
         setError(null)
       } else {
         throw new Error('Failed to fetch subscription')

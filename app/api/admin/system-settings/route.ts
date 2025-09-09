@@ -137,7 +137,7 @@ export async function PATCH(request: NextRequest) {
           enabled,
           updated_by: user.email,
           updated_at: new Date().toISOString(),
-          description: enabled ? 'Subscription system is active' : 'Free usage mode - no credit charges'
+          description: enabled ? 'Subscription system is active' : 'Free usage mode - no subscription charges'
         },
         description: 'Controls whether the subscription system is enabled'
       }, {

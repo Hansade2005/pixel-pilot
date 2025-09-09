@@ -32,23 +32,39 @@ export const STRIPE_PRICES = {
 
 export const PLAN_LIMITS = {
   FREE: {
-    credits: 25,
-    appDeploys: 1,
+    deploymentsPerMonth: 5,
+    githubPushesPerMonth: 2,
+    canUseVercel: false,
+    canUseNetlify: true,
+    canUseGitHub: true,
+    unlimitedPrompts: false,
     features: ["auto_model", "basic_projects"]
   },
   PRO: {
-    credits: 500,
-    appDeploys: 1,
-    features: ["all_models", "swe1", "advanced_projects", "custom_templates"]
+    deploymentsPerMonth: 10,
+    githubPushesPerMonth: null, // unlimited
+    canUseVercel: true,
+    canUseNetlify: true,
+    canUseGitHub: true,
+    unlimitedPrompts: true,
+    features: ["all_models", "advanced_projects", "custom_templates", "premium_ai_models"]
   },
   TEAMS: {
-    credits: 500,
-    appDeploys: 5,
-    features: ["all_models", "swe1", "team_collaboration", "advanced_projects", "analytics"]
+    deploymentsPerMonth: 25,
+    githubPushesPerMonth: null, // unlimited
+    canUseVercel: true,
+    canUseNetlify: true,
+    canUseGitHub: true,
+    unlimitedPrompts: true,
+    features: ["all_models", "team_collaboration", "advanced_projects", "analytics", "premium_ai_models"]
   },
   ENTERPRISE: {
-    credits: 1000,
-    appDeploys: 50,
-    features: ["all_models", "swe1", "enterprise_features", "custom_integrations", "dedicated_support"]
+    deploymentsPerMonth: 50,
+    githubPushesPerMonth: null, // unlimited
+    canUseVercel: true,
+    canUseNetlify: true,
+    canUseGitHub: true,
+    unlimitedPrompts: true,
+    features: ["all_models", "enterprise_features", "custom_integrations", "dedicated_support", "premium_ai_models"]
   }
 }

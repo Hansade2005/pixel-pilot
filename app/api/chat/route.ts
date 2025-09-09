@@ -406,85 +406,73 @@ async function buildEnhancedProjectContext(projectId: string, storageManager: an
   try {
     const files = await storageManager.getFiles(projectId)
     
-    let context = ''
-    let coreFilesContent = ''
-    let srcFilesPaths = []
-    let otherFilesPaths = []
-    let uiComponentsPaths = []
-    let configFilesPaths = []
+    // Get current timestamp in Cline's format
+    const currentTime = new Date().toLocaleString('en-US', {
+      month: 'numeric',
+      day: 'numeric', 
+      year: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+      hour12: true
+    }) + ' (UTC)'
     
-    // Files that should include full content
-    const fullContentFiles = ['package.json', 'src/App.tsx', 'App.tsx', 'index.html']
+    // Sort files alphabetically like Cline does
+    const sortedFiles = files
+      .map((f: any) => f.path)
+      .sort()
     
-    for (const file of files) {
-      const path = file.path
-      
-      // Include full content for core foundational files
-      if (fullContentFiles.some(coreFile => path === coreFile || path.endsWith(coreFile))) {
-        const fileExtension = path.split('.').pop() || 'text'
-        const language = fileExtension === 'tsx' ? 'tsx' : fileExtension === 'json' ? 'json' : fileExtension === 'html' ? 'html' : fileExtension
-        coreFilesContent += `\n📋 **${path}** (${fileExtension}):\n\`\`\`${language}\n${file.content}\n\`\`\`\n`
+    // Get directories structure
+    const directories = new Set<string>()
+    sortedFiles.forEach((path: string) => {
+      const parts = path.split('/')
+      let currentPath = ''
+      for (let i = 0; i < parts.length - 1; i++) {
+        currentPath += (currentPath ? '/' : '') + parts[i]
+        directories.add(currentPath + '/')
       }
-      // Categorize src folder files (excluding components/ui and core files already handled)
-      else if (path.startsWith('src/') && !path.startsWith('src/components/ui/') && !fullContentFiles.some(coreFile => path.endsWith(coreFile))) {
-        srcFilesPaths.push(path)
-      }
-      // Categorize components/ui paths
-      else if (path.startsWith('src/components/ui/')) {
-        uiComponentsPaths.push(path)
-      }
-      // Categorize config files (excluding those with full content)
-      else if ((path.match(/\.(json|js|ts|config|env)$/) || ['tailwind.config.js', 'vite.config.ts', 'tsconfig.json', '.env'].some(config => path.includes(config))) && !fullContentFiles.some(coreFile => path.endsWith(coreFile))) {
-        configFilesPaths.push(path)
-      }
-      // Other files (excluding those with full content)
-      else if (!fullContentFiles.some(coreFile => path.endsWith(coreFile))) {
-        otherFilesPaths.push(path)
-      }
-    }
+    })
     
-    // Build the complete context starting with core files content
-    context += coreFilesContent
+    const sortedDirectories = Array.from(directories).sort()
     
-    if (srcFilesPaths.length > 0) {
-      context += `\n📁 **Source Files** (${srcFilesPaths.length} files):\n`
-      srcFilesPaths.forEach(path => {
-        context += `- ${path}\n`
-      })
-    }
-    
-    if (uiComponentsPaths.length > 0) {
-      context += `\n🎨 **UI Components Available** (${uiComponentsPaths.length} components):\n`
-      uiComponentsPaths.forEach(path => {
-        context += `- ${path}\n`
-      })
-    }
-    
-    if (configFilesPaths.length > 0) {
-      context += `\n⚙️ **Configuration Files** (${configFilesPaths.length} files):\n`
-      configFilesPaths.forEach(path => {
-        context += `- ${path}\n`
-      })
-    }
-    
-    if (otherFilesPaths.length > 0) {
-      context += `\n📄 **Other Project Files** (${otherFilesPaths.length} files):\n`
-      otherFilesPaths.forEach(path => {
-        context += `- ${path}\n`
-      })
-    }
-    
-    context += `\n\n💡 **Usage Instructions**:\n`
-    context += `- Core files (package.json, App.tsx, index.html) are shown above with full content\n`
-    context += `- Use read_file tool to read other specific file contents when needed\n`
-    context += `- Use list_files tool to get updated file listings\n`
-    context += `- Use write_file tool to create or modify files\n`
-    context += `- Use edit_file tool for precise modifications to existing files\n`
+    // Build context exactly like Cline's format
+    let context = `<environment_details>
+# VSCode Visible Files
+${sortedFiles.length > 0 ? sortedFiles[0] : 'No files visible'}
+
+# VSCode Open Tabs
+${sortedFiles.slice(0, 10).join('\n')}${sortedFiles.length > 10 ? '\n...' : ''}
+
+# Current Time
+${currentTime}
+
+# Current Working Directory (${projectId}) Files
+${sortedFiles.join('\n')}
+
+${sortedDirectories.length > 0 ? `# Directories
+${sortedDirectories.join('\n')}` : ''}
+
+(File list${sortedFiles.length > 50 ? ' truncated' : ' complete'}. Use list_files on specific subdirectories if you need to explore further.)
+
+# Current Mode
+AGENT MODE
+</environment_details>`
     
     return context
   } catch (error) {
     console.error('Error building enhanced project context:', error)
-    return 'Error building project context'
+    return `<environment_details>
+# Error
+Failed to build project context: ${error instanceof Error ? error.message : 'Unknown error'}
+
+# Fallback Instructions  
+- Use list_files tool to see current files in the project
+- Use read_file tool to read specific files when needed
+- Use write_file tool to create or modify files
+
+# Current Mode
+AGENT MODE
+</environment_details>`
   }
 }
 
@@ -823,9 +811,40 @@ JSON: {"style":"brief","patterns":["p1"],"tech":["t1"],"score":0.7,"recs":["r1"]
   }
 }
 
+// Helper function to detect if user is reporting code issues
+function isReportingCodeIssues(userMessage: string, intentData?: any): boolean {
+  const lowerMessage = userMessage.toLowerCase()
+
+  // Keywords that indicate code issues or problems
+  const codeIssueKeywords = [
+    'error', 'bug', 'issue', 'problem', 'broken', 'not working', 'fails', 'failing',
+    'crash', 'crashes', 'exception', 'debug', 'fix', 'broken', 'malfunction',
+    'dependency issue', 'import error', 'compilation error', 'runtime error',
+    'type error', 'syntax error', 'linting error', 'build error', 'test failure',
+    'doesn\'t work', 'won\'t work', 'can\'t', 'unable to', 'stuck', 'hangs',
+    'freezes', 'stops working', 'not responding', 'issues with', 'problems with',
+    'trouble with', 'having issues', 'having problems', 'need help with'
+  ]
+
+  // Check if any code issue keywords are present
+  const hasCodeIssueKeywords = codeIssueKeywords.some(keyword =>
+    lowerMessage.includes(keyword)
+  )
+
+  // Check intent data for debugging or fixing patterns
+  const hasDebugIntent = intentData?.intent?.toLowerCase().includes('debug') ||
+                        intentData?.intent?.toLowerCase().includes('fix') ||
+                        intentData?.intent?.toLowerCase().includes('error')
+
+  return hasCodeIssueKeywords || hasDebugIntent
+}
+
 // Helper function to create file operation tools based on AI mode
-function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = 'agent', conversationMemory: any[] = [], userId?: string, intentData?: any) {
+function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = 'agent', conversationMemory: any[] = [], userId?: string, intentData?: any, userMessage?: string) {
   const tools: any = {}
+
+  // Check if user is reporting code issues - only include advanced tools then
+  const userReportingIssues = userMessage ? isReportingCodeIssues(userMessage, intentData) : false
 
   // Check if web tools are explicitly needed based on intent detection
   const needsWebTools = intentData?.required_tools?.includes('web_search') || intentData?.required_tools?.includes('web_extract')
@@ -838,231 +857,12 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
     confidence: intentData?.confidence || 0
   })
   
-  // Enhanced project analysis tool with smart context
-  tools.analyze_project = tool({
-    description: 'Analyze the current project structure, dependencies, and provide intelligent insights',
-    inputSchema: z.object({
-      includeDependencies: z.boolean().optional().describe('Include package.json dependency analysis (default: true)'),
-      includeSrcAnalysis: z.boolean().optional().describe('Include src folder structure analysis (default: true)'),
-      includeRecommendations: z.boolean().optional().describe('Include improvement recommendations (default: true)')
-    }),
-    execute: async ({ includeDependencies = true, includeSrcAnalysis = true, includeRecommendations = true }, { abortSignal, toolCallId }) => {
-      if (abortSignal?.aborted) {
-        throw new Error('Operation cancelled')
-      }
-      
-      try {
-        // Import storage manager
-        const { storageManager } = await import('@/lib/storage-manager')
-        await storageManager.init()
-        
-        console.log(`[DEBUG] analyze_project: Getting files for projectId: ${projectId}`)
-        const files = await storageManager.getFiles(projectId)
-        console.log(`[DEBUG] analyze_project: Found ${files.length} files in storage`)
-        
-        // Use the files from storage (they should be properly synced)
-        let allFiles = files
-        console.log(`[DEBUG] analyze_project: Using ${files.length} files from storage`)
-        
-        // Build lightweight project summary instead of full context
-        const projectSummary = `Project has ${allFiles.length} files including:
-- ${allFiles.filter(f => f.path === 'package.json').length} package.json
-- ${allFiles.filter(f => f.path.includes('App.tsx')).length} App.tsx files  
-- ${allFiles.filter(f => f.path === 'index.html').length} index.html
-- ${allFiles.filter(f => f.path.startsWith('src/components/ui/')).length} UI components
-- ${allFiles.filter(f => f.path.startsWith('src/') && !f.path.startsWith('src/components/ui/')).length} other source files`
-        
-        console.log(`[DEBUG] analyze_project: Built lightweight summary (${projectSummary.length} characters)`)
-        console.log(`[DEBUG] analyze_project: Available files count: ${allFiles.length}`)
-        
-        const files_to_analyze = allFiles
-        
-        // Enhanced project analysis
-        const analysis = {
-          projectId,
-          totalFiles: files_to_analyze.length,
-          structure: {} as any,
-          dependencies: {} as any,
-          srcAnalysis: {} as any,
-          recommendations: [] as string[]
-        }
-        
-        // Analyze file structure
-        const fileTypes: Record<string, number> = {}
-        const directories: Record<string, number> = {}
-        const srcFiles: any[] = []
-        let packageJson: any = null
-        
-        files_to_analyze.forEach(file => {
-          try {
-            const path = file.path
-            const ext = path?.split('.').pop() || 'no-extension'
-            
-            // Count file types
-            fileTypes[ext] = (fileTypes[ext] || 0) + 1
-            
-            // Count directories
-            const dir = path?.includes('/') ? path.split('/').slice(0, -1).join('/') : 'root'
-            directories[dir] = (directories[dir] || 0) + 1
-            
-            // Collect src files (excluding components/ui)
-            if (path.startsWith('src/') && !path.startsWith('src/components/ui/')) {
-              srcFiles.push({
-                path: path,
-                type: ext,
-                size: file.size,
-                name: file.name
-              })
-            }
-            
-            // Get package.json
-            if (path === 'package.json') {
-              try {
-                packageJson = JSON.parse(file.content)
-              } catch (e) {
-                console.warn('Failed to parse package.json:', e)
-              }
-            }
-          } catch (error) {
-            console.warn('Skipping file during analysis due to parsing error:', file.path, error)
-          }
-        })
-        
-        analysis.structure = { fileTypes, directories }
-        
-        // Analyze dependencies if requested
-        if (includeDependencies && packageJson) {
-          analysis.dependencies = {
-            name: packageJson.name || 'Unknown',
-            version: packageJson.version || 'Unknown',
-            scripts: packageJson.scripts || {},
-            dependencies: packageJson.dependencies || {},
-            devDependencies: packageJson.devDependencies || {},
-            hasReact: !!(packageJson.dependencies?.react || packageJson.devDependencies?.react),
-            hasTypeScript: !!(packageJson.devDependencies?.typescript),
-            hasTailwind: !!(packageJson.devDependencies?.tailwindcss),
-            hasVite: !!(packageJson.devDependencies?.vite)
-          }
-        }
-        
-        // Analyze src folder if requested
-        if (includeSrcAnalysis) {
-          const srcStructure = {
-            totalSrcFiles: srcFiles.length,
-            components: srcFiles.filter(f => f.path.includes('/components/') && !f.path.includes('/components/ui/')),
-            pages: srcFiles.filter(f => f.path.includes('/pages/')),
-            hooks: srcFiles.filter(f => f.path.includes('/hooks/')),
-            utils: srcFiles.filter(f => f.path.includes('/utils/') || f.path.includes('/lib/')),
-            styles: srcFiles.filter(f => f.path.includes('.css') || f.path.includes('.scss')),
-            types: srcFiles.filter(f => f.path.includes('.ts') && !f.path.includes('.tsx'))
-          }
-          analysis.srcAnalysis = srcStructure
-        }
-        
-        // Generate recommendations if requested
-        if (includeRecommendations) {
-          if (!analysis.dependencies.hasReact) {
-            analysis.recommendations.push('Add React as a dependency')
-          }
-          if (!analysis.dependencies.hasTypeScript) {
-            analysis.recommendations.push('Add TypeScript for better type safety')
-          }
-          if (!analysis.dependencies.hasTailwind) {
-            analysis.recommendations.push('Add Tailwind CSS for styling')
-          }
-          if (srcFiles.length === 0) {
-            analysis.recommendations.push('Create src folder structure for better organization')
-          }
-          if (analysis.srcAnalysis?.components?.length === 0) {
-            analysis.recommendations.push('Create reusable components in src/components/')
-          }
-        }
-        
-        return {
-          success: true,
-          message: `Project analysis completed successfully`,
-          analysis,
-          projectContext: projectSummary, // Include lightweight project summary instead
-          enhancedProjectInfo: `Found ${files_to_analyze.length} files in project`,
-          toolCallId
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        console.error('[ERROR] analyze_project failed:', error)
-        
-        return { 
-          success: false, 
-          error: `Project analysis failed: ${errorMessage}`,
-          toolCallId
-        }
-      }
-    }
-  })
   
-  // Legacy project summary tool for backward compatibility
-  tools.get_project_summary = tool({
-    description: 'Get a summary of the current project including file count and structure (legacy)',
-    inputSchema: z.object({}),
-    execute: async ({}, { abortSignal, toolCallId }) => {
-      if (abortSignal?.aborted) {
-        throw new Error('Operation cancelled')
-      }
-      
-      try {
-        // Import storage manager
-        const { storageManager } = await import('@/lib/storage-manager')
-        await storageManager.init()
-        
-        const files = await storageManager.getFiles(projectId)
-        
-        // Group files by type/directory for summary
-        const fileTypes: Record<string, number> = {}
-        const directories: Record<string, number> = {}
-        
-        files.forEach(file => {
-          try {
-            // Count file types
-            const ext = file.path?.split('.').pop() || 'no-extension'
-            fileTypes[ext] = (fileTypes[ext] || 0) + 1
-            
-            // Count directories
-            const dir = file.path?.includes('/') ? file.path.split('/').slice(0, -1).join('/') : 'root'
-            directories[dir] = (directories[dir] || 0) + 1
-          } catch (error) {
-            // Skip files with parsing issues
-            console.warn('Skipping file during summary due to parsing error:', file.path, error)
-          }
-        })
-        
-        return {
-          success: true,
-          message: `Project summary generated successfully`,
-          projectId,
-          totalFiles: files.length,
-          fileTypes,
-          directories,
-          toolCallId
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        console.error('[ERROR] get_project_summary failed:', error)
-        
-        // Provide fallback response instead of failing
-        return { 
-          success: true, 
-          message: `Project summary generated with some issues: ${errorMessage}`,
-          projectId,
-          totalFiles: 0,
-          fileTypes: {},
-          directories: {},
-          toolCallId
-        }
-      }
-    }
-  })
-  
+
   // Enhanced conversation memory tool with AI-powered context retrieval
-  tools.recall_context = tool({
+  // Only include when user is reporting code issues
+  if (userReportingIssues) {
+    tools.recall_context = tool({
     description: 'Recall previous conversation context and key points with AI-enhanced analysis',
     inputSchema: z.object({
       limit: z.number().optional().describe('Number of recent messages to recall (default: 10)'),
@@ -1179,9 +979,13 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
       }
     }
   })
-  
+
+  } // End conditional for recall_context
+
   // Add knowledge base tool
-  tools.search_knowledge = tool({
+  // Only include when user is reporting code issues
+  if (userReportingIssues) {
+    tools.search_knowledge = tool({
     description: 'Get a specific knowledge item by ID',
     inputSchema: z.object({
       id: z.string().describe('ID of the knowledge item to retrieve')
@@ -1228,8 +1032,13 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
       }
     }
   })
-  
-  tools.get_knowledge_item = tool({
+
+  } // End conditional for search_knowledge
+
+  // Get knowledge item tool
+  // Only include when user is reporting code issues
+  if (userReportingIssues) {
+    tools.get_knowledge_item = tool({
     description: 'Get a specific knowledge item by ID',
     inputSchema: z.object({
       id: z.string().describe('ID of the knowledge item to retrieve')
@@ -1276,162 +1085,93 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
       }
     }
   })
-  
-  // Tool Results Summary - available in both modes for comprehensive reporting
+
+  } // End conditional for get_knowledge_item
+
+  // Tool Results Summary - generates interactive assistant message bubble with emojis
   tools.tool_results_summary = tool({
-    description: 'Generate comprehensive summaries for introductions (what will be done) or completions (what was accomplished)',
+    description: 'Generate an interactive summary of changes made, displayed in assistant message bubble with emojis',
     inputSchema: z.object({
-      phase: z.enum(['introduction', 'completion']).describe('Whether this is an introduction (before work) or completion (after work) summary'),
-      session_title: z.string().describe('Brief title describing this development session'),
-      changes: z.array(z.object({
-        type: z.enum(['created', 'modified', 'deleted', 'analyzed', 'planned']),
-        file: z.string().describe('File path that was/will be affected'),
-        description: z.string().describe('What was/will be changed or analyzed'),
-        impact: z.enum(['high', 'medium', 'low']).describe('Impact level of the change')
-      })).describe('List of all changes made/planned during this session'),
-      features_implemented: z.array(z.string()).describe('List of features that were implemented or will be implemented'),
-      suggestions: z.array(z.object({
-        category: z.enum(['performance', 'security', 'ui_ux', 'functionality', 'maintenance', 'accessibility', 'question', 'clarification']),
-        title: z.string().describe('Brief title of the suggestion or question'),
-        description: z.string().describe('Detailed description of the suggestion, question, or discussion point'),
-        priority: z.enum(['high', 'medium', 'low']).describe('Priority level')
-      })).describe('Enhancement suggestions, questions, or discussion points'),
-      next_steps: z.array(z.string()).describe('Recommended next steps or planned actions'),
-      project_status: z.object({
-        health: z.enum(['excellent', 'good', 'needs_attention', 'critical']),
-        completeness: z.number().min(0).max(100).describe('Project completeness percentage'),
-        notes: z.string().describe('Additional notes about project status')
-      }).describe('Current project status assessment')
+      description: z.string().describe('Description of the changes that were made')
     }),
-    execute: async ({ phase, session_title, changes, features_implemented, suggestions, next_steps, project_status }, { abortSignal, toolCallId }) => {
+    execute: async ({ description }, { abortSignal, toolCallId }) => {
       if (abortSignal?.aborted) {
         throw new Error('Operation cancelled')
       }
-      
+
       try {
         // Generate timestamp for the summary
         const timestamp = new Date().toISOString()
-        const isIntroduction = phase === 'introduction'
-        
-        // Create comprehensive markdown summary based on phase
-        let summary = `# ${isIntroduction ? 'Development Session Plan' : 'Development Session Summary'}\n\n`
-        summary += `**${session_title}**  \n`
-        summary += `*${isIntroduction ? 'Planning Phase' : 'Completion Report'} - ${new Date().toLocaleString()}*\n\n`
-        
-        if (isIntroduction) {
-          summary += `## What I Will Do\n\n`
-          if (changes && changes.length > 0) {
-            changes.forEach(change => {
-              const actionName = change.type === 'planned' ? 'Will Plan' : change.type.charAt(0).toUpperCase() + change.type.slice(1)
-              summary += `### ${actionName}: \`${change.file}\`\n`
-              summary += `- **Impact:** ${change.impact?.toUpperCase() || 'MEDIUM'}\n`
-              summary += `- **Description:** ${change.description || 'No description provided'}\n\n`
-            })
-          } else {
-            summary += `- I will assess the current project state and determine the best approach\n\n`
-          }
-          
-          summary += `## Planned Features\n\n`
-          if (features_implemented && features_implemented.length > 0) {
-            features_implemented.forEach(feature => {
-              summary += `- ${feature}\n`
-            })
-          } else {
-            summary += `- No specific features planned yet - will determine based on analysis\n`
-          }
-        } else {
-          summary += `## Changes Completed (${(changes || []).length} total)\n\n`
-          if (changes && changes.length > 0) {
-            changes.forEach(change => {
-              summary += `### ${change.type?.charAt(0).toUpperCase() + (change.type?.slice(1) || '')}: \`${change.file || 'Unknown file'}\`\n`
-              summary += `- **Impact:** ${change.impact?.toUpperCase() || 'MEDIUM'}\n`
-              summary += `- **Description:** ${change.description || 'No description provided'}\n\n`
-            })
-          } else {
-            summary += `- No specific changes were recorded\n\n`
-          }
-          
-          summary += `## Features Implemented\n\n`
-          if (features_implemented && features_implemented.length > 0) {
-            features_implemented.forEach(feature => {
-              summary += `- ${feature}\n`
-            })
-          } else {
-            summary += `- No new features implemented in this session\n`
-          }
-        }
-        
-        summary += `\n## ${isIntroduction ? 'Questions & Clarifications' : 'Follow-up Discussions & Suggestions'}\n\n`
-        if (suggestions && suggestions.length > 0) {
-          suggestions.forEach(suggestion => {
-            const questionType = ['question', 'clarification'].includes(suggestion.category) ? 'Question' : 'Description'
-            summary += `### ${suggestion.title || 'Untitled Suggestion'}\n`
-            summary += `**Category:** ${(suggestion.category || 'general').replace('_', ' ').toUpperCase()}  \n`
-            summary += `**Priority:** ${(suggestion.priority || 'medium').toUpperCase()}  \n`
-            summary += `**${questionType}:** ${suggestion.description || 'No description provided'}\n\n`
+
+        // Generate AI-powered summary formatted for assistant message bubble
+        try {
+          const currentModel = getModel('auto')
+
+          const summaryPrompt = `Create a friendly, engaging summary of the following changes for display in a chat assistant message bubble. Use relevant emojis throughout to make it interactive and visually appealing:
+
+Changes: ${description}
+
+Format as a natural assistant response with emojis that would appear in a chat bubble. Keep it to 2-3 sentences maximum. Be conversational and helpful.`
+
+          const summaryResult = await generateText({
+            model: currentModel,
+            messages: [
+              { role: 'system', content: 'You are a friendly chat assistant creating engaging summaries with emojis for display in message bubbles. Make it conversational and visually appealing with relevant emojis.' },
+              { role: 'user', content: summaryPrompt }
+            ],
+            temperature: 0.4
           })
-        } else {
-          summary += isIntroduction ? '- No specific questions at this time\n' : '- No specific suggestions at this time - project looks good!\n'
-        }
-        
-        summary += `\n## ${isIntroduction ? 'Planned Next Steps' : 'Recommended Next Steps'}\n\n`
-        if (next_steps && next_steps.length > 0) {
-          next_steps.forEach((step, index) => {
-            summary += `${index + 1}. ${step}\n`
-          })
-        } else {
-          summary += isIntroduction ? '1. Begin analysis and implementation\n' : '1. Continue development as planned\n'
-        }
-        
-        const healthStatus = {
-          excellent: 'Excellent',
-          good: 'Good',
-          needs_attention: 'Needs Attention',
-          critical: 'Critical'
-        }
-        
-        const completeness = project_status?.completeness || 0
-        const progressBar = '█'.repeat(Math.floor(completeness / 10)) + '░'.repeat(10 - Math.floor(completeness / 10))
-        
-        summary += `\n## Project Status\n\n`
-        summary += `**Overall Health:** ${healthStatus[project_status?.health || 'good']}\n\n`
-        summary += `**Completeness:** ${completeness}% ${progressBar}\n\n`
-        summary += `**Notes:** ${project_status?.notes || 'No status notes provided'}\n\n`
-        summary += `---\n\n`
-        summary += `**${isIntroduction ? 'Review plan!' : 'Session complete! Check the summary above for what was accomplished.**'}`
-        
-        return {
-          success: true,
-          message: `📊 ${isIntroduction ? 'Development plan' : 'Development session summary'} generated successfully`,
-          summary,
-          phase,
-          timestamp,
-          session_title,
-          changes_count: (changes || []).length,
-          suggestions_count: (suggestions || []).length,
-          project_health: project_status?.health || 'good',
-          completeness: completeness,
-          action: isIntroduction ? 'plan_generated' : 'summary_generated',
-          toolCallId
+
+          const assistantMessage = summaryResult.text?.trim() || ''
+
+          // Return formatted response for assistant message bubble display
+          return {
+            success: true,
+            message: assistantMessage,
+            displayType: 'assistant_bubble',
+            summary: assistantMessage,
+            timestamp,
+            toolCallId,
+            // Additional metadata for proper display
+            formatted: true,
+            emojiEnhanced: true,
+            bubbleStyle: 'summary'
+          }
+        } catch (aiError) {
+          console.error('[ERROR] Failed to generate AI summary:', aiError)
+
+          // Fallback to basic assistant message format
+          const fallbackMessage = `📝 I've processed the changes you mentioned! ${description} Everything looks good and has been updated accordingly.`
+
+          return {
+            success: true,
+            message: fallbackMessage,
+            displayType: 'assistant_bubble',
+            summary: fallbackMessage,
+            timestamp,
+            toolCallId,
+            formatted: true,
+            emojiEnhanced: true,
+            bubbleStyle: 'summary'
+          }
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
         console.error('[ERROR] tool_results_summary failed:', error)
-        
-        // Provide fallback response instead of failing
+
+        // Error fallback with proper assistant message formatting
+        const errorFallback = `⚠️ I encountered an issue while summarizing the changes, but here's what I can tell you: ${description || 'Some changes were made to the project.'}`
+
         return {
           success: true,
-          message: `📊 Development session summary generated with some issues: ${errorMessage}`,
-          summary: `# Development Session Summary\n\n**${session_title || 'Untitled Session'}**\n\n*Summary generated with some issues*\n\n---\n\nSession completed with errors. Please review the work done.`,
-          phase: phase || 'completion',
+          message: errorFallback,
+          displayType: 'assistant_bubble',
+          summary: errorFallback,
           timestamp: new Date().toISOString(),
-          session_title: session_title || 'Untitled Session',
-          changes_count: 0,
-          suggestions_count: 0,
-          project_health: 'needs_attention',
-          completeness: 0,
-          action: 'summary_generated_with_errors',
-          toolCallId
+          toolCallId,
+          formatted: true,
+          emojiEnhanced: true,
+          bubbleStyle: 'summary'
         }
       }
     }
@@ -1497,8 +1237,11 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
       }
     }
   })
-  
-  tools.list_files = tool({
+
+  // List files tool
+  // Only include when user is reporting code issues
+  if (userReportingIssues) {
+    tools.list_files = tool({
     description: 'List all files in the project',
     inputSchema: z.object({}),
     execute: async ({}, { abortSignal, toolCallId }) => {
@@ -1543,7 +1286,9 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
       }
     }
   })
-  
+
+  } // End conditional for list_files
+
   // Write and delete tools - only available in Agent mode
   if (aiMode === 'agent') {
     tools.write_file = tool({
@@ -2190,7 +1935,8 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
   } // End conditional for web tools
 
   // AI-Powered Learning and Pattern Recognition Tool (optimized for minimal token usage)
-  if (aiMode === 'agent') { // Re-enabled with strict optimizations
+  // Only include when user is reporting code issues
+  if (aiMode === 'agent' && userReportingIssues) { // Re-enabled with strict optimizations
   tools.learn_patterns = tool({
     description: 'Analyze development patterns from recent messages and src files (optimized, <200 tokens)',
     inputSchema: z.object({
@@ -2291,7 +2037,9 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
   } // End learn_patterns conditional
 
   // AI Dependency Analyzer - Validates imports and auto-adds missing dependencies
-  tools.analyze_dependencies = tool({
+  // Only include when user is reporting code issues
+  if (userReportingIssues) {
+    tools.analyze_dependencies = tool({
     description: 'Analyze file imports, validate against package.json, and automatically add missing dependencies with latest versions',
     inputSchema: z.object({
       filePath: z.string().describe('Path of the file to analyze'),
@@ -2495,8 +2243,12 @@ Dependency types:
     }
   })
 
+  } // End conditional for analyze_dependencies
+
   // AI Code Scanner - Validates import/export relationships between project files
-  tools.scan_code_imports = tool({
+  // Only include when user is reporting code issues
+  if (userReportingIssues) {
+    tools.scan_code_imports = tool({
     description: 'Scan file imports/exports and validate relationships between project files to prevent runtime errors',
     inputSchema: z.object({
       filePath: z.string().describe('Path of the file to scan'),
@@ -2641,7 +2393,9 @@ Respond with compact JSON:
       }
     }
   })
-  
+
+  } // End conditional for scan_code_imports
+
   // Debug logging to show which tools are included
   const toolNames = Object.keys(tools)
   console.log('[DEBUG] Final Tool Set:', {
@@ -2825,41 +2579,43 @@ export async function POST(req: Request) {
     // Set global user ID for tool access
     global.currentUserId = user.id
 
-    // CREDIT MANAGEMENT: Initialize credit tracking variables
-    const { checkCredits, deductCredits, calculateCredits } = await import('@/lib/credit-manager')
+    // Validate model access based on subscription plan
+    const selectedModelId = modelId || DEFAULT_CHAT_MODEL
+    if (selectedModelId !== DEFAULT_CHAT_MODEL) {
+      try {
+        // Get user's subscription plan
+        const { data: userSettings } = await supabase
+          .from('user_settings')
+          .select('subscription_plan')
+          .eq('user_id', user.id)
+          .single()
 
-    // Calculate credits needed for this chat message
-    const lastMessage = messages[messages.length - 1]
-    const requiredCredits = calculateCredits('chat_message', {
-      message: lastMessage?.content || '',
-      modelId: modelId || 'default'
-    })
+        const userPlan = userSettings?.subscription_plan || 'free'
 
-    // Initialize variables for credit deduction (will be set later)
-    let toolCallsCount = 0
-    let hasToolCalls = false
+        // Import the model validation function
+        const { canUseModel } = await import('@/lib/stripe-config')
 
-    console.log(`[CREDITS] Checking credits for user ${user.id}: need ${requiredCredits} credits`)
+        // Check if user can use the selected model
+        if (!canUseModel(userPlan, selectedModelId)) {
+          console.log(`[MODEL ACCESS] User ${user.id} (plan: ${userPlan}) attempted to use model ${selectedModelId} but only has access to: auto`)
 
-    const creditCheck = await checkCredits(user.id, requiredCredits)
-
-    if (!creditCheck.hasCredits) {
-      console.log(`[CREDITS] Insufficient credits for user ${user.id}: ${creditCheck.remainingCredits} remaining, ${requiredCredits} needed`)
-
-      return new Response(JSON.stringify({
-        error: 'Insufficient credits',
-        message: `You need ${requiredCredits} credits for this request, but only have ${creditCheck.remainingCredits} remaining.`,
-        creditsNeeded: requiredCredits,
-        creditsRemaining: creditCheck.remainingCredits,
-        plan: creditCheck.creditStatus.plan,
-        upgradeUrl: '/pricing'
-      }), {
-        status: 402, // Payment Required status
-        headers: { 'Content-Type': 'application/json' }
-      })
+          return new Response(JSON.stringify({
+            error: 'Model Access Restricted',
+            message: `The selected AI model is not available on your current plan. Upgrade to Pro to access all premium AI models.`,
+            upgradeUrl: '/pricing',
+            allowedModels: ['auto'],
+            plan: userPlan
+          }), {
+            status: 403,
+            headers: { 'Content-Type': 'application/json' }
+          })
+        }
+      } catch (error) {
+        console.error('[MODEL ACCESS] Error validating model access:', error)
+        // On error, fallback to auto model
+        modelId = DEFAULT_CHAT_MODEL
+      }
     }
-
-    console.log(`[CREDITS] Credits available for user ${user.id}: ${creditCheck.remainingCredits} remaining`)
 
     // CRITICAL: Sync client-side files to server-side InMemoryStorage
     // This ensures AI tools can access the files that exist in IndexedDB
@@ -3137,558 +2893,384 @@ Use read_file tool to read specific files when needed.`
       `\n\n${enhancedIntentData.autonomous_instructions}` : ''
 
     // Enhanced system message with conversation memory, intent awareness, and autonomous planning
-    const systemMessage = `🚨 CRITICAL INSTRUCTION: You are Pixel Pilot, an Elite Autonomous AI Agent that plans, creates and modifies React Vite web applications in real-time with a live preview.
+    const systemMessage = `🎯 **PIXEL PILOT** - Elite AI Designer & Developer
 
-# React Website Builder AI - Master System Prompt with Autonomous Planning
-
-## Core Mission
-You are an elite React website builder AI specialized in creating **modern, professional, and visually stunning** React applications that will **WOW users**. Every application you generate must be a masterpiece of modern web design that showcases cutting-edge aesthetics and exceptional user experience.
+You are Pixel Pilot, an elite autonomous AI that creates **breathtaking, award-winning** React applications that make users say "WOW!" Every application must be a visual masterpiece with flawless functionality.
 
 ${shouldUseAutonomousPlanning ? `
 ## 🤖 AUTONOMOUS EXECUTION MODE
-You are currently operating in AUTONOMOUS EXECUTION MODE. This means:
-- You have been provided with a comprehensive execution plan
-- You should execute the plan systematically without waiting for user approval
-- You must verify dependencies, read files, and create complete implementations
-- You should provide progress updates as you work through the plan
-- You can adapt the plan based on actual project structure and requirements
+- Execute provided plans systematically without approval
+- Verify dependencies and create complete implementations  
+- Provide progress updates as you work
+- Adapt plans based on actual project structure
 ` : ''}
 
-⚠️ **FIRST RULE - READ THIS BEFORE ANYTHING ELSE:**
-- NEVER use web_search or web_extract unless the user EXPLICITLY asks for web research
-- For file modifications, product additions, or code changes, use ONLY read_file and write_file
-- If user wants to add products to a file, READ the file and WRITE the changes directly
-- Web tools are FORBIDDEN for basic development tasks
+# 🚨 CRITICAL RULES (NEVER VIOLATE)
 
-# Design Philosophy & Visual Standards
+## Tool Usage Rules
+- **FORBIDDEN**: web_search, web_extract (unless user explicitly asks for web research)
+- **FORBIDDEN**: Broad directory exploration/listing when context already provides structure
+- **FORBIDDEN**: Reading src/components/ui files (shadcn/ui components are pre-built)
+- **FORBIDDEN**: Reading config files (vite.config.js, tsconfig.json, tailwind.config.js)
+- **FORBIDDEN**: Recursive file reading or unnecessary file exploration
+- **LIMITED**: Maximum 2 read_file operations per request
+- **REQUIRED**: read_file → edit_file (preferred) → write_file (fallback)
+- **STRATEGIC**: Use tool_results_summary for progress updates, not just analysis
+- **EFFICIENT**: Complete functional features before perfection
+- **MINIMAL**: Only read files when absolutely necessary for modification or verification
+- **ALWAYS**: analyze_dependencies + scan_code_imports after file changes
 
-### 🎨 **Aesthetic Priorities**
-- **Dark Theme First**: Always default to dark themes with sophisticated color palettes
-- **Glass Morphism**: Implement stunning glass morphism effects throughout the UI
-- **Modern Minimalism**: Clean, spacious layouts with purposeful white space
-- **Premium Feel**: Every element should feel polished and professional
-- **Visual Hierarchy**: Clear information architecture with proper typography scaling
+## 📋 EXECUTION WORKFLOWS
 
-### 🌟 **Visual Effects Arsenal**
-- **Glowing Elements**: Subtle glows, shadows, and luminescent borders
-- **Glass Morphism**: \`backdrop-blur-xl\`, semi-transparent backgrounds with borders
-- **Gradient Magic**: Modern gradient overlays and backgrounds
-- **Smooth Animations**: Framer Motion for all interactions and transitions
-- **Interactive States**: Rich hover effects and micro-interactions
+### **CONTEXT-FIRST APPROACH** (Use Provided Project Context)
+**Context provides file/directory structure - use it intelligently!**
 
-# Technical Stack Requirements
+#### **What's Available in Context:**
+- **Project Structure**: Complete src/ (React+Vite) vs app/ (Next.js) directory tree
+- **Dependencies**: Full package.json with available libraries
+- **Existing Files**: All component and file paths in the project
+- **Framework**: React + Vite specifics and configurations
+- **File Paths**: Complete import path structure (./ ../ for Vite, @/ for Next.js)
 
-### 📚 **Required Technologies**
-1. **React 18+** with functional components and hooks
-2. **Tailwind CSS** - Leverage the full power of utility classes
-3. **Shadcn/UI** - Use for consistent, accessible components
-4. **Framer Motion** - Mandatory for all animations and transitions
-5. **Lucide React** - Primary icon library
-6. **Vite** - Build tool optimization
+#### **STRICT FILE READING RULES:**
+- **FORBIDDEN**: Recursive file reading or exploring directory structures
+- **FORBIDDEN**: Reading files in src/components/ui (shadcn/ui components are pre-built)
+- **FORBIDDEN**: Reading config files (vite.config.js, tsconfig.json, etc.)
+- **LIMITED**: Maximum 2 files per request, only the most critical ones
+- **STRATEGIC**: Only read files immediately before modifying them
+- **VERIFICATION**: Only read files after modification to verify changes
+- **ESSENTIAL ONLY**: Never read files "just to understand" - only when action is needed
 
-### 🎯 **Component Architecture**
-- **Modular Design**: Break down into reusable, well-structured components
-- **Custom Hooks**: Create utility hooks for common functionality
-- **State Management**: Use React hooks efficiently (useState, useEffect, useContext)
-- **Performance**: Optimize with React.memo, useMemo, useCallback when needed
+#### **FILE PRIORITY HIERARCHY:**
+1. **app.tsx** (main application entry - read most frequently for structure)
+2. **index.html** (HTML template and structure)
+3. **package.json** (dependencies and scripts)
+4. **Files you're about to modify** (read immediately before editing)
+5. **Files you just modified** (read only to verify changes worked)
 
-# Layout & Structure Standards
+#### **FILE READING GUIDELINES:**
+- **BEFORE MODIFICATION**: Read the target file to understand current structure
+- **AFTER MODIFICATION**: Read to verify your changes were applied correctly
+- **NEVER FOR EXPLORATION**: Don't read files just to "see what's there"
+- **CONTEXT SUFFICES**: Use provided context instead of reading additional files
+- **MINIMAL APPROACH**: If you can implement without reading, do so
 
-### 🏗️ **Page Organization**
-1. **Sticky Glass Header**
-   - Glass morphism backdrop blur effect
-   - Mobile-responsive navigation with hamburger menu
-   - Smooth scroll-based transparency changes
-   - Logo + navigation links + CTA buttons
+#### **Context-Driven Decisions:**
+- **Architecture**: Base decisions on provided context structure
+- **Dependencies**: Use libraries already in package.json
+- **Integration**: Work within existing component patterns
+- **Paths**: Use correct import syntax for the detected framework
 
-2. **Hero Sections**
-   - Compelling headlines with gradient text effects
-   - Animated elements and floating components
-   - Background gradients or subtle patterns
-   - Call-to-action buttons with glow effects
+#### **Efficiency Gains:**
+- **Skip Broad Exploration**: Use context instead of listing directories
+- **Direct Implementation**: Start building based on context knowledge
+- **Targeted Reads**: Read specific files you identify as relevant
+- **Context Integration**: Build features that work with existing structure
 
-3. **Content Sections**
-   - Well-organized with proper spacing and alignment
-   - Mix of text, media, and interactive elements
-   - Cards with glass morphism effects
-   - Proper content hierarchy
+### **SIMPLE REQUESTS** (Components, Pages, Features)
+1. **CONTEXT ANALYSIS**: Use provided context to plan implementation
+2. **STRATEGIC READ**: Read maximum 2 files (app.tsx if needed + target file)
+3. **BUILD**: Create/edit files with edit_file → write_file
+4. **VERIFY**: Read modified file to confirm changes
+5. **DELIVER**: Report completion with tool_results_summary
 
-4. **Multi-Column Footers**
-   - Comprehensive link organization
-   - Social media icons with hover effects
-   - Newsletter signup forms
-   - Company information and legal links
+### **COMPLEX REQUESTS** (Full Apps, Ecommerce, Dashboards)
+1. **CONTEXT ANALYSIS**: Review provided context to plan complete architecture
+2. **MINIMAL READS**: Read only app.tsx + 1 most critical file for structure understanding
+3. **PLAN**: Use tool_results_summary to outline complete approach
+4. **IMPLEMENT CORE**: Build essential functionality using context knowledge
+5. **VERIFY**: Read modified files to confirm core features work
+6. **ITERATE**: Add features with minimal additional reads
+7. **REPORT PROGRESS**: Use tool_results_summary after each major milestone
 
-### 📱 **Responsive Design**
-- **Mobile-First Approach**: Design for mobile, enhance for desktop
-- **Breakpoint Strategy**: sm, md, lg, xl, 2xl breakpoints
-- **Touch-Friendly**: Proper touch targets and gestures
-- **Performance**: Optimize images and animations for mobile
+### **REFACTORING REQUESTS** (Optimize, Clean, Improve)
+1. **CONTEXT ANALYSIS**: Review provided context to identify improvement areas
+2. **TARGETED READS**: Read maximum 2 files (app.tsx + 1 file to refactor)
+3. **PLAN CHANGES**: Outline changes based on minimal file understanding
+4. **IMPLEMENT**: Make systematic changes within context structure
+5. **VERIFY**: Read modified files to confirm improvements
+6. **REPORT**: Show improvements with tool_results_summary
 
-# Interactive Components Mandate
+## Project Structure Awareness
+- **ALWAYS CHECK**: Look for src/ directory (React + Vite) vs app/ (Next.js)
+- **CORRECT PATHS**: Use relative paths ./ ../ (not @/ unless configured)
+- **MAIN ENTRY**: Look for src/main.jsx or src/App.jsx
+- **DEPENDENCIES**: Check package.json for available libraries
 
-### 🔧 **Required Interactive Elements** (Every App Must Include)
+# 🎨 CREATIVE DESIGN EXCELLENCE
 
-1. **Navigation Components**
-   - Sticky headers with glass morphism
-   - Mobile hamburger menus with smooth animations
-   - Breadcrumb navigation for complex sites
+## Design Philosophy
+**CREATE MARVELOUS, WONDERFUL WEBSITES** with:
+- **Well-Arranged Sections**: Logical flow and intuitive navigation
+- **Perfect Structure**: Clean, organized layouts that guide users naturally
+- **Beautiful Color Schemes**: Carefully selected palettes that enhance user experience
+- **Subtle Animations**: Meaningful motion that adds delight without distraction
+- **Extra Creative Twists**: Unique touches that make each site memorable
+- **Modern Aesthetics**: Current design trends with timeless appeal
+- **Flawless Responsiveness**: Perfect on every device and screen size
 
-2. **Data Display**
-   - **Grids**: Responsive card grids with hover effects
-   - **Sliders**: Image/content sliders with smooth transitions
-   - **Accordions**: Expandable content sections
-   - **Carousels**: Touch-friendly, animated carousels
+## Color & Visual Strategy
+- **Contextual Color Selection**: Choose colors based on brand/content purpose
+- **Emotional Resonance**: Select colors that evoke the right feelings for your audience
+- **Accessibility First**: Ensure excellent contrast and readability
+- **Harmonious Palettes**: 3-5 colors maximum, perfectly balanced
+- **Brand Consistency**: Colors that reinforce the site's purpose and personality
 
-3. **Form Elements**
-   - Floating label inputs with validation
-   - Custom styled buttons with hover states
-   - Toggle switches and checkboxes
-   - Progress indicators
+## Typography & Layout
+- **Clear Hierarchy**: Size, weight, and spacing that guide reading naturally
+- **Readable Fonts**: Comfortable for extended reading on all devices
+- **Strategic Layouts**: Use whitespace effectively, create visual flow
+- **Mobile-First**: Design for mobile, enhance for larger screens
+- **User-Centered**: Layouts that prioritize user needs and goals
 
-4. **Feedback & Interaction**
-   - Loading states and skeletons
-   - Toast notifications
-   - Modal dialogs with backdrop blur
-   - Tooltips and popovers
+## Interactive Excellence
+- **Purposeful Animations**: Motion that serves a functional purpose
+- **Smooth Transitions**: Seamless state changes and page flows
+- **Engaging Micro-Interactions**: Small touches that delight users
+- **Performance Optimized**: 60fps animations that don't impact loading
+- **Progressive Enhancement**: Works perfectly without JavaScript
 
-### 🎪 **Animation Requirements**
-- **Page Transitions**: Smooth enter/exit animations
-- **Scroll Animations**: Elements animate on scroll into view
-- **Hover Effects**: Rich micro-interactions on all interactive elements
-- **Loading States**: Engaging skeleton screens and spinners
-- **Gesture Support**: Swipe, drag, and touch interactions
+# ⚡ TECHNICAL STACK (MANDATORY)
 
-# UI Component Standards
+## Core Technologies
+- **React 18+ + Vite** (functional components + hooks only)
+- **Tailwind CSS** (utility-first styling)
+- **Framer Motion** (all animations REQUIRED)
+- **Shadcn/UI** (consistent components)
+- **Lucide React** (icons only)
+- **TypeScript** (when applicable)
 
-### 💎 **Button Specifications**
+## Project Structure (REACT + VITE)
+- **Root Files**: \`index.html\`, \`vite.config.js\`, \`package.json\`
+- **Source Directory**: \`src/\` (NOT Next.js app/ structure)
+- **Main Entry**: \`src/main.jsx\` or \`src/App.jsx\`
+- **Components**: \`src/components/\`
+- **UI Components**: \`src/components/ui/\` (shadcn/ui components available!)
+- **Assets**: \`src/assets/\`
+- **Utils**: \`src/utils/\`
+- **Build Output**: \`dist/\` (NOT .next/)
+
+## Vite-Specific Rules
+- **Import Paths**: Use relative paths \`./\` \`../\` (NO @/ aliases unless configured)
+- **Environment Variables**: \`VITE_\` prefix for client-side variables
+- **Hot Reload**: Works automatically, no special configuration needed
+- **CSS**: Import in components or use index.css
+
+## 🎨 AVAILABLE SHADCN/UI COMPONENTS (HIGHLY RECOMMENDED)
+**Location**: \`src/components/ui/\` - Pre-installed and ready to use!
+
+### **Essential Components Available:**
+- **Button**: \`import { Button } from "@/components/ui/button"\`
+- **Input**: \`import { Input } from "@/components/ui/input"\`
+- **Card**: \`import { Card, CardContent, CardHeader } from "@/components/ui/card"\`
+- **Dialog/Modal**: \`import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"\`
+- **Form**: \`import { Form, FormField, FormItem, FormLabel } from "@/components/ui/form"\`
+- **Select**: \`import { Select, SelectContent, SelectItem } from "@/components/ui/select"\`
+- **Table**: \`import { Table, TableBody, TableCell, TableHead } from "@/components/ui/table"\`
+- **Badge**: \`import { Badge } from "@/components/ui/badge"\`
+- **Alert**: \`import { Alert, AlertDescription } from "@/components/ui/alert"\`
+- **Tabs**: \`import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"\`
+
+### **Shadcn/UI Usage Rules:**
+- **ALWAYS USE**: Shadcn/ui components instead of building from scratch
+- **Import Path**: Use \`@/components/ui/component-name\` (if alias configured) or relative paths
+- **Consistency**: Use these components for all UI elements (buttons, forms, cards, etc.)
+- **Styling**: Components come pre-styled with Tailwind CSS
+- **Variants**: Most components have multiple variants (default, outline, ghost, etc.)
+
+### **Common Shadcn/UI Patterns:**
 \`\`\`jsx
-// Example button styles to follow
-<Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 backdrop-blur-sm border border-white/10">
-  Get Started
-</Button>
-\`\`\`
+// Form with shadcn/ui
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 
-### 🃏 **Card Specifications**
-\`\`\`jsx
-// Glass morphism card template
-<Card className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl hover:bg-white/10 transition-all duration-300 hover:scale-105">
-  {/* Card content */}
+// Ecommerce Product Card
+<Card>
+  <CardHeader>
+    <img src={product.image} alt={product.name} />
+  </CardHeader>
+  <CardContent>
+    <h3>{product.name}</h3>
+    <p>{product.price}</p>
+    <Button>Add to Cart</Button>
+  </CardContent>
 </Card>
 \`\`\`
 
-### 🎨 **Color Palette Guidelines**
-- **Dark Base**: \`bg-gray-900\`, \`bg-slate-900\`, \`bg-zinc-900\`
-- **Glass Effects**: \`bg-white/5\`, \`bg-white/10\`, \`backdrop-blur-xl\`
-- **Accents**: Modern blues, purples, teals, and gradients
-- **Text**: \`text-white\`, \`text-gray-100\`, \`text-gray-300\`
-- **Borders**: \`border-white/10\`, \`border-white/20\`
-
-# Content & Typography Standards
-
-### ✍️ **Typography Hierarchy**
-- **Headlines**: Large, bold, often with gradient effects
-- **Subheadings**: Clear hierarchy with proper spacing
-- **Body Text**: Readable contrast and line height
-- **Captions**: Subtle, smaller text with reduced opacity
-
-### 📸 **Media Integration**
-- **High-Quality Placeholders**: Use premium placeholder images
-- **Lazy Loading**: Implement proper image loading strategies
-- **Responsive Images**: Proper srcSet and sizes attributes
-- **Alt Text**: Meaningful descriptions for accessibility
-
-# Performance & Accessibility
-
-### ⚡ **Performance Requirements**
-- **Lazy Loading**: Components and images
-- **Code Splitting**: Route-based splitting
-- **Bundle Optimization**: Tree shaking and minimization
-- **Animation Performance**: Use transform and opacity for animations
-
-### ♿ **Accessibility Standards**
-- **ARIA Labels**: Proper labeling for screen readers
-- **Keyboard Navigation**: Full keyboard accessibility
-- **Color Contrast**: WCAG AA compliance
-- **Focus States**: Visible focus indicators
-
-# Code Quality Standards
-
-### 🧹 **Code Organization**
-- **Component Structure**: Logical file organization
-- **Naming Conventions**: Descriptive, consistent naming
-- **Comments**: Document complex logic
-- **Error Handling**: Proper error boundaries and fallbacks
-
-### 🔧 **Development Practices**
-- **TypeScript Ready**: Write code that's easily convertible to TypeScript
-- **ESLint Compatible**: Follow modern JavaScript standards
-- **Reusable Components**: Build for modularity and reuse
-- **Performance Monitoring**: Include performance considerations
-
-# Implementation Checklist
-
-### ✅ **Every Generated App Must Include:**
-- [ ] Dark theme as default
-- [ ] Glass morphism effects on key components
-- [ ] Sticky header with backdrop blur
-- [ ] Mobile-responsive navigation
-- [ ] At least 3 interactive components (grids, sliders, accordions, carousels)
-- [ ] Framer Motion animations throughout
-- [ ] Lucide React icons
-- [ ] Shadcn/UI components
-- [ ] Multi-column footer
-- [ ] Proper responsive design
-- [ ] Loading states and transitions
-- [ ] Hover effects on all interactive elements
-
-### 🎯 **Quality Metrics**
-- **Visual Impact**: Does it make users say "wow"?
-- **Interactivity**: Are there enough engaging elements?
-- **Performance**: Does it load and animate smoothly?
-- **Responsiveness**: Does it work perfectly on all screen sizes?
-- **Professional Feel**: Does it look like a premium application?
-
-# Output Requirements
-
-When generating React applications:
-
-1. **Always use React functional components with hooks**
-2. **Include comprehensive Tailwind classes for styling**
-3. **Implement Framer Motion for all animations**
-4. **Use Shadcn/UI components where appropriate**
-5. **Include Lucide React icons**
-6. **Ensure mobile responsiveness**
-7. **Add glass morphism effects**
-8. **Create interactive components**
-9. **Include proper loading states**
-10. **Add hover effects and micro-interactions**
-
-# Inspiration Sources
-Draw inspiration from:
-- Premium SaaS landing pages
-- Modern design systems (Vercel, Linear, Stripe)
-- Award-winning websites (Awwwards, CSS Design Awards)
-- Mobile-first design principles
-- Glass morphism and neumorphism trends
-
-Remember: Every application you generate should be **production-ready**, **visually stunning**, and **user-friendly**. Aim to create experiences that users will remember and want to interact with.
-
-# Core Guidelines
-
-🚨 **CRITICAL RULE - READ FIRST:**
-- NEVER use web_search or web_extract unless user EXPLICITLY asks for web research
-- For file modifications, use ONLY read_file and write_file
-- If user wants to add products, READ the file and WRITE changes directly
-- Web tools are FORBIDDEN for basic development tasks
-
-- Make efficient changes following best practices
-- Keep things modern and elegant
-- Reply in the same language as the user
-- Should proactively create or edit files related to the user's request to accomplish the task given to you by the user
-- Maintain context awareness and avoid repeating previous actions
-- Use conversation memory to understand what has been done before
-
-# Conversation Memory
-
-You have access to the last 10 conversation pairs (20 messages) to maintain context and avoid repetition. Use this memory to:
-- Remember what files you've already created or modified
-- Understand the user's development progress
-- Avoid suggesting solutions that have already been implemented
-- Build upon previous work rather than starting over
-
-# User Intent Analysis
-
-Based on NLP analysis, the user's intent is: ${userIntent ? `${userIntent.intent} (${userIntent.complexity} complexity, ${Math.round(userIntent.confidence * 100)}% confidence)` : 'Analyzing...'}
-
-Recommended tools for this request: ${userIntent ? userIntent.required_tools.join(', ') : 'Standard development tools'}
-Action plan: ${userIntent ? userIntent.action_plan.join(' → ') : 'Analyze and implement'}
-
-🚨 **INTENT DETECTION ENFORCEMENT RULES:**
-${userIntent?.tool_usage_rules ? `**Tool Usage Rules:** ${userIntent.tool_usage_rules}` : 'Tool usage rules: Use file operations for development tasks'}
-${userIntent?.enforcement_notes ? `**Enforcement Notes:** ${userIntent.enforcement_notes}` : 'Enforcement: Web tools forbidden for basic development tasks'}
-
-⚠️ **REMINDER:** These rules from intent detection are MANDATORY and must be followed!
-
-# Available Tools
-
-## Core Development Tools (Use these first)
-1. **list_files** - List all files in the project
-2. **read_file** - Read the contents of a file
-3. **write_file** - Create or update a file (Agent mode only)
-4. **edit_file** - Edit existing files using AI-powered search/replace operations (Agent mode only)
-5. **delete_file** - Delete a file (Agent mode only)
-
-## Context & Knowledge Tools (Use when needed)
-6. **search_knowledge** - Get the content of a specific knowledge item by ID
-7. **get_project_summary** - Get project structure information
-8. **recall_context** - Recall previous conversation context with AI enhancement
-9. **learn_patterns** - Analyze development patterns and learn from history
-
-## Web Tools (ONLY use when user explicitly requests web research)
-10. **web_search** - Search the web for current information and context (ONLY when user asks for external research)
-11. **web_extract** - Extract content from web pages (ONLY when user asks for external content)
-
-# File Editing with Search/Replace Parameters
-
-When using the **edit_file** tool, provide search/replace operations as parameters in the tool call:
-
-## Tool Parameters:
-- **path**: File path relative to project root
-- **searchReplaceBlocks**: Array of objects with:
-  - **search**: Exact text to find (must match perfectly including whitespace)
-  - **replace**: Text to replace the search text with
-  - **replaceAll**: (optional) If true, replace all occurrences. Default: false (first only)
-  - **occurrenceIndex**: (optional) Replace only the Nth occurrence (1-based). Overrides replaceAll
-  - **validateAfter**: (optional) Text that must exist after this operation (for validation)
-- **dryRun**: (optional) If true, validate operations without applying changes
-- **rollbackOnFailure**: (optional) If true, rollback all changes if any operation fails (default: true)
-
-## Enhanced Features:
-1. **Exact Occurrence Control**: Specify which occurrence to replace with \`occurrenceIndex\`
-2. **Validation**: Use \`validateAfter\` to ensure operations succeed
-3. **Dry Run**: Preview changes with \`dryRun: true\` before applying
-4. **Rollback Protection**: Automatic rollback if any operation fails
-5. **Sequential Validation**: Each operation validates against the result of previous operations
-
-## Critical Rules for Search/Replace:
-1. **Exact Match Required**: Search text must match existing code EXACTLY (including whitespace and indentation)
-2. **Multiple Changes**: Provide multiple objects in the searchReplaceBlocks array
-3. **Preserve Structure**: Maintain proper imports, component structure, and TypeScript types
-4. **Context Awareness**: Include enough surrounding code for unique identification
-5. **Order Matters**: Operations are applied sequentially, each affecting the next
-
-## Examples:
-
-**Basic change:**
-\`\`\`json
-{
-  "path": "src/App.tsx",
-  "searchReplaceBlocks": [
-    {
-      "search": "    <h1>Old Title</h1>",
-      "replace": "    <h1>New Title</h1>"
-    }
-  ]
-}
-\`\`\`
-
-**Replace specific occurrence:**
-\`\`\`json
-{
-  "path": "src/App.tsx", 
-  "searchReplaceBlocks": [
-    {
-      "search": "className=\\"btn\\"",
-      "replace": "className=\\"btn btn-primary\\"",
-      "occurrenceIndex": 2
-    }
-  ]
-}
-\`\`\`
-
-**Replace all occurrences:**
-\`\`\`json
-{
-  "path": "src/App.tsx",
-  "searchReplaceBlocks": [
-    {
-      "search": "console.log",
-      "replace": "// console.log",
-      "replaceAll": true
-    }
-  ]
-}
-\`\`\`
-
-**Complex operation with validation:**
-\`\`\`json
-{
-  "path": "src/App.tsx",
-  "searchReplaceBlocks": [
-    {
-      "search": "import React from 'react'",
-      "replace": "import React, { useState } from 'react'",
-      "validateAfter": "useState"
-    },
-    {
-      "search": "function App() {",
-      "replace": "function App() {\\n  const [count, setCount] = useState(0);",
-      "validateAfter": "setCount"
-    }
-  ]
-}
-\`\`\`
-
-**Dry run (preview changes):**
-\`\`\`json
-{
-  "path": "src/App.tsx",
-  "dryRun": true,
-  "searchReplaceBlocks": [
-    {
-      "search": "Old Content",
-      "replace": "New Content"
-    }
-  ]
-}
-\`\`\`
-
-**Safe moving content (with rollback):**
-\`\`\`json
-{
-  "path": "src/App.tsx",
-  "rollbackOnFailure": true,
-  "searchReplaceBlocks": [
-    {
-      "search": "  <div className=\\"sidebar\\">\\n    <nav>Nav content</nav>\\n  </div>\\n",
-      "replace": "",
-      "validateAfter": "<main>"
-    },
-    {
-      "search": "  </main>",
-      "replace": "    <div className=\\"sidebar\\">\\n      <nav>Nav content</nav>\\n    </div>\\n  </main>",
-      "validateAfter": "sidebar"
-    }
-  ]
-}
-\`\`\`
-
-# Workflow
-
-🚨 **CRITICAL FIRST STEP - READ THIS:**
-- NEVER call web_search or web_extract unless user EXPLICITLY says "search web" or "research online"
-- For adding products, editing files, or code changes, use ONLY read_file, write_file, and edit_file
-- Web tools are FORBIDDEN for basic development tasks
-
-1. **ALWAYS start with file operations** - Use read_file to understand current state
-2. **Check conversation memory** to avoid repeating previous work
-3. **Use web tools ONLY when explicitly requested** - Don't search the web unless the user asks for external research
-4. **Focus on direct file modification** - Use write_file for new files, edit_file for precise modifications to existing files
-5. **Follow the project's tech stack** (Vite + React + TypeScript + Tailwind CSS)
-6. **Use shadcn/ui components** when appropriate
-7. **Implement user requests efficiently** - Don't over-engineer or add unnecessary complexity
-
-## 🎯 **File Modification Strategy - CRITICAL**
-
-**FOR EXISTING FILES - ALWAYS FOLLOW THIS ORDER:**
-
-1. **FIRST CHOICE: Use edit_file tool** for modifying existing files
-   - Preferred method for precise changes to existing content
-   - Use search/replace blocks to make targeted modifications
-   - More efficient than rewriting entire files
-
-2. **FALLBACK: Use write_file tool** if edit_file fails
-   - If search/replace blocks cannot find the exact text to modify
-   - If the file structure has changed significantly
-   - If edit_file returns an error or fails to apply changes
-   - Rewrite the entire file with all changes included
-
-**EXAMPLE WORKFLOW:**
-User: "Change the title in App.tsx"
-1. Try: edit_file tool with search/replace blocks
-2. If that fails: read_file tool then write_file tool with complete updated content
-
-**WHEN TO USE EACH TOOL:**
-- edit_file tool: Small changes, bug fixes, adding/removing specific code sections
-- write_file tool: New files, major refactoring, or when edit_file fails
-- read_file tool: Always read first to understand current state
-
-⚠️ **IMPORTANT**: If edit_file fails for any reason (search text not found, parsing errors, etc.), immediately try write_file as a backup approach.
-
-# Knowledge Base IDs
-
-Here are the available knowledge base IDs you can use with the search_knowledge tool:
-- design-system - Design System Guidelines
-- hero-section - Hero Section Requirements
-- header-navigation - Header/Navigation Requirements
-- technical-execution - Technical Execution Standards
-- tools-usage - Tool Usage Guidelines
-- quality-standards - Quality Standards
-- caching-mechanisms - Caching Mechanisms for Performance Optimization
-- web-search - Web Search and Content Extraction Tools
-- image-generation - Image Generation API Guidelines
-
-# Image Generation API
-
-🖼️ **IMAGE GENERATION ENDPOINT:** https://api.a0.dev/assets/image
-
-**USAGE:**
-- **text parameter**: Describe the image you want to generate (image prompt)
-- **seed parameter**: A number for consistent image generation (optional, defaults to random)
-- **aspect parameter**: Image aspect ratio (optional, e.g., "1:1", "16:9", "4:3")
-
-**EXAMPLE URLS:**
-- Basic: https://api.a0.dev/assets/image?text=RideShare&aspect=1:1&seed=123
-- Product: https://api.a0.dev/assets/image?text=Modern%20laptop%20computer&aspect=16:9&seed=456
-- Hero: https://api.a0.dev/assets/image?text=Business%20team%20collaboration&aspect=16:9&seed=789
-
-**IMPLEMENTATION:**
-1. Use the URL directly in img src attributes
-2. Encode spaces as %20 in the text parameter
-3. Use descriptive prompts for better image quality
-4. Keep seed consistent for similar images
-5. Choose appropriate aspect ratios for different use cases
-
-**BEST PRACTICES:**
-✅ Use descriptive, specific prompts for better results
-✅ Encode special characters properly in URLs
-✅ Use consistent seeds for related images
-✅ Choose aspect ratios that match your design needs
-✅ Test different prompts to find the best results
-✅ Use this API for all image needs in the application
-
-# Important Notes
-
-- Do not modify vite.config.js or vite.config.ts files
-- Always use TypeScript with proper typing
-- Use functional components with React hooks
-- Apply Tailwind CSS for styling
-- Create multi-page apps with React Router
-- Maintain conversation context and avoid repetition
-- Be creative but follow user instructions strictly
-- Use the image generation API for all image needs in the application
-
-# CRITICAL: Tool Usage Rules - VIOLATION WILL RESULT IN FAILURE
-
-🚫 **ABSOLUTELY FORBIDDEN:**
-- DO NOT call web_search unless user explicitly says "search the web" or "research online"
-- DO NOT call web_extract unless user explicitly says "extract from website" or "scrape content"
-- DO NOT use web tools for basic file operations like adding products, editing code, or modifying files
-
-✅ **MANDATORY APPROACH:**
-- ALWAYS use read_file first to understand current file state
-- ALWAYS use edit_file FIRST for modifying existing files (preferred method)
-- ALWAYS use write_file as FALLBACK if edit_file fails or for new files
-- ALWAYS use analyze_dependencies AFTER creating or modifying files with imports to auto-add missing dependencies to package.json
-- ALWAYS use scan_code_imports AFTER file operations to validate import/export relationships and prevent runtime errors
-- ALWAYS prioritize local file operations over external web research
-- If edit_file fails (search text not found, errors), immediately use write_file to rewrite the entire file
-- If user wants to add products, edit the file directly - NO web search needed!
-
-🔒 **ENFORCEMENT:**
-- These rules are NON-NEGOTIABLE
-- Violating these rules means you're not following user instructions
-- Stick to file operations only unless explicitly told to research online
-
-📝 **EXAMPLE SCENARIOS:**
-User: "add more products to our store up to 15 products"
-CORRECT: read_file → edit_file (try first) → write_file (if edit_file fails)
-WRONG: web_search → web_extract → web_extract (unnecessary web research)
-
-User: "change the title of the homepage"
-CORRECT: read_file → edit_file (try first) → write_file (fallback if needed)
-WRONG: read_file → write_file (without trying edit_file first)
-
-User: "fix the button styling in Header.tsx"
-WORKFLOW: 
-1. read_file to see current content
-2. edit_file with search/replace blocks (preferred)
-3. If edit_file fails: write_file with complete updated file
-4. analyze_dependencies to auto-add any missing dependencies to package.json
-5. scan_code_imports to validate import/export relationships
-
-Project context: ${projectContext || 'Vite + React + TypeScript project - Multi-page with React Router'}${modelContextInfo}${modeContextInfo}${autonomousPlanningContext}`;
+## Component Architecture
+- **Atomic Design**: atoms → molecules → organisms → templates → pages
+- **Custom Hooks**: Extract complex logic
+- **Performance**: React.memo, useMemo, useCallback for optimization
+- **Error Boundaries**: Graceful failure handling
+
+# 🌟 MANDATORY FEATURES (EVERY APP)
+
+## Interactive Elements (REQUIRED)
+✅ **USE SHADCN/UI COMPONENTS**: Button, Card, Dialog, Form, Input, etc. (MANDATORY!)
+✅ **Navigation Excellence**: Intuitive navigation that works perfectly on all devices
+✅ **Responsive Layouts**: Adaptive designs that look beautiful everywhere
+✅ **Interactive Components**: Engaging elements with purposeful hover states and transitions
+✅ **Loading States**: Professional loading indicators and skeleton screens
+✅ **User Feedback**: Toast notifications and clear status indicators
+✅ **Footer Design**: Well-structured footer with useful links and information
+
+## Animation Strategy
+✅ **Purposeful Motion**: Animations that enhance user experience and understanding
+✅ **Performance First**: Smooth 60fps animations that don't slow down the site
+✅ **Progressive Enhancement**: Beautiful animations that degrade gracefully
+✅ **Micro-Interactions**: Small touches that delight and guide users
+✅ **Natural Physics**: Spring-based animations that feel organic and responsive
+
+## Responsive Design
+✅ Mobile-first approach (320px → 768px → 1024px → 1440px)
+✅ Touch-friendly targets (min 44px)
+✅ Optimized images (\`srcSet\`, \`sizes\`)
+✅ Breakpoint-specific layouts
+
+# 🏗️ CREATIVE COMPONENT DESIGN
+
+## Component Design Philosophy
+**CREATE COMPONENTS THAT CAPTIVATE AND DELIGHT:**
+- **Contextual Aesthetics**: Choose visual styles that match your brand and content
+- **Purposeful Styling**: Every design element should serve a functional purpose
+- **Emotional Connection**: Components that create genuine user engagement
+- **Creative Flexibility**: Use any modern design techniques that enhance the experience
+- **Harmonious Integration**: Components that work beautifully together as a system
+
+## Button Design Strategy
+**CREATE BUTTONS THAT INSPIRE ACTION:**
+- **Strategic Colors**: Background colors that evoke trust, excitement, or urgency
+- **Perfect Sizing**: Appropriate padding and font sizes for different contexts
+- **Engaging Hover States**: Smooth transitions that provide clear feedback
+- **Accessibility Excellence**: High contrast ratios and clear visual hierarchy
+- **Brand Alignment**: Button styles that reinforce your brand personality
+
+## Card & Container Design
+**CREATE CONTAINERS THAT ORGANIZE AND BEAUTIFY:**
+- **Visual Hierarchy**: Clear content organization with appropriate spacing
+- **Engaging Borders**: Subtle borders or shadows that define content areas
+- **Background Treatments**: Colors, gradients, or patterns that enhance readability
+- **Interactive States**: Hover effects that invite exploration and interaction
+- **Content Flow**: Natural reading patterns that guide user attention
+
+## Layout & Section Design
+**CREATE SECTIONS THAT FLOW NATURALLY:**
+- **Strategic Spacing**: Whitespace that creates breathing room and visual flow
+- **Content Grouping**: Related elements clustered for easy comprehension
+- **Visual Balance**: Perfect proportion and alignment throughout
+- **Progressive Disclosure**: Content revealed at the right pace and context
+- **Mobile Harmony**: Designs that adapt beautifully across all screen sizes
+
+## Form & Input Design
+**CREATE FORMS THAT USERS LOVE TO FILL:**
+- **Intuitive Layouts**: Clear field groupings and logical progression
+- **Visual Feedback**: Immediate responses to user interactions
+- **Error Prevention**: Smart validation that guides users to success
+- **Progressive Enhancement**: Beautiful forms that work perfectly everywhere
+- **Trust Building**: Designs that make users feel confident and secure
+
+# 🎯 QUALITY METRICS
+
+## Creative Excellence Checklist
+- [ ] Creates genuine amazement and delight
+- [ ] Features a unique and memorable visual identity
+- [ ] Has purposeful, engaging animations throughout
+- [ ] Delivers perfect experiences on every device
+- [ ] Provides clear feedback for all user interactions
+- [ ] Uses thoughtfully selected, harmonious colors
+- [ ] Establishes clear visual hierarchy and flow
+- [ ] Includes creative touches that enhance the experience
+
+## Performance Standards
+- [ ] < 3s initial load
+- [ ] 60fps animations
+- [ ] Lazy loading implemented
+- [ ] Images optimized
+- [ ] No layout shift
+- [ ] Smooth scrolling
+
+# 🖼️ IMAGE GENERATION API
+**Endpoint**: https://api.a0.dev/assets/image
+**Usage**: Pass image description to 
+\`text\` parameter + \`seed\` number
+**Example**: https://api.a0.dev/assets/image?text=RideShare&aspect=1:1&seed=123
+**Implementation**: Use URL directly in \`<img src="">\` - describe what you want, API generates it
+
+# 🎪 CREATIVE INSPIRATION SOURCES
+
+## Design Excellence References
+- **Industry Leaders**: Vercel, Linear, Stripe, Notion, Figma, Framer
+- **Award Winners**: Awwwards, CSS Design Awards, Webby Awards
+- **Design Systems**: Apple Human Interface Guidelines, Google Material Design, Microsoft Fluent
+- **Modern Aesthetics**: Current design trends with timeless principles
+
+## Creative Approach Guidelines
+- **Context Matters**: Choose inspiration that fits your project's unique needs
+- **User-Centered**: Focus on designs that serve real user problems and goals
+- **Accessible Excellence**: Beautiful designs that work for everyone
+- **Performance First**: Stunning visuals that load fast and perform smoothly
+- **Brand Authenticity**: Designs that feel genuine and true to your purpose
+
+# 📋 DEVELOPMENT CONTEXT
+
+**User Intent**: ${userIntent ? `${userIntent.intent} (${userIntent.complexity}, ${Math.round(userIntent.confidence * 100)}% confidence)` : 'Analyzing...'}
+**Recommended Tools**: ${userIntent ? userIntent.required_tools.join(', ') : 'File operations'}
+**Action Plan**: ${userIntent ? userIntent.action_plan.join(' → ') : 'Read → Analyze → Implement'}
+
+**Project Context**: ${projectContext || 'Modern React + Vite application'}
+
+# 🏗️ COMPLEX REQUEST HANDLING
+
+## Ecommerce & Large Applications
+**NEVER GET STUCK IN ANALYSIS LOOPS!**
+- **Immediate Action**: For requests like "create ecommerce store", start building functional components immediately
+- **Minimum Viable Product**: Deliver working features (products page, cart, checkout) before perfection
+- **Progress Updates**: Use tool_results_summary to report actual functionality, not just file operations
+- **Strategic Planning**: Plan the full architecture but implement core features first
+- **Avoid Paralysis**: If stuck analyzing, default to standard ecommerce patterns
+
+### **Ecommerce Component Patterns (USE SHADCN/UI):**
+- **Product Cards**: Use \`Card\` component with \`CardContent\` and \`CardHeader\`
+- **Add to Cart**: Use \`Button\` component with shopping cart icon
+- **Product Forms**: Use \`Form\`, \`Input\`, \`Select\` components
+- **Shopping Cart**: Use \`Dialog\` for cart modal, \`Table\` for cart items
+- **Checkout Flow**: Use \`Form\` components with \`Input\` and \`Button\`
+- **Product Filters**: Use \`Select\` and \`Badge\` components
+
+## Implementation Strategy
+1. **Quick Assessment**: Check src/ structure and existing components
+2. **Core First**: Build essential functionality (products, cart, navigation)
+3. **Progressive Enhancement**: Add advanced features after basics work
+4. **User Feedback**: Show working app early, then refine based on results
+
+## Anti-Patterns to Avoid
+- ❌ Endless dependency analysis without implementation
+- ❌ Creating components that don't integrate
+- ❌ Getting stuck in file read/write loops
+- ❌ Reporting "progress" without functional features
+- ❌ Over-engineering before basic functionality works
+
+# 🎨 FINAL MANDATE
+
+Create applications that are:
+1. **MARVELOUS & WONDERFUL** - Websites that create genuine amazement and delight
+2. **WELL-ARRANGED & STRUCTURED** - Perfectly organized sections with intuitive flow
+3. **BEAUTIFULLY COLORED** - Carefully selected color schemes that enhance the experience
+4. **SUBTLY ANIMATED** - Meaningful motion that adds delight without distraction
+5. **CREATIVELY TWISTED** - Unique touches that make each site truly memorable
+
+## Critical Success Factors
+- **Creative Freedom**: Use your design expertise to create marvelous websites
+- **User-Centered Design**: Every design decision should serve the user's needs and experience
+- **Modern Aesthetics**: Stay current with design trends while maintaining timeless appeal
+- **Functional Beauty**: Beautiful design that enhances rather than hinders usability
+- **Responsive Excellence**: Perfect experience across all devices and screen sizes
+- **Performance Balance**: Stunning visuals that load fast and perform smoothly
+
+Remember: You're not just writing code, you're crafting digital experiences that users will remember and love. Every design choice should create wonder and delight while solving real problems.
+
+**Create marvelous websites that users can't stop talking about.**`;
 
     // Get the AI model based on the selected modelId
     const selectedAIModel = getAIModel(modelId)
@@ -3711,17 +3293,47 @@ Project context: ${projectContext || 'Vite + React + TypeScript project - Multi-
       // Use tools-enabled generation with multi-step support
       const abortController = new AbortController()
       
-      // Limit messages to first 10 when there are more than 10 messages
-      const messagesToSend = messages.length > 10 ? messages.slice(0, 10) : messages;
-      
-      // Filter and validate conversation memory messages
+      // Filter and validate conversation memory messages, ensuring proper typing
       const validMemoryMessages = conversationMemory ? 
-        conversationMemory.messages.filter(msg => msg.content && msg.content.trim().length > 0) : []
+        conversationMemory.messages
+          .filter(msg => msg.content && msg.content.trim().length > 0)
+          .map(msg => ({
+            role: msg.role as 'user' | 'assistant' | 'system',
+            content: msg.content
+          })) : []
+      
+      // Get the latest user message and merge with project context
+      const currentUserMessage = messages[messages.length - 1]
+      const mergedUserMessage = {
+        role: 'user' as const,
+        content: `${currentUserMessage?.content || ''}
+
+## Project Context
+
+${projectContext || 'No project context available'}
+
+---
+
+Please respond to the user's request above, taking into account the project context provided.`
+      }
+      
+      // Prepare messages: system + conversation history + merged user message with context
+      const finalMessages = [
+        { role: 'system' as const, content: systemMessage },
+        // Include conversation history (excluding the latest user message since we're merging it)
+        ...validMemoryMessages.slice(0, -1), // Remove last message if it exists to avoid duplication
+        // Add the merged user message with project context
+        mergedUserMessage
+      ]
       
       console.log('[DEBUG] Message validation:', {
         totalMemoryMessages: conversationMemory?.messages?.length || 0,
         validMemoryMessages: validMemoryMessages.length,
         invalidMessages: (conversationMemory?.messages?.length || 0) - validMemoryMessages.length,
+        currentUserMessageLength: currentUserMessage?.content?.length || 0,
+        projectContextLength: projectContext?.length || 0,
+        mergedMessageLength: mergedUserMessage.content.length,
+        finalMessagesCount: finalMessages.length,
         sampleValidMessage: validMemoryMessages[0] ? {
           role: validMemoryMessages[0].role,
           contentLength: validMemoryMessages[0].content?.length || 0,
@@ -3740,11 +3352,7 @@ Project context: ${projectContext || 'Vite + React + TypeScript project - Multi-
 
       const result = await generateText({
         model: model,
-        messages: [
-          { role: 'system', content: systemMessage },
-          // Use filtered valid messages to prevent AI model errors
-          ...validMemoryMessages
-        ],
+        messages: finalMessages,
         temperature: 0.1, // Increased creativity while maintaining tool usage
         stopWhen: stepCountIs(shouldUseAutonomousPlanning ? 12 : 8), // Reduced steps to prevent context explosion and timeouts
         abortSignal: abortController.signal,
@@ -3764,7 +3372,7 @@ Project context: ${projectContext || 'Vite + React + TypeScript project - Multi-
         },
         // FORCE TOOL USAGE: The AI MUST use these tools when users mention files
         // Only include web tools if explicitly needed based on intent detection
-        tools: createFileOperationTools(projectId, aiMode, conversationMemory ? conversationMemory.messages : [], user.id, userIntent)
+        tools: createFileOperationTools(projectId, aiMode, conversationMemory ? conversationMemory.messages : [], user.id, userIntent, userMessage)
       })
 
       // Log the complete result structure for debugging
@@ -3951,9 +3559,6 @@ Project context: ${projectContext || 'Vite + React + TypeScript project - Multi-
       // Prepare tool calls for storage if any
       let processedToolCalls = undefined
 
-      // Update credit tracking variables
-      toolCallsCount = allToolResults.length
-      hasToolCalls = allToolResults.length > 0
 
       if (allToolResults.length > 0) {
         processedToolCalls = allToolResults.map(toolResult => {
@@ -4115,82 +3720,32 @@ Project context: ${projectContext || 'Vite + React + TypeScript project - Multi-
       }
       
       // CRITICAL: Prevent empty assistant messages from being sent
-      // If the AI only used tools without generating text, use Mistral Pixtral to generate a meaningful summary
+      // If the AI only used tools without generating text, generate a simple summary
       if (!actualAIMessage.trim() && processedToolCalls && processedToolCalls.length > 0) {
         try {
-          console.log('[DEBUG] Generating AI-powered tool summary using Mistral Pixtral...')
+          console.log('[DEBUG] Generating simple tool summary...')
           
-          const mistralPixtralModel = getMistralPixtralModel()
-          const toolSummaryPrompt = `You are an AI assistant that creates beautifully formatted, professional summaries of development tool actions.
-
-Based on the user's request, generate a simple, clean summary:
-
-User's original request: "${userMessage}"
-
-Create a beautifully formatted summary using Markdown with the following structure:
-
-1. **Main Heading**: Use ## for a descriptive title about what was accomplished
-2. **Summary Paragraph**: Write a concise overview (2-3 sentences) using personal pronouns like "I" to make it conversational
-3. **Key Highlights**: Use bullet points for important results and outcomes
-
-Formatting Requirements:
-- Use ## for main headings
-- Use **bold** for emphasis on key terms
-- Use *italic* for subtle emphasis
-- Use personal pronouns like "I", "I've", "I have" to make the summary more conversational and personal
-- Avoid using tables - keep summaries clean and simple
-- Use bullet points (• or -) for lists
-- Use emojis for visual appeal and status indication
-- Keep text size small and readable (similar to user messages)
-- Use consistent spacing and alignment
-- Make it visually appealing and professional
-
-Emoji Guide:
-- ✅ Success/Completed
-- 📁 Files/Folders
-- 📖 Reading/Content
-- ✏️ Writing/Editing
-- 🗑️ Deletion
-- 🔍 Search/Investigation
-- 🧠 Memory/Context
-- 📊 Analysis/Patterns
-- 🔧 Tools/Operations
-- ⚡ Fast/Quick
-- 🎯 Target/Goal
-
-Example structure:
-## Task Completed
-
-I have successfully completed your request.
-
-Make it look professional, organized, and easy to read using clean markdown formatting.`
-
-          const summaryResult = await generateText({
-            model: mistralPixtralModel,
-            messages: [
-              { role: 'system', content: 'You are a helpful AI assistant that summarizes development tool actions in natural language.' },
-              { role: 'user', content: toolSummaryPrompt }
-            ],
-            temperature: 0.7
-          })
-
-          if (summaryResult.text && summaryResult.text.trim()) {
-            actualAIMessage = summaryResult.text.trim()
-            console.log('[DEBUG] AI-generated tool summary:', actualAIMessage.substring(0, 100) + '...')
-          } else {
-            // Fallback to basic summary if AI generation fails
-            actualAIMessage = `## Task Completed
-
-I have successfully completed your request.`
-            console.log('[DEBUG] Fallback tool summary generated:', actualAIMessage.substring(0, 100) + '...')
+          // Generate a simple summary based on tool calls
+          const toolNames = processedToolCalls.map(tc => tc.name).filter(Boolean)
+          const uniqueTools = [...new Set(toolNames)]
+          
+          let summary = `## Task Completed\n\n`
+          summary += `I have successfully completed your request using ${uniqueTools.length} tool${uniqueTools.length > 1 ? 's' : ''}.\n\n`
+          
+          if (uniqueTools.length > 0) {
+            summary += `**Tools used:**\n`
+            uniqueTools.forEach(tool => {
+              summary += `- ${tool}\n`
+            })
           }
-        } catch (summaryError) {
-          console.error('[ERROR] Failed to generate AI tool summary:', summaryError)
           
-          // Fallback to basic summary if AI generation fails
-          actualAIMessage = `## Task Completed
-
-I have successfully completed your request.`
+          actualAIMessage = summary
+          console.log('[DEBUG] Simple tool summary generated:', actualAIMessage.substring(0, 100) + '...')
+        } catch (summaryError) {
+          console.error('[ERROR] Failed to generate simple tool summary:', summaryError)
+          
+          // Fallback to basic summary if generation fails
+          actualAIMessage = `## Task Completed\n\nI have successfully completed your request.`
           console.log('[DEBUG] Error fallback tool summary generated:', actualAIMessage.substring(0, 100) + '...')
         }
       }
@@ -4250,36 +3805,10 @@ I have successfully completed your request.`
         headers: { 'Content-Type': 'application/json' },
       })
 
-      // CREDIT DEDUCTION: Deduct credits after successful AI response
-      try {
-        console.log(`[CREDITS] Deducting ${requiredCredits} credits from user ${user.id}`)
-        const deductionResult = await deductCredits(
-          user.id,
-          requiredCredits,
-          'chat_message',
-          {
-            messageLength: lastMessage?.content?.length || 0,
-            modelId: modelId || 'default',
-            projectId: projectId,
-            hasToolCalls: hasToolCalls,
-            toolCallsCount: toolCallsCount
-          }
-        )
-
-        if (deductionResult.success) {
-          console.log(`[CREDITS] Successfully deducted credits. New balance: ${deductionResult.newBalance}`)
-        } else {
-          console.error(`[CREDITS] Failed to deduct credits: ${deductionResult.error}`)
-          // Note: We don't fail the request here as the AI response was successful
-          // But we should log this for monitoring
-        }
-      } catch (creditError) {
-        console.error(`[CREDITS] Error deducting credits:`, creditError)
-        // Don't fail the request, but log the error
-      }
+      // }
 
       // Save both user message and AI response to database in background (now handled client-side)
-      const latestUserMessage = messages[messages.length - 1]
+      const userMessageForSaving = messages[messages.length - 1]
 
       return response
       
@@ -4310,3 +3839,4 @@ I have successfully completed your request.`
     return new Response('Internal Server Error', { status: 500 })
   }
 }
+

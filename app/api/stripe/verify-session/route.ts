@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { stripe, PLAN_LIMITS } from "@/lib/stripe"
+import { stripe } from "@/lib/stripe"
 
 // Helper function to get Stripe instance safely
 function getStripe() {
@@ -69,17 +69,13 @@ export async function POST(request: NextRequest) {
     const priceId = lineItems.data[0]?.price?.id
 
     let planType = 'free'
-    let credits = PLAN_LIMITS.FREE.credits
 
     if (priceId?.includes('pro')) {
       planType = 'pro'
-      credits = PLAN_LIMITS.PRO.credits
     } else if (priceId?.includes('teams')) {
       planType = 'teams'
-      credits = PLAN_LIMITS.TEAMS.credits
     } else if (priceId?.includes('enterprise')) {
       planType = 'enterprise'
-      credits = PLAN_LIMITS.ENTERPRISE.credits
     }
 
     // Update subscription status
@@ -90,7 +86,8 @@ export async function POST(request: NextRequest) {
         stripe_subscription_id: session.subscription as string,
         subscription_status: 'active',
         subscription_plan: planType,
-        credits_remaining: credits,
+        deployments_this_month: 0,
+        github_pushes_this_month: 0,
         last_payment_date: new Date().toISOString(),
       })
       .eq('user_id', user.id)
@@ -103,7 +100,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       plan: planType,
-      credits: credits,
     })
   } catch (error) {
     console.error('Error verifying session:', error)

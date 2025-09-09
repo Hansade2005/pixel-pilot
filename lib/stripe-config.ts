@@ -1,14 +1,25 @@
 // Stripe Product and Pricing Configuration
 // This file defines all our products, prices, and features
 
+import { chatModels } from '@/lib/ai-models'
+
+// Get all available model IDs for premium plans
+const ALL_MODEL_IDS = chatModels.map(model => model.id)
+
 export interface ProductConfig {
   id: string
   name: string
   description: string
   features: string[]
   limits: {
-    credits: number
-    appDeploys: number
+    deploymentPlatforms: string[]
+    deploymentsPerMonth: number
+    githubPushesPerMonth?: number
+    canUseVercel: boolean
+    canUseNetlify: boolean
+    canUseGitHub: boolean
+    unlimitedPrompts: boolean
+    allowedModels: string[]
     storage?: string
     users?: number
   }
@@ -31,16 +42,21 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
     name: 'Free',
     description: 'Get started with AI-powered development',
     features: [
-      '25 prompt credits/month',
-      'Auto model - perfect for quick prototyping',
-      'Project creation and basic editing',
-      '2 week Pro trial',
-      'Community support',
-      'Basic deployment (1 project/month)'
+      'GitHub repository creation (2 pushes/month)',
+      'Deploy to Netlify only',
+      'Limited to 5 deployments per month',
+      'Basic project templates',
+      'Community support'
     ],
     limits: {
-      credits: 25,
-      appDeploys: 1
+      deploymentPlatforms: ['netlify'],
+      deploymentsPerMonth: 5,
+      githubPushesPerMonth: 2,
+      canUseVercel: false,
+      canUseNetlify: true,
+      canUseGitHub: true,
+      unlimitedPrompts: false,
+      allowedModels: ['auto']
     },
     prices: {
       monthly: {
@@ -57,70 +73,39 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
   pro: {
     id: 'pro',
     name: 'Pro',
-    description: 'Perfect for individual developers and small teams',
+    description: 'Professional AI development for serious developers',
     features: [
       'Everything in Free, plus:',
-      '500 prompt credits/month',
-      'All premium models (OpenAI, Claude, Gemini, xAI)',
-      'SWE-1 model - specialized coding AI (0 credits)',
+      'Unlimited prompts and messages',
+      'Deploy to Vercel and Netlify',
+      '10 deployments per month (combined)',
+      'All premium AI models (GPT-4, Claude, Gemini)',
       'Advanced project management',
-      'Add-on credits at $10/250 credits',
-      'Optional zero data retention',
-      'Unlimited Fast Tab & Command',
-      'Real-time previews',
-      '1 App Deploy / day',
+      'Real-time previews & debugging',
       'Priority support',
-      'Custom project templates'
+      'Custom project templates',
+      'Unlimited GitHub pushes',
+      'Full-stack application generation',
+      'Production-ready deployments'
     ],
     limits: {
-      credits: 500,
-      appDeploys: 1,
-      storage: '10GB'
+      deploymentPlatforms: ['vercel', 'netlify'],
+      deploymentsPerMonth: 10,
+      canUseVercel: true,
+      canUseNetlify: true,
+      canUseGitHub: true,
+      unlimitedPrompts: true,
+      allowedModels: ALL_MODEL_IDS,
+      storage: 'Unlimited'
     },
     prices: {
       monthly: {
-        amount: 15,
+        amount: 29,
         stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_MONTHLY || 'price_pro_monthly_id'
       },
       yearly: {
-        amount: 180,
+        amount: 279,
         stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO_YEARLY || 'price_pro_yearly_id',
-        savings: '20%'
-      }
-    }
-  },
-  teams: {
-    id: 'teams',
-    name: 'Teams',
-    description: 'Advanced collaboration tools for growing teams',
-    features: [
-      'Everything in Pro, plus:',
-      '500 prompt credits/user/month',
-      'Team project collaboration',
-      'Shared project workspaces',
-      'Add-on credits at $40/1000 credits',
-      'Centralized billing & admin dashboard',
-      'Advanced analytics & reporting',
-      'Automated zero data retention',
-      'SSO available for +$10/user/month',
-      '5 App Deploys / day',
-      'Role-based project permissions',
-      'Team code reviews & feedback'
-    ],
-    limits: {
-      credits: 500,
-      appDeploys: 5,
-      storage: '100GB',
-      users: 50
-    },
-    prices: {
-      monthly: {
-        amount: 30,
-        stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_TEAMS_MONTHLY || 'price_teams_monthly_id'
-      },
-      yearly: {
-        amount: 360,
-        stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_TEAMS_YEARLY || 'price_teams_yearly_id',
         savings: '20%'
       }
     }
@@ -128,38 +113,35 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
   enterprise: {
     id: 'enterprise',
     name: 'Enterprise',
-    description: 'Complete solution for large organizations',
+    description: 'Coming soon - Advanced enterprise features',
     features: [
-      'Everything in Teams, plus:',
-      '1,000 prompt credits/user/month',
-      'Enterprise project portfolio management',
-      'Multi-organization support',
-      'Add-on credits at $40/1000 credits',
-      'Full RBAC & advanced permissions',
-      'SSO + enterprise access control',
-      'Volume discounts (>200 seats)',
-      'Dedicated account management',
-      'Hybrid & on-premise deployment',
-      'Custom integrations & APIs',
-      'Advanced security & compliance',
-      '24/7 premium support',
-      'Custom project workflows'
+      'Everything in Pro, plus:',
+      'Team collaboration tools',
+      'Advanced analytics',
+      'Dedicated support',
+      'Custom integrations',
+      'Enterprise security features'
     ],
     limits: {
-      credits: 1000,
-      appDeploys: 50,
+      deploymentPlatforms: ['vercel', 'netlify'],
+      deploymentsPerMonth: 50,
+      canUseVercel: true,
+      canUseNetlify: true,
+      canUseGitHub: true,
+      unlimitedPrompts: true,
+      allowedModels: ALL_MODEL_IDS,
       storage: 'Unlimited',
-      users: 1000
+      users: 100
     },
     prices: {
       monthly: {
-        amount: 60,
+        amount: 0, // Coming soon
         stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE_MONTHLY || 'price_enterprise_monthly_id'
       },
       yearly: {
-        amount: 720,
+        amount: 0, // Coming soon
         stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE_YEARLY || 'price_enterprise_yearly_id',
-        savings: '20%'
+        savings: '0%'
       }
     }
   }
@@ -195,7 +177,21 @@ export function getSavings(planId: string, isAnnual: boolean): string | null {
 
 export function getLimits(planId: string) {
   const config = getProductConfig(planId)
-  return config?.limits || { credits: 25, appDeploys: 1 }
+  return config?.limits || {
+    deploymentPlatforms: ['netlify'],
+    deploymentsPerMonth: 5,
+    githubPushesPerMonth: 2,
+    canUseVercel: false,
+    canUseNetlify: true,
+    canUseGitHub: true,
+    unlimitedPrompts: false,
+    allowedModels: ['auto']
+  }
+}
+
+export function canUseModel(planId: string, modelId: string): boolean {
+  const limits = getLimits(planId)
+  return limits.allowedModels.includes(modelId)
 }
 
 // Stripe Product IDs (to be created in Stripe dashboard)

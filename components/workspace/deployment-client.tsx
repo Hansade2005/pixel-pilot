@@ -133,6 +133,48 @@ import { useToast } from "@/hooks/use-toast"
 import { storageManager, type Workspace as Project, type Deployment, type EnvironmentVariable } from "@/lib/storage-manager"
 import { createClient } from "@/lib/supabase/client"
 import { getDeploymentTokens } from "@/lib/cloud-sync"
+// Plan limit checking functions
+async function checkPlanLimits(userId: string, operation: string, platform: string) {
+  try {
+    const response = await fetch('/api/limits/check', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ operation, platform })
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      return data
+    } else {
+      console.error('Failed to check plan limits:', response.statusText)
+      return { canPerform: false, reason: 'Unable to verify plan limits' }
+    }
+  } catch (error) {
+    console.error('Error checking plan limits:', error)
+    return { canPerform: false, reason: 'Unable to verify plan limits' }
+  }
+}
+
+async function recordUsage(userId: string, operation: string, platform: string) {
+  try {
+    const response = await fetch('/api/limits/record', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ operation, platform })
+    })
+
+    if (!response.ok) {
+      console.error('Failed to record usage:', response.statusText)
+    }
+  } catch (error) {
+    console.error('Error recording usage:', error)
+  }
+}
+
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { DeploymentSetupAccordion } from "@/components/workspace/deployment-setup-accordion"
@@ -836,6 +878,12 @@ export default function DeploymentClient() {
         return
       }
 
+      // Check plan limits for GitHub deployment (repository creation)
+      const planCheck = await checkPlanLimits('', 'deploy', 'github')
+      if (!planCheck.canPerform) {
+        throw new Error(planCheck.reason || 'Deployment not allowed with your current plan.')
+      }
+
       // Deploy code to the repository
       const deployResponse = await fetch('/api/github/deploy', {
         method: 'POST',
@@ -873,6 +921,9 @@ export default function DeploymentClient() {
         environment: 'production',
         provider: 'github'
       })
+
+      // Record usage for deployment tracking
+      await recordUsage('', 'deploy', 'github')
 
       // Reload deployed repos to update dropdowns
       await loadDeployedRepos()
@@ -1530,6 +1581,12 @@ export default function DeploymentClient() {
                         throw new Error('Vercel token not configured. Please set up your Vercel token in Account Settings.')
                       }
 
+                      // Check plan limits for Vercel deployment
+                      const planCheck = await checkPlanLimits('', 'deploy', 'vercel')
+                      if (!planCheck.canPerform) {
+                        throw new Error(planCheck.reason || 'Deployment not allowed with your current plan.')
+                      }
+
                       setDeploymentState(prev => ({ ...prev, isDeploying: true, currentStep: 'deploying' }))
 
                       try {
@@ -1575,6 +1632,9 @@ export default function DeploymentClient() {
                           environment: 'production',
                           provider: 'vercel'
                         })
+
+                        // Record usage for deployment tracking
+                        await recordUsage('', 'deploy', 'vercel')
 
                         // Reload deployed repos to update dropdowns
                         await loadDeployedRepos()
@@ -1853,6 +1913,12 @@ export default function DeploymentClient() {
                         throw new Error('Netlify token not configured. Please set up your Netlify token in Account Settings.')
                       }
 
+                      // Check plan limits for Netlify deployment
+                      const planCheck = await checkPlanLimits('', 'deploy', 'netlify')
+                      if (!planCheck.canPerform) {
+                        throw new Error(planCheck.reason || 'Deployment not allowed with your current plan.')
+                      }
+
                       setDeploymentState(prev => ({ ...prev, isDeploying: true, currentStep: 'deploying' }))
 
                       try {
@@ -1899,6 +1965,9 @@ export default function DeploymentClient() {
                           environment: 'production',
                           provider: 'netlify'
                         })
+
+                        // Record usage for deployment tracking
+                        await recordUsage('', 'deploy', 'netlify')
 
                         // Reload deployed repos to update dropdowns
                         await loadDeployedRepos()

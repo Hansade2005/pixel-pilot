@@ -26,9 +26,9 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
-import { useCredits } from "@/hooks/use-credits"
+import { useSubscription } from "@/hooks/use-subscription"
 import { checkAdminAccess } from "@/lib/admin-utils"
-import { Shield } from "lucide-react"
+import { Shield, Crown } from "lucide-react"
 
 export function Navigation() {
   const [user, setUser] = useState<any>(null)
@@ -38,8 +38,8 @@ export function Navigation() {
   const [isMobileProfileOpen, setIsMobileProfileOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
 
-  // Credit status hook
-  const { creditStatus, loading: creditsLoading, isLowOnCredits, isOutOfCredits } = useCredits(user?.id)
+  // Subscription status hook
+  const { subscription, loading: subscriptionLoading } = useSubscription()
 
   useEffect(() => {
     checkUser()
@@ -127,32 +127,19 @@ export function Navigation() {
             {/* Icons - Only show when logged in */}
             {!isLoading && user && (
               <>
-                {/* Credit Status */}
-                {!creditsLoading && creditStatus && (
+                {/* Subscription Status */}
+                {!subscriptionLoading && subscription && (
                   <div className="flex items-center space-x-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
-                    <Zap className="w-4 h-4 text-green-400" />
+                    <Crown className="w-4 h-4 text-purple-400" />
                     <span className="text-sm font-medium text-white">
-                      {creditStatus.plan === 'admin' ? 'Unlimited' :
-                       creditStatus.plan === 'free_mode' ? 'Unlimited' :
-                       creditStatus.remaining}
+                      {subscription.plan === 'pro' ? 'Pro' :
+                       subscription.plan === 'enterprise' ? 'Enterprise' :
+                       'Free'}
                     </span>
-                    {creditStatus.plan === 'admin' ? (
-                      <span className="text-xs text-green-400 font-medium">
-                        Admin
+                    {subscription.plan === 'free' && (subscription.githubPushesThisMonth || 0) >= 2 && (
+                      <span className="text-xs text-orange-400 font-medium">
+                        Limit
                       </span>
-                    ) : (
-                      <>
-                        {isLowOnCredits && (
-                          <span className="text-xs text-yellow-400 font-medium">
-                            Low
-                          </span>
-                        )}
-                        {isOutOfCredits && (
-                          <span className="text-xs text-red-400 font-medium">
-                            Empty
-                          </span>
-                        )}
-                      </>
                     )}
                   </div>
                 )}
@@ -315,43 +302,30 @@ export function Navigation() {
 
               {/* Mobile Auth Section */}
               <div className="border-t border-gray-700 pt-4 mt-4">
-                {/* Mobile Credit Status */}
-                {!isLoading && user && !creditsLoading && creditStatus && (
+                {/* Mobile Subscription Status */}
+                {!isLoading && user && !subscriptionLoading && subscription && (
                   <div className="mb-4 p-3 bg-gray-800/50 rounded-lg border border-gray-700/50">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        <Zap className="w-4 h-4 text-green-400" />
+                        <Crown className="w-4 h-4 text-purple-400" />
                         <span className="text-sm font-medium text-white">
-                          {creditStatus.plan === 'admin' ? 'Unlimited Credits (Admin)' :
-                           creditStatus.plan === 'free_mode' ? 'Unlimited Credits (Free Mode)' :
-                           `${creditStatus.remaining} Credits`}
+                          {subscription.plan === 'pro' ? 'Pro Plan' :
+                           subscription.plan === 'enterprise' ? 'Enterprise Plan' :
+                           'Free Plan'}
                         </span>
                       </div>
-                      {creditStatus.plan === 'admin' ? (
-                        <span className="text-xs text-green-400 bg-green-400/10 px-2 py-1 rounded">
-                          Admin
+                      {subscription.plan === 'free' && (subscription.githubPushesThisMonth || 0) >= 2 && (
+                        <span className="text-xs text-orange-400 bg-orange-400/10 px-2 py-1 rounded">
+                          Limit Reached
                         </span>
-                      ) : (
-                        <>
-                          {isLowOnCredits && (
-                            <span className="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded">
-                              Low
-                            </span>
-                          )}
-                          {isOutOfCredits && (
-                            <span className="text-xs text-red-400 bg-red-400/10 px-2 py-1 rounded">
-                              Empty
-                            </span>
-                          )}
-                        </>
                       )}
                     </div>
                     <div className="mt-2 text-xs text-gray-400">
-                      {creditStatus.plan === 'admin'
-                        ? 'Unlimited usage • Admin plan'
-                        : creditStatus.plan === 'free_mode'
-                        ? 'Unlimited usage • Free Mode'
-                        : `${creditStatus.used} used this month • ${creditStatus.plan} plan`
+                      {subscription.plan === 'pro'
+                        ? `${subscription.deploymentsThisMonth || 0}/10 deployments • Pro plan`
+                        : subscription.plan === 'enterprise'
+                        ? 'Unlimited usage • Enterprise plan'
+                        : `${subscription.deploymentsThisMonth || 0}/5 deployments • ${subscription.githubPushesThisMonth || 0}/2 GitHub pushes • Free plan`
                       }
                     </div>
                   </div>

@@ -214,7 +214,7 @@ export default function AdminAnalyticsPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckCircle className="h-4 w-4 text-green-500" />
-                  <span className="text-sm">Credit usage tracking</span>
+                  <span className="text-sm">Usage tracking (deployments & GitHub)</span>
                 </div>
               </div>
             </CardContent>
