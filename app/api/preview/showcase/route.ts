@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { TemplateManager } from '@/lib/template-manager'
+import { baseTemplateFiles } from '@/lib/templates/base-template'
 import {
   createEnhancedSandbox,
   reconnectToSandbox,
@@ -121,15 +122,44 @@ async function handleStreamingShowcasePreview(req: Request) {
           })
           send({ type: "log", message: "Sandbox created" })
 
-          // 🔹 Write template files
-          send({ type: "log", message: "Writing template files..." })
-          const sandboxFiles: SandboxFile[] = template.files.map((f: { path: string; content: string }) => ({
-            path: `/project/${f.path}`,
-            content: f.content || "",
-          }))
+          // 🔹 Write base template files first (index.html, main.tsx, vite.config.ts, etc.)
+          send({ type: "log", message: "Writing base template files..." })
+          let sandboxFiles: SandboxFile[] = []
+
+          // Add base template files
+          for (const file of baseTemplateFiles) {
+            // If this is package.json and template has additional packages, merge them
+            if (file.name === 'package.json' && template.additionalPackages) {
+              const basePackageJson = JSON.parse(file.content)
+              const enhancedPackageJson = {
+                ...basePackageJson,
+                dependencies: {
+                  ...basePackageJson.dependencies,
+                  ...template.additionalPackages
+                }
+              }
+              sandboxFiles.push({
+                path: `/project/${file.path}`,
+                content: JSON.stringify(enhancedPackageJson, null, 2)
+              })
+            } else {
+              sandboxFiles.push({
+                path: `/project/${file.path}`,
+                content: file.content || ""
+              })
+            }
+          }
+
+          // Add template-specific files (these will override base files if they have the same path)
+          for (const file of template.files) {
+            sandboxFiles.push({
+              path: `/project/${file.path}`,
+              content: file.content || ""
+            })
+          }
 
           await sandbox.writeFiles(sandboxFiles)
-          send({ type: "log", message: "Template files written" })
+          send({ type: "log", message: `${sandboxFiles.length} files written (base + template)` })
 
           // 🔹 Install dependencies
           send({ type: "log", message: "Installing dependencies..." })
@@ -268,48 +298,42 @@ async function handleRegularShowcasePreview(req: Request) {
       })
 
       try {
-        // Prepare template files for batch operation
-        const sandboxFiles: SandboxFile[] = template.files.map((file: { path: string; content: string }) => ({
-          path: `/project/${file.path}`,
-          content: file.content || ''
-        }))
+        // Prepare base template files and template-specific files for batch operation
+        let sandboxFiles: SandboxFile[] = []
 
-        // Create package.json if it doesn't exist
-        const hasPackageJson = template.files.some((f: { path: string; content: string }) => f.path === 'package.json')
-        if (!hasPackageJson) {
-          const packageJson = {
-            name: 'showcase-preview-app',
-            version: '0.1.0',
-            private: true,
-            packageManager: 'pnpm@8.15.0',
-            scripts: {
-              dev: 'vite',
-              build: 'tsc && vite build',
-              preview: 'vite preview',
-              lint: 'eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0'
-            },
-            dependencies: {
-              'react': '^18.2.0',
-              'react-dom': '^18.2.0'
-            },
-            devDependencies: {
-              '@types/react': '^18.2.43',
-              '@types/react-dom': '^18.2.17',
-              '@typescript-eslint/eslint-plugin': '^6.14.0',
-              '@typescript-eslint/parser': '^6.14.0',
-              '@vitejs/plugin-react': '^4.2.1',
-              'eslint': '^8.55.0',
-              'eslint-plugin-react-hooks': '^4.6.0',
-              'eslint-plugin-react-refresh': '^0.4.5',
-              'typescript': '^5.2.2',
-              'vite': '^5.0.8'
+        // Add base template files
+        for (const file of baseTemplateFiles) {
+          // If this is package.json and template has additional packages, merge them
+          if (file.name === 'package.json' && template.additionalPackages) {
+            const basePackageJson = JSON.parse(file.content)
+            const enhancedPackageJson = {
+              ...basePackageJson,
+              dependencies: {
+                ...basePackageJson.dependencies,
+                ...template.additionalPackages
+              }
             }
+            sandboxFiles.push({
+              path: `/project/${file.path}`,
+              content: JSON.stringify(enhancedPackageJson, null, 2)
+            })
+          } else {
+            sandboxFiles.push({
+              path: `/project/${file.path}`,
+              content: file.content || ""
+            })
           }
+        }
+
+        // Add template-specific files (these will override base files if they have the same path)
+        for (const file of template.files) {
           sandboxFiles.push({
-            path: '/project/package.json',
-            content: JSON.stringify(packageJson, null, 2)
+            path: `/project/${file.path}`,
+            content: file.content || ""
           })
         }
+
+        // Base template already includes package.json, so no need for fallback
 
         // Add .npmrc for pnpm optimization
         const hasNpmrc = template.files.some((f: { path: string; content: string }) => f.path === '.npmrc')
