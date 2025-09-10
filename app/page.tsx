@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { 
-  ArrowUp, 
   Plus, 
   Image as ImageIcon, 
   Gift, 
@@ -21,15 +20,64 @@ import { AuthModal } from "@/components/auth-modal"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { createClient } from "@/lib/supabase/client"
+import { templateManager } from "@/lib/template-manager"
 
 export default function LandingPage() {
   const [user, setUser] = useState<any>(null)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [templates, setTemplates] = useState<any[]>([])
 
   useEffect(() => {
     checkUser()
+    loadTemplates()
   }, [])
+
+  const loadTemplates = () => {
+    const templateData = templateManager.getAllTemplates()
+    setTemplates(templateData)
+  }
+
+  const handleTemplateSelect = async (templateId: string) => {
+    if (!user) {
+      setShowAuthModal(true)
+      return
+    }
+
+    try {
+      // Import the required services
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+
+      const template = templateManager.getTemplateById(templateId)
+      if (!template) {
+        throw new Error('Template not found')
+      }
+
+      // Create workspace with template name
+      const slug = template.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+      const workspace = await storageManager.createWorkspace({
+        name: template.title,
+        description: template.description,
+        userId: user.id,
+        isPublic: false,
+        isTemplate: true,
+        lastActivity: new Date().toISOString(),
+        deploymentStatus: 'not_deployed',
+        slug
+      })
+
+      // Apply template files
+      await templateManager.applyTemplate(templateId, workspace.id)
+
+      // Redirect to the workspace
+      window.location.href = `/workspace/${workspace.id}`
+
+    } catch (error) {
+      console.error('Error creating project from template:', error)
+      // You might want to show a toast notification here
+    }
+  }
 
   const checkUser = async () => {
     try {
@@ -158,66 +206,22 @@ export default function LandingPage() {
 
           {/* Community Projects Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              {
-                title: "Cryptocurrency Trading Dashboard",
-                category: "Website",
-                remixes: 17024,
-                image: "bg-gradient-to-br from-blue-500 to-purple-600",
-                description: "Advanced trading interface with real-time charts"
-              },
-              {
-                title: "CharacterForge Imagix",
-                category: "Consumer App",
-                remixes: 7421,
-                image: "bg-gradient-to-br from-yellow-400 to-orange-500",
-                description: "AI-powered character creation platform"
-              },
-              {
-                title: "Forklift Navigator",
-                category: "Prototype",
-                remixes: 3000,
-                image: "bg-gradient-to-br from-green-400 to-teal-500",
-                description: "Dashboard de Controle for logistics"
-              },
-              {
-                title: "Market Mosaic Online",
-                category: "Consumer App",
-                remixes: 7109,
-                image: "bg-gradient-to-br from-purple-500 to-pink-600",
-                description: "Complex dashboard with analytics"
-              },
-              {
-                title: "PSK Services",
-                category: "Website",
-                remixes: 4521,
-                image: "bg-gradient-to-br from-emerald-500 to-green-600",
-                description: "Elevate Your Event Experience"
-              },
-              {
-                title: "Pulse Robot Template",
-                category: "Website",
-                remixes: 3890,
-                image: "bg-gradient-to-br from-orange-400 to-red-500",
-                description: "Atlas: Where Code Meets Motion"
-              },
-              {
-                title: "Landing Simulator Sorcery",
-                category: "Website",
-                remixes: 6234,
-                image: "bg-gradient-to-br from-violet-500 to-purple-600",
-                description: "Create Games With Just a Prompt"
-              },
-              {
-                title: "Cortex Second Brain",
-                category: "Consumer App",
-                remixes: 8912,
-                image: "bg-gradient-to-br from-cyan-500 to-blue-600",
-                description: "Your Personal AI Engine"
-              }
-            ].map((project, index) => (
-              <Card key={index} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-all duration-300 hover:scale-105 group">
-                <div className={`h-48 ${project.image} rounded-t-lg relative overflow-hidden`}>
+            {templates.map((template, index) => (
+              <Card
+                key={index}
+                className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-all duration-300 hover:scale-105 group cursor-pointer"
+                onClick={() => handleTemplateSelect(template.id)}
+              >
+                <div className="h-48 bg-gradient-to-br from-blue-500 to-purple-600 rounded-t-lg relative overflow-hidden">
+                  <img
+                    src={template.thumbnailUrl}
+                    alt={template.title}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // Fallback to gradient if image fails to load
+                      e.currentTarget.style.display = 'none'
+                    }}
+                  />
                   {/* Project Preview Overlay */}
                   <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
                     <Button size="sm" variant="secondary" className="bg-white/20 text-white hover:bg-white/30">
@@ -229,7 +233,7 @@ export default function LandingPage() {
                   {/* Category Badge */}
                   <div className="absolute top-3 left-3">
                     <Badge variant="secondary" className="bg-gray-800/80 text-white border-gray-600">
-                      {project.category}
+                      {template.category}
                     </Badge>
                   </div>
                   
@@ -237,33 +241,36 @@ export default function LandingPage() {
                   <div className="absolute bottom-3 right-3">
                     <div className="bg-black/50 backdrop-blur-sm rounded-full px-3 py-1">
                       <span className="text-white text-sm font-medium">
-                        {project.remixes.toLocaleString()} Remixes
+                        {template.remixes.toLocaleString()} Remixes
                       </span>
                     </div>
                   </div>
                 </div>
                 
                 <CardContent className="p-4">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <img
+                      src={template.authorAvatar}
+                      alt={template.author}
+                      className="w-6 h-6 rounded-full"
+                      onError={(e) => {
+                        // Fallback to placeholder if avatar fails to load
+                        e.currentTarget.src = '/placeholder-user.jpg'
+                      }}
+                    />
+                    <span className="text-gray-400 text-sm">{template.author}</span>
+                  </div>
                   <h3 className="text-white font-semibold text-lg mb-2 line-clamp-1">
-                    {project.title}
+                    {template.title}
                   </h3>
                   <p className="text-gray-300 text-sm line-clamp-2">
-                    {project.description}
+                    {template.description}
                   </p>
                 </CardContent>
               </Card>
             ))}
           </div>
 
-          {/* Show More Button */}
-          <div className="text-center mt-12">
-            <Link href="/community">
-              <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3">
-                Show More
-                <ArrowUp className="w-4 h-4 ml-2 rotate-45" />
-              </Button>
-            </Link>
-          </div>
         </div>
       </section>
 

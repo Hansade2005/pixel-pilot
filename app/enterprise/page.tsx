@@ -1,10 +1,12 @@
 "use client"
 
+import { useState } from "react"
 import { Logo } from "@/components/ui/logo"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Building2, Shield, Users, Zap, Globe, Lock, Headphones, Rocket,
   CheckCircle, Star, ArrowRight, Calendar, TrendingUp, Award,
@@ -15,6 +17,8 @@ import {
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import Link from "next/link"
+import { enterpriseService } from "@/lib/supabase/enterprise"
+import { toast } from "sonner"
 
 export default function EnterprisePage() {
   const enterpriseFeatures = [
@@ -140,6 +144,114 @@ export default function EnterprisePage() {
     }
   ]
 
+  // Modal states
+  const [showDemoModal, setShowDemoModal] = useState(false)
+  const [showContactModal, setShowContactModal] = useState(false)
+  const [showProposalModal, setShowProposalModal] = useState(false)
+
+  // Form states
+  const [demoForm, setDemoForm] = useState({
+    name: '',
+    email: '',
+    company: '',
+    role: '',
+    company_size: '',
+    message: ''
+  })
+
+  const [contactForm, setContactForm] = useState({
+    name: '',
+    email: '',
+    company: '',
+    phone: '',
+    message: ''
+  })
+
+  const [proposalForm, setProposalForm] = useState({
+    name: '',
+    email: '',
+    company: '',
+    company_size: '',
+    requirements: '',
+    timeline: ''
+  })
+
+  // Handler functions
+  const handleScheduleDemo = () => {
+    setShowDemoModal(true)
+  }
+
+  const handleContactSales = () => {
+    setShowContactModal(true)
+  }
+
+  const handleRequestProposal = () => {
+    setShowProposalModal(true)
+  }
+
+  const handleDemoSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const { data, error } = await enterpriseService.submitDemoRequest(demoForm)
+
+      if (error) {
+        console.error('Error submitting demo request:', error)
+        toast.error('Failed to submit demo request. Please try again.')
+        return
+      }
+
+      toast.success('Thank you! We will contact you within 24 hours to schedule your demo.')
+      setShowDemoModal(false)
+      setDemoForm({ name: '', email: '', company: '', role: '', company_size: '', message: '' })
+    } catch (error) {
+      console.error('Error submitting demo request:', error)
+      toast.error('Failed to submit demo request. Please try again.')
+    }
+  }
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const { data, error } = await enterpriseService.submitContactRequest(contactForm)
+
+      if (error) {
+        console.error('Error submitting contact request:', error)
+        toast.error('Failed to submit contact request. Please try again.')
+        return
+      }
+
+      toast.success('Thank you! Our sales team will contact you within 24 hours.')
+      setShowContactModal(false)
+      setContactForm({ name: '', email: '', company: '', phone: '', message: '' })
+    } catch (error) {
+      console.error('Error submitting contact request:', error)
+      toast.error('Failed to submit contact request. Please try again.')
+    }
+  }
+
+  const handleProposalSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const { data, error } = await enterpriseService.submitProposalRequest(proposalForm)
+
+      if (error) {
+        console.error('Error submitting proposal request:', error)
+        toast.error('Failed to submit proposal request. Please try again.')
+        return
+      }
+
+      toast.success('Thank you! We will send a customized proposal within 48 hours.')
+      setShowProposalModal(false)
+      setProposalForm({ name: '', email: '', company: '', company_size: '', requirements: '', timeline: '' })
+    } catch (error) {
+      console.error('Error submitting proposal request:', error)
+      toast.error('Failed to submit proposal request. Please try again.')
+    }
+  }
+
+  const companySizes = ['1-50', '51-200', '201-1000', '1000+']
+  const timelines = ['ASAP', '1-3 months', '3-6 months', '6+ months']
+
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Enhanced Gradient Background */}
@@ -194,11 +306,20 @@ export default function EnterprisePage() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 text-lg">
+              <Button
+                size="lg"
+                className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 text-lg"
+                onClick={handleScheduleDemo}
+              >
                 <Calendar className="w-5 h-5 mr-2" />
                 Schedule Enterprise Demo
               </Button>
-              <Button size="lg" variant="outline" className="border-gray-600 text-white hover:bg-gray-700 px-8 py-4 text-lg">
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-gray-600 text-white hover:bg-gray-700 px-8 py-4 text-lg"
+                onClick={handleContactSales}
+              >
                 <MessageSquare className="w-5 h-5 mr-2" />
                 Contact Sales Team
               </Button>
@@ -375,6 +496,7 @@ export default function EnterprisePage() {
                           : 'bg-gray-700 hover:bg-gray-600'
                       } text-white`}
                       size="lg"
+                      onClick={handleContactSales}
                     >
                       Contact Sales
                     </Button>
@@ -404,7 +526,7 @@ export default function EnterprisePage() {
                   <p className="text-gray-300 text-sm mb-4">
                     Book a personalized demonstration tailored to your enterprise needs.
                   </p>
-                  <Button className="w-full bg-blue-600 hover:bg-blue-700">
+                  <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={handleScheduleDemo}>
                     Book Demo
                   </Button>
                 </CardContent>
@@ -419,7 +541,7 @@ export default function EnterprisePage() {
                   <p className="text-gray-300 text-sm mb-4">
                     Speak with our enterprise sales team about custom pricing and solutions.
                   </p>
-                  <Button className="w-full bg-green-600 hover:bg-green-700">
+                  <Button className="w-full bg-green-600 hover:bg-green-700" onClick={handleContactSales}>
                     Contact Sales
                   </Button>
                 </CardContent>
@@ -434,7 +556,7 @@ export default function EnterprisePage() {
                   <p className="text-gray-300 text-sm mb-4">
                     Get a customized proposal with pricing, timeline, and implementation plan.
                   </p>
-                  <Button className="w-full bg-purple-600 hover:bg-purple-700">
+                  <Button className="w-full bg-purple-600 hover:bg-purple-700" onClick={handleRequestProposal}>
                     Get Proposal
                   </Button>
                 </CardContent>
@@ -462,6 +584,331 @@ export default function EnterprisePage() {
 
       {/* Footer */}
       <Footer />
+
+      {/* Demo Request Modal */}
+      {showDemoModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-white">Schedule Enterprise Demo</h3>
+                <button
+                  onClick={() => setShowDemoModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <form onSubmit={handleDemoSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Name *</label>
+                  <Input
+                    type="text"
+                    value={demoForm.name}
+                    onChange={(e) => setDemoForm({ ...demoForm, name: e.target.value })}
+                    required
+                    className="bg-gray-800 border-gray-600 text-white"
+                    placeholder="Your full name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Email *</label>
+                  <Input
+                    type="email"
+                    value={demoForm.email}
+                    onChange={(e) => setDemoForm({ ...demoForm, email: e.target.value })}
+                    required
+                    className="bg-gray-800 border-gray-600 text-white"
+                    placeholder="your.email@company.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Company *</label>
+                  <Input
+                    type="text"
+                    value={demoForm.company}
+                    onChange={(e) => setDemoForm({ ...demoForm, company: e.target.value })}
+                    required
+                    className="bg-gray-800 border-gray-600 text-white"
+                    placeholder="Your company name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Role *</label>
+                  <Input
+                    type="text"
+                    value={demoForm.role}
+                    onChange={(e) => setDemoForm({ ...demoForm, role: e.target.value })}
+                    required
+                    className="bg-gray-800 border-gray-600 text-white"
+                    placeholder="Your job title"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Company Size *</label>
+                  <select
+                    value={demoForm.company_size}
+                    onChange={(e) => setDemoForm({ ...demoForm, company_size: e.target.value })}
+                    required
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                  >
+                    <option value="">Select company size</option>
+                    {companySizes.map(size => (
+                      <option key={size} value={size}>{size} employees</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Message</label>
+                  <Textarea
+                    value={demoForm.message}
+                    onChange={(e) => setDemoForm({ ...demoForm, message: e.target.value })}
+                    className="bg-gray-800 border-gray-600 text-white"
+                    placeholder="Tell us about your specific needs and requirements..."
+                    rows={3}
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    type="button"
+                    onClick={() => setShowDemoModal(false)}
+                    variant="outline"
+                    className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-purple-600 hover:bg-purple-700"
+                  >
+                    Schedule Demo
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Contact Sales Modal */}
+      {showContactModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-white">Contact Sales Team</h3>
+                <button
+                  onClick={() => setShowContactModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <form onSubmit={handleContactSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Name *</label>
+                  <Input
+                    type="text"
+                    value={contactForm.name}
+                    onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+                    required
+                    className="bg-gray-800 border-gray-600 text-white"
+                    placeholder="Your full name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Email *</label>
+                  <Input
+                    type="email"
+                    value={contactForm.email}
+                    onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                    required
+                    className="bg-gray-800 border-gray-600 text-white"
+                    placeholder="your.email@company.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Company *</label>
+                  <Input
+                    type="text"
+                    value={contactForm.company}
+                    onChange={(e) => setContactForm({ ...contactForm, company: e.target.value })}
+                    required
+                    className="bg-gray-800 border-gray-600 text-white"
+                    placeholder="Your company name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Phone</label>
+                  <Input
+                    type="tel"
+                    value={contactForm.phone}
+                    onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                    className="bg-gray-800 border-gray-600 text-white"
+                    placeholder="+1 (555) 123-4567"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Message *</label>
+                  <Textarea
+                    value={contactForm.message}
+                    onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
+                    required
+                    className="bg-gray-800 border-gray-600 text-white"
+                    placeholder="Tell us about your requirements and how we can help..."
+                    rows={4}
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    type="button"
+                    onClick={() => setShowContactModal(false)}
+                    variant="outline"
+                    className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                  >
+                    Contact Sales
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Proposal Request Modal */}
+      {showProposalModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-white">Request Custom Proposal</h3>
+                <button
+                  onClick={() => setShowProposalModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <form onSubmit={handleProposalSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Name *</label>
+                  <Input
+                    type="text"
+                    value={proposalForm.name}
+                    onChange={(e) => setProposalForm({ ...proposalForm, name: e.target.value })}
+                    required
+                    className="bg-gray-800 border-gray-600 text-white"
+                    placeholder="Your full name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Email *</label>
+                  <Input
+                    type="email"
+                    value={proposalForm.email}
+                    onChange={(e) => setProposalForm({ ...proposalForm, email: e.target.value })}
+                    required
+                    className="bg-gray-800 border-gray-600 text-white"
+                    placeholder="your.email@company.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Company *</label>
+                  <Input
+                    type="text"
+                    value={proposalForm.company}
+                    onChange={(e) => setProposalForm({ ...proposalForm, company: e.target.value })}
+                    required
+                    className="bg-gray-800 border-gray-600 text-white"
+                    placeholder="Your company name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Company Size *</label>
+                  <select
+                    value={proposalForm.company_size}
+                    onChange={(e) => setProposalForm({ ...proposalForm, company_size: e.target.value })}
+                    required
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                  >
+                    <option value="">Select company size</option>
+                    {companySizes.map(size => (
+                      <option key={size} value={size}>{size} employees</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Requirements *</label>
+                  <Textarea
+                    value={proposalForm.requirements}
+                    onChange={(e) => setProposalForm({ ...proposalForm, requirements: e.target.value })}
+                    required
+                    className="bg-gray-800 border-gray-600 text-white"
+                    placeholder="Describe your specific requirements, use cases, and goals..."
+                    rows={4}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Timeline *</label>
+                  <select
+                    value={proposalForm.timeline}
+                    onChange={(e) => setProposalForm({ ...proposalForm, timeline: e.target.value })}
+                    required
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                  >
+                    <option value="">Select preferred timeline</option>
+                    {timelines.map(timeline => (
+                      <option key={timeline} value={timeline}>{timeline}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    type="button"
+                    onClick={() => setShowProposalModal(false)}
+                    variant="outline"
+                    className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-purple-600 hover:bg-purple-700"
+                  >
+                    Request Proposal
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

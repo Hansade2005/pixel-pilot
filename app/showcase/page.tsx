@@ -1,94 +1,158 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Logo } from "@/components/ui/logo"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Star, ExternalLink, Heart, MessageCircle, Eye, Code, Globe, Zap, Users, TrendingUp } from "lucide-react"
+import { Star, ExternalLink, Heart, MessageCircle, Eye, Code, Globe, Zap, Users, TrendingUp, GitFork, Loader2 } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
+import { AuthModal } from "@/components/auth-modal"
+import { TemplateManager } from "@/lib/template-manager"
+import { createClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
 
 export default function ShowcasePage() {
+  const [user, setUser] = useState<any>(null)
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [isForking, setIsForking] = useState<string | null>(null)
+
+  // Check user authentication
+  useEffect(() => {
+    const supabase = createClient()
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+    }
+    checkUser()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const handleForkProject = async (project: any) => {
+    if (!user) {
+      setShowAuthModal(true)
+      return
+    }
+
+    setIsForking(project.id)
+    try {
+      // Create new workspace
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+      const workspace = await storageManager.createWorkspace({
+        name: `${project.title} (Forked)`,
+        description: `Forked from ${project.title}`,
+        slug: `${project.title.toLowerCase().replace(/\s+/g, '-')}-forked`,
+        userId: user.id,
+        isPublic: false,
+        isTemplate: false,
+        lastActivity: new Date().toISOString(),
+        deploymentStatus: 'not_deployed'
+      })
+
+      // Apply template to workspace
+      await TemplateManager.applyTemplate(project.templateId, workspace.id)
+
+      toast.success(`Successfully forked ${project.title}!`)
+      // Navigate to the new workspace
+      window.location.href = `/?workspace=${workspace.id}`
+    } catch (error) {
+      console.error('Error forking project:', error)
+      toast.error('Failed to fork project. Please try again.')
+    } finally {
+      setIsForking(null)
+    }
+  }
+
   const featuredProjects = [
     {
+      id: "ecommerce-platform",
       title: "AI-Powered E-commerce Platform",
       description: "A complete e-commerce solution built in just 2 hours using Pixel Pilot's AI capabilities. Features include product management, shopping cart, and payment integration.",
       author: "Sarah Chen",
       avatar: "SC",
-      stars: 127,
-      views: 2400,
-      tech: ["React", "Next.js", "Stripe", "Tailwind"],
+      tech: ["React", "React Router", "Lucide Icons", "Tailwind"],
       image: "bg-gradient-to-br from-blue-500 to-purple-600",
-      featured: true
+      featured: true,
+      templateId: "ecommerce-platform" // Now using dedicated e-commerce template
     },
     {
+      id: "chat-application",
       title: "Real-time Chat Application",
       description: "Modern chat app with real-time messaging, user authentication, and file sharing. Built entirely with AI assistance in under an hour.",
       author: "Mike Johnson",
       avatar: "MJ",
-      stars: 89,
-      views: 1800,
-      tech: ["React", "Socket.io", "Node.js", "MongoDB"],
+      tech: ["React", "React Router", "Lucide Icons", "Tailwind"],
       image: "bg-gradient-to-br from-green-500 to-blue-600",
-      featured: true
+      featured: true,
+      templateId: "chat-application"
     },
     {
+      id: "project-dashboard",
       title: "Project Management Dashboard",
       description: "Comprehensive project management tool with task tracking, team collaboration, and progress analytics. Perfect for agile development teams.",
       author: "Alex Rodriguez",
       avatar: "AR",
-      stars: 156,
-      views: 3200,
       tech: ["Vue.js", "Firebase", "Chart.js", "Material-UI"],
       image: "bg-gradient-to-br from-purple-500 to-pink-600",
-      featured: true
+      featured: true,
+      templateId: "cortex-second-brain"
     }
   ]
 
   const recentProjects = [
     {
+      id: "weather-app",
       title: "Weather App with AI Predictions",
       author: "Emma Davis",
       avatar: "ED",
-      stars: 45,
-      views: 890,
       tech: ["React", "OpenWeather API", "AI"],
-      image: "bg-gradient-to-br from-cyan-500 to-blue-600"
+      image: "bg-gradient-to-br from-cyan-500 to-blue-600",
+      templateId: "characterforge-imagix"
     },
     {
+      id: "finance-tracker",
       title: "Personal Finance Tracker",
+      description: "Comprehensive personal finance management tool with budgeting, goals, and expense tracking.",
       author: "David Wilson",
       avatar: "DW",
-      stars: 78,
-      views: 1200,
-      tech: ["Next.js", "Prisma", "PostgreSQL"],
-      image: "bg-gradient-to-br from-emerald-500 to-teal-600"
+      tech: ["React", "React Router", "Lucide Icons", "Tailwind"],
+      image: "bg-gradient-to-br from-emerald-500 to-teal-600",
+      templateId: "finance-tracker"
     },
     {
+      id: "recipe-platform",
       title: "Recipe Sharing Platform",
+      description: "Social platform for sharing and discovering recipes with community features.",
       author: "Lisa Brown",
       avatar: "LB",
-      stars: 92,
-      views: 2100,
       tech: ["React", "Express", "MongoDB"],
-      image: "bg-gradient-to-br from-orange-500 to-red-600"
+      image: "bg-gradient-to-br from-orange-500 to-red-600",
+      templateId: "saas-template"
     },
     {
+      id: "fitness-app",
       title: "Fitness Tracking App",
+      description: "Comprehensive fitness tracking with workout plans and progress monitoring.",
       author: "Tom Anderson",
       avatar: "TA",
-      stars: 67,
-      views: 1500,
       tech: ["React Native", "Firebase", "AI"],
-      image: "bg-gradient-to-br from-pink-500 to-rose-600"
+      image: "bg-gradient-to-br from-pink-500 to-rose-600",
+      templateId: "saas-template"
     }
   ]
 
   const stats = [
-    { label: "Projects Shared", value: "2,500+", icon: Code },
-    { label: "Active Developers", value: "50K+", icon: Users },
-    { label: "Total Views", value: "1.2M+", icon: Eye },
-    { label: "Stars Given", value: "15K+", icon: Star }
+    { label: "Projects Shared", value: "Coming Soon", icon: Code },
+    { label: "Active Developers", value: "Launching", icon: Users },
+    { label: "Total Views", value: "Growing", icon: Eye },
+    { label: "Stars Given", value: "Exciting", icon: Star }
   ]
 
   return (
@@ -179,16 +243,7 @@ export default function ShowcasePage() {
                       </div>
                       <div>
                         <p className="text-white text-sm font-medium">{project.author}</p>
-                        <div className="flex items-center space-x-3 text-xs text-gray-400">
-                          <span className="flex items-center">
-                            <Star className="w-3 h-3 mr-1" />
-                            {project.stars}
-                          </span>
-                          <span className="flex items-center">
-                            <Eye className="w-3 h-3 mr-1" />
-                            {project.views}
-                          </span>
-                        </div>
+                        <p className="text-xs text-gray-400">Featured Project</p>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2 mb-4">
@@ -199,12 +254,26 @@ export default function ShowcasePage() {
                       ))}
                     </div>
                     <div className="flex gap-2">
-                      <Button size="sm" className="flex-1 bg-purple-600 hover:bg-purple-700">
+                      <Button
+                        size="sm"
+                        className="flex-1 bg-purple-600 hover:bg-purple-700"
+                        onClick={() => window.open(`/showcase/${project.id}`, '_blank')}
+                      >
                         <ExternalLink className="w-3 h-3 mr-2" />
                         View Project
                       </Button>
-                      <Button size="sm" variant="outline" className="border-gray-600">
-                        <Heart className="w-3 h-3" />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-gray-600"
+                        onClick={() => handleForkProject(project)}
+                        disabled={isForking === project.id}
+                      >
+                        {isForking === project.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <GitFork className="w-3 h-3" />
+                        )}
                       </Button>
                     </div>
                   </CardContent>
@@ -237,16 +306,9 @@ export default function ShowcasePage() {
                             <img src="/hans.png" alt={project.author} className="w-full h-full object-cover" />
                           </div>
                           <span className="text-gray-300 text-sm">{project.author}</span>
-                          <div className="flex items-center space-x-3 text-xs text-gray-400">
-                            <span className="flex items-center">
-                              <Star className="w-3 h-3 mr-1" />
-                              {project.stars}
-                            </span>
-                            <span className="flex items-center">
-                              <Eye className="w-3 h-3 mr-1" />
-                              {project.views}
-                            </span>
-                          </div>
+                          <Badge variant="outline" className="text-xs border-gray-600 text-gray-400">
+                            Recent
+                          </Badge>
                         </div>
                         <div className="flex flex-wrap gap-2 mb-4">
                           {project.tech.map((tech, techIndex) => (
@@ -256,11 +318,25 @@ export default function ShowcasePage() {
                           ))}
                         </div>
                         <div className="flex gap-2">
-                          <Button size="sm" className="flex-1 bg-purple-600 hover:bg-purple-700">
-                            View Details
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-purple-600 hover:bg-purple-700"
+                            onClick={() => window.open(`/showcase/${project.id}`, '_blank')}
+                          >
+                            View Project
                           </Button>
-                          <Button size="sm" variant="outline" className="border-gray-600">
-                            <Heart className="w-3 h-3" />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-gray-600"
+                            onClick={() => handleForkProject(project)}
+                            disabled={isForking === project.id}
+                          >
+                            {isForking === project.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <GitFork className="w-3 h-3" />
+                            )}
                           </Button>
                         </div>
                       </div>
@@ -276,10 +352,10 @@ export default function ShowcasePage() {
             <h2 className="text-3xl font-bold text-white mb-8 text-center">Explore by Category</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { name: "Web Apps", count: "1,200+", icon: Globe },
-                { name: "Mobile Apps", count: "800+", icon: Zap },
-                { name: "APIs", count: "400+", icon: Code },
-                { name: "AI/ML", count: "300+", icon: TrendingUp }
+                { name: "Web Apps", icon: Globe },
+                { name: "Mobile Apps", icon: Zap },
+                { name: "APIs", icon: Code },
+                { name: "AI/ML", icon: TrendingUp }
               ].map((category, index) => (
                 <Card key={index} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors cursor-pointer">
                   <CardContent className="p-6 text-center">
@@ -287,7 +363,7 @@ export default function ShowcasePage() {
                       <category.icon className="w-6 h-6 text-purple-400" />
                     </div>
                     <h3 className="text-white font-semibold mb-2">{category.name}</h3>
-                    <p className="text-gray-400 text-sm">{category.count} projects</p>
+                    <p className="text-gray-400 text-sm">Coming Soon</p>
                   </CardContent>
                 </Card>
               ))}
@@ -319,6 +395,13 @@ export default function ShowcasePage() {
 
       {/* Footer */}
       <Footer />
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={() => setShowAuthModal(false)}
+      />
     </div>
   )
 }
