@@ -22,7 +22,6 @@ export const baseTemplateFiles: Omit<File, 'id' | 'workspaceId' | 'createdAt' | 
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.28.0",
-
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
     "@radix-ui/react-aspect-ratio": "1.1.1",
@@ -51,23 +50,18 @@ export const baseTemplateFiles: Omit<File, 'id' | 'workspaceId' | 'createdAt' | 
     "@radix-ui/react-toggle-group": "1.1.1",
     "@radix-ui/react-tooltip": "1.1.6",
     "@radix-ui/react-icons": "^1.3.0",
-
     "lucide-react": "^0.454.0",
     "framer-motion": "^12.23.12",
-
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "tailwind-merge": "^2.5.5",
     "cmdk": "1.0.4",
     "next-themes": "^0.4.6",
-
     "react-hook-form": "^7.60.0",
     "zod": "3.25.67",
     "@hookform/resolvers": "^3.10.0",
-
     "date-fns": "4.1.0",
     "recharts": "2.15.4",
-
     "sonner": "^1.7.4",
     "react-day-picker": "9.8.0",
     "input-otp": "1.4.1",
@@ -76,19 +70,10 @@ export const baseTemplateFiles: Omit<File, 'id' | 'workspaceId' | 'createdAt' | 
     "react-resizable-panels": "^2.1.7",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-
     "@tanstack/react-table": "^8.20.5",
-
     "@supabase/supabase-js": "^2.39.3",
     "@stripe/stripe-js": "^3.0.8",
     "@tanstack/react-query": "^5.17.15",
-    "sonner": "^1.4.3",
-
-    // Enhanced animations and styling
-    "framer-motion": "^12.23.12",
-    "react-intersection-observer": "^9.8.2",
-    "react-spring": "^9.7.4",
-
     "leaflet": "^1.9.4",
     "react-leaflet": "^4.2.1",
     "socket.io-client": "^4.7.5",
@@ -116,15 +101,11 @@ export const baseTemplateFiles: Omit<File, 'id' | 'workspaceId' | 'createdAt' | 
     "typescript": "^5.2.2",
     "vite": "^5.0.8",
     "tailwindcss-animate": "^1.0.7",
-
     "@types/uuid": "^9.0.7",
-
     "@types/leaflet": "^1.9.8",
     "@types/d3": "^7.4.3",
     "@types/fabric": "^5.3.6",
     "@types/three": "^0.158.0",
-
-    // TypeScript definitions for animation libraries
     "@types/react-intersection-observer": "^9.8.2"
   }
 }`,
@@ -161,12 +142,28 @@ export const baseTemplateFiles: Omit<File, 'id' | 'workspaceId' | 'createdAt' | 
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      "@": path.resolve(__dirname, "./src"),
     },
+  },
+  server: {
+    host: '0.0.0.0', // Allow external connections
+    port: 3000,
+    strictPort: true, // Ensure port 3000 is used
+    hmr: {
+      host: 'localhost', // HMR host for development
+    },
+    cors: true, // Enable CORS for external access
+    allowedHosts: [
+      'localhost',
+      '127.0.0.1',
+      '.e2b.app', // Allow all E2B sandbox domains
+      '3000-*.e2b.app', // Allow E2B preview domains
+    ],
   },
 })`,
     fileType: 'ts',

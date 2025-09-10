@@ -236,22 +236,38 @@ export class TemplateManager {
         await storageManager.createFile({
           ...file,
           content: JSON.stringify(enhancedPackageJson, null, 2),
-          workspaceId
+          workspaceId,
+          fileType: file.fileType || 'json',
+          type: file.type || file.fileType || 'json',
+          size: JSON.stringify(enhancedPackageJson, null, 2).length,
+          isDirectory: false
         })
       } else {
-        await storageManager.createFile({
+        // Ensure all required properties are present
+        const fileData = {
           ...file,
-          workspaceId
-        })
+          workspaceId,
+          fileType: file.fileType || 'unknown',
+          type: file.type || file.fileType || 'unknown',
+          size: file.size || file.content.length,
+          isDirectory: file.isDirectory || false
+        }
+        await storageManager.createFile(fileData)
       }
     }
 
     // Then, apply template-specific files
     for (const file of template.files) {
-      await storageManager.createFile({
+      // Ensure all required properties are present
+      const fileData = {
         ...file,
-        workspaceId
-      })
+        workspaceId,
+        fileType: file.fileType || 'unknown',
+        type: file.type || file.fileType || 'unknown',
+        size: file.size || file.content.length,
+        isDirectory: file.isDirectory || false
+      }
+      await storageManager.createFile(fileData)
     }
   }
 

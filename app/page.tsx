@@ -54,17 +54,20 @@ export default function LandingPage() {
         throw new Error('Template not found')
       }
 
-      // Create workspace with template name
-      const slug = template.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+      // Create workspace with template name (ensure unique slug)
+      const baseSlug = template.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+      const timestamp = Date.now()
+      const uniqueSlug = `${baseSlug}-${timestamp}`
+
       const workspace = await storageManager.createWorkspace({
         name: template.title,
         description: template.description,
         userId: user.id,
         isPublic: false,
-        isTemplate: true,
+        isTemplate: false, // Don't mark as template since this is a user workspace
         lastActivity: new Date().toISOString(),
         deploymentStatus: 'not_deployed',
-        slug
+        slug: uniqueSlug
       })
 
       // Apply template files

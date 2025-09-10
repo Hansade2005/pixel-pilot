@@ -149,14 +149,24 @@ async function handleStreamingShowcasePreview(req: Request) {
 
           // 🔹 Start dev server
           send({ type: "log", message: "Starting dev server..." })
+
           const devServer = await sandbox.startDevServer({
             command: "npm run dev",
             workingDirectory: "/project",
             port: 3000,
-            timeoutMs: 0,
+            timeoutMs: 60000, // Increase timeout to 60 seconds
             envVars,
-            onStdout: (data) => send({ type: "log", message: data.trim() }),
-            onStderr: (data) => send({ type: "error", message: data.trim() }),
+            onStdout: (data) => {
+              send({ type: "log", message: data.trim() })
+              // Debug: Log server readiness indicators
+              if (data.includes('ready') || data.includes('Local:') || data.includes('3000')) {
+                console.log(`[${sandbox.id}] Server readiness indicator: ${data.trim()}`)
+              }
+            },
+            onStderr: (data) => {
+              send({ type: "error", message: data.trim() })
+              console.error(`[${sandbox.id}] Dev server error: ${data.trim()}`)
+            },
           })
 
           send({

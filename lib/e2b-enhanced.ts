@@ -419,13 +419,29 @@ export class EnhancedE2BSandbox {
     
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        // Try to check if port is listening
-        const result = await this.executeCommand(
-          `curl -s http://localhost:${port} || echo "NOT_READY"`,
-          { timeoutMs: 5000, envVars } // Pass environment variables
+        // Try to check if port is listening - use multiple methods
+        const curlResult = await this.executeCommand(
+          `curl -s --max-time 5 http://localhost:${port} | head -c 100 || echo "NOT_READY"`,
+          { timeoutMs: 10000, envVars }
         )
-        
-        if (!result.stdout.includes('NOT_READY') && result.exitCode === 0) {
+
+        // Also check if the port is actually listening
+        const netstatResult = await this.executeCommand(
+          `netstat -tln | grep :${port} || echo "NOT_LISTENING"`,
+          { timeoutMs: 5000, envVars }
+        )
+
+        // Check if Vite is running by looking for the process
+        const viteCheck = await this.executeCommand(
+          `ps aux | grep -v grep | grep "vite" || echo "NO_VITE"`,
+          { timeoutMs: 5000, envVars }
+        )
+
+        const isReady = (!curlResult.stdout.includes('NOT_READY') && curlResult.exitCode === 0) ||
+                       (netstatResult.stdout.includes(`:${port}`) && !netstatResult.stdout.includes('NOT_LISTENING')) ||
+                       (!viteCheck.stdout.includes('NO_VITE'))
+
+        if (isReady) {
           console.log(`[${this.id}] Server ready on port ${port}`)
           return
         }

@@ -17,8 +17,9 @@ export default function ShowcasePage() {
   const [user, setUser] = useState<any>(null)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [isForking, setIsForking] = useState<string | null>(null)
+  const [templateData, setTemplateData] = useState<any[]>([])
 
-  // Check user authentication
+  // Check user authentication and load template data
   useEffect(() => {
     const supabase = createClient()
     const checkUser = async () => {
@@ -31,8 +32,17 @@ export default function ShowcasePage() {
       setUser(session?.user ?? null)
     })
 
+    // Load template data for thumbnails and author info
+    const templateData = TemplateManager.getAllTemplates()
+    setTemplateData(templateData)
+
     return () => subscription.unsubscribe()
   }, [])
+
+  // Helper function to get template info by templateId
+  const getTemplateInfo = (templateId: string) => {
+    return templateData.find(template => template.id === templateId)
+  }
 
   const handleForkProject = async (project: any) => {
     if (!user) {
@@ -219,8 +229,26 @@ export default function ShowcasePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {featuredProjects.map((project, index) => (
                 <Card key={index} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors overflow-hidden">
-                  <div className={`h-32 ${project.image} flex items-center justify-center`}>
-                    <Code className="w-8 h-8 text-white" />
+                  <div className="h-32 relative overflow-hidden">
+                    {(() => {
+                      const templateInfo = getTemplateInfo(project.templateId)
+                      return templateInfo ? (
+                        <img
+                          src={templateInfo.thumbnailUrl}
+                          alt={project.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            // Fallback to gradient if image fails to load
+                            e.currentTarget.style.display = 'none'
+                            e.currentTarget.parentElement!.style.background = project.image || 'linear-gradient(to right, #667eea 0%, #764ba2 100%)'
+                          }}
+                        />
+                      ) : (
+                        <div className={`w-full h-full ${project.image} flex items-center justify-center`}>
+                          <Code className="w-8 h-8 text-white" />
+                        </div>
+                      )
+                    })()}
                   </div>
                   <CardHeader>
                     <div className="flex items-start justify-between">
@@ -238,12 +266,31 @@ export default function ShowcasePage() {
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center space-x-3 mb-4">
-                      <div className="w-8 h-8 rounded-full overflow-hidden">
-                        <img src="/hans.png" alt={project.author} className="w-full h-full object-cover" />
-                      </div>
+                      {(() => {
+                        const templateInfo = getTemplateInfo(project.templateId)
+                        return (
+                          <div className="w-8 h-8 rounded-full overflow-hidden">
+                            <img
+                              src={templateInfo?.authorAvatar || "/hans.png"}
+                              alt={templateInfo?.author || "Hans Ade"}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.src = "/placeholder-user.jpg"
+                              }}
+                            />
+                          </div>
+                        )
+                      })()}
                       <div>
-                        <p className="text-white text-sm font-medium">{project.author}</p>
-                        <p className="text-xs text-gray-400">Featured Project</p>
+                        {(() => {
+                          const templateInfo = getTemplateInfo(project.templateId)
+                          return (
+                            <>
+                              <p className="text-white text-sm font-medium">{templateInfo?.author || "Hans Ade"}</p>
+                              <p className="text-xs text-gray-400">Featured Project</p>
+                            </>
+                          )
+                        })()}
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2 mb-4">
@@ -296,16 +343,52 @@ export default function ShowcasePage() {
                 <Card key={index} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors">
                   <CardContent className="p-6">
                     <div className="flex items-start space-x-4">
-                      <div className={`w-16 h-16 ${project.image} rounded-lg flex items-center justify-center flex-shrink-0`}>
-                        <Code className="w-6 h-6 text-white" />
+                      <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
+                        {(() => {
+                          const templateInfo = getTemplateInfo(project.templateId)
+                          return templateInfo ? (
+                            <img
+                              src={templateInfo.thumbnailUrl}
+                              alt={project.title}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Fallback to gradient if image fails to load
+                                e.currentTarget.style.display = 'none'
+                                e.currentTarget.parentElement!.style.background = project.image || 'linear-gradient(to right, #667eea 0%, #764ba2 100%)'
+                                e.currentTarget.parentElement!.innerHTML = '<div class="w-6 h-6 text-white"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg></div>'
+                              }}
+                            />
+                          ) : (
+                            <div className={`w-full h-full ${project.image} rounded-lg flex items-center justify-center`}>
+                              <Code className="w-6 h-6 text-white" />
+                            </div>
+                          )
+                        })()}
                       </div>
                       <div className="flex-1">
                         <h3 className="text-lg font-semibold text-white mb-2">{project.title}</h3>
                         <div className="flex items-center space-x-3 mb-3">
-                          <div className="w-6 h-6 rounded-full overflow-hidden">
-                            <img src="/hans.png" alt={project.author} className="w-full h-full object-cover" />
-                          </div>
-                          <span className="text-gray-300 text-sm">{project.author}</span>
+                          {(() => {
+                            const templateInfo = getTemplateInfo(project.templateId)
+                            return (
+                              <div className="w-6 h-6 rounded-full overflow-hidden">
+                                <img
+                                  src={templateInfo?.authorAvatar || "/hans.png"}
+                                  alt={templateInfo?.author || "Hans Ade"}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    e.currentTarget.src = "/placeholder-user.jpg"
+                                  }}
+                                />
+                              </div>
+                            )
+                          })()}
+                          <span className="text-gray-300 text-sm">
+                            {(() => {
+                              const templateInfo = getTemplateInfo(project.templateId)
+                              return templateInfo?.author || "Hans Ade"
+                            })()}
+                          </span>
                           <Badge variant="outline" className="text-xs border-gray-600 text-gray-400">
                             Recent
                           </Badge>

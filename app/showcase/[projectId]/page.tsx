@@ -48,7 +48,7 @@ export default function ProjectViewPage() {
   const [project, setProject] = useState<any>(null)
 
   // Console and preview state (similar to code preview panel)
-  const [isConsoleOpen, setIsConsoleOpen] = useState(false)
+  const [isConsoleOpen, setIsConsoleOpen] = useState(false) // Start closed by default
   const [consoleOutput, setConsoleOutput] = useState<string[]>([])
   const [currentLog, setCurrentLog] = useState("Initializing preview...")
   const [consoleHeight, setConsoleHeight] = useState(300)
@@ -509,7 +509,7 @@ export default function ProjectViewPage() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 flex flex-col">
         {/* Preview Content */}
         <div className={`flex-1 min-h-0 ${isMobile && isConsoleOpen ? 'pb-48' : ''}`}>
           {isPreviewLoading ? (
@@ -539,7 +539,7 @@ export default function ProjectViewPage() {
               </div>
             </div>
           ) : previewUrl ? (
-            <div className="w-full h-full relative">
+            <div className={`w-full relative ${isConsoleOpen ? 'h-[calc(100%-300px)]' : 'h-full'}`}>
               <iframe
                 id="preview-iframe"
                 src={previewUrl}
@@ -567,8 +567,8 @@ export default function ProjectViewPage() {
           )}
         </div>
 
-        {/* Console Output Accordion - Similar to Code Preview Panel */}
-        <div className={`border-t border-border ${isMobile ? 'fixed bottom-12 left-0 right-0 z-40 bg-background shadow-lg' : ''}`}>
+        {/* Console Output Accordion - Fixed at Bottom */}
+        <div className={`border-t border-border ${isMobile ? 'fixed bottom-12 left-0 right-0 z-40 bg-background shadow-lg' : 'mt-auto'}`}>
           <Accordion
             type="single"
             collapsible
