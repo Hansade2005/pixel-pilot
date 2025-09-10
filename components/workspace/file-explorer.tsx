@@ -1268,18 +1268,78 @@ enabled = false`
       // Create new ZIP instance
       const zip = new window.JSZip()
 
-      // Get all files (excluding directories)
-      const filesToExport = files.filter(file => !file.isDirectory)
+      // Get all files and directories
+      const allFiles = files.filter(file => !file.isDirectory)
+      const directories = files.filter(file => file.isDirectory)
 
-      if (filesToExport.length === 0) {
+      console.log(`Export: Found ${allFiles.length} files and ${directories.length} directories`)
+
+      if (allFiles.length === 0) {
         throw new Error('No files found to export')
       }
 
-      // Add files to ZIP
-      for (const file of filesToExport) {
-        if (file.content) {
-          zip.file(file.name, file.content)
+      // Create directory structure in ZIP
+      const createdDirs = new Set<string>()
+
+      // First, create all directory structures
+      for (const dir of directories) {
+        const dirPath = dir.path.endsWith('/') ? dir.path : dir.path + '/'
+        if (!createdDirs.has(dirPath)) {
+          zip.folder(dirPath)
+          createdDirs.add(dirPath)
         }
+      }
+
+      // Track export statistics
+      let filesExported = 0
+      let filesSkipped = 0
+      let emptyFiles = 0
+
+      // Add files to ZIP with their full path structure
+      for (const file of allFiles) {
+        try {
+          // Ensure parent directories exist in ZIP
+          const pathParts = file.path.split('/')
+          const fileName = pathParts.pop() || file.name
+          let currentPath = ''
+
+          for (let i = 0; i < pathParts.length; i++) {
+            currentPath += pathParts[i] + '/'
+            if (!createdDirs.has(currentPath)) {
+              zip.folder(currentPath)
+              createdDirs.add(currentPath)
+            }
+          }
+
+          // Handle different content scenarios
+          if (file.content && file.content.trim().length > 0) {
+            // File has content
+            zip.file(file.path, file.content)
+            filesExported++
+          } else if (file.content === '' || file.content === null || file.content === undefined) {
+            // Empty file - still include it
+            zip.file(file.path, '')
+            emptyFiles++
+          } else {
+            // File has some content
+            zip.file(file.path, file.content)
+            filesExported++
+          }
+        } catch (fileError) {
+          console.warn(`Failed to export file ${file.path}:`, fileError)
+          filesSkipped++
+        }
+      }
+
+      console.log(`Export complete: ${filesExported} files exported, ${emptyFiles} empty files included, ${filesSkipped} files skipped`)
+
+      // Show summary in toast
+      if (filesSkipped > 0) {
+        toast({
+          title: "Export Warning",
+          description: `Exported ${filesExported + emptyFiles} files (${filesSkipped} skipped due to errors)`,
+          variant: "default"
+        })
       }
 
       // Generate ZIP content
@@ -1339,19 +1399,69 @@ enabled = false`
       const zip = new window.JSZip()
 
       // Filter files by selected paths
-      const filesToExport = files.filter(file =>
-        filePaths.includes(file.path) && !file.isDirectory && file.content
+      const selectedFiles = files.filter(file =>
+        filePaths.includes(file.path) && !file.isDirectory
       )
 
-      if (filesToExport.length === 0) {
+      console.log(`Export: Selected ${selectedFiles.length} files from ${filePaths.length} selected paths`)
+
+      if (selectedFiles.length === 0) {
         throw new Error('No files found to export')
       }
 
-      // Add files to ZIP
-      for (const file of filesToExport) {
-        if (file.content) {
-          zip.file(file.name, file.content)
+      // Create directory structure for selected files
+      const createdDirs = new Set<string>()
+
+      // Track export statistics
+      let filesExported = 0
+      let filesSkipped = 0
+      let emptyFiles = 0
+
+      // Add files to ZIP with their full path structure
+      for (const file of selectedFiles) {
+        try {
+          // Ensure parent directories exist in ZIP
+          const pathParts = file.path.split('/')
+          const fileName = pathParts.pop() || file.name
+          let currentPath = ''
+
+          for (let i = 0; i < pathParts.length; i++) {
+            currentPath += pathParts[i] + '/'
+            if (!createdDirs.has(currentPath)) {
+              zip.folder(currentPath)
+              createdDirs.add(currentPath)
+            }
+          }
+
+          // Handle different content scenarios
+          if (file.content && file.content.trim().length > 0) {
+            // File has content
+            zip.file(file.path, file.content)
+            filesExported++
+          } else if (file.content === '' || file.content === null || file.content === undefined) {
+            // Empty file - still include it
+            zip.file(file.path, '')
+            emptyFiles++
+          } else {
+            // File has some content
+            zip.file(file.path, file.content)
+            filesExported++
+          }
+        } catch (fileError) {
+          console.warn(`Failed to export file ${file.path}:`, fileError)
+          filesSkipped++
         }
+      }
+
+      console.log(`Selected export complete: ${filesExported} files exported, ${emptyFiles} empty files included, ${filesSkipped} files skipped`)
+
+      // Show summary in toast
+      if (filesSkipped > 0) {
+        toast({
+          title: "Export Warning",
+          description: `Exported ${filesExported + emptyFiles} selected files (${filesSkipped} skipped due to errors)`,
+          variant: "default"
+        })
       }
 
       // Generate ZIP content
@@ -1370,7 +1480,7 @@ enabled = false`
 
       toast({
         title: "Export Complete",
-        description: `${filesToExport.length} file(s) exported as zip`,
+        description: `${filesExported + emptyFiles} file(s) exported as zip`,
       })
     } catch (error) {
       console.error('Export error:', error)
