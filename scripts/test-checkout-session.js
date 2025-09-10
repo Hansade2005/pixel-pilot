@@ -1,20 +1,21 @@
 #!/usr/bin/env node
 
-// Test the checkout session creation API
+// Test the subscription intent creation API
 const fetch = require('node-fetch')
 
-console.log("🧪 Testing Checkout Session API with Fallback")
-console.log("===========================================")
+console.log("🧪 Testing Subscription Intent API with Fallback")
+console.log("===============================================")
 
-const API_BASE = "https://pipilot.dev/api/stripe/create-checkout-session"
+const API_BASE = "https://pipilot.dev/api/stripe/create-subscription-intent"
 
 // Test data
 const testPayload = {
   planType: "pro",
-  isAnnual: false
+  isAnnual: false,
+  priceId: "price_test_pro_monthly" // This would be a real price ID in production
 }
 
-console.log("📤 Making test request to checkout API...")
+console.log("📤 Making test request to subscription intent API...")
 console.log("URL:", API_BASE)
 console.log("Payload:", JSON.stringify(testPayload, null, 2))
 
@@ -54,10 +55,11 @@ fetch(API_BASE, {
       console.log("The API is trying to use the Stripe keys, which is correct.")
       console.log("In a real environment with proper authentication, this would succeed.")
     }
-  } else if (data.sessionId && data.url) {
-    console.log("\n🎉 SUCCESS! Checkout session created successfully!")
-    console.log("Session ID:", data.sessionId)
-    console.log("Checkout URL:", data.url)
+  } else if (data.clientSecret && data.subscriptionId) {
+    console.log("\n🎉 SUCCESS! Subscription intent created successfully!")
+    console.log("Client Secret:", data.clientSecret.substring(0, 50) + "...")
+    console.log("Subscription ID:", data.subscriptionId)
+    console.log("Customer ID:", data.customerId)
   } else {
     console.log("\n❓ Unexpected response format")
   }
@@ -71,5 +73,5 @@ fetch(API_BASE, {
   console.log("The API endpoint may need a valid user session to work properly.")
 })
 .finally(() => {
-  console.log("\n🏁 Checkout session test completed")
+  console.log("\n🏁 Subscription intent test completed")
 })

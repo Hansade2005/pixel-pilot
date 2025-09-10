@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { stripe, PLAN_LIMITS } from "@/lib/stripe"
+import Stripe from "stripe"
 
 // Helper function to get Stripe instance safely
 function getStripe() {
   if (!stripe) {
     throw new Error("Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.")
   }
-  return stripe
+  return stripe as Stripe
 }
 
 // Helper function to check if webhooks are working
@@ -86,19 +87,23 @@ export async function POST(request: NextRequest) {
         const lastUpdate = new Date(userSettings.updated_at || userSettings.created_at || 0)
         const shouldSkip = shouldSkipPolling(user.id, lastUpdate)
 
+        let subscription: Stripe.Subscription | undefined
+        let status: string
+
         if (webhooksWorking && shouldSkip) {
           console.log(`🎣 Webhooks active for user ${user.id}, using cached data`)
+          status = userSettings.subscription_status
         } else {
           console.log(`🔄 Polling Stripe for user ${user.id} (${webhooksWorking ? 'webhooks may be down' : 'no webhook activity'})`)
 
           const stripeInstance = getStripe()
-          const subscription = await stripeInstance.subscriptions.retrieve(userSettings.stripe_subscription_id)
+          subscription = await stripeInstance.subscriptions.retrieve(userSettings.stripe_subscription_id)
 
           // Update local status based on Stripe subscription
-          const status = subscription.status === 'active' ? 'active' :
-                        subscription.status === 'canceled' ? 'canceled' :
-                        subscription.status === 'past_due' ? 'past_due' :
-                        subscription.status === 'trialing' ? 'trialing' : 'inactive'
+          status = subscription.status === 'active' ? 'active' :
+                   subscription.status === 'canceled' ? 'canceled' :
+                   subscription.status === 'past_due' ? 'past_due' :
+                   subscription.status === 'trialing' ? 'trialing' : 'inactive'
 
           // Check if subscription is still active and update if needed
           if (status !== userSettings.subscription_status ||
@@ -119,25 +124,27 @@ export async function POST(request: NextRequest) {
         // Check if we need to reset deployment count (new billing period)
         // Only do this if we actually polled Stripe (not if we skipped polling)
         if (!webhooksWorking || !shouldSkip) {
-          const currentPeriodEnd = (subscription as any).current_period_end * 1000
-          const lastPayment = new Date(userSettings.last_payment_date || 0).getTime()
+          if (subscription) {
+            const currentPeriodEnd = (subscription as Stripe.Subscription & { current_period_end: number }).current_period_end * 1000
+            const lastPayment = new Date(userSettings.last_payment_date || 0).getTime()
 
-          if (currentPeriodEnd > lastPayment) {
-            console.log(`🔄 Resetting usage counters for user ${user.id} (new billing period)`)
+            if (currentPeriodEnd > lastPayment) {
+              console.log(`🔄 Resetting usage counters for user ${user.id} (new billing period)`)
 
-            // New billing period, reset deployment count and GitHub pushes
-            await supabase
-              .from('user_settings')
-              .update({
-                deployments_this_month: 0,
-                github_pushes_this_month: 0,
-                last_payment_date: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              })
-              .eq('user_id', user.id)
+              // New billing period, reset deployment count and GitHub pushes
+              await supabase
+                .from('user_settings')
+                .update({
+                  deployments_this_month: 0,
+                  github_pushes_this_month: 0,
+                  last_payment_date: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('user_id', user.id)
 
-            userSettings.deployments_this_month = 0
-            userSettings.github_pushes_this_month = 0
+              userSettings.deployments_this_month = 0
+              userSettings.github_pushes_this_month = 0
+            }
           }
         }
 
@@ -146,8 +153,10 @@ export async function POST(request: NextRequest) {
           status: status,
           deploymentsThisMonth: userSettings.deployments_this_month || 0,
           githubPushesThisMonth: userSettings.github_pushes_this_month || 0,
-          subscriptionEndDate: new Date((subscription as any).current_period_end * 1000).toISOString(),
-          cancelAtPeriodEnd: subscription.cancel_at_period_end,
+          subscriptionEndDate: subscription 
+            ? new Date((subscription as Stripe.Subscription & { current_period_end: number }).current_period_end * 1000).toISOString() 
+            : undefined,
+          cancelAtPeriodEnd: subscription?.cancel_at_period_end,
         })
 
       } catch (stripeError) {

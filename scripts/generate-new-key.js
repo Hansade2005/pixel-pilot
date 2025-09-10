@@ -5,7 +5,7 @@ console.log("🔑 STRIPE API KEY DIAGNOSTIC")
 console.log("============================")
 
 console.log("\n📋 Current Status:")
-console.log("❌ Primary key: Expired (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)")
+console.log("❌ Primary key: Expired")
 console.log("❌ Fallback key: Also expired")
 
 console.log("\n🔧 Required Action:")

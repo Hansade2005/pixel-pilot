@@ -2,6 +2,21 @@
 
 import React, { useState, useEffect } from "react"
 import { useToast } from '@/hooks/use-toast'
+
+// Type declaration for JSZip
+declare global {
+  interface Window {
+    JSZip?: any
+  }
+}
+
+// Load JSZip from CDN
+if (typeof window !== 'undefined' && !window.JSZip) {
+  const script = document.createElement('script')
+  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
+  script.async = true
+  document.head.appendChild(script)
+}
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -1232,22 +1247,46 @@ enabled = false`
 
     setIsExporting(true)
     try {
-      const response = await fetch('/api/export-to-disk', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          projectId: project.id,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`Export failed: ${response.status}`)
+      // Wait for JSZip to load if it's not ready yet
+      if (typeof window !== 'undefined' && !window.JSZip) {
+        await new Promise((resolve) => {
+          const checkJSZip = () => {
+            if (window.JSZip) {
+              resolve(void 0)
+            } else {
+              setTimeout(checkJSZip, 100)
+            }
+          }
+          checkJSZip()
+        })
       }
 
-      // Create download link
-      const blob = await response.blob()
+      if (!window.JSZip) {
+        throw new Error('JSZip library not loaded')
+      }
+
+      // Create new ZIP instance
+      const zip = new window.JSZip()
+
+      // Get all files (excluding directories)
+      const filesToExport = files.filter(file => !file.isDirectory)
+
+      if (filesToExport.length === 0) {
+        throw new Error('No files found to export')
+      }
+
+      // Add files to ZIP
+      for (const file of filesToExport) {
+        if (file.content) {
+          zip.file(file.name, file.content)
+        }
+      }
+
+      // Generate ZIP content
+      const zipContent = await zip.generateAsync({ type: 'uint8array' })
+
+      // Create blob and download
+      const blob = new Blob([zipContent], { type: 'application/zip' })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -1265,7 +1304,7 @@ enabled = false`
       console.error('Export error:', error)
       toast({
         title: "Export Failed",
-        description: "Failed to export project. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to export project. Please try again.",
         variant: "destructive"
       })
     } finally {
@@ -1278,23 +1317,48 @@ enabled = false`
 
     setIsExporting(true)
     try {
-      const response = await fetch('/api/export-to-disk', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          projectId: project.id,
-          filePaths,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`Export failed: ${response.status}`)
+      // Wait for JSZip to load if it's not ready yet
+      if (typeof window !== 'undefined' && !window.JSZip) {
+        await new Promise((resolve) => {
+          const checkJSZip = () => {
+            if (window.JSZip) {
+              resolve(void 0)
+            } else {
+              setTimeout(checkJSZip, 100)
+            }
+          }
+          checkJSZip()
+        })
       }
 
-      // Create download link
-      const blob = await response.blob()
+      if (!window.JSZip) {
+        throw new Error('JSZip library not loaded')
+      }
+
+      // Create new ZIP instance
+      const zip = new window.JSZip()
+
+      // Filter files by selected paths
+      const filesToExport = files.filter(file =>
+        filePaths.includes(file.path) && !file.isDirectory && file.content
+      )
+
+      if (filesToExport.length === 0) {
+        throw new Error('No files found to export')
+      }
+
+      // Add files to ZIP
+      for (const file of filesToExport) {
+        if (file.content) {
+          zip.file(file.name, file.content)
+        }
+      }
+
+      // Generate ZIP content
+      const zipContent = await zip.generateAsync({ type: 'uint8array' })
+
+      // Create blob and download
+      const blob = new Blob([zipContent], { type: 'application/zip' })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -1306,13 +1370,13 @@ enabled = false`
 
       toast({
         title: "Export Complete",
-        description: `${filePaths.length} file(s) exported as zip`,
+        description: `${filesToExport.length} file(s) exported as zip`,
       })
     } catch (error) {
       console.error('Export error:', error)
       toast({
         title: "Export Failed",
-        description: "Failed to export files. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to export selected files. Please try again.",
         variant: "destructive"
       })
     } finally {

@@ -57,11 +57,6 @@ export const stripeConfig = {
   secretKey: process.env.STRIPE_SECRET_KEY || FALLBACK_STRIPE_SECRET_KEY,
 }
 
-// Client-side Stripe configuration for publishable key only usage
-export const getClientStripeConfig = () => ({
-  publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "",
-})
-
 // Price IDs for different plans (you'll need to create these in Stripe)
 export const STRIPE_PRICES = {
   PRO: process.env.STRIPE_PRICE_PRO || "price_pro_id",

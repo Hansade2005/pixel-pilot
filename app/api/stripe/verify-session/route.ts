@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { stripe } from "@/lib/stripe"
+import Stripe from "stripe"
 
 // Helper function to get Stripe instance safely
 function getStripe() {
   if (!stripe) {
     throw new Error("Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.")
   }
-  return stripe
+  return stripe as Stripe
 }
 
 export async function POST(request: NextRequest) {
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     // Retrieve the checkout session from Stripe
     const stripeInstance = getStripe()
-    const session = await stripeInstance.checkout.sessions.retrieve(sessionId)
+    const session = await stripeInstance.checkout.sessions.retrieve(sessionId) as Stripe.Checkout.Session
 
     if (session.payment_status !== 'paid') {
       return NextResponse.json({ error: "Payment not completed" }, { status: 400 })
@@ -61,7 +62,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Failed to create user settings" }, { status: 500 })
       }
 
-      userSettings = { data: newSettings }
+      userSettings = { 
+        data: newSettings, 
+        error: null, 
+        count: 1, 
+        status: 200, 
+        statusText: 'OK' 
+      }
     }
 
     // Determine plan from the session

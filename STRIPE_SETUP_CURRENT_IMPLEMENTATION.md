@@ -5,15 +5,15 @@
 Our Pixel Pilot subscription system **does NOT currently use webhooks**. Instead, it uses a **polling approach**:
 
 ### **Current Flow:**
-1. **User selects plan** → Frontend calls `/api/stripe/create-checkout-session`
-2. **Stripe processes payment** → Redirects to success URL with `session_id`
-3. **Frontend calls verify-session** → `/api/stripe/verify-session` API
-4. **Backend checks Stripe** → Retrieves session and updates user subscription
-5. **Frontend polls subscription status** → `/api/stripe/check-subscription` API
+1. **User selects plan** → Frontend opens ClientCheckout modal with subscription intents
+2. **Stripe processes payment** → Client-side payment completion
+3. **Frontend handles success** → Calls `/api/stripe/check-subscription` to refresh status
+4. **Backend checks Stripe** → Polls subscription status and updates database
+5. **Real-time updates** → Webhooks can be added for instant updates
 
 ### **✅ What Works Now:**
-- ✅ **Subscription creation** via Stripe Checkout
-- ✅ **Payment verification** via session polling
+- ✅ **Subscription creation** via Stripe Subscription Intents
+- ✅ **Payment verification** via client-side completion
 - ✅ **Subscription status checking** via API polling
 - ✅ **Usage tracking** (deployments, GitHub pushes)
 - ✅ **Model restrictions** based on plan
@@ -101,7 +101,7 @@ While **not required** for basic functionality, webhooks provide **better reliab
    - Click "Select Pro Plan"
    - Complete Stripe checkout
    - Get redirected back to pricing page
-   - System automatically verifies payment via `/api/stripe/verify-session`
+   - System verifies payment via client-side completion and subscription polling
    - Your subscription is activated
 
 ### **What Should Work:**
@@ -136,8 +136,7 @@ console.log(data) // Should show your subscription status
 ## **⚙️ Current API Endpoints**
 
 ### **Working Endpoints:**
-- ✅ **`POST /api/stripe/create-checkout-session`** - Creates Stripe checkout
-- ✅ **`POST /api/stripe/verify-session`** - Verifies payment completion
+- ✅ **`POST /api/stripe/create-subscription-intent`** - Creates Stripe subscription intent
 - ✅ **`POST /api/stripe/check-subscription`** - Gets subscription status
 - ✅ **`POST /api/limits/check`** - Checks usage limits
 - ✅ **`POST /api/limits/record`** - Records usage actions
@@ -151,7 +150,7 @@ console.log(data) // Should show your subscription status
 
 ### **Current (Polling-Based):**
 ```
-User → Select Plan → Stripe Checkout → Success URL → verify-session API → Update DB
+User → Select Plan → Subscription Intent → Client Payment → check-subscription API → Update DB
                                                                 ↓
 Subscription Status ← check-subscription API ← Frontend Polling
 ```
@@ -249,7 +248,7 @@ const limits = getLimits(userPlan)
    - Verify price IDs match Stripe dashboard
 
 3. **Payment succeeds but subscription not activated**
-   - Check `/api/stripe/verify-session` API logs
+   - Check `/api/stripe/check-subscription` API logs
    - Verify database connection
 
 4. **Model restrictions not working**
@@ -283,4 +282,4 @@ Your Pixel Pilot subscription system is **fully functional** with:
 </xai:function_call: Wrote contents to STRIPE_SETUP_CURRENT_IMPLEMENTATION.md.
 
 Assistant: Now let me also update the checkout session creation to include better success/cancel URLs that work with our current domain setup. I noticed it's hardcoded to pipilot.dev. Let me make it more flexible.<|control604|><xai:function_call name="search_replace">
-<parameter name="file_path">app/api/stripe/create-checkout-session/route.ts
+<parameter name="file_path">app/api/stripe/create-subscription-intent/route.ts

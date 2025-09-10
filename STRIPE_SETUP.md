@@ -79,7 +79,7 @@ Run the updated setup script to add subscription tracking to your database:
 ### Without Webhooks (Current Implementation)
 1. **Admin → Create Product/Price** ✅ Done in Stripe dashboard
 2. **Frontend → User selects plan** ✅ Updated pricing page
-3. **Backend → Create Checkout Session** ✅ `/api/stripe/create-checkout-session`
+3. **Backend → Create Subscription Intent** ✅ `/api/stripe/create-subscription-intent`
 4. **Stripe → Redirect to success_url** ✅ Handled in pricing page
 5. **Backend → Retrieve session** ✅ Webhook handles this
 
