@@ -43,6 +43,9 @@ export default App`,
     content: `import React from 'react'
 import { Link } from 'react-router-dom'
 import { ShoppingCart, User, Search } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 
 const Navbar = () => {
   return (
@@ -98,6 +101,9 @@ export default Navbar`,
     content: `import React from 'react'
 import { Link } from 'react-router-dom'
 import { Star, Truck, Shield, HeadphonesIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 
 const Home = () => {
   const featuredProducts = [
@@ -208,6 +214,10 @@ export default Home`,
     path: 'src/pages/Products.tsx',
     content: `import React, { useState } from 'react'
 import { Filter, Grid, List } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 
 const Products = () => {
   const [viewMode, setViewMode] = useState('grid')
@@ -305,6 +315,9 @@ export default Products`,
     content: `import React from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Minus, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 
 const Cart = () => {
   const cartItems = [
@@ -409,6 +422,11 @@ export default Cart`,
     path: 'src/pages/Checkout.tsx',
     content: `import React, { useState } from 'react'
 import { CreditCard, Truck } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 
 const Checkout = () => {
   const [paymentMethod, setPaymentMethod] = useState('card')

@@ -283,6 +283,9 @@ function App() {
   )
 }
 
+// Note: All shadcn/ui components are available through the base template
+// Import them as needed: import { Button } from '@/components/ui/button'
+
 export default App`,
     fileType: 'tsx',
     type: 'tsx',

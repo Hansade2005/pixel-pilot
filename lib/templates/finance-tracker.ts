@@ -45,6 +45,8 @@ export default App`,
     content: `import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Home, CreditCard, PieChart, Target, BarChart3, Settings } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const Sidebar = () => {
   const location = useLocation()
@@ -103,6 +105,8 @@ export default Sidebar`,
     path: 'src/pages/Dashboard.tsx',
     content: `import React from 'react'
 import { TrendingUp, TrendingDown, DollarSign, CreditCard, PiggyBank, Target } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const Dashboard = () => {
   const stats = [
@@ -224,6 +228,9 @@ export default Dashboard`,
     path: 'src/pages/Transactions.tsx',
     content: `import React, { useState } from 'react'
 import { Plus, Search, Filter } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 
 const Transactions = () => {
   const [searchTerm, setSearchTerm] = useState('')
@@ -354,6 +361,8 @@ export default Transactions`,
     path: 'src/pages/Budget.tsx',
     content: `import React from 'react'
 import { PieChart, TrendingUp, AlertTriangle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const Budget = () => {
   const budgetCategories = [
@@ -470,6 +479,8 @@ export default Budget`,
     path: 'src/pages/Goals.tsx',
     content: `import React from 'react'
 import { Target, Plus, Edit, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const Goals = () => {
   const goals = [
@@ -614,6 +625,8 @@ export default Goals`,
     path: 'src/pages/Reports.tsx',
     content: `import React, { useState } from 'react'
 import { BarChart3, PieChart, TrendingUp, Calendar } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const Reports = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('month')

@@ -41,6 +41,8 @@ export default App`,
     content: `import React from 'react'
 import { Link } from 'react-router-dom'
 import { MessageCircle, User, Settings } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 const Navbar = () => {
   return (
@@ -84,6 +86,8 @@ export default Navbar`,
     content: `import React from 'react'
 import { Link } from 'react-router-dom'
 import { MessageCircle, Users, Zap, Shield } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const Home = () => {
   const features = [
@@ -179,6 +183,9 @@ export default Home`,
     path: 'src/pages/Chat.tsx',
     content: `import React, { useState, useRef, useEffect } from 'react'
 import { Send, Paperclip, Smile, MoreVertical } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const Chat = () => {
   const [messages, setMessages] = useState([
@@ -304,6 +311,10 @@ export default Chat`,
     path: 'src/pages/Profile.tsx',
     content: `import React, { useState } from 'react'
 import { Camera, Edit2, Save } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const Profile = () => {
   const [isEditing, setIsEditing] = useState(false)

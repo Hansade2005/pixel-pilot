@@ -20,7 +20,7 @@ import { AuthModal } from "@/components/auth-modal"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { createClient } from "@/lib/supabase/client"
-import { templateManager } from "@/lib/template-manager"
+import { TemplateManager } from "@/lib/template-manager"
 
 export default function LandingPage() {
   const [user, setUser] = useState<any>(null)
@@ -34,7 +34,7 @@ export default function LandingPage() {
   }, [])
 
   const loadTemplates = () => {
-    const templateData = templateManager.getAllTemplates()
+    const templateData = TemplateManager.getAllTemplates()
     setTemplates(templateData)
   }
 
@@ -49,7 +49,7 @@ export default function LandingPage() {
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
 
-      const template = templateManager.getTemplateById(templateId)
+      const template = TemplateManager.getTemplateById(templateId)
       if (!template) {
         throw new Error('Template not found')
       }
@@ -68,7 +68,7 @@ export default function LandingPage() {
       })
 
       // Apply template files
-      await templateManager.applyTemplate(templateId, workspace.id)
+      await TemplateManager.applyTemplate(templateId, workspace.id)
 
       // Redirect to the workspace
       window.location.href = `/workspace/${workspace.id}`
