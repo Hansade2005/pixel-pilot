@@ -3,7 +3,7 @@ import { storageManager, File } from '@/lib/storage-manager';
 
 export async function POST(request: NextRequest) {
   try {
-    const { repoName, repoOwner, token, workspaceId, files } = await request.json();
+    const { repoName, repoOwner, token, workspaceId, files, commitMessage } = await request.json();
 
     if (!repoName || !repoOwner || !token || !workspaceId) {
       return NextResponse.json({
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
 
     // Create a new commit
     console.log('Creating new commit...');
-    const commitMessage = `Deploy project files - ${new Date().toISOString()}`;
+    const finalCommitMessage = commitMessage || `Deploy project files - ${new Date().toISOString()}`;
     const newCommitResponse = await fetch(`https://api.github.com/repos/${actualRepoOwner}/${repoName}/git/commits`, {
       method: 'POST',
       headers: {
@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        message: commitMessage,
+        message: finalCommitMessage,
         tree: treeData.sha,
         parents: [latestCommitSha],
       }),

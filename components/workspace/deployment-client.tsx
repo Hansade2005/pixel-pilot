@@ -184,7 +184,13 @@ interface GitHubRepo {
   name: string
   fullName: string
   url: string
-  defaultBranch: string
+  private?: boolean
+  description?: string
+  updatedAt?: string
+  language?: string
+  stars?: number
+  forks?: number
+  defaultBranch?: string
   lastCommit?: {
     sha: string
     message: string
@@ -299,6 +305,9 @@ export default function DeploymentClient() {
     repoName: '',
     repoDescription: '',
     isPrivate: false,
+    deploymentMode: 'new' as 'new' | 'existing', // 'new' for creating new repo, 'existing' for pushing to existing
+    selectedRepo: '',
+    commitMessage: 'Update project files',
   })
 
   const [vercelForm, setVercelForm] = useState({
@@ -338,6 +347,9 @@ export default function DeploymentClient() {
   }>({})
   const [deployedRepos, setDeployedRepos] = useState<DeployedRepo[]>([])
   const [availableRepos, setAvailableRepos] = useState<GitHubRepo[]>([])
+  const [userRepos, setUserRepos] = useState<GitHubRepo[]>([])
+  const [isLoadingRepos, setIsLoadingRepos] = useState(false)
+  const [isGeneratingCommitMessage, setIsGeneratingCommitMessage] = useState(false)
   const [selectedRepoForVercel, setSelectedRepoForVercel] = useState<string>('')
   const [selectedRepoForNetlify, setSelectedRepoForNetlify] = useState<string>('')
 
@@ -378,6 +390,202 @@ export default function DeploymentClient() {
       .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
       .substring(0, 100) // Limit to 100 characters
       || 'my-project' // Fallback if name becomes empty
+  }
+
+  // Fetch user's GitHub repositories
+  const fetchUserGitHubRepos = async () => {
+    if (!storedTokens.github) return
+
+    setIsLoadingRepos(true)
+    try {
+      const response = await fetch(`https://api.github.com/user/repos?sort=updated&per_page=100`, {
+        headers: {
+          'Authorization': `Bearer ${storedTokens.github}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch repositories')
+      }
+
+      const repos = await response.json()
+      const formattedRepos: GitHubRepo[] = repos.map((repo: any) => ({
+        name: repo.name,
+        fullName: repo.full_name,
+        url: repo.html_url,
+        private: repo.private,
+        description: repo.description,
+        updatedAt: repo.updated_at,
+        language: repo.language,
+        stars: repo.stargazers_count,
+        forks: repo.forks_count
+      }))
+
+      setUserRepos(formattedRepos)
+    } catch (error) {
+      console.error('Error fetching GitHub repositories:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch your GitHub repositories',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsLoadingRepos(false)
+    }
+  }
+
+  // Fetch the last chat message from IndexedDB
+  const fetchLastChatMessage = async (): Promise<string | null> => {
+    try {
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+
+      // Get current user ID
+      const supabaseClient = createClient()
+      const { data: { user } } = await supabaseClient.auth.getUser()
+      if (!user) return null
+
+      // Get all chat sessions for this user
+      const chatSessions = await storageManager.getChatSessions(user.id)
+
+      if (chatSessions.length === 0) {
+        return null
+      }
+
+      // Get the most recent chat session
+      const latestSession = chatSessions.sort((a, b) =>
+        new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
+      )[0]
+
+      // Get the latest message from this session
+      const messages = await storageManager.getMessages(latestSession.id)
+
+      if (messages.length === 0) {
+        return null
+      }
+
+      // Get the most recent user message
+      const userMessages = messages
+        .filter(msg => msg.role === 'user')
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+      return userMessages.length > 0 ? userMessages[0].content : null
+    } catch (error) {
+      console.error('Error fetching last chat message:', error)
+      return null
+    }
+  }
+
+  // Generate AI-powered commit message from last chat message
+  const generateCommitMessageFromChat = async (chatMessage: string): Promise<string> => {
+    try {
+      // Import AI dependencies dynamically
+      const { generateText } = await import('ai')
+      const { getModel } = await import('@/lib/ai-providers')
+
+      // Get the auto model (Codestral by default)
+      const model = getModel('auto')
+
+      const commitMessageResult = await generateText({
+        model: model,
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert software engineer creating professional, meaningful commit messages.
+
+Your task is to analyze a user's chat message about their development work and create a concise, professional commit message that follows conventional commit standards.
+
+COMMIT MESSAGE GUIDELINES:
+- Keep it under 72 characters total
+- Start with a capital letter
+- Use imperative mood (Add, Fix, Update, Remove, etc.)
+- Be specific and meaningful
+- Focus on WHAT was changed, not HOW
+- Avoid generic messages like "Update files" or "Fix bugs"
+- Extract the core development task from the conversation
+
+EXAMPLES:
+- User says: "please add a login form to the app" → "feat: Add user login form component"
+- User says: "I need to implement dark mode toggle" → "feat: Implement dark mode theme toggle"
+- User says: "fix the bug in user authentication" → "fix: Fix user authentication validation"
+- User says: "add error handling for API calls" → "feat: Add error handling for API requests"
+- User says: "update the styling of the header" → "feat: Update header component styling"
+
+Return ONLY the commit message, no quotes or additional text.`
+          },
+          {
+            role: 'user',
+            content: `Please create a professional commit message for this development work: "${chatMessage}"`
+          }
+        ],
+        temperature: 0.3, // Low temperature for consistent, professional output
+      })
+
+      const aiCommitMessage = commitMessageResult.text.trim()
+
+      // Validate the generated message
+      if (aiCommitMessage.length > 0 && aiCommitMessage.length <= 72) {
+        return aiCommitMessage
+      }
+
+      // Fallback if AI generation fails
+      return 'Update project files'
+
+    } catch (error) {
+      console.error('AI commit message generation failed:', error)
+
+      // Fallback to simple text processing if AI fails
+      let cleaned = chatMessage
+        .replace(/[^\w\s-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .substring(0, 50)
+
+      if (cleaned.length === 0) {
+        return 'Update project files'
+      }
+
+      return cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
+    }
+  }
+
+  // Generate auto commit message
+  const generateAutoCommitMessage = async () => {
+    setIsGeneratingCommitMessage(true)
+
+    try {
+      const lastMessage = await fetchLastChatMessage()
+
+      if (!lastMessage) {
+        toast({
+          title: 'No Chat History',
+          description: 'No recent chat messages found to generate commit message from',
+          variant: 'default'
+        })
+        setGithubForm(prev => ({ ...prev, commitMessage: 'Update project files' }))
+        return
+      }
+
+      const commitMessage = await generateCommitMessageFromChat(lastMessage)
+      setGithubForm(prev => ({ ...prev, commitMessage }))
+
+      toast({
+        title: 'AI Commit Message Generated',
+        description: `Created professional commit message from your chat`,
+        variant: 'default'
+      })
+
+    } catch (error) {
+      console.error('Error generating commit message:', error)
+      toast({
+        title: 'Generation Failed',
+        description: 'Failed to generate commit message from chat history',
+        variant: 'destructive'
+      })
+    } finally {
+      setIsGeneratingCommitMessage(false)
+    }
   }
 
   // Generate a unique Netlify site name
@@ -539,6 +747,13 @@ export default function DeploymentClient() {
       initializeEnvironments()
     }
   }, [currentUserId])
+
+  // Fetch user repositories when deployment mode changes to 'existing'
+  useEffect(() => {
+    if (githubForm.deploymentMode === 'existing' && storedTokens.github && userRepos.length === 0) {
+      fetchUserGitHubRepos()
+    }
+  }, [githubForm.deploymentMode, storedTokens.github, userRepos.length])
 
   // Load deployed repositories from storage
   const loadDeployedRepos = async (projectsList?: ProjectDisplay[]) => {
@@ -746,10 +961,20 @@ export default function DeploymentClient() {
       return
     }
 
-    if (!githubForm.repoName) {
+    // Validate repository selection based on deployment mode
+    if (githubForm.deploymentMode === 'new' && !githubForm.repoName) {
       toast({
         title: "Repository Name Required",
         description: "Please enter a repository name",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (githubForm.deploymentMode === 'existing' && !githubForm.selectedRepo) {
+      toast({
+        title: "Repository Selection Required",
+        description: "Please select an existing repository",
         variant: "destructive"
       })
       return
@@ -772,77 +997,110 @@ export default function DeploymentClient() {
       return
     }
 
-    // Validate repository name format
-    const nameRegex = /^[a-zA-Z0-9._-]+$/;
-    if (!nameRegex.test(githubForm.repoName)) {
-      toast({
-        title: "Invalid Repository Name",
-        description: "Repository name can only contain letters, numbers, hyphens, underscores, and periods",
-        variant: "destructive"
-      })
-      return
-    }
+    // Validate repository name format for new repositories
+    if (githubForm.deploymentMode === 'new') {
+      const nameRegex = /^[a-zA-Z0-9._-]+$/;
+      if (!nameRegex.test(githubForm.repoName)) {
+        toast({
+          title: "Invalid Repository Name",
+          description: "Repository name can only contain letters, numbers, hyphens, underscores, and periods",
+          variant: "destructive"
+        })
+        return
+      }
 
-    if (githubForm.repoName.length > 100) {
-      toast({
-        title: "Repository Name Too Long",
-        description: "Repository name must be 100 characters or less",
-        variant: "destructive"
-      })
-      return
+      if (githubForm.repoName.length > 100) {
+        toast({
+          title: "Repository Name Too Long",
+          description: "Repository name must be 100 characters or less",
+          variant: "destructive"
+        })
+        return
+      }
     }
 
     setDeploymentState(prev => ({ ...prev, isDeploying: true, currentStep: 'connecting' }))
 
     try {
-      // First create the GitHub repository
-      const repoResponse = await fetch('/api/github/create-repo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: githubForm.repoName,
-          description: githubForm.repoDescription,
-          private: githubForm.isPrivate,
-          token: storedTokens.github,
+      let repoData: any = null
+      let repoOwner: string
+      let repoName: string
+
+      if (githubForm.deploymentMode === 'new') {
+        // Create new GitHub repository
+        setDeploymentState(prev => ({ ...prev, currentStep: 'connecting' }))
+
+        const repoResponse = await fetch('/api/github/create-repo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: githubForm.repoName,
+            description: githubForm.repoDescription,
+            private: githubForm.isPrivate,
+            token: storedTokens.github,
+          })
         })
-      })
 
-      if (!repoResponse.ok) {
-        const errorData = await repoResponse.json()
-        console.error('Repository creation failed:', errorData)
+        if (!repoResponse.ok) {
+          const errorData = await repoResponse.json()
+          console.error('Repository creation failed:', errorData)
 
-        // Provide specific error messages based on status code
-        if (repoResponse.status === 422) {
-          toast({
-            title: "Repository Creation Failed",
-            description: errorData.error || "Repository name may already exist or is invalid. Try using a different name.",
-            variant: "destructive"
-          })
-        } else if (repoResponse.status === 401) {
-          toast({
-            title: "Authentication Failed",
-            description: "Invalid GitHub token. Please check your token and try again.",
-            variant: "destructive"
-          })
-        } else if (repoResponse.status === 403) {
-          toast({
-            title: "Access Forbidden",
-            description: "You don't have permission to create repositories. Check your token permissions.",
-            variant: "destructive"
-          })
-        } else {
-          toast({
-            title: "Repository Creation Failed",
-            description: errorData.error || "Failed to create repository",
-            variant: "destructive"
-          })
+          // Provide specific error messages based on status code
+          if (repoResponse.status === 422) {
+            toast({
+              title: "Repository Creation Failed",
+              description: errorData.error || "Repository name may already exist or is invalid. Try using a different name.",
+              variant: "destructive"
+            })
+          } else if (repoResponse.status === 401) {
+            toast({
+              title: "Authentication Failed",
+              description: "Invalid GitHub token. Please check your token and try again.",
+              variant: "destructive"
+            })
+          } else if (repoResponse.status === 403) {
+            toast({
+              title: "Access Forbidden",
+              description: "You don't have permission to create repositories. Check your token permissions.",
+              variant: "destructive"
+            })
+          } else {
+            toast({
+              title: "Repository Creation Failed",
+              description: errorData.error || "Failed to create repository",
+              variant: "destructive"
+            })
+          }
+
+          setDeploymentState(prev => ({ ...prev, isDeploying: false }))
+          return
         }
 
-        setDeploymentState(prev => ({ ...prev, isDeploying: false }))
-        return
+        repoData = await repoResponse.json()
+        repoOwner = repoData.fullName.split('/')[0]
+        repoName = repoData.name
+      } else {
+        // Use existing repository
+        const selectedRepo = userRepos.find(repo => repo.fullName === githubForm.selectedRepo)
+        if (!selectedRepo) {
+          toast({
+            title: "Repository Not Found",
+            description: "Selected repository could not be found. Please refresh and try again.",
+            variant: "destructive"
+          })
+          setDeploymentState(prev => ({ ...prev, isDeploying: false }))
+          return
+        }
+
+        repoData = {
+          url: selectedRepo.url,
+          fullName: selectedRepo.fullName,
+          name: selectedRepo.name
+        }
+        repoOwner = selectedRepo.fullName.split('/')[0]
+        repoName = selectedRepo.name
       }
 
-      const repoData = await repoResponse.json()
       setDeploymentState(prev => ({ ...prev, currentStep: 'deploying' }))
 
       // Update project with GitHub repo URL
@@ -889,11 +1147,12 @@ export default function DeploymentClient() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          repoName: githubForm.repoName,
-          repoOwner: repoData.fullName.split('/')[0],
+          repoName: repoName,
+          repoOwner: repoOwner,
           token: storedTokens.github,
           workspaceId: selectedProject.id,
           files: projectFiles, // Include files in the request
+          commitMessage: githubForm.commitMessage || 'Update project files',
         })
       })
 
@@ -1270,18 +1529,118 @@ export default function DeploymentClient() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
+                    {/* Deployment Mode Selection */}
                     <div>
-                      <Label htmlFor="repo-name" className="flex items-center space-x-2 text-gray-300">
-                        <span>Repository Name</span>
+                      <Label className="flex items-center space-x-2 text-gray-300">
+                        <span>Deployment Mode</span>
                         <Tooltip>
                           <TooltipTrigger>
                             <HelpCircle className="h-4 w-4 text-gray-400" />
                           </TooltipTrigger>
                           <TooltipContent className="bg-gray-700 border-gray-600 text-white">
-                            <p>Choose a unique name for your repository</p>
+                            <p>Choose to create a new repository or deploy to an existing one</p>
                           </TooltipContent>
                         </Tooltip>
                       </Label>
+                      <div className="flex space-x-4 mt-2">
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="deploymentMode"
+                            value="new"
+                            checked={githubForm.deploymentMode === 'new'}
+                            onChange={(e) => setGithubForm(prev => ({ ...prev, deploymentMode: e.target.value as 'new' | 'existing' }))}
+                            className="text-blue-600"
+                          />
+                          <span className="text-gray-300">Create New Repository</span>
+                        </label>
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="deploymentMode"
+                            value="existing"
+                            checked={githubForm.deploymentMode === 'existing'}
+                            onChange={(e) => setGithubForm(prev => ({ ...prev, deploymentMode: e.target.value as 'new' | 'existing' }))}
+                            className="text-blue-600"
+                          />
+                          <span className="text-gray-300">Use Existing Repository</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Repository Selection for Existing Mode */}
+                    {githubForm.deploymentMode === 'existing' && (
+                      <div>
+                        <Label htmlFor="existing-repo" className="flex items-center space-x-2 text-gray-300">
+                          <span>Select Repository</span>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="h-4 w-4 text-gray-400" />
+                            </TooltipTrigger>
+                            <TooltipContent className="bg-gray-700 border-gray-600 text-white">
+                              <p>Choose an existing repository to deploy to</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </Label>
+                        <div className="flex space-x-2 mt-1">
+                          <Select
+                            value={githubForm.selectedRepo}
+                            onValueChange={(value) => setGithubForm(prev => ({ ...prev, selectedRepo: value }))}
+                          >
+                            <SelectTrigger className="flex-1 bg-gray-700 border-gray-600 text-white">
+                              <SelectValue placeholder="Select a repository" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-gray-700 border-gray-600">
+                              {userRepos.map((repo) => (
+                                <SelectItem
+                                  key={repo.fullName}
+                                  value={repo.fullName}
+                                  className="text-white hover:bg-gray-600"
+                                >
+                                  <div className="flex items-center space-x-2">
+                                    <span>{repo.fullName}</span>
+                                    {repo.private && (
+                                      <Badge variant="secondary" className="text-xs">Private</Badge>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={fetchUserGitHubRepos}
+                            disabled={isLoadingRepos}
+                            className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                          >
+                            {isLoadingRepos ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                        <p className="text-sm text-gray-400 mt-1">
+                          Refresh to load your latest repositories
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Repository Name for New Mode */}
+                    {githubForm.deploymentMode === 'new' && (
+                      <div>
+                        <Label htmlFor="repo-name" className="flex items-center space-x-2 text-gray-300">
+                          <span>Repository Name</span>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="h-4 w-4 text-gray-400" />
+                            </TooltipTrigger>
+                            <TooltipContent className="bg-gray-700 border-gray-600 text-white">
+                              <p>Choose a unique name for your repository</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </Label>
                       <div className="flex space-x-2 mt-1">
                         <Input
                           id="repo-name"
@@ -1308,7 +1667,8 @@ export default function DeploymentClient() {
                       <p className="text-sm text-gray-400 mt-1">
                         Only letters, numbers, hyphens, underscores, and periods allowed. Max 100 characters.
                       </p>
-                    </div>
+                      </div>
+                    )}
 
                     <div>
                       <Label htmlFor="repo-description" className="text-gray-300">Repository Description (Optional)</Label>
@@ -1320,6 +1680,48 @@ export default function DeploymentClient() {
                         rows={2}
                         className="mt-1 bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                       />
+                    </div>
+
+                    {/* Commit Message - shown for both modes */}
+                    <div>
+                      <Label htmlFor="commit-message" className="flex items-center space-x-2 text-gray-300">
+                        <span>Commit Message</span>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <HelpCircle className="h-4 w-4 text-gray-400" />
+                          </TooltipTrigger>
+                          <TooltipContent className="bg-gray-700 border-gray-600 text-white">
+                            <p>Message for this deployment commit</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </Label>
+                      <div className="relative mt-1">
+                        <Input
+                          id="commit-message"
+                          value={githubForm.commitMessage}
+                          onChange={(e) => setGithubForm(prev => ({ ...prev, commitMessage: e.target.value }))}
+                          placeholder="Update project files"
+                          className="bg-gray-700 border-gray-600 text-white placeholder-gray-400 pr-10"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={generateAutoCommitMessage}
+                          disabled={isGeneratingCommitMessage}
+                          className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-yellow-400 hover:text-yellow-300 hover:bg-gray-600"
+                          title="Generate commit message from last chat"
+                        >
+                          {isGeneratingCommitMessage ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Sparkles className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-sm text-gray-400 mt-1">
+                        This will be the commit message for your deployment. Click ✨ to generate an AI-powered professional commit message from your last chat.
+                      </p>
                     </div>
 
                     <div className="flex items-center space-x-2">
