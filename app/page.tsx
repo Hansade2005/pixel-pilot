@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -23,6 +24,7 @@ import { createClient } from "@/lib/supabase/client"
 import { TemplateManager } from "@/lib/template-manager"
 
 export default function LandingPage() {
+  const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -73,8 +75,8 @@ export default function LandingPage() {
       // Apply template files
       await TemplateManager.applyTemplate(templateId, workspace.id)
 
-      // Redirect to the workspace
-      window.location.href = `/workspace/${workspace.id}`
+      // Redirect to workspace with newProject parameter (same as chat input)
+      router.push(`/workspace?newProject=${workspace.id}&template=${encodeURIComponent(template.title)}`)
 
     } catch (error) {
       console.error('Error creating project from template:', error)

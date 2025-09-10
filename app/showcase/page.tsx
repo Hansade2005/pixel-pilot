@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Logo } from "@/components/ui/logo"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,6 +15,7 @@ import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 
 export default function ShowcasePage() {
+  const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [isForking, setIsForking] = useState<string | null>(null)
@@ -70,8 +72,8 @@ export default function ShowcasePage() {
       await TemplateManager.applyTemplate(project.templateId, workspace.id)
 
       toast.success(`Successfully forked ${project.title}!`)
-      // Navigate to the new workspace
-      window.location.href = `/?workspace=${workspace.id}`
+      // Navigate to the new workspace with correct format
+      router.push(`/workspace?newProject=${workspace.id}&template=${encodeURIComponent(project.title)}`)
     } catch (error) {
       console.error('Error forking project:', error)
       toast.error('Failed to fork project. Please try again.')

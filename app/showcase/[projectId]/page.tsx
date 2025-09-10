@@ -367,8 +367,8 @@ export default function ProjectViewPage() {
 
       toast.success(`Successfully forked "${project.title}"!`)
 
-      // Redirect to the workspace
-      window.location.href = `/workspace/${workspace.id}`
+      // Redirect to the workspace with correct format
+      router.push(`/workspace?newProject=${workspace.id}&template=${encodeURIComponent(project.title)}`)
 
     } catch (error) {
       console.error('Error forking project:', error)
