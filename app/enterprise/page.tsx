@@ -292,12 +292,12 @@ export default function EnterprisePage() {
                 <div className="text-gray-400">Uptime SLA</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-white mb-2">500+</div>
-                <div className="text-gray-400">Enterprise Clients</div>
+                <div className="text-3xl font-bold text-white mb-2">100%</div>
+                <div className="text-gray-400">Security Compliance</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-white mb-2">50M+</div>
-                <div className="text-gray-400">Lines of Code Generated</div>
+                <div className="text-3xl font-bold text-white mb-2">∞</div>
+                <div className="text-gray-400">API Requests</div>
               </div>
               <div className="text-center">
                 <div className="text-3xl font-bold text-white mb-2">24/7</div>
@@ -570,11 +570,11 @@ export default function EnterprisePage() {
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button variant="outline" className="border-gray-600 text-white hover:bg-gray-700">
                   <Phone className="w-4 h-4 mr-2" />
-                  Call Us: (555) 123-4567
+                  WhatsApp: +237679719353
                 </Button>
                 <Button variant="outline" className="border-gray-600 text-white hover:bg-gray-700">
                   <Mail className="w-4 h-4 mr-2" />
-                  Email: enterprise@pixelpilot.com
+                  Email: hello@pipilot.dev
                 </Button>
               </div>
             </div>

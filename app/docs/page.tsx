@@ -5,11 +5,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { BookOpen, Code, Zap, Shield, ArrowRight, Search, FileText, Video, Users, Settings, Rocket, Database, MessageSquare, Cloud, Layers, Filter, X } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { BookOpen, Code, Zap, Shield, ArrowRight, Search, FileText, Video, Users, Settings, Rocket, Database, MessageSquare, Cloud, Layers, Filter, X, Phone, Mail } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { enterpriseService } from "@/lib/supabase/enterprise"
+import { toast } from "sonner"
 
 interface HelpResource {
   id: string
@@ -36,6 +39,16 @@ export default function DocsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>("all")
+
+  // Contact modal states
+  const [showContactModal, setShowContactModal] = useState(false)
+  const [contactForm, setContactForm] = useState({
+    name: '',
+    email: '',
+    company: '',
+    phone: '',
+    message: ''
+  })
 
   useEffect(() => {
     const loadHelpResources = async () => {
@@ -117,6 +130,26 @@ export default function DocsPage() {
     setSearchQuery("")
     setSelectedCategory("all")
     setSelectedDifficulty("all")
+  }
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const { data, error } = await enterpriseService.submitContactRequest(contactForm)
+
+      if (error) {
+        console.error('Error submitting contact request:', error)
+        toast.error('Failed to submit contact request. Please try again.')
+        return
+      }
+
+      toast.success('Thank you! Our support team will contact you within 24 hours.')
+      setShowContactModal(false)
+      setContactForm({ name: '', email: '', company: '', phone: '', message: '' })
+    } catch (error) {
+      console.error('Error submitting contact request:', error)
+      toast.error('Failed to submit contact request. Please try again.')
+    }
   }
 
   const getIconForCategory = (categoryId: string) => {
@@ -430,16 +463,121 @@ export default function DocsPage() {
               Join our community of developers and get help from fellow Pixel Pilot users, or contact our support team directly.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Button
+                size="lg"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => toast.info("Coming soon!")}
+              >
                 Join Discord Community
               </Button>
-              <Button size="lg" variant="outline" className="border-gray-600 text-white hover:bg-gray-700">
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-gray-600 text-white hover:bg-gray-700"
+                onClick={() => setShowContactModal(true)}
+              >
                 Contact Support
               </Button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Contact Support Modal */}
+      {showContactModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-white">Contact Support</h3>
+                <button
+                  onClick={() => setShowContactModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <form onSubmit={handleContactSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Name *</label>
+                  <Input
+                    type="text"
+                    value={contactForm.name}
+                    onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+                    required
+                    className="bg-gray-800 border-gray-600 text-white"
+                    placeholder="Your full name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Email *</label>
+                  <Input
+                    type="email"
+                    value={contactForm.email}
+                    onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                    required
+                    className="bg-gray-800 border-gray-600 text-white"
+                    placeholder="your.email@example.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Company</label>
+                  <Input
+                    type="text"
+                    value={contactForm.company}
+                    onChange={(e) => setContactForm({ ...contactForm, company: e.target.value })}
+                    className="bg-gray-800 border-gray-600 text-white"
+                    placeholder="Your company name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Phone</label>
+                  <Input
+                    type="tel"
+                    value={contactForm.phone}
+                    onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                    className="bg-gray-800 border-gray-600 text-white"
+                    placeholder="+1 (555) 123-4567"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Message *</label>
+                  <Textarea
+                    value={contactForm.message}
+                    onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
+                    required
+                    className="bg-gray-800 border-gray-600 text-white"
+                    placeholder="Describe your issue or question..."
+                    rows={4}
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    type="button"
+                    onClick={() => setShowContactModal(false)}
+                    variant="outline"
+                    className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  >
+                    Send Message
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <Footer />

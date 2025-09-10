@@ -20,6 +20,8 @@ export default function ShowcasePage() {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [isForking, setIsForking] = useState<string | null>(null)
   const [templateData, setTemplateData] = useState<any[]>([])
+  const [sortBy, setSortBy] = useState<string>('popular')
+  const [filterBy, setFilterBy] = useState<string>('all')
 
   // Check user authentication and load template data
   useEffect(() => {
@@ -195,12 +197,85 @@ export default function ShowcasePage() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white">
+              <Button
+                size="lg"
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+                onClick={() => toast.info("Coming soon!")}
+              >
                 Share Your Project
               </Button>
-              <Button size="lg" variant="outline" className="border-gray-600 text-white hover:bg-gray-700">
-                View All Projects
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-gray-600 text-white hover:bg-gray-700"
+                onClick={() => toast.info("Coming soon!")}
+              >
+                Submit Your Project
               </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-gray-600 text-white hover:bg-gray-700"
+                onClick={() => router.push('/docs')}
+              >
+                Learn More
+              </Button>
+            </div>
+          </div>
+
+          {/* Sorting and Filtering */}
+          <div className="mb-8">
+            <div className="flex flex-wrap gap-4 items-center justify-center">
+              {/* Sort By */}
+              <div className="flex items-center space-x-2">
+                <span className="text-gray-400 text-sm">Sort by:</span>
+                <div className="flex bg-gray-800/50 rounded-lg p-1">
+                  {[
+                    { key: 'popular', label: 'Popular' },
+                    { key: 'recent', label: 'Recent' },
+                    { key: 'trending', label: 'Trending' }
+                  ].map((option) => (
+                    <button
+                      key={option.key}
+                      onClick={() => setSortBy(option.key)}
+                      className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                        sortBy === option.key
+                          ? 'bg-purple-600 text-white'
+                          : 'text-gray-300 hover:text-white hover:bg-gray-700/50'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Filter By */}
+              <div className="flex items-center space-x-2">
+                <span className="text-gray-400 text-sm">Filter:</span>
+                <div className="flex bg-gray-800/50 rounded-lg p-1">
+                  {[
+                    { key: 'all', label: 'All' },
+                    { key: 'website', label: 'Website' },
+                    { key: 'personal', label: 'Personal' },
+                    { key: 'consumer', label: 'Consumer App' },
+                    { key: 'b2b', label: 'B2B App' },
+                    { key: 'prototype', label: 'Prototype' }
+                  ].map((option) => (
+                    <button
+                      key={option.key}
+                      onClick={() => setFilterBy(option.key)}
+                      className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                        filterBy === option.key
+                          ? 'bg-purple-600 text-white'
+                          : 'text-gray-300 hover:text-white hover:bg-gray-700/50'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -333,12 +408,8 @@ export default function ShowcasePage() {
 
           {/* Recent Projects */}
           <div className="mb-16">
-            <div className="flex items-center justify-between mb-8">
+            <div className="mb-8">
               <h2 className="text-3xl font-bold text-white">Recent Projects</h2>
-              <Button variant="outline" className="border-gray-600 text-white hover:bg-gray-700">
-                View All
-                <ExternalLink className="w-4 h-4 ml-2" />
-              </Button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {recentProjects.map((project, index) => (

@@ -1,5 +1,6 @@
 import { Logo } from "@/components/ui/logo"
 import Link from "next/link"
+import { toast } from "sonner"
 
 export function Footer() {
   return (
@@ -19,10 +20,10 @@ export function Footer() {
               <li><Link href="/pricing" className="text-gray-400 hover:text-white transition-colors">Plans</Link></li>
               <li><Link href="/enterprise" className="text-gray-400 hover:text-white transition-colors">Business</Link></li>
               <li><Link href="/showcase" className="text-gray-400 hover:text-white transition-colors">Showcase</Link></li>
-              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Student discount</Link></li>
-              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Solutions</Link></li>
-              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Integrations</Link></li>
-              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Changelog</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); toast.info("Coming soon!") }}>Student discount</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); toast.info("Coming soon!") }}>Solutions</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); toast.info("Coming soon!") }}>Integrations</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); toast.info("Coming soon!") }}>Changelog</Link></li>
             </ul>
           </div>
 
@@ -42,11 +43,11 @@ export function Footer() {
             <h3 className="text-white font-semibold mb-4">Community</h3>
             <ul className="space-y-2 text-sm">
               <li><Link href="/community" className="text-gray-400 hover:text-white transition-colors">Community</Link></li>
-              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Support</Link></li>
-              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Discord</Link></li>
-              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Reddit</Link></li>
-              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">X/Twitter</Link></li>
-              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">LinkedIn</Link></li>
+              <li><Link href="/docs" className="text-gray-400 hover:text-white transition-colors">Support</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); toast.info("Coming soon!") }}>Discord</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); toast.info("Coming soon!") }}>Reddit</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); toast.info("Coming soon!") }}>X/Twitter</Link></li>
+              <li><Link href="#" className="text-gray-400 hover:text-white transition-colors cursor-pointer" onClick={(e) => { e.preventDefault(); toast.info("Coming soon!") }}>LinkedIn</Link></li>
             </ul>
           </div>
         </div>
