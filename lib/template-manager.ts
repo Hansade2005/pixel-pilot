@@ -207,7 +207,7 @@ export class TemplateManager {
       thumbnailUrl: 'https://api.a0.dev/assets/image?text=SaaS template with authentication, payments, dashboard, user management, subscription system, modern UI&aspect=1:1&seed=1000',
       files: saasTemplateFiles,
       additionalPackages: {
-
+        "react-intersection-observer": "^3.0.0"
       }
     }
   ]
