@@ -105,8 +105,7 @@ export const baseTemplateFiles: Omit<File, 'id' | 'workspaceId' | 'createdAt' | 
     "@types/leaflet": "^1.9.8",
     "@types/d3": "^7.4.3",
     "@types/fabric": "^5.3.6",
-    "@types/three": "^0.158.0",
-    "@types/react-intersection-observer": "^9.8.2"
+    "@types/three": "^0.158.0"
   }
 }`,
     fileType: 'json',
