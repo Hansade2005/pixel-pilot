@@ -702,19 +702,34 @@ export default function AccountSettingsPage() {
   const fetchSubscriptionStatus = async (userId: string) => {
     try {
       setSubscriptionLoading(true)
-      const response = await fetch('/api/stripe/check-subscription', {
-        method: 'POST',
-      })
 
-      if (response.ok) {
-        const data = await response.json()
-        setSubscription(data)
+      // Fetch subscription directly from database
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+
+      const { data: userSettings, error: settingsError } = await supabase
+        .from('user_settings')
+        .select('*')
+        .eq('user_id', userId)
+        .single()
+
+      if (!settingsError && userSettings) {
+        const subscriptionData = {
+          plan: userSettings.subscription_plan || 'free',
+          status: userSettings.subscription_status || 'active',
+          deploymentsThisMonth: userSettings.deployments_this_month || 0,
+          githubPushesThisMonth: userSettings.github_pushes_this_month || 0,
+          subscriptionEndDate: userSettings.cancel_at_period_end ? userSettings.updated_at : undefined,
+          cancelAtPeriodEnd: userSettings.cancel_at_period_end || false
+        }
+
+        setSubscription(subscriptionData)
 
         // Update usage stats based on subscription
         setUsageStats(prev => ({
           ...prev,
-          deploymentsThisMonth: data.deploymentsThisMonth || 0,
-          githubPushesThisMonth: data.githubPushesThisMonth || 0
+          deploymentsThisMonth: subscriptionData.deploymentsThisMonth,
+          githubPushesThisMonth: subscriptionData.githubPushesThisMonth
         }))
       }
     } catch (error) {

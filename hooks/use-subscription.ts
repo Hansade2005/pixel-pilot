@@ -21,44 +21,50 @@ export function useSubscription(pollInterval = 300000) { // 5 minutes default
     try {
       setLoading(true)
 
-      // Get subscription data from limits API (which includes all plan information)
-      const limitsResponse = await fetch('/api/limits/status')
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
 
-      if (limitsResponse.ok) {
-        const limitsData = await limitsResponse.json()
-
-        // Get subscription status from Stripe API
-        const stripeResponse = await fetch('/api/stripe/check-subscription', {
-          method: 'POST',
-        })
-
-        let stripeData = {}
-        if (stripeResponse.ok) {
-          stripeData = await stripeResponse.json()
-        }
-
-        // Combine both data sources
-        const combinedData = {
-          plan: limitsData.plan,
-          status: stripeData.status || 'active',
-          deploymentsThisMonth: limitsData.deploymentsThisMonth || 0,
-          githubPushesThisMonth: limitsData.githubPushesThisMonth || 0,
-          subscriptionEndDate: stripeData.subscriptionEndDate,
-          cancelAtPeriodEnd: stripeData.cancelAtPeriodEnd
-        }
-
-        setSubscription(combinedData)
-        setError(null)
-      } else {
-        throw new Error('Failed to fetch subscription')
+      if (userError || !user) {
+        throw new Error('User not authenticated')
       }
+
+      // Get user settings from database directly
+      const { data: userSettings, error: settingsError } = await supabase
+        .from('user_settings')
+        .select('*')
+        .eq('user_id', user.id)
+        .single()
+
+      if (settingsError || !userSettings) {
+        // Default to free plan if no settings found
+        setSubscription({
+          plan: 'free',
+          status: 'active',
+          deploymentsThisMonth: 0,
+          githubPushesThisMonth: 0,
+          subscriptionEndDate: undefined,
+          cancelAtPeriodEnd: false
+        })
+      } else {
+        // Use the data from user_settings table directly
+        setSubscription({
+          plan: userSettings.subscription_plan || 'free',
+          status: userSettings.subscription_status || 'active',
+          deploymentsThisMonth: userSettings.deployments_this_month || 0,
+          githubPushesThisMonth: userSettings.github_pushes_this_month || 0,
+          subscriptionEndDate: userSettings.cancel_at_period_end ? userSettings.updated_at : undefined,
+          cancelAtPeriodEnd: userSettings.cancel_at_period_end || false
+        })
+      }
+
+      setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
       console.error('Error fetching subscription:', err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [supabase])
 
   const refreshSubscription = useCallback(() => {
     fetchSubscription()
@@ -74,28 +80,42 @@ export function useSubscription(pollInterval = 300000) { // 5 minutes default
     return () => clearInterval(interval)
   }, [fetchSubscription, pollInterval])
 
-  // Optional: Set up Supabase realtime subscription for user_settings changes
+  // Set up real-time subscription for user_settings changes
   useEffect(() => {
-    const channel = supabase
-      .channel('subscription-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_settings',
-        },
-        (payload) => {
-          console.log('Subscription updated:', payload)
-          // Refetch subscription data when user_settings changes
-          fetchSubscription()
-        }
-      )
-      .subscribe()
+    // Get current user first to filter the subscription
+    const getUserAndSubscribe = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
 
-    return () => {
-      supabase.removeChannel(channel)
+        if (user) {
+          const channel = supabase
+            .channel(`user-settings-updates-${user.id}`)
+            .on(
+              'postgres_changes',
+              {
+                event: '*',
+                schema: 'public',
+                table: 'user_settings',
+                filter: `user_id=eq.${user.id}`
+              },
+              (payload) => {
+                console.log('User settings updated:', payload)
+                // Refetch subscription data when user_settings changes
+                fetchSubscription()
+              }
+            )
+            .subscribe()
+
+          return () => {
+            supabase.removeChannel(channel)
+          }
+        }
+      } catch (error) {
+        console.error('Error setting up real-time subscription:', error)
+      }
     }
+
+    getUserAndSubscribe()
   }, [supabase, fetchSubscription])
 
   return {

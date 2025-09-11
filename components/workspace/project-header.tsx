@@ -29,6 +29,7 @@ interface ProjectHeaderProps {
   selectedModel?: string
   onModelChange?: (modelId: string) => void
   userPlan?: string
+  subscriptionStatus?: string
   user?: any
   onProjectCreated?: (newProject: Project) => Promise<void>
 }
@@ -41,6 +42,7 @@ export function ProjectHeader({
   selectedModel,
   onModelChange,
   userPlan,
+  subscriptionStatus,
   user,
   onProjectCreated
 }: ProjectHeaderProps) {
@@ -176,6 +178,7 @@ export function ProjectHeader({
               selectedModel={selectedModel}
               onModelChange={onModelChange}
               userPlan={userPlan}
+              subscriptionStatus={subscriptionStatus}
               compact={true}
             />
           </div>

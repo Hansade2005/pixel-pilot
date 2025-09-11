@@ -10,6 +10,7 @@ interface ModelSelectorProps {
   selectedModel: string
   onModelChange: (modelId: string) => void
   userPlan?: string
+  subscriptionStatus?: string
   className?: string
   compact?: boolean
 }
@@ -20,9 +21,12 @@ export function ModelSelector({
   selectedModel,
   onModelChange,
   userPlan = 'free',
+  subscriptionStatus,
   className = '',
   compact = true
 }: ModelSelectorProps) {
+  // Default subscription status based on plan (matches admin page behavior)
+  const effectiveStatus = subscriptionStatus || (userPlan === 'free' ? 'active' : 'inactive')
   const currentModel = getModelById(selectedModel)
   
   // Group models by provider for better organization
@@ -34,9 +38,18 @@ export function ModelSelector({
     return acc
   }, {} as Record<string, ChatModel[]>)
 
-  // Get allowed models for user's plan
+  // Determine allowed models based on subscription status and plan
   const userLimits = getLimits(userPlan)
-  const allowedModels = userLimits.allowedModels || []
+
+  // ONLY Pro plan users with ACTIVE status can access all models
+  // All other users (Free, inactive Pro, canceled, etc.) only get auto model
+  const isProActive = userPlan === 'pro' && effectiveStatus === 'active'
+
+  // If user has Pro plan with active status, allow all models
+  // Otherwise, only allow auto model
+  const allowedModels = isProActive
+    ? userLimits.allowedModels || []
+    : ['auto']
 
   // Helper function to check if model is allowed
   const isModelAllowed = (modelId: string) => allowedModels.includes(modelId)
@@ -85,7 +98,7 @@ export function ModelSelector({
                       <div className="flex items-center justify-between w-full">
                         <span>{model.name}</span>
                         {!allowed && <Lock className="h-3 w-3 text-muted-foreground ml-2" />}
-                        {allowed && userPlan === 'free' && model.id === 'auto' && (
+                        {allowed && isProActive && (
                           <Crown className="h-3 w-3 text-yellow-500 ml-2" />
                         )}
                       </div>
@@ -139,7 +152,7 @@ export function ModelSelector({
                       </div>
                       <div className="flex items-center gap-2">
                         {!allowed && <Lock className="h-4 w-4 text-muted-foreground" />}
-                        {allowed && userPlan === 'free' && model.id === 'auto' && (
+                        {allowed && isProActive && (
                           <Crown className="h-4 w-4 text-yellow-500" />
                         )}
                       </div>

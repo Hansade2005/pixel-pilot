@@ -17,6 +17,7 @@ interface GlobalHeaderProps {
   selectedModel?: string
   onModelChange?: (model: string) => void
   userPlan?: string
+  subscriptionStatus?: string
   aiMode?: AIMode
   onAiModeChange?: (mode: AIMode) => void
 }
@@ -30,6 +31,7 @@ export function GlobalHeader({
   selectedModel,
   onModelChange,
   userPlan,
+  subscriptionStatus,
   aiMode,
   onAiModeChange
 }: GlobalHeaderProps) {
@@ -90,6 +92,7 @@ export function GlobalHeader({
             selectedModel={selectedModel}
             onModelChange={onModelChange}
             userPlan={userPlan}
+            subscriptionStatus={subscriptionStatus}
             compact={true}
             className="min-w-[60px]"
           />

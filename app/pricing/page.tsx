@@ -28,13 +28,20 @@ export default function PricingPage() {
       setUser(user)
 
       if (user) {
-        // Fetch current subscription using the polling endpoint
-        const response = await fetch('/api/stripe/check-subscription', {
-          method: 'POST',
-        })
-        if (response.ok) {
-          const subscription = await response.json()
-          setCurrentPlan(subscription.plan)
+        // Fetch current subscription directly from database
+        const { createClient } = await import('@/lib/supabase/client')
+        const supabase = createClient()
+
+        const { data: userSettings, error: settingsError } = await supabase
+          .from('user_settings')
+          .select('subscription_plan')
+          .eq('user_id', user.id)
+          .single()
+
+        if (!settingsError && userSettings) {
+          setCurrentPlan(userSettings.subscription_plan || 'free')
+        } else {
+          setCurrentPlan('free')
         }
       }
     }

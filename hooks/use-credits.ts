@@ -24,16 +24,37 @@ export function useCredits(userId?: string) {
       setLoading(true)
       setError(null)
 
-      // Fetch subscription status from API
-      const response = await fetch('/api/stripe/check-subscription', {
-        method: 'POST',
-      })
+      // Import supabase client and fetch directly from user_settings table
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
 
-      if (response.ok) {
-        const data = await response.json()
-        setSubscription(data)
+      // Get user settings from database directly
+      const { data: userSettings, error: settingsError } = await supabase
+        .from('user_settings')
+        .select('*')
+        .eq('user_id', userId)
+        .single()
+
+      if (settingsError || !userSettings) {
+        // Default to free plan if no settings found
+        setSubscription({
+          plan: 'free',
+          status: 'active',
+          deploymentsThisMonth: 0,
+          githubPushesThisMonth: 0,
+          subscriptionEndDate: undefined,
+          cancelAtPeriodEnd: false
+        })
       } else {
-        throw new Error('Failed to fetch subscription')
+        // Use the data from user_settings table directly
+        setSubscription({
+          plan: userSettings.subscription_plan || 'free',
+          status: userSettings.subscription_status || 'active',
+          deploymentsThisMonth: userSettings.deployments_this_month || 0,
+          githubPushesThisMonth: userSettings.github_pushes_this_month || 0,
+          subscriptionEndDate: userSettings.cancel_at_period_end ? userSettings.updated_at : undefined,
+          cancelAtPeriodEnd: userSettings.cancel_at_period_end || false
+        })
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch subscription')
@@ -53,12 +74,12 @@ export function useCredits(userId?: string) {
     }
   }, [userId, fetchSubscription])
 
-  // Set up real-time subscription for subscription updates
+  // Set up real-time subscription for user_settings updates
   useEffect(() => {
     if (!userId) return
 
     const channel = supabase
-      .channel(`subscription-updates-${userId}`)
+      .channel(`user-settings-updates-${userId}`)
       .on(
         'postgres_changes',
         {
@@ -68,8 +89,8 @@ export function useCredits(userId?: string) {
           filter: `user_id=eq.${userId}`
         },
         (payload) => {
-          console.log('Subscription updated:', payload)
-          // Refresh subscription when user_settings table changes
+          console.log('User settings updated:', payload)
+          // Refresh subscription data when user_settings table changes
           fetchSubscription()
         }
       )

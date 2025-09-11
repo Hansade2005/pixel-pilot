@@ -51,7 +51,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [selectedProject, setSelectedProject] = useState<Workspace | null>(null)
 
   // Get user subscription information
-  const { plan: userPlan } = useSubscription(user?.id)
+  const { subscription } = useSubscription(user?.id)
+  const userPlan = subscription?.plan || 'free'
+  const subscriptionStatus = subscription?.status || 'inactive'
   const [activeTab, setActiveTab] = useState<"code" | "preview">("code")
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true) // Changed from false to true
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -500,6 +502,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               selectedModel={selectedModel}
               onModelChange={setSelectedModel}
               userPlan={userPlan}
+              subscriptionStatus={subscriptionStatus}
               onShare={(_shareUrl?: string) => {
                 toast({ title: 'Link Copied', description: 'Project link copied to clipboard' })
               }}
@@ -864,6 +867,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 selectedModel={selectedModel}
                 onModelChange={setSelectedModel}
                 userPlan={userPlan}
+                subscriptionStatus={subscriptionStatus}
                 compact={true}
                 className="flex-1"
               />
