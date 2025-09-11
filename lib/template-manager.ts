@@ -15,6 +15,13 @@ import { ecommercePlatformFiles } from './templates/ecommerce-platform'
 import { chatApplicationFiles } from './templates/chat-application'
 import { financeTrackerFiles } from './templates/finance-tracker'
 
+// Type declaration for JSZip
+declare global {
+  interface Window {
+    JSZip?: any
+  }
+}
+
 export interface TemplateProject {
   id: string
   title: string
@@ -277,6 +284,144 @@ export class TemplateManager {
 
   static getTemplateById(id: string): TemplateProject | undefined {
     return this.TEMPLATES.find(t => t.id === id)
+  }
+}
+
+// Template ZIP Download Utility
+export class TemplateDownloader {
+  private static async ensureJSZipLoaded(): Promise<void> {
+    // Load JSZip from CDN if not already loaded
+    if (typeof window !== 'undefined' && !(window as any).JSZip) {
+      const script = document.createElement('script')
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
+      script.async = true
+      document.head.appendChild(script)
+
+      await new Promise((resolve) => {
+        const       checkJSZip = () => {
+        if ((window as any).JSZip) {
+          resolve(void 0)
+        } else {
+          setTimeout(checkJSZip, 100)
+        }
+      }
+        checkJSZip()
+      })
+    }
+
+    if (!(window as any).JSZip) {
+      throw new Error('JSZip library not loaded')
+    }
+  }
+
+  static async downloadTemplateAsZip(templateId: string): Promise<void> {
+    try {
+      await this.ensureJSZipLoaded()
+
+      const template = TemplateManager.getTemplateById(templateId)
+      if (!template) {
+        throw new Error(`Template ${templateId} not found`)
+      }
+
+      if (!(window as any).JSZip) {
+        throw new Error('JSZip library not loaded')
+      }
+
+      // Create new ZIP instance
+      const zip = new (window as any).JSZip()
+
+      // Get all files from the template (both base and template-specific)
+      const allFiles = [
+        ...baseTemplateFiles,
+        ...template.files
+      ]
+
+      console.log(`Template Export: Found ${allFiles.length} files for ${template.title}`)
+
+      if (allFiles.length === 0) {
+        throw new Error('No files found in template')
+      }
+
+      // Track export statistics
+      let filesExported = 0
+      let filesSkipped = 0
+      let emptyFiles = 0
+
+      // Create directory structure in ZIP
+      const createdDirs = new Set<string>()
+
+      // First pass: create all directory structures
+      for (const file of allFiles) {
+        if (file.isDirectory) {
+          const dirPath = file.path.endsWith('/') ? file.path : file.path + '/'
+          if (!createdDirs.has(dirPath)) {
+            zip.folder(dirPath)
+            createdDirs.add(dirPath)
+          }
+        }
+      }
+
+      // Second pass: add all files
+      for (const file of allFiles) {
+        try {
+          // Skip directories (already handled above)
+          if (file.isDirectory) continue
+
+          // Ensure parent directories exist in ZIP
+          const pathParts = file.path.split('/')
+          const fileName = pathParts.pop() || file.name
+          let currentPath = ''
+
+          for (let i = 0; i < pathParts.length; i++) {
+            currentPath += pathParts[i] + '/'
+            if (!createdDirs.has(currentPath)) {
+              zip.folder(currentPath)
+              createdDirs.add(currentPath)
+            }
+          }
+
+          // Handle different content scenarios
+          if (file.content && file.content.trim().length > 0) {
+            // File has content
+            zip.file(file.path, file.content)
+            filesExported++
+          } else if (file.content === '' || file.content === null || file.content === undefined) {
+            // Empty file - still include it
+            zip.file(file.path, '')
+            emptyFiles++
+          } else {
+            // File has some content
+            zip.file(file.path, file.content)
+            filesExported++
+          }
+        } catch (fileError) {
+          console.warn(`Failed to export file ${file.path}:`, fileError)
+          filesSkipped++
+        }
+      }
+
+      console.log(`Template export complete: ${filesExported} files exported, ${emptyFiles} empty files included, ${filesSkipped} files skipped`)
+
+      // Generate ZIP content
+      const zipContent = await zip.generateAsync({ type: 'uint8array' })
+
+      // Create blob and download
+      const blob = new Blob([zipContent], { type: 'application/zip' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${template.title.replace(/[^a-zA-Z0-9]/g, '-')}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+
+      console.log(`Template ${template.title} downloaded successfully as ZIP`)
+
+    } catch (error) {
+      console.error('Template download error:', error)
+      throw error
+    }
   }
 }
 

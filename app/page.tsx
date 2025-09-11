@@ -5,15 +5,16 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { 
-  Plus, 
-  Image as ImageIcon, 
-  Gift, 
-  Bell, 
-  Heart, 
+import {
+  Plus,
+  Image as ImageIcon,
+  Gift,
+  Bell,
+  Heart,
   ChevronDown,
   ExternalLink,
-  Users
+  Users,
+  Download
 } from "lucide-react"
 import Link from "next/link"
 import { ChatInput } from "@/components/chat-input"
@@ -22,6 +23,7 @@ import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { createClient } from "@/lib/supabase/client"
 import { TemplateManager } from "@/lib/template-manager"
+import { toast } from "sonner"
 
 export default function LandingPage() {
   const router = useRouter()
@@ -40,49 +42,17 @@ export default function LandingPage() {
     setTemplates(templateData)
   }
 
-  const handleTemplateSelect = async (templateId: string) => {
-    if (!user) {
-      setShowAuthModal(true)
-      return
-    }
-
+  const handleDownloadTemplate = async (templateId: string) => {
     try {
-      // Import the required services
-      const { storageManager } = await import('@/lib/storage-manager')
-      await storageManager.init()
-
-      const template = TemplateManager.getTemplateById(templateId)
-      if (!template) {
-        throw new Error('Template not found')
-      }
-
-      // Create workspace with template name (ensure unique slug)
-      const baseSlug = template.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-      const timestamp = Date.now()
-      const uniqueSlug = `${baseSlug}-${timestamp}`
-
-      const workspace = await storageManager.createWorkspace({
-        name: template.title,
-        description: template.description,
-        userId: user.id,
-        isPublic: false,
-        isTemplate: false, // Don't mark as template since this is a user workspace
-        lastActivity: new Date().toISOString(),
-        deploymentStatus: 'not_deployed',
-        slug: uniqueSlug
-      })
-
-      // Apply template files
-      await TemplateManager.applyTemplate(templateId, workspace.id)
-
-      // Redirect to workspace with newProject parameter (same as chat input)
-      router.push(`/workspace?newProject=${workspace.id}&template=${encodeURIComponent(template.title)}`)
-
+      const { TemplateDownloader } = await import('@/lib/template-manager')
+      await TemplateDownloader.downloadTemplateAsZip(templateId)
+      toast.success('Template ZIP download has begun!')
     } catch (error) {
-      console.error('Error creating project from template:', error)
-      // You might want to show a toast notification here
+      console.error('Error downloading template:', error)
+      toast.error('Failed to download template. Please try again.')
     }
   }
+
 
   const checkUser = async () => {
     try {
@@ -214,8 +184,7 @@ export default function LandingPage() {
             {templates.map((template, index) => (
               <Card
                 key={index}
-                className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-all duration-300 hover:scale-105 group cursor-pointer"
-                onClick={() => handleTemplateSelect(template.id)}
+                className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-all duration-300 hover:scale-105 group"
               >
                 <div className="h-48 bg-gradient-to-br from-blue-500 to-purple-600 rounded-t-lg relative overflow-hidden">
                   <img
@@ -229,10 +198,26 @@ export default function LandingPage() {
                   />
                   {/* Project Preview Overlay */}
                   <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                    <Button size="sm" variant="secondary" className="bg-white/20 text-white hover:bg-white/30">
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      View Project
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="bg-white/20 text-white hover:bg-white/30"
+                        onClick={() => router.push(`/templates/${template.title.toLowerCase().replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')}`)}
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        View Template
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="bg-white/20 text-white hover:bg-white/30"
+                        onClick={() => handleDownloadTemplate(template.id)}
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Download ZIP
+                      </Button>
+                    </div>
                   </div>
                   
                   {/* Category Badge */}
@@ -268,9 +253,30 @@ export default function LandingPage() {
                   <h3 className="text-white font-semibold text-lg mb-2 line-clamp-1">
                     {template.title}
                   </h3>
-                  <p className="text-gray-300 text-sm line-clamp-2">
+                  <p className="text-gray-300 text-sm line-clamp-2 mb-4">
                     {template.description}
                   </p>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 border-gray-600 text-white hover:bg-gray-700"
+                      onClick={() => router.push(`/templates/${template.title.toLowerCase().replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')}`)}
+                    >
+                      <ExternalLink className="w-3 h-3 mr-2" />
+                      View Template
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="flex-1 bg-purple-600 hover:bg-purple-700"
+                      onClick={() => handleDownloadTemplate(template.id)}
+                    >
+                      <Download className="w-3 h-3 mr-2" />
+                      Download
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}

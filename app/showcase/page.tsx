@@ -6,7 +6,7 @@ import { Logo } from "@/components/ui/logo"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Star, ExternalLink, Heart, MessageCircle, Eye, Code, Globe, Zap, Users, TrendingUp, GitFork, Loader2 } from "lucide-react"
+import { Star, ExternalLink, Heart, MessageCircle, Eye, Code, Globe, Zap, Users, TrendingUp, Download } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { AuthModal } from "@/components/auth-modal"
@@ -48,41 +48,17 @@ export default function ShowcasePage() {
     return templateData.find(template => template.id === templateId)
   }
 
-  const handleForkProject = async (project: any) => {
-    if (!user) {
-      setShowAuthModal(true)
-      return
-    }
-
-    setIsForking(project.id)
+  const handleDownloadTemplate = async (templateId: string) => {
     try {
-      // Create new workspace
-      const { storageManager } = await import('@/lib/storage-manager')
-      await storageManager.init()
-      const workspace = await storageManager.createWorkspace({
-        name: `${project.title} (Forked)`,
-        description: `Forked from ${project.title}`,
-        slug: `${project.title.toLowerCase().replace(/\s+/g, '-')}-forked`,
-        userId: user.id,
-        isPublic: false,
-        isTemplate: false,
-        lastActivity: new Date().toISOString(),
-        deploymentStatus: 'not_deployed'
-      })
-
-      // Apply template to workspace
-      await TemplateManager.applyTemplate(project.templateId, workspace.id)
-
-      toast.success(`Successfully forked ${project.title}!`)
-      // Navigate to the new workspace with correct format
-      router.push(`/workspace?newProject=${workspace.id}&template=${encodeURIComponent(project.title)}`)
+      const { TemplateDownloader } = await import('@/lib/template-manager')
+      await TemplateDownloader.downloadTemplateAsZip(templateId)
+      toast.success('Template ZIP download started!')
     } catch (error) {
-      console.error('Error forking project:', error)
-      toast.error('Failed to fork project. Please try again.')
-    } finally {
-      setIsForking(null)
+      console.error('Error downloading template:', error)
+      toast.error('Failed to download template. Please try again.')
     }
   }
+
 
   const featuredProjects = [
     {
@@ -380,24 +356,20 @@ export default function ShowcasePage() {
                     <div className="flex gap-2">
                       <Button
                         size="sm"
-                        className="flex-1 bg-purple-600 hover:bg-purple-700"
-                        onClick={() => window.open(`/showcase/${project.id}`, '_blank')}
+                        variant="outline"
+                        className="flex-1 border-gray-600"
+                        onClick={() => router.push(`/templates/${project.templateId}`)}
                       >
                         <ExternalLink className="w-3 h-3 mr-2" />
-                        View Project
+                        View Template
                       </Button>
                       <Button
                         size="sm"
-                        variant="outline"
-                        className="border-gray-600"
-                        onClick={() => handleForkProject(project)}
-                        disabled={isForking === project.id}
+                        className="flex-1 bg-purple-600 hover:bg-purple-700"
+                        onClick={() => handleDownloadTemplate(project.templateId)}
                       >
-                        {isForking === project.id ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <GitFork className="w-3 h-3" />
-                        )}
+                        <Download className="w-3 h-3 mr-2" />
+                        Download ZIP
                       </Button>
                     </div>
                   </CardContent>
@@ -476,23 +448,20 @@ export default function ShowcasePage() {
                         <div className="flex gap-2">
                           <Button
                             size="sm"
-                            className="flex-1 bg-purple-600 hover:bg-purple-700"
-                            onClick={() => window.open(`/showcase/${project.id}`, '_blank')}
+                            variant="outline"
+                            className="flex-1 border-gray-600"
+                            onClick={() => router.push(`/templates/${project.templateId}`)}
                           >
-                            View Project
+                            <ExternalLink className="w-3 h-3 mr-2" />
+                            View Template
                           </Button>
                           <Button
                             size="sm"
-                            variant="outline"
-                            className="border-gray-600"
-                            onClick={() => handleForkProject(project)}
-                            disabled={isForking === project.id}
+                            className="flex-1 bg-purple-600 hover:bg-purple-700"
+                            onClick={() => handleDownloadTemplate(project.templateId)}
                           >
-                            {isForking === project.id ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <GitFork className="w-3 h-3" />
-                            )}
+                            <Download className="w-3 h-3 mr-2" />
+                            Download ZIP
                           </Button>
                         </div>
                       </div>
