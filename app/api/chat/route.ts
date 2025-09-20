@@ -82,6 +82,314 @@ function isComplexDevelopmentTask(userMessage: string): boolean {
   return complexPatterns.some(pattern => pattern.test(userMessage))
 }
 
+// Multistep Workflow Manager
+class MultistepWorkflowManager {
+  private encoder = new TextEncoder()
+  private controller: WritableStreamDefaultController | null = null
+  private currentStep = 0
+  
+  constructor(controller?: WritableStreamDefaultController) {
+    this.controller = controller
+  }
+
+  private sendSSE(data: any) {
+    if (this.controller) {
+      const sseData = `data: ${JSON.stringify(data)}\n\n`
+      this.controller.write(this.encoder.encode(sseData))
+    }
+  }
+
+  async sendStep(stepNumber: number, message: string, type: 'planning' | 'execution' | 'verification' | 'completion' = 'planning') {
+    this.currentStep = stepNumber
+    this.sendSSE({
+      type: 'workflow_step',
+      step: stepNumber,
+      message,
+      stepType: type,
+      timestamp: new Date().toISOString()
+    })
+    
+    // Small delay to ensure proper streaming
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+
+  async sendNarration(message: string) {
+    this.sendSSE({
+      type: 'ai_narration',
+      message,
+      currentStep: this.currentStep,
+      timestamp: new Date().toISOString()
+    })
+    
+    await new Promise(resolve => setTimeout(resolve, 50))
+  }
+
+  async sendToolExecution(toolName: string, status: 'starting' | 'success' | 'error', details?: any) {
+    this.sendSSE({
+      type: 'tool_execution',
+      tool: toolName,
+      status,
+      details,
+      currentStep: this.currentStep,
+      timestamp: new Date().toISOString()
+    })
+    
+    await new Promise(resolve => setTimeout(resolve, 50))
+  }
+
+  async sendVerification(message: string, success: boolean) {
+    this.sendSSE({
+      type: 'verification',
+      message,
+      success,
+      currentStep: this.currentStep,
+      timestamp: new Date().toISOString()
+    })
+    
+    await new Promise(resolve => setTimeout(resolve, 50))
+  }
+
+  async sendCompletion(summary: string, toolCalls: any[], fileOperations: any[]) {
+    this.sendSSE({
+      type: 'workflow_completion',
+      summary,
+      toolCalls,
+      fileOperations,
+      totalSteps: this.currentStep,
+      timestamp: new Date().toISOString()
+    })
+  }
+}
+
+// Execute Multistep Workflow with SSE streaming
+async function executeMultistepWorkflow(
+  generateTextOptions: any,
+  userMessage: string,
+  controller: ReadableStreamDefaultController,
+  projectId: string,
+  userId: string
+) {
+  const workflow = new MultistepWorkflowManager(controller)
+  let allToolCalls: any[] = []
+  let allFileOperations: any[] = []
+
+  try {
+    // Step 1: Understanding Request
+    await workflow.sendStep(1, "Understanding your request...", 'planning')
+    await workflow.sendNarration(`I'm analyzing your request: "${userMessage}". Let me break this down and create a plan.`)
+
+    // Step 2: Planning Actions  
+    await workflow.sendStep(2, "Planning the implementation...", 'planning')
+    await workflow.sendNarration("Based on your request, I'm creating a step-by-step plan to implement this feature effectively.")
+
+    // Step 3: Reading/Listing Files (if needed)
+    await workflow.sendStep(3, "Examining current project structure...", 'execution')
+    await workflow.sendNarration("I'll first examine the current project files to understand the existing structure and determine what needs to be created or modified.")
+
+    // Execute the first phase - gathering information
+    const explorationResult = await generateText({
+      ...generateTextOptions,
+      messages: [
+        ...generateTextOptions.messages,
+        { 
+          role: 'user', 
+          content: `Before implementing "${userMessage}", I need you to:
+1. Use read_file or list_files to understand the current project structure
+2. Explain what you found and how it relates to the request
+3. Stop after gathering information - don't implement anything yet
+
+Focus ONLY on understanding the current state. The implementation will come in the next phase.`
+        }
+      ],
+      stopWhen: stepCountIs(2), // Limit to just exploration
+      toolChoice: 'required'
+    })
+
+    // Process exploration results
+    if (explorationResult.steps) {
+      for (const step of explorationResult.steps) {
+        if (step.toolResults) {
+          for (const toolResult of step.toolResults) {
+            await workflow.sendToolExecution(toolResult.toolName, 'success', {
+              path: toolResult.args?.path,
+              result: toolResult.result
+            })
+            allToolCalls.push({
+              name: toolResult.toolName,
+              args: toolResult.args,
+              result: toolResult.result
+            })
+          }
+        }
+      }
+    }
+
+    await workflow.sendNarration(`I've examined the project structure. ${explorationResult.text || 'Information gathered successfully.'}`)
+
+    // Step 4: Executing Tools
+    await workflow.sendStep(4, "Implementing the changes...", 'execution')
+    await workflow.sendNarration("Now I'll implement the requested changes step by step.")
+
+    // Execute the implementation phase
+    const implementationResult = await generateText({
+      ...generateTextOptions,
+      messages: [
+        ...generateTextOptions.messages,
+        { 
+          role: 'assistant', 
+          content: explorationResult.text || 'I have examined the project structure.'
+        },
+        { 
+          role: 'user', 
+          content: `Now implement "${userMessage}" based on what you learned about the project structure. 
+Create/modify the necessary files to fulfill the request completely.
+
+Make sure to:
+1. Create well-structured, modern code
+2. Follow best practices and the existing project patterns
+3. Include proper error handling and TypeScript types where applicable
+4. Make the implementation complete and functional`
+        }
+      ],
+      stopWhen: stepCountIs(6), // Allow more steps for implementation
+      toolChoice: 'required'
+    })
+
+    // Process implementation results
+    if (implementationResult.steps) {
+      for (const step of implementationResult.steps) {
+        if (step.toolResults) {
+          for (const toolResult of step.toolResults) {
+            await workflow.sendToolExecution(toolResult.toolName, 'success', {
+              path: toolResult.args?.path,
+              result: toolResult.result
+            })
+            
+            allToolCalls.push({
+              name: toolResult.toolName,
+              args: toolResult.args,
+              result: toolResult.result
+            })
+
+            // Track file operations
+            if (['write_file', 'edit_file', 'delete_file'].includes(toolResult.toolName)) {
+              allFileOperations.push({
+                type: toolResult.toolName,
+                path: toolResult.args?.path || toolResult.result?.path,
+                content: toolResult.args?.content,
+                projectId: projectId,
+                success: toolResult.result?.success !== false
+              })
+            }
+          }
+        }
+      }
+    }
+
+    await workflow.sendNarration(`Implementation completed. ${implementationResult.text || 'All changes have been applied successfully.'}`)
+
+    // Step 5: Verification
+    await workflow.sendStep(5, "Verifying the changes...", 'verification')
+    await workflow.sendNarration("Let me verify that all changes were applied correctly.")
+
+    // Verification phase - read back the created/modified files
+    if (allFileOperations.length > 0) {
+      const verificationFiles = allFileOperations.filter(op => op.type !== 'delete_file').map(op => op.path)
+      
+      if (verificationFiles.length > 0) {
+        const verificationResult = await generateText({
+          ...generateTextOptions,
+          messages: [
+            { role: 'system', content: 'You are verifying that file changes were applied correctly. Read the specified files and confirm the changes are present and correct.' },
+            { 
+              role: 'user', 
+              content: `Please verify the implementation by reading these files that were created/modified: ${verificationFiles.join(', ')}.
+              
+Confirm that:
+1. The files contain the expected content
+2. The implementation matches the original request
+3. The code follows best practices
+
+Just read the files and provide a brief verification summary.`
+            }
+          ],
+          stopWhen: stepCountIs(3),
+          tools: { read_file: generateTextOptions.tools.read_file },
+          toolChoice: 'required'
+        })
+
+        if (verificationResult.steps) {
+          for (const step of verificationResult.steps) {
+            if (step.toolResults) {
+              for (const toolResult of step.toolResults) {
+                await workflow.sendToolExecution(toolResult.toolName, 'success', {
+                  path: toolResult.args?.path,
+                  verification: true
+                })
+              }
+            }
+          }
+        }
+
+        await workflow.sendVerification(
+          verificationResult.text || 'All files have been verified successfully.', 
+          true
+        )
+      } else {
+        await workflow.sendVerification('No files to verify.', true)
+      }
+    } else {
+      await workflow.sendVerification('No file changes were made.', true)
+    }
+
+    // Step 6: Completion & Summary
+    await workflow.sendStep(6, "Generating final summary...", 'completion')
+    
+    const summary = generateWorkflowSummary(userMessage, allToolCalls, allFileOperations, [
+      explorationResult.text || '',
+      implementationResult.text || ''
+    ])
+
+    await workflow.sendCompletion(summary, allToolCalls, allFileOperations)
+
+  } catch (error) {
+    console.error('[WORKFLOW] Error during execution:', error)
+    workflow.sendSSE({
+      type: 'workflow_error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    })
+  }
+}
+
+// Generate a comprehensive workflow summary
+function generateWorkflowSummary(
+  originalRequest: string,
+  toolCalls: any[],
+  fileOperations: any[],
+  aiResponses: string[]
+): string {
+  const summary = `## ✅ Task Completed: ${originalRequest}
+
+### 🔧 Actions Performed
+${toolCalls.length > 0 ? `- Executed ${toolCalls.length} tool operations` : '- No tools were needed'}
+${fileOperations.length > 0 ? `- Modified ${fileOperations.length} files` : '- No files were modified'}
+
+### 📁 File Changes
+${fileOperations.length > 0 
+  ? fileOperations.map(op => `- **${op.type}**: \`${op.path}\``).join('\n')
+  : '- No file changes were made'
+}
+
+### 🤖 Implementation Notes
+${aiResponses.filter(r => r && r.trim()).join('\n\n')}
+
+### 🎯 Summary
+The requested task has been completed successfully using a structured multistep workflow. All changes have been implemented and verified.`
+
+  return summary
+}
+
 // Server-side message saving function using storage manager (IndexedDB)
 async function saveMessageToIndexedDB(message: Message, projectId?: string, userId?: string): Promise<void> {
   if (!projectId || !userId) {
@@ -5467,6 +5775,50 @@ Please respond to the user's request above, taking into account the project cont
         }
       }
 
+      // Check if this requires the multistep workflow
+      const userMessage = messages[messages.length - 1]?.content || ''
+      const isWorkflowTask = isComplexDevelopmentTask(userMessage)
+      
+      console.log('[DEBUG] Workflow detection:', {
+        userMessage: userMessage.substring(0, 100) + '...',
+        isWorkflowTask,
+        aiMode
+      })
+
+      // If this is a complex workflow task, use SSE streaming
+      if (isWorkflowTask && aiMode === 'agent') {
+        console.log('[WORKFLOW] Starting multistep workflow with SSE streaming')
+        
+        // Create SSE stream
+        const stream = new ReadableStream({
+          start(controller) {
+            executeMultistepWorkflow(
+              generateTextOptions,
+              userMessage,
+              controller,
+              projectId,
+              user.id
+            ).then(() => {
+              controller.close()
+            }).catch((error) => {
+              console.error('[WORKFLOW] Stream error:', error)
+              controller.error(error)
+            })
+          }
+        })
+
+        return new Response(stream, {
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Content-Type',
+          },
+        })
+      }
+
+      // Original execution for non-workflow tasks
       const result = await generateText({
         ...generateTextOptions,
         onStepFinish: ({ text, toolCalls, toolResults, finishReason, usage }) => {

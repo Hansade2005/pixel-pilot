@@ -191,6 +191,61 @@ const WorkflowMessageComponent = ({ workflowChunk, sessionId }: { workflowChunk:
   )
 }
 
+// Format workflow content for real-time display
+function formatWorkflowContent(eventData: any, currentContent: string): string {
+  switch (eventData.type) {
+    case 'workflow_step':
+      return `## Step ${eventData.step}: ${eventData.message}
+
+🔄 **Current Phase:** ${eventData.stepType || 'processing'}
+
+${currentContent}`
+
+    case 'ai_narration':
+      return `${currentContent}
+
+💭 **AI:** ${eventData.message}`
+
+    case 'tool_execution':
+      const statusEmoji = eventData.status === 'success' ? '✅' : eventData.status === 'error' ? '❌' : '⏳'
+      const toolInfo = eventData.details?.path ? ` (${eventData.details.path})` : ''
+      return `${currentContent}
+
+${statusEmoji} **Tool:** ${eventData.tool}${toolInfo}`
+
+    case 'verification':
+      const verifyEmoji = eventData.success ? '✅' : '❌'
+      return `${currentContent}
+
+${verifyEmoji} **Verification:** ${eventData.message}`
+
+    case 'workflow_completion':
+      return `${currentContent}
+
+---
+
+## ✅ Workflow Completed
+
+${eventData.summary}
+
+**Tools Used:** ${eventData.toolCalls?.length || 0}
+**Files Modified:** ${eventData.fileOperations?.length || 0}
+**Total Steps:** ${eventData.totalSteps || 6}`
+
+    case 'workflow_error':
+      return `${currentContent}
+
+---
+
+## ❌ Workflow Error
+
+An error occurred during execution: ${eventData.error}`
+
+    default:
+      return currentContent
+  }
+}
+
 // ExpandableUserMessage component for long user messages
 const ExpandableUserMessage = ({ content, messageId, onRevert, showRestore = false }: { content: string, messageId: string, onRevert: (messageId: string) => void, showRestore?: boolean }) => {
   const [isExpanded, setIsExpanded] = useState(false)
@@ -2273,8 +2328,31 @@ export function ChatPanel({
                 try {
                   const data = JSON.parse(line.slice(6))
 
-                  // Check if this is a workflow chunk
-                  if (data.id && data.type && data.data) {
+                  // Handle multistep workflow events
+                  if (data.type && ['workflow_step', 'ai_narration', 'tool_execution', 'verification', 'workflow_completion', 'workflow_error'].includes(data.type)) {
+                    hasReceivedContent = true
+                    
+                    console.log('[WORKFLOW] Received event:', data.type, data)
+                    
+                    // Update the assistant message with workflow progress
+                    setMessages(prev => prev.map(msg =>
+                      msg.id === assistantMessageId
+                        ? {
+                            ...msg,
+                            content: formatWorkflowContent(data, msg.content),
+                            metadata: {
+                              ...msg.metadata,
+                              workflowMode: true,
+                              workflowStep: data.step,
+                              workflowType: data.stepType,
+                              workflowEvents: [...(msg.metadata?.workflowEvents || []), data]
+                            }
+                          }
+                        : msg
+                    ))
+                  }
+                  // Check if this is a workflow chunk (legacy format)
+                  else if (data.id && data.type && data.data) {
                     // This is a workflow chunk from our sophisticated workflow system
                     const workflowChunk = data
                     hasReceivedContent = true
