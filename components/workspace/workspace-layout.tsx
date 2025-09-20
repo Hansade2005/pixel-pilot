@@ -76,6 +76,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [newProjectName, setNewProjectName] = useState("")
   const [newProjectDescription, setNewProjectDescription] = useState("")
   const [isCreating, setIsCreating] = useState(false)
+  const [openProjectHeaderDialog, setOpenProjectHeaderDialog] = useState(false)
+  const [projectHeaderInitialDescription, setProjectHeaderInitialDescription] = useState("")
 
   // Auto-restore state
   const [isAutoRestoring, setIsAutoRestoring] = useState(false)
@@ -215,28 +217,45 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     }
   }, [user.id]) // Only depend on user.id, not projects
 
-  // Handle project selection from URL params
+  // Handle project selection from URL params (both newProject and projectId)
   useEffect(() => {
-    const projectId = searchParams.get('projectId')
-    console.log('WorkspaceLayout: Project selection effect - projectId:', projectId, 'clientProjects length:', clientProjects.length)
-    
-    if (projectId && clientProjects.length > 0) {
+    const projectId = searchParams.get('projectId') || searchParams.get('newProject')
+    console.log('WorkspaceLayout: Project selection effect - projectId:', projectId, 'clientProjects length:', clientProjects.length, 'isLoadingProjects:', isLoadingProjects)
+
+    if (projectId && clientProjects.length > 0 && !isLoadingProjects) {
       const project = clientProjects.find(p => p.id === projectId)
       if (project) {
         console.log('WorkspaceLayout: Setting project from URL params:', project.name)
         setSelectedProject(project)
+
+        // Force file explorer refresh when selecting any project
+        console.log('WorkspaceLayout: Forcing file explorer refresh for selected project')
+        setTimeout(() => {
+          setFileExplorerKey(prev => prev + 1)
+        }, 100)
+
+        // Update URL to use projectId if it was newProject
+        if (searchParams.get('newProject') && !searchParams.get('projectId')) {
+          const params = new URLSearchParams(searchParams.toString())
+          params.delete('newProject')
+          params.set('projectId', projectId)
+          router.replace(`/workspace?${params.toString()}`)
+        }
+      } else {
+        // Project not found, might be a newly created project that's not loaded yet
+        console.log('WorkspaceLayout: Project not found in current projects, might be newly created')
       }
-    } else if (clientProjects.length > 0 && !selectedProject) {
+    } else if (clientProjects.length > 0 && !selectedProject && !isLoadingProjects) {
       // If no project is selected but we have projects, select the first one
       console.log('WorkspaceLayout: No project selected, selecting first project:', clientProjects[0].name)
       setSelectedProject(clientProjects[0])
-      
+
       // Update URL to reflect the first project
       const params = new URLSearchParams(searchParams.toString())
       params.set('projectId', clientProjects[0].id)
       router.push(`/workspace?${params.toString()}`)
     }
-  }, [searchParams, clientProjects, selectedProject, router])
+  }, [searchParams, clientProjects, selectedProject, router, isLoadingProjects])
 
   // Also reload when newProjectId changes (in case project was just created)
   useEffect(() => {
@@ -247,16 +266,67 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           await storageManager.init()
           const workspaces = await storageManager.getWorkspaces(user.id)
           console.log('WorkspaceLayout: Reloaded workspaces after newProjectId change:', workspaces?.length || 0)
+
+          // Update client projects
           setClientProjects(workspaces || [])
+
+          // Find and auto-select the new project if it exists
+          const newProject = workspaces?.find(w => w.id === newProjectId)
+          if (newProject) {
+            console.log('WorkspaceLayout: Auto-selecting newly created project:', newProject.name)
+            setSelectedProject(newProject)
+
+        // Force file explorer refresh for newly created projects
+        console.log('WorkspaceLayout: Forcing file explorer refresh for new project')
+        setTimeout(() => {
+          setFileExplorerKey(prev => prev + 1)
+        }, 100)
+
+            // Update URL to use projectId instead of newProject
+            const params = new URLSearchParams(searchParams.toString())
+            params.delete('newProject')
+            params.set('projectId', newProjectId)
+            router.replace(`/workspace?${params.toString()}`)
+          }
         } catch (error) {
           console.error('Error reloading projects:', error)
         }
       }
       reloadProjects()
     }
-  }, [newProjectId, user.id])
+  }, [newProjectId, user.id, searchParams, router])
 
+  // Handle initialPrompt - auto-open create modal when prompt is provided
+  useEffect(() => {
+    if (initialPrompt) {
+      console.log('WorkspaceLayout: Initial prompt detected, opening create dialog:', initialPrompt)
+      
+      if (isMobile) {
+        // For mobile, use the mobile dialog
+        setNewProjectDescription(initialPrompt)
+        setIsCreateDialogOpen(true)
+      } else {
+        // For desktop, trigger ProjectHeader dialog
+        setProjectHeaderInitialDescription(initialPrompt)
+        setOpenProjectHeaderDialog(true)
+      }
+      
+      // Remove prompt from URL after opening modal
+      const params = new URLSearchParams(searchParams.toString())
+      params.delete('prompt')
+      router.replace(`/workspace?${params.toString()}`)
+    }
+  }, [initialPrompt, searchParams, router, isMobile])
 
+  // Handle modal close - reset form fields
+  const handleModalClose = (open: boolean) => {
+    setIsCreateDialogOpen(open)
+    if (!open) {
+      // Reset form when closing
+      setNewProjectName("")
+      setNewProjectDescription("")
+    }
+  }
 
   const handleCreateProject = async () => {
     if (!newProjectName.trim()) return
@@ -509,6 +579,14 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               onSettings={() => window.open('/workspace/management', '_blank')}
               onDeploy={() => router.push(`/workspace/deployment?project=${selectedProject?.id}`)}
               user={user}
+              openDialog={openProjectHeaderDialog}
+              initialDescription={projectHeaderInitialDescription}
+              onDialogOpenChange={(open) => {
+                setOpenProjectHeaderDialog(open)
+                if (!open) {
+                  setProjectHeaderInitialDescription("")
+                }
+              }}
               onProjectCreated={async (newProject) => {
                 // Refresh projects when a new one is created
                 try {
@@ -874,7 +952,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             </div>
             
             <div className="flex items-center space-x-2">
-              <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <Dialog open={isCreateDialogOpen} onOpenChange={handleModalClose}>
                 <DialogTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                     <Plus className="h-4 w-4" />

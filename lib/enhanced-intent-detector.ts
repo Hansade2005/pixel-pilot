@@ -289,6 +289,9 @@ Your analysis determines how the AI will execute the user's request, so accuracy
 
         console.log('[DEBUG] Cleaned JSON text for parsing:', jsonText.substring(0, 200) + '...')
         enhancedIntentData = JSON.parse(jsonText)
+
+        // Validate and fix tool suggestions
+        enhancedIntentData = this.validateAndFixToolSuggestions(enhancedIntentData)
         
         // Generate autonomous instructions if required
         if (enhancedIntentData.requires_autonomous_planning) {
@@ -387,6 +390,75 @@ Your analysis determines how the AI will execute the user's request, so accuracy
       confidence,
       detected_patterns: detectedPatterns
     }
+  }
+
+  /**
+   * Validate and fix tool suggestions to ensure they match available tools
+   */
+  private static validateAndFixToolSuggestions(intentData: EnhancedIntentData): EnhancedIntentData {
+    // Define available tools
+    const availableTools = [
+      'recall_context',
+      'search_knowledge',
+      'get_knowledge_item',
+      'tool_results_summary',
+      'read_file',
+      'list_files',
+      'write_file',
+      'delete_file',
+      'edit_file',
+      'web_search',
+      'web_extract',
+      'learn_patterns',
+      'analyze_dependencies',
+      'scan_code_imports',
+      'create_task',
+      'list_tasks',
+      'update_task',
+      'delete_task',
+      'plan_tasks'
+    ]
+
+    // Define tool mappings for common requests
+    const toolMappings: { [key: string]: string[] } = {
+      'install_package': ['write_file'], // Map to package.json editing
+      'install_packages': ['write_file'],
+      'npm_install': ['write_file'],
+      'yarn_install': ['write_file'],
+      'add_dependency': ['write_file'],
+      'add_dependencies': ['write_file'],
+      'package_install': ['write_file'],
+      'install_dependencies': ['write_file']
+    }
+
+    // Filter out non-existent tools and map known aliases
+    const validatedTools: string[] = []
+
+    for (const tool of intentData.required_tools) {
+      if (availableTools.includes(tool)) {
+        // Tool exists, keep it
+        validatedTools.push(tool)
+      } else if (toolMappings[tool]) {
+        // Tool has a mapping, use the mapped tools
+        validatedTools.push(...toolMappings[tool])
+      } else {
+        // Unknown tool, log warning and skip
+        console.warn(`[INTENT VALIDATION] Unknown tool suggested: ${tool}, skipping`)
+      }
+    }
+
+    // Ensure we have at least basic file operation tools
+    if (validatedTools.length === 0) {
+      console.warn('[INTENT VALIDATION] No valid tools found, adding defaults')
+      validatedTools.push('read_file', 'list_files', 'write_file')
+    }
+
+    // Remove duplicates
+    intentData.required_tools = [...new Set(validatedTools)]
+
+    console.log(`[INTENT VALIDATION] Original tools: ${intentData.required_tools.length}, Validated: ${validatedTools.length}`)
+
+    return intentData
   }
 
   /**

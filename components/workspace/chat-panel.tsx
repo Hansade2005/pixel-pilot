@@ -72,7 +72,12 @@ interface Message {
       projectId: string
       success: boolean
     }>
-    
+
+    // Workflow system properties
+    workflowMode?: boolean
+    workflowChunk?: any
+    sessionId?: string
+
     // Legacy properties (for backward compatibility)
     toolResult?: any
     timestamp?: string
@@ -87,6 +92,103 @@ interface ChatPanelProps {
   aiMode?: AIMode
   onModeChange?: (mode: AIMode) => void
   onClearChat?: () => void
+}
+
+// Workflow Message Component for sophisticated workflow rendering
+const WorkflowMessageComponent = ({ workflowChunk, sessionId }: { workflowChunk: any, sessionId?: string }) => {
+  const [progress, setProgress] = useState(workflowChunk?.data?.progress || 0)
+
+  useEffect(() => {
+    if (workflowChunk?.data?.progress) {
+      setProgress(workflowChunk.data.progress)
+    }
+  }, [workflowChunk])
+
+  const getWorkflowIcon = (type: string) => {
+    switch (type) {
+      case 'setup': return '🎯'
+      case 'generation': return '🏗️'
+      case 'validation': return '🔍'
+      case 'cleanup': return '📋'
+      default: return '🤖'
+    }
+  }
+
+  const getProgressColor = (progress: number) => {
+    if (progress < 30) return 'bg-blue-500'
+    if (progress < 70) return 'bg-yellow-500'
+    if (progress < 100) return 'bg-green-500'
+    return 'bg-emerald-500'
+  }
+
+  return (
+    <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
+      {/* Progress Bar */}
+      <div className="mb-3">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-sm font-medium text-blue-900">
+            {getWorkflowIcon(workflowChunk?.type || 'setup')} {workflowChunk?.data?.workflowStep || 1}/7 Steps
+          </span>
+          <span className="text-sm text-blue-700">{progress}%</span>
+        </div>
+        <div className="w-full bg-blue-200 rounded-full h-2">
+          <div
+            className={`h-2 rounded-full transition-all duration-500 ${getProgressColor(progress)}`}
+            style={{ width: `${progress}%` }}
+          ></div>
+        </div>
+      </div>
+
+      {/* Workflow Message */}
+      <div className="text-blue-900">
+        <div className="font-medium mb-2">AI Development Workflow</div>
+        <div className="text-sm leading-relaxed">
+          {workflowChunk?.data?.message || 'Processing your request...'}
+        </div>
+
+        {/* Workflow Details */}
+        {workflowChunk?.data?.implementationPlan && (
+          <div className="mt-3 p-3 bg-white/50 rounded-lg">
+            <div className="text-xs font-medium text-blue-800 mb-2">📋 Implementation Plan:</div>
+            <ul className="text-xs space-y-1">
+              {workflowChunk.data.implementationPlan.steps?.map((step: string, index: number) => (
+                <li key={index} className="text-blue-700">• {step}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Workflow Results */}
+        {workflowChunk?.data?.creationResult && (
+          <div className="mt-3 p-3 bg-white/50 rounded-lg">
+            <div className="text-xs font-medium text-green-800 mb-2">✅ Created Files:</div>
+            <ul className="text-xs space-y-1">
+              {workflowChunk.data.creationResult.filesCreated?.map((file: string, index: number) => (
+                <li key={index} className="text-green-700">📄 {file}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Workflow Summary */}
+        {workflowChunk?.data?.summary && (
+          <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+            <div className="text-sm font-medium text-emerald-900 mb-2">📋 Workflow Summary:</div>
+            <div className="text-xs text-emerald-800 whitespace-pre-line">
+              {workflowChunk.data.summary}
+            </div>
+          </div>
+        )}
+
+        {/* Session Info */}
+        {sessionId && (
+          <div className="mt-2 text-xs text-blue-600">
+            Session: {sessionId.slice(-8)}
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 // ExpandableUserMessage component for long user messages
@@ -2014,7 +2116,11 @@ export function ChatPanel({
             stepCount: jsonResponse.stepCount,
             steps: jsonResponse.steps,
             serverSideExecution: true,
-            fileOperations: jsonResponse.fileOperations || []
+            fileOperations: jsonResponse.fileOperations || [],
+            // Workflow mode properties
+            workflowMode: jsonResponse.workflowMode || false,
+            workflowChunk: jsonResponse.workflowChunk,
+            sessionId: jsonResponse.sessionId
           }
         }
         
@@ -2166,11 +2272,33 @@ export function ChatPanel({
               if (line.startsWith('data: ')) {
                 try {
                   const data = JSON.parse(line.slice(6))
-                  if (data.choices?.[0]?.delta?.content) {
+
+                  // Check if this is a workflow chunk
+                  if (data.id && data.type && data.data) {
+                    // This is a workflow chunk from our sophisticated workflow system
+                    const workflowChunk = data
+                    hasReceivedContent = true
+
+                    setMessages(prev => prev.map(msg =>
+                      msg.id === assistantMessageId
+                        ? {
+                            ...msg,
+                            content: workflowChunk.data.message || 'Processing workflow...',
+                            metadata: {
+                              ...msg.metadata,
+                              workflowMode: true,
+                              workflowChunk: workflowChunk,
+                              sessionId: workflowChunk.data.sessionId || msg.metadata?.sessionId
+                            }
+                          }
+                        : msg
+                    ))
+                  } else if (data.choices?.[0]?.delta?.content) {
+                    // Regular AI SDK streaming content
                     assistantContent += data.choices[0].delta.content
                         hasReceivedContent = true
-                    setMessages(prev => prev.map(msg => 
-                          msg.id === assistantMessageId 
+                    setMessages(prev => prev.map(msg =>
+                          msg.id === assistantMessageId
                         ? { ...msg, content: assistantContent }
                         : msg
                     ))
@@ -2856,11 +2984,19 @@ export function ChatPanel({
                       <div className="mb-3">
                         <div className="flex items-start">
                           <div className="flex-1 min-w-0">
+                            {/* Workflow mode rendering */}
+                            {msg.metadata?.workflowMode && msg.metadata?.workflowChunk && (
+                              <WorkflowMessageComponent
+                                workflowChunk={msg.metadata.workflowChunk}
+                                sessionId={msg.metadata.sessionId}
+                              />
+                            )}
+
                             {/* Multi-step execution summary */}
                             {msg.metadata?.steps && (msg.metadata?.stepCount || 0) > 1 && (
-                              <MultiStepSummary 
-                                steps={msg.metadata.steps} 
-                                hasErrors={msg.metadata.hasToolErrors || false} 
+                              <MultiStepSummary
+                                steps={msg.metadata.steps}
+                                hasErrors={msg.metadata.hasToolErrors || false}
                               />
                             )}
                             

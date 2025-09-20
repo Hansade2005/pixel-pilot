@@ -32,6 +32,9 @@ interface ProjectHeaderProps {
   subscriptionStatus?: string
   user?: any
   onProjectCreated?: (newProject: Project) => Promise<void>
+  openDialog?: boolean
+  initialDescription?: string
+  onDialogOpenChange?: (open: boolean) => void
 }
 
 export function ProjectHeader({
@@ -44,7 +47,10 @@ export function ProjectHeader({
   userPlan,
   subscriptionStatus,
   user,
-  onProjectCreated
+  onProjectCreated,
+  openDialog,
+  initialDescription,
+  onDialogOpenChange
 }: ProjectHeaderProps) {
   const [copied, setCopied] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -57,6 +63,20 @@ export function ProjectHeader({
   React.useEffect(() => {
     setNameInput(project?.name || "")
   }, [project?.name])
+
+  // Handle external dialog open control
+  React.useEffect(() => {
+    if (openDialog !== undefined) {
+      setIsCreateDialogOpen(openDialog)
+    }
+  }, [openDialog])
+
+  // Handle initial description from external control
+  React.useEffect(() => {
+    if (initialDescription && openDialog) {
+      setNewProjectDescription(initialDescription)
+    }
+  }, [initialDescription, openDialog])
 
   const handleShareClick = async () => {
     if (!project) return
@@ -114,6 +134,7 @@ export function ProjectHeader({
       await TemplateService.applyViteReactTemplate(workspace.id)
       // Close dialog and reset form
       setIsCreateDialogOpen(false)
+      onDialogOpenChange?.(false)
       setNewProjectName("")
       setNewProjectDescription("")
       // Notify parent to refresh projects
@@ -186,7 +207,15 @@ export function ProjectHeader({
       </div>
 
       <div className="flex items-center space-x-2">
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+          setIsCreateDialogOpen(open)
+          onDialogOpenChange?.(open)
+          if (!open) {
+            // Reset form when closing
+            setNewProjectName("")
+            setNewProjectDescription("")
+          }
+        }}>
           <DialogTrigger asChild>
             <Button size="sm" variant="outline" className="h-8 w-8 p-0">
               <Plus className="h-4 w-4" />

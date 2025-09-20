@@ -5,9 +5,11 @@ import { cn } from '@/lib/utils'
 
 interface ThinkingIndicatorProps {
   className?: string
+  mode?: 'agent' | 'ask'
 }
 
-const PHASES = [
+// Agent mode phases (for code changes and modifications)
+const AGENT_PHASES = [
   {
     id: 'thinking',
     text: 'Thinking',
@@ -59,11 +61,52 @@ const PHASES = [
   }
 ]
 
-export function ThinkingIndicator({ className }: ThinkingIndicatorProps) {
+// Ask mode phases (for analysis and discussion only)
+const ASK_PHASES = [
+  {
+    id: 'fetching',
+    text: 'Fetching context',
+    duration: 3000,
+    icon: '📥',
+    description: 'Loading project files and gathering relevant context...'
+  },
+  {
+    id: 'analyzing',
+    text: 'Analyzing project',
+    duration: 4000,
+    icon: '🔍',
+    description: 'Examining code structure, patterns, and architecture...'
+  },
+  {
+    id: 'processing',
+    text: 'Processing insights',
+    duration: 3500,
+    icon: '🧠',
+    description: 'Identifying issues, opportunities, and best practices...'
+  },
+  {
+    id: 'structuring',
+    text: 'Structuring analysis',
+    duration: 3000,
+    icon: '📋',
+    description: 'Organizing findings into clear, actionable insights...'
+  },
+  {
+    id: 'formatting',
+    text: 'Formatting response',
+    duration: 3500,
+    icon: '✨',
+    description: 'Crafting a beautifully structured response with clear explanations...'
+  }
+]
+
+export function ThinkingIndicator({ className, mode = 'agent' }: ThinkingIndicatorProps) {
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0)
   const [dots, setDots] = useState('')
   const [isVisible, setIsVisible] = useState(true)
 
+  // Select appropriate phases based on mode
+  const PHASES = mode === 'ask' ? ASK_PHASES : AGENT_PHASES
   const currentPhase = PHASES[currentPhaseIndex]
 
   // Handle phase transitions

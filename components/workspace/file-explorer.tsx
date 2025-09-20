@@ -147,7 +147,7 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
   useEffect(() => {
     console.log('FileExplorer: Project changed:', project?.id, project?.name)
     if (project) {
-      console.log('FileExplorer: Fetching files for project:', project.id)
+      console.log('FileExplorer: Fetching files for project:', project.id, '- component key changed, forcing refresh')
       fetchFiles()
     } else {
       console.log('FileExplorer: No project selected, clearing files')
@@ -197,10 +197,13 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
   }, [project]);
 
   const fetchFiles = async () => {
-    if (!project) return;
+    if (!project) {
+      console.log('FileExplorer: No project provided to fetchFiles')
+      return;
+    }
 
     try {
-      console.log(`Fetching files for project: ${project.id} from IndexedDB`);
+      console.log(`FileExplorer: Fetching files for project: ${project.id} (${project.name}) from IndexedDB`);
 
       // Import and initialize storage manager
       const { storageManager } = await import('@/lib/storage-manager');
@@ -208,12 +211,18 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
 
       // Get files directly from IndexedDB
       const projectFiles = await storageManager.getFiles(project.id);
-      console.log(`Found ${projectFiles.length} files for project: ${project.id}`);
+      console.log(`FileExplorer: Found ${projectFiles.length} files for project: ${project.id}`);
+
+      if (projectFiles.length === 0) {
+        console.log('FileExplorer: No files found for project, this might indicate template application failed')
+      } else {
+        console.log('FileExplorer: First few files:', projectFiles.slice(0, 3).map(f => f.name))
+      }
 
       setFiles(projectFiles);
       // If no files, show empty state in UI (handled by render logic)
     } catch (error) {
-      console.error('Error fetching files:', error);
+      console.error('FileExplorer: Error fetching files:', error);
     }
   }
 

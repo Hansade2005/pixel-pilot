@@ -666,7 +666,7 @@ class InMemoryStorage implements StorageInterface {
 class IndexedDBStorage implements StorageInterface {
   private db: IDBDatabase | null = null
   private dbName = 'PixelPilotDB'
-  private version = 9 // Updated version to ensure proper checkpoint indexing
+  private version = 11 // Updated version to match existing database version
 
   async init(): Promise<void> {
     if (this.db) return

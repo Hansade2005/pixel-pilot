@@ -18,9 +18,10 @@ import { useSubscription } from "@/hooks/use-subscription"
 
 interface ChatInputProps {
   onAuthRequired: () => void
+  onProjectCreated?: (project: any) => void
 }
 
-export function ChatInput({ onAuthRequired }: ChatInputProps) {
+export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) {
   const [prompt, setPrompt] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -32,9 +33,9 @@ export function ChatInput({ onAuthRequired }: ChatInputProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!prompt.trim()) return
-    
+
     // Check if user is authenticated
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
@@ -42,44 +43,19 @@ export function ChatInput({ onAuthRequired }: ChatInputProps) {
       return
     }
 
-    // Check subscription status for Free users
-    if (subscription?.plan === 'free') {
-      toast.info('You\'re on the Free plan. Upgrade to Pro for unlimited prompts and full features!')
-    }
-
     setIsLoading(true)
-    
+
     try {
-      const projectName = `App from: ${prompt.slice(0, 50)}${prompt.length > 50 ? '...' : ''}`
-      const slug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+      console.log('🚀 ChatInput: Redirecting to workspace with prompt:', prompt)
       
-      console.log('🚀 Creating project with prompt:', prompt)
-      console.log('📝 Project name:', projectName)
-      
-      // Client-side project creation
-      const { storageManager } = await import('@/lib/storage-manager')
-      await storageManager.init()
-      const workspace = await storageManager.createWorkspace({
-        name: projectName,
-        description: prompt,
-        userId: user.id,
-        isPublic: false,
-        isTemplate: false,
-        lastActivity: new Date().toISOString(),
-        deploymentStatus: 'not_deployed',
-        slug
-      })
-      // Apply template files
-      const { TemplateService } = await import('@/lib/template-service')
-      await TemplateService.applyViteReactTemplate(workspace.id)
-      const files = await storageManager.getFiles(workspace.id)
-      toast.success('Project created and saved to local storage!')
-      // Redirect to workspace with the new project
-      router.push(`/workspace?newProject=${workspace.id}&prompt=${encodeURIComponent(prompt)}`)
-      
+      // Clear the input and redirect to workspace with the prompt
+      // The workspace will auto-open the project creation modal
+      setPrompt("")
+      router.push(`/workspace?prompt=${encodeURIComponent(prompt)}`)
+
     } catch (error) {
-      console.error('❌ Error creating project:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to create project')
+      console.error('❌ Error:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to navigate to workspace')
     } finally {
       setIsLoading(false)
     }
@@ -159,7 +135,7 @@ export function ChatInput({ onAuthRequired }: ChatInputProps) {
               <input
                 type="text"
                 ref={inputRef}
-                placeholder="Ask Pixel Pilot anything..."
+                placeholder={isLoading ? "Opening workspace..." : "Describe your app idea..."}
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -193,7 +169,11 @@ export function ChatInput({ onAuthRequired }: ChatInputProps) {
                 disabled={!prompt.trim() || isLoading}
                 className="w-8 h-8 rounded-full bg-gray-700/50 hover:bg-gray-600/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-gray-400 hover:text-white transition-colors"
               >
-                <ArrowUp className="w-4 h-4" />
+                {isLoading ? (
+                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <ArrowUp className="w-4 h-4" />
+                )}
               </button>
             </div>
           </form>
