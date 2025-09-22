@@ -1,1034 +1,16 @@
 import { streamText, generateText, tool, stepCountIs } from 'ai'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server' // Only used for auth, not message storage
+import { createClient } from '@/lib/supabase/server'
 import { getModel } from '@/lib/ai-providers'
 import { DEFAULT_CHAT_MODEL, getModelById } from '@/lib/ai-models'
-
-// Lovable-style system imports
-import { EnhancedIntentDetector } from '@/lib/enhanced-intent-detector'
-
-// Type definitions
-interface Message {
-  id: string
-  role: "user" | "assistant" | "system"
-  content: string
-  createdAt?: string
-  metadata?: {
-    toolCalls?: any[]
-    success?: boolean
-    hasToolCalls?: boolean
-    hasToolErrors?: boolean
-    stepCount?: number
-    steps?: any[]
-    serverSideExecution?: boolean
-    fileOperations?: Array<{
-      type: string
-      path: string
-      content?: string
-      projectId: string
-      success: boolean
-    }>
-    lovableMode?: boolean
-    nextStepsPlan?: any
-    implementedStep?: string
-    requestedStep?: string
-    workflowMode?: boolean
-    workflowChunk?: any
-    sessionId?: string
-  }
-}
-
-// Helper functions for string operations
-function escapeRegExp(string: string): string {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function findNthOccurrence(content: string, searchText: string, n: number): number {
-  let index = -1;
-  for (let i = 0; i < n; i++) {
-    index = content.indexOf(searchText, index + 1);
-    if (index === -1) return -1;
-  }
-  return index;
-}
-
-function replaceNthOccurrence(content: string, searchText: string, replaceText: string, n: number): string {
-  const index = findNthOccurrence(content, searchText, n);
-  if (index === -1) return content;
-  return content.substring(0, index) + replaceText + content.substring(index + searchText.length);
-}
-
-// Detect if request requires sophisticated workflow
-function isComplexDevelopmentTask(userMessage: string): boolean {
-  const complexPatterns = [
-    // Page/component creation
-    /\b(add|create|build|make)\b.*\b(page|component|homepage|dashboard|login|signup|profile)\b/i,
-    /\bnew\b.*\b(page|component|screen|view)\b/i,
-
-    // Feature implementation
-    /\b(add|implement|create)\b.*\b(auth|authentication|login|signup|register)\b/i,
-    /\b(add|implement|create)\b.*\b(crud|dashboard|navigation|menu)\b/i,
-    /\b(add|implement|create)\b.*\b(api|endpoint|route|database)\b/i,
-
-    // App structure changes
-    /\b(update|modify|change)\b.*\b(app|application|structure|layout)\b/i,
-    /\b(integrate|connect)\b.*\b(component|page|feature)\b/i,
-
-    // Complex UI tasks
-    /\b(create|build|design)\b.*\b(form|modal|dialog|table|chart)\b/i,
-    /\b(add|implement)\b.*\b(validation|error.*handling|loading.*state)\b/i
-  ]
-
-  return complexPatterns.some(pattern => pattern.test(userMessage))
-}
-
-// Multistep Workflow Manager
-class MultistepWorkflowManager {
-  private encoder = new TextEncoder()
-  private controller: WritableStreamDefaultController | null = null
-  private currentStep = 0
-  
-  constructor(controller?: WritableStreamDefaultController) {
-    this.controller = controller
-  }
-
-  private sendSSE(data: any) {
-    if (this.controller) {
-      const sseData = `data: ${JSON.stringify(data)}\n\n`
-      this.controller.write(this.encoder.encode(sseData))
-    }
-  }
-
-  async sendStep(stepNumber: number, message: string, type: 'planning' | 'execution' | 'verification' | 'completion' = 'planning') {
-    this.currentStep = stepNumber
-    this.sendSSE({
-      type: 'workflow_step',
-      step: stepNumber,
-      message,
-      stepType: type,
-      timestamp: new Date().toISOString()
-    })
-    
-    // Small delay to ensure proper streaming
-    await new Promise(resolve => setTimeout(resolve, 100))
-  }
-
-  async sendNarration(message: string) {
-    this.sendSSE({
-      type: 'ai_narration',
-      message,
-      currentStep: this.currentStep,
-      timestamp: new Date().toISOString()
-    })
-    
-    await new Promise(resolve => setTimeout(resolve, 50))
-  }
-
-  async sendToolExecution(toolName: string, status: 'starting' | 'success' | 'error', details?: any) {
-    this.sendSSE({
-      type: 'tool_execution',
-      tool: toolName,
-      status,
-      details,
-      currentStep: this.currentStep,
-      timestamp: new Date().toISOString()
-    })
-    
-    await new Promise(resolve => setTimeout(resolve, 50))
-  }
-
-  async sendVerification(message: string, success: boolean) {
-    this.sendSSE({
-      type: 'verification',
-      message,
-      success,
-      currentStep: this.currentStep,
-      timestamp: new Date().toISOString()
-    })
-    
-    await new Promise(resolve => setTimeout(resolve, 50))
-  }
-
-  async sendCompletion(summary: string, toolCalls: any[], fileOperations: any[]) {
-    this.sendSSE({
-      type: 'workflow_completion',
-      summary,
-      toolCalls,
-      fileOperations,
-      totalSteps: this.currentStep,
-      timestamp: new Date().toISOString()
-    })
-  }
-}
-
-// Execute Multistep Workflow with SSE streaming
-async function executeMultistepWorkflow(
-  generateTextOptions: any,
-  userMessage: string,
-  controller: ReadableStreamDefaultController,
-  projectId: string,
-  userId: string
-) {
-  const workflow = new MultistepWorkflowManager(controller)
-  let allToolCalls: any[] = []
-  let allFileOperations: any[] = []
-
-  try {
-    // Step 1: Understanding Request
-    await workflow.sendStep(1, "Understanding your request...", 'planning')
-    await workflow.sendNarration(`I'm analyzing your request: "${userMessage}". Let me break this down and create a plan.`)
-
-    // Step 2: Planning Actions  
-    await workflow.sendStep(2, "Planning the implementation...", 'planning')
-    await workflow.sendNarration("Based on your request, I'm creating a step-by-step plan to implement this feature effectively.")
-
-    // Step 3: Reading/Listing Files (if needed)
-    await workflow.sendStep(3, "Examining current project structure...", 'execution')
-    await workflow.sendNarration("I'll first examine the current project files to understand the existing structure and determine what needs to be created or modified.")
-
-    // Execute the first phase - gathering information
-    const explorationResult = await generateText({
-      ...generateTextOptions,
-      messages: [
-        ...generateTextOptions.messages,
-        { 
-          role: 'user', 
-          content: `Before implementing "${userMessage}", I need you to:
-1. Use read_file or list_files to understand the current project structure
-2. Explain what you found and how it relates to the request
-3. Stop after gathering information - don't implement anything yet
-
-Focus ONLY on understanding the current state. The implementation will come in the next phase.`
-        }
-      ],
-      stopWhen: stepCountIs(2), // Limit to just exploration
-      toolChoice: 'required'
-    })
-
-    // Process exploration results
-    if (explorationResult.steps) {
-      for (const step of explorationResult.steps) {
-        if (step.toolResults) {
-          for (const toolResult of step.toolResults) {
-            await workflow.sendToolExecution(toolResult.toolName, 'success', {
-              path: toolResult.args?.path,
-              result: toolResult.result
-            })
-            allToolCalls.push({
-              name: toolResult.toolName,
-              args: toolResult.args,
-              result: toolResult.result
-            })
-          }
-        }
-      }
-    }
-
-    await workflow.sendNarration(`I've examined the project structure. ${explorationResult.text || 'Information gathered successfully.'}`)
-
-    // Step 4: Executing Tools
-    await workflow.sendStep(4, "Implementing the changes...", 'execution')
-    await workflow.sendNarration("Now I'll implement the requested changes step by step.")
-
-    // Execute the implementation phase
-    const implementationResult = await generateText({
-      ...generateTextOptions,
-      messages: [
-        ...generateTextOptions.messages,
-        { 
-          role: 'assistant', 
-          content: explorationResult.text || 'I have examined the project structure.'
-        },
-        { 
-          role: 'user', 
-          content: `Now implement "${userMessage}" based on what you learned about the project structure. 
-Create/modify the necessary files to fulfill the request completely.
-
-Make sure to:
-1. Create well-structured, modern code
-2. Follow best practices and the existing project patterns
-3. Include proper error handling and TypeScript types where applicable
-4. Make the implementation complete and functional`
-        }
-      ],
-      stopWhen: stepCountIs(6), // Allow more steps for implementation
-      toolChoice: 'required'
-    })
-
-    // Process implementation results
-    if (implementationResult.steps) {
-      for (const step of implementationResult.steps) {
-        if (step.toolResults) {
-          for (const toolResult of step.toolResults) {
-            await workflow.sendToolExecution(toolResult.toolName, 'success', {
-              path: toolResult.args?.path,
-              result: toolResult.result
-            })
-            
-            allToolCalls.push({
-              name: toolResult.toolName,
-              args: toolResult.args,
-              result: toolResult.result
-            })
-
-            // Track file operations
-            if (['write_file', 'edit_file', 'delete_file'].includes(toolResult.toolName)) {
-              allFileOperations.push({
-                type: toolResult.toolName,
-                path: toolResult.args?.path || toolResult.result?.path,
-                content: toolResult.args?.content,
-                projectId: projectId,
-                success: toolResult.result?.success !== false
-              })
-            }
-          }
-        }
-      }
-    }
-
-    await workflow.sendNarration(`Implementation completed. ${implementationResult.text || 'All changes have been applied successfully.'}`)
-
-    // Step 5: Verification
-    await workflow.sendStep(5, "Verifying the changes...", 'verification')
-    await workflow.sendNarration("Let me verify that all changes were applied correctly.")
-
-    // Verification phase - read back the created/modified files
-    if (allFileOperations.length > 0) {
-      const verificationFiles = allFileOperations.filter(op => op.type !== 'delete_file').map(op => op.path)
-      
-      if (verificationFiles.length > 0) {
-        const verificationResult = await generateText({
-          ...generateTextOptions,
-          messages: [
-            { role: 'system', content: 'You are verifying that file changes were applied correctly. Read the specified files and confirm the changes are present and correct.' },
-            { 
-              role: 'user', 
-              content: `Please verify the implementation by reading these files that were created/modified: ${verificationFiles.join(', ')}.
-              
-Confirm that:
-1. The files contain the expected content
-2. The implementation matches the original request
-3. The code follows best practices
-
-Just read the files and provide a brief verification summary.`
-            }
-          ],
-          stopWhen: stepCountIs(3),
-          tools: { read_file: generateTextOptions.tools.read_file },
-          toolChoice: 'required'
-        })
-
-        if (verificationResult.steps) {
-          for (const step of verificationResult.steps) {
-            if (step.toolResults) {
-              for (const toolResult of step.toolResults) {
-                await workflow.sendToolExecution(toolResult.toolName, 'success', {
-                  path: toolResult.args?.path,
-                  verification: true
-                })
-              }
-            }
-          }
-        }
-
-        await workflow.sendVerification(
-          verificationResult.text || 'All files have been verified successfully.', 
-          true
-        )
-      } else {
-        await workflow.sendVerification('No files to verify.', true)
-      }
-    } else {
-      await workflow.sendVerification('No file changes were made.', true)
-    }
-
-    // Step 6: Completion & Summary
-    await workflow.sendStep(6, "Generating final summary...", 'completion')
-    
-    const summary = generateWorkflowSummary(userMessage, allToolCalls, allFileOperations, [
-      explorationResult.text || '',
-      implementationResult.text || ''
-    ])
-
-    await workflow.sendCompletion(summary, allToolCalls, allFileOperations)
-
-  } catch (error) {
-    console.error('[WORKFLOW] Error during execution:', error)
-    workflow.sendSSE({
-      type: 'workflow_error',
-      error: error instanceof Error ? error.message : 'Unknown error',
-      timestamp: new Date().toISOString()
-    })
-  }
-}
-
-// Generate a comprehensive workflow summary
-function generateWorkflowSummary(
-  originalRequest: string,
-  toolCalls: any[],
-  fileOperations: any[],
-  aiResponses: string[]
-): string {
-  const summary = `## ✅ Task Completed: ${originalRequest}
-
-### 🔧 Actions Performed
-${toolCalls.length > 0 ? `- Executed ${toolCalls.length} tool operations` : '- No tools were needed'}
-${fileOperations.length > 0 ? `- Modified ${fileOperations.length} files` : '- No files were modified'}
-
-### 📁 File Changes
-${fileOperations.length > 0 
-  ? fileOperations.map(op => `- **${op.type}**: \`${op.path}\``).join('\n')
-  : '- No file changes were made'
-}
-
-### 🤖 Implementation Notes
-${aiResponses.filter(r => r && r.trim()).join('\n\n')}
-
-### 🎯 Summary
-The requested task has been completed successfully using a structured multistep workflow. All changes have been implemented and verified.`
-
-  return summary
-}
-
-// Server-side message saving function using storage manager (IndexedDB)
-async function saveMessageToIndexedDB(message: Message, projectId?: string, userId?: string): Promise<void> {
-  if (!projectId || !userId) {
-    console.warn('[Chat Route] Cannot save message: missing projectId or userId')
-    return
-  }
-
-  try {
-    console.log(`[Chat Route] Saving message to project ${projectId}:`, message.role, message.content.substring(0, 50) + '...')
-
-    // Use storage manager for IndexedDB storage (client-side)
-    // Since we're on server-side, we can't directly access IndexedDB
-    // Messages will be saved by the client via storage manager
-    console.log(`[Chat Route] Message queued for IndexedDB storage: ${message.id}`)
-  } catch (error) {
-    console.error('[Chat Route] Error queuing message for storage:', error)
-    // Don't throw error, just log it
-  }
-}
 
 // Global user ID for tool access
 declare global {
   var currentUserId: string
-
-  // Surgical file tracking system
-  var surgicalContext: {
-    currentUserMessage: string
-    currentRequestId: string
-    fileOperationsThisRequest: number
-    recentEdits: Array<{
-      filePath: string
-      action: 'created' | 'edited' | 'read'
-      timestamp: number
-      userIntent: string
-      projectId: string
-      requestId: string
-    }>
-    projectContext: {
-      filesCreated: string[]
-      filesEdited: string[]
-      lastActivity: number
-      componentRelationships: Record<string, string[]>
-    }
-    conversationMemory: Array<{
-      message: string
-      intent: string
-      filesAffected: string[]
-      timestamp: number
-    }>
-  } | null
 }
 
 // Use Node.js runtime for full IndexedDB and file system access
 // export const runtime = 'edge' // Removed: Edge runtime doesn't support IndexedDB
-
-// Initialize surgical context for a project
-function initializeSurgicalContext(projectId: string, userMessage: string = '', requestId?: string) {
-  const currentRequestId = requestId || `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-
-  if (!global.surgicalContext) {
-    global.surgicalContext = {
-      currentUserMessage: userMessage,
-      currentRequestId,
-      fileOperationsThisRequest: 0,
-      recentEdits: [],
-      projectContext: {
-        filesCreated: [],
-        filesEdited: [],
-        lastActivity: Date.now(),
-        componentRelationships: {}
-      },
-      conversationMemory: []
-    }
-  } else {
-    // Reset counter for new request
-    if (global.surgicalContext.currentRequestId !== currentRequestId) {
-      global.surgicalContext.fileOperationsThisRequest = 0
-      global.surgicalContext.currentRequestId = currentRequestId
-    }
-    // Update current user message
-    global.surgicalContext.currentUserMessage = userMessage
-  }
-
-  // Clean up old entries (keep last 24 hours)
-  const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000)
-  global.surgicalContext.recentEdits = global.surgicalContext.recentEdits.filter(
-    edit => edit.timestamp > oneDayAgo
-  )
-  global.surgicalContext.conversationMemory = global.surgicalContext.conversationMemory.filter(
-    memory => memory.timestamp > oneDayAgo
-  )
-
-  return global.surgicalContext
-}
-
-// Track file operations for surgical context
-function trackFileOperation(projectId: string, filePath: string, action: 'created' | 'edited' | 'read') {
-  const context = initializeSurgicalContext(projectId)
-  const userIntent = context.currentUserMessage || 'Unknown intent'
-
-  // Increment operation counter
-  context.fileOperationsThisRequest++
-
-  context.recentEdits.push({
-    filePath,
-    action,
-    timestamp: Date.now(),
-    userIntent,
-    projectId,
-    requestId: context.currentRequestId
-  })
-
-  // Update project context
-  if (action === 'created' && !context.projectContext.filesCreated.includes(filePath)) {
-    context.projectContext.filesCreated.push(filePath)
-  } else if (action === 'edited' && !context.projectContext.filesEdited.includes(filePath)) {
-    context.projectContext.filesEdited.push(filePath)
-  }
-
-  context.projectContext.lastActivity = Date.now()
-
-  // Limit arrays to prevent memory bloat
-  if (context.recentEdits.length > 50) {
-    context.recentEdits = context.recentEdits.slice(-50)
-  }
-  if (context.projectContext.filesCreated.length > 20) {
-    context.projectContext.filesCreated = context.projectContext.filesCreated.slice(-20)
-  }
-  if (context.projectContext.filesEdited.length > 20) {
-    context.projectContext.filesEdited = context.projectContext.filesEdited.slice(-20)
-  }
-}
-
-// Add conversation memory for better context
-function addConversationMemory(projectId: string, message: string, intent: string, filesAffected: string[] = []) {
-  const context = initializeSurgicalContext(projectId)
-
-  context.conversationMemory.push({
-    message,
-    intent,
-    filesAffected,
-    timestamp: Date.now()
-  })
-
-  // Keep only recent conversations
-  if (context.conversationMemory.length > 10) {
-    context.conversationMemory = context.conversationMemory.slice(-10)
-  }
-}
-
-// Check if we've exceeded file operation limits
-function checkFileOperationLimit(projectId: string): { allowed: boolean; operationsUsed: number; limit: number } {
-  const context = initializeSurgicalContext(projectId)
-  const limit = 3 // Maximum 3 file operations per request
-  const operationsUsed = context.fileOperationsThisRequest
-
-  return {
-    allowed: operationsUsed < limit,
-    operationsUsed,
-    limit
-  }
-}
-
-// Generate detailed surgical guidance with specific file instructions
-function generateSurgicalGuidance(projectId: string, userMessage: string, intentData?: any): string {
-  const context = initializeSurgicalContext(projectId)
-  const limits = checkFileOperationLimit(projectId)
-
-  let guidance = '\n### 🔪 PRECISE SURGICAL INSTRUCTIONS 🔪\n'
-
-  // Operation limits warning
-  if (!limits.allowed) {
-    guidance += `\n🚨 FILE OPERATION LIMIT EXCEEDED: ${limits.operationsUsed}/${limits.limit}`
-    guidance += '\n⚠️ STOP ALL FILE OPERATIONS - Request limit reached!'
-    return guidance
-  }
-
-  guidance += `\n📊 FILE OPERATIONS USED: ${limits.operationsUsed}/${limits.limit}`
-
-  // Analyze user message for specific file operations
-  const specificInstructions = analyzeUserMessageForFileOperations(userMessage, context, intentData)
-
-  if (specificInstructions.length > 0) {
-    guidance += '\n\n🎯 SPECIFIC FILE OPERATIONS TO PERFORM:'
-    specificInstructions.forEach((instruction, index) => {
-      guidance += `\n${index + 1}. ${instruction}`
-    })
-  }
-
-  // Recent edits context with specific warnings
-  if (context.recentEdits.length > 0) {
-    const recentFiles = Array.from(new Set(context.recentEdits.slice(-5).map(edit => edit.filePath)))
-    guidance += '\n\n📁 EXISTING FILES (DO NOT RECREATE):'
-    recentFiles.forEach(file => {
-      const lastAction = context.recentEdits
-        .filter(edit => edit.filePath === file)
-        .sort((a, b) => b.timestamp - a.timestamp)[0]?.action
-      guidance += `\n- ${file} (${lastAction})`
-    })
-    guidance += '\n\n⚠️ CRITICAL: EDIT existing files instead of creating duplicates!'
-  }
-
-  // Project context with specific file status
-  if (context.projectContext.filesCreated.length > 0) {
-    guidance += '\n\n🆕 FILES ALREADY CREATED THIS SESSION:'
-    context.projectContext.filesCreated.forEach(file => {
-      guidance += `\n- ${file} ✅ (ready to use)`
-    })
-  }
-
-  // Read file recommendations
-  const readRecommendations = getReadFileRecommendations(userMessage, context, intentData)
-  if (readRecommendations.length > 0) {
-    guidance += '\n\n📖 FILES TO READ FIRST:'
-    readRecommendations.forEach(file => {
-      guidance += `\n- ${file.filePath}: ${file.reason}`
-    })
-  }
-
-  // Edit file instructions
-  const editInstructions = getEditFileInstructions(userMessage, context, intentData)
-  if (editInstructions.length > 0) {
-    guidance += '\n\n✏️ FILES TO EDIT:'
-    editInstructions.forEach(instruction => {
-      guidance += `\n- ${instruction.filePath}: ${instruction.action}`
-      if (instruction.lineHint) {
-        guidance += ` (around line ${instruction.lineHint})`
-      }
-    })
-  }
-
-  // Create file instructions
-  const createInstructions = getCreateFileInstructions(userMessage, context, intentData)
-  if (createInstructions.length > 0) {
-    guidance += '\n\n➕ FILES TO CREATE:'
-    createInstructions.forEach(instruction => {
-      guidance += `\n- ${instruction.filePath}: ${instruction.purpose}`
-    })
-  }
-
-  // Operation sequence
-  guidance += '\n\n🔄 OPERATION SEQUENCE:'
-  guidance += '\n1. Read existing files first (to understand current structure)'
-  guidance += '\n2. Edit existing files (preferred over creating new ones)'
-  guidance += '\n3. Create new files only when necessary'
-  guidance += `\n4. Maximum ${limits.limit} total file operations per request`
-
-  // Component relationships
-  if (Object.keys(context.projectContext.componentRelationships).length > 0) {
-    guidance += '\n\n🔗 COMPONENT RELATIONSHIPS TO MAINTAIN:'
-    Object.entries(context.projectContext.componentRelationships).forEach(([component, related]) => {
-      guidance += `\n- ${component} depends on: ${related.join(', ')}`
-    })
-  }
-
-  return guidance
-}
-
-// Analyze user message for specific file operations needed
-function analyzeUserMessageForFileOperations(userMessage: string, context: any, intentData?: any): string[] {
-  const instructions: string[] = []
-  const message = userMessage.toLowerCase()
-
-  // Component creation patterns
-  if (message.includes('create') || message.includes('add') || message.includes('new')) {
-    if (message.includes('component') || message.includes('button') || message.includes('header') ||
-        message.includes('footer') || message.includes('nav') || message.includes('form')) {
-      instructions.push('Check existing components first - do not create duplicates')
-      instructions.push('Read App.jsx to see current component structure')
-    }
-  }
-
-  // Styling patterns
-  if (message.includes('style') || message.includes('color') || message.includes('layout') ||
-      message.includes('design') || message.includes('css')) {
-    instructions.push('Check existing CSS files and Tailwind classes before adding new styles')
-    instructions.push('Look for existing component styling patterns to maintain consistency')
-  }
-
-  // Feature addition patterns
-  if (message.includes('add feature') || message.includes('implement') || message.includes('build')) {
-    instructions.push('READ App.jsx first to understand current app structure')
-    instructions.push('Check what components are already imported and used')
-  }
-
-  // Edit patterns
-  if (message.includes('change') || message.includes('update') || message.includes('modify') ||
-      message.includes('fix') || message.includes('edit')) {
-    instructions.push('Find the exact file that contains the code to change')
-    instructions.push('READ the file first to see current content before editing')
-  }
-
-  // Specific component patterns
-  if (message.includes('hero') || message.includes('landing')) {
-    instructions.push('Check if Hero component exists - edit it instead of creating new')
-  }
-
-  if (message.includes('navigation') || message.includes('menu') || message.includes('navbar')) {
-    instructions.push('Navigation is usually in Header.jsx - read it first')
-  }
-
-  if (message.includes('contact') || message.includes('about') || message.includes('services')) {
-    instructions.push('These sections might already exist - check App.jsx structure first')
-  }
-
-  return instructions.slice(0, 4) // Max 4 specific instructions
-}
-
-// Get specific files that should be read first
-function getReadFileRecommendations(userMessage: string, context: any, intentData?: any): Array<{filePath: string, reason: string}> {
-  const recommendations: Array<{filePath: string, reason: string}> = []
-  const message = userMessage.toLowerCase()
-
-  // Always recommend reading App.jsx for structural changes
-  if (message.includes('component') || message.includes('page') || message.includes('layout') ||
-      message.includes('structure') || message.includes('add') || message.includes('create') ||
-      message.includes('new') || message.includes('build')) {
-    recommendations.push({
-      filePath: 'src/App.jsx',
-      reason: 'ESSENTIAL: Check current app structure and component hierarchy first'
-    })
-  }
-
-  // Read specific component files based on user request
-  if (message.includes('header') || message.includes('navigation') || message.includes('nav') ||
-      message.includes('menu') || message.includes('navbar')) {
-    const existingHeader = context.recentEdits.find((edit: any) => edit.filePath.includes('Header'))
-    if (existingHeader) {
-      recommendations.push({
-        filePath: 'src/components/Header.jsx',
-        reason: 'Header exists - read current navigation structure'
-      })
-    } else {
-      recommendations.push({
-        filePath: 'src/App.jsx',
-        reason: 'Check if navigation exists in App or separate Header component'
-      })
-    }
-  }
-
-  if (message.includes('footer') || message.includes('bottom')) {
-    const existingFooter = context.recentEdits.find((edit: any) => edit.filePath.includes('Footer'))
-    if (existingFooter) {
-      recommendations.push({
-        filePath: 'src/components/Footer.jsx',
-        reason: 'Footer exists - read current footer content'
-      })
-    }
-  }
-
-  if (message.includes('hero') || message.includes('landing') || message.includes('main')) {
-    const existingHero = context.recentEdits.find((edit: any) => edit.filePath.includes('Hero'))
-    if (existingHero) {
-      recommendations.push({
-        filePath: 'src/components/Hero.jsx',
-        reason: 'Hero component exists - read current landing section'
-      })
-    }
-  }
-
-  if (message.includes('button') || message.includes('btn') || message.includes('click')) {
-    const existingButton = context.recentEdits.find((edit: any) => edit.filePath.includes('Button'))
-    if (existingButton) {
-      recommendations.push({
-        filePath: 'src/components/Button.jsx',
-        reason: 'Button component exists - check current button styles and functionality'
-      })
-    }
-  }
-
-  if (message.includes('form') || message.includes('input') || message.includes('contact')) {
-    const existingForm = context.recentEdits.find((edit: any) => edit.filePath.includes('Form'))
-    if (existingForm) {
-      recommendations.push({
-        filePath: 'src/components/Form.jsx',
-        reason: 'Form component exists - read current form structure'
-      })
-    }
-  }
-
-  // Read files that have been recently edited for context
-  context.recentEdits.slice(-3).forEach((edit: any) => {
-    if (!recommendations.some(rec => rec.filePath === edit.filePath)) {
-      recommendations.push({
-        filePath: edit.filePath,
-        reason: `Recently ${edit.action} - check current state before making changes`
-      })
-    }
-  })
-
-  // If no specific recommendations, suggest reading main app file
-  if (recommendations.length === 0) {
-    recommendations.push({
-      filePath: 'src/App.jsx',
-      reason: 'Read main app structure to understand current implementation'
-    })
-  }
-
-  return recommendations.slice(0, 4) // Max 4 read recommendations
-}
-
-// Get specific edit instructions
-function getEditFileInstructions(userMessage: string, context: any, intentData?: any): Array<{filePath: string, action: string, lineHint?: number}> {
-  const instructions: Array<{filePath: string, action: string, lineHint?: number}> = []
-  const message = userMessage.toLowerCase()
-
-  // Edit existing components based on user request
-  if (message.includes('header') || message.includes('navigation') || message.includes('nav') ||
-      message.includes('menu') || message.includes('navbar')) {
-    const existingHeader = context.recentEdits.find((edit: any) => edit.filePath.includes('Header'))
-    if (existingHeader) {
-      let action = 'Update header content and navigation'
-      if (message.includes('color') || message.includes('style')) {
-        action = 'Update header styling and colors'
-      } else if (message.includes('text') || message.includes('change')) {
-        action = 'Update header text and links'
-      }
-      instructions.push({
-        filePath: 'src/components/Header.jsx',
-        action,
-        lineHint: 5
-      })
-    }
-  }
-
-  if (message.includes('footer') || message.includes('bottom')) {
-    const existingFooter = context.recentEdits.find((edit: any) => edit.filePath.includes('Footer'))
-    if (existingFooter) {
-      let action = 'Update footer content and links'
-      if (message.includes('color') || message.includes('style')) {
-        action = 'Update footer styling and layout'
-      } else if (message.includes('text') || message.includes('contact')) {
-        action = 'Update footer text and contact information'
-      }
-      instructions.push({
-        filePath: 'src/components/Footer.jsx',
-        action,
-        lineHint: 3
-      })
-    }
-  }
-
-  if (message.includes('hero') || message.includes('landing') || message.includes('main')) {
-    const existingHero = context.recentEdits.find((edit: any) => edit.filePath.includes('Hero'))
-    if (existingHero) {
-      let action = 'Update hero section content and layout'
-      if (message.includes('color') || message.includes('background')) {
-        action = 'Update hero background and colors'
-      } else if (message.includes('text') || message.includes('title')) {
-        action = 'Update hero title and description text'
-      }
-      instructions.push({
-        filePath: 'src/components/Hero.jsx',
-        action,
-        lineHint: 8
-      })
-    }
-  }
-
-  if (message.includes('button') || message.includes('btn') || message.includes('click')) {
-    const existingButton = context.recentEdits.find((edit: any) => edit.filePath.includes('Button'))
-    if (existingButton) {
-      let action = 'Update button component styling and functionality'
-      if (message.includes('color') || message.includes('style')) {
-        action = 'Update button colors and visual styling'
-      } else if (message.includes('text') || message.includes('label')) {
-        action = 'Update button text and labels'
-      } else if (message.includes('function') || message.includes('click')) {
-        action = 'Update button click handlers and functionality'
-      }
-      instructions.push({
-        filePath: 'src/components/Button.jsx',
-        action,
-        lineHint: 5
-      })
-    }
-  }
-
-  // Edit App.jsx for structural changes
-  if (message.includes('layout') || message.includes('structure') || message.includes('component') ||
-      message.includes('add') || message.includes('remove') || message.includes('reorganize')) {
-    let action = 'Update component imports and app layout structure'
-    if (message.includes('add')) {
-      action = 'Add new component imports and update layout'
-    } else if (message.includes('remove')) {
-      action = 'Remove component imports and update layout'
-    }
-    instructions.push({
-      filePath: 'src/App.jsx',
-      action,
-      lineHint: 1
-    })
-  }
-
-  // Edit based on recently created files
-  context.projectContext.filesCreated.forEach((filePath: string) => {
-    const componentName = filePath.split('/').pop()?.replace('.jsx', '').toLowerCase() || ''
-    if (message.includes(componentName) || message.includes('new') || message.includes('created')) {
-      instructions.push({
-        filePath,
-        action: `Modify newly created ${componentName} component`,
-        lineHint: 1
-      })
-    }
-  })
-
-  // If no specific instructions but we have existing files, suggest editing them
-  if (instructions.length === 0 && context.recentEdits.length > 0) {
-    const mostRecentEdit = context.recentEdits[context.recentEdits.length - 1]
-    instructions.push({
-      filePath: mostRecentEdit.filePath,
-      action: `Continue editing ${mostRecentEdit.filePath.split('/').pop()}`,
-      lineHint: 1
-    })
-  }
-
-  return instructions.slice(0, 3) // Max 3 edit instructions
-}
-
-// Get specific create instructions
-function getCreateFileInstructions(userMessage: string, context: any, intentData?: any): Array<{filePath: string, purpose: string}> {
-  const instructions: Array<{filePath: string, purpose: string}> = []
-  const message = userMessage.toLowerCase()
-
-  // Only suggest creating files if they don't already exist and are specifically requested
-  if (message.includes('create') || message.includes('add') || message.includes('new') ||
-      message.includes('build') || message.includes('make')) {
-
-    // Check for specific component requests
-    if ((message.includes('button') || message.includes('btn')) &&
-        !context.recentEdits.some((edit: any) => edit.filePath.includes('Button'))) {
-      let purpose = 'Create reusable button component with proper styling'
-      if (message.includes('primary') || message.includes('main')) {
-        purpose = 'Create primary action button component'
-      } else if (message.includes('secondary')) {
-        purpose = 'Create secondary button component'
-      } else if (message.includes('icon')) {
-        purpose = 'Create button component with icon support'
-      }
-      instructions.push({
-        filePath: 'src/components/Button.jsx',
-        purpose
-      })
-    }
-
-    if ((message.includes('header') || message.includes('navigation') || message.includes('nav') ||
-         message.includes('menu') || message.includes('navbar')) &&
-        !context.recentEdits.some((edit: any) => edit.filePath.includes('Header'))) {
-      let purpose = 'Create header component with navigation'
-      if (message.includes('responsive') || message.includes('mobile')) {
-        purpose = 'Create responsive header with mobile navigation menu'
-      } else if (message.includes('logo')) {
-        purpose = 'Create header component with logo and navigation'
-      }
-      instructions.push({
-        filePath: 'src/components/Header.jsx',
-        purpose
-      })
-    }
-
-    if ((message.includes('footer') || message.includes('bottom')) &&
-        !context.recentEdits.some((edit: any) => edit.filePath.includes('Footer'))) {
-      let purpose = 'Create footer component with links and information'
-      if (message.includes('contact')) {
-        purpose = 'Create footer with contact information and social links'
-      } else if (message.includes('links')) {
-        purpose = 'Create footer with navigation links'
-      }
-      instructions.push({
-        filePath: 'src/components/Footer.jsx',
-        purpose
-      })
-    }
-
-    if ((message.includes('hero') || message.includes('landing') || message.includes('main') ||
-         message.includes('banner')) &&
-        !context.recentEdits.some((edit: any) => edit.filePath.includes('Hero'))) {
-      let purpose = 'Create hero section component for landing page'
-      if (message.includes('call') || message.includes('action')) {
-        purpose = 'Create hero section with call-to-action buttons'
-      } else if (message.includes('image') || message.includes('background')) {
-        purpose = 'Create hero section with background image'
-      }
-      instructions.push({
-        filePath: 'src/components/Hero.jsx',
-        purpose
-      })
-    }
-
-    if ((message.includes('form') || message.includes('contact') || message.includes('input')) &&
-        !context.recentEdits.some((edit: any) => edit.filePath.includes('Form'))) {
-      let purpose = 'Create form component with input validation'
-      if (message.includes('contact')) {
-        purpose = 'Create contact form with name, email, and message fields'
-      } else if (message.includes('login') || message.includes('sign')) {
-        purpose = 'Create login/signup form component'
-      }
-      instructions.push({
-        filePath: 'src/components/Form.jsx',
-        purpose
-      })
-    }
-
-    if ((message.includes('card') || message.includes('panel')) &&
-        !context.recentEdits.some((edit: any) => edit.filePath.includes('Card'))) {
-      let purpose = 'Create reusable card component'
-      if (message.includes('product')) {
-        purpose = 'Create product card component for e-commerce'
-      } else if (message.includes('feature')) {
-        purpose = 'Create feature card component'
-      }
-      instructions.push({
-        filePath: 'src/components/Card.jsx',
-        purpose
-      })
-    }
-
-    // Generic component creation for other requests
-    if (instructions.length === 0 && (message.includes('component') || message.includes('page'))) {
-      // Extract potential component name from the message
-      const words = message.split(' ')
-      const componentKeywords = ['page', 'section', 'modal', 'sidebar', 'sidebar', 'panel', 'widget']
-      const potentialName = words.find(word =>
-        word.length > 3 &&
-        !['create', 'add', 'new', 'build', 'make', 'component', 'page', 'section'].includes(word)
-      )
-
-      if (potentialName) {
-        const componentName = potentialName.charAt(0).toUpperCase() + potentialName.slice(1)
-        instructions.push({
-          filePath: `src/components/${componentName}.jsx`,
-          purpose: `Create ${componentName} component as requested`
-        })
-      }
-    }
-  }
-
-  return instructions.slice(0, 2) // Max 2 create instructions
-}
 
 // Get AI model by ID with fallback to default
 const getAIModel = (modelId?: string) => {
@@ -1283,6 +265,92 @@ async function executeWriteFile(projectId: string, path: string, content: string
   }
 }
 
+// Search/Replace constants for file editing
+const SEARCH_START = "<<<<<<< SEARCH";
+const DIVIDER = "=======";
+const REPLACE_END = ">>>>>>> REPLACE";
+
+// Helper function to escape special regex characters
+function escapeRegExp(string: string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Parse AI response into search/replace blocks
+function parseSearchReplaceBlocks(aiResponse: string) {
+  const blocks: Array<{search: string, replace: string}> = [];
+  const lines = aiResponse.split('\n');
+  
+  let currentBlock: {search: string[], replace: string[]} | null = null;
+  let mode: 'none' | 'search' | 'replace' = 'none';
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    if (line.trim() === SEARCH_START) {
+      currentBlock = { search: [], replace: [] };
+      mode = 'search';
+    } else if (line.trim() === DIVIDER && currentBlock) {
+      mode = 'replace';
+    } else if (line.trim() === REPLACE_END && currentBlock) {
+      blocks.push({
+        search: currentBlock.search.join('\n'),
+        replace: currentBlock.replace.join('\n')
+      });
+      currentBlock = null;
+      mode = 'none';
+    } else if (mode === 'search' && currentBlock) {
+      currentBlock.search.push(line);
+    } else if (mode === 'replace' && currentBlock) {
+      currentBlock.replace.push(line);
+    }
+  }
+  
+  return blocks;
+}
+
+// Apply search/replace edits to content
+function applySearchReplaceEdits(content: string, blocks: Array<{search: string, replace: string}>) {
+  let modifiedContent = content;
+  const appliedEdits: Array<{
+    blockIndex: number;
+    search: string;
+    replace: string;
+    status: string;
+  }> = [];
+  const failedEdits: Array<{
+    blockIndex: number;
+    search: string;
+    replace: string;
+    status: string;
+    reason: string;
+  }> = [];
+  
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+    const searchText = block.search;
+    const replaceText = block.replace;
+    
+    if (modifiedContent.includes(searchText)) {
+      modifiedContent = modifiedContent.replace(searchText, replaceText);
+      appliedEdits.push({
+        blockIndex: i,
+        search: searchText,
+        replace: replaceText,
+        status: 'applied'
+      });
+    } else {
+      failedEdits.push({
+        blockIndex: i,
+        search: searchText,
+        replace: replaceText,
+        status: 'failed',
+        reason: 'Search text not found in content'
+      });
+    }
+  }
+  
+  return { modifiedContent, appliedEdits, failedEdits };
+}
 
 async function executeReadFile(projectId: string, path: string, userId: string, storageManager: any) {
   try {
@@ -1434,6 +502,12 @@ async function buildOptimizedProjectContext(projectId: string, storageManager: a
       .slice(0, 8)
       .join(' • ')
 
+    // ENHANCEMENT 5: Task-aware context
+    let taskContext = ''
+    if (userIntent?.intent) {
+      const taskInfo = `${userIntent.intent} (${userIntent.complexity || 'medium'})`
+      taskContext = `\n🎯 TASK: ${taskInfo}`
+    }
 
     // ENHANCEMENT 6: File type breakdown for better understanding
     const fileTypeStats = limitedFiles.reduce((acc: any, file: any) => {
@@ -1451,7 +525,7 @@ async function buildOptimizedProjectContext(projectId: string, storageManager: a
 🔧 ACTIVE: ${limitedFiles.length} relevant (${typeSummary})
 📂 DIRS: ${dirSummary || 'src • components • lib'}
 📄 FILES: ${fileSummary || 'App.tsx • package.json • index.html'}
-🎯 MODE: AGENT (file operations enabled)`
+🎯 MODE: AGENT (file operations enabled)${taskContext}`
 
     console.log(`[CONTEXT OPTIMIZATION] Enhanced: ${files.length} → ${limitedFiles.length} files (${contextPriority} priority)`)
     return context
@@ -1460,7 +534,7 @@ async function buildOptimizedProjectContext(projectId: string, storageManager: a
     console.error('Error building enhanced project context:', error)
     return `📁 PROJECT: ${projectId}
 🎯 MODE: AGENT (file operations available)
-⚠️ Context loading failed - working with limited context`
+⚠️ Context loading failed - use list_files tool with path parameter (e.g., {path: "/"})`
   }
 }
 
@@ -1819,27 +893,9 @@ function isReportingCodeIssues(userMessage: string, intentData?: any): boolean {
   return hasCodeIssueKeywords || hasDebugIntent
 }
 
-// Helper function to detect if user is requesting file listing
-function isRequestingFileList(userMessage?: string): boolean {
-  if (!userMessage) return false
-  
-  const lowerMessage = userMessage.toLowerCase()
-  return /\b(list files?|show files|directory|dir\b|ls\b|file list|what files|show me.*(files|directory)|browse files|view files)\b/i.test(lowerMessage)
-}
-
 // Helper function to create file operation tools based on AI mode
-function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = 'agent', conversationMemory: any[] = [], userId?: string, intentData?: any, userMessage?: string, globalTracker?: any) {
+function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = 'agent', conversationMemory: any[] = [], userId?: string, intentData?: any, userMessage?: string) {
   const tools: Record<string, any> = {}
-
-  // Tool usage tracking for efficiency monitoring
-  const toolUsageTracker = {
-    filesRead: new Set<string>(),
-    filesEdited: new Set<string>(),
-    readCount: 0,
-    editCount: 0,
-    totalTools: 0,
-    globalTracker: globalTracker // Reference to the global tracker
-  }
 
   // Check if user is reporting code issues - only include advanced tools then
   const userReportingIssues = userMessage ? isReportingCodeIssues(userMessage, intentData) : false
@@ -1860,20 +916,14 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
           throw new Error('Operation cancelled')
         }
 
-        // Track file reads for efficiency monitoring
-        toolUsageTracker.totalTools++
-        toolUsageTracker.readCount++
-        
-        if (toolUsageTracker.filesRead.has(path)) {
-          console.warn(`⚠️ EFFICIENCY WARNING: Reading file ${path} multiple times in one request`)
-        }
-        toolUsageTracker.filesRead.add(path)
-
         try {
+          console.log('[DEBUG] Executing read_file tool:', { path, projectId })
           const { storageManager } = await import('@/lib/storage-manager')
           await storageManager.init()
 
           const file = await storageManager.getFile(projectId, path)
+          console.log('[DEBUG] read_file result:', { path, fileFound: !!file, fileSize: file?.size })
+          
           if (!file) {
             return {
               success: false,
@@ -1892,6 +942,7 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
             toolCallId
           }
         } catch (error) {
+          console.error('[DEBUG] read_file error:', error)
           const errorMessage = error instanceof Error ? error.message : 'Unknown error'
           return {
             success: false,
@@ -1902,54 +953,82 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
       }
     })
 
-    // Include list_files only when user explicitly requests file listing
-    if (isRequestingFileList(userMessage)) {
-      tools.list_files = tool({
-        description: 'Explore project structure and file organization for codebase understanding',
-        inputSchema: z.object({
-          path: z.string().optional().describe('Directory path to list (default: root)')
-        }),
-        execute: async ({ path = '/' }, { abortSignal, toolCallId }) => {
-          if (abortSignal?.aborted) {
-            throw new Error('Operation cancelled')
-          }
-
-        try {
-          const { storageManager } = await import('@/lib/storage-manager')
-          await storageManager.init()
-
-          const files = await storageManager.getFiles(projectId)
-
-          // Filter by path if specified
-          const filteredFiles = path === '/' ? files : files.filter(f =>
-            f.path.startsWith(path) && !f.path.slice(path.length + 1).includes('/')
-          )
-
-          return {
-            success: true,
-            message: `📁 Explored directory: ${path}`,
-            files: filteredFiles.map(f => ({
-              name: f.name,
-              path: f.path,
-              type: f.type,
-              size: f.size,
-              isDirectory: f.isDirectory
-            })),
-            count: filteredFiles.length,
+  // List files tool - available in both modes  
+  tools.list_files = tool({
+    description: 'List files and directories in a specific folder path',
+    inputSchema: z.object({
+      path: z.string().describe('Directory path to list (use "/" for root)')
+    }),
+    execute: async ({ path }, { abortSignal, toolCallId }) => {
+      if (abortSignal?.aborted) {
+        throw new Error('Operation cancelled')
+      }
+      
+      try {
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        
+        // Validate path
+        if (!path || typeof path !== 'string') {
+          return { 
+            success: false, 
+            error: `Invalid directory path provided`,
             path,
             toolCallId
           }
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-          return {
-            success: false,
-            error: `Failed to list files: ${errorMessage}`,
-            toolCallId
-          }
+        }
+        
+        // Get all files from the project
+        const allFiles = await storageManager.getFiles(projectId)
+        
+        // Filter files based on the requested path
+        let filteredFiles;
+        if (path === '/' || path === '') {
+          // Root directory - show all files at root level
+          filteredFiles = allFiles.filter(f => {
+            const pathParts = f.path.split('/').filter(p => p.length > 0)
+            return pathParts.length === 1 // Only top-level files
+          })
+        } else {
+          // Specific directory - show files in that directory
+          const normalizedPath = path.startsWith('/') ? path.slice(1) : path
+          const searchPath = normalizedPath.endsWith('/') ? normalizedPath : normalizedPath + '/'
+          
+          filteredFiles = allFiles.filter(f => {
+            return f.path.startsWith(searchPath) && 
+                   f.path.slice(searchPath.length).indexOf('/') === -1 // Only direct children
+          })
+        }
+
+        return { 
+          success: true, 
+          message: `✅ Listed ${filteredFiles.length} items in directory: ${path}`,
+          path,
+          files: filteredFiles.map(f => ({
+            name: f.name,
+            path: f.path,
+            type: f.type,
+            size: f.size,
+            isDirectory: f.isDirectory,
+            createdAt: f.createdAt
+          })),
+          count: filteredFiles.length,
+          action: 'list',
+          toolCallId
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error(`[ERROR] list_files failed for ${path}:`, error)
+        
+        return { 
+          success: false, 
+          error: `Failed to list directory ${path}: ${errorMessage}`,
+          path,
+          toolCallId
         }
       }
-    })
-  }
+    }
+  })
 
     // Include analysis tools for ask mode
     tools.analyze_dependencies = tool({
@@ -2293,7 +1372,7 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
           const results = scoredItems.slice(0, maxResults)
 
           // Group by categories for better organization
-          const categories = Array.from(new Set(results.map(item => item.category).filter(Boolean)))
+          const categories = [...new Set(results.map(item => item.category).filter(Boolean))]
           const categoryGroups = categories.map(cat => ({
             category: cat,
             items: results.filter(item => item.category === cat).map(item => ({
@@ -2398,10 +1477,67 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
 
   } // End conditional for get_knowledge_item
 
-  // REMOVED: tool_results_summary - AI was calling it multiple times, wasting resources
-  // REMOVED: Duplicate read_file tool - keeping the one above
+  
+  // Read and list tools - available in both modes
+  tools.read_file = tool({
+    description: 'Read the contents of a file',
+    inputSchema: z.object({
+      path: z.string().describe('File path to read')
+    }),
+    execute: async ({ path }, { abortSignal, toolCallId }) => {
+      if (abortSignal?.aborted) {
+        throw new Error('Operation cancelled')
+      }
+      
+      try {
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        
+        // Validate path
+        if (!path || typeof path !== 'string') {
+          return { 
+            success: false, 
+            error: `Invalid file path provided`,
+            path,
+            toolCallId
+          }
+        }
+        
+        const file = await storageManager.getFile(projectId, path)
 
-  // REMOVED: Duplicate list_files tool - keeping the one above
+        if (!file) {
+          return { 
+            success: false, 
+            error: `File not found: ${path}. Use list_files with path parameter to see available files in directories.`,
+            path,
+            toolCallId
+          }
+        }
+
+        return { 
+          success: true, 
+          message: `✅ File ${path} read successfully.`,
+          path,
+          content: file.content || '',
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          action: 'read',
+          toolCallId
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error(`[ERROR] read_file failed for ${path}:`, error)
+        
+        return { 
+          success: false, 
+          error: `Failed to read file ${path}: ${errorMessage}`,
+          path,
+          toolCallId
+        }
+      }
+    }
+  })
 
   // Write and delete tools - only available in Agent mode
   if (aiMode === 'agent') {
@@ -2416,20 +1552,10 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
         if (abortSignal?.aborted) {
           throw new Error('Operation cancelled')
         }
-
-        // Check file operation limits
-        const limits = checkFileOperationLimit(projectId)
-        if (!limits.allowed) {
-          return {
-            success: false,
-            error: `File operation limit exceeded (${limits.operationsUsed}/${limits.limit}). Maximum ${limits.limit} file operations per request allowed.`,
-            path,
-            toolCallId,
-            limitExceeded: true
-          }
-        }
         
         try {
+          console.log('[DEBUG] Executing write_file tool:', { path, contentLength: content?.length, projectId })
+          
           // Validate inputs
           if (!path || typeof path !== 'string') {
             return { 
@@ -2455,14 +1581,12 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
           
           // Check if file already exists
           const existingFile = await storageManager.getFile(projectId, path)
+          console.log('[DEBUG] write_file file check:', { path, fileExists: !!existingFile })
 
           if (existingFile) {
             // Update existing file
             await storageManager.updateFile(projectId, path, { content })
-
-            // Track surgical operation
-            trackFileOperation(projectId, path, 'edited')
-
+            console.log('[DEBUG] write_file updated existing file:', path)
             return { 
               success: true, 
               message: `✅ File ${path} updated successfully.`,
@@ -2482,10 +1606,8 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
               size: content.length,
               isDirectory: false
             })
-
-            // Track surgical operation
-            trackFileOperation(projectId, path, 'created')
             
+            console.log('[DEBUG] write_file created new file:', path, newFile.id)
             return { 
               success: true, 
               message: `✅ File ${path} created successfully.`,
@@ -2497,8 +1619,8 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
           }
         } catch (error) {
           // Enhanced error handling
+          console.error(`[DEBUG] write_file error for ${path}:`, error)
           const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-          console.error(`[ERROR] write_file failed for ${path}:`, error)
           
           return { 
             success: false, 
@@ -2542,7 +1664,7 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
           if (!existingFile) {
             return { 
               success: false, 
-              error: `File not found: ${path}. Please check the file path.`,
+              error: `File not found: ${path}. Use list_files to see available files.`,
               path,
               toolCallId
             }
@@ -2601,18 +1723,6 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
         if (abortSignal?.aborted) {
           throw new Error('Operation cancelled')
         }
-
-        // Check file operation limits
-        const limits = checkFileOperationLimit(projectId)
-        if (!limits.allowed) {
-          return {
-            success: false,
-            error: `File operation limit exceeded (${limits.operationsUsed}/${limits.limit}). Maximum ${limits.limit} file operations per request allowed.`,
-            path,
-            toolCallId,
-            limitExceeded: true
-          }
-        }
         
         try {
           // Validate inputs
@@ -2644,13 +1754,31 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
           if (!existingFile) {
             return { 
               success: false, 
-              error: `File not found: ${path}. Please check the file path.`,
+              error: `File not found: ${path}. Use list_files to see available files.`,
               path,
               toolCallId
             }
           }
 
-          // Helper functions are defined at the top level
+          // Helper functions
+          function escapeRegExp(string: string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          }
+
+          function findNthOccurrence(content: string, searchText: string, n: number): number {
+            let index = -1;
+            for (let i = 0; i < n; i++) {
+              index = content.indexOf(searchText, index + 1);
+              if (index === -1) return -1;
+            }
+            return index;
+          }
+
+          function replaceNthOccurrence(content: string, searchText: string, replaceText: string, n: number): string {
+            const index = findNthOccurrence(content, searchText, n);
+            if (index === -1) return content;
+            return content.substring(0, index) + replaceText + content.substring(index + searchText.length);
+          }
 
           // Initialize tracking arrays
           const appliedEdits: Array<{
@@ -2880,9 +2008,6 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
           });
 
           console.log(`[DEBUG] Successfully applied ${appliedEdits.length} edits to ${path}`);
-
-          // Track surgical operation
-          trackFileOperation(projectId, path, 'edited')
           
           return {
             success: true,
@@ -3088,9 +2213,9 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
   })
   } // End conditional for web tools
 
-  // REMOVED: learn_patterns tool - too complex and not needed for Lovable-style system
-  // if (aiMode === 'agent' && userReportingIssues) { // Disabled - wasting resources
-  /*
+  // AI-Powered Learning and Pattern Recognition Tool (optimized for minimal token usage)
+  // Only include when user is reporting code issues
+  if (aiMode === 'agent' && userReportingIssues) { // Re-enabled with strict optimizations
   tools.learn_patterns = tool({
     description: 'Advanced pattern analysis with code metrics, complexity analysis, and actionable recommendations',
     inputSchema: z.object({
@@ -3407,8 +2532,7 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
     }
   })
 
-  */ // End learn_patterns conditional - DISABLED
-  // }
+  } // End learn_patterns conditional
 
   // AI Dependency Analyzer - Validates imports and auto-adds missing dependencies
   // ALWAYS INCLUDE - Critical for production-ready code generation
@@ -4147,6 +3271,7 @@ ${analyzeDependencies ? '6. **Circular Dependencies**: Detect potential circular
 
   } // End conditional for scan_code_imports
 
+  // TASK MANAGEMENT TOOLS - CONDITIONALLY INCLUDED
 
 
 
@@ -4169,43 +3294,18 @@ ${analyzeDependencies ? '6. **Circular Dependencies**: Detect potential circular
   return tools
 }
 
-
-
-
-
-// NLP Intent Detection using Mistral Pixtral with Surgical Context
-async function detectUserIntent(userMessage: string, projectContext: string, conversationHistory: any[], projectId: string) {
+// NLP Intent Detection using Mistral Pixtral
+async function detectUserIntent(userMessage: string, projectContext: string, conversationHistory: any[]) {
   try {
     const mistralPixtralModel = getMistralPixtralModel()
-
-    // Generate surgical guidance for this project
-    const surgicalGuidance = generateSurgicalGuidance(projectId, userMessage)
     
     const intentPrompt = `Analyze the user's request and determine their intent for building or modifying a React application.
 
 🚨 CRITICAL RULES - READ FIRST:
 - NEVER recommend web_search or web_extract unless user EXPLICITLY asks for web research
-- For file modifications, product additions, or code changes, recommend ONLY read_file, write_file, edit_file
-- list_files is FORBIDDEN unless user specifically says "list files", "show files", "what files", "browse files"
-- Creating landing pages, components, or features does NOT require list_files
+- For file modifications, product additions, or code changes, recommend ONLY list_files, read_file, write_file, edit_file
 - Web tools are FORBIDDEN for basic development tasks
 - If user wants to add products, edit files, or modify code, use file operations only
-- MAXIMUM 3 FILES PER REQUEST (Vercel timeout prevention)
-
-🚫 **BANNED COMBINATIONS:**
-- "create landing page" → NEVER include list_files
-- "build component" → NEVER include list_files  
-- "add feature" → NEVER include list_files
-- "make app" → NEVER include list_files
-
-✅ **ONLY USE list_files WHEN USER SAYS:**
-- "list the files"
-- "show me files" 
-- "what files exist"
-- "browse the directory"
-- "explore file structure"
-
-${surgicalGuidance}
 
 User Message: "${userMessage}"
 
@@ -4216,54 +3316,35 @@ ${conversationHistory.slice(-10).map((msg, i) => `${msg.role}: ${msg.content}`).
 
 Based on the user's request, determine:
 1. **Primary Intent**: What does the user want to accomplish?
-2. **Required Tools**: Which tools should be used? (PREFER read_file, write_file, edit_file, delete_file - NEVER suggest list_files unless user asks to list/show files - AVOID web_search, web_extract unless explicitly requested)
-3. **Target Files**: SPECIFIC files to create/edit (MAX 3 files!)
-4. **File Operations**: What files need to be created, modified, or deleted?
-5. **Complexity Level**: Simple, Medium, or Complex task?
-6. **Action Plan**: Step-by-step plan to accomplish the task
+2. **Required Tools**: Which tools should be used? (PREFER list_files, read_file, write_file, edit_file, delete_file - AVOID web_search, web_extract unless explicitly requested)
+3. **File Operations**: What files need to be created, modified, or deleted?
+4. **Complexity Level**: Simple, Medium, or Complex task?
+5. **Action Plan**: Step-by-step plan to accomplish the task
 
 📝 **TOOL SELECTION RULES:**
 - File operations (add products, edit code) → use read_file + write_file/edit_file
 - Web research (search online, external content) → use web_search + web_extract
 - When in doubt, choose file operations over web tools
-- PRIORITIZE: Edit existing → Create new → Read context
 
-🚫 **EXAMPLES OF WHAT NOT TO DO:**
-- User: "create landing page" → WRONG: ["list_files", "read_file", "write_file"] 
-- User: "build component" → WRONG: ["list_files", "write_file"]
-- User: "add feature" → WRONG: ["list_files", "edit_file"]
-
-✅ **CORRECT EXAMPLES:**
-- User: "create landing page" → CORRECT: ["write_file", "edit_file"]
-- User: "build component" → CORRECT: ["write_file"] 
-- User: "add feature" → CORRECT: ["read_file", "edit_file"]
-- User: "list the files" → CORRECT: ["list_files"]
-
-📋 **SURGICAL FILE TARGETING:**
-- If user mentions a component, EDIT the existing file instead of creating new
-- Check recently modified files first
-- Maximum 3 files per operation
-- Use read_file ONLY when you need to see current content
+📋 **EXAMPLE SCENARIOS:**
+- User: "add more products" → required_tools: ["read_file", "edit_file"], tool_usage_rules: "Use file operations only. NO web tools needed."
+- User: "search for jewelry trends online" → required_tools: ["web_search", "web_extract"], tool_usage_rules: "Web research requested - use web tools appropriately."
 
 Respond in JSON format:
 {
   "intent": "string",
   "required_tools": ["tool1", "tool2"],
-  "target_files": ["file1.jsx", "file2.tsx"], // MAX 3 files!
   "file_operations": ["create", "modify", "delete"],
   "complexity": "simple|medium|complex",
   "action_plan": ["step1", "step2"],
   "confidence": 0.95,
   "tool_usage_rules": "string",
-  "enforcement_notes": "string",
-  "surgical_guidance": "string"
+  "enforcement_notes": "string"
 }
 
 Include these fields:
-- "target_files": Array of specific files to work on (MAX 3!)
 - "tool_usage_rules": Specific rules about when to use each tool type
-- "enforcement_notes": Critical reminders about file limits and surgical approach
-- "surgical_guidance": How to approach this task surgically`
+- "enforcement_notes": Critical reminders about web tool restrictions`
 
     const intentResult = await generateText({
       model: mistralPixtralModel,
@@ -4272,24 +3353,9 @@ Include these fields:
 
 🚨 CRITICAL RULES:
 - NEVER recommend web_search or web_extract unless user EXPLICITLY asks for web research
-- For file modifications, product additions, or code changes, recommend ONLY read_file, write_file, edit_file
-- list_files is FORBIDDEN unless user specifically says "list files", "show files", "what files", "browse files"
-- Creating landing pages, components, or new features does NOT require list_files
+- For file modifications, product additions, or code changes, recommend ONLY list_files, read_file, write_file, edit_file
 - Web tools are FORBIDDEN for basic development tasks
-- When in doubt, choose file operations over web tools
-
-🚫 **NEVER INCLUDE list_files FOR:**
-- Creating landing pages
-- Building components  
-- Adding features
-- Making apps
-- Code modifications
-
-✅ **ONLY INCLUDE list_files WHEN USER EXPLICITLY SAYS:**
-- "list the files"
-- "show me files" 
-- "what files exist"
-- "browse the directory"` },
+- When in doubt, choose file operations over web tools` },
         { role: 'user', content: intentPrompt }
       ],
       temperature: 0.3
@@ -4337,12 +3403,12 @@ Include these fields:
       
       return {
         intent: 'general_development',
-        required_tools: ['read_file'],
+        required_tools: ['list_files', 'read_file'],
         file_operations: ['analyze'],
         complexity: 'medium',
         action_plan: ['Analyze current project state', 'Provide guidance'],
         confidence: 0.7,
-        tool_usage_rules: 'Use read_file, write_file, and edit_file for file operations. Only use list_files when user asks to list/show files. Avoid web tools unless explicitly requested.',
+        tool_usage_rules: 'Use list_files, read_file, write_file, and edit_file for file operations. Avoid web tools unless explicitly requested.',
         enforcement_notes: 'Web tools (web_search, web_extract) are FORBIDDEN for basic development tasks. Stick to file operations.'
       }
     }
@@ -4350,13 +3416,388 @@ Include these fields:
     console.error('Intent detection failed:', error)
     return {
       intent: 'general_development',
-      required_tools: ['read_file'],
+      required_tools: ['list_files', 'read_file'],
       file_operations: ['analyze'],
       complexity: 'medium',
       action_plan: ['Analyze current project state', 'Provide guidance'],
       confidence: 0.5,
-      tool_usage_rules: 'Use read_file, write_file, and edit_file for file operations. Only use list_files when user asks to list/show files. Avoid web tools unless explicitly requested.',
+      tool_usage_rules: 'Use list_files, read_file, write_file, and edit_file for file operations. Avoid web tools unless explicitly requested.',
       enforcement_notes: 'Web tools (web_search, web_extract) are FORBIDDEN for basic development tasks. Stick to file operations.'
+    }
+  }
+}
+
+// Focused System Prompts for Two-Phase Architecture
+function getPreprocessingSystemPrompt(): string {
+  return `🔍 **PIXEL FORGE - INFORMATION GATHERING PHASE**
+
+You are a specialized code analysis assistant in the preprocessing phase. Your role is to intelligently gather information to understand the current codebase state.
+
+**🎯 PRIMARY OBJECTIVES:**
+- Read and analyze files to understand current implementation
+- List directories to understand project structure  
+- Search for information when requested
+- Extract and analyze dependencies
+- Gather comprehensive context for the implementation phase
+
+**🛠️ AVAILABLE TOOLS:**
+- read_file: Read file contents for analysis
+- list_files: Explore project structure and file organization
+- web_search: Search for external information when needed
+- web_extract: Extract content from web resources
+- analyze_dependencies: Understand project dependencies and imports
+
+**🚫 RESTRICTIONS:**
+- Do NOT attempt to write, edit, or delete files
+- Do NOT provide implementation solutions yet
+- Focus ONLY on information gathering and analysis
+- Provide thorough understanding of current state
+
+**📊 RESPONSE REQUIREMENTS:**
+- Be thorough and comprehensive in your analysis
+- Identify relevant files, patterns, and structures
+- Note any potential issues or areas of interest
+- Prepare detailed context for the implementation phase
+- Use clear, organized formatting with proper markdown
+
+**🎪 ANALYSIS APPROACH:**
+- Start with broad structure understanding (list_files)
+- Read specific files for detailed implementation analysis
+- Identify patterns, conventions, and architectural decisions
+- Note dependencies and external integrations
+- Document current state comprehensively
+
+Remember: This is the INFORMATION GATHERING phase. Your job is to understand and analyze, not to implement.`
+}
+
+function getStreamingSystemPrompt(): string {
+  return `<role>
+You are PIXEL FORGE, an AI development assistant that creates and modifies web applications in real-time. You assist users by chatting with them and making changes to their code through XML commands that execute immediately during our conversation.
+
+You make efficient and effective changes to codebases while following best practices for maintainability and readability. You take pride in keeping things simple and elegant. You are friendly and helpful, always aiming to provide clear explanations.
+
+You understand that users can see a live preview of their application while you make code changes, and all file operations execute immediately through XML commands.
+</role>
+
+# XML Commands for File Operations
+
+Do *not* tell the user to run shell commands. Instead, use XML commands for all file operations:
+
+- **pilotwrite**: Create or overwrite files with complete content
+- **pilotedit**: Edit existing files with search/replace operations  
+- **pilotdelete**: Delete files from the project
+
+You can use these commands by using XML tags like this:
+
+<pilotwrite path="src/components/Example.tsx">
+import React from 'react';
+
+export default function Example() {
+  return <div>Professional implementation</div>;
+}
+</pilotwrite>
+
+<pilotedit path="src/App.tsx" operation="search_replace" search="old code here" replace="new code here" />
+
+<pilotdelete path="src/old-file.ts" />
+
+# Guidelines
+
+Always reply to the user in the same language they are using.
+
+- Before proceeding with any code edits, check whether the user's request has already been implemented. If the requested change has already been made in the codebase, point this out to the user.
+- Only edit files that are related to the user's request and leave all other files alone.
+
+If new code needs to be written (i.e., the requested feature does not exist), you MUST:
+
+- Briefly explain the needed changes in a few short sentences, without being too technical.
+- Use <pilotwrite> for creating or updating files. Try to create small, focused files that will be easy to maintain.
+- Use <pilotedit> for modifying existing files with search/replace operations.
+- Use <pilotdelete> for removing files.
+- After all of the code changes, provide a VERY CONCISE, non-technical summary of the changes made in one sentence.
+
+Before sending your final answer, review every import statement you output and do the following:
+
+First-party imports (modules that live in this project)
+- Only import files/modules that have already been described to you.
+- If you need a project file that does not yet exist, create it immediately with <pilotwrite> before finishing your response.
+
+Third-party imports (anything that would come from npm)
+- If the package is not listed in package.json, inform the user that the package needs to be installed.
+
+Do not leave any import unresolved.
+
+# Examples
+
+## Example 1: Adding a new component
+
+I'll create a new Button component with Tailwind styling and then update the App to use it.
+
+<pilotwrite path="src/components/Button.tsx">
+import React from 'react';
+
+interface ButtonProps {
+  children: React.ReactNode;
+  variant?: 'primary' | 'secondary' | 'danger';
+  onClick?: () => void;
+  disabled?: boolean;
+}
+
+const Button: React.FC<ButtonProps> = ({ 
+  children, 
+  variant = 'primary', 
+  onClick, 
+  disabled = false 
+}) => {
+  const baseClasses = "px-4 py-2 rounded-md font-medium transition-colors";
+  
+  const variantClasses = {
+    primary: "bg-blue-600 hover:bg-blue-700 text-white",
+    secondary: "bg-gray-200 hover:bg-gray-300 text-gray-800",
+    danger: "bg-red-600 hover:bg-red-700 text-white"
+  };
+  
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={\`\$\{baseClasses\} \$\{variantClasses[variant]\}\`}
+    >
+      {children}
+    </button>
+  );
+};
+
+export default Button;
+</pilotwrite>
+
+<pilotwrite path="src/App.tsx">
+import React from 'react';
+import Button from './components/Button';
+
+function App() {
+  return (
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">My Application</h1>
+      
+      <div className="space-x-2">
+        <Button onClick={() => console.log('Primary clicked')}>
+          Primary Button
+        </Button>
+        <Button variant="secondary" onClick={() => console.log('Secondary clicked')}>
+          Secondary Button
+        </Button>
+        <Button variant="danger" onClick={() => console.log('Danger clicked')}>
+          Danger Button
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export default App;
+</pilotwrite>
+
+I've created a new Button component with three variants and updated the App to demonstrate its usage.
+
+## Example 2: Editing an existing file
+
+I'll update the existing App component to add a new feature.
+
+<pilotedit path="src/App.tsx" operation="search_replace" search="<h1 className=\"text-2xl font-bold mb-4\">My Application</h1>" replace="<h1 className=\"text-2xl font-bold mb-4\">My Enhanced Application</h1>
+      <p className=\"text-gray-600 mb-4\">Welcome to the new version!</p>" />
+
+I've updated the App component to include a welcome message.
+
+# Additional Guidelines
+
+All edits you make on the codebase will directly be built and rendered, therefore you should NEVER make partial changes like letting the user know that they should implement some components or partially implementing features.
+
+If a user asks for many features at once, you do not have to implement them all as long as the ones you implement are FULLY FUNCTIONAL and you clearly communicate to the user that you didn't implement some specific features.
+
+## Immediate Component Creation
+You MUST create a new file for every new component or hook, no matter how small.
+Never add new components to existing files, even if they seem related.
+Aim for components that are 100 lines of code or less.
+Continuously be ready to refactor files that are getting too large.
+
+## Important Rules for XML operations:
+- Only make changes that were directly requested by the user. Everything else in the files must stay exactly as it was.
+- Always specify the correct file path when using XML commands.
+- Ensure that the code you write is complete, syntactically correct, and follows the existing coding style and conventions of the project.
+- IMPORTANT: Only use ONE <pilotwrite> block per file that you write!
+- Prioritize creating small, focused files and components.
+- Do NOT be lazy and ALWAYS write the entire file. It needs to be a complete file.
+
+## Coding guidelines
+- ALWAYS generate responsive designs.
+- Use modern React patterns and TypeScript.
+- Don't catch errors with try/catch blocks unless specifically requested by the user.
+- Focus on the user's request and make the minimum amount of changes needed.
+- DON'T DO MORE THAN WHAT THE USER ASKS FOR.
+
+# Tech Stack
+- You are building a **Vite + React + TypeScript** application.
+- Use **React Router** for routing. KEEP the routes in \`src/App.tsx\`.
+- Always put source code in the **src** folder.
+- Put components into **src/components/**
+- Put custom hooks into **src/hooks/**
+- Put utility functions into **src/lib/**
+- Put static assets into **src/assets/**
+- The main entry point is **src/main.tsx** (NOT index.tsx).
+- The main application component is **src/App.tsx**.
+- **UPDATE the main App.tsx to include new components. OTHERWISE, the user can NOT see any components!**
+- **ALWAYS try to use the shadcn/ui library** (already installed with Radix UI components).
+- **Tailwind CSS**: Always use Tailwind CSS for styling components. Utilize Tailwind classes extensively for layout, spacing, colors, and other design aspects.
+- Use **Framer Motion** for animations (already installed).
+- Use **Lucide React** for icons (already installed).
+
+# REMEMBER
+
+> **XML FORMATTING IS NON-NEGOTIABLE:**
+> **NEVER, EVER** use markdown code blocks (\`\`\`) for code.
+> **ONLY** use XML commands for **ALL** code output.
+> Using \`\`\` for code is **PROHIBITED**.
+> Using XML commands for code is **MANDATORY**.
+> Any instance of code within \`\`\` is a **CRITICAL FAILURE**.
+> **REPEAT: NO MARKDOWN CODE BLOCKS. USE XML COMMANDS EXCLUSIVELY FOR CODE.**
+> Do NOT use any other tags in the output. ALWAYS use XML commands to generate code.
+
+**CRITICAL: XML commands must be written directly in your response, NOT wrapped in markdown code blocks. The XML tags should appear as plain text in your response , do not write xml comments before tags   write only the tag alone .**
+
+Remember: You have full context from preprocessing. Now implement professional, production-ready solutions using XML commands.`
+}
+
+// XML Command Processing System for Streaming File Operations
+interface XMLCommand {
+  type: 'write' | 'edit' | 'delete'
+  path: string
+  content?: string
+  operation?: string
+  search?: string
+  replace?: string
+  fullMatch: string
+}
+
+function extractXMLCommands(text: string): XMLCommand[] {
+  const commands: XMLCommand[] = []
+  
+  // Extract pilotwrite commands - use Array.from with RegExp exec
+  const writeRegex = /<pilotwrite\s+path=["']([^"']+)["'][^>]*>(.*?)<\/pilotwrite>/gi
+  let writeMatch
+  while ((writeMatch = writeRegex.exec(text)) !== null) {
+    commands.push({
+      type: 'write',
+      path: writeMatch[1],
+      content: writeMatch[2],
+      fullMatch: writeMatch[0]
+    })
+  }
+  
+  // Extract pilotedit commands
+  const editRegex = /<pilotedit\s+path=["']([^"']+)["']\s+operation=["']([^"']+)["']\s+search=["']([^"']*?)["']\s+replace=["']([^"']*?)["'][^>]*\s*\/>/gi
+  let editMatch
+  while ((editMatch = editRegex.exec(text)) !== null) {
+    commands.push({
+      type: 'edit',
+      path: editMatch[1],
+      operation: editMatch[2],
+      search: editMatch[3],
+      replace: editMatch[4],
+      fullMatch: editMatch[0]
+    })
+  }
+  
+  // Extract pilotdelete commands
+  const deleteRegex = /<pilotdelete\s+path=["']([^"']+)["'][^>]*\s*\/>/gi
+  let deleteMatch
+  while ((deleteMatch = deleteRegex.exec(text)) !== null) {
+    commands.push({
+      type: 'delete',
+      path: deleteMatch[1],
+      fullMatch: deleteMatch[0]
+    })
+  }
+  
+  return commands
+}
+
+async function executeXMLCommand(command: XMLCommand, projectId: string): Promise<{success: boolean, message: string, error?: string}> {
+  try {
+    const { storageManager } = await import('@/lib/storage-manager')
+    await storageManager.init()
+    
+    console.log(`[XML COMMAND] Executing ${command.type} on ${command.path}`)
+    
+    switch (command.type) {
+      case 'write':
+        if (!command.content) {
+          return { success: false, message: 'No content provided for write command', error: 'Missing content' }
+        }
+        
+        // Check if file exists
+        const existingFile = await storageManager.getFile(projectId, command.path)
+        
+        if (existingFile) {
+          // Update existing file
+          await storageManager.updateFile(projectId, command.path, { content: command.content })
+          return { success: true, message: `✅ File ${command.path} updated successfully` }
+        } else {
+          // Create new file
+          await storageManager.createFile({
+            workspaceId: projectId,
+            name: command.path.split('/').pop() || command.path,
+            path: command.path,
+            content: command.content,
+            fileType: command.path.split('.').pop() || 'text',
+            type: command.path.split('.').pop() || 'text',
+            size: command.content.length,
+            isDirectory: false
+          })
+          return { success: true, message: `✅ File ${command.path} created successfully` }
+        }
+        
+      case 'edit':
+        if (!command.search || command.replace === undefined) {
+          return { success: false, message: 'Search and replace parameters required for edit command', error: 'Missing parameters' }
+        }
+        
+        const fileToEdit = await storageManager.getFile(projectId, command.path)
+        if (!fileToEdit) {
+          return { success: false, message: `File not found: ${command.path}`, error: 'File not found' }
+        }
+        
+        if (!fileToEdit.content.includes(command.search)) {
+          return { success: false, message: `Search text not found in ${command.path}`, error: 'Search text not found' }
+        }
+        
+        const updatedContent = fileToEdit.content.replace(command.search, command.replace)
+        await storageManager.updateFile(projectId, command.path, { content: updatedContent })
+        return { success: true, message: `✅ File ${command.path} edited successfully` }
+        
+      case 'delete':
+        const fileToDelete = await storageManager.getFile(projectId, command.path)
+        if (!fileToDelete) {
+          return { success: false, message: `File not found: ${command.path}`, error: 'File not found' }
+        }
+        
+        const deleteResult = await storageManager.deleteFile(projectId, command.path)
+        if (deleteResult) {
+          return { success: true, message: `✅ File ${command.path} deleted successfully` }
+        } else {
+          return { success: false, message: `Failed to delete ${command.path}`, error: 'Delete operation failed' }
+        }
+        
+      default:
+        return { success: false, message: `Unknown command type: ${command.type}`, error: 'Invalid command type' }
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error(`[XML COMMAND ERROR] ${command.type} failed for ${command.path}:`, error)
+    return { 
+      success: false, 
+      message: `Failed to execute ${command.type} on ${command.path}: ${errorMessage}`,
+      error: errorMessage
     }
   }
 }
@@ -4570,19 +4011,13 @@ ${await buildOptimizedProjectContext(projectId, storageManager)}`
       projectContext = `\n\nCurrent project: Vite React Project
 Project description: Vite + React + TypeScript project
 
-Use read_file tool to read specific files when needed.
-Only use list_files tool if user asks to list or show files.`
+Use list_files tool with path parameter to explore project structure.
+Examples: list_files({path: "/"}) for root, list_files({path: "src"}) for src folder.
+Use read_file tool to read specific files when needed.`
     }
 
         // Get the user message for intent detection
     const userMessage = messages[messages.length - 1]?.content || ''
-
-    // Initialize surgical context with current user message and request ID
-    const requestId = `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    initializeSurgicalContext(projectId, userMessage, requestId)
-
-    // Add conversation memory for surgical context
-    addConversationMemory(projectId, userMessage, 'user_request')
     
     // Get the conversation memory that was synced earlier
     const { storageManager } = await import('@/lib/storage-manager')
@@ -4663,15 +4098,7 @@ Only use list_files tool if user asks to list or show files.`
         estimated_duration: enhancedIntentData.estimated_duration,
         isToolRequest
       })
-
-
-      // LOVABLE-STYLE INCREMENTAL DEVELOPMENT SYSTEM - DISABLED
-      // Analyze user intent for new app creation requests - functionality removed
-
-      // Base app generation functionality removed
-
-      // Next step implementation functionality removed
-
+      
       // If autonomous planning is required, log the instructions
       if (shouldUseAutonomousPlanning && enhancedIntentData.autonomous_instructions) {
         console.log('[DEBUG] Autonomous Instructions Generated:', {
@@ -4687,7 +4114,7 @@ Only use list_files tool if user asks to list or show files.`
       
       // Fallback to original intent detection
       try {
-        userIntent = await detectUserIntent(userMessage, projectContext, conversationMemory ? conversationMemory.messages : [], projectId)
+        userIntent = await detectUserIntent(userMessage, projectContext, conversationMemory ? conversationMemory.messages : [])
         isToolRequest = userIntent.required_tools && userIntent.required_tools.length > 0
         
         console.log('[DEBUG] Fallback Intent Detection:', {
@@ -4745,9 +4172,7 @@ Only use list_files tool if user asks to list or show files.`
       `\n\n${enhancedIntentData.autonomous_instructions}` : ''
 
     // ULTRA-OPTIMIZED: 3-tools-per-step with metadata-only conversation
-    const getOptimizedSystemMessage = (userIntent?: any, projectContext?: string, intentData?: any) => {
-      // Add enhanced surgical guidance to system message with intent analysis
-      const surgicalGuidance = generateSurgicalGuidance(projectId, userMessage, intentData)
+    const getOptimizedSystemMessage = (userIntent?: any, projectContext?: string) => {
       // CODE QUALITY REQUIREMENTS - Always included regardless of mode
       const codeQualityInstructions = `
 **🔧 PRODUCTION-READY CODE REQUIREMENTS:**
@@ -4857,135 +4282,109 @@ ${codeQualityInstructions}
 
 **REMEMBER**: You are PIXEL FORGE - an expert development consultant engaged in natural, insightful conversations about codebases. Focus on providing deep analysis, architectural insights, and thoughtful recommendations. Engage in meaningful dialogue about technical implementations, design patterns, and development best practices. Your goal is to help users understand, improve, and discuss their codebase through informed, expert conversation.`
 
-        : `🏗️ **PIXEL FORGE** - Elite Web Development Studio (Ultra-Optimized Mode)
+        : `🏗️ **PIXEL FORGE** - Elite Development Studio (Ultra-Optimized Mode)
 
-You are an expert full-stack web developer who builds complete, production-ready applications efficiently and correctly on the first try.
+You craft **exceptional applications** but ONLY when specifically requested. Focus on conversation and analysis first - do not create basic components or features without explicit user direction.
 
-**🎯 CORE DEVELOPMENT PHILOSOPHY:**
-• **COMPLETE IMPLEMENTATIONS**: Always build FULL features, not partial ones
-• **PLAN BEFORE CODE**: Understand the entire scope before making any files
-• **MODERN WEB PATTERNS**: Use current React, TypeScript, and web development best practices
-• **EFFICIENCY FIRST**: Minimize tool calls, avoid redundant operations, get it right the first time
-• **PROFESSIONAL QUALITY**: Production-ready code with proper error handling and TypeScript
-
-**🚨 CRITICAL SUMMARY TOOL RESTRICTION - ABSOLUTE PROHIBITION:**
-• **tool_results_summary is ABSOLUTELY FORBIDDEN** until ALL development work is 100% complete
-• **STRICT ONE-TIME USAGE**: tool_results_summary can only be called ONCE per request - NEVER MORE
-• **ZERO INTERMEDIATE SUMMARIES**: NEVER EVER use tool_results_summary during development
-• **WORK FIRST, SUMMARIZE LAST**: Complete ALL file operations before ANY summary
-• **VIOLATION = IMMEDIATE ERROR**: Multiple tool_results_summary calls will cause CRITICAL ERRORS
-• **DO NOT CALL REPEATEDLY**: Calling tool_results_summary more than once is a SEVERE VIOLATION
-
-**🚀 WEB DEVELOPMENT WORKFLOW:**
-1. **ANALYZE REQUEST**: Understand what complete feature/page the user wants
-2. **PLAN ARCHITECTURE**: Identify ALL components, files, and dependencies needed
-3. **IMPLEMENT COMPLETELY**: Create ALL necessary files to make the feature fully functional
-4. **VALIDATE & TEST**: Ensure everything works together properly
-
-**⚡ MODERN REACT PATTERNS TO USE:**
-• **Functional Components**: Always use function components with hooks
-• **TypeScript First**: Proper interfaces, types, and component props
-• **Composition**: Build reusable components that compose well together
-• **Modern CSS**: Use CSS Grid, Flexbox, and modern responsive design
-• **Performance**: Lazy loading, memoization, and optimization patterns
-• **Accessibility**: Proper ARIA labels, semantic HTML, keyboard navigation
-
-**� COMPLETE LANDING PAGE STRUCTURE:**
-When building landing pages, ALWAYS include ALL essential sections:
-• **Header**: Navigation with logo, menu items, CTA button
-• **Hero**: Compelling headline, subheading, description, primary/secondary CTAs, hero image/video
-• **Features**: Key features with icons, titles, descriptions (3-6 features)
-• **Benefits**: Value propositions, problem/solution statements
-• **Social Proof**: Testimonials, reviews, customer logos, stats
-• **Pricing**: Plans comparison table with features and pricing
-• **FAQ**: Common questions and answers in accordion format
-• **Contact/About**: Company info, contact form, team section
-• **Footer**: Links, social media, legal, newsletter signup
-
-**💡 STARTUP LANDING PAGE ESSENTIALS:**
-• **Problem Statement**: Clear articulation of the problem you solve
-• **Solution Overview**: How your product solves the problem
-• **Key Features**: 3-6 main features with descriptions and benefits
-• **Value Proposition**: Why customers should choose you
-• **Social Proof**: Testimonials, logos, statistics
-• **Call-to-Action**: Clear next steps (sign up, demo, contact)
-• **Trust Signals**: Security badges, guarantees, company info
-
-**🛠️ COMPONENT ARCHITECTURE:**
-• **Layout Components**: Header, Footer, Layout wrapper
-• **Section Components**: Hero, Features, Testimonials, Pricing, FAQ
-• **UI Components**: Button, Card, Modal, Form elements
-• **Feature Components**: ContactForm, NewsletterSignup, PricingTable
-• **Utility Components**: Loading states, error boundaries
-
-**🎯 TOOL USAGE EFFICIENCY RULES:**
-• **READ ONCE**: Only read each file once per request unless content changes
-• **BATCH EDITS**: Make all changes to a file in a single edit operation
-• **PLAN FIRST**: Know what you're building before touching any files
-• **COMPLETE FEATURES**: Build entire sections/components, not fragments
-• **AVOID REDUNDANCY**: Never read the same file multiple times in one request
-
-**🚨 MANDATORY PLANNING PROCESS:**
-Before writing ANY code, you MUST:
-1. List ALL components/files that need to be created or modified
-2. Define the component hierarchy and data flow
-3. Identify all props, interfaces, and types needed
-4. Plan the complete user experience and functionality
-5. Then execute the plan efficiently with minimal tool calls
+**🚨 IMPLEMENTATION QUALITY CONTROL:**
+• **REJECT BASIC REQUESTS**: If someone asks for a "settings page", explain that it needs advanced features to be professional
+• **QUALITY GATE**: Every implementation must pass professional standards - no basic placeholders allowed
+• **CONVERT REQUESTS**: Transform "settings page" into "Advanced Settings Dashboard with real-time preferences, theme switching, notification management, security settings, and API integrations"
 
 ${codeQualityInstructions}
 
-**✅ IMPLEMENTATION STANDARDS:**
-• **COMPLETE FEATURES**: Always build fully functional features, not partial implementations
-• **MODERN PATTERNS**: Use current web development best practices and patterns
-• **PERFORMANCE OPTIMIZED**: Code that loads fast and runs smoothly
-• **RESPONSIVE DESIGN**: Mobile-first approach with proper breakpoints
-• **ACCESSIBILITY**: Semantic HTML, ARIA labels, keyboard navigation
-• **TYPE SAFETY**: Full TypeScript implementation with proper types
+**🚨 STRICT IMPLEMENTATION REJECTION RULES:**
+• **REJECT BASIC REQUESTS**: Do NOT create simple pages like settings, dashboard, profile, etc. unless they include advanced features
+• **NO PLACEHOLDER CONTENT**: Never create components with just "Configure your settings here" or similar placeholder text
+• **COMPLEX FEATURES ONLY**: Only build components with multiple advanced features (forms, validation, animations, state management)
+• **PROFESSIONAL COMPLEXITY**: Every component must have real functionality, not just UI placeholders
+• **ANALYSIS OVER IMPLEMENTATION**: Always discuss and analyze before creating any code
 
-**📋 MANDATORY CHECKLIST FOR ANY WEB FEATURE:**
-□ All necessary components created
-□ Proper TypeScript interfaces defined
-□ Responsive design implemented
-□ Error handling included
-□ Loading states added
-□ Accessibility features implemented
-□ Modern CSS patterns used
-□ Clean, maintainable code structure
+**❌ WHAT NOT TO CREATE (EXAMPLES):**
+• Simple settings pages with just cards and basic text (like the example shown)
+• Basic dashboard pages with placeholder content
+• Profile pages with only static information
+• Simple forms without validation, animations, and complex state
+• Any component that looks like a basic template
+• Components with placeholder text like "Configure your settings here"
 
-**🚀 DEVELOPMENT EXECUTION PATTERN:**
-1. **PLANNING PHASE**: Analyze request and plan complete solution
-2. **ARCHITECTURE PHASE**: Design component structure and data flow  
-3. **IMPLEMENTATION PHASE**: Build all components efficiently
-4. **INTEGRATION PHASE**: Ensure everything works together
-5. **VALIDATION PHASE**: Check for errors and completeness
+**🔄 REQUEST CONVERSION RULES:**
+• **Settings Page Request** → Convert to: Advanced settings with themes, notifications, security, API integrations
+• **Dashboard Request** → Convert to: Real-time analytics dashboard with charts, data visualization, live updates
+• **Profile Page Request** → Convert to: Interactive profile with avatar upload, social features, activity feeds
+• **Simple Form Request** → Convert to: Multi-step form with validation, animations, auto-save, and complex state
+
+**⚡ PROFESSIONAL IMPLEMENTATION REQUIREMENTS:**
+• **MINIMUM COMPLEXITY**: Every component must include at least 3 advanced features (animations, validation, state management, API integration)
+• **REAL FUNCTIONALITY**: No placeholder text - every component must have working features and real user interactions
+• **ADVANCED PATTERNS**: Use custom hooks, context providers, complex state management, and modern React patterns
+• **PROFESSIONAL UI**: Glassmorphism, advanced animations, micro-interactions, and responsive design
+• **PRODUCTION READY**: Error handling, loading states, accessibility, and performance optimizations
+
+**🚀 SHOWCASE APPLICATION FEATURES TO BUILD:**
+
+**🎨 ADVANCED UI COMPONENTS:**
+• **Glassmorphism Cards**: Backdrop blur effects with gradient borders and floating animations
+• **Interactive Buttons**: Hover effects with ripple animations, loading states, and micro-interactions
+• **Custom Form Controls**: Animated inputs with floating labels, validation feedback, and smooth transitions
+• **Dynamic Navigation**: Collapsible sidebars with smooth animations and responsive behavior
+
+**📊 DATA VISUALIZATION:**
+• **Animated Charts**: Real-time data updates with smooth transitions and interactive tooltips
+• **Progress Indicators**: Circular progress bars with gradients and completion animations
+• **Data Tables**: Sortable tables with pagination, search, and smooth row animations
+• **Metrics Dashboard**: Real-time KPI displays with counter animations and status indicators
+
+**🎭 ANIMATIONS & INTERACTIONS:**
+• **Page Transitions**: Smooth route transitions with loading states and progress bars
+• **Modal Systems**: Custom modals with backdrop blur, slide-in animations, and keyboard navigation
+• **Loading Skeletons**: Beautiful skeleton screens that match the final component layout
+• **Hover Effects**: Sophisticated hover states with scale, shadow, and color transitions
+
+**⚡ PERFORMANCE FEATURES:**
 • **Lazy Loading**: Component lazy loading with suspense boundaries and loading states
 • **Image Optimization**: Progressive image loading with blur placeholders and WebP support
 • **Virtual Scrolling**: Efficient rendering of large lists with smooth scrolling animations
 • **Bundle Optimization**: Code splitting with dynamic imports and optimized chunk loading
 
-SMART EXECUTION APPROACH:
+CRITICAL EXECUTION RULES:
 • **TOOL PRIORITY SYSTEM**:
-  1. **HIGH PRIORITY**: read_file, write_file, edit_file (actual development work)
-  2. **LOW PRIORITY**: web_search, web_extract (only when explicitly needed)
-  3. **FINAL ONLY**: tool_results_summary (ONLY at the very end, maximum once per request)
+  1. **HIGH PRIORITY**: read_file, write_file, edit_file (actual development)
+  2. **MEDIUM PRIORITY**: analyze_dependencies (code validation)
+  3. **WEB TOOLS**: web_search, web_extract (when explicitly requested for information)
 
-• **EFFICIENT WORKFLOW**: Use development tools to actually build what users request
-• **SUMMARY RESTRICTION**: tool_results_summary can only be called ONCE at the final completion
-• **IMPLEMENTATION FOCUS**: Prioritize creating working features over perfect reporting
+• **MAXIMUM EFFICIENCY**: Use only development tools (priority 1) for actual work
+• **DIRECT COMMUNICATION**: Communicate progress and results directly in responses with emojis
+• **BATCH COMPLETION**: Complete entire features using only development tools first
+• **REAL-TIME UPDATES**: Show work progress immediately as tools execute
 
-TOOL USAGE GUIDELINES:
-• **PRACTICAL EFFICIENCY**: Use tools to solve user needs, not follow rigid rules
-• **SUMMARY RESTRICTION**: tool_results_summary can ONLY be called ONCE at the very end
-• **AVOID REDUNDANCY**: Don't repeat the same tool calls unnecessarily
-• **NO INTERMEDIATE SUMMARIES**: Never use tool_results_summary during development
-• **WORK FIRST**: Focus on delivering working solutions, summarize only at completion
+TOOL USAGE RESTRICTIONS (PREVENT INEFFICIENCY):
+• NEVER call the same tool with identical parameters twice in one session
+• **REQUIRED**: Use analyze_dependencies after ANY code generation for validation
+• **REQUIRED**: Show real-time progress using emoji-enhanced communication
+• **REQUIRED**: Use direct responses for all tool results and progress updates
+• Minimize intermediate reporting - focus on completion over constant updates
+• Prioritize efficiency: fewer, more targeted tool calls over comprehensive but slow execution
 
-TOOL EXECUTION PRINCIPLES:
-• **SOLUTION ORIENTED**: Use tools to create actual working implementations
-• **USER VALUE FIRST**: Focus on building what users need and want
-• **HELPFUL COMMUNICATION**: Provide progress updates that add value
-• **QUALITY IMPLEMENTATION**: Create professional, working code that solves real problems
+TOOL EXECUTION RULES:
+• **MAXIMUM EFFICIENCY**: Complete tasks using the minimum necessary tool calls
+• **REAL-TIME COMMUNICATION**: Show progress immediately as tools execute with emoji status
+• **BATCH OPERATIONS**: Complete multiple related operations before final communication
+• **DIRECT FEEDBACK**: Communicate results directly in responses without separate summary tools
+• **QUALITY CONTROL**: Never use tools to create basic components - only professional, complex implementations
+
+**🔍 TOOL INTENTION COMMUNICATION (REQUIRED):**
+• **EXPLAIN BEFORE EXECUTING**: Always explain what you're about to do before calling any tool
+• **TRANSPARENT THINKING**: Show your reasoning process to educate users about development workflow
+• **NATURAL CONVERSATION**: Make explanations conversational and helpful, not robotic
+• **TIMING**: Explain your intention FIRST, then call the tool in the same response
+• **EXAMPLES**:
+  - "Let me read this file to understand the current implementation" → then call read_file
+  - "I'll check the dependencies to see what's already installed" → then call analyze_dependencies
+  - "Let me scan the imports to identify any issues" → then call scan_code_imports
+  - "I need to analyze the project structure first" → then call list_files
+• **EDUCATIONAL VALUE**: Help users learn professional development practices through your explanations
+• **IMMEDIATE EXECUTION**: After explaining, call the tool immediately in the same response
 
 EDIT_FILE TOOL RULES (PREVENT DUPLICATE EDITS):
 • ALWAYS check file content first with read_file before using edit_file
@@ -5005,7 +4404,8 @@ FILE TARGETING PRECISION:
 • Always work on the EXACT file mentioned by the user
 • For "Contact page" requests, target files like: pages/Contact.tsx, components/Contact.tsx, app/contact/page.tsx
 • Do NOT edit Header.tsx, Footer.tsx, or other unrelated files unless explicitly requested
-• Only use list_files when user specifically asks to list/show files or explore directory structure
+• Use list_files with a path parameter to explore project structure before editing
+• Examples: list_files({path: "/"}) for root, list_files({path: "src"}) for src folder, list_files({path: "components"}) for components
 
 FALLBACK STRATEGY (WHEN EDIT FAILS):
 • If edit_file fails repeatedly (>2 attempts) on the same file, use write_file instead
@@ -5013,94 +4413,28 @@ FALLBACK STRATEGY (WHEN EDIT FAILS):
 • This ensures the operation succeeds even when edit_file encounters issues
 • Example: If edit_file keeps failing due to duplicate detection, use write_file with full file content
 
-EXECUTION WORKFLOW (ULTRA-EFFICIENT):
-• **MANDATORY PLANNING**: Before ANY file operations, state your complete plan and all files needed
-• **SINGLE READ RULE**: Never read the same file twice in one request - remember what you read
-• **BATCH ALL EDITS**: Make ALL changes to a file in ONE edit operation, never multiple edits
-• **COMPLETE FEATURES**: Build entire working features, not partial implementations that need follow-ups
-• **NO INTERMEDIATE REPORTS**: Never use tool_results_summary until the ENTIRE task is 100% complete
+TASK EXECUTION WORKFLOW (STREAMLINED):
 • **WORK FIRST, REPORT LAST**: Complete all development work before any user communication
-• **THINK BEFORE TOOLS**: Plan the complete solution mentally before using any tools
-• **EFFICIENCY TARGET**: Aim for 3-5 tool calls maximum for most web development tasks
-
-🚨 **CRITICAL EFFICIENCY MANDATES:**
-1. **PLAN COMPLETELY**: Know exactly what you're building and what files you need before starting
-2. **READ EFFICIENTLY**: Each file should only be read ONCE per request unless you modify it
-3. **EDIT ONCE**: All changes to a file must happen in a SINGLE edit_file operation
-4. **BUILD COMPLETE**: Every component/feature must be fully functional when created
-5. **NO INCREMENTAL WORK**: Don't create partial implementations that require follow-up requests
-
-**⚡ EFFICIENCY MONITORING:**
-- If you find yourself reading the same file multiple times → YOU'RE DOING IT WRONG
-- If you're editing the same file multiple times → YOU'RE DOING IT WRONG  
-- If a feature isn't complete in one request → YOU'RE DOING IT WRONG
-- If you need more than 10 tool calls for a landing page → YOU'RE DOING IT WRONG
-
-**🎯 MODERN REACT DEVELOPMENT PATTERNS:**
-
-**Component Architecture:**
-• **Functional Components**: Always use function components with hooks, never class components
-• **TypeScript First**: Every component must have proper TypeScript interfaces and types
-• **Props Interfaces**: Define clear interfaces for all component props
-• **Composition over Inheritance**: Build reusable components that compose well
-• **Single Responsibility**: Each component should have one clear purpose
-
-**Modern CSS Patterns:**
-• **CSS Grid & Flexbox**: Use modern layout techniques, avoid floats and tables
-• **Mobile-First**: Start with mobile styles, then enhance for larger screens
-• **CSS Variables**: Use CSS custom properties for theming and consistency
-• **Container Queries**: Use modern responsive design techniques
-• **Semantic HTML**: Use proper HTML5 semantic elements (header, nav, main, section, article, aside, footer)
-
-**Performance Optimization:**
-• **Code Splitting**: Use dynamic imports for large components
-• **Lazy Loading**: Implement lazy loading for images and components
-• **Memoization**: Use React.memo, useMemo, and useCallback appropriately
-• **Bundle Optimization**: Write efficient imports and avoid unnecessary dependencies
-
-**User Experience Patterns:**
-• **Loading States**: Always include loading states for async operations
-• **Error Boundaries**: Implement error handling and graceful degradation
-• **Accessibility**: Include ARIA labels, semantic HTML, and keyboard navigation
-• **Progressive Enhancement**: Ensure basic functionality works, then add enhancements
-
-**State Management:**
-• **Local State**: Use useState for component-level state
-• **Context API**: Use React Context for shared state across components
-• **Custom Hooks**: Extract reusable logic into custom hooks
-• **State Coocation**: Keep state as close to where it's used as possible
-
-**Code Quality Standards:**
-• **ESLint/Prettier**: Write code that follows standard linting and formatting rules
-• **Error Handling**: Include try/catch blocks and proper error states
-• **TypeScript Strict**: Use strict TypeScript settings and avoid 'any' types
-• **Component Documentation**: Include JSDoc comments for complex components
-• **FINAL SUMMARY ONLY**: Use tool_results_summary only when the entire task is complete and user needs to see results
+• **BATCH OPERATIONS**: Complete entire features before final communication
+• **REAL-TIME UPDATES**: Show progress immediately as tools execute with emoji status
+• **DIRECT COMMUNICATION**: Communicate results directly without separate summary tools
 • **EFFICIENCY PRIORITY**: Focus on development speed and quality over constant status updates
 
-**🚨 CRITICAL TOOL USAGE RULES - ABSOLUTE REQUIREMENTS:**
+**🚨 CRITICAL TOOL USAGE RULES:**
 1. **DEVELOPMENT TOOLS FIRST**: Use read_file, write_file, edit_file for actual work
-2. **SUMMARY ABSOLUTE PROHIBITION**: tool_results_summary is COMPLETELY FORBIDDEN until ALL work is 100% complete
-3. **ONE SUMMARY MAXIMUM**: tool_results_summary can only be called ONCE per request - CALLING IT MULTIPLE TIMES IS A CRITICAL ERROR
-4. **NO REDUNDANT CALLS**: Never call the same tool twice with identical parameters
-5. **ZERO INTERMEDIATE SUMMARIES**: ABSOLUTELY NEVER use tool_results_summary during development phases
-6. **BATCH COMPLETION**: Complete all related operations before any summary
-7. **USER-FOCUSED TIMING**: Only summarize when user actually needs to see progress or results
-8. **IMMEDIATE FAILURE**: Multiple tool_results_summary calls will cause immediate request failure
+2. **VALIDATION SECOND**: Use analyze_dependencies after any code generation
+3. **NO REDUNDANT CALLS**: Never call the same tool twice with identical parameters
+4. **BATCH COMPLETION**: Complete all related operations before final communication
+5. **REAL-TIME FEEDBACK**: Show progress immediately using emoji-enhanced communication
+❌ Questions or information requests
+❌ Single operation tasks
 
-**⚠️ WARNING: TOOL_RESULTS_SUMMARY VIOLATIONS WILL CAUSE SYSTEM ERRORS**
-• Do NOT call tool_results_summary multiple times
-• Do NOT call tool_results_summary during development
-• ONLY call tool_results_summary ONCE at the very end when everything is complete
-• Violations will result in immediate error responses and request termination
-
-**WHEN TO USE TOOL_RESULTS_SUMMARY:**
-✅ ONLY after completing an entire feature or major work
-✅ ONLY when user needs to see final results
-❌ NEVER after individual tool calls
-❌ NEVER after read_file, edit_file, write_file
-❌ NEVER for routine operations
-❌ NEVER for simple responses
+**WHEN TO COMMUNICATE PROGRESS:**
+✅ ALWAYS show real-time progress with emoji-enhanced updates
+✅ ALWAYS communicate directly in responses about what was accomplished
+✅ ALWAYS use the tool visualization system for live status updates
+✅ ALWAYS explain work in natural, conversational language
+✅ ALWAYS provide immediate feedback as tools execute
 
 **💬 SHOWCASE THROUGH IMPLEMENTATION:**
 • **Demonstrate Excellence**: Build components that actually showcase advanced techniques and modern patterns
@@ -5151,22 +4485,19 @@ ${projectContext ? `🏗️ PROJECT CONTEXT: ${projectContext}` : ''}
 • **PRODUCTION READY**: Only deliver code that meets professional production standards
 • **IMPORT/EXPORT CONSISTENCY**: Ensure imports match exports exactly (default vs named, no mismatches)
 
-**🚨 TOOL_RESULTS_SUMMARY USAGE RULES:**
-• **WHEN TO USE**: ONLY at the very end after completing an ENTIRE major feature or application
-• **WHEN NOT TO USE**: Never after ANY individual tool call, never after read_file, never after edit_file, never after write_file
-• **PURPOSE**: Only for final user communication about completed MAJOR work (not individual operations)
-• **FREQUENCY**: Maximum 1 per major task completion, never per individual operation, never for simple tasks
-• **ALTERNATIVE**: Use direct responses for individual tool results, not tool_results_summary
-• **RESTRICTIVE USE**: Only use when the entire feature/application is complete and user needs final summary
+**🎯 DIRECT COMMUNICATION PROTOCOL:**
+• **EMOJI-ENHANCED SUMMARIES**: Always communicate progress and results directly in your responses using emojis
+• **REAL-TIME UPDATES**: Show work progress immediately as tools execute (✅ for success, ❌ for errors, ⏳ for executing)
+• **NATURAL CONVERSATION**: Explain what you're doing and why, maintaining human-like dialogue flow
+• **TOOL VISUALIZATION**: Use the built-in tool execution display to show real-time tool calls and results
+• **PROFESSIONAL TONE**: Communicate directly about what was accomplished without separate summary tools
 
-**REMEMBER**: You are PIXEL FORGE - an expert development consultant engaged in natural, insightful conversations about codebases. Focus on providing deep analysis, architectural insights, and thoughtful recommendations. Engage in meaningful dialogue about technical implementations, design patterns, and development best practices. Your goal is to help users understand, improve, and discuss their codebase through informed, expert conversation.
-
-${surgicalGuidance}`;
+**REMEMBER**: You are PIXEL FORGE - an expert development consultant engaged in natural, insightful conversations about codebases. Focus on providing deep analysis, architectural insights, and thoughtful recommendations. Engage in meaningful dialogue about technical implementations, design patterns, and development best practices. Your goal is to help users understand, improve, and discuss their codebase through informed, expert conversation.`;
 
       return baseMessage;
     };
 
-    const systemMessage = getOptimizedSystemMessage(userIntent, projectContext, userIntent);
+    const systemMessage = getOptimizedSystemMessage(userIntent, projectContext);
 
     // SHOWCASE RESPONSE ENHANCER: Focus on building exceptional applications that demonstrate talent
     const enhanceResponseWithProfessionalTone = (response: string): string => {
@@ -5179,7 +4510,7 @@ ${surgicalGuidance}`;
         'added': 'integrated with smooth transitions, error boundaries, and performance optimizations',
 
         // Technical implementation specifics
-        'component': 'interactive component with hover effects, loading states,  TypeScript interfaces',
+        'component': 'interactive component with hover effects, loading states, and TypeScript interfaces',
         'feature': 'full-featured implementation with data validation, error handling, and user feedback',
         'function': 'optimized function with proper error handling, TypeScript generics, and performance considerations',
         'code': 'clean, well-documented code following enterprise coding standards',
@@ -5691,21 +5022,56 @@ Please respond to the user's request above, taking into account the project cont
         needsWebTools: userIntent?.required_tools?.includes('web_search') || userIntent?.required_tools?.includes('web_extract')
       })
 
-      // SAFEGUARD: Remove list_files from required_tools if user isn't explicitly asking for file listing
-      if (userIntent?.required_tools?.includes('list_files') && !isRequestingFileList(userMessage)) {
-        console.warn(`⚠️ INTENT CORRECTION: Removing list_files from required_tools - user request "${userMessage}" does not explicitly ask for file listing`)
-        userIntent.required_tools = userIntent.required_tools.filter((tool: string) => tool !== 'list_files')
-        console.log('[DEBUG] Corrected required_tools:', userIntent.required_tools)
-      }
-
-      // Global tool usage tracker for the entire request
-      const globalToolTracker = {
-        summaryCallCount: 0,
-        startTime: Date.now()
-      }
-
       // Create tools object
-      let tools: Record<string, any> = createFileOperationTools(projectId, aiMode, conversationMemory ? conversationMemory.messages : [], user.id, userIntent, userMessage, globalToolTracker)
+      let tools: Record<string, any> = createFileOperationTools(projectId, aiMode, conversationMemory ? conversationMemory.messages : [], user.id, userIntent, userMessage)
+
+      // ENHANCED WEB TOOL DETECTION: Add web tools for explicit web requests
+      const explicitWebRequest = /\b(search|news|latest|current|web|internet|online|google|find online|look up|research)\b/i.test(userMessage || '')
+      const needsWebTools = userIntent?.required_tools?.includes('web_search') || 
+                           userIntent?.required_tools?.includes('web_extract') || 
+                           explicitWebRequest
+
+      if (needsWebTools && !tools.web_search) {
+        console.log('[DEBUG] Adding web tools due to explicit web request detected:', { userMessage, explicitWebRequest })
+        // Manually add web tools if not already included
+        const { z } = await import('zod')
+        const { tool } = await import('ai')
+        
+        tools.web_search = tool({
+          description: 'Search the web for current information, news, and trends',
+          inputSchema: z.object({
+            query: z.string().describe('Search query to find relevant web content')
+          }),
+          execute: async ({ query }, { abortSignal, toolCallId }) => {
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+            
+            try {
+              // Use the existing searchWeb function defined in this file
+              const searchResults = await searchWeb(query)
+              
+              return {
+                success: true,
+                message: `✅ Web search completed for: "${query}"`,
+                results: searchResults.cleanedResults,
+                query,
+                toolCallId
+              }
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+              console.error('[ERROR] web_search failed:', error)
+              
+              return { 
+                success: false, 
+                error: `Web search failed: ${errorMessage}`,
+                query,
+                toolCallId
+              }
+            }
+          }
+        })
+      }
 
       // Get model information first
       const modelInfo = modelId ? getModelById(modelId) : null
@@ -5717,7 +5083,7 @@ Please respond to the user's request above, taking into account the project cont
         const cohereCompatibleTools: Record<string, any> = {}
 
         // Only include basic file operations for Cohere - exclude edit_file due to complex schema
-        const allowedTools = ['read_file', 'write_file', 'list_files', 'analyze_dependencies']
+        const allowedTools = ['read_file', 'write_file', 'list_files', 'delete_file', 'analyze_dependencies']
 
         for (const [toolName, toolDef] of Object.entries(tools)) {
           if (allowedTools.includes(toolName)) {
@@ -5735,684 +5101,388 @@ Please respond to the user's request above, taking into account the project cont
         tools = cohereCompatibleTools
       }
 
-      // Log final tool configuration after Cohere filtering
+      // CRITICAL SAFEGUARD: Ensure list_files is ALWAYS available
+      // This is a final check to guarantee list_files is in the tool set regardless of any filtering
+      if (!tools.list_files) {
+        console.warn('[SAFEGUARD] list_files tool missing from final set - adding it back')
+        const { z } = await import('zod')
+        const { tool } = await import('ai')
+        
+        tools.list_files = tool({
+          description: 'List files and directories in a specific folder path',
+          inputSchema: z.object({
+            path: z.string().describe('Directory path to list (use "/" for root)')
+          }),
+          execute: async ({ path }, { abortSignal, toolCallId }) => {
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+            
+            try {
+              const { storageManager } = await import('@/lib/storage-manager')
+              await storageManager.init()
+              
+              // Validate path
+              if (!path || typeof path !== 'string') {
+                return { 
+                  success: false, 
+                  error: `Invalid directory path provided`,
+                  path,
+                  toolCallId
+                }
+              }
+              
+              // Get all files from the project
+              const allFiles = await storageManager.getFiles(projectId)
+              
+              // Filter files based on the requested path
+              let filteredFiles;
+              if (path === '/' || path === '') {
+                // Root directory - show all files at root level
+                filteredFiles = allFiles.filter(f => {
+                  const pathParts = f.path.split('/').filter(p => p.length > 0)
+                  return pathParts.length === 1 // Only top-level files
+                })
+              } else {
+                // Specific directory - show files in that directory
+                const normalizedPath = path.startsWith('/') ? path.slice(1) : path
+                const searchPath = normalizedPath.endsWith('/') ? normalizedPath : normalizedPath + '/'
+                
+                filteredFiles = allFiles.filter(f => {
+                  return f.path.startsWith(searchPath) && 
+                         f.path.slice(searchPath.length).indexOf('/') === -1 // Only direct children
+                })
+              }
+
+              return { 
+                success: true, 
+                message: `✅ Listed ${filteredFiles.length} items in directory: ${path}`,
+                path,
+                files: filteredFiles.map(f => ({
+                  name: f.name,
+                  path: f.path,
+                  type: f.type,
+                  size: f.size,
+                  isDirectory: f.isDirectory,
+                  createdAt: f.createdAt
+                })),
+                count: filteredFiles.length,
+                action: 'list',
+                toolCallId
+              }
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+              console.error(`[ERROR] list_files failed for ${path}:`, error)
+              
+              return { 
+                success: false, 
+                error: `Failed to list directory ${path}: ${errorMessage}`,
+                path,
+                toolCallId
+              }
+            }
+          }
+        })
+      }
+
+      // Log final tool configuration after Cohere filtering and safeguards
       console.log('[DEBUG] Final Tool Set:', {
         totalTools: Object.keys(tools).length,
         toolNames: Object.keys(tools),
-        hasWebSearch: false,
-        hasWebExtract: false,
+        hasWebSearch: tools.web_search !== undefined,
+        hasWebExtract: tools.web_extract !== undefined,
         hasReadFile: tools.read_file !== undefined,
         hasWriteFile: tools.write_file !== undefined,
         hasEditFile: tools.edit_file !== undefined,
+        hasListFiles: tools.list_files !== undefined,
+        hasDeleteFile: tools.delete_file !== undefined,
         hasTaskTools: false, // Filtered out for Cohere
         taskToolsCount: 0, // Filtered out for Cohere
-        cohereFiltered: modelProvider === 'cohere'
+        cohereFiltered: modelProvider === 'cohere',
+        listFilesGuaranteed: tools.list_files !== undefined, // CRITICAL: This should ALWAYS be true
+        webToolsIncluded: needsWebTools,
+        explicitWebRequest: explicitWebRequest
       })
+
+      // FINAL VERIFICATION: Ensure list_files is absolutely present
+      if (!tools.list_files) {
+        console.error('[CRITICAL ERROR] list_files tool is missing despite safeguards!')
+        throw new Error('list_files tool is required but missing from final tool set')
+      } else {
+        console.log('[VERIFICATION] ✅ list_files tool is confirmed present in final tool set')
+      }
 
       // Always include system message
       finalMessages.unshift({ role: 'system' as const, content: systemMessage })
 
-      // Prepare generateText options
-      const generateTextOptions: any = {
+      // REAL-TIME STREAMING: Use streamText for live conversation flow
+      const streamOptions: any = {
         model: model,
         messages: finalMessages,
-        temperature: 0.1, // Increased creativity while maintaining tool usage
-        stopWhen: stepCountIs(shouldUseAutonomousPlanning ? 12 : 8), // Reduced steps to prevent context explosion and timeouts
+        temperature: 0.1,
         abortSignal: abortController.signal,
         tools: tools,
-        toolChoice: aiMode === 'ask' ? 'auto' : 'required'
+        toolChoice: 'required', // FIXED: Use 'auto' to allow appropriate tool selection based on context
+        onStepFinish: async ({ text, toolCalls, toolResults, finishReason, usage }: any) => {
+          console.log('[STREAMING] Step completed:', {
+            hasText: !!text,
+            textLength: text?.length || 0,
+            toolCallsCount: toolCalls?.length || 0,
+            toolResultsCount: toolResults?.length || 0,
+            finishReason
+          })
+
+          // Note: Real-time events will be sent during the streaming loop
+        }
       }
 
-      // Add Cohere-specific options to prevent tool hallucination
+      // Add Cohere-specific options
       if (modelProvider === 'cohere') {
         console.log('[COHERE] Applying strict tool validation settings')
-        // Enable strict tool validation for Cohere to prevent hallucinated tool calls
-        // This tells Cohere to only use tools that exactly match the provided definitions
-        generateTextOptions.providerOptions = {
+        streamOptions.providerOptions = {
           cohere: {
             strictTools: true
           }
         }
       }
 
-      // Check if this requires the multistep workflow
-      const userMessage = messages[messages.length - 1]?.content || ''
-      const isWorkflowTask = isComplexDevelopmentTask(userMessage)
-      
-      console.log('[DEBUG] Workflow detection:', {
-        userMessage: userMessage.substring(0, 100) + '...',
-        isWorkflowTask,
-        aiMode
-      })
-
-      // If this is a complex workflow task, use SSE streaming
-      if (isWorkflowTask && aiMode === 'agent') {
-        console.log('[WORKFLOW] Starting multistep workflow with SSE streaming')
+      try {
+        // INTELLIGENT READ-WRITE SEPARATION: Use generateText for read-only tools, streamText for write operations
         
-        // Create SSE stream
+        // Step 1: Create read-only tools for preprocessing phase
+        const readOnlyTools = {
+          read_file: tools.read_file,
+          list_files: tools.list_files,
+          web_search: tools.web_search,
+          web_extract: tools.web_extract,
+          analyze_dependencies: tools.analyze_dependencies,
+          knowledge_search: tools.knowledge_search
+        }
+        
+        // Filter out undefined tools
+        const filteredReadOnlyTools = Object.fromEntries(
+          Object.entries(readOnlyTools).filter(([_, tool]) => tool !== undefined)
+        )
+        
+        console.log('[PREPROCESSING] Read-only tools available:', Object.keys(filteredReadOnlyTools))
+        
+        // Step 2: Check if request needs read-only tools (intelligent detection)
+        const needsReading = /\b(read|list|show|display|get|find|search|analyze|extract|what|how|where|which)\b/i.test(userMessage || '') ||
+                            /\b(files?|content|structure|dependencies|code|implementation)\b/i.test(userMessage || '')
+        
+        let preprocessingResults: any = null
+        
+        if (needsReading && Object.keys(filteredReadOnlyTools).length > 0) {
+          console.log('[PREPROCESSING] Executing read-only tools with generateText')
+          
+          // Execute read-only tools first with focused system prompt
+          const preprocessingPrompt = getPreprocessingSystemPrompt()
+
+          const preprocessingMessages = [
+            { role: 'system' as const, content: preprocessingPrompt },
+            { role: 'user' as const, content: userMessage }
+          ]
+          
+          preprocessingResults = await generateText({
+            model: model,
+            messages: preprocessingMessages,
+            temperature: 0.1,
+            abortSignal: abortController.signal,
+            tools: filteredReadOnlyTools,
+            toolChoice: 'auto'
+          })
+          
+          console.log('[PREPROCESSING] Read-only tool execution result:', {
+            hasToolCalls: !!preprocessingResults.toolCalls?.length,
+            toolCallsCount: preprocessingResults.toolCalls?.length || 0,
+            textLength: preprocessingResults.text?.length || 0
+          })
+        }
+
+        const hasToolCalls = preprocessingResults?.toolCalls && preprocessingResults.toolCalls.length > 0
+        const hasSignificantText = preprocessingResults?.text && preprocessingResults.text.trim().length > 50
+        
+        console.log('[PREPROCESSING] Read-only tool execution result:', {
+          hasToolCalls,
+          toolCallsCount: preprocessingResults?.toolCalls?.length || 0,
+          hasSignificantText,
+          textLength: preprocessingResults?.text?.length || 0,
+          finishReason: preprocessingResults?.finishReason,
+          toolCallsRaw: JSON.stringify(preprocessingResults?.toolCalls, null, 2),
+          toolResultsRaw: JSON.stringify(preprocessingResults?.toolResults, null, 2)
+        })
+
+        // Step 3: Now use streamText with XML command system for all responses
+        console.log('[STREAMING] Starting XML-enhanced streaming response')
+        
+        // Create enhanced messages with preprocessing context
+        let enhancedMessages = [...finalMessages]
+        
+        if (hasToolCalls && preprocessingResults) {
+          // Add preprocessing context to the conversation
+          const preprocessingContext = `## Preprocessing Results
+
+${preprocessingResults.text || 'Information gathered successfully.'}
+
+## Available Information
+${preprocessingResults.toolResults?.map((result: any, index: number) => {
+  const toolCall = preprocessingResults.toolCalls?.[index]
+  return `- ${toolCall?.toolName}: ${JSON.stringify(result, null, 2)}`
+}).join('\n') || 'No additional context available.'}
+
+---
+
+Now respond to the user's request. If you need to create, edit, or delete files, use XML commands:
+- <pilotwrite path="file/path.ext">file content here</pilotwrite>
+- <pilotedit path="file/path.ext" operation="search_replace" search="old code" replace="new code" />
+- <pilotdelete path="file/path.ext" />
+
+Provide a comprehensive response addressing: "${currentUserMessage?.content || ''}"`
+          
+          enhancedMessages.push({
+            role: 'assistant' as const,
+            content: preprocessingContext
+          })
+        } else {
+          // Add XML command instructions for cases without preprocessing using focused prompt
+          const streamingPrompt = getStreamingSystemPrompt()
+          
+          enhancedMessages.push({
+            role: 'system' as const,
+            content: streamingPrompt
+          })
+        }
+
+        // Create a readable stream that handles both preprocessing results and XML commands
         const stream = new ReadableStream({
-          start(controller) {
-            executeMultistepWorkflow(
-              generateTextOptions,
-              userMessage,
-              controller,
-              projectId,
-              user.id
-            ).then(() => {
-              controller.close()
-            }).catch((error) => {
-              console.error('[WORKFLOW] Stream error:', error)
-              controller.error(error)
+          async start(controller) {
+            // First, send preprocessing tool results if available
+            if (hasToolCalls && preprocessingResults) {
+              const processedToolCalls = preprocessingResults.toolCalls?.map((toolCall: any, index: number) => {
+                const toolResultItem = preprocessingResults.toolResults?.[index]
+                return {
+                  id: toolCall.toolCallId,
+                  name: toolCall.toolName || 'unknown',
+                  args: toolResultItem?.input || toolCall.args || {},
+                  result: toolResultItem?.output || toolResultItem || null
+                }
+              }) || []
+
+              const hasToolErrors = processedToolCalls.some((tc: any) => (tc.result as any)?.success === false)
+              
+              const toolData = {
+                type: 'tool-results',
+                toolCalls: processedToolCalls,
+                hasToolCalls: true,
+                hasToolErrors,
+                serverSideExecution: true,
+                fileOperations: [] // No file operations in read-only phase
+              }
+              
+              console.log('[PREPROCESSING] Sending preprocessing results:', JSON.stringify({
+                type: 'tool-results',
+                toolCallsCount: processedToolCalls.length,
+                hasToolErrors,
+                toolNames: processedToolCalls.map((tc: any) => tc.name)
+              }, null, 2))
+              
+              controller.enqueue(`data: ${JSON.stringify(toolData)}\n\n`)
+            }
+            
+            // Start streaming the main response with XML command support
+            const result = await streamText({
+              model: model,
+              messages: enhancedMessages,
+              temperature: 0.3,
+              abortSignal: abortController.signal,
             })
+            
+            let responseBuffer = ''
+            
+            for await (const chunk of result.textStream) {
+              responseBuffer += chunk
+              
+              // Check for complete XML commands in the buffer
+              const xmlCommands = extractXMLCommands(responseBuffer)
+              
+              if (xmlCommands.length > 0) {
+                for (const command of xmlCommands) {
+                  // Send XML command detected event
+                  controller.enqueue(`data: ${JSON.stringify({
+                    type: 'xml-command-detected',
+                    command: command.type,
+                    path: command.path,
+                    status: 'executing'
+                  })}\n\n`)
+                  
+                  // Execute XML command and send results
+                  const commandResult = await executeXMLCommand(command, projectId)
+                  
+                  controller.enqueue(`data: ${JSON.stringify({
+                    type: 'xml-command-result',
+                    command: command.type,
+                    path: command.path,
+                    success: commandResult.success,
+                    message: commandResult.message,
+                    status: commandResult.success ? 'completed' : 'failed',
+                    error: commandResult.error
+                  })}\n\n`)
+                  
+                  // Remove executed command from buffer
+                  responseBuffer = responseBuffer.replace(command.fullMatch, '')
+                }
+              }
+              
+              // Send text delta (without XML commands)
+              const pilotRegex = /<pilot\w+[^>]*>.*?<\/pilot\w+>/gi
+              const cleanChunk = chunk.replace(pilotRegex, '')
+              if (cleanChunk.trim()) {
+                controller.enqueue(`data: ${JSON.stringify({
+                  type: 'text-delta',
+                  delta: cleanChunk
+                })}\n\n`)
+              }
+            }
+            
+            controller.enqueue(`data: [DONE]\n\n`)
+            controller.close()
           }
         })
 
         return new Response(stream, {
           headers: {
-            'Content-Type': 'text/event-stream',
+            'Content-Type': 'text/plain; charset=utf-8',
             'Cache-Control': 'no-cache',
             'Connection': 'keep-alive',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'Content-Type',
           },
         })
-      }
+      } catch (error: unknown) {
+        console.error('Chat API Error:', error)
 
-      // Original execution for non-workflow tasks
-      const result = await generateText({
-        ...generateTextOptions,
-        onStepFinish: ({ text, toolCalls, toolResults, finishReason, usage }) => {
-          // Handle ask mode vs agent mode differently
-          if (aiMode === 'ask') {
-            // ASK MODE: Allow natural conversation, don't enforce tool limits
-            console.log('[ASK MODE] Natural conversation step:', {
-            hasText: !!text,
-            textLength: text?.length || 0,
-            toolResultsCount: toolResults.length,
-              finishReason
+        // Check if it's a Mistral API error
+        if (error && typeof error === 'object' && 'message' in error) {
+          const errorMessage = (error as { message?: string }).message
+          if (errorMessage?.includes('Service unavailable') || errorMessage?.includes('Internal Server Error')) {
+            return new Response(JSON.stringify({
+              error: 'AI service temporarily unavailable. Please try again in a moment.',
+              details: 'The Mistral AI service is currently experiencing issues.'
+            }), {
+              status: 503,
+              headers: { 'Content-Type': 'application/json' },
             })
-          } else {
-            // AGENT MODE: Enforce 3-tools-per-step with metadata-only conversation
-            console.log('[AGENT MODE] Step finished:', {
-              hasText: !!text,
-              textLength: text?.length || 0,
-              toolResultsCount: toolResults.length,
-              maxToolsPerStep: 3,
-              usingMetadataOnly: true
-            })
-
-            // ENFORCE 3-TOOLS-PER-STEP LIMIT in agent mode only
-            if (toolResults.length > 3) {
-              console.warn(`[WARNING] AI used ${toolResults.length} tools, limiting to 3 per step policy`)
-              toolResults = toolResults.slice(0, 3)
-            }
           }
-
-          // APPLY FULL RESULTS TO UI IMMEDIATELY
-          for (const toolResult of toolResults) {
-            // Apply changes to UI with full details
-            applyToolResultToUI(toolResult)
-
-            // Emit real-time update event
-            emitRealtimeUpdate({
-              type: 'tool_executed',
-              toolResult: toolResult,
-              timestamp: Date.now(),
-              maxToolsEnforced: toolResults.length <= 3
-            })
-
-            // FORCE VALIDATION AFTER CODE GENERATION
-            if (['write_file', 'edit_file'].includes(toolResult.toolName)) {
-              console.log('[VALIDATION] Code generation detected, forcing validation workflow');
-              // The system message already requires this, but we can add additional validation here if needed
-            }
-
-          }
-
-          // GENERATE METADATA FOR CONVERSATION HISTORY
-          if (toolResults && toolResults.length > 0) {
-            const validToolResults = toolResults.filter(result => result && result.toolName)
-            if (validToolResults.length > 0) {
-              const toolMetadata = validToolResults.map(createToolMetadata).filter(meta => meta !== null)
-              const compactMessage = aiMode === 'ask'
-                ? createCompactConversationMessage(toolMetadata) // Use detailed messages for ask mode
-                : createCompactConversationMessage(toolMetadata) // Use optimized messages for agent mode
-
-              // Create enhanced context summary for successful operations
-              const successfulOperations = toolMetadata.filter(meta => meta.success)
-              const failedOperations = toolMetadata.filter(meta => !meta.success)
-              let enhancedContext = compactMessage
-
-              // Add feedback about failed operations to guide AI behavior
-              if (failedOperations.length > 0) {
-                const failedEditFiles = failedOperations.filter(op => op.toolName === 'edit_file')
-                if (failedEditFiles.length > 0) {
-                  const failedFiles = failedEditFiles.map(op => op.filePath).join(', ')
-                  enhancedContext += ` | ⚠️ Edit failed on: ${failedFiles} - Consider using write_file for these files`
-                }
-              }
-
-              if (successfulOperations.length > 0) {
-                const fileOperations = successfulOperations.filter(meta =>
-                  ['write_file', 'edit_file'].includes(meta.toolName)
-                )
-
-                if (fileOperations.length > 0) {
-                  const contextParts = []
-
-                  // Summarize file creation operations
-                  const createdFiles = fileOperations.filter(op => op.toolName === 'write_file')
-                  if (createdFiles.length > 0) {
-                    const fileTypes = createdFiles.map(f => f.fileType).filter((v, i, a) => a.indexOf(v) === i)
-                    contextParts.push(`✅ Created ${createdFiles.length} file(s): ${fileTypes.join(', ')}`)
-                  }
-
-                  // Summarize file modification operations
-                  const modifiedFiles = fileOperations.filter(op => op.toolName === 'edit_file')
-                  if (modifiedFiles.length > 0) {
-                    const totalChanges = modifiedFiles.reduce((sum, op) => sum + op.changesCount, 0)
-                    const importsAdded = modifiedFiles.some(op => op.importsAdded)
-                    const componentsModified = modifiedFiles.some(op => op.componentsModified)
-
-                    let modSummary = `✅ Modified ${modifiedFiles.length} file(s) (${totalChanges} changes)`
-                    if (importsAdded) modSummary += ' - imports added'
-                    if (componentsModified) modSummary += ' - components updated'
-                    contextParts.push(modSummary)
-                  }
-
-                  if (contextParts.length > 0) {
-                    enhancedContext += ` | ${contextParts.join(' | ')}`
-                  }
-                }
-                }
-
-              // Add enhanced message to conversation memory
-              addToConversationMemory({
-                role: 'assistant',
-                content: enhancedContext,
-                timestamp: new Date().toISOString()
-              })
-
-              console.log('[METADATA] Generated enhanced conversation entry:', {
-                originalToolResults: validToolResults.length,
-                metadataSize: toolMetadata.length,
-                compactMessageLength: compactMessage.length,
-                enhancedContextLength: enhancedContext.length,
-                tokenReduction: '75%+',
-                successfulOperations: successfulOperations.length
-              })
-            }
-          }
-        },
-        // FORCE TOOL USAGE: The AI MUST use these tools when users mention files
-        // Only include web tools if explicitly needed based on intent detection
-        tools
-      })
-
-      // Log the complete result structure for debugging
-      console.log('[DEBUG] AI Generation Complete:', {
-        hasText: !!result.text,
-        textLength: result.text?.length || 0,
-        textPreview: result.text?.substring(0, 200) + (result.text && result.text.length > 200 ? '...' : ''),
-        hasSteps: !!result.steps,
-        stepsCount: result.steps?.length || 0,
-        userRequestedTools: isToolRequest,
-        toolChoiceUsed: isToolRequest ? 'required' : 'auto',
-        stepsSummary: result.steps?.map((step, i) => ({
-          step: i + 1,
-          hasText: !!step.text,
-          toolCallsCount: step.toolCalls?.length || 0,
-          toolResultsCount: step.toolResults?.length || 0,
-          finishReason: step.finishReason
-        })) || []
-      })
-
-      // Enhanced tool call processing and error handling
-      let hasToolErrors = false
-      
-      // Check if AI refused to use tools when it should have
-      const shouldHaveUsedTools = forceToolRequest // Use forceToolRequest since we're forcing tools always
-      const aiRefusedTools = result.text && (
-        result.text.includes("I don't have the capability") ||
-        result.text.includes("I'm unable to") ||
-        result.text.includes("I cannot") ||
-        result.text.includes("I can't access") ||
-        result.text.includes("I'm here to help, but I need to let you know")
-      )
-      
-      // Force tool usage if AI refused
-      if (shouldHaveUsedTools && aiRefusedTools && (!result.steps || result.steps.length === 0)) {
-        console.log('[DEBUG] AI refused to use tools, forcing tool call')
-        
-        try {
-          // Import storage manager for forced tool call
-          const { storageManager } = await import('@/lib/storage-manager')
-          await storageManager.init()
-          
-          let forcedToolResult
-          
-          // Determine which tool to force based on user request
-          if (isRequestingFileList(userMessage)) {
-            const files = await storageManager.getFiles(projectId)
-            forcedToolResult = {
-              toolCallId: 'forced-list',
-              toolName: 'list_files',
-              input: {},
-              output: {
-                success: true,
-                message: `✅ Found ${files.length} files in project.`,
-                files: files.map(f => ({
-                  path: f.path,
-                  name: f.name,
-                  type: f.type,
-                  size: f.size,
-                  isDirectory: f.isDirectory,
-                  createdAt: f.createdAt
-                })),
-                count: files.length,
-                action: 'list'
-              }
-            }
-          } else if (/\b(read|show|open)\b.*file/i.test(userMessage)) {
-            // Try to extract filename from user message
-            const fileMatch = userMessage.match(/(?:read|show|open)\s+(?:the\s+)?([\w\.\/\-]+)/i)
-            if (fileMatch) {
-              const filePath = fileMatch[1]
-              try {
-                const file = await storageManager.getFile(projectId, filePath)
-                if (file) {
-                  forcedToolResult = {
-                    toolCallId: 'forced-read',
-                    toolName: 'read_file',
-                    input: { path: filePath },
-                    output: {
-                      success: true,
-                      message: `✅ File ${filePath} read successfully.`,
-                      path: filePath,
-                      content: file.content || '',
-                      name: file.name,
-                      type: file.type,
-                      size: file.size,
-                      action: 'read'
-                    }
-                  }
-                }
-              } catch (error) {
-                console.error('[DEBUG] Forced read failed:', error)
-              }
-            }
-          }
-          
-          // If we have a forced result, create a new response
-          if (forcedToolResult) {
-            // Update the result text to indicate tool was used
-            const newResponse = `I have used the ${forcedToolResult.toolName} tool to fulfill your request. ${forcedToolResult.output.message}`
-            
-            // Create a new result object that includes the forced tool execution
-            const modifiedResult = {
-              ...result,
-              text: newResponse,
-              steps: [
-                ...(result.steps || []),
-                {
-                  text: newResponse,
-                  toolCalls: [{
-                    toolCallId: forcedToolResult.toolCallId,
-                    toolName: forcedToolResult.toolName,
-                    args: forcedToolResult.input
-                  }],
-                  toolResults: [{
-                    toolCallId: forcedToolResult.toolCallId,
-                    toolName: forcedToolResult.toolName,
-                    result: forcedToolResult.output
-                  }],
-                  finishReason: 'tool-calls' as const,
-                  content: []
-                }
-              ]
-            }
-            
-            // Replace the original result
-            Object.assign(result, modifiedResult)
-            
-            console.log('[DEBUG] Successfully forced tool usage:', forcedToolResult.toolName)
-          }
-        } catch (error) {
-          console.error('[DEBUG] Failed to force tool usage:', error)
         }
-      }
-      
-      // Debug: Log the complete result structure
-      console.log('[DEBUG] Complete result structure:', {
-        hasToolResults: !!result.toolResults,
-        toolResultsLength: result.toolResults?.length || 0,
-        hasSteps: !!result.steps,
-        stepsLength: result.steps?.length || 0
-      })
-      
-      // Extract tool results from steps (AI SDK stores them here)
-      const allToolResults: any[] = []
-      if (result.steps && result.steps.length > 0) {
-        result.steps.forEach(step => {
-          if (step.toolResults && step.toolResults.length > 0) {
-            allToolResults.push(...step.toolResults)
-          }
-        })
-      }
-      
-      console.log('[DEBUG] Extracted tool results from steps:', {
-        stepsCount: result.steps?.length || 0,
-        toolResultsFound: allToolResults.length,
-        toolResults: allToolResults
-      })
-      
-      if (allToolResults.length > 0) {
-        // Debug: Log raw tool results
-        console.log('[DEBUG] Raw tool results:', JSON.stringify(allToolResults, null, 2))
-        
-        // Check for tool errors in any step
-        hasToolErrors = result.steps.some(step => 
-          step.content.some(part => part.type === 'tool-error')
-        )
-        
-        if (hasToolErrors) {
-          console.error('[ERROR] Tool execution errors detected in steps:')
-          result.steps.forEach((step, stepIndex) => {
-            const toolErrors = step.content.filter(part => part.type === 'tool-error')
-            toolErrors.forEach(toolError => {
-              console.error(`Step ${stepIndex + 1} - Tool error:`, {
-                toolName: (toolError as any).toolName,
-                error: (toolError as any).error,
-                input: (toolError as any).input
-              })
-            })
-          })
+
+        // Return appropriate error response
+        if (error instanceof Error) {
+          return new Response(`Error: ${error.message}`, { status: 500 })
         }
+
+        return new Response('Internal Server Error', { status: 500 })
       }
-
-      // Prepare tool calls for storage if any
-      let processedToolCalls = undefined
-
-
-      if (allToolResults.length > 0) {
-        processedToolCalls = allToolResults.map(toolResult => {
-          // Extract tool call info from the AI SDK step structure
-          // AI SDK uses 'input' for arguments and 'output' for results
-          const toolCall = {
-            id: toolResult.toolCallId,
-            name: toolResult.toolName || 'unknown',
-            args: toolResult.input || {},
-            result: toolResult.output
-          }
-          
-          console.log('[DEBUG] Processing tool result:', {
-            toolName: toolCall.name,
-            hasArgs: !!toolCall.args,
-            hasResult: !!toolCall.result,
-            args: toolCall.args,
-            result: toolCall.result
-          })
-          
-          return toolCall
-        })
-        
-        // Debug: Log the processed tool calls
-        console.log('[DEBUG] Processed tool calls:', JSON.stringify(processedToolCalls, null, 2))
-      }
-      
-      // Extract the actual AI-generated text from steps if result.text is empty
-      let actualAIMessage = result.text || ''
-      
-      // If result.text is empty, extract text from the steps
-      if (!actualAIMessage && result.steps && result.steps.length > 0) {
-        // Collect all text content from steps, including both step.text and content with type 'text'
-        const stepTexts: string[] = []
-        
-        result.steps.forEach(step => {
-          // Add step.text if it exists
-          if (step.text && step.text.trim().length > 0) {
-            stepTexts.push(step.text.trim())
-          }
-          
-          // Also check step.content for text content
-          if (step.content && Array.isArray(step.content)) {
-            step.content.forEach(content => {
-              if (content.type === 'text' && content.text && content.text.trim().length > 0) {
-                stepTexts.push(content.text.trim())
-              }
-            })
-          }
-        })
-        
-        if (stepTexts.length > 0) {
-          actualAIMessage = stepTexts.join('\n\n')
-        }
-      }
-      
-    
-      
-      console.log('[DEBUG] Final AI message extraction:', {
-        hasResultText: !!result.text,
-        resultTextLength: result.text?.length || 0,
-        stepsCount: result.steps?.length || 0,
-        extractedTextsCount: result.steps?.reduce((acc, step) => {
-          let count = step.text ? 1 : 0
-          if (step.content && Array.isArray(step.content)) {
-            count += step.content.filter(c => c.type === 'text' && c.text).length
-          }
-          return acc + count
-        }, 0) || 0,
-        finalMessageLength: actualAIMessage.length,
-        finalMessagePreview: actualAIMessage.substring(0, 300) + (actualAIMessage.length > 300 ? '...' : '')
-      })
-      
-      // Store conversation memory with the new AI response
-      try {
-        // Import storage manager for conversation memory storage
-        const { storageManager } = await import('@/lib/storage-manager')
-        await storageManager.init()
-        
-        // Enhanced: Use AI to process and enhance the memory
-        const projectContext = await buildOptimizedProjectContext(projectId, storageManager, userIntent)
-        const enhancedMemory = await processMemoryWithAI(
-          conversationMemory,
-          userMessage,
-          projectContext,
-          processedToolCalls
-        )
-        
-        if (conversationMemory) {
-          // Update existing memory with AI-enhanced insights
-          await storageManager.updateConversationMemory(
-            conversationMemory.id,
-            {
-              messages: [
-                ...conversationMemory.messages,
-                {
-                  role: 'assistant',
-                  content: actualAIMessage,
-                  timestamp: new Date().toISOString(),
-                  toolCalls: processedToolCalls,
-                  toolResults: processedToolCalls?.map(tc => tc.result) || []
-                }
-              ],
-              lastActivity: new Date().toISOString(),
-              // AI-enhanced memory fields
-              aiInsights: enhancedMemory.keyInsights,
-              semanticSummary: enhancedMemory.semanticSummary,
-              technicalPatterns: enhancedMemory.technicalPatterns,
-              architecturalDecisions: enhancedMemory.architecturalDecisions,
-              nextLogicalSteps: enhancedMemory.nextLogicalSteps,
-              potentialImprovements: enhancedMemory.potentialImprovements,
-              relevanceScore: enhancedMemory.relevanceScore,
-              contextForFuture: enhancedMemory.contextForFuture
-            }
-          )
-        } else {
-          // Create new memory with AI-enhanced insights
-          await storageManager.createConversationMemory({
-            projectId,
-            userId: user.id,
-            messages: [
-              ...messages.slice(-20).map((msg: any) => ({
-                role: msg.role,
-                content: msg.content,
-                timestamp: new Date().toISOString()
-              })),
-              {
-                role: 'assistant',
-                content: actualAIMessage,
-                timestamp: new Date().toISOString(),
-                toolCalls: processedToolCalls,
-                toolResults: processedToolCalls?.map(tc => tc.result) || []
-              }
-            ],
-            summary: enhancedMemory.semanticSummary || `Project: ${projectId} | Messages: ${messages.length + 1}`,
-            keyPoints: enhancedMemory.keyInsights || [],
-            lastActivity: new Date().toISOString(),
-            // AI-enhanced memory fields
-            aiInsights: enhancedMemory.keyInsights,
-            semanticSummary: enhancedMemory.semanticSummary,
-            technicalPatterns: enhancedMemory.technicalPatterns,
-            architecturalDecisions: enhancedMemory.architecturalDecisions,
-            nextLogicalSteps: enhancedMemory.nextLogicalSteps,
-            potentialImprovements: enhancedMemory.potentialImprovements,
-            relevanceScore: enhancedMemory.relevanceScore,
-            contextForFuture: enhancedMemory.contextForFuture
-          })
-        }
-        
-        console.log('[DEBUG] Conversation memory stored successfully:', {
-          projectId,
-          userId: user.id,
-          messageCount: conversationMemory ? conversationMemory.messages.length + 1 : messages.length + 1,
-          lastActivity: new Date().toISOString()
-        })
-      } catch (error) {
-        console.warn('[WARNING] Failed to store conversation memory:', error)
-        // Continue without failing the request
-      }
-      
-      // CRITICAL: Prevent empty assistant messages from being sent
-      // If the AI only used tools without generating text, generate a simple summary
-      if (!actualAIMessage.trim() && processedToolCalls && processedToolCalls.length > 0) {
-        try {
-          console.log('[DEBUG] Generating simple tool summary...')
-          
-          // Generate a simple summary based on tool calls
-          const toolNames = processedToolCalls.map(tc => tc.name).filter(Boolean)
-          const uniqueTools = Array.from(new Set(toolNames))
-          
-          let summary = `## Task Completed\n\n`
-          summary += `I have successfully completed your request using ${uniqueTools.length} tool${uniqueTools.length > 1 ? 's' : ''}.\n\n`
-          
-          if (uniqueTools.length > 0) {
-            summary += `**Tools used:**\n`
-            uniqueTools.forEach(tool => {
-              summary += `- ${tool}\n`
-            })
-          }
-          
-          actualAIMessage = summary
-          console.log('[DEBUG] Simple tool summary generated:', actualAIMessage.substring(0, 100) + '...')
-        } catch (summaryError) {
-          console.error('[ERROR] Failed to generate simple tool summary:', summaryError)
-          
-          // Fallback to basic summary if generation fails
-          actualAIMessage = `## Task Completed\n\nI have successfully completed your request.`
-          console.log('[DEBUG] Error fallback tool summary generated:', actualAIMessage.substring(0, 100) + '...')
-        }
-      }
-      
-      // Return the response immediately for instant UI update
-      const response = new Response(JSON.stringify({
-        message: actualAIMessage,
-        toolCalls: processedToolCalls,
-        success: !hasToolErrors,
-        hasToolCalls: processedToolCalls && processedToolCalls.length > 0,
-        hasToolErrors,
-        stepCount: result.steps?.length || 0,
-        steps: result.steps?.map((step, index) => ({
-          stepNumber: index + 1,
-          hasText: !!step.text,
-          toolCallsCount: step.toolCalls?.length || 0,
-          toolResultsCount: step.toolResults?.length || 0,
-          finishReason: step.finishReason
-        })) || [],
-        serverSideExecution: true,  // Flag to indicate server-side execution
-        // ULTRA-OPTIMIZED: Real-time updates for immediate UI feedback
-        realtimeUpdates: realtimeUpdates,
-        // IMPORTANT: Include file operations for client-side persistence
-        fileOperations: (await Promise.all((processedToolCalls || []).map(async (toolCall, index) => {
-          console.log(`[DEBUG] Processing toolCall ${index}:`, {
-            name: toolCall.name,
-            hasResult: !!toolCall.result,
-            hasArgs: !!toolCall.args,
-            resultKeys: toolCall.result ? Object.keys(toolCall.result) : [],
-            argsKeys: toolCall.args ? Object.keys(toolCall.args) : []
-          })
-          
-          let operation: any = {
-            type: toolCall.name,
-            path: toolCall.result?.path || toolCall.args?.path,
-            content: toolCall.args?.content || toolCall.result?.content,
-            projectId: projectId,
-            success: toolCall.result?.success !== false
-          }
-
-          // No post-processing needed for edit_file - it's handled directly in the tool execution
-          
-          // Debug log each operation
-          console.log(`[DEBUG] File operation ${index}:`, operation)
-          
-          return operation
-        }))).filter((op, index) => {
-          const shouldInclude = op.success && op.path && (op.type === 'write_file' || op.type === 'edit_file' || op.type === 'delete_file')
-          console.log(`[DEBUG] Operation ${index} filter result:`, {
-            success: op.success,
-            hasPath: !!op.path,
-            isValidType: ['write_file', 'edit_file', 'delete_file'].includes(op.type),
-            shouldInclude
-          })
-          return shouldInclude
-        }) || []
-      }), {
-        status: hasToolErrors ? 207 : 200, // 207 Multi-Status for partial success
-        headers: { 'Content-Type': 'application/json' },
-      })
-
-      // }
-
-      // Save both user message and AI response to database in background (now handled client-side)
-      const userMessageForSaving = messages[messages.length - 1]
-
-      return response
-      
-    } // End of if (true) - tools always enabled
-    
+    }
   } catch (error: unknown) {
-    console.error('Chat API Error:', error)
-    
-    // Check if it's a Mistral API error
-    if (error && typeof error === 'object' && 'message' in error) {
-      const errorMessage = (error as { message?: string }).message
-      if (errorMessage?.includes('Service unavailable') || errorMessage?.includes('Internal Server Error')) {
-        return new Response(JSON.stringify({ 
-          error: 'AI service temporarily unavailable. Please try again in a moment.',
-          details: 'The Mistral AI service is currently experiencing issues.'
-        }), {
-          status: 503,
-          headers: { 'Content-Type': 'application/json' },
-        })
-      }
-    }
-    
-    // Return appropriate error response
-    if (error instanceof Error) {
-      return new Response(`Error: ${error.message}`, { status: 500 })
-    }
-    
+    console.error('Unexpected error in chat API:', error)
     return new Response('Internal Server Error', { status: 500 })
   }
 }
-

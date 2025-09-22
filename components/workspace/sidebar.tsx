@@ -270,7 +270,7 @@ export function Sidebar({
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="w-8 h-8 p-0">
                 <Avatar className="h-6 w-6">
-                  <AvatarImage src={user.user_metadata?.avatar_url || "https://randomuser.me/api/portraits/men/62.jpg"} />
+                  <AvatarImage src={user.user_metadata?.avatar_url || "/default-avatar.svg"} />
                   <AvatarFallback className="text-xs">{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
                 </Avatar>
               </Button>
@@ -677,7 +677,7 @@ export function Sidebar({
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="w-full justify-start p-2">
                 <Avatar className="h-6 w-6 mr-3">
-                  <AvatarImage src={user.user_metadata?.avatar_url || "https://randomuser.me/api/portraits/men/62.jpg"} />
+                  <AvatarImage src={user.user_metadata?.avatar_url || "/default-avatar.svg"} />
                   <AvatarFallback className="text-xs">{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div className="text-left min-w-0 flex-1">

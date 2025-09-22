@@ -24,8 +24,7 @@ import {
   FileSearch,
   BookOpen,
   Database,
-  User,
-  Clock
+  User
 } from "lucide-react"
 import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown"
 import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
@@ -60,7 +59,6 @@ interface Message {
   metadata?: {
     // Server-side tool execution results
     toolCalls?: any[]
-    toolResults?: any[]  // Match specs pattern - array of tool result objects
     success?: boolean
     hasToolCalls?: boolean
     hasToolErrors?: boolean
@@ -74,21 +72,10 @@ interface Message {
       projectId: string
       success: boolean
     }>
-    
-    // XML command execution results
-    xmlCommands?: Array<{
-      id: string
-      command: 'write' | 'edit' | 'delete'
-      path: string
-      status: 'pending' | 'executing' | 'completed' | 'failed'
-      error?: string
-      message?: string
-    }>
 
     // Workflow system properties
     workflowMode?: boolean
     workflowChunk?: any
-    workflowEvents?: any[]
     sessionId?: string
 
     // Legacy properties (for backward compatibility)
@@ -202,99 +189,6 @@ const WorkflowMessageComponent = ({ workflowChunk, sessionId }: { workflowChunk:
       </div>
     </div>
   )
-
-  // If no special case matches, return null (shouldn't happen with our current tool set)
-  return null
-}
-
-// Format workflow content for real-time display
-function formatWorkflowContent(eventData: any, currentContent: string): string {
-  switch (eventData.type) {
-    case 'workflow_step':
-      return `## Step ${eventData.step}: ${eventData.message}
-
-🔄 **Current Phase:** ${eventData.stepType || 'processing'}
-
-${currentContent}`
-
-    case 'ai_narration':
-      return `${currentContent}
-
-💭 **AI:** ${eventData.message}`
-
-    case 'tool_execution':
-      const statusEmoji = eventData.status === 'success' ? '✅' : eventData.status === 'error' ? '❌' : '⏳'
-      const toolInfo = eventData.details?.path ? ` (${eventData.details.path})` : ''
-      return `${currentContent}
-
-${statusEmoji} **Tool:** ${eventData.tool}${toolInfo}`
-
-    case 'verification':
-      const verifyEmoji = eventData.success ? '✅' : '❌'
-      return `${currentContent}
-
-${verifyEmoji} **Verification:** ${eventData.message}`
-
-    case 'workflow_completion':
-      return `${currentContent}
-
----
-
-## ✅ Workflow Completed
-
-${eventData.summary}
-
-**Tools Used:** ${eventData.toolCalls?.length || 0}
-**Files Modified:** ${eventData.fileOperations?.length || 0}
-**Total Steps:** ${eventData.totalSteps || 6}`
-
-    case 'workflow_error':
-      return `${currentContent}
-
----
-
-## ❌ Workflow Error
-
-An error occurred during execution: ${eventData.error}`
-
-    default:
-      return currentContent
-  }
-}
-
-// Sanitize content to remove raw streaming data
-function sanitizeStreamingContent(content: string): string {
-  if (!content) return content
-  
-  // Only sanitize if we detect actual raw SSE patterns that shouldn't be in final content
-  // This should only catch content that is literally raw SSE data, not regular content
-  
-  // Check if the entire content is just raw SSE data (starts with data: and has streaming patterns)
-  const isRawSSEData = content.trim().startsWith('data: {') && 
-                      content.includes('"type":') && 
-                      content.includes('"text-delta"')
-  
-  if (isRawSSEData) {
-    console.warn('[SANITIZER] Detected raw SSE data, filtering out:', content.substring(0, 100))
-    return ''
-  }
-  
-  // For legitimate content, clean up any stray SSE fragments and XML tool tags
-  let sanitized = content
-    // Remove isolated data: {JSON} patterns that shouldn't be in final content
-    .replace(/^data:\s*\{[^}]*\}$/gm, '')
-    // Remove standalone [DONE] markers
-    .replace(/^data:\s*\[DONE\]$/gm, '')
-    // Remove XML tool tags completely to prevent highlight.js from processing them
-    .replace(/<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory)[^>]*>.*?<\/\1>/g, '')
-    // Remove self-closing XML tool tags
-    .replace(/<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory)[^>]*\/>/g, '')
-    // Clean up multiple newlines
-    .replace(/\n\n\n+/g, '\n\n')
-    // Remove leading/trailing whitespace
-    .trim()
-  
-  return sanitized
 }
 
 // ExpandableUserMessage component for long user messages
@@ -407,665 +301,6 @@ const ExpandableUserMessage = ({ content, messageId, onRevert, showRestore = fal
   )
 }
 
-// Enhanced client-side XML tool detection and execution system
-interface XMLToolCall {
-  id: string
-  name: string
-  args: Record<string, any>
-  status: 'detected' | 'processing' | 'executing' | 'completed' | 'failed'
-  result?: any
-  error?: string
-  startTime?: number
-  endTime?: number
-}
-
-// XML tool detection patterns - matching actual chat route implementation
-const XML_TOOL_PATTERNS = {
-  // File operations (actual tags from chat route)
-  pilotwrite: /<pilotwrite\s+path=["']([^"']+)["'][^>]*>(.*?)<\/pilotwrite>/gi,
-  pilotedit: /<pilotedit\s+path=["']([^"']+)["']\s+operation=["']([^"']+)["']\s+search=["']([^"']*?)["']\s+replace=["']([^"']*?)["'][^>]*\s*\/>/gi,
-  pilotdelete: /<pilotdelete\s+path=["']([^"']+)["'][^>]*\s*\/>/gi,
-  
-  // Additional tool patterns (if used elsewhere)
-  write_file: /<write_file\s+path="([^"]+)"(?:\s+content="([^"]*)")?>/g,
-  edit_file: /<edit_file\s+path="([^"]+)"(?:\s+content="([^"]*)")?>/g,
-  delete_file: /<delete_file\s+path="([^"]+)"\s*\/>/g,
-  read_file: /<read_file\s+path="([^"]+)"\s*\/>/g,
-  list_files: /<list_files\s*(?:\s+path="([^"]+)")?\s*\/>/g,
-  
-  // Directory operations
-  create_directory: /<create_directory\s+path="([^"]+)"\s*\/>/g,
-  delete_directory: /<delete_directory\s+path="([^"]+)"\s*\/>/g,
-  
-  // Search operations
-  search_files: /<search_files\s+query="([^"]+)"(?:\s+path="([^"]+)")?\s*\/>/g,
-  grep_search: /<grep_search\s+pattern="([^"]+)"(?:\s+path="([^"]+)")?\s*\/>/g,
-  
-  // Web operations
-  web_search: /<web_search\s+query="([^"]+)"(?:\s+count="([^"]+)")?\s*\/>/g,
-  web_extract: /<web_extract\s+url="([^"]+)"(?:\s+selector="([^"]+)")?\s*\/>/g,
-  
-  // Analysis operations
-  analyze_code: /<analyze_code\s+path="([^"]+)"\s*\/>/g,
-  check_syntax: /<check_syntax\s+path="([^"]+)"\s*\/>/g,
-  run_tests: /<run_tests\s*(?:\s+path="([^"]+)")?\s*\/>/g,
-}
-
-// XML tool closing patterns - matching actual chat route implementation
-const XML_TOOL_CLOSING_PATTERNS = {
-  // File operations (actual tags from chat route)
-  pilotwrite: /<\/pilotwrite>/gi,
-  pilotedit: /<\/pilotedit>/gi,
-  pilotdelete: /<\/pilotdelete>/gi,
-  
-  // Additional tool patterns (if used elsewhere)
-  write_file: /<\/write_file>/g,
-  edit_file: /<\/edit_file>/g,
-  delete_file: /<\/delete_file>/g,
-  read_file: /<\/read_file>/g,
-  list_files: /<\/list_files>/g,
-  create_directory: /<\/create_directory>/g,
-  delete_directory: /<\/delete_directory>/g,
-  search_files: /<\/search_files>/g,
-  grep_search: /<\/grep_search>/g,
-  web_search: /<\/web_search>/g,
-  web_extract: /<\/web_extract>/g,
-  analyze_code: /<\/analyze_code>/g,
-  check_syntax: /<\/check_syntax>/g,
-  run_tests: /<\/run_tests>/g,
-}
-
-// Client-side tool execution functions
-async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): Promise<any> {
-  const { storageManager } = await import('@/lib/storage-manager')
-  await storageManager.init()
-
-  console.log('[CLIENT-TOOL] Executing tool:', toolCall.name, toolCall.args)
-
-  try {
-    switch (toolCall.name) {
-      case 'pilotwrite':
-        const { path: pilotWritePath, content: pilotWriteContent } = toolCall.args
-        const pilotWriteExistingFile = await storageManager.getFile(projectId, pilotWritePath)
-        
-        if (pilotWriteExistingFile) {
-          await storageManager.updateFile(projectId, pilotWritePath, { content: pilotWriteContent || '' })
-          return { success: true, action: 'updated', path: pilotWritePath, message: `File updated: ${pilotWritePath}` }
-        } else {
-          const newFile = await storageManager.createFile({
-            workspaceId: projectId,
-            name: pilotWritePath.split('/').pop() || pilotWritePath,
-            path: pilotWritePath,
-            content: pilotWriteContent || '',
-            fileType: pilotWritePath.split('.').pop() || 'text',
-            type: pilotWritePath.split('.').pop() || 'text',
-            size: (pilotWriteContent || '').length,
-            isDirectory: false
-          })
-          return { success: true, action: 'created', path: pilotWritePath, file: newFile, message: `File created: ${pilotWritePath}` }
-        }
-
-      case 'pilotedit':
-        const { path: pilotEditPath, operation, search, replace } = toolCall.args
-        const pilotEditFileToEdit = await storageManager.getFile(projectId, pilotEditPath)
-        if (pilotEditFileToEdit) {
-          let newContent = pilotEditFileToEdit.content
-          
-          if (operation === 'search_replace') {
-            newContent = newContent.replace(new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), replace)
-          }
-          
-          await storageManager.updateFile(projectId, pilotEditPath, { content: newContent })
-          return { success: true, action: 'edited', path: pilotEditPath, message: `File edited: ${pilotEditPath}` }
-        } else {
-          throw new Error(`File not found: ${pilotEditPath}`)
-        }
-        
-      case 'pilotdelete':
-        const { path: pilotDeletePath } = toolCall.args
-        const pilotDeleteFileToDelete = await storageManager.getFile(projectId, pilotDeletePath)
-        if (pilotDeleteFileToDelete) {
-          await storageManager.deleteFile(projectId, pilotDeletePath)
-          return { success: true, action: 'deleted', path: pilotDeletePath, message: `File deleted: ${pilotDeletePath}` }
-        } else {
-          throw new Error(`File not found: ${pilotDeletePath}`)
-        }
-        
-      case 'write_file':
-        const { path: writeFilePath, content: writeFileContent } = toolCall.args
-        const writeFileExistingFile = await storageManager.getFile(projectId, writeFilePath)
-        
-        if (writeFileExistingFile) {
-          await storageManager.updateFile(projectId, writeFilePath, {
-            content: writeFileContent || '',
-            updatedAt: new Date().toISOString()
-          })
-          return { success: true, action: 'updated', path: writeFilePath, message: `File updated: ${writeFilePath}` }
-        } else {
-          const newFile = await storageManager.createFile({
-            workspaceId: projectId,
-            name: writeFilePath.split('/').pop() || writeFilePath,
-            path: writeFilePath,
-            content: writeFileContent || '',
-            fileType: writeFilePath.split('.').pop() || 'text',
-            type: writeFilePath.split('.').pop() || 'text',
-            size: (writeFileContent || '').length,
-            isDirectory: false
-          })
-          return { success: true, action: 'created', path: writeFilePath, file: newFile, message: `File created: ${writeFilePath}` }
-        }
-        
-      case 'edit_file':
-        const { path: editFilePath, content: editFileContent } = toolCall.args
-        const editFileToEdit = await storageManager.getFile(projectId, editFilePath)
-        if (editFileToEdit) {
-          await storageManager.updateFile(projectId, editFilePath, {
-            content: editFileContent || '',
-            updatedAt: new Date().toISOString()
-          })
-          return { success: true, action: 'edited', path: editFilePath, message: `File edited: ${editFilePath}` }
-        } else {
-          throw new Error(`File not found: ${editFilePath}`)
-        }
-        
-      case 'delete_file':
-        const { path: deleteFilePath } = toolCall.args
-        const deleteFileToDelete = await storageManager.getFile(projectId, deleteFilePath)
-        if (deleteFileToDelete) {
-          await storageManager.deleteFile(projectId, deleteFilePath)
-          return { success: true, action: 'deleted', path: deleteFilePath, message: `File deleted: ${deleteFilePath}` }
-        } else {
-          throw new Error(`File not found: ${deleteFilePath}`)
-        }
-        
-      case 'read_file':
-        const { path: readPath } = toolCall.args
-        const fileToRead = await storageManager.getFile(projectId, readPath)
-        if (fileToRead) {
-          return { 
-            success: true, 
-            path: readPath, 
-            content: fileToRead.content,
-            size: fileToRead.size,
-            type: fileToRead.type,
-            message: `File read: ${readPath}` 
-          }
-        } else {
-          throw new Error(`File not found: ${readPath}`)
-        }
-        
-      case 'list_files':
-        const { path: listPath } = toolCall.args
-        const allFiles = await storageManager.getFiles(projectId)
-        let filteredFiles = allFiles
-        
-        if (listPath && listPath !== '/') {
-          filteredFiles = allFiles.filter(f => f.path.startsWith(listPath))
-        }
-        
-        return {
-          success: true,
-          files: filteredFiles.map(f => ({
-            path: f.path,
-            name: f.name,
-            type: f.type,
-            size: f.size,
-            isDirectory: f.isDirectory,
-            createdAt: f.createdAt
-          })),
-          count: filteredFiles.length,
-          message: `Found ${filteredFiles.length} files`
-        }
-        
-      case 'search_files':
-        const { query, path: searchPath } = toolCall.args
-        const searchFiles = await storageManager.getFiles(projectId)
-        const searchResults = searchFiles.filter(f => 
-          f.name.toLowerCase().includes(query.toLowerCase()) ||
-          f.path.toLowerCase().includes(query.toLowerCase())
-        )
-        
-        return {
-          success: true,
-          results: searchResults.map(f => ({
-            path: f.path,
-            name: f.name,
-            type: f.type,
-            size: f.size
-          })),
-          count: searchResults.length,
-          query,
-          message: `Found ${searchResults.length} files matching "${query}"`
-        }
-        
-      case 'grep_search':
-        const { pattern, path: grepPath } = toolCall.args
-        const grepFiles = await storageManager.getFiles(projectId)
-        const grepResults = []
-        
-        for (const file of grepFiles) {
-          if (file.content && file.content.includes(pattern)) {
-            const lines = file.content.split('\n')
-            const matchingLines = lines
-              .map((line, index) => ({ line, lineNumber: index + 1 }))
-              .filter(({ line }) => line.includes(pattern))
-            
-            if (matchingLines.length > 0) {
-              grepResults.push({
-                path: file.path,
-                name: file.name,
-                matches: matchingLines,
-                count: matchingLines.length
-              })
-            }
-          }
-        }
-        
-        return {
-          success: true,
-          results: grepResults,
-          count: grepResults.length,
-          pattern,
-          message: `Found ${grepResults.length} files containing "${pattern}"`
-        }
-
-      default:
-        throw new Error(`Unsupported tool: ${toolCall.name}`)
-    }
-  } catch (error) {
-    console.error('[CLIENT-TOOL] Tool execution failed:', error)
-    throw error
-  }
-}
-
-// Enhanced XML tool detection and parsing
-function detectXMLTools(content: string): XMLToolCall[] {
-  const detectedTools: XMLToolCall[] = []
-  
-  // Reset all regex lastIndex to 0
-  Object.values(XML_TOOL_PATTERNS).forEach(regex => regex.lastIndex = 0)
-  
-  console.log('[DEBUG] detectXMLTools called with content length:', content.length)
-  console.log('[DEBUG] Content preview:', content.substring(0, 200))
-  
-  // Check each tool pattern
-  for (const [toolName, pattern] of Object.entries(XML_TOOL_PATTERNS)) {
-    console.log('[DEBUG] Checking pattern for:', toolName)
-    let match
-    while ((match = pattern.exec(content)) !== null) {
-      console.log('[DEBUG] Found match for', toolName, ':', match[1])
-      const toolId = `${toolName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-      const args: Record<string, any> = {}
-      
-      // Extract arguments based on tool type
-      switch (toolName) {
-        // Actual XML tags from chat route
-        case 'pilotwrite':
-          args.path = match[1]
-          args.content = match[2] || ''
-          break
-        case 'pilotedit':
-          args.path = match[1]
-          args.operation = match[2]
-          args.search = match[3]
-          args.replace = match[4]
-          break
-        case 'pilotdelete':
-          args.path = match[1]
-          break
-          
-        // Additional tool patterns (if used elsewhere)
-        case 'write_file':
-        case 'edit_file':
-          args.path = match[1]
-          args.content = match[2] || ''
-          break
-        case 'delete_file':
-        case 'read_file':
-          args.path = match[1]
-          break
-        case 'list_files':
-          args.path = match[1] || '/'
-          break
-        case 'create_directory':
-        case 'delete_directory':
-          args.path = match[1]
-          break
-        case 'search_files':
-          args.query = match[1]
-          args.path = match[2] || '/'
-          break
-        case 'grep_search':
-          args.pattern = match[1]
-          args.path = match[2] || '/'
-          break
-        case 'web_search':
-          args.query = match[1]
-          args.count = match[2] || '5'
-          break
-        case 'web_extract':
-          args.url = match[1]
-          args.selector = match[2] || ''
-          break
-        case 'analyze_code':
-        case 'check_syntax':
-          args.path = match[1]
-          break
-        case 'run_tests':
-          args.path = match[1] || '/'
-          break
-      }
-      
-      detectedTools.push({
-        id: toolId,
-        name: toolName,
-        args,
-        status: 'detected',
-        startTime: Date.now()
-      })
-    }
-  }
-  
-  return detectedTools
-}
-
-// Check if XML tool is complete (has closing tag)
-function isXMLToolComplete(content: string, toolName: string): boolean {
-  const closingPattern = XML_TOOL_CLOSING_PATTERNS[toolName as keyof typeof XML_TOOL_CLOSING_PATTERNS]
-  if (!closingPattern) return false
-  
-  // Reset regex lastIndex
-  closingPattern.lastIndex = 0
-  return closingPattern.test(content)
-}
-
-// Extract content between XML tool tags
-function extractXMLToolContent(content: string, toolName: string): string {
-  const openingPattern = XML_TOOL_PATTERNS[toolName as keyof typeof XML_TOOL_PATTERNS]
-  const closingPattern = XML_TOOL_CLOSING_PATTERNS[toolName as keyof typeof XML_TOOL_CLOSING_PATTERNS]
-  
-  if (!openingPattern || !closingPattern) return ''
-  
-  // Reset regex lastIndex
-  openingPattern.lastIndex = 0
-  closingPattern.lastIndex = 0
-  
-  const openingMatch = openingPattern.exec(content)
-  const closingMatch = closingPattern.exec(content)
-  
-  if (openingMatch && closingMatch) {
-    return content.slice(
-      openingMatch.index + openingMatch[0].length,
-      closingMatch.index
-    ).trim()
-  }
-  
-  return ''
-}
-
-// Clean content by removing XML tool tags
-function cleanXMLToolTags(content: string): string {
-  let cleaned = content
-  
-  // Remove all XML tool opening and closing tags
-  Object.values(XML_TOOL_PATTERNS).forEach(pattern => {
-    // Reset regex lastIndex
-    pattern.lastIndex = 0
-    cleaned = cleaned.replace(pattern, '')
-  })
-  
-  Object.values(XML_TOOL_CLOSING_PATTERNS).forEach(pattern => {
-    // Reset regex lastIndex
-    pattern.lastIndex = 0
-    cleaned = cleaned.replace(pattern, '')
-  })
-  
-  // Also remove any remaining XML tool tags that might have been missed
-  const xmlTagRegex = /<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory)[^>]*>.*?<\/\1>/g
-  cleaned = cleaned.replace(xmlTagRegex, '')
-  
-  // Clean up extra whitespace and newlines
-  cleaned = cleaned.replace(/\n\s*\n\s*\n/g, '\n\n')
-  
-  return cleaned.trim()
-}
-
-// Legacy function for backward compatibility
-async function executeXMLCommandClientSide(xmlCommand: any, projectId: string) {
-  // Convert legacy format to new format
-  const toolCall: XMLToolCall = {
-    id: xmlCommand.id || `legacy-${Date.now()}`,
-    name: xmlCommand.command,
-    args: {
-      path: xmlCommand.path,
-      content: xmlCommand.content
-    },
-    status: 'executing',
-    startTime: Date.now()
-  }
-  
-  return executeClientSideTool(toolCall, projectId)
-}
-
-// XMLToolPill component for displaying client-side XML tool execution
-const XMLToolPill = ({ toolCall }: { toolCall: XMLToolCall }) => {
-  const getToolIcon = (toolName: string) => {
-    switch (toolName) {
-      case 'pilotwrite':
-      case 'write_file':
-      case 'edit_file':
-        return <FileText className="h-4 w-4" />
-      case 'pilotdelete':
-      case 'delete_file':
-        return <Trash2 className="h-4 w-4" />
-      case 'pilotedit':
-        return <Edit3 className="h-4 w-4" />
-      case 'read_file':
-        return <Eye className="h-4 w-4" />
-      case 'list_files':
-        return <FolderOpen className="h-4 w-4" />
-      case 'search_files':
-      case 'grep_search':
-        return <FileSearch className="h-4 w-4" />
-      case 'web_search':
-        return <Globe className="h-4 w-4" />
-      case 'web_extract':
-        return <Database className="h-4 w-4" />
-      case 'analyze_code':
-      case 'check_syntax':
-        return <Wrench className="h-4 w-4" />
-      case 'run_tests':
-        return <Zap className="h-4 w-4" />
-      default:
-        return <Wrench className="h-4 w-4" />
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'detected':
-        return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'processing':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'executing':
-        return 'bg-orange-100 text-orange-800 border-orange-200'
-      case 'completed':
-        return 'bg-green-100 text-green-800 border-green-200'
-      case 'failed':
-        return 'bg-red-100 text-red-800 border-red-200'
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200'
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'detected':
-        return <Clock className="h-3 w-3" />
-      case 'processing':
-      case 'executing':
-        return <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-      case 'completed':
-        return <Check className="h-3 w-3" />
-      case 'failed':
-        return <AlertTriangle className="h-3 w-3" />
-      default:
-        return <Clock className="h-3 w-3" />
-    }
-  }
-
-  const getToolDescription = (toolCall: XMLToolCall) => {
-    const { name, args } = toolCall
-    switch (name) {
-      case 'pilotwrite':
-        return `Writing to ${args.path}`
-      case 'pilotedit':
-        return `Editing ${args.path} (${args.operation})`
-      case 'pilotdelete':
-        return `Deleting ${args.path}`
-      case 'write_file':
-        return `Writing to ${args.path}`
-      case 'edit_file':
-        return `Editing ${args.path}`
-      case 'delete_file':
-        return `Deleting ${args.path}`
-      case 'read_file':
-        return `Reading ${args.path}`
-      case 'list_files':
-        return `Listing files in ${args.path}`
-      case 'search_files':
-        return `Searching for "${args.query}" in ${args.path}`
-      case 'grep_search':
-        return `Searching for "${args.pattern}" in ${args.path}`
-      case 'web_search':
-        return `Searching web for "${args.query}"`
-      case 'web_extract':
-        return `Extracting from ${args.url}`
-      case 'analyze_code':
-        return `Analyzing code in ${args.path}`
-      case 'check_syntax':
-        return `Checking syntax in ${args.path}`
-      case 'run_tests':
-        return `Running tests in ${args.path}`
-      default:
-        return `Executing ${name}`
-    }
-  }
-
-  const isExpanded = toolCall.status === 'completed' || toolCall.status === 'failed'
-  const [isOpen, setIsOpen] = React.useState(isExpanded)
-
-  return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="mb-2">
-      <CollapsibleTrigger asChild>
-        <div className={`
-          flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer
-          hover:shadow-sm transition-all duration-200
-          ${getStatusColor(toolCall.status)}
-        `}>
-          {getStatusIcon(toolCall.status)}
-          {getToolIcon(toolCall.name)}
-          <span className="text-sm font-medium">
-            {getToolDescription(toolCall)}
-          </span>
-          <div className="ml-auto flex items-center gap-1">
-            {toolCall.status === 'completed' && toolCall.result && (
-              <span className="text-xs opacity-75">
-                {toolCall.result.message || 'Completed'}
-              </span>
-            )}
-            {toolCall.status === 'failed' && toolCall.error && (
-              <span className="text-xs opacity-75">
-                {toolCall.error}
-              </span>
-            )}
-            {isOpen ? (
-              <ChevronUp className="h-3 w-3" />
-            ) : (
-              <ChevronDown className="h-3 w-3" />
-            )}
-          </div>
-        </div>
-      </CollapsibleTrigger>
-      
-      <CollapsibleContent className="mt-2">
-        <div className="bg-gray-50 rounded-lg p-3 text-sm">
-          {toolCall.status === 'completed' && toolCall.result && (
-            <div className="space-y-2">
-              <div className="font-medium text-green-800">✅ Success</div>
-              <div className="text-gray-700">{toolCall.result.message}</div>
-              
-              {toolCall.result.files && (
-                <div>
-                  <div className="font-medium mb-1">Files:</div>
-                  <div className="space-y-1">
-                    {toolCall.result.files.slice(0, 5).map((file: any, index: number) => (
-                      <div key={index} className="flex items-center gap-2 text-xs">
-                        <FileText className="h-3 w-3" />
-                        <span>{file.path}</span>
-                        <span className="text-gray-500">({file.size} bytes)</span>
-                      </div>
-                    ))}
-                    {toolCall.result.files.length > 5 && (
-                      <div className="text-xs text-gray-500">
-                        ... and {toolCall.result.files.length - 5} more files
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              
-              {toolCall.result.results && (
-                <div>
-                  <div className="font-medium mb-1">Results:</div>
-                  <div className="space-y-1">
-                    {toolCall.result.results.slice(0, 3).map((result: any, index: number) => (
-                      <div key={index} className="text-xs">
-                        <div className="font-medium">{result.path}</div>
-                        {result.matches && (
-                          <div className="text-gray-600">
-                            {result.matches.length} matches found
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                    {toolCall.result.results.length > 3 && (
-                      <div className="text-xs text-gray-500">
-                        ... and {toolCall.result.results.length - 3} more results
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          
-          {toolCall.status === 'failed' && toolCall.error && (
-            <div className="space-y-2">
-              <div className="font-medium text-red-800">❌ Failed</div>
-              <div className="text-red-700">{toolCall.error}</div>
-            </div>
-          )}
-          
-          {toolCall.status === 'executing' && (
-            <div className="space-y-2">
-              <div className="font-medium text-orange-800">⚡ Executing...</div>
-              <div className="text-gray-700">Please wait while the tool executes</div>
-            </div>
-          )}
-          
-          {toolCall.status === 'processing' && (
-            <div className="space-y-2">
-              <div className="font-medium text-yellow-800">🔄 Processing...</div>
-              <div className="text-gray-700">Preparing to execute tool</div>
-            </div>
-          )}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
-  )
-}
-
 // ToolPill component for displaying server-side tool results
 const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 'executing' | 'completed' | 'failed' }) => {
   const getToolIcon = (toolName: string) => {
@@ -1125,8 +360,8 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
     // Debug logging to see the actual structure
     console.log('[DEBUG] web_search tool result:', toolCall.result)
     
-    const webResultCount = toolCall.result?.metadata?.resultCount || toolCall.result?.results?.length || 0
-    const webCleanResults = toolCall.result?.cleanResults || toolCall.result?.results || []
+    const resultCount = toolCall.result?.metadata?.resultCount || toolCall.result?.results?.length || 0
+    const cleanResults = toolCall.result?.cleanResults || toolCall.result?.results || []
     
     return (
       <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
@@ -1150,7 +385,7 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
               <span className="font-medium text-foreground">Web Search</span>
             </div>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <span>{webResultCount} results found</span>
+              <span>{resultCount} results found</span>
               <span>•</span>
                 <span>{isSuccess ? 'Success' : 'Failed'}</span>
             </div>
@@ -1179,7 +414,7 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
               </div>
               
               {/* Results Content */}
-              {webCleanResults ? (
+              {cleanResults ? (
                 <div className="prose prose-sm max-w-none">
                   <h3 className="text-base font-bold text-white mb-3">Search Results</h3>
                   <ReactMarkdown 
@@ -1211,7 +446,7 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
                       )
                     }}
                   >
-                    {webCleanResults}
+                    {cleanResults}
                   </ReactMarkdown>
                 </div>
               ) : (
@@ -1233,8 +468,8 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
     // Debug logging to see the actual structure
     console.log('[DEBUG] web_extract tool result:', toolCall.result)
     
-    const extractCleanResults = toolCall.result?.cleanResults || toolCall.result?.results || []
-    const extractUrlCount = toolCall.result?.metadata?.urlCount || toolCall.result?.metadata?.contentCount || toolCall.result?.urls?.length || 0
+    const cleanResults = toolCall.result?.cleanResults || toolCall.result?.results || []
+    const urlCount = toolCall.result?.metadata?.urlCount || toolCall.result?.metadata?.contentCount || toolCall.result?.urls?.length || 0
     
     return (
       <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
@@ -1258,7 +493,7 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
               <span className="font-medium text-foreground">Content Extraction</span>
             </div>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <span>{extractUrlCount} URL{extractUrlCount !== 1 ? 's' : ''} processed</span>
+                <span>{urlCount} URL{urlCount !== 1 ? 's' : ''} processed</span>
               <span>•</span>
                 <span>{isSuccess ? 'Success' : 'Failed'}</span>
             </div>
@@ -1291,7 +526,7 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
               </div>
               
               {/* Results Content */}
-              {extractCleanResults ? (
+              {cleanResults ? (
                 <div className="prose prose-sm max-w-none">
                   <h3 className="text-base font-bold text-white mb-3">Extracted Content</h3>
                   <ReactMarkdown 
@@ -1323,7 +558,7 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
                       )
                     }}
                   >
-                    {extractCleanResults}
+                    {cleanResults}
                   </ReactMarkdown>
                 </div>
               ) : (
@@ -1342,7 +577,7 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
   if (toolCall.name === 'list_files') {
     const [isExpanded, setIsExpanded] = useState(false)
     const files = toolCall.result?.files || toolCall.result?.results || []
-
+    
     return (
       <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
         {/* Header - Clickable to toggle */}
@@ -1952,190 +1187,6 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
   )
 }
 
-// XMLCommandPill component for displaying XML command status with real-time updates
-const XMLCommandPill = ({ 
-  command, 
-  status = 'pending',
-  filePath = '',
-  error = null 
-}: { 
-  command: 'pilotwrite' | 'pilotedit' | 'pilotdelete'
-  status?: 'pending' | 'executing' | 'completed' | 'failed'
-  filePath?: string
-  error?: string | null 
-}) => {
-  const [isExpanded, setIsExpanded] = useState(false)
-
-  const getCommandIcon = (cmd: string) => {
-    switch (cmd) {
-      case 'pilotwrite': return FileText
-      case 'pilotedit': return Edit3
-      case 'pilotdelete': return Trash2
-      default: return Wrench
-    }
-  }
-
-  const getCommandLabel = (cmd: string) => {
-    switch (cmd) {
-      case 'pilotwrite': return 'Creating File'
-      case 'pilotedit': return 'Editing File'
-      case 'pilotdelete': return 'Deleting File'
-      default: return 'Processing'
-    }
-  }
-
-  const getStatusLabel = (cmd: string, status: string) => {
-    if (status === 'failed') return 'Failed'
-    if (status === 'completed') {
-      switch (cmd) {
-        case 'pilotwrite': return 'Created'
-        case 'pilotedit': return 'Edited'
-        case 'pilotdelete': return 'Deleted'
-        default: return 'Completed'
-      }
-    }
-    if (status === 'executing') {
-      switch (cmd) {
-        case 'pilotwrite': return 'Creating...'
-        case 'pilotedit': return 'Editing...'
-        case 'pilotdelete': return 'Deleting...'
-        default: return 'Processing...'
-      }
-    }
-    return 'Pending'
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'border-l-green-500 bg-green-900/10'
-      case 'failed': return 'border-l-red-500 bg-red-900/20'
-      case 'executing': return 'border-l-blue-500 bg-blue-900/10'
-      default: return 'border-l-yellow-500 bg-yellow-900/10'
-    }
-  }
-
-  const getIconColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-gradient-to-r from-green-500 to-emerald-600 text-white'
-      case 'failed': return 'bg-red-500 text-white'
-      case 'executing': return 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
-      default: return 'bg-gradient-to-r from-yellow-500 to-orange-600 text-white'
-    }
-  }
-
-  const IconComponent = getCommandIcon(command)
-  const fileName = filePath.split('/').pop() || filePath
-
-  return (
-    <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
-      {/* Header - Clickable to toggle */}
-      <div
-        className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors border-l-4 ${getStatusColor(status)}`}
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-full ${getIconColor(status)} relative`}>
-            <IconComponent className="w-4 h-4" />
-            {status === 'executing' && (
-              <div className="absolute inset-0 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-            )}
-            {status === 'pending' && (
-              <Clock className="absolute -bottom-1 -right-1 w-3 h-3 bg-yellow-500 rounded-full p-0.5 text-white" />
-            )}
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-foreground">
-                {getCommandLabel(command)}
-              </span>
-              {fileName && (
-                <span className="text-xs text-muted-foreground">({fileName})</span>
-              )}
-            </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <span>{getStatusLabel(command, status)}</span>
-              {status !== 'pending' && (
-                <>
-                  <span>•</span>
-                  <span className={
-                    status === 'completed' ? 'text-green-400' :
-                    status === 'failed' ? 'text-red-400' :
-                    status === 'executing' ? 'text-blue-400' : 'text-yellow-400'
-                  }>
-                    {status === 'executing' ? 'In Progress' : 
-                     status === 'completed' ? 'Success' :
-                     status === 'failed' ? 'Error' : 'Queued'}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-          {/* Chevron indicator */}
-          <div className="ml-2">
-            {isExpanded ? (
-              <ChevronUp className="w-4 h-4 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="w-4 h-4 text-muted-foreground" />
-            )}
-          </div>
-        </div>
-      </div>
-      
-      {/* Content - Collapsible */}
-      {isExpanded && (
-        <div className="p-4 bg-background border-t">
-          <div className="space-y-3">
-            {/* File Path */}
-            {filePath && (
-              <div>
-                <h4 className="text-sm font-medium text-foreground mb-1">File Path</h4>
-                <code className="text-xs bg-muted px-2 py-1 rounded font-mono text-muted-foreground">
-                  {filePath}
-                </code>
-              </div>
-            )}
-            
-            {/* Status Details */}
-            <div>
-              <h4 className="text-sm font-medium text-foreground mb-1">Status</h4>
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${
-                  status === 'completed' ? 'bg-green-500' :
-                  status === 'failed' ? 'bg-red-500' :
-                  status === 'executing' ? 'bg-blue-500' : 'bg-yellow-500'
-                }`} />
-                <span className="text-sm text-muted-foreground">
-                  {getStatusLabel(command, status)}
-                </span>
-              </div>
-            </div>
-            
-            {/* Error Details */}
-            {error && status === 'failed' && (
-              <div>
-                <h4 className="text-sm font-medium text-red-400 mb-1">Error</h4>
-                <div className="bg-red-900/20 border border-red-500/30 rounded p-2">
-                  <code className="text-xs text-red-300 font-mono">{error}</code>
-                </div>
-              </div>
-            )}
-            
-            {/* Command Type Info */}
-            <div>
-              <h4 className="text-sm font-medium text-foreground mb-1">Operation</h4>
-              <span className="text-sm text-muted-foreground">
-                {command === 'pilotwrite' ? 'File creation operation' :
-                 command === 'pilotedit' ? 'File modification operation' :
-                 command === 'pilotdelete' ? 'File deletion operation' : 'Unknown operation'}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ExpandableAISummary component for long AI summary messages
 const ExpandableAISummary = ({ content }: { content: string }) => {
   const [isExpanded, setIsExpanded] = useState(false)
@@ -2496,81 +1547,11 @@ const HighlightLoader = () => {
       document.head.appendChild(link)
     }
     
-    // Add custom CSS to prevent XML tool tags from being wrapped in code blocks
-    if (!document.getElementById('xml-tool-css')) {
-      const style = document.createElement('style')
-      style.id = 'xml-tool-css'
-      style.textContent = `
-        /* Prevent XML tool tags from being wrapped in code blocks */
-        .chat-message-content pre code {
-          white-space: pre-wrap;
-        }
-        
-        /* Style XML tool tags differently */
-        .chat-message-content :not(pre) > code {
-          background: transparent;
-          padding: 0;
-          border: none;
-          font-family: inherit;
-        }
-        
-        /* Hide XML tool tags that got wrapped in code blocks */
-        .chat-message-content pre code[data-xml-tool] {
-          display: none !important;
-        }
-        
-        .chat-message-content pre[data-contains-xml-tool] {
-          display: none !important;
-        }
-        
-        /* Alternative: Make XML tool tags transparent */
-        .chat-message-content code[data-xml-tool] {
-          background: transparent !important;
-          color: inherit !important;
-          padding: 0 !important;
-          border: none !important;
-          font-family: inherit !important;
-          font-size: inherit !important;
-        }
-        
-        .chat-message-content pre:has(code:contains("<web_extract")) {
-          display: none;
-        }
-        
-        .chat-message-content pre:has(code:contains("<analyze_code")) {
-          display: none;
-        }
-        
-        .chat-message-content pre:has(code:contains("<check_syntax")) {
-          display: none;
-        }
-        
-        .chat-message-content pre:has(code:contains("<run_tests")) {
-          display: none;
-        }
-        
-        .chat-message-content pre:has(code:contains("<create_directory")) {
-          display: none;
-        }
-        
-        .chat-message-content pre:has(code:contains("<delete_directory")) {
-          display: none;
-        }
-      `
-      document.head.appendChild(style)
-    }
-    
-    // Highlight code blocks after each render, but exclude XML tool tags
+    // Highlight code blocks after each render
     const highlight = () => {
       if ((window as any).hljs) {
         document.querySelectorAll('pre code').forEach(block => {
-          // Check if this code block contains XML tool tags
-          const content = block.textContent || ''
-          const hasXMLTools = /<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory)/.test(content)
-          
-          if (!hasXMLTools) {
           (window as any).hljs.highlightElement(block)
-          }
         })
       }
     }
@@ -2606,7 +1587,6 @@ export function ChatPanel({
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
   const [isEditingRevertedMessage, setIsEditingRevertedMessage] = useState(false) // New state for edit mode
   const [showScrollToBottom, setShowScrollToBottom] = useState(false) // State for floating chevron visibility
-  const [xmlCommands, setXmlCommands] = useState<any[]>([]) // State for XML tool commands
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null) // Ref for messages container
 
@@ -2688,37 +1668,8 @@ export function ChatPanel({
           metadata: msg.metadata
         }))
         
-        // Clean up any potential partial or duplicate assistant messages
-        // Keep only the last assistant message if there are multiple consecutive ones with similar timestamps
-        const cleanedMessages = formattedMessages.filter((msg, index) => {
-          if (msg.role !== 'assistant') return true
-          
-          // Check if this is a partial message (very short content or "Thinking...")
-          const isPartialMessage = msg.content.length < 10 || 
-                                 msg.content === "Thinking..." || 
-                                 msg.content.startsWith("data:")
-          
-          if (isPartialMessage) {
-            // Check if there's a complete assistant message after this one
-            const nextAssistantIndex = formattedMessages.findIndex((nextMsg, nextIndex) => 
-              nextIndex > index && 
-              nextMsg.role === 'assistant' && 
-              nextMsg.content.length > 10 &&
-              !nextMsg.content.startsWith("data:")
-            )
-            
-            // If there's a complete message after this partial one, filter out the partial
-            if (nextAssistantIndex !== -1) {
-              console.log(`[ChatPanel] Filtering out partial assistant message: "${msg.content.substring(0, 50)}..."`)
-              return false
-            }
-          }
-          
-          return true
-        })
-        
-        console.log(`[ChatPanel] Loaded ${cleanedMessages.length} messages (filtered ${formattedMessages.length - cleanedMessages.length} partial messages) for project ${targetProject.id}`)
-        setMessages(cleanedMessages)
+        console.log(`[ChatPanel] Loaded ${formattedMessages.length} messages for project ${targetProject.id}`)
+        setMessages(formattedMessages)
         // Don't clear restoreMessageId here as it should persist across reloads
       } else {
         console.log(`[ChatPanel] No active session found for project ${targetProject.id}, starting fresh`)
@@ -2766,16 +1717,7 @@ export function ChatPanel({
         console.log(`[ChatPanel] Using existing chat session:`, chatSession.id)
       }
       
-      // Check if message with this ID already exists and delete it (to prevent duplicates)
-      const existingMessages = await storageManager.getMessages(chatSession.id)
-      const existingMessage = existingMessages.find((m: any) => m.id === message.id)
-      
-      if (existingMessage) {
-        console.log(`[ChatPanel] Deleting existing message with ID ${message.id} to prevent duplicates`)
-        await storageManager.deleteMessage(chatSession.id, message.id)
-      }
-      
-      // Create the message (fresh or replacement)
+      // Save message to the session
       await storageManager.createMessage({
         chatSessionId: chatSession.id,
         role: message.role,
@@ -3300,16 +2242,8 @@ export function ChatPanel({
         const decoder = new TextDecoder()
         let assistantContent = ""
         let assistantMessageId = (Date.now() + 1).toString()
-        
-        // Track tool calls during streaming
-        let toolCalls: any[] = []
-        let hasToolCalls = false
-        let hasToolErrors = false
-        
-        // Reset XML commands for new message
-        setXmlCommands([])
 
-        // Create assistant message with loading indicator - DON'T save to DB yet
+        // Create assistant message with loading indicator
         const assistantMessage: Message = {
           id: assistantMessageId,
           role: "assistant",
@@ -3324,660 +2258,68 @@ export function ChatPanel({
 
         if (reader) {
           try {
-            let buffer = ""
-            
-            while (true) {
-              const { done, value } = await reader.read()
-              if (done) break
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
 
               const chunk = decoder.decode(value, { stream: true })
-              buffer += chunk
               
-              // Process complete SSE events from buffer
-              // Handle concatenated events like: data: {...}data: {...}
-              let remainingBuffer = buffer
-              
-              while (remainingBuffer.length > 0) {
-                // Look for 'data: ' pattern
-                const dataIndex = remainingBuffer.indexOf('data: ')
-                if (dataIndex === -1) break
-                
-                // Extract the data part after 'data: '
-                const dataStart = dataIndex + 6
-                let dataEnd = remainingBuffer.indexOf('data: ', dataStart)
-                
-                // If no next 'data: ' found, check for newline or end of buffer
-                if (dataEnd === -1) {
-                  const newlineIndex = remainingBuffer.indexOf('\n', dataStart)
-                  dataEnd = newlineIndex !== -1 ? newlineIndex : remainingBuffer.length
-                }
-                
-                const dataStr = remainingBuffer.slice(dataStart, dataEnd).trim()
-                
-                // Process this SSE event
-                if (dataStr) {
-                  // Handle [DONE] marker
-                  if (dataStr === '[DONE]') {
-                    console.log('[STREAM] Received [DONE] marker')
-                    break
-                  }
-                  
-                  try {
-                    const data = JSON.parse(dataStr)
-                    console.log('[STREAM] Received event type:', data.type, 'Full data:', data)
-                    
-                    // Handle text-delta events for actual content
-                    if (data.type === 'text-delta' && data.delta) {
-                      assistantContent += data.delta
-                      hasReceivedContent = true
-                      
-                      console.log('[STREAM] Adding delta:', data.delta)
-                      
-                      // Enhanced XML tool detection and processing
-                      const detectedTools = detectXMLTools(assistantContent)
-                      console.log('[DEBUG] Detected tools:', detectedTools.length, 'from content length:', assistantContent.length)
-                      
-                      // Process newly detected tools
-                      let updatedXmlCommands = [...xmlCommands]
-                      let hasNewTools = false
-                      
-                      for (const detectedTool of detectedTools) {
-                        // Check if this tool is already being tracked
-                        const existingTool = updatedXmlCommands.find(cmd => 
-                          cmd.name === detectedTool.name && 
-                          cmd.args.path === detectedTool.args.path && 
-                          (cmd.status === 'detected' || cmd.status === 'processing' || cmd.status === 'executing')
-                        )
-                        
-                        if (!existingTool) {
-                          console.log('[CLIENT-TOOL] Detected new tool:', detectedTool.name, detectedTool.args)
-                          
-                          // Add to tracking
-                          updatedXmlCommands.push({
-                            id: detectedTool.id,
-                            command: detectedTool.name, // Legacy compatibility
-                            name: detectedTool.name,
-                            args: detectedTool.args,
-                            path: detectedTool.args.path || '',
-                            content: detectedTool.args.content || '',
-                            status: 'detected',
-                            startTime: detectedTool.startTime
-                          })
-                          hasNewTools = true
-                        }
-                      }
-                      
-                      // Update state and UI if new tools were detected
-                      if (hasNewTools) {
-                        setXmlCommands(updatedXmlCommands)
-                        setMessages(prev => prev.map(msg =>
+              // Handle different streaming formats
+              if (chunk.includes('data: ')) {
+                // Server-Sent Events format
+            const lines = chunk.split('\n')
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.slice(6))
+
+                  // Check if this is a workflow chunk
+                  if (data.id && data.type && data.data) {
+                    // This is a workflow chunk from our sophisticated workflow system
+                    const workflowChunk = data
+                    hasReceivedContent = true
+
+                    setMessages(prev => prev.map(msg =>
+                      msg.id === assistantMessageId
+                        ? {
+                            ...msg,
+                            content: workflowChunk.data.message || 'Processing workflow...',
+                            metadata: {
+                              ...msg.metadata,
+                              workflowMode: true,
+                              workflowChunk: workflowChunk,
+                              sessionId: workflowChunk.data.sessionId || msg.metadata?.sessionId
+                            }
+                          }
+                        : msg
+                    ))
+                  } else if (data.choices?.[0]?.delta?.content) {
+                    // Regular AI SDK streaming content
+                    assistantContent += data.choices[0].delta.content
+                        hasReceivedContent = true
+                    setMessages(prev => prev.map(msg =>
                           msg.id === assistantMessageId
-                            ? { 
-                                ...msg, 
-                                metadata: {
-                                  ...msg.metadata,
-                                  xmlCommands: updatedXmlCommands
-                                }
-                              }
-                            : msg
-                        ))
-                      }
-                      
-                      // Check for completed tools (have closing tags)
-                      let hasCompletedTools = false
-                      for (let i = 0; i < updatedXmlCommands.length; i++) {
-                        const tool = updatedXmlCommands[i]
-                        
-                        if (tool.status === 'detected' && isXMLToolComplete(assistantContent, tool.name)) {
-                          console.log('[CLIENT-TOOL] Tool completed, extracting content:', tool.name)
-                          
-                          // Extract content between tags
-                          const extractedContent = extractXMLToolContent(assistantContent, tool.name)
-                          
-                          // Update tool with extracted content
-                          updatedXmlCommands[i] = {
-                            ...tool,
-                            content: extractedContent,
-                            args: {
-                              ...tool.args,
-                              content: extractedContent
-                            },
-                            status: 'processing'
-                          }
-                          hasCompletedTools = true
-                        }
-                      }
-                      
-                      // Update state and UI if tools were completed
-                      if (hasCompletedTools) {
-                        setXmlCommands(updatedXmlCommands)
-                        setMessages(prev => prev.map(msg =>
-                          msg.id === assistantMessageId
-                            ? { 
-                                ...msg, 
-                                metadata: {
-                                  ...msg.metadata,
-                                  xmlCommands: updatedXmlCommands
-                                }
-                              }
-                            : msg
-                        ))
-                        
-                        // Execute completed tools
-                        for (const tool of updatedXmlCommands) {
-                          if (tool.status === 'processing') {
-                            const toolCall: XMLToolCall = {
-                              id: tool.id,
-                              name: tool.name,
-                              args: tool.args,
-                              status: 'executing',
-                              startTime: tool.startTime
-                            }
-                            
-                            executeClientSideTool(toolCall, project.id)
-                              .then((result) => {
-                                console.log('[CLIENT-TOOL] Tool executed successfully:', result)
-                                
-                                // Update the tool with result
-                                setXmlCommands(prev => prev.map(cmd => 
-                                  cmd.id === tool.id 
-                                    ? { ...cmd, status: 'completed', result }
-                                    : cmd
-                                ))
-                                
-                                setMessages(prev => prev.map(msg =>
-                                  msg.id === assistantMessageId
-                                    ? { 
-                                        ...msg, 
-                                        metadata: {
-                                          ...msg.metadata,
-                                          xmlCommands: updatedXmlCommands.map(cmd => 
-                                            cmd.id === tool.id 
-                                              ? { ...cmd, status: 'completed', result }
-                                              : cmd
-                                          )
-                                        }
-                                      }
-                                    : msg
-                                ))
-                              })
-                              .catch((error) => {
-                                console.error('[CLIENT-TOOL] Tool execution failed:', error)
-                                
-                                // Update the tool with error
-                                setXmlCommands(prev => prev.map(cmd => 
-                                  cmd.id === tool.id 
-                                    ? { ...cmd, status: 'failed', error: error.message }
-                                    : cmd
-                                ))
-                                
-                                setMessages(prev => prev.map(msg =>
-                                  msg.id === assistantMessageId
-                                    ? { 
-                                        ...msg, 
-                                        metadata: {
-                                          ...msg.metadata,
-                                          xmlCommands: updatedXmlCommands.map(cmd => 
-                                            cmd.id === tool.id 
-                                              ? { ...cmd, status: 'failed', error: error.message }
-                                              : cmd
-                                          )
-                                        }
-                                      }
-                                    : msg
-                                ))
-                              })
-                          }
-                        }
-                      }
-                      
-                      // Update the message content incrementally
-                      setMessages(prev => prev.map(msg =>
-                        msg.id === assistantMessageId
-                          ? { 
-                              ...msg, 
-                              content: assistantContent,
-                              metadata: {
-                                ...msg.metadata,
-                                xmlCommands: updatedXmlCommands
-                              }
-                            }
-                          : msg
-                      ))
-                      
-                      // Note: Don't save incrementally to avoid multiple partial messages in DB
-                      // The final complete message will be saved after streaming is done
-                    }
-                    // Handle tool call events
-                    else if (data.type === 'tool-call') {
-                      console.log('[STREAM] Tool call:', data)
-                      
-                      const toolCall = {
-                        name: data.toolName,
-                        input: data.input || {},
-                        id: data.toolCallId || data.id,
-                        status: 'pending',
-                        result: null
-                      }
-                      
-                      toolCalls.push(toolCall)
-                      hasToolCalls = true
-                      
-                      // Update message with tool call
-                      setMessages(prev => prev.map(msg =>
-                        msg.id === assistantMessageId
-                          ? { 
-                              ...msg,
-                              metadata: {
-                                ...msg.metadata,
-                                toolCalls,
-                                hasToolCalls,
-                                hasToolErrors
-                              }
-                            }
-                          : msg
-                      ))
-                    }
-                    // Handle tool result events
-                    else if (data.type === 'tool-result') {
-                      console.log('[STREAM] Tool result:', data)
-                      
-                      // Find and update the corresponding tool call
-                      const toolCallIndex = toolCalls.findIndex(tc => tc.id === (data.toolCallId || data.id))
-                      if (toolCallIndex !== -1) {
-                        toolCalls[toolCallIndex].result = data.output || data.result
-                        toolCalls[toolCallIndex].status = 'completed'
-                      }
-                      
-                      // Update message with tool result
-                      setMessages(prev => prev.map(msg =>
-                        msg.id === assistantMessageId
-                          ? { 
-                              ...msg,
-                              metadata: {
-                                ...msg.metadata,
-                                toolCalls: [...toolCalls],
-                                hasToolCalls,
-                                hasToolErrors
-                              }
-                            }
-                          : msg
-                      ))
-                    }
-                    // Handle tool error events
-                    else if (data.type === 'tool-error') {
-                      console.log('[STREAM] Tool error:', data)
-                      
-                      // Find and update the corresponding tool call
-                      const toolCallIndex = toolCalls.findIndex(tc => tc.id === (data.toolCallId || data.id))
-                      if (toolCallIndex !== -1) {
-                        toolCalls[toolCallIndex].status = 'error'
-                        toolCalls[toolCallIndex].error = data.errorText || data.error
-                      }
-                      
-                      hasToolErrors = true
-                      
-                      // Update message with tool error
-                      setMessages(prev => prev.map(msg =>
-                        msg.id === assistantMessageId
-                          ? { 
-                              ...msg,
-                              metadata: {
-                                ...msg.metadata,
-                                toolCalls: [...toolCalls],
-                                hasToolCalls,
-                                hasToolErrors
-                              }
-                            }
-                          : msg
-                      ))
-                    }
-                    // Handle XML command detection events
-                    else if (data.type === 'xml-command-detected') {
-                      console.log('[STREAM] XML command detected:', data)
-                      
-                      // Add XML command to tracking
-                      if (!xmlCommands) {
-                        setXmlCommands([])
-                      }
-                      
-                      setXmlCommands(prev => [...prev, {
-                        id: `xml-${Date.now()}-${Math.random()}`,
-                        command: data.command,
-                        path: data.path,
-                        status: data.status || 'executing'
-                      }])
-                      
-                      // Update message with XML command
-                      setMessages(prev => prev.map(msg =>
-                        msg.id === assistantMessageId
-                          ? { 
-                              ...msg,
-                              metadata: {
-                                ...msg.metadata,
-                                toolCalls,
-                                hasToolCalls,
-                                hasToolErrors,
-                                xmlCommands: [...xmlCommands]
-                              }
-                            }
-                          : msg
-                      ))
-                    }
-                    // Handle XML command result events
-                    else if (data.type === 'xml-command-result') {
-                      console.log('[STREAM] XML command result:', data)
-                      
-                      // Find and update the corresponding XML command
-                      setXmlCommands(prev => {
-                        const commandIndex = prev.findIndex(cmd => 
-                          cmd.command === data.command && cmd.path === data.path && cmd.status === 'executing'
-                        )
-                        if (commandIndex !== -1) {
-                          const updated = [...prev]
-                          updated[commandIndex] = {
-                            ...updated[commandIndex],
-                            status: data.status || (data.success ? 'completed' : 'failed'),
-                            error: data.error,
-                            message: data.message
-                          }
-                          return updated
-                        }
-                        return prev
-                      })
-                      
-                      // Update message with XML command result
-                      setMessages(prev => prev.map(msg =>
-                        msg.id === assistantMessageId
-                          ? { 
-                              ...msg,
-                              metadata: {
-                                ...msg.metadata,
-                                toolCalls,
-                                hasToolCalls,
-                                hasToolErrors,
-                                xmlCommands: xmlCommands ? [...xmlCommands] : []
-                              }
-                            }
-                          : msg
-                      ))
-                    }
-                    // Handle tool-results event (from hybrid approach)
-                    else if (data.type === 'tool-results' && data.toolCalls) {
-                      console.log('[STREAM] Tool results batch received:', data.toolCalls)
-                      console.log('[STREAM] Current toolCalls array before update:', toolCalls)
-                      
-                      // Process all tool results from the batch
-                      data.toolCalls.forEach((toolCall: any) => {
-                        console.log('[STREAM] Processing individual tool call:', toolCall)
-                        const processedToolCall = {
-                          name: toolCall.name,
-                          args: toolCall.args || {},
-                          id: toolCall.id,
-                          result: toolCall.result
-                        }
-                        
-                        toolCalls.push(processedToolCall)
-                        hasToolCalls = true
-                        
-                        if (toolCall.result?.success === false) {
-                          hasToolErrors = true
-                        }
-                      })
-                      
-                      console.log('[STREAM] Updated toolCalls array:', toolCalls)
-                      
-                      // Check for failed tools that need client-side execution
-                      const failedTools = data.toolCalls.filter((tc: any) => tc.result?.success === false)
-                      if (failedTools.length > 0) {
-                        console.log('[STREAM] Found failed tools, attempting client-side execution:', failedTools)
-                        
-                        // Execute failed tools client-side
-                        for (const failedTool of failedTools) {
-                          try {
-                            console.log('[CLIENT-SIDE] Executing tool:', failedTool.name, failedTool.args)
-                            
-                            if (failedTool.name === 'read_file' && failedTool.args?.path) {
-                              const { storageManager } = await import('@/lib/storage-manager')
-                              await storageManager.init()
-                              
-                              const file = await storageManager.getFile(project.id, failedTool.args.path)
-                              if (file) {
-                                // Update the tool call with successful result
-                                const toolIndex = toolCalls.findIndex(tc => tc.id === failedTool.id)
-                                if (toolIndex !== -1) {
-                                  toolCalls[toolIndex] = {
-                                    ...toolCalls[toolIndex],
-                                    result: {
-                                      success: true,
-                                      message: `📖 File read successfully: ${failedTool.args.path}`,
-                                      path: failedTool.args.path,
-                                      content: file.content,
-                                      size: file.size,
-                                      type: file.type
-                                    }
-                                  }
-                                  console.log('[CLIENT-SIDE] Successfully executed read_file for:', failedTool.args.path)
-                                  
-                                  // Update hasToolErrors if all errors are now resolved
-                                  hasToolErrors = toolCalls.some(tc => tc.result?.success === false)
-                                }
-                              }
-                            } else if (failedTool.name === 'list_files') {
-                              const { storageManager } = await import('@/lib/storage-manager')
-                              await storageManager.init()
-                              
-                              const files = await storageManager.getFiles(project.id)
-                              const toolIndex = toolCalls.findIndex(tc => tc.id === failedTool.id)
-                              if (toolIndex !== -1) {
-                                toolCalls[toolIndex] = {
-                                  ...toolCalls[toolIndex],
-                                  result: {
-                                    success: true,
-                                    message: `📁 Found ${files.length} files in project`,
-                                    files: files.map(f => ({
-                                      path: f.path,
-                                      name: f.name,
-                                      type: f.type,
-                                      size: f.size,
-                                      isDirectory: f.isDirectory,
-                                      createdAt: f.createdAt
-                                    })),
-                                    count: files.length
-                                  }
-                                }
-                                console.log('[CLIENT-SIDE] Successfully executed list_files, found:', files.length, 'files')
-                                hasToolErrors = toolCalls.some(tc => tc.result?.success === false)
-                              }
-                            } else if (failedTool.name === 'write_file' && failedTool.args?.path && failedTool.args?.content !== undefined) {
-                              const { storageManager } = await import('@/lib/storage-manager')
-                              await storageManager.init()
-                              
-                              try {
-                                // Check if file exists
-                                const existingFile = await storageManager.getFile(project.id, failedTool.args.path)
-                                
-                                if (existingFile) {
-                                  // Update existing file
-                                  await storageManager.updateFile(project.id, failedTool.args.path, { 
-                                    content: failedTool.args.content,
-                                    updatedAt: new Date().toISOString()
-                                  })
-                                } else {
-                                  // Create new file
-                                  await storageManager.createFile({
-                                    workspaceId: project.id,
-                                    name: failedTool.args.path.split('/').pop() || failedTool.args.path,
-                                    path: failedTool.args.path,
-                                    content: failedTool.args.content,
-                                    fileType: failedTool.args.path.split('.').pop() || 'text',
-                                    type: failedTool.args.path.split('.').pop() || 'text',
-                                    size: failedTool.args.content.length,
-                                    isDirectory: false
-                                  })
-                                }
-                                
-                                const toolIndex = toolCalls.findIndex(tc => tc.id === failedTool.id)
-                                if (toolIndex !== -1) {
-                                  toolCalls[toolIndex] = {
-                                    ...toolCalls[toolIndex],
-                                    result: {
-                                      success: true,
-                                      message: `📝 File ${existingFile ? 'updated' : 'created'} successfully: ${failedTool.args.path}`,
-                                      path: failedTool.args.path,
-                                      content: failedTool.args.content
-                                    }
-                                  }
-                                  console.log('[CLIENT-SIDE] Successfully executed write_file for:', failedTool.args.path)
-                                  hasToolErrors = toolCalls.some(tc => tc.result?.success === false)
-                                  
-                                  // Trigger file refresh
-                                  setTimeout(() => {
-                                    window.dispatchEvent(new CustomEvent('files-changed', { 
-                                      detail: { projectId: project.id, forceRefresh: true } 
-                                    }))
-                                  }, 100)
-                                }
-                              } catch (writeError) {
-                                console.error('[CLIENT-SIDE] Failed to execute write_file:', writeError)
-                              }
-                            }
-                          } catch (clientError) {
-                            console.error('[CLIENT-SIDE] Failed to execute tool client-side:', failedTool.name, clientError)
-                          }
-                        }
-                      }
-                      
-                      // Also store server-side execution metadata
-                      const serverMetadata = {
-                        toolCalls: [...toolCalls],
-                        hasToolCalls,
-                        hasToolErrors,
-                        serverSideExecution: data.serverSideExecution || true,
-                        fileOperations: data.fileOperations || []
-                      }
-                      
-                      console.log('[STREAM] Final server metadata:', serverMetadata)
-                      
-                      // Apply file operations to client-side IndexedDB for persistence (same as specs)
-                      if (data.fileOperations && data.fileOperations.length > 0) {
-                        console.log('[DEBUG] Processing streaming file operations:', data.fileOperations)
-                        
-                        try {
-                          const { storageManager } = await import('@/lib/storage-manager')
-                          await storageManager.init()
-                          
-                          let operationsApplied = 0
-                          
-                          for (const fileOp of data.fileOperations) {
-                            console.log('[DEBUG] Applying streaming file operation:', fileOp)
-                            
-                            if (fileOp.type === 'write_file' && fileOp.path) {
-                              // Check if file exists
-                              const existingFile = await storageManager.getFile(project.id, fileOp.path)
-                              
-                              if (existingFile) {
-                                // Update existing file
-                                await storageManager.updateFile(project.id, fileOp.path, { 
-                                  content: fileOp.content || '',
-                                  updatedAt: new Date().toISOString()
-                                })
-                                console.log(`[DEBUG] Updated existing file: ${fileOp.path}`)
-                              } else {
-                                // Create new file
-                                const newFile = await storageManager.createFile({
-                                  workspaceId: project.id,
-                                  name: fileOp.path.split('/').pop() || fileOp.path,
-                                  path: fileOp.path,
-                                  content: fileOp.content || '',
-                                  fileType: fileOp.path.split('.').pop() || 'text',
-                                  type: fileOp.path.split('.').pop() || 'text',
-                                  size: (fileOp.content || '').length,
-                                  isDirectory: false
-                                })
-                                console.log(`[DEBUG] Created new file: ${fileOp.path}`, newFile)
-                              }
-                              operationsApplied++
-                            } else if (fileOp.type === 'edit_file' && fileOp.path && fileOp.content) {
-                              // Update existing file with new content
-                              await storageManager.updateFile(project.id, fileOp.path, { 
-                                content: fileOp.content,
-                                updatedAt: new Date().toISOString()
-                              })
-                              console.log(`[DEBUG] Edited file: ${fileOp.path}`)
-                              operationsApplied++
-                            } else if (fileOp.type === 'delete_file' && fileOp.path) {
-                              // Delete file
-                              await storageManager.deleteFile(project.id, fileOp.path)
-                              console.log(`[DEBUG] Deleted file: ${fileOp.path}`)
-                              operationsApplied++
-                            } else {
-                              console.warn('[DEBUG] Skipped invalid streaming file operation:', fileOp)
-                            }
-                          }
-                          
-                          console.log(`[DEBUG] Applied ${operationsApplied}/${data.fileOperations.length} streaming file operations to IndexedDB`)
-                          
-                          if (operationsApplied > 0) {
-                            // Force refresh the file explorer
-                            setTimeout(() => {
-                              window.dispatchEvent(new CustomEvent('files-changed', { 
-                                detail: { projectId: project.id, forceRefresh: true } 
-                              }))
-                            }, 100)
-                          }
-                        } catch (error) {
-                          console.error('[ERROR] Failed to apply streaming file operations to IndexedDB:', error)
-                          toast({
-                            title: "Storage Warning",
-                            description: `File operations completed but may not persist: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                            variant: "destructive"
-                          })
-                        }
-                      } else {
-                        console.log('[DEBUG] No streaming file operations to process')
-                      }
-                      
-                      // Update message with all tool results
-                      setMessages(prev => prev.map(msg =>
-                        msg.id === assistantMessageId
-                          ? { 
-                              ...msg,
-                              metadata: {
-                                ...msg.metadata,
-                                ...serverMetadata
-                              }
-                            }
-                          : msg
-                      ))
-                    }
-                    // Handle tool input start/delta events
-                    else if (data.type === 'tool-input-start' || data.type === 'tool-input-delta') {
-                      console.log('[STREAM] Tool input event:', data.type, data)
-                      // These events can be used for showing tool input streaming progress
-                      // For now, we'll just log them
-                    }
-                    // Log other events but don't process them
-                    else {
-                      console.log('[STREAM] Ignoring event type:', data.type)
-                    }
-                    
-                  } catch (parseError) {
-                    console.warn('[STREAM] JSON parse error:', parseError, 'for data:', dataStr.substring(0, 100))
+                        ? { ...msg, content: assistantContent }
+                        : msg
+                    ))
                   }
-                }
-                
-                // Move to next event
-                remainingBuffer = remainingBuffer.slice(dataEnd)
-              }
-              
-              // Keep any remaining incomplete data in buffer
-              const lastDataIndex = remainingBuffer.lastIndexOf('data: ')
-              if (lastDataIndex !== -1) {
-                buffer = remainingBuffer.slice(lastDataIndex)
-              } else {
-                buffer = ""
-              }
+                } catch (e) {
+                  // Ignore parsing errors for non-JSON lines
+            }
+          }
+        }
+      } else {
+                // Direct text streaming (AI SDK format)
+                if (chunk.trim()) {
+                  assistantContent += chunk
+                  hasReceivedContent = true
+          setMessages(prev => prev.map(msg => 
+                    msg.id === assistantMessageId 
+              ? { ...msg, content: assistantContent }
+              : msg
+          ))
+        }
+      }
             }
           } catch (streamError) {
             console.error('Streaming error:', streamError)
@@ -3990,30 +2332,22 @@ export function ChatPanel({
           } finally {
             // Ensure we have some content, even if streaming failed
             if (!hasReceivedContent || !assistantContent.trim()) {
-              setMessages(prev => prev.map(msg => 
+          setMessages(prev => prev.map(msg => 
                 msg.id === assistantMessageId 
                   ? { ...msg, content: "I'm sorry, I couldn't generate a response. Please try again." }
-                : msg
-              ))
+              : msg
+          ))
             }
           }
         }
 
-        // Save assistant message to database after streaming completes - match specs pattern
-        if (project && (assistantContent.trim() || hasToolCalls)) {
+        // Save assistant message to database after streaming completes
+        if (project && assistantContent.trim()) {
           const finalAssistantMessage: Message = {
             id: assistantMessageId,
             role: "assistant",
-            content: assistantContent || (hasToolCalls ? "Tool execution completed." : ""),
+            content: assistantContent,
             createdAt: new Date().toISOString(),
-            metadata: {
-              toolCalls,
-              toolResults: toolCalls?.map(tc => tc.result) || [],  // Match specs pattern
-              hasToolCalls,
-              hasToolErrors,
-              serverSideExecution: true,  // This came from server-side via streaming
-              fileOperations: []  // Will be populated if there were any file operations
-            }
           }
 
           await saveMessageToIndexedDB(finalAssistantMessage)
@@ -4667,43 +3001,14 @@ export function ChatPanel({
                             )}
                             
                             {/* Tool execution results - exclude tool_results_summary as it displays in assistant bubble */}
-                            {msg.metadata?.toolCalls && msg.metadata.toolCalls.length > 0 && (
+                            {msg.metadata?.toolCalls && msg.metadata.toolCalls.filter(tc => tc.name !== 'tool_results_summary').length > 0 && (
                               <div className="space-y-2 mb-4">
                                 {msg.metadata.toolCalls
-                                  .filter((tc: any) => tc.name !== 'tool_results_summary')
-                                  .map((toolCall: any, toolIndex: number) => (
+                                  .filter(tc => tc.name !== 'tool_results_summary')
+                                  .map((toolCall, toolIndex) => (
                                     <ToolPill key={toolIndex} toolCall={toolCall} />
                                   ))
                                 }
-                              </div>
-                            )}
-                            
-                            {/* XML Tool execution results */}
-                            {msg.metadata?.xmlCommands && msg.metadata.xmlCommands.length > 0 && (
-                              <div className="space-y-2 mb-4">
-                                {(msg.metadata.xmlCommands as any[]).map((xmlCommand: any, xmlIndex: number) => {
-                                  // Convert legacy format to new format if needed
-                                  const toolCall: XMLToolCall = {
-                                    id: xmlCommand.id || `legacy-${xmlIndex}`,
-                                    name: xmlCommand.name || xmlCommand.command,
-                                    args: xmlCommand.args || {
-                                      path: xmlCommand.path,
-                                      content: xmlCommand.content
-                                    },
-                                    status: xmlCommand.status || 'detected',
-                                    result: xmlCommand.result,
-                                    error: xmlCommand.error,
-                                    startTime: xmlCommand.startTime,
-                                    endTime: xmlCommand.endTime
-                                  }
-                                  
-                                  return (
-                                    <XMLToolPill 
-                                      key={toolCall.id}
-                                      toolCall={toolCall}
-                                    />
-                                  )
-                                })}
                               </div>
                             )}
                             
@@ -4758,7 +3063,7 @@ export function ChatPanel({
                                     ),
                                   }}
                                 >
-                                  {sanitizeStreamingContent(msg.content)}
+                                  {msg.content}
                                 </ReactMarkdown>
                                 </div>
                               </div>
