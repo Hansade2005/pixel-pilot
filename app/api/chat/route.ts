@@ -4079,6 +4079,16 @@ You understand that users can see a live preview of their application while you 
 - End with a concise summary or next steps
 - Include visual hierarchy with headers, lists, and emphasis
 
+**⚠️ CRITICAL MARKDOWN FORMATTING RULES:**
+- **Always put blank lines before and after headers** (##, ###)
+- **Ensure proper spacing around bold and italic formatting**
+- **Use consistent bullet point style** with dashes (-) or asterisks (*)
+- **Add blank lines between different content blocks** (paragraphs, lists, code blocks)
+- **Never mix formatting styles within the same line**
+- **Keep headers concise and descriptive**
+- **Use only standard markdown syntax** - avoid complex HTML or special characters
+- **Start each major section with a clear header and emoji**
+
 **💬 CONVERSATION STYLE:**
 - Be conversational yet professional
 - Use engaging language with appropriate emojis
@@ -4086,14 +4096,16 @@ You understand that users can see a live preview of their application while you 
 - Provide context for decisions and recommendations
 - Acknowledge user's previous work and build upon it
 
-**🎯 EXAMPLE RESPONSE FORMAT:**
+**🎯 PERFECT MARKDOWN EXAMPLE:**
 
 🚀 **Creating Advanced Dashboard Component**
 
 ## 📋 Overview
+
 I'll help you build a professional dashboard with real-time data visualization and interactive features.
 
 ### ✨ Key Features
+
 - **Real-time Charts**: Live data updates with smooth animations
 - **Interactive Filters**: Dynamic data filtering with intuitive controls  
 - **Responsive Design**: Mobile-first approach with adaptive layouts
@@ -4101,16 +4113,25 @@ I'll help you build a professional dashboard with real-time data visualization a
 ## 🔧 Implementation Steps
 
 ### 1. 📊 Data Layer
-Creating the data management system...
+
+Creating the data management system with proper state management...
 
 ### 2. 🎨 UI Components  
-Building the visual components...
+
+Building the visual components with modern design patterns...
 
 ### 3. ⚡ Performance Optimization
-Adding performance enhancements...
+
+Adding performance enhancements and optimization techniques...
 
 ## ✅ Summary
+
 Successfully implemented a professional dashboard with advanced features and optimal performance.
+
+**🔑 CRITICAL**: Notice the blank lines before and after each header (##, ###) and the consistent spacing throughout. This is EXACTLY how you should format all responses.
+
+## ✅ Summary
+Successfully implemented a professional dashboard with advanced features and optimal performance.🎯
 
 
 ${projectContext ? `
@@ -5028,14 +5049,16 @@ You craft **exceptional applications** but ONLY when specifically requested. Foc
 - Include performance considerations and best practices
 - Reference previous work and build incrementally
 
-**🎯 EXAMPLE PROFESSIONAL RESPONSE:**
+**🎯 PERFECT MARKDOWN EXAMPLE:**
 
 🚀 **Building Advanced Analytics Dashboard**
 
 ## 📊 Overview
+
 Creating a professional real-time analytics dashboard with interactive charts and live data streaming.
 
 ### ✨ Core Features
+
 - **Real-time Data**: Live WebSocket connections with automatic reconnection
 - **Interactive Charts**: Click-to-drill-down functionality with smooth animations
 - **Custom Filters**: Advanced filtering with date ranges and multi-select options
@@ -5043,16 +5066,22 @@ Creating a professional real-time analytics dashboard with interactive charts an
 ## 🏗️ Architecture Design
 
 ### 1. 📡 Data Layer
-Setting up the real-time data management system...
+
+Setting up the real-time data management system with proper state handling...
 
 ### 2. 🎨 Component Architecture
-Building reusable chart components with TypeScript...
+
+Building reusable chart components with TypeScript and modern patterns...
 
 ### 3. ⚡ Performance Optimization
-Implementing virtualization and memoization...
+
+Implementing virtualization, memoization, and optimization techniques...
 
 ## ✅ Implementation Summary
+
 Successfully created a professional analytics dashboard with enterprise-grade features and optimal performance.
+
+**🔑 REMEMBER**: Always use blank lines before and after headers, and maintain consistent spacing throughout your responses.
 
 ${codeQualityInstructions}
 
@@ -6234,7 +6263,8 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
               if (cleanChunk.trim()) {
                 controller.enqueue(`data: ${JSON.stringify({
                   type: 'text-delta',
-                  delta: cleanChunk
+                  delta: cleanChunk,
+                  format: 'markdown'  // Indicate this is markdown content
                 })}\n\n`)
               }
             }
