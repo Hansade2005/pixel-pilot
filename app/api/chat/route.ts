@@ -1028,7 +1028,7 @@ ${currentTime}
 
 # Current Project Structure
 ${fileTree.join('\n')}
-
+# Important Files Content
 ---`
 
     // Add full content for important files
