@@ -3336,6 +3336,7 @@ export function ChatPanel({
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [isStreaming, setIsStreaming] = useState(false)
   const [showDiagnostics, setShowDiagnostics] = useState(false)
   const [abortController, setAbortController] = useState<AbortController | null>(null)
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
@@ -3585,6 +3586,7 @@ export function ChatPanel({
       abortController.abort()
       setAbortController(null)
       setIsLoading(false)
+      setIsStreaming(false)
       
       toast({
         title: "Generation Stopped",
@@ -4094,6 +4096,7 @@ export function ChatPanel({
                   // Handle [DONE] marker
                   if (dataStr === '[DONE]') {
                     console.log('[STREAM] Received [DONE] marker')
+                    setIsStreaming(false)
                     break
                   }
                   
@@ -4105,6 +4108,11 @@ export function ChatPanel({
                     if (data.type === 'text-delta' && data.delta) {
                       assistantContent += data.delta
                       hasReceivedContent = true
+                      
+                      // Set streaming state when content starts flowing
+                      if (!isStreaming) {
+                        setIsStreaming(true)
+                      }
                       
                       console.log('[STREAM] Adding delta:', data.delta)
                       console.log('[DEBUG] Full assistant content length:', assistantContent.length)
@@ -4783,6 +4791,7 @@ export function ChatPanel({
       })
     } finally {
       setIsLoading(false)
+      setIsStreaming(false)
       setAbortController(null)
     }
   }
@@ -5680,6 +5689,7 @@ export function ChatPanel({
                             })
                           } finally {
                             setIsLoading(false)
+                            setIsStreaming(false)
                             setAbortController(null)
                           }
                         }}
@@ -5708,8 +5718,8 @@ export function ChatPanel({
               {/* Show interactive thinking indicator when loading */}
               {isLoading && (
                 <div className="mb-6">
-                      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden">
-                    <ThinkingIndicator />
+                  <div className="p-4">
+                    <ThinkingIndicator isStreaming={isStreaming} />
                   </div>
                 </div>
               )}
