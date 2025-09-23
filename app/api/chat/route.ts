@@ -3498,11 +3498,9 @@ export default function Example() {
 </pilotwrite>
 
 <pilotedit path="src/App.tsx" operation="search_replace" search="old code here" replace="new code here">
-<!-- Edit operation details -->
 </pilotedit>
 
 <pilotdelete path="src/old-file.ts">
-<!-- File deletion reason or notes (optional) -->
 </pilotdelete>
 
 **CRITICAL FORMATTING RULES:**
@@ -3513,6 +3511,8 @@ export default function Example() {
 - The XML tags should appear as regular text in your response
 - **ALWAYS use opening and closing tags for ALL XML commands (pilotwrite, pilotedit, pilotdelete)**
 - **NO self-closing tags - all XML commands must have both opening and closing tags**
+- **NEVER put comments or explanations inside pilotedit and pilotdelete tags - leave them empty**
+- **Only pilotwrite tags should contain the actual file content**
 
 # Guidelines
 
@@ -3619,7 +3619,6 @@ I'll update the existing App component to add a new feature.
 
 <pilotedit path="src/App.tsx" operation="search_replace" search="<h1 className=\"text-2xl font-bold mb-4\">My Application</h1>" replace="<h1 className=\"text-2xl font-bold mb-4\">My Enhanced Application</h1>
       <p className=\"text-gray-600 mb-4\">Welcome to the new version!</p>">
-<!-- Updated the main heading and added welcome message -->
 </pilotedit>
 
 I've updated the App component to include a welcome message.
@@ -5349,8 +5348,8 @@ ${preprocessingResults.toolResults?.map((result: any, index: number) => {
 
 Now respond to the user's request. If you need to create, edit, or delete files, use XML commands:
 - <pilotwrite path="file/path.ext">file content here</pilotwrite>
-- <pilotedit path="file/path.ext" operation="search_replace" search="old code" replace="new code" />
-- <pilotdelete path="file/path.ext" />
+- <pilotedit path="file/path.ext" operation="search_replace" search="old code" replace="new code"></pilotedit>
+- <pilotdelete path="file/path.ext"></pilotdelete>
 
 Provide a comprehensive response addressing: "${currentUserMessage?.content || ''}"`
           
