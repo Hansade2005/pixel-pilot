@@ -42,6 +42,495 @@ const getMistralPixtralModel = () => {
   }
 }
 
+// Enhanced Memory System for AI Context Awareness (XML-Based)
+interface AIStreamMemory {
+  id: string
+  timestamp: string
+  projectId: string
+  userId: string
+  userMessage: string
+  aiResponse?: string
+  xmlOperations: XMLFileOperation[]
+  conversationContext: {
+    semanticSummary: string
+    keyInsights: string[]
+    technicalPatterns: string[]
+    architecturalDecisions: string[]
+    nextLogicalSteps: string[]
+    potentialImprovements: string[]
+    relevanceScore: number
+    contextForFuture: string
+  }
+  patterns: {
+    duplicateActions: string[]
+    fileAccessPatterns: string[]
+    userIntentPatterns: string[]
+    xmlCommandPatterns: string[]
+  }
+  actionSummary: {
+    filesCreated: string[]
+    filesModified: string[]
+    filesDeleted: string[]
+    mainPurpose: string
+    keyChanges: string[]
+  }
+}
+
+interface XMLFileOperation {
+  xmlCommand: 'pilotwrite' | 'pilotedit' | 'pilotdelete'
+  filePath: string
+  fileName: string
+  purpose: string
+  changeSummary: string
+  contentPreview?: string
+  searchReplacePattern?: {
+    search: string
+    replace: string
+  }
+  timestamp: string
+  extractedFromResponse: boolean
+}
+
+// Memory Storage for streaming API
+const aiStreamMemoryStore = new Map<string, AIStreamMemory[]>() // projectId -> memory array
+
+// XML Command Analysis Functions
+function extractXMLOperationsFromResponse(aiResponse: string): XMLFileOperation[] {
+  const operations: XMLFileOperation[] = []
+  const timestamp = new Date().toISOString()
+  
+  // Extract pilotwrite commands
+  const writeMatches = aiResponse.match(/<pilotwrite\s+path="([^"]+)"[^>]*>([\s\S]*?)<\/pilotwrite>/gi)
+  if (writeMatches) {
+    writeMatches.forEach(match => {
+      const pathMatch = match.match(/path="([^"]+)"/)
+      const contentMatch = match.match(/<pilotwrite[^>]*>([\s\S]*?)<\/pilotwrite>/i)
+      
+      if (pathMatch && contentMatch) {
+        const filePath = pathMatch[1]
+        const content = contentMatch[1]
+        
+        operations.push({
+          xmlCommand: 'pilotwrite',
+          filePath,
+          fileName: filePath.split('/').pop() || filePath,
+          purpose: inferPurposeFromContent(content, filePath),
+          changeSummary: generateChangeSummary('create/update', filePath, content),
+          contentPreview: content.substring(0, 200) + (content.length > 200 ? '...' : ''),
+          timestamp,
+          extractedFromResponse: true
+        })
+      }
+    })
+  }
+  
+  // Extract pilotedit commands
+  const editMatches = aiResponse.match(/<pilotedit\s+[^>]*>/gi)
+  if (editMatches) {
+    editMatches.forEach(match => {
+      const pathMatch = match.match(/path="([^"]+)"/)
+      const searchMatch = match.match(/search="([^"]*)"/)
+      const replaceMatch = match.match(/replace="([^"]*)"/)
+      
+      if (pathMatch) {
+        const filePath = pathMatch[1]
+        const searchText = searchMatch ? searchMatch[1] : ''
+        const replaceText = replaceMatch ? replaceMatch[1] : ''
+        
+        operations.push({
+          xmlCommand: 'pilotedit',
+          filePath,
+          fileName: filePath.split('/').pop() || filePath,
+          purpose: inferPurposeFromEdit(searchText, replaceText, filePath),
+          changeSummary: generateChangeSummary('edit', filePath, `${searchText} → ${replaceText}`),
+          searchReplacePattern: {
+            search: searchText,
+            replace: replaceText
+          },
+          timestamp,
+          extractedFromResponse: true
+        })
+      }
+    })
+  }
+  
+  // Extract pilotdelete commands
+  const deleteMatches = aiResponse.match(/<pilotdelete\s+path="([^"]+)"[^>]*>/gi)
+  if (deleteMatches) {
+    deleteMatches.forEach(match => {
+      const pathMatch = match.match(/path="([^"]+)"/)
+      
+      if (pathMatch) {
+        const filePath = pathMatch[1]
+        
+        operations.push({
+          xmlCommand: 'pilotdelete',
+          filePath,
+          fileName: filePath.split('/').pop() || filePath,
+          purpose: `Delete file: ${filePath}`,
+          changeSummary: generateChangeSummary('delete', filePath, ''),
+          timestamp,
+          extractedFromResponse: true
+        })
+      }
+    })
+  }
+  
+  return operations
+}
+
+// Helper function to infer purpose from file content
+function inferPurposeFromContent(content: string, filePath: string): string {
+  const fileExt = filePath.split('.').pop()?.toLowerCase()
+  
+  // Analyze content for patterns
+  if (content.includes('export default') || content.includes('export function')) {
+    return `Create/update ${fileExt} component or utility`
+  }
+  if (content.includes('interface ') || content.includes('type ')) {
+    return `Define TypeScript types and interfaces`
+  }
+  if (content.includes('useState') || content.includes('useEffect')) {
+    return `Create React component with hooks`
+  }
+  if (content.includes('API') || content.includes('fetch') || content.includes('POST')) {
+    return `Implement API functionality`
+  }
+  if (content.includes('style') || content.includes('className')) {
+    return `Add styling and UI elements`
+  }
+  
+  return `Update ${fileExt} file`
+}
+
+// Helper function to infer purpose from edit operation
+function inferPurposeFromEdit(searchText: string, replaceText: string, filePath: string): string {
+  if (searchText.includes('function') && replaceText.includes('function')) {
+    return `Modify function logic in ${filePath}`
+  }
+  if (searchText.includes('import') || replaceText.includes('import')) {
+    return `Update imports in ${filePath}`
+  }
+  if (searchText.includes('interface') || replaceText.includes('interface')) {
+    return `Update type definitions in ${filePath}`
+  }
+  if (searchText.includes('style') || replaceText.includes('className')) {
+    return `Update styling in ${filePath}`
+  }
+  
+  return `Edit content in ${filePath}`
+}
+
+// Helper function to generate change summary
+function generateChangeSummary(operationType: string, filePath: string, content: string): string {
+  const fileName = filePath.split('/').pop() || filePath
+  
+  switch (operationType) {
+    case 'create/update':
+      const lines = content.split('\n').length
+      return `${operationType} ${fileName} (${lines} lines)`
+    case 'edit':
+      return `Edit ${fileName}: ${content.substring(0, 100)}${content.length > 100 ? '...' : ''}`
+    case 'delete':
+      return `Delete ${fileName}`
+    default:
+      return `${operationType} ${fileName}`
+  }
+}
+
+// AI-Enhanced Memory Processing for XML Operations
+async function processStreamMemoryWithAI(
+  userMessage: string,
+  aiResponse: string,
+  projectContext: string,
+  xmlOperations: XMLFileOperation[],
+  projectId: string
+) {
+  try {
+    const mistralPixtral = getMistralPixtralModel()
+    
+    // Get previous memory for context
+    const previousMemories = aiStreamMemoryStore.get(projectId) || []
+    const recentMemories = previousMemories.slice(-5) // Last 5 interactions
+    
+    const enhancedMemory = await generateText({
+      model: mistralPixtral,
+      messages: [
+        { role: 'system', content: 'You are an AI assistant analyzing development conversations and XML file operations.' },
+        { role: 'user', content: `Analyze this development interaction and provide intelligent insights:
+
+User Message: "${userMessage}"
+AI Response: "${aiResponse.substring(0, 1000)}${aiResponse.length > 1000 ? '...' : ''}"
+Project Context: ${projectContext}
+XML Operations: ${JSON.stringify(xmlOperations, null, 2)}
+Previous Context: ${JSON.stringify(recentMemories.map(m => ({
+  userMessage: m.userMessage,
+  xmlOps: m.xmlOperations.map(op => `${op.xmlCommand}: ${op.filePath}`),
+  purpose: m.actionSummary.mainPurpose
+})), null, 2)}
+
+Provide a JSON response with enhanced memory analysis:
+{
+  "semanticSummary": "Intelligent summary of what was accomplished in this interaction",
+  "keyInsights": ["insight1", "insight2", "insight3"],
+  "technicalPatterns": ["pattern1", "pattern2"],
+  "architecturalDecisions": ["decision1", "decision2"],
+  "nextLogicalSteps": ["step1", "step2"],
+  "potentialImprovements": ["improvement1", "improvement2"],
+  "relevanceScore": 0.0-1.0,
+  "contextForFuture": "What future developers should know about this work",
+  "duplicateActions": ["action1 already done", "action2 repeated"],
+  "fileAccessPatterns": ["pattern of file usage"],
+  "mainPurpose": "Primary goal of this interaction",
+  "keyChanges": ["change1", "change2"]
+}
+
+Focus on tracking what files were manipulated, why, and preventing duplicate work.` }
+      ],
+      temperature: 0.3
+    })
+
+    try {
+      // Parse AI response
+      let jsonText = enhancedMemory.text || ''
+      if (jsonText.includes('```json')) {
+        jsonText = jsonText.replace(/```json\s*/, '').replace(/\s*```$/, '')
+      } else if (jsonText.includes('```')) {
+        jsonText = jsonText.replace(/```\s*/, '').replace(/\s*```$/, '')
+      }
+      jsonText = jsonText.trim()
+      
+      // Remove any text after the JSON object
+      const jsonEndIndex = jsonText.lastIndexOf('}')
+      if (jsonEndIndex !== -1) {
+        jsonText = jsonText.substring(0, jsonEndIndex + 1)
+      }
+      
+      const parsed = JSON.parse(jsonText)
+      
+      return {
+        semanticSummary: parsed.semanticSummary || 'Development interaction processed',
+        keyInsights: parsed.keyInsights || [],
+        technicalPatterns: parsed.technicalPatterns || [],
+        architecturalDecisions: parsed.architecturalDecisions || [],
+        nextLogicalSteps: parsed.nextLogicalSteps || [],
+        potentialImprovements: parsed.potentialImprovements || [],
+        relevanceScore: parsed.relevanceScore || 0.8,
+        contextForFuture: parsed.contextForFuture || 'Standard development patterns used',
+        duplicateActions: parsed.duplicateActions || [],
+        fileAccessPatterns: parsed.fileAccessPatterns || [],
+        mainPurpose: parsed.mainPurpose || 'Development work',
+        keyChanges: parsed.keyChanges || []
+      }
+    } catch (parseError) {
+      console.warn('Failed to parse AI memory enhancement, using fallback:', parseError)
+      return {
+        semanticSummary: 'Development interaction completed',
+        keyInsights: ['XML operations executed'],
+        technicalPatterns: ['XML-based file operations'],
+        architecturalDecisions: ['File manipulation via XML commands'],
+        nextLogicalSteps: ['Continue development'],
+        potentialImprovements: ['Monitor for duplicates'],
+        relevanceScore: 0.7,
+        contextForFuture: 'XML operations performed',
+        duplicateActions: [],
+        fileAccessPatterns: xmlOperations.map(op => `${op.xmlCommand}:${op.filePath}`),
+        mainPurpose: 'File operations via XML',
+        keyChanges: xmlOperations.map(op => op.changeSummary)
+      }
+    }
+  } catch (error) {
+    console.error('AI memory enhancement failed:', error)
+    return {
+      semanticSummary: 'Memory processing completed',
+      keyInsights: ['Development work tracked'],
+      technicalPatterns: ['XML operations'],
+      architecturalDecisions: ['Client-side file manipulation'],
+      nextLogicalSteps: ['Continue development'],
+      potentialImprovements: ['Add error handling'],
+      relevanceScore: 0.6,
+      contextForFuture: 'Development work in progress',
+      duplicateActions: [],
+      fileAccessPatterns: [],
+      mainPurpose: 'Development work',
+      keyChanges: []
+    }
+  }
+}
+
+// Function to store memory and provide context awareness
+async function storeStreamMemory(
+  projectId: string,
+  userId: string,
+  userMessage: string,
+  aiResponse: string,
+  projectContext: string
+): Promise<AIStreamMemory> {
+  // Extract XML operations from AI response
+  const xmlOperations = extractXMLOperationsFromResponse(aiResponse)
+  
+  // Process memory with AI
+  const memoryAnalysis = await processStreamMemoryWithAI(
+    userMessage,
+    aiResponse,
+    projectContext,
+    xmlOperations,
+    projectId
+  )
+  
+  // Create memory record
+  const memory: AIStreamMemory = {
+    id: `memory_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    timestamp: new Date().toISOString(),
+    projectId,
+    userId,
+    userMessage,
+    aiResponse,
+    xmlOperations,
+    conversationContext: {
+      semanticSummary: memoryAnalysis.semanticSummary,
+      keyInsights: memoryAnalysis.keyInsights,
+      technicalPatterns: memoryAnalysis.technicalPatterns,
+      architecturalDecisions: memoryAnalysis.architecturalDecisions,
+      nextLogicalSteps: memoryAnalysis.nextLogicalSteps,
+      potentialImprovements: memoryAnalysis.potentialImprovements,
+      relevanceScore: memoryAnalysis.relevanceScore,
+      contextForFuture: memoryAnalysis.contextForFuture
+    },
+    patterns: {
+      duplicateActions: memoryAnalysis.duplicateActions,
+      fileAccessPatterns: memoryAnalysis.fileAccessPatterns,
+      userIntentPatterns: [extractUserIntentPattern(userMessage)],
+      xmlCommandPatterns: xmlOperations.map(op => `${op.xmlCommand}:${op.fileName}`)
+    },
+    actionSummary: {
+      filesCreated: xmlOperations.filter(op => op.xmlCommand === 'pilotwrite').map(op => op.filePath),
+      filesModified: xmlOperations.filter(op => op.xmlCommand === 'pilotedit').map(op => op.filePath),
+      filesDeleted: xmlOperations.filter(op => op.xmlCommand === 'pilotdelete').map(op => op.filePath),
+      mainPurpose: memoryAnalysis.mainPurpose,
+      keyChanges: memoryAnalysis.keyChanges
+    }
+  }
+  
+  // Store memory
+  const memories = aiStreamMemoryStore.get(projectId) || []
+  memories.push(memory)
+  
+  // Keep only last 50 memories to prevent memory bloat
+  if (memories.length > 50) {
+    memories.splice(0, memories.length - 50)
+  }
+  
+  aiStreamMemoryStore.set(projectId, memories)
+  
+  return memory
+}
+
+// Helper function to extract user intent pattern
+function extractUserIntentPattern(userMessage: string): string {
+  const message = userMessage.toLowerCase()
+  
+  if (message.includes('create') || message.includes('build') || message.includes('make')) {
+    return 'creation_intent'
+  }
+  if (message.includes('fix') || message.includes('bug') || message.includes('error')) {
+    return 'fix_intent'
+  }
+  if (message.includes('update') || message.includes('modify') || message.includes('change')) {
+    return 'modification_intent'
+  }
+  if (message.includes('delete') || message.includes('remove')) {
+    return 'deletion_intent'
+  }
+  if (message.includes('help') || message.includes('how') || message.includes('?')) {
+    return 'help_intent'
+  }
+  
+  return 'general_intent'
+}
+
+// Function to get context for preventing duplicates
+function getStreamContextForRequest(projectId: string, userMessage: string): {
+  previousActions: string[]
+  suggestedApproach: string
+  potentialDuplicates: string[]
+  relevantMemories: AIStreamMemory[]
+} {
+  const memories = aiStreamMemoryStore.get(projectId) || []
+  const recentMemories = memories.slice(-10) // Last 10 interactions
+  
+  // Check for potential duplicates
+  const currentIntent = extractUserIntentPattern(userMessage)
+  const potentialDuplicates: string[] = []
+  const previousActions: string[] = []
+  
+  recentMemories.forEach(memory => {
+    // Check for similar intents
+    if (memory.patterns.userIntentPatterns.includes(currentIntent)) {
+      potentialDuplicates.push(`Similar ${currentIntent} request: "${memory.userMessage}"`)
+    }
+    
+    // Collect previous actions
+    memory.xmlOperations.forEach(op => {
+      previousActions.push(`${op.xmlCommand}: ${op.filePath} - ${op.purpose}`)
+    })
+  })
+  
+  // Generate suggested approach
+  const suggestedApproach = potentialDuplicates.length > 0 
+    ? `Consider reviewing previous similar work before proceeding: ${potentialDuplicates[0]}`
+    : 'Proceed with implementation based on request'
+  
+  return {
+    previousActions: [...new Set(previousActions)], // Remove duplicates
+    suggestedApproach,
+    potentialDuplicates,
+    relevantMemories: recentMemories.filter(m => m.conversationContext.relevanceScore > 0.6)
+  }
+}
+
+// Helper function to view memory state (for debugging)
+export function getMemoryState(projectId: string): {
+  totalMemories: number
+  recentMemories: AIStreamMemory[]
+  memoryStats: {
+    totalXMLOperations: number
+    filesCreated: number
+    filesModified: number
+    filesDeleted: number
+    averageRelevanceScore: number
+  }
+} {
+  const memories = aiStreamMemoryStore.get(projectId) || []
+  const recentMemories = memories.slice(-10)
+  
+  let totalXMLOperations = 0
+  let filesCreated = 0
+  let filesModified = 0
+  let filesDeleted = 0
+  let totalRelevanceScore = 0
+  
+  memories.forEach(memory => {
+    totalXMLOperations += memory.xmlOperations.length
+    filesCreated += memory.actionSummary.filesCreated.length
+    filesModified += memory.actionSummary.filesModified.length
+    filesDeleted += memory.actionSummary.filesDeleted.length
+    totalRelevanceScore += memory.conversationContext.relevanceScore
+  })
+  
+  return {
+    totalMemories: memories.length,
+    recentMemories,
+    memoryStats: {
+      totalXMLOperations,
+      filesCreated,
+      filesModified,
+      filesDeleted,
+      averageRelevanceScore: memories.length > 0 ? totalRelevanceScore / memories.length : 0
+    }
+  }
+}
+
 // Add Tavily API configuration with environment variable support
 const tavilyConfig = {
   apiKeys: [
@@ -401,140 +890,202 @@ async function executeDeleteFile(projectId: string, path: string, userId: string
   }
 }
 
-// ENHANCED: Ultra-optimized project context builder (95%+ token reduction)
+// ENHANCED: File tree context builder with selective full content
 async function buildOptimizedProjectContext(projectId: string, storageManager: any, userIntent?: any) {
   try {
     const files = await storageManager.getFiles(projectId)
-
-    // ENHANCEMENT 1: Intelligent file prioritization based on multiple factors
-    let relevantFiles = files
-    let contextPriority = 'balanced' // 'minimal', 'balanced', 'comprehensive'
-
-    if (userIntent?.intent) {
-      // Determine context priority based on task complexity
-      if (userIntent.complexity === 'simple') {
-        contextPriority = 'minimal'
-      } else if (userIntent.complexity === 'complex') {
-        contextPriority = 'comprehensive'
-      }
-
-      // Enhanced intent-based filtering
-      const intent = userIntent.intent.toLowerCase()
-      if (intent.includes('component') || intent.includes('ui') || intent.includes('react')) {
-        relevantFiles = files.filter((f: any) =>
-          f.path.includes('/components/') ||
-          f.path.includes('/ui/') ||
-          f.path.includes('.tsx') ||
-          f.path.includes('.jsx') ||
-          f.path === 'package.json'
-        )
-      } else if (intent.includes('api') || intent.includes('route') || intent.includes('backend')) {
-        relevantFiles = files.filter((f: any) =>
-          f.path.includes('/api/') ||
-          f.path.includes('/routes/') ||
-          f.path.includes('/lib/') ||
-          f.path.includes('.ts')
-        )
-      } else if (intent.includes('config') || intent.includes('setup')) {
-        relevantFiles = files.filter((f: any) =>
-          f.path.includes('config') ||
-          f.path.includes('.json') ||
-          f.path.includes('.env') ||
-          f.path.includes('vite.config') ||
-          f.path.includes('package.json')
-        )
-      } else if (intent.includes('style') || intent.includes('css')) {
-        relevantFiles = files.filter((f: any) =>
-          f.path.includes('.css') ||
-          f.path.includes('.scss') ||
-          f.path.includes('tailwind')
-        )
-      }
-    }
-
-    // ENHANCEMENT 2: Smart file ranking and limiting
-    const maxFiles = contextPriority === 'minimal' ? 8 : contextPriority === 'comprehensive' ? 25 : 15
-
-    // Score files by relevance
-    const scoredFiles = relevantFiles.map((file: any) => {
-      let score = 0
-
-      // Boost score for core files
-      if (file.path.includes('package.json')) score += 10
-      if (file.path.includes('main.') || file.path.includes('App.')) score += 8
-      if (file.path.includes('index.')) score += 6
-
-      // Boost score for recently modified files
-      const daysSinceModified = file.updatedAt ?
-        (Date.now() - new Date(file.updatedAt).getTime()) / (1000 * 60 * 60 * 24) : 30
-      if (daysSinceModified < 7) score += 5
-      else if (daysSinceModified < 30) score += 2
-
-      // Boost score for larger files (likely more important)
-      if (file.size > 1000) score += 3
-
-      return { ...file, relevanceScore: score }
+    
+    // Get current time and working directory for context
+    const currentTime = new Date().toLocaleString('en-US', {
+      timeZone: 'Africa/Douala',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZoneName: 'long'
     })
 
-    // Sort by relevance and limit
-    scoredFiles.sort((a: any, b: any) => b.relevanceScore - a.relevanceScore)
-    const limitedFiles = scoredFiles.slice(0, maxFiles)
+    // Filter out shadcn UI components and common excluded files
+    const filteredFiles = files.filter((file: any) => {
+      const path = file.path.toLowerCase()
+      // Exclude shadcn UI components
+      if (path.includes('components/ui/') && (
+        path.includes('button.tsx') ||
+        path.includes('input.tsx') ||
+        path.includes('dialog.tsx') ||
+        path.includes('card.tsx') ||
+        path.includes('badge.tsx') ||
+        path.includes('alert.tsx') ||
+        path.includes('accordion.tsx') ||
+        path.includes('avatar.tsx') ||
+        path.includes('checkbox.tsx') ||
+        path.includes('dropdown-menu.tsx') ||
+        path.includes('form.tsx') ||
+        path.includes('label.tsx') ||
+        path.includes('select.tsx') ||
+        path.includes('sheet.tsx') ||
+        path.includes('tabs.tsx') ||
+        path.includes('textarea.tsx') ||
+        path.includes('toast.tsx') ||
+        path.includes('tooltip.tsx') ||
+        path.includes('separator.tsx') ||
+        path.includes('skeleton.tsx') ||
+        path.includes('scroll-area.tsx') ||
+        path.includes('progress.tsx') ||
+        path.includes('popover.tsx') ||
+        path.includes('navigation-menu.tsx') ||
+        path.includes('menubar.tsx') ||
+        path.includes('hover-card.tsx') ||
+        path.includes('command.tsx') ||
+        path.includes('calendar.tsx') ||
+        path.includes('table.tsx') ||
+        path.includes('switch.tsx') ||
+        path.includes('slider.tsx') ||
+        path.includes('radio-group.tsx')
+      )) {
+        return false
+      }
+      
+      // Exclude node_modules, .git, build outputs
+      if (path.includes('node_modules') || 
+          path.includes('.git/') || 
+          path.includes('dist/') || 
+          path.includes('build/') ||
+          path.includes('.next/')) {
+        return false
+      }
+      
+      return true
+    })
 
-    // ENHANCEMENT 3: Compact but informative file summary
-    const fileSummary = limitedFiles.map((f: any) => {
-      const fileName = f.path.split('/').pop() || f.path
-      const fileType = f.fileType || f.type || 'file'
-      const size = f.size ? `(${Math.round(f.size / 1024)}KB)` : ''
-      return `${fileName} [${fileType}] ${size}`
-    }).join(' • ')
-
-    // ENHANCEMENT 4: Smart directory structure
+    // Build file tree structure
+    const fileTree: string[] = []
     const directories = new Set<string>()
-    limitedFiles.forEach((f: any) => {
-      const pathParts = f.path.split('/')
+    
+    // Sort files for better organization
+    const sortedFiles = filteredFiles.sort((a: any, b: any) => {
+      return a.path.localeCompare(b.path)
+    })
+
+    // Collect all directories
+    sortedFiles.forEach((file: any) => {
+      const pathParts = file.path.split('/')
       if (pathParts.length > 1) {
-        directories.add(pathParts.slice(0, -1).join('/'))
+        // Add all parent directories
+        for (let i = 1; i < pathParts.length; i++) {
+          const dirPath = pathParts.slice(0, i).join('/')
+          if (dirPath) {
+            directories.add(dirPath)
+          }
+        }
       }
     })
 
-    const dirSummary = Array.from(directories)
-      .filter(dir => dir && !dir.includes('node_modules'))
-      .slice(0, 8)
-      .join(' • ')
+    // Add root files first
+    const rootFiles = sortedFiles.filter((file: any) => !file.path.includes('/'))
+    rootFiles.forEach((file: any) => {
+      fileTree.push(file.path)
+    })
 
-    // ENHANCEMENT 5: Task-aware context
-    let taskContext = ''
-    if (userIntent?.intent) {
-      const taskInfo = `${userIntent.intent} (${userIntent.complexity || 'medium'})`
-      taskContext = `\n🎯 TASK: ${taskInfo}`
+    // Add directories and their files
+    const sortedDirectories = Array.from(directories).sort()
+    sortedDirectories.forEach((dir: string) => {
+      fileTree.push(`${dir}/`)
+      
+      // Add files in this directory
+      const dirFiles = sortedFiles.filter((file: any) => {
+        const filePath = file.path
+        const fileDir = filePath.substring(0, filePath.lastIndexOf('/'))
+        return fileDir === dir
+      })
+      
+      dirFiles.forEach((file: any) => {
+        fileTree.push(file.path)
+      })
+    })
+
+    // Files that should include full content
+    const fullContentFiles = [
+      'package.json',
+      'app/page.tsx',
+      'app/layout.tsx',
+      'src/App.tsx',
+      'src/main.tsx',
+      'App.tsx',
+      'main.tsx',
+      'index.tsx',
+      'next.config.mjs',
+      'tailwind.config.js',
+      'vite.config.ts',
+      'tsconfig.json'
+    ]
+
+    // Build the context
+    let context = `# Current Time
+${currentTime}
+
+# Current Working Directory (c:/Users/DELL/Downloads/ai-app-builder) Files
+${fileTree.join('\n')}
+
+---`
+
+    // Add full content for important files
+    for (const filePath of fullContentFiles) {
+      const file = files.find((f: any) => f.path === filePath || f.path.endsWith(`/${filePath}`))
+      if (file && file.content) {
+        context += `
+
+## ${file.path}
+\`\`\`${getFileExtension(file.path)}
+${file.content}
+\`\`\``
+      }
     }
 
-    // ENHANCEMENT 6: File type breakdown for better understanding
-    const fileTypeStats = limitedFiles.reduce((acc: any, file: any) => {
-      const type = file.fileType || file.type || 'unknown'
-      acc[type] = (acc[type] || 0) + 1
-      return acc
-    }, {})
-
-    const typeSummary = Object.entries(fileTypeStats)
-      .map(([type, count]) => `${type}: ${count}`)
-      .join(', ')
-
-    // ENHANCEMENT 7: Ultra-compact context format with emoji indicators
-    const context = `📁 PROJECT: ${files.length} total files
-🔧 ACTIVE: ${limitedFiles.length} relevant (${typeSummary})
-📂 DIRS: ${dirSummary || 'src • components • lib'}
-📄 FILES: ${fileSummary || 'App.tsx • package.json • index.html'}
-🎯 MODE: AGENT (file operations enabled)${taskContext}`
-
-    console.log(`[CONTEXT OPTIMIZATION] Enhanced: ${files.length} → ${limitedFiles.length} files (${contextPriority} priority)`)
+    console.log(`[CONTEXT] Built file tree with ${fileTree.length} files, ${fullContentFiles.length} with full content`)
     return context
 
   } catch (error) {
-    console.error('Error building enhanced project context:', error)
-    return `📁 PROJECT: ${projectId}
-🎯 MODE: AGENT (file operations available)
-⚠️ Context loading failed - use list_files tool with path parameter (e.g., {path: "/"})`
+    console.error('Error building project context:', error)
+    return `# Current Time
+${new Date().toLocaleString()}
+
+# Project Context Error
+Unable to load project structure. Use list_files tool to explore the project.`
+  }
+}
+
+// Helper function to get file extension for syntax highlighting
+function getFileExtension(filePath: string): string {
+  const ext = filePath.split('.').pop()?.toLowerCase()
+  switch (ext) {
+    case 'tsx':
+    case 'jsx':
+      return 'typescript'
+    case 'ts':
+      return 'typescript'
+    case 'js':
+      return 'javascript'
+    case 'json':
+      return 'json'
+    case 'css':
+      return 'css'
+    case 'scss':
+    case 'sass':
+      return 'scss'
+    case 'html':
+      return 'html'
+    case 'md':
+      return 'markdown'
+    case 'yml':
+    case 'yaml':
+      return 'yaml'
+    case 'sql':
+      return 'sql'
+    default:
+      return ext || 'text'
   }
 }
 
@@ -3293,6 +3844,32 @@ ${analyzeDependencies ? '6. **Circular Dependencies**: Detect potential circular
 
   return tools
 }
+const codeQualityInstructions = `
+**🔧 PRODUCTION-READY CODE REQUIREMENTS:**
+• **Syntax Perfection**: Generate 100% syntactically correct code - no unclosed tags, unmatched brackets, or parsing errors
+• **Import/Export Consistency**: Always use correct import/export syntax matching the actual module definitions
+• **Type Safety**: Full TypeScript compliance with proper type annotations and no 'any' types
+• **Complete Implementation**: Never generate incomplete code, partial functions, or unfinished logic
+• **Error Prevention**: Include proper error handling, validation, and null checks
+• **Code Validation**: Use validation tools automatically after code generation to catch and fix issues
+• **Import Accuracy**: Verify all imports exist and match the actual file structure
+• **Export Matching**: Ensure exports match exactly how they're defined (default vs named exports)
+• **No Trailing Code**: Never leave incomplete statements, unfinished functions, or dangling code
+• **Proper Escaping**: All strings, quotes, and special characters must be properly escaped
+• **Complete Structures**: Always close all brackets, parentheses, and tags properly
+• **Consistent Formatting**: Use consistent indentation, spacing, and code style throughout
+• **Dependency Management**: Ensure all required imports are included and dependencies are properly declared
+
+**🧪 AUTOMATED QUALITY WORKFLOW:**
+• After ANY code generation, run analyze_dependencies and scan_code_imports automatically
+• Validate syntax and fix detected issues before presenting results to user
+• Check import/export relationships and correct mismatches immediately
+• Never present broken, incomplete, or syntactically incorrect code
+• Use tools proactively to ensure code quality, not just reactively when issues occur
+• **IMMEDIATE VALIDATION**: Always validate code syntax and imports immediately after generation
+• **MANDATORY VALIDATION**: You MUST use validation tools after any file creation or modification
+• **PRODUCTION STANDARD**: Only present code that passes all validation checks
+• **ERROR PREVENTION**: Identify and fix issues during generation, not after presentation`;
 
 // NLP Intent Detection using Mistral Pixtral
 async function detectUserIntent(userMessage: string, projectContext: string, conversationHistory: any[]) {
@@ -3470,13 +4047,70 @@ You are a specialized code analysis assistant in the preprocessing phase. Your r
 Remember: This is the INFORMATION GATHERING phase. Your job is to understand and analyze, not to implement.`
 }
 
-function getStreamingSystemPrompt(): string {
+
+function getStreamingSystemPrompt(projectContext?: string, memoryContext?: any): string {
   return `<role>
 You are PIXEL FORGE, an AI development assistant that creates and modifies web applications in real-time. You assist users by chatting with them and making changes to their code through XML commands that execute immediately during our conversation.
 
 You make efficient and effective changes to codebases while following best practices for maintainability and readability. You take pride in keeping things simple and elegant. You are friendly and helpful, always aiming to provide clear explanations.
 
 You understand that users can see a live preview of their application while you make code changes, and all file operations execute immediately through XML commands.
+
+${projectContext ? `
+
+## 🏗️ **PROJECT CONTEXT**
+${projectContext}
+
+---
+` : ''}
+
+## 🧠 **ENHANCED AI MEMORY SYSTEM**
+You have access to an advanced memory system that tracks all your previous actions and decisions. Use this context to:
+
+${memoryContext ? `
+### Previous File Operations (Last 10 actions):
+${memoryContext.previousActions?.length > 0 
+  ? memoryContext.previousActions.slice(-10).map((action: string, index: number) => `${index + 1}. ${action}`).join('\n')
+  : 'No previous file operations in this session.'}
+
+### Potential Duplicate Work Detection:
+${memoryContext.potentialDuplicates?.length > 0 
+  ? `⚠️ **POTENTIAL DUPLICATES DETECTED:**\n${memoryContext.potentialDuplicates.map((dup: string) => `- ${dup}`).join('\n')}\n\n**RECOMMENDATION:** ${memoryContext.suggestedApproach}`
+  : '✅ No duplicate work patterns detected. Proceed with implementation.'}
+
+### Relevant Previous Context:
+${memoryContext.relevantMemories?.length > 0 
+  ? memoryContext.relevantMemories.map((memory: any) => 
+      `- ${memory.conversationContext.semanticSummary} (${memory.xmlOperations.length} XML operations)`
+    ).join('\n')
+  : 'No highly relevant previous context found.'}
+
+### Smart Context Guidelines:
+- **Avoid Duplication**: Check previous actions before creating similar functionality
+- **Build Upon Previous Work**: Reference and extend existing implementations
+- **Context-Aware Decisions**: Consider architectural patterns already established
+- **Efficient Development**: Don't recreate what already exists
+
+` : ''}
+
+**🔍 Context Awareness:**
+- **Avoid Duplicate Work**: Check if similar functionality already exists before creating new code
+- **Build Upon Previous Work**: Reference and extend existing implementations instead of recreating
+- **Maintain Consistency**: Follow established patterns and architectural decisions
+- **Smart Decision Making**: Consider previous user feedback and preferences
+
+**📊 Memory-Driven Development:**
+- Before implementing new features, consider what you've already built
+- Reference previous XML operations to understand file structure and patterns
+- Avoid recreating components or functions that already exist
+- Build incrementally on established foundation
+
+**⚡ Smart Workflow:**
+1. **Analyze Context**: Review previous actions and current request
+2. **Check for Duplicates**: Ensure you're not repeating previous work
+3. **Plan Efficiently**: Build upon existing code rather than starting from scratch
+4. **Execute Smartly**: Use XML commands to make targeted, precise changes
+
 </role>
 
 # XML Commands for File Operations
@@ -3518,12 +4152,32 @@ export default function Example() {
 
 Always reply to the user in the same language they are using.
 
-- Before proceeding with any code edits, check whether the user's request has already been implemented. If the requested change has already been made in the codebase, point this out to the user.
-- Only edit files that are related to the user's request and leave all other files alone.
+## 🧠 **MEMORY-ENHANCED DEVELOPMENT APPROACH**
+
+Before proceeding with any implementation:
+
+1. **Context Analysis**: Review the memory context provided in the system message to understand:
+   - Previous file operations you've performed
+   - Existing components and functionality
+   - Established patterns and architectural decisions
+   - Potential duplicate work warnings
+
+2. **Smart Implementation Strategy**:
+   - **Avoid Duplication**: If the memory context shows similar functionality exists, extend it instead of recreating
+   - **Build Incrementally**: Use existing components and patterns as building blocks
+   - **Follow Patterns**: Maintain consistency with previously established coding styles and structures
+   - **Reference Previous Work**: Mention and build upon work you've already completed
+
+3. **Efficient Development**:
+   - Check whether the user's request has already been implemented
+   - If similar functionality exists, suggest improvements or extensions instead of recreation
+   - Only create new components when genuinely needed
+   - Leverage existing code patterns and architectural decisions
 
 If new code needs to be written (i.e., the requested feature does not exist), you MUST:
 
 - Briefly explain the needed changes in a few short sentences, without being too technical.
+- **Reference Memory Context**: Mention if you're building upon previous work or creating something new
 - Use <pilotwrite> for creating or updating files. Try to create small, focused files that will be easy to maintain.
 - Use <pilotedit> for modifying existing files with search/replace operations.
 - Use <pilotdelete> for removing files.
@@ -3532,7 +4186,7 @@ If new code needs to be written (i.e., the requested feature does not exist), yo
 Before sending your final answer, review every import statement you output and do the following:
 
 First-party imports (modules that live in this project)
-- Only import files/modules that have already been described to you.
+- Only import files/modules that have already been described to you OR shown in your memory context.
 - If you need a project file that does not yet exist, create it immediately with <pilotwrite> before finishing your response.
 
 Third-party imports (anything that would come from npm)
@@ -3542,90 +4196,47 @@ Do not leave any import unresolved.
 
 # Examples
 
-## Example 1: Adding a new component
+## Example 1: Memory-Aware Component Creation
 
-I'll create a new Button component with Tailwind styling and then update the App to use it.
+Based on my memory context, I can see you already have a basic Button component. I'll enhance it with additional variants and functionality rather than creating a new one.
 
-<pilotwrite path="src/components/Button.tsx">
-import React from 'react';
-
-interface ButtonProps {
-  children: React.ReactNode;
-  variant?: 'primary' | 'secondary' | 'danger';
-  onClick?: () => void;
-  disabled?: boolean;
-}
-
-const Button: React.FC<ButtonProps> = ({ 
-  children, 
-  variant = 'primary', 
-  onClick, 
-  disabled = false 
-}) => {
-  const baseClasses = "px-4 py-2 rounded-md font-medium transition-colors";
-  
-  const variantClasses = {
-    primary: "bg-blue-600 hover:bg-blue-700 text-white",
-    secondary: "bg-gray-200 hover:bg-gray-300 text-gray-800",
-    danger: "bg-red-600 hover:bg-red-700 text-white"
-  };
-  
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={\`\$\{baseClasses\} \$\{variantClasses[variant]\}\`}
-    >
-      {children}
-    </button>
-  );
-};
-
-export default Button;
-</pilotwrite>
-
-<pilotwrite path="src/App.tsx">
-import React from 'react';
-import Button from './components/Button';
-
-function App() {
-  return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">My Application</h1>
-      
-      <div className="space-x-2">
-        <Button onClick={() => console.log('Primary clicked')}>
-          Primary Button
-        </Button>
-        <Button variant="secondary" onClick={() => console.log('Secondary clicked')}>
-          Secondary Button
-        </Button>
-        <Button variant="danger" onClick={() => console.log('Danger clicked')}>
-          Danger Button
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-export default App;
-</pilotwrite>
-
-I've created a new Button component with three variants and updated the App to demonstrate its usage.
-
-## Example 2: Editing an existing file
-
-I'll update the existing App component to add a new feature.
-
-<pilotedit path="src/App.tsx" operation="search_replace" search="<h1 className=\"text-2xl font-bold mb-4\">My Application</h1>" replace="<h1 className=\"text-2xl font-bold mb-4\">My Enhanced Application</h1>
-      <p className=\"text-gray-600 mb-4\">Welcome to the new version!</p>">
+<pilotedit path="src/components/Button.tsx" operation="search_replace" search="variant?: 'primary' | 'secondary' | 'danger';" replace="variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'warning';">
 </pilotedit>
 
-I've updated the App component to include a welcome message.
+<pilotedit path="src/components/Button.tsx" operation="search_replace" search="const variantClasses = {
+    primary: \"bg-blue-600 hover:bg-blue-700 text-white\",
+    secondary: \"bg-gray-200 hover:bg-gray-300 text-gray-800\",
+    danger: \"bg-red-600 hover:bg-red-700 text-white\"
+  };" replace="const variantClasses = {
+    primary: \"bg-blue-600 hover:bg-blue-700 text-white\",
+    secondary: \"bg-gray-200 hover:bg-gray-300 text-gray-800\",
+    danger: \"bg-red-600 hover:bg-red-700 text-white\",
+    success: \"bg-green-600 hover:bg-green-700 text-white\",
+    warning: \"bg-yellow-600 hover:bg-yellow-700 text-white\"
+  };">
+</pilotedit>
+
+I've enhanced your existing Button component with success and warning variants, building upon the foundation you already have.
+
+## Example 2: Context-Aware Development
+
+Looking at my memory context, I can see you've already created several components in this session. I'll build upon your existing navigation structure rather than creating a new one.
+
+<pilotedit path="src/App.tsx" operation="search_replace" search="<nav className=\"mb-4\">" replace="<nav className=\"mb-4 border-b border-gray-200 pb-4\">">
+</pilotedit>
+
+I've enhanced your existing navigation with better visual separation, maintaining the patterns you've already established.
 
 # Additional Guidelines
 
 All edits you make on the codebase will directly be built and rendered, therefore you should NEVER make partial changes like letting the user know that they should implement some components or partially implementing features.
+
+## 🧠 **MEMORY-DRIVEN EFFICIENCY**
+
+- **Leverage Previous Work**: Always check your memory context before creating new components
+- **Avoid Redundancy**: If similar functionality exists, enhance it instead of duplicating
+- **Maintain Patterns**: Follow architectural and styling patterns you've already established
+- **Incremental Development**: Build upon existing foundation rather than starting from scratch
 
 If a user asks for many features at once, you do not have to implement them all as long as the ones you implement are FULLY FUNCTIONAL and you clearly communicate to the user that you didn't implement some specific features.
 
@@ -3637,6 +4248,7 @@ Continuously be ready to refactor files that are getting too large.
 
 ## Important Rules for XML operations:
 - Only make changes that were directly requested by the user. Everything else in the files must stay exactly as it was.
+- **Memory-Guided Changes**: Use context from previous operations to make informed decisions
 - Always specify the correct file path when using XML commands.
 - Ensure that the code you write is complete, syntactically correct, and follows the existing coding style and conventions of the project.
 - IMPORTANT: Only use ONE <pilotwrite> block per file that you write!
@@ -3646,9 +4258,11 @@ Continuously be ready to refactor files that are getting too large.
 ## Coding guidelines
 - ALWAYS generate responsive designs.
 - Use modern React patterns and TypeScript.
+${codeQualityInstructions}
 - Don't catch errors with try/catch blocks unless specifically requested by the user.
 - Focus on the user's request and make the minimum amount of changes needed.
 - DON'T DO MORE THAN WHAT THE USER ASKS FOR.
+- **Follow Established Patterns**: Maintain consistency with patterns shown in memory context
 
 # Tech Stack
 - You are building a **Vite + React + TypeScript** application.
@@ -3679,7 +4293,14 @@ Continuously be ready to refactor files that are getting too large.
 
 **CRITICAL: XML commands must be written directly in your response, NOT wrapped in markdown code blocks. The XML tags should appear as plain text in your response , do not write xml comments before tags   write only the tag alone .**
 
-Remember: You have full context from preprocessing. Now implement professional, production-ready solutions using XML commands.`
+## 🧠 **FINAL MEMORY CHECKPOINT**
+Before implementing any solution:
+1. Review the memory context provided in your system message
+2. Check for potential duplicate work or existing similar functionality  
+3. Plan to build upon existing patterns and components
+4. Ensure your approach aligns with previously established architectural decisions
+
+Remember: You have access to comprehensive context about previous work through the memory system. Use it to be more efficient, consistent, and avoid unnecessary duplication.`
 }
 
 // XML Command Processing System for Streaming File Operations
@@ -3846,6 +4467,20 @@ export async function POST(req: Request) {
 
     // Set global user ID for tool access
     global.currentUserId = user.id
+
+    // Get memory context to prevent duplicates and provide AI awareness
+    const currentUserMessage = messages[messages.length - 1]?.content || ''
+    const memoryContext = getStreamContextForRequest(projectId, currentUserMessage)
+    
+    // Log memory context for debugging
+    console.log('[MEMORY] Retrieved context for request:', {
+      projectId,
+      userMessage: currentUserMessage.substring(0, 100) + '...',
+      previousActionsCount: memoryContext.previousActions.length,
+      potentialDuplicatesCount: memoryContext.potentialDuplicates.length,
+      relevantMemoriesCount: memoryContext.relevantMemories.length,
+      suggestedApproach: memoryContext.suggestedApproach
+    })
 
     // Validate model access based on subscription plan
     const selectedModelId = modelId || DEFAULT_CHAT_MODEL
@@ -4512,6 +5147,38 @@ ${projectContext ? `🏗️ PROJECT CONTEXT: ${projectContext}` : ''}
     };
 
     const systemMessage = getOptimizedSystemMessage(userIntent, projectContext);
+
+    // Enhance system message with memory context for AI awareness
+    const memoryAwareSystemMessage = systemMessage + `
+
+## 🧠 **AI MEMORY CONTEXT** (Context Awareness System)
+
+### Previous File Operations (Last 10 actions):
+${memoryContext.previousActions.length > 0 
+  ? memoryContext.previousActions.slice(-10).map((action, index) => `${index + 1}. ${action}`).join('\n')
+  : 'No previous file operations in this session.'}
+
+### Potential Duplicate Work Detection:
+${memoryContext.potentialDuplicates.length > 0 
+  ? `⚠️ **POTENTIAL DUPLICATES DETECTED:**\n${memoryContext.potentialDuplicates.map(dup => `- ${dup}`).join('\n')}\n\n**RECOMMENDATION:** ${memoryContext.suggestedApproach}`
+  : '✅ No duplicate work patterns detected. Proceed with implementation.'}
+
+### Relevant Previous Context:
+${memoryContext.relevantMemories.length > 0 
+  ? memoryContext.relevantMemories.map(memory => 
+      `- ${memory.conversationContext.semanticSummary} (${memory.xmlOperations.length} XML operations)`
+    ).join('\n')
+  : 'No highly relevant previous context found.'}
+
+### Smart Context Guidelines:
+- **Avoid Duplication**: Check previous actions before creating similar functionality
+- **Build Upon Previous Work**: Reference and extend existing implementations
+- **Context-Aware Decisions**: Consider architectural patterns already established
+- **Efficient Development**: Don't recreate what already exists
+
+---
+
+`;
 
     // SHOWCASE RESPONSE ENHANCER: Focus on building exceptional applications that demonstrate talent
     const enhanceResponseWithProfessionalTone = (response: string): string => {
@@ -5226,8 +5893,8 @@ Please respond to the user's request above, taking into account the project cont
         console.log('[VERIFICATION] ✅ list_files tool is confirmed present in final tool set')
       }
 
-      // Always include system message
-      finalMessages.unshift({ role: 'system' as const, content: systemMessage })
+      // Always include system message with memory context
+      finalMessages.unshift({ role: 'system' as const, content: memoryAwareSystemMessage })
 
       // REAL-TIME STREAMING: Use streamText for live conversation flow
       const streamOptions: any = {
@@ -5359,7 +6026,7 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
           })
         } else {
           // Add XML command instructions for cases without preprocessing using focused prompt
-          const streamingPrompt = getStreamingSystemPrompt()
+          const streamingPrompt = getStreamingSystemPrompt(projectContext, memoryContext)
           
           enhancedMessages.push({
             role: 'system' as const,
@@ -5456,6 +6123,33 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
                   delta: cleanChunk
                 })}\n\n`)
               }
+            }
+            
+            // After streaming is complete, store memory with full AI response
+            try {
+              const userMessage = messages[messages.length - 1]?.content || ''
+              console.log('[MEMORY] Processing stream memory for AI response analysis...')
+              
+              // Store memory asynchronously (don't block response)
+              storeStreamMemory(
+                projectId,
+                user?.id || 'anonymous',
+                userMessage,
+                responseBuffer,
+                projectContext || ''
+              ).then((memory) => {
+                console.log('[MEMORY] Stream memory stored successfully:', {
+                  memoryId: memory.id,
+                  xmlOperations: memory.xmlOperations.length,
+                  mainPurpose: memory.actionSummary.mainPurpose,
+                  filesAffected: memory.xmlOperations.map(op => `${op.xmlCommand}:${op.filePath}`)
+                })
+              }).catch((error) => {
+                console.error('[MEMORY] Failed to store stream memory:', error)
+              })
+              
+            } catch (memoryError) {
+              console.error('[MEMORY] Memory processing error:', memoryError)
             }
             
             controller.enqueue(`data: [DONE]\n\n`)
