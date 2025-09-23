@@ -500,6 +500,12 @@ const XML_TOOL_CLOSING_PATTERNS = {
 
 // XMLToolPill component for displaying XML tool tags as pills
 const XMLToolPill = ({ toolCall, status = 'completed' }: { toolCall: XMLToolCall, status?: 'executing' | 'completed' | 'failed' }) => {
+  // Validate the tool call before rendering to prevent corrupted pills
+  if (!validateXMLToolCall(toolCall)) {
+    console.warn('[XMLToolPill] Invalid tool call detected, skipping render:', toolCall)
+    return null
+  }
+
   const getToolIcon = (toolName: string | undefined) => {
     switch (toolName) {
       case 'pilotwrite': return FileText
@@ -641,13 +647,62 @@ const XMLToolPill = ({ toolCall, status = 'completed' }: { toolCall: XMLToolCall
   )
 }
 
+// Validate XML tool call data to prevent corrupted pills
+function validateXMLToolCall(toolCall: XMLToolCall): boolean {
+  // Basic validation checks
+  if (!toolCall.id || !toolCall.name) {
+    return false
+  }
+  
+  // Ensure path is valid
+  if (!toolCall.path || 
+      toolCall.path === 'Unknown' || 
+      toolCall.path.includes('<') || 
+      toolCall.path.includes('>') ||
+      toolCall.path.trim().length === 0) {
+    return false
+  }
+  
+  // Ensure command is valid
+  const validCommands = ['pilotwrite', 'pilotedit', 'pilotdelete']
+  if (toolCall.command && !validCommands.includes(toolCall.command)) {
+    return false
+  }
+  
+  // Check for suspicious IDs that might indicate corruption
+  if (toolCall.id.includes('.') && toolCall.id.split('.').length > 2) {
+    return false
+  }
+  
+  return true
+}
+
+// Validate if content actually contains valid XML tool tags (not just keywords)
+function hasValidXMLTools(content: string): boolean {
+  if (!content || typeof content !== 'string') return false
+  
+  // More strict patterns that require proper XML syntax
+  const strictXMLPatterns = [
+    /<pilotwrite\s+[^>]*path=(["'])[^"']+\1[^>]*>[\s\S]*?<\/pilotwrite>/i,
+    /<pilotedit\s+[^>]*path=(["'])[^"']+\1[^>]*>[\s\S]*?<\/pilotedit>/i,
+    /<pilotdelete\s+[^>]*path=(["'])[^"']+\1[^>]*\s*\/?>/i
+  ]
+  
+  return strictXMLPatterns.some(pattern => pattern.test(content))
+}
+
 // Direct XML tool rendering - converts XML tags directly to pills without placeholders
 function renderXMLToolsDirectly(content: string): React.ReactNode[] {
   const components: React.ReactNode[] = []
   let remainingContent = content
   let elementKey = 0
 
-  // Define all XML tool patterns
+  // First validate that content actually contains valid XML tools
+  if (!hasValidXMLTools(content)) {
+    return []
+  }
+
+  // Define all XML tool patterns with stricter validation
   const xmlPatterns = [
     {
       name: 'pilotwrite',
@@ -659,7 +714,8 @@ function renderXMLToolsDirectly(content: string): React.ReactNode[] {
     },
     {
       name: 'pilotdelete',
-      pattern: /<pilotdelete\s+[^>]*path=(["'])([^"']+)\1[^>]*>([\s\S]*?)<\/pilotdelete>/gi
+      // Handle both self-closing and regular closing patterns for pilotdelete
+      pattern: /<pilotdelete\s+[^>]*path=(["'])([^"']+)\1[^>]*(?:\s*\/>|>([\s\S]*?)<\/pilotdelete>)/gi
     }
   ]
 
@@ -672,18 +728,29 @@ function renderXMLToolsDirectly(content: string): React.ReactNode[] {
   }> = []
 
   xmlPatterns.forEach(({ name, pattern }) => {
+    // Reset regex lastIndex to prevent state issues
+    pattern.lastIndex = 0
     const matches = [...remainingContent.matchAll(pattern)]
     matches.forEach(match => {
-      if (match.index !== undefined) {
-        allMatches.push({
-          match,
-          toolName: name,
-          startIndex: match.index,
-          endIndex: match.index + match[0].length
-        })
+      if (match.index !== undefined && match[2]) { // Ensure we have a valid path
+        // Additional validation: ensure the path looks valid
+        const path = match[2].trim()
+        if (path && path.length > 0 && !path.includes('<') && !path.includes('>')) {
+          allMatches.push({
+            match,
+            toolName: name,
+            startIndex: match.index,
+            endIndex: match.index + match[0].length
+          })
+        }
       }
     })
   })
+
+  // If no valid matches found, return empty array
+  if (allMatches.length === 0) {
+    return []
+  }
 
   // Sort matches by position
   allMatches.sort((a, b) => a.startIndex - b.startIndex)
@@ -769,6 +836,11 @@ function parseXMLToolsToComponents(content: string): { content: string; xmlTools
   const xmlTools: XMLToolCall[] = []
   let processedContent = content
   
+  // Validate input
+  if (!content || typeof content !== 'string') {
+    return { content: processedContent, xmlTools }
+  }
+  
   // First, parse existing XML tool placeholders that are already in the content
   const existingPlaceholders = [...content.matchAll(/<!-- XMLTOOL_(pilot\w+)_(\d+)_([a-z0-9]+) -->/gi)]
   existingPlaceholders.forEach(match => {
@@ -779,33 +851,45 @@ function parseXMLToolsToComponents(content: string): { content: string; xmlTools
     const validCommands = ['pilotwrite', 'pilotedit', 'pilotdelete'] as const
     const command = validCommands.includes(toolType as any) ? toolType as typeof validCommands[number] : undefined
     
-    const xmlTool: XMLToolCall = {
-      id: toolId,
-      name: toolType,
-      command: command,
-      path: 'Unknown', // We don't have the original path info from placeholders
-      content: '',     // We don't have the original content from placeholders
-      args: { path: 'Unknown', content: '' },
-      status: 'completed' // Assume these are completed since they're already placeholders
+    // Only add if it's a valid command
+    if (command) {
+      const xmlTool: XMLToolCall = {
+        id: toolId,
+        name: toolType,
+        command: command,
+        path: 'Unknown', // We don't have the original path info from placeholders
+        content: '',     // We don't have the original content from placeholders
+        args: { path: 'Unknown', content: '' },
+        status: 'completed' // Assume these are completed since they're already placeholders
+      }
+      
+      xmlTools.push(xmlTool)
     }
-    
-    xmlTools.push(xmlTool)
   })
   
-  // Process pilotwrite tags (with opening and closing tags)
-  // This pattern handles pilotwrite tags with various attributes
+  // Process pilotwrite tags (with opening and closing tags) - with validation
   const pilotwriteMatches = [...content.matchAll(/<pilotwrite\s+[^>]*path=(["'])([^"']+)\1[^>]*>([\s\S]*?)<\/pilotwrite>/gi)]
   pilotwriteMatches.forEach(match => {
     const [fullMatch, quote, path, xmlContent] = match
-    const toolId = `pilotwrite_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
+    // Validate the path - ensure it's not empty and doesn't contain invalid characters
+    if (!path || path.trim().length === 0 || path.includes('<') || path.includes('>')) {
+      console.warn('[XML Parser] Invalid path detected in pilotwrite tag:', path)
+      return
+    }
+    
+    // Generate unique ID using crypto if available, fallback to timestamp + random
+    const toolId = typeof crypto !== 'undefined' && crypto.randomUUID 
+      ? `pilotwrite_${crypto.randomUUID()}`
+      : `pilotwrite_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
     const xmlTool: XMLToolCall = {
       id: toolId,
       name: 'pilotwrite',
       command: 'pilotwrite',
-      path: path,
-      content: xmlContent,
-      args: { path, content: xmlContent },
+      path: path.trim(),
+      content: xmlContent || '',
+      args: { path: path.trim(), content: xmlContent || '' },
       status: 'detected'
     }
     
@@ -815,20 +899,29 @@ function parseXMLToolsToComponents(content: string): { content: string; xmlTools
     processedContent = processedContent.replace(fullMatch, `<!-- XMLTOOL_${toolId} -->`)
   })
   
-  // Process pilotedit tags (with opening and closing tags - unified pattern)
-  // This pattern handles both simple and complex pilotedit tags with various attributes
+  // Process pilotedit tags (with opening and closing tags - unified pattern) - with validation
   const piloteditMatches = [...processedContent.matchAll(/<pilotedit\s+[^>]*path=(["'])([^"']+)\1[^>]*>([\s\S]*?)<\/pilotedit>/gi)]
   piloteditMatches.forEach(match => {
     const [fullMatch, quote, path, xmlContent] = match
-    const toolId = `pilotedit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
+    // Validate the path - ensure it's not empty and doesn't contain invalid characters
+    if (!path || path.trim().length === 0 || path.includes('<') || path.includes('>')) {
+      console.warn('[XML Parser] Invalid path detected in pilotedit tag:', path)
+      return
+    }
+    
+    // Generate unique ID using crypto if available
+    const toolId = typeof crypto !== 'undefined' && crypto.randomUUID 
+      ? `pilotedit_${crypto.randomUUID()}`
+      : `pilotedit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
     const xmlTool: XMLToolCall = {
       id: toolId,
       name: 'pilotedit',
       command: 'pilotedit',
-      path: path,
-      content: xmlContent,
-      args: { path, content: xmlContent },
+      path: path.trim(),
+      content: xmlContent || '',
+      args: { path: path.trim(), content: xmlContent || '' },
       status: 'detected'
     }
     
@@ -838,20 +931,32 @@ function parseXMLToolsToComponents(content: string): { content: string; xmlTools
     processedContent = processedContent.replace(fullMatch, `<!-- XMLTOOL_${toolId} -->`)
   })
   
-  // Process pilotdelete tags (with opening and closing tags - unified pattern)
-  // This pattern handles pilotdelete tags with various attributes
-  const pilotdeleteMatches = [...processedContent.matchAll(/<pilotdelete\s+[^>]*path=(["'])([^"']+)\1[^>]*>([\s\S]*?)<\/pilotdelete>/gi)]
+  // Process pilotdelete tags (with both self-closing and regular patterns) - with validation
+  const pilotdeleteMatches = [
+    ...processedContent.matchAll(/<pilotdelete\s+[^>]*path=(["'])([^"']+)\1[^>]*\s*\/?>/gi),
+    ...processedContent.matchAll(/<pilotdelete\s+[^>]*path=(["'])([^"']+)\1[^>]*>([\s\S]*?)<\/pilotdelete>/gi)
+  ]
   pilotdeleteMatches.forEach(match => {
     const [fullMatch, quote, path, xmlContent] = match
-    const toolId = `pilotdelete_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
+    // Validate the path - ensure it's not empty and doesn't contain invalid characters
+    if (!path || path.trim().length === 0 || path.includes('<') || path.includes('>')) {
+      console.warn('[XML Parser] Invalid path detected in pilotdelete tag:', path)
+      return
+    }
+    
+    // Generate unique ID using crypto if available
+    const toolId = typeof crypto !== 'undefined' && crypto.randomUUID 
+      ? `pilotdelete_${crypto.randomUUID()}`
+      : `pilotdelete_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
     const xmlTool: XMLToolCall = {
       id: toolId,
       name: 'pilotdelete',
       command: 'pilotdelete',
-      path: path,
-      content: xmlContent,
-      args: { path, content: xmlContent },
+      path: path.trim(),
+      content: xmlContent || '',
+      args: { path: path.trim(), content: xmlContent || '' },
       status: 'detected'
     }
     
@@ -861,7 +966,13 @@ function parseXMLToolsToComponents(content: string): { content: string; xmlTools
     processedContent = processedContent.replace(fullMatch, `<!-- XMLTOOL_${toolId} -->`)
   })
   
-  return { content: processedContent, xmlTools }
+  // Deduplicate tools - remove duplicates based on command + path + content
+  const deduplicatedTools = xmlTools.filter((tool, index, arr) => {
+    const key = `${tool.command}_${tool.path}_${(tool.content || '').substring(0, 50)}`
+    return arr.findIndex(t => `${t.command}_${t.path}_${(t.content || '').substring(0, 50)}` === key) === index
+  })
+  
+  return { content: processedContent, xmlTools: deduplicatedTools }
 }
 
 // Render message content with XML tool pills
@@ -870,11 +981,18 @@ function renderXMLToolsInContent(content: string, xmlTools: XMLToolCall[]): Reac
     return []
   }
   
+  // Filter out invalid tools before rendering
+  const validTools = xmlTools.filter(validateXMLToolCall)
+  
+  if (validTools.length === 0) {
+    return []
+  }
+  
   const components: React.ReactNode[] = []
   let workingContent = content
   
   // Split content by XML tool placeholders
-  xmlTools.forEach((tool, index) => {
+  validTools.forEach((tool, index) => {
     const placeholder = `<!-- XMLTOOL_${tool.id} -->`
     const parts = workingContent.split(placeholder)
     
@@ -5340,31 +5458,37 @@ export function ChatPanel({
                             <div className="bg-card text-card-foreground border rounded-xl shadow-sm overflow-hidden w-full">
                               <div className="p-4">
                                 {(() => {
-                                  // Check if content has XML tools and render directly
-                                  const hasXMLTools = /<pilot(write|edit|delete)\s+[^>]*>/i.test(msg.content)
+                                  // Check if content has valid XML tools (not just keywords)
+                                  const hasXMLTools = hasValidXMLTools(msg.content)
                                   const hasExistingPlaceholders = /<!-- XMLTOOL_pilot\w+_\d+_[a-z0-9]+ -->/.test(msg.content)
                                   
                                   if (hasXMLTools) {
-                                    // Direct rendering of XML tools - no placeholder conversion
+                                    // Direct rendering of XML tools - only for valid XML syntax
                                     const renderedComponents = renderXMLToolsDirectly(msg.content)
-                                    return (
-                                      <div className="space-y-3">
-                                        {renderedComponents.map((component, idx) => (
-                                          <div key={idx}>{component}</div>
-                                        ))}
-                                      </div>
-                                    )
+                                    if (renderedComponents.length > 0) {
+                                      return (
+                                        <div className="space-y-3">
+                                          {renderedComponents.map((component, idx) => (
+                                            <div key={idx}>{component}</div>
+                                          ))}
+                                        </div>
+                                      )
+                                    }
+                                    // If no valid components were rendered, fall through to normal content
                                   } else if (hasExistingPlaceholders) {
                                     // Handle existing placeholders (legacy support)
                                     const { content: processedContent, xmlTools } = parseXMLToolsToComponents(msg.content)
                                     const renderedComponents = renderXMLToolsInContent(processedContent, xmlTools)
-                                    return (
-                                      <div className="space-y-3">
-                                        {renderedComponents.map((component, idx) => (
-                                          <div key={idx}>{component}</div>
-                                        ))}
-                                      </div>
-                                    )
+                                    if (renderedComponents.length > 0) {
+                                      return (
+                                        <div className="space-y-3">
+                                          {renderedComponents.map((component, idx) => (
+                                            <div key={idx}>{component}</div>
+                                          ))}
+                                        </div>
+                                      )
+                                    }
+                                    // If no valid components were rendered, fall through to normal content
                                   }
                                   
                                   // Otherwise, render normal markdown content
