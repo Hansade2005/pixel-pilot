@@ -142,6 +142,22 @@ export interface EnvironmentVariable {
   updatedAt: string
 }
 
+// Tool execution tracking interface for preventing duplicate executions
+export interface ToolExecution {
+  id: string
+  workspaceId: string
+  toolName: string
+  args: Record<string, any>
+  status: 'pending' | 'executing' | 'completed' | 'failed'
+  result?: any
+  error?: string
+  startTime: number
+  endTime?: number
+  messageId?: string // Reference to the message that triggered this execution
+  createdAt: string
+  updatedAt: string
+}
+
 // Storage interface for type safety
 export interface StorageInterface {
   createWorkspace(workspace: Omit<Workspace, 'id' | 'createdAt' | 'updatedAt'>): Promise<Workspace>;
@@ -188,6 +204,14 @@ export interface StorageInterface {
   updateConversationMemory(id: string, updates: Partial<ConversationMemory>): Promise<ConversationMemory | null>;
   deleteConversationMemory(id: string): Promise<boolean>;
   
+  // Tool execution tracking methods for preventing duplicate executions
+  createToolExecution(execution: Omit<ToolExecution, 'id' | 'createdAt' | 'updatedAt'>): Promise<ToolExecution>;
+  getToolExecution(id: string): Promise<ToolExecution | null>;
+  getToolExecutions(workspaceId: string): Promise<ToolExecution[]>;
+  updateToolExecution(id: string, updates: Partial<ToolExecution>): Promise<ToolExecution | null>;
+  deleteToolExecution(id: string): Promise<boolean>;
+  findExistingExecution(workspaceId: string, toolName: string, args: Record<string, any>): Promise<ToolExecution | null>;
+  
   // Additional utility methods
   importTable(tableName: string, data: any[]): Promise<void>;
   
@@ -207,6 +231,7 @@ class InMemoryStorage implements StorageInterface {
   private environmentVariables: Map<string, EnvironmentVariable> = new Map()
   private checkpoints: Map<string, Checkpoint> = new Map() // Add checkpoints map
   private conversationMemories: Map<string, ConversationMemory> = new Map() // Add conversation memories map
+  private toolExecutions: Map<string, ToolExecution> = new Map() // Add tool executions map
 
   private constructor() {}
 
@@ -660,13 +685,58 @@ class InMemoryStorage implements StorageInterface {
   async deleteConversationMemory(id: string): Promise<boolean> {
     return this.conversationMemories.delete(id)
   }
+
+  // Tool execution tracking methods
+  async createToolExecution(execution: Omit<ToolExecution, 'id' | 'createdAt' | 'updatedAt'>): Promise<ToolExecution> {
+    const id = `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const now = new Date().toISOString()
+    const newExecution: ToolExecution = {
+      ...execution,
+      id,
+      createdAt: now,
+      updatedAt: now
+    }
+    this.toolExecutions.set(id, newExecution)
+    return newExecution
+  }
+
+  async getToolExecution(id: string): Promise<ToolExecution | null> {
+    return this.toolExecutions.get(id) || null
+  }
+
+  async getToolExecutions(workspaceId: string): Promise<ToolExecution[]> {
+    return Array.from(this.toolExecutions.values()).filter(exec => exec.workspaceId === workspaceId)
+  }
+
+  async updateToolExecution(id: string, updates: Partial<ToolExecution>): Promise<ToolExecution | null> {
+    const existing = this.toolExecutions.get(id)
+    if (!existing) return null
+    
+    const updated = { ...existing, ...updates, updatedAt: new Date().toISOString() }
+    this.toolExecutions.set(id, updated)
+    return updated
+  }
+
+  async deleteToolExecution(id: string): Promise<boolean> {
+    return this.toolExecutions.delete(id)
+  }
+
+  async findExistingExecution(workspaceId: string, toolName: string, args: Record<string, any>): Promise<ToolExecution | null> {
+    const executions = Array.from(this.toolExecutions.values())
+    return executions.find(exec => 
+      exec.workspaceId === workspaceId && 
+      exec.toolName === toolName && 
+      JSON.stringify(exec.args) === JSON.stringify(args) &&
+      (exec.status === 'completed' || exec.status === 'executing')
+    ) || null
+  }
 }
 
 // Client-side IndexedDB storage
 class IndexedDBStorage implements StorageInterface {
   private db: IDBDatabase | null = null
   private dbName = 'PixelPilotDB'
-  private version = 11 // Updated version to match existing database version
+  private version = 12 // Updated version to add toolExecutions object store
 
   async init(): Promise<void> {
     if (this.db) return
@@ -738,6 +808,15 @@ class IndexedDBStorage implements StorageInterface {
           memoryStore.createIndex('projectId', 'projectId', { unique: false })
           memoryStore.createIndex('userId', 'userId', { unique: false })
           memoryStore.createIndex('lastActivity', 'lastActivity', { unique: false })
+        }
+
+        // Create tool executions store for tracking XML command executions
+        if (!db.objectStoreNames.contains('toolExecutions')) {
+          const executionStore = db.createObjectStore('toolExecutions', { keyPath: 'id' })
+          executionStore.createIndex('workspaceId', 'workspaceId', { unique: false })
+          executionStore.createIndex('toolName', 'toolName', { unique: false })
+          executionStore.createIndex('status', 'status', { unique: false })
+          executionStore.createIndex('createdAt', 'createdAt', { unique: false })
         }
       }
     })
@@ -1689,6 +1768,116 @@ class IndexedDBStorage implements StorageInterface {
       request.onerror = () => reject(request.error)
     })
   }
+
+  // Tool execution tracking methods
+  async createToolExecution(execution: Omit<ToolExecution, 'id' | 'createdAt' | 'updatedAt'>): Promise<ToolExecution> {
+    if (!this.db) throw new Error('Database not initialized')
+    
+    const id = `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const now = new Date().toISOString()
+    const newExecution: ToolExecution = {
+      ...execution,
+      id,
+      createdAt: now,
+      updatedAt: now
+    }
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['toolExecutions'], 'readwrite')
+      const store = transaction.objectStore('toolExecutions')
+      const request = store.add(newExecution)
+      
+      request.onsuccess = () => resolve(newExecution)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getToolExecution(id: string): Promise<ToolExecution | null> {
+    if (!this.db) throw new Error('Database not initialized')
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['toolExecutions'], 'readonly')
+      const store = transaction.objectStore('toolExecutions')
+      const request = store.get(id)
+      
+      request.onsuccess = () => resolve(request.result || null)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getToolExecutions(workspaceId: string): Promise<ToolExecution[]> {
+    if (!this.db) throw new Error('Database not initialized')
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['toolExecutions'], 'readonly')
+      const store = transaction.objectStore('toolExecutions')
+      const index = store.index('workspaceId')
+      const request = index.getAll(workspaceId)
+      
+      request.onsuccess = () => resolve(request.result || [])
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async updateToolExecution(id: string, updates: Partial<ToolExecution>): Promise<ToolExecution | null> {
+    if (!this.db) throw new Error('Database not initialized')
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['toolExecutions'], 'readwrite')
+      const store = transaction.objectStore('toolExecutions')
+      const getRequest = store.get(id)
+      
+      getRequest.onsuccess = () => {
+        const existing = getRequest.result
+        if (!existing) {
+          resolve(null)
+          return
+        }
+        
+        const updated = { ...existing, ...updates, updatedAt: new Date().toISOString() }
+        const putRequest = store.put(updated)
+        
+        putRequest.onsuccess = () => resolve(updated)
+        putRequest.onerror = () => reject(putRequest.error)
+      }
+      getRequest.onerror = () => reject(getRequest.error)
+    })
+  }
+
+  async deleteToolExecution(id: string): Promise<boolean> {
+    if (!this.db) throw new Error('Database not initialized')
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['toolExecutions'], 'readwrite')
+      const store = transaction.objectStore('toolExecutions')
+      const request = store.delete(id)
+      
+      request.onsuccess = () => resolve(true)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async findExistingExecution(workspaceId: string, toolName: string, args: Record<string, any>): Promise<ToolExecution | null> {
+    if (!this.db) throw new Error('Database not initialized')
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['toolExecutions'], 'readonly')
+      const store = transaction.objectStore('toolExecutions')
+      const index = store.index('workspaceId')
+      const request = index.getAll(workspaceId)
+      
+      request.onsuccess = () => {
+        const executions = request.result || []
+        const existing = executions.find(exec => 
+          exec.toolName === toolName && 
+          JSON.stringify(exec.args) === JSON.stringify(args) &&
+          (exec.status === 'completed' || exec.status === 'executing')
+        )
+        resolve(existing || null)
+      }
+      request.onerror = () => reject(request.error)
+    })
+  }
 }
 
 // Universal storage manager
@@ -1968,6 +2157,37 @@ class StorageManager {
   async deleteConversationMemory(id: string): Promise<boolean> {
     await this.init()
     return this.storage!.deleteConversationMemory(id)
+  }
+
+  // Tool execution tracking methods
+  async createToolExecution(execution: Omit<ToolExecution, 'id' | 'createdAt' | 'updatedAt'>): Promise<ToolExecution> {
+    await this.init()
+    return this.storage!.createToolExecution(execution)
+  }
+
+  async getToolExecution(id: string): Promise<ToolExecution | null> {
+    await this.init()
+    return this.storage!.getToolExecution(id)
+  }
+
+  async getToolExecutions(workspaceId: string): Promise<ToolExecution[]> {
+    await this.init()
+    return this.storage!.getToolExecutions(workspaceId)
+  }
+
+  async updateToolExecution(id: string, updates: Partial<ToolExecution>): Promise<ToolExecution | null> {
+    await this.init()
+    return this.storage!.updateToolExecution(id, updates)
+  }
+
+  async deleteToolExecution(id: string): Promise<boolean> {
+    await this.init()
+    return this.storage!.deleteToolExecution(id)
+  }
+
+  async findExistingExecution(workspaceId: string, toolName: string, args: Record<string, any>): Promise<ToolExecution | null> {
+    await this.init()
+    return this.storage!.findExistingExecution(workspaceId, toolName, args)
   }
 
   /**

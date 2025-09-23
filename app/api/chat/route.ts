@@ -3487,7 +3487,7 @@ Do *not* tell the user to run shell commands. Instead, use XML commands for all 
 - **pilotedit**: Edit existing files with search/replace operations  
 - **pilotdelete**: Delete files from the project
 
-You can use these commands by using XML tags like this:
+You can use these commands by using XML tags directly in your response like this (DO NOT wrap them in code blocks):
 
 <pilotwrite path="src/components/Example.tsx">
 import React from 'react';
@@ -3497,9 +3497,22 @@ export default function Example() {
 }
 </pilotwrite>
 
-<pilotedit path="src/App.tsx" operation="search_replace" search="old code here" replace="new code here" />
+<pilotedit path="src/App.tsx" operation="search_replace" search="old code here" replace="new code here">
+<!-- Edit operation details -->
+</pilotedit>
 
-<pilotdelete path="src/old-file.ts" />
+<pilotdelete path="src/old-file.ts">
+<!-- File deletion reason or notes (optional) -->
+</pilotdelete>
+
+**CRITICAL FORMATTING RULES:**
+- Write XML commands directly in your response as plain text
+- DO NOT wrap XML commands in markdown code blocks (\`\`\`xml or \`\`\`)
+- DO NOT use backticks around XML commands
+- DO NOT add any extra formatting around XML commands
+- The XML tags should appear as regular text in your response
+- **ALWAYS use opening and closing tags for ALL XML commands (pilotwrite, pilotedit, pilotdelete)**
+- **NO self-closing tags - all XML commands must have both opening and closing tags**
 
 # Guidelines
 
@@ -3605,7 +3618,9 @@ I've created a new Button component with three variants and updated the App to d
 I'll update the existing App component to add a new feature.
 
 <pilotedit path="src/App.tsx" operation="search_replace" search="<h1 className=\"text-2xl font-bold mb-4\">My Application</h1>" replace="<h1 className=\"text-2xl font-bold mb-4\">My Enhanced Application</h1>
-      <p className=\"text-gray-600 mb-4\">Welcome to the new version!</p>" />
+      <p className=\"text-gray-600 mb-4\">Welcome to the new version!</p>">
+<!-- Updated the main heading and added welcome message -->
+</pilotedit>
 
 I've updated the App component to include a welcome message.
 

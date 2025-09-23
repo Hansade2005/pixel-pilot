@@ -85,6 +85,9 @@ interface Message {
       message?: string
     }>
 
+    // XML placeholders for inline rendering
+    xmlPlaceholders?: Array<{ token: string; tool: XMLToolCall }>
+
     // Workflow system properties
     workflowMode?: boolean
     workflowChunk?: any
@@ -265,6 +268,9 @@ An error occurred during execution: ${eventData.error}`
 // Sanitize content to remove raw streaming data
 function sanitizeStreamingContent(content: string): string {
   if (!content) return content
+
+  console.log('[SANITIZER] Processing content length:', content.length)
+  console.log('[SANITIZER] Content preview:', content.substring(0, 300))
   
   // Only sanitize if we detect actual raw SSE patterns that shouldn't be in final content
   // This should only catch content that is literally raw SSE data, not regular content
@@ -286,13 +292,26 @@ function sanitizeStreamingContent(content: string): string {
     // Remove standalone [DONE] markers
     .replace(/^data:\s*\[DONE\]$/gm, '')
     // Remove XML tool tags completely to prevent highlight.js from processing them
-    .replace(/<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory)[^>]*>.*?<\/\1>/g, '')
+    // First remove any code block wrappers around XML
+    .replace(/```xml\s*([\s\S]*?)```/g, '$1')
+    .replace(/```([\s\S]*?)```/g, (match, content) => {
+      // Only remove code blocks that contain XML tags
+      if (/<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory)/.test(content)) {
+        console.log('[SANITIZER] Removing code block wrapper around XML content')
+        return content
+      }
+      return match
+    })
+    .replace(/<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory)[^>]*>[\s\S]*?<\/\1>/gi, '')
     // Remove self-closing XML tool tags
-    .replace(/<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory)[^>]*\/>/g, '')
+    .replace(/<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory)[^>]*\/>/gi, '')
     // Clean up multiple newlines
     .replace(/\n\n\n+/g, '\n\n')
     // Remove leading/trailing whitespace
     .trim()
+  
+  console.log('[SANITIZER] Final sanitized content length:', sanitized.length)
+  console.log('[SANITIZER] Final content preview:', sanitized.substring(0, 300))
   
   return sanitized
 }
@@ -417,14 +436,18 @@ interface XMLToolCall {
   error?: string
   startTime?: number
   endTime?: number
+  // Additional properties for pill rendering
+  command?: 'pilotwrite' | 'pilotedit' | 'pilotdelete'
+  path?: string
+  content?: string
 }
 
 // XML tool detection patterns - matching actual chat route implementation
 const XML_TOOL_PATTERNS = {
-  // File operations (actual tags from chat route)
-  pilotwrite: /<pilotwrite\s+path=["']([^"']+)["'][^>]*>(.*?)<\/pilotwrite>/gi,
-  pilotedit: /<pilotedit\s+path=["']([^"']+)["']\s+operation=["']([^"']+)["']\s+search=["']([^"']*?)["']\s+replace=["']([^"']*?)["'][^>]*\s*\/>/gi,
-  pilotdelete: /<pilotdelete\s+path=["']([^"']+)["'][^>]*\s*\/>/gi,
+  // File operations - matching server-side tool definitions
+  pilotwrite: /<pilotwrite\s+path=(["'])([^"']+)\1[^>]*>([\s\S]*?)<\/pilotwrite>/gi,
+  pilotedit: /<pilotedit\s+path=(["'])([^"']+)\1[^>]*>([\s\S]*?)<\/pilotedit>/gi,
+  pilotdelete: /<pilotdelete\s+path=(["'])([^"']+)\1[^>]*\s*\/>/gi,
   
   // Additional tool patterns (if used elsewhere)
   write_file: /<write_file\s+path="([^"]+)"(?:\s+content="([^"]*)")?>/g,
@@ -475,6 +498,422 @@ const XML_TOOL_CLOSING_PATTERNS = {
   run_tests: /<\/run_tests>/g,
 }
 
+// XMLToolPill component for displaying XML tool tags as pills
+const XMLToolPill = ({ toolCall, status = 'completed' }: { toolCall: XMLToolCall, status?: 'executing' | 'completed' | 'failed' }) => {
+  const getToolIcon = (toolName: string | undefined) => {
+    switch (toolName) {
+      case 'pilotwrite': return FileText
+      case 'pilotedit': return Edit3
+      case 'pilotdelete': return X
+      default: return Wrench
+    }
+  }
+
+  const getToolAction = (toolName: string | undefined) => {
+    switch (toolName) {
+      case 'pilotwrite': return 'Created'
+      case 'pilotedit': return 'Modified'
+      case 'pilotdelete': return 'Deleted'
+      default: return 'Executed'
+    }
+  }
+
+  const getToolDisplayName = (toolName: string | undefined) => {
+    switch (toolName) {
+      case 'pilotwrite': return 'File Created'
+      case 'pilotedit': return 'File Modified'
+      case 'pilotdelete': return 'File Deleted'
+      default: return 'Tool Executed'
+    }
+  }
+
+  const isSuccess = status !== 'failed'
+  const fileName = toolCall.path && toolCall.path !== 'Unknown' ? 
+    (toolCall.path.split('/').pop() || toolCall.path) : 
+    `${toolCall.name || 'tool'}.${toolCall.id.split('_').pop()}`
+  const IconComponent = getToolIcon(toolCall.command || toolCall.name || 'unknown')
+
+  // Special handling for pilotwrite and pilotedit with content
+  if ((toolCall.command || toolCall.name) === 'pilotwrite' || (toolCall.command || toolCall.name) === 'pilotedit') {
+    const [isExpanded, setIsExpanded] = useState(false)
+    const fileExtension = toolCall.path && toolCall.path !== 'Unknown' ? 
+      (toolCall.path.split('.').pop() || 'text') : 
+      'tsx' // Default extension for unknown files
+    
+    // Don't show expansion for placeholders with no content
+    const hasContent = toolCall.content && toolCall.content.trim().length > 0
+    
+    return (
+      <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
+        {/* Header - Clickable to toggle */}
+        <div
+          className={`px-4 py-3 border-b ${hasContent ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors ${
+            isSuccess
+              ? 'bg-muted border-l-4 border-l-primary'
+              : 'bg-red-900/20 border-l-4 border-l-red-500'
+          }`}
+          onClick={hasContent ? () => setIsExpanded(!isExpanded) : undefined}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-full ${
+              isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
+            }`}>
+              <IconComponent className="w-4 h-4" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-foreground">{getToolDisplayName(toolCall.command || toolCall.name || 'unknown')}</span>
+                <span className="text-xs text-muted-foreground">({fileName})</span>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <span>{getToolAction(toolCall.command || toolCall.name || 'unknown')}</span>
+                <span>•</span>
+                <span>{status === 'executing' ? 'Processing...' : isSuccess ? 'Completed' : 'Failed'}</span>
+              </div>
+            </div>
+            {/* Chevron indicator - only show if there's content to expand */}
+            {hasContent && (
+              <div className="ml-2">
+                {isExpanded ? (
+                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* File Content - Collapsible with Syntax Highlighting */}
+        {hasContent && toolCall.content && isExpanded && (
+          <div className="p-4 bg-background border-t">
+            <div className="max-h-96 overflow-y-auto">
+              <div className="bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
+                <div className="px-3 py-2 bg-gray-700 border-b border-gray-600 text-xs font-medium text-white">
+                  {toolCall.path && toolCall.path !== 'Unknown' ? toolCall.path : fileName} • {fileExtension}
+                </div>
+                <pre className="p-4 overflow-x-auto bg-[#1e1e1e]">
+                  <code className={`hljs language-${fileExtension} text-sm text-white`}>
+                    {toolCall.content}
+                  </code>
+                </pre>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Simple pill for pilotdelete (no content to show)
+  return (
+    <div className="bg-background border rounded-lg shadow-sm mb-2 overflow-hidden">
+      <div className={`px-3 py-2 flex items-center gap-3 ${
+        isSuccess
+          ? 'bg-muted border-l-4 border-l-primary'
+          : 'bg-red-900/20 border-l-4 border-l-red-500'
+      }`}>
+        <div className={`p-2 rounded-full ${
+          isSuccess ? 'bg-gradient-to-r from-red-500 to-red-600 text-white' : 'bg-red-500 text-white'
+        }`}>
+          <IconComponent className={`w-4 h-4`} />
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-foreground">{getToolDisplayName(toolCall.command || toolCall.name || 'unknown')}</span>
+            <span className="text-xs text-muted-foreground">({fileName})</span>
+          </div>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <span>{getToolAction(toolCall.command || toolCall.name || 'unknown')}</span>
+            <span>•</span>
+            <span>{status === 'executing' ? 'Processing...' : isSuccess ? 'Completed' : 'Failed'}</span>
+          </div>
+        </div>
+        <div className={`p-1 rounded-full ${isSuccess ? 'bg-green-500' : 'bg-red-500'}`}>
+          {isSuccess ? (
+            <Check className="w-4 h-4 text-white" />
+          ) : (
+            <X className="w-4 h-4 text-white" />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Direct XML tool rendering - converts XML tags directly to pills without placeholders
+function renderXMLToolsDirectly(content: string): React.ReactNode[] {
+  const components: React.ReactNode[] = []
+  let remainingContent = content
+  let elementKey = 0
+
+  // Define all XML tool patterns
+  const xmlPatterns = [
+    {
+      name: 'pilotwrite',
+      pattern: /<pilotwrite\s+[^>]*path=(["'])([^"']+)\1[^>]*>([\s\S]*?)<\/pilotwrite>/gi
+    },
+    {
+      name: 'pilotedit', 
+      pattern: /<pilotedit\s+[^>]*path=(["'])([^"']+)\1[^>]*>([\s\S]*?)<\/pilotedit>/gi
+    },
+    {
+      name: 'pilotdelete',
+      pattern: /<pilotdelete\s+[^>]*path=(["'])([^"']+)\1[^>]*>([\s\S]*?)<\/pilotdelete>/gi
+    }
+  ]
+
+  // Find all XML tool matches with their positions
+  const allMatches: Array<{
+    match: RegExpMatchArray,
+    toolName: string,
+    startIndex: number,
+    endIndex: number
+  }> = []
+
+  xmlPatterns.forEach(({ name, pattern }) => {
+    const matches = [...remainingContent.matchAll(pattern)]
+    matches.forEach(match => {
+      if (match.index !== undefined) {
+        allMatches.push({
+          match,
+          toolName: name,
+          startIndex: match.index,
+          endIndex: match.index + match[0].length
+        })
+      }
+    })
+  })
+
+  // Sort matches by position
+  allMatches.sort((a, b) => a.startIndex - b.startIndex)
+
+  let currentPosition = 0
+
+  allMatches.forEach(({ match, toolName }) => {
+    const [fullMatch, quote, path, xmlContent] = match
+    const matchStart = match.index!
+    const matchEnd = matchStart + fullMatch.length
+
+    // Add content before this XML tool (if any)
+    if (matchStart > currentPosition) {
+      const beforeContent = remainingContent.slice(currentPosition, matchStart)
+      if (beforeContent.trim()) {
+        components.push(
+          <div key={`content-${elementKey++}`} className="markdown-content">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {beforeContent}
+            </ReactMarkdown>
+          </div>
+        )
+      }
+    }
+
+    // Determine the appropriate status based on content
+    // If the content looks like actual code (has imports, jsx, etc), it's likely AI-generated content
+    // If it's empty or just a comment, it's likely a tool execution placeholder
+    const hasCodeContent = xmlContent && (
+      xmlContent.includes('import ') ||
+      xmlContent.includes('export ') ||
+      xmlContent.includes('function ') ||
+      xmlContent.includes('const ') ||
+      xmlContent.includes('class ') ||
+      xmlContent.includes('interface ') ||
+      xmlContent.includes('<') && xmlContent.includes('>') ||
+      xmlContent.trim().length > 100 // Substantial content
+    )
+
+    // Create and add the XML tool pill
+    const toolId = `${toolName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const validCommands = ['pilotwrite', 'pilotedit', 'pilotdelete'] as const
+    const command = validCommands.includes(toolName as any) ? toolName as typeof validCommands[number] : undefined
+
+    const xmlTool: XMLToolCall = {
+      id: toolId,
+      name: toolName,
+      command: command,
+      path: path,
+      content: xmlContent,
+      args: { path, content: xmlContent },
+      status: hasCodeContent ? 'detected' : 'completed' // 'detected' shows as expandable, 'completed' shows as done
+    }
+
+    const pillStatus = hasCodeContent ? 'executing' : 'completed' // This controls the visual state
+
+    components.push(
+      <XMLToolPill key={`tool-${elementKey++}`} toolCall={xmlTool} status={pillStatus} />
+    )
+
+    currentPosition = matchEnd
+  })
+
+  // Add any remaining content after the last XML tool
+  if (currentPosition < remainingContent.length) {
+    const afterContent = remainingContent.slice(currentPosition)
+    if (afterContent.trim()) {
+      components.push(
+        <div key={`content-${elementKey++}`} className="markdown-content">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {afterContent}
+          </ReactMarkdown>
+        </div>
+      )
+    }
+  }
+
+  return components
+}
+
+// Parse XML tags from content and convert them to XMLToolPill components
+function parseXMLToolsToComponents(content: string): { content: string; xmlTools: XMLToolCall[] } {
+  const xmlTools: XMLToolCall[] = []
+  let processedContent = content
+  
+  // First, parse existing XML tool placeholders that are already in the content
+  const existingPlaceholders = [...content.matchAll(/<!-- XMLTOOL_(pilot\w+)_(\d+)_([a-z0-9]+) -->/gi)]
+  existingPlaceholders.forEach(match => {
+    const [fullMatch, toolType, timestamp, randomId] = match
+    const toolId = `${toolType}_${timestamp}_${randomId}`
+    
+    // Type-safe command mapping
+    const validCommands = ['pilotwrite', 'pilotedit', 'pilotdelete'] as const
+    const command = validCommands.includes(toolType as any) ? toolType as typeof validCommands[number] : undefined
+    
+    const xmlTool: XMLToolCall = {
+      id: toolId,
+      name: toolType,
+      command: command,
+      path: 'Unknown', // We don't have the original path info from placeholders
+      content: '',     // We don't have the original content from placeholders
+      args: { path: 'Unknown', content: '' },
+      status: 'completed' // Assume these are completed since they're already placeholders
+    }
+    
+    xmlTools.push(xmlTool)
+  })
+  
+  // Process pilotwrite tags (with opening and closing tags)
+  // This pattern handles pilotwrite tags with various attributes
+  const pilotwriteMatches = [...content.matchAll(/<pilotwrite\s+[^>]*path=(["'])([^"']+)\1[^>]*>([\s\S]*?)<\/pilotwrite>/gi)]
+  pilotwriteMatches.forEach(match => {
+    const [fullMatch, quote, path, xmlContent] = match
+    const toolId = `pilotwrite_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
+    const xmlTool: XMLToolCall = {
+      id: toolId,
+      name: 'pilotwrite',
+      command: 'pilotwrite',
+      path: path,
+      content: xmlContent,
+      args: { path, content: xmlContent },
+      status: 'detected'
+    }
+    
+    xmlTools.push(xmlTool)
+    
+    // Replace the XML tag with a placeholder
+    processedContent = processedContent.replace(fullMatch, `<!-- XMLTOOL_${toolId} -->`)
+  })
+  
+  // Process pilotedit tags (with opening and closing tags - unified pattern)
+  // This pattern handles both simple and complex pilotedit tags with various attributes
+  const piloteditMatches = [...processedContent.matchAll(/<pilotedit\s+[^>]*path=(["'])([^"']+)\1[^>]*>([\s\S]*?)<\/pilotedit>/gi)]
+  piloteditMatches.forEach(match => {
+    const [fullMatch, quote, path, xmlContent] = match
+    const toolId = `pilotedit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
+    const xmlTool: XMLToolCall = {
+      id: toolId,
+      name: 'pilotedit',
+      command: 'pilotedit',
+      path: path,
+      content: xmlContent,
+      args: { path, content: xmlContent },
+      status: 'detected'
+    }
+    
+    xmlTools.push(xmlTool)
+    
+    // Replace the XML tag with a placeholder
+    processedContent = processedContent.replace(fullMatch, `<!-- XMLTOOL_${toolId} -->`)
+  })
+  
+  // Process pilotdelete tags (with opening and closing tags - unified pattern)
+  // This pattern handles pilotdelete tags with various attributes
+  const pilotdeleteMatches = [...processedContent.matchAll(/<pilotdelete\s+[^>]*path=(["'])([^"']+)\1[^>]*>([\s\S]*?)<\/pilotdelete>/gi)]
+  pilotdeleteMatches.forEach(match => {
+    const [fullMatch, quote, path, xmlContent] = match
+    const toolId = `pilotdelete_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
+    const xmlTool: XMLToolCall = {
+      id: toolId,
+      name: 'pilotdelete',
+      command: 'pilotdelete',
+      path: path,
+      content: xmlContent,
+      args: { path, content: xmlContent },
+      status: 'detected'
+    }
+    
+    xmlTools.push(xmlTool)
+    
+    // Replace the XML tag with a placeholder
+    processedContent = processedContent.replace(fullMatch, `<!-- XMLTOOL_${toolId} -->`)
+  })
+  
+  return { content: processedContent, xmlTools }
+}
+
+// Render message content with XML tool pills
+function renderXMLToolsInContent(content: string, xmlTools: XMLToolCall[]): React.ReactNode[] {
+  if (!xmlTools || xmlTools.length === 0) {
+    return []
+  }
+  
+  const components: React.ReactNode[] = []
+  let workingContent = content
+  
+  // Split content by XML tool placeholders
+  xmlTools.forEach((tool, index) => {
+    const placeholder = `<!-- XMLTOOL_${tool.id} -->`
+    const parts = workingContent.split(placeholder)
+    
+    if (parts.length === 2) {
+      // Add the content before the placeholder (if any)
+      if (parts[0].trim()) {
+        components.push(
+          <div key={`content_before_${tool.id}`} className="markdown-content">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {parts[0]}
+            </ReactMarkdown>
+          </div>
+        )
+      }
+      
+      // Add the XML tool pill
+      components.push(
+        <XMLToolPill key={tool.id} toolCall={tool} status="completed" />
+      )
+      
+      // Update working content to the remainder
+      workingContent = parts[1]
+    }
+  })
+  
+  // Add any remaining content after the last tool
+  if (workingContent.trim()) {
+    components.push(
+      <div key="content_after_tools" className="markdown-content">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {workingContent}
+        </ReactMarkdown>
+      </div>
+    )
+  }
+  
+  return components
+}
+
 // Client-side tool execution functions
 async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): Promise<any> {
   const { storageManager } = await import('@/lib/storage-manager')
@@ -486,49 +925,255 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): 
     switch (toolCall.name) {
       case 'pilotwrite':
         const { path: pilotWritePath, content: pilotWriteContent } = toolCall.args
-        const pilotWriteExistingFile = await storageManager.getFile(projectId, pilotWritePath)
-        
-        if (pilotWriteExistingFile) {
-          await storageManager.updateFile(projectId, pilotWritePath, { content: pilotWriteContent || '' })
-          return { success: true, action: 'updated', path: pilotWritePath, message: `File updated: ${pilotWritePath}` }
+
+        // Validate inputs
+        if (!pilotWritePath || typeof pilotWritePath !== 'string') {
+          return {
+            success: false,
+            error: `Invalid file path provided`,
+            path: pilotWritePath,
+            toolCallId: toolCall.id
+          }
+        }
+
+        if (pilotWriteContent === undefined || pilotWriteContent === null) {
+          return {
+            success: false,
+            error: `Invalid content provided`,
+            path: pilotWritePath,
+            toolCallId: toolCall.id
+          }
+        }
+
+        // Check if file already exists
+        const writeExistingFile = await storageManager.getFile(projectId, pilotWritePath)
+
+        if (writeExistingFile) {
+          // Update existing file
+          await storageManager.updateFile(projectId, pilotWritePath, { content: pilotWriteContent })
+          return {
+            success: true,
+            message: `✅ File ${pilotWritePath} updated successfully.`,
+            path: pilotWritePath,
+            action: 'updated',
+            toolCallId: toolCall.id
+          }
         } else {
+          // Create new file
           const newFile = await storageManager.createFile({
             workspaceId: projectId,
             name: pilotWritePath.split('/').pop() || pilotWritePath,
             path: pilotWritePath,
-            content: pilotWriteContent || '',
+            content: pilotWriteContent,
             fileType: pilotWritePath.split('.').pop() || 'text',
             type: pilotWritePath.split('.').pop() || 'text',
-            size: (pilotWriteContent || '').length,
+            size: pilotWriteContent.length,
             isDirectory: false
           })
-          return { success: true, action: 'created', path: pilotWritePath, file: newFile, message: `File created: ${pilotWritePath}` }
+
+          return {
+            success: true,
+            message: `✅ File ${pilotWritePath} created successfully.`,
+            path: pilotWritePath,
+            action: 'created',
+            fileId: newFile.id,
+            toolCallId: toolCall.id
+          }
         }
 
       case 'pilotedit':
-        const { path: pilotEditPath, operation, search, replace } = toolCall.args
-        const pilotEditFileToEdit = await storageManager.getFile(projectId, pilotEditPath)
-        if (pilotEditFileToEdit) {
-          let newContent = pilotEditFileToEdit.content
-          
-          if (operation === 'search_replace') {
-            newContent = newContent.replace(new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), replace)
+        const { path: pilotEditPath, searchReplaceBlocks } = toolCall.args
+
+        // Validate inputs
+        if (!pilotEditPath || typeof pilotEditPath !== 'string') {
+          return {
+            success: false,
+            error: `Invalid file path provided`,
+            path: pilotEditPath,
+            toolCallId: toolCall.id
           }
-          
-          await storageManager.updateFile(projectId, pilotEditPath, { content: newContent })
-          return { success: true, action: 'edited', path: pilotEditPath, message: `File edited: ${pilotEditPath}` }
-        } else {
-          throw new Error(`File not found: ${pilotEditPath}`)
+        }
+
+        if (!searchReplaceBlocks || !Array.isArray(searchReplaceBlocks) || searchReplaceBlocks.length === 0) {
+          return {
+            success: false,
+            error: `No search/replace blocks provided`,
+            path: pilotEditPath,
+            toolCallId: toolCall.id
+          }
+        }
+
+        // Check if file exists
+        const editExistingFile = await storageManager.getFile(projectId, pilotEditPath)
+
+        if (!editExistingFile) {
+          return {
+            success: false,
+            error: `File not found: ${pilotEditPath}. Use list_files to see available files.`,
+            path: pilotEditPath,
+            toolCallId: toolCall.id
+          }
+        }
+
+        // Helper functions (simplified version of server-side logic)
+        function escapeRegExp(string: string) {
+          return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        function findNthOccurrence(content: string, searchText: string, n: number): number {
+          let index = -1;
+          for (let i = 0; i < n; i++) {
+            index = content.indexOf(searchText, index + 1);
+            if (index === -1) return -1;
+          }
+          return index;
+        }
+
+        function replaceNthOccurrence(content: string, searchText: string, replaceText: string, n: number): string {
+          const index = findNthOccurrence(content, searchText, n);
+          if (index === -1) return content;
+          return content.substring(0, index) + replaceText + content.substring(index + searchText.length);
+        }
+
+        // Store original content for rollback
+        const originalContent = editExistingFile.content;
+        let modifiedContent = originalContent;
+        const contentSnapshots: string[] = [originalContent];
+
+        // Phase 1: Validation (simplified)
+        const validationResults: Array<{
+          blockIndex: number;
+          canApply: boolean;
+          reason?: string;
+          occurrencesFound: number;
+        }> = [];
+
+        let tempContent = originalContent;
+        for (let i = 0; i < searchReplaceBlocks.length; i++) {
+          const block = searchReplaceBlocks[i];
+          const searchText = block.search;
+          const replaceText = block.replace;
+          const replaceAll = block.replaceAll || false;
+          const occurrenceIndex = block.occurrenceIndex;
+
+          // Count occurrences in current temp content
+          const occurrences = (tempContent.match(new RegExp(escapeRegExp(searchText), 'g')) || []).length;
+
+          let canApply = true;
+          let reason = '';
+
+          if (occurrences === 0) {
+            canApply = false;
+            reason = 'Search text not found in content';
+          } else if (occurrenceIndex && occurrenceIndex > occurrences) {
+            canApply = false;
+            reason = `Requested occurrence ${occurrenceIndex} but only ${occurrences} occurrences found`;
+          }
+
+          validationResults.push({
+            blockIndex: i,
+            canApply,
+            reason,
+            occurrencesFound: occurrences
+          });
+
+          // If this block can be applied, simulate the change for next validation
+          if (canApply) {
+            if (occurrenceIndex) {
+              tempContent = replaceNthOccurrence(tempContent, searchText, replaceText, occurrenceIndex);
+            } else if (replaceAll) {
+              tempContent = tempContent.replaceAll(searchText, replaceText);
+            } else {
+              tempContent = tempContent.replace(searchText, replaceText);
+            }
+          }
+        }
+
+        // Check if any validations failed
+        const failedValidations = validationResults.filter(r => !r.canApply);
+
+        if (failedValidations.length > 0) {
+          return {
+            success: false,
+            error: `Operation failed: ${failedValidations[0].reason}. All changes rolled back.`,
+            path: pilotEditPath,
+            toolCallId: toolCall.id,
+            rollbackPerformed: true
+          };
+        }
+
+        // Phase 2: Apply changes
+        for (let i = 0; i < searchReplaceBlocks.length; i++) {
+          const block = searchReplaceBlocks[i];
+          const searchText = block.search;
+          const replaceText = block.replace;
+          const replaceAll = block.replaceAll || false;
+          const occurrenceIndex = block.occurrenceIndex;
+
+          // Apply the replacement
+          if (occurrenceIndex) {
+            modifiedContent = replaceNthOccurrence(modifiedContent, searchText, replaceText, occurrenceIndex);
+          } else if (replaceAll) {
+            modifiedContent = modifiedContent.replaceAll(searchText, replaceText);
+          } else {
+            modifiedContent = modifiedContent.replace(searchText, replaceText);
+          }
+        }
+
+        // Update the file
+        await storageManager.updateFile(projectId, pilotEditPath, { content: modifiedContent })
+
+        return {
+          success: true,
+          message: `✅ File ${pilotEditPath} edited successfully.`,
+          path: pilotEditPath,
+          action: 'edited',
+          toolCallId: toolCall.id
         }
         
       case 'pilotdelete':
         const { path: pilotDeletePath } = toolCall.args
-        const pilotDeleteFileToDelete = await storageManager.getFile(projectId, pilotDeletePath)
-        if (pilotDeleteFileToDelete) {
-          await storageManager.deleteFile(projectId, pilotDeletePath)
-          return { success: true, action: 'deleted', path: pilotDeletePath, message: `File deleted: ${pilotDeletePath}` }
+
+        // Validate path
+        if (!pilotDeletePath || typeof pilotDeletePath !== 'string') {
+          return {
+            success: false,
+            error: `Invalid file path provided`,
+            path: pilotDeletePath,
+            toolCallId: toolCall.id
+          }
+        }
+
+        // Check if file exists
+        const deleteExistingFile = await storageManager.getFile(projectId, pilotDeletePath)
+
+        if (!deleteExistingFile) {
+          return {
+            success: false,
+            error: `File not found: ${pilotDeletePath}. Use list_files to see available files.`,
+            path: pilotDeletePath,
+            toolCallId: toolCall.id
+          }
+        }
+
+        // Delete the file
+        const result = await storageManager.deleteFile(projectId, pilotDeletePath)
+
+        if (result) {
+          return {
+            success: true,
+            message: `✅ File ${pilotDeletePath} deleted successfully.`,
+            path: pilotDeletePath,
+            action: 'deleted',
+            toolCallId: toolCall.id
+          }
         } else {
-          throw new Error(`File not found: ${pilotDeletePath}`)
+          return {
+            success: false,
+            error: `Failed to delete file ${pilotDeletePath}`,
+            path: pilotDeletePath,
+            toolCallId: toolCall.id
+          }
         }
         
       case 'write_file':
@@ -681,12 +1326,106 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): 
 // Enhanced XML tool detection and parsing
 function detectXMLTools(content: string): XMLToolCall[] {
   const detectedTools: XMLToolCall[] = []
-  
+
   // Reset all regex lastIndex to 0
   Object.values(XML_TOOL_PATTERNS).forEach(regex => regex.lastIndex = 0)
-  
+
   console.log('[DEBUG] detectXMLTools called with content length:', content.length)
   console.log('[DEBUG] Content preview:', content.substring(0, 200))
+
+  // Also check for XML wrapped in code blocks
+  const codeBlockPattern = /```(?:xml)?\s*([\s\S]*?)```/g
+  let codeBlockMatch
+  while ((codeBlockMatch = codeBlockPattern.exec(content)) !== null) {
+    console.log('[DEBUG] Found code block with XML:', codeBlockMatch[1].substring(0, 100))
+    // Process the content inside the code block (without recursion)
+    const codeBlockContent = codeBlockMatch[1]
+    for (const [toolName, pattern] of Object.entries(XML_TOOL_PATTERNS)) {
+      pattern.lastIndex = 0 // Reset regex
+      let match
+      while ((match = pattern.exec(codeBlockContent)) !== null) {
+        console.log('[DEBUG] Found match in code block for', toolName, ':', match[1])
+        // Process the match as normal
+        const toolId = `${toolName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        const args: Record<string, any> = {}
+
+        // Extract arguments based on tool type
+        switch (toolName) {
+          case 'pilotwrite':
+            args.path = match[2]
+            args.content = match[3] || ''
+            break
+          case 'pilotedit':
+            args.path = match[2]
+            // Parse the content to extract searchReplaceBlocks
+            const editContent = match[3] || ''
+            // Parse as searchReplaceBlocks format
+            args.searchReplaceBlocks = [{
+              search: editContent,
+              replace: '',
+              replaceAll: false
+            }]
+            break
+          case 'pilotdelete':
+            args.path = match[2]
+            break
+          // Additional tool patterns (if used elsewhere)
+          case 'write_file':
+          case 'edit_file':
+            args.path = match[2]
+            args.content = match[3] || ''
+            break
+          case 'delete_file':
+          case 'read_file':
+            args.path = match[2]
+            break
+          case 'list_files':
+            args.path = match[2] || '/'
+            break
+          case 'create_directory':
+          case 'delete_directory':
+            args.path = match[2]
+            break
+          case 'search_files':
+            args.query = match[2]
+            args.path = match[3] || '/'
+            break
+          case 'grep_search':
+            args.pattern = match[2]
+            args.path = match[3] || '/'
+            break
+          case 'web_search':
+            args.query = match[2]
+            args.count = match[3] || '5'
+            break
+          case 'web_extract':
+            args.url = match[2]
+            args.selector = match[3] || ''
+            break
+          case 'analyze_code':
+          case 'check_syntax':
+            args.path = match[2]
+            break
+          case 'run_tests':
+            args.path = match[2] || '/'
+            break
+          default:
+            if (match[1]) args.path = match[1]
+            if (match[2]) args.content = match[2]
+        }
+
+        detectedTools.push({
+          id: toolId,
+          name: toolName,
+          args,
+          status: 'detected',
+          startTime: Date.now()
+        })
+      }
+    }
+  }
+
+  console.log('[DEBUG] Raw content for debugging:', JSON.stringify(content))
   
   // Check each tool pattern
   for (const [toolName, pattern] of Object.entries(XML_TOOL_PATTERNS)) {
@@ -803,6 +1542,103 @@ function extractXMLToolContent(content: string, toolName: string): string {
   return ''
 }
 
+// Generate unique placeholder token for XML blocks
+function generateXMLPlaceholder(toolId: string): string {
+  return `{{XML_TOOL_${toolId}}}`
+}
+
+// Extract XML blocks and replace with placeholders
+function extractAndReplaceXMLBlocks(content: string, detectedTools: XMLToolCall[]): { content: string; placeholders: Array<{ token: string; tool: XMLToolCall }> } {
+  let processedContent = content
+  const placeholders: Array<{ token: string; tool: XMLToolCall }> = []
+
+  // Reset all regex lastIndex to 0
+  Object.values(XML_TOOL_PATTERNS).forEach(regex => regex.lastIndex = 0)
+
+  // Process each tool pattern
+  for (const [toolName, pattern] of Object.entries(XML_TOOL_PATTERNS)) {
+    pattern.lastIndex = 0 // Reset regex
+    let match: RegExpExecArray | null
+
+    while ((match = pattern.exec(content)) !== null) {
+      if (!match || !match[2]) continue
+      // Type assertion to fix TypeScript null issues
+      const safeMatch = match as RegExpExecArray & { [key: number]: string }
+
+      const tool = detectedTools.find(t =>
+        t.name === toolName &&
+        t.args.path === safeMatch[2] &&
+        (toolName !== 'pilotedit' || safeMatch[3] === undefined || (safeMatch[3] !== null && JSON.stringify(t.args.searchReplaceBlocks) === JSON.stringify(safeMatch[3])))
+      ) as any
+
+      if (tool && safeMatch && safeMatch[0] && safeMatch[2]) {
+        const token = generateXMLPlaceholder(tool.id)
+        processedContent = processedContent.replace(safeMatch[0], token)
+        placeholders.push({ token, tool })
+      }
+    }
+  }
+
+  return { content: processedContent, placeholders }
+}
+
+
+// Render inline content with XML tool pills (simple text-based approach)
+function renderInlineContent(content: string, placeholders: Array<{ token: string; tool: XMLToolCall }>): string {
+  if (!placeholders || placeholders.length === 0) {
+    return content
+  }
+
+  // Split content by placeholders and render pills inline
+  const parts = content.split(/(\{\{XML_TOOL_[^}]+\}\})/g)
+  const elements: string[] = []
+
+  parts.forEach((part, index) => {
+    const placeholder = placeholders.find(p => p.token === part)
+    if (placeholder) {
+      // Render the pill as a simple placeholder - will be replaced by actual pills later
+      elements.push(`[XML_TOOL_${placeholder.tool.id}]`)
+    } else {
+      // Render regular text content
+      if (part.trim()) {
+        elements.push(part)
+      }
+    }
+  })
+
+  return elements.join('')
+}
+
+// Render message content with pills for ReactMarkdown
+function renderMessageContentWithPills(content: string, placeholders: Array<{ token: string; tool: XMLToolCall }>): string {
+  if (!placeholders || placeholders.length === 0) {
+    return content
+  }
+
+  // Split content by placeholders and create markdown with pill markers
+  const parts = content.split(/(\[XML_TOOL_[^]]+\])/g)
+  const elements: string[] = []
+
+  parts.forEach((part, index) => {
+    const toolIdMatch = part.match(/\[XML_TOOL_([^]]+)\]/)
+    if (toolIdMatch) {
+      const toolId = toolIdMatch[1]
+      const placeholder = placeholders.find(p => p.tool.id === toolId)
+      if (placeholder) {
+        // Create a markdown comment that will be replaced by the pill
+        elements.push(`<!-- XML_TOOL_${toolId} -->`)
+      }
+    } else {
+      // Keep regular text content
+      if (part.trim()) {
+        elements.push(part)
+      }
+    }
+  })
+
+  return elements.join('')
+}
+
 // Clean content by removing XML tool tags
 function cleanXMLToolTags(content: string): string {
   let cleaned = content
@@ -821,7 +1657,7 @@ function cleanXMLToolTags(content: string): string {
   })
   
   // Also remove any remaining XML tool tags that might have been missed
-  const xmlTagRegex = /<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory)[^>]*>.*?<\/\1>/g
+  const xmlTagRegex = /<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory)[^>]*>[\s\S]*?<\/\1>/g
   cleaned = cleaned.replace(xmlTagRegex, '')
   
   // Clean up extra whitespace and newlines
@@ -845,225 +1681,6 @@ async function executeXMLCommandClientSide(xmlCommand: any, projectId: string) {
   }
   
   return executeClientSideTool(toolCall, projectId)
-}
-
-// XMLToolPill component for displaying client-side XML tool execution
-const XMLToolPill = ({ toolCall }: { toolCall: XMLToolCall }) => {
-  const getToolIcon = (toolName: string) => {
-    switch (toolName) {
-      case 'pilotwrite':
-      case 'write_file':
-      case 'edit_file':
-        return <FileText className="h-4 w-4" />
-      case 'pilotdelete':
-      case 'delete_file':
-        return <Trash2 className="h-4 w-4" />
-      case 'pilotedit':
-        return <Edit3 className="h-4 w-4" />
-      case 'read_file':
-        return <Eye className="h-4 w-4" />
-      case 'list_files':
-        return <FolderOpen className="h-4 w-4" />
-      case 'search_files':
-      case 'grep_search':
-        return <FileSearch className="h-4 w-4" />
-      case 'web_search':
-        return <Globe className="h-4 w-4" />
-      case 'web_extract':
-        return <Database className="h-4 w-4" />
-      case 'analyze_code':
-      case 'check_syntax':
-        return <Wrench className="h-4 w-4" />
-      case 'run_tests':
-        return <Zap className="h-4 w-4" />
-      default:
-        return <Wrench className="h-4 w-4" />
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'detected':
-        return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'processing':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'executing':
-        return 'bg-orange-100 text-orange-800 border-orange-200'
-      case 'completed':
-        return 'bg-green-100 text-green-800 border-green-200'
-      case 'failed':
-        return 'bg-red-100 text-red-800 border-red-200'
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200'
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'detected':
-        return <Clock className="h-3 w-3" />
-      case 'processing':
-      case 'executing':
-        return <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-      case 'completed':
-        return <Check className="h-3 w-3" />
-      case 'failed':
-        return <AlertTriangle className="h-3 w-3" />
-      default:
-        return <Clock className="h-3 w-3" />
-    }
-  }
-
-  const getToolDescription = (toolCall: XMLToolCall) => {
-    const { name, args } = toolCall
-    switch (name) {
-      case 'pilotwrite':
-        return `Writing to ${args.path}`
-      case 'pilotedit':
-        return `Editing ${args.path} (${args.operation})`
-      case 'pilotdelete':
-        return `Deleting ${args.path}`
-      case 'write_file':
-        return `Writing to ${args.path}`
-      case 'edit_file':
-        return `Editing ${args.path}`
-      case 'delete_file':
-        return `Deleting ${args.path}`
-      case 'read_file':
-        return `Reading ${args.path}`
-      case 'list_files':
-        return `Listing files in ${args.path}`
-      case 'search_files':
-        return `Searching for "${args.query}" in ${args.path}`
-      case 'grep_search':
-        return `Searching for "${args.pattern}" in ${args.path}`
-      case 'web_search':
-        return `Searching web for "${args.query}"`
-      case 'web_extract':
-        return `Extracting from ${args.url}`
-      case 'analyze_code':
-        return `Analyzing code in ${args.path}`
-      case 'check_syntax':
-        return `Checking syntax in ${args.path}`
-      case 'run_tests':
-        return `Running tests in ${args.path}`
-      default:
-        return `Executing ${name}`
-    }
-  }
-
-  const isExpanded = toolCall.status === 'completed' || toolCall.status === 'failed'
-  const [isOpen, setIsOpen] = React.useState(isExpanded)
-
-  return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="mb-2">
-      <CollapsibleTrigger asChild>
-        <div className={`
-          flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer
-          hover:shadow-sm transition-all duration-200
-          ${getStatusColor(toolCall.status)}
-        `}>
-          {getStatusIcon(toolCall.status)}
-          {getToolIcon(toolCall.name)}
-          <span className="text-sm font-medium">
-            {getToolDescription(toolCall)}
-          </span>
-          <div className="ml-auto flex items-center gap-1">
-            {toolCall.status === 'completed' && toolCall.result && (
-              <span className="text-xs opacity-75">
-                {toolCall.result.message || 'Completed'}
-              </span>
-            )}
-            {toolCall.status === 'failed' && toolCall.error && (
-              <span className="text-xs opacity-75">
-                {toolCall.error}
-              </span>
-            )}
-            {isOpen ? (
-              <ChevronUp className="h-3 w-3" />
-            ) : (
-              <ChevronDown className="h-3 w-3" />
-            )}
-          </div>
-        </div>
-      </CollapsibleTrigger>
-      
-      <CollapsibleContent className="mt-2">
-        <div className="bg-gray-50 rounded-lg p-3 text-sm">
-          {toolCall.status === 'completed' && toolCall.result && (
-            <div className="space-y-2">
-              <div className="font-medium text-green-800">✅ Success</div>
-              <div className="text-gray-700">{toolCall.result.message}</div>
-              
-              {toolCall.result.files && (
-                <div>
-                  <div className="font-medium mb-1">Files:</div>
-                  <div className="space-y-1">
-                    {toolCall.result.files.slice(0, 5).map((file: any, index: number) => (
-                      <div key={index} className="flex items-center gap-2 text-xs">
-                        <FileText className="h-3 w-3" />
-                        <span>{file.path}</span>
-                        <span className="text-gray-500">({file.size} bytes)</span>
-                      </div>
-                    ))}
-                    {toolCall.result.files.length > 5 && (
-                      <div className="text-xs text-gray-500">
-                        ... and {toolCall.result.files.length - 5} more files
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              
-              {toolCall.result.results && (
-                <div>
-                  <div className="font-medium mb-1">Results:</div>
-                  <div className="space-y-1">
-                    {toolCall.result.results.slice(0, 3).map((result: any, index: number) => (
-                      <div key={index} className="text-xs">
-                        <div className="font-medium">{result.path}</div>
-                        {result.matches && (
-                          <div className="text-gray-600">
-                            {result.matches.length} matches found
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                    {toolCall.result.results.length > 3 && (
-                      <div className="text-xs text-gray-500">
-                        ... and {toolCall.result.results.length - 3} more results
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          
-          {toolCall.status === 'failed' && toolCall.error && (
-            <div className="space-y-2">
-              <div className="font-medium text-red-800">❌ Failed</div>
-              <div className="text-red-700">{toolCall.error}</div>
-            </div>
-          )}
-          
-          {toolCall.status === 'executing' && (
-            <div className="space-y-2">
-              <div className="font-medium text-orange-800">⚡ Executing...</div>
-              <div className="text-gray-700">Please wait while the tool executes</div>
-            </div>
-          )}
-          
-          {toolCall.status === 'processing' && (
-            <div className="space-y-2">
-              <div className="font-medium text-yellow-800">🔄 Processing...</div>
-              <div className="text-gray-700">Preparing to execute tool</div>
-            </div>
-          )}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
-  )
 }
 
 // ToolPill component for displaying server-side tool results
@@ -3372,10 +3989,19 @@ export function ChatPanel({
                       hasReceivedContent = true
                       
                       console.log('[STREAM] Adding delta:', data.delta)
-                      
-                      // Enhanced XML tool detection and processing
+                      console.log('[DEBUG] Full assistant content length:', assistantContent.length)
+                      console.log('[DEBUG] Assistant content preview:', assistantContent.substring(0, 500))
+
+                      // Enhanced XML tool detection and processing with inline replacement
                       const detectedTools = detectXMLTools(assistantContent)
                       console.log('[DEBUG] Detected tools:', detectedTools.length, 'from content length:', assistantContent.length)
+                      if (detectedTools.length > 0) {
+                        console.log('[DEBUG] Detected tool details:', detectedTools)
+                      }
+
+                      // Replace XML blocks with placeholders for inline display
+                      const { content: processedContent, placeholders } = extractAndReplaceXMLBlocks(assistantContent, detectedTools)
+                      console.log('[DEBUG] Processed content with placeholders:', processedContent.substring(0, 500))
                       
                       // Process newly detected tools
                       let updatedXmlCommands = [...xmlCommands]
@@ -3430,9 +4056,11 @@ export function ChatPanel({
                         
                         if (tool.status === 'detected' && isXMLToolComplete(assistantContent, tool.name)) {
                           console.log('[CLIENT-TOOL] Tool completed, extracting content:', tool.name)
-                          
+                          console.log('[DEBUG] Tool details:', tool)
+
                           // Extract content between tags
                           const extractedContent = extractXMLToolContent(assistantContent, tool.name)
+                          console.log('[DEBUG] Extracted content length:', extractedContent.length)
                           
                           // Update tool with extracted content
                           updatedXmlCommands[i] = {
@@ -3531,15 +4159,16 @@ export function ChatPanel({
                         }
                       }
                       
-                      // Update the message content incrementally
+                      // Update the message content incrementally with processed content and placeholders
                       setMessages(prev => prev.map(msg =>
                         msg.id === assistantMessageId
                           ? { 
                               ...msg, 
-                              content: assistantContent,
+                              content: processedContent,
                               metadata: {
                                 ...msg.metadata,
-                                xmlCommands: updatedXmlCommands
+                                xmlCommands: updatedXmlCommands,
+                                xmlPlaceholders: placeholders // Store placeholders for inline rendering
                               }
                             }
                           : msg
@@ -4710,57 +5339,89 @@ export function ChatPanel({
                             {/* Message content */}
                             <div className="bg-card text-card-foreground border rounded-xl shadow-sm overflow-hidden w-full">
                               <div className="p-4">
-                                <div className="chat-message-content prose prose-sm max-w-none">
-                                <ReactMarkdown 
-                                  remarkPlugins={[remarkGfm]}
-                                  components={{
-                                    code: ({node, className, children, ...props}: any) => {
-                                      const match = /language-(\w+)/.exec(className || '')
-                                      const language = match ? match[1] : ''
-                                      const isInline = !className
-                                      
-                                      return isInline ? (
-                                          <code className="bg-gray-600 px-1.5 py-0.5 rounded text-sm font-mono border border-gray-500 text-white" {...props}>
-                                          {children}
-                                        </code>
-                                      ) : (
-                                        <div className="my-4">
-                                            <div className="bg-gray-600 border border-gray-500 rounded-lg overflow-hidden">
-                                              <div className="px-3 py-2 bg-gray-500 border-b border-gray-500 text-xs font-medium text-white">
-                                              {language || 'code'}
-                                            </div>
-                                            <pre className="p-4 overflow-x-auto bg-[#2e2e2e]">
-                                                <code className={`hljs ${language ? `language-${language}` : ''} text-sm text-white`}>
+                                {(() => {
+                                  // Check if content has XML tools and render directly
+                                  const hasXMLTools = /<pilot(write|edit|delete)\s+[^>]*>/i.test(msg.content)
+                                  const hasExistingPlaceholders = /<!-- XMLTOOL_pilot\w+_\d+_[a-z0-9]+ -->/.test(msg.content)
+                                  
+                                  if (hasXMLTools) {
+                                    // Direct rendering of XML tools - no placeholder conversion
+                                    const renderedComponents = renderXMLToolsDirectly(msg.content)
+                                    return (
+                                      <div className="space-y-3">
+                                        {renderedComponents.map((component, idx) => (
+                                          <div key={idx}>{component}</div>
+                                        ))}
+                                      </div>
+                                    )
+                                  } else if (hasExistingPlaceholders) {
+                                    // Handle existing placeholders (legacy support)
+                                    const { content: processedContent, xmlTools } = parseXMLToolsToComponents(msg.content)
+                                    const renderedComponents = renderXMLToolsInContent(processedContent, xmlTools)
+                                    return (
+                                      <div className="space-y-3">
+                                        {renderedComponents.map((component, idx) => (
+                                          <div key={idx}>{component}</div>
+                                        ))}
+                                      </div>
+                                    )
+                                  }
+                                  
+                                  // Otherwise, render normal markdown content
+                                  return (
+                                    <div className="chat-message-content prose prose-sm max-w-none">
+                                      <ReactMarkdown 
+                                        remarkPlugins={[remarkGfm]}
+                                        components={{
+                                          code: ({node, className, children, ...props}: any) => {
+                                            const match = /language-(\w+)/.exec(className || '')
+                                            const language = match ? match[1] : ''
+                                            const isInline = !className
+                                            
+                                            return isInline ? (
+                                                <code className="bg-gray-600 px-1.5 py-0.5 rounded text-sm font-mono border border-gray-500 text-white" {...props}>
                                                 {children}
                                               </code>
-                                            </pre>
-                                          </div>
-                                        </div>
-                                      );
-                                    },
-                                    p: ({ children }) => (
-                                        <p className="text-white leading-[1.5]  text-sm mb-3 last:mb-0 font-medium">{children}</p>
-                                    ),
-                                    ul: ({ children }) => (
-                                        <ul className="list-disc list-inside space-y-1 text-white mb-3">{children}</ul>
-                                    ),
-                                    ol: ({ children }) => (
-                                        <ol className="list-decimal list-inside space-y-1 text-white mb-3">{children}</ol>
-                                    ),
-                                    h1: ({ children }) => (
-                                        <h1 className="text-lg font-bold mb-3 text-white">{children}</h1>
-                                    ),
-                                    h2: ({ children }) => (
-                                        <h2 className="text-base font-bold mb-2 text-white">{children}</h2>
-                                    ),
-                                    h3: ({ children }) => (
-                                        <h3 className="text-sm font-bold mb-2 text-white">{children}</h3>
-                                    ),
-                                  }}
-                                >
-                                  {sanitizeStreamingContent(msg.content)}
-                                </ReactMarkdown>
-                                </div>
+                                            ) : (
+                                              <div className="my-4">
+                                                  <div className="bg-gray-600 border border-gray-500 rounded-lg overflow-hidden">
+                                                    <div className="px-3 py-2 bg-gray-500 border-b border-gray-500 text-xs font-medium text-white">
+                                                    {language || 'code'}
+                                                  </div>
+                                                  <pre className="p-4 overflow-x-auto bg-[#2e2e2e]">
+                                                      <code className={`hljs ${language ? `language-${language}` : ''} text-sm text-white`}>
+                                                      {children}
+                                                    </code>
+                                                  </pre>
+                                                </div>
+                                              </div>
+                                            );
+                                          },
+                                          p: ({ children }) => (
+                                              <p className="text-white leading-[1.5]  text-sm mb-3 last:mb-0 font-medium">{children}</p>
+                                          ),
+                                          ul: ({ children }) => (
+                                              <ul className="list-disc list-inside space-y-1 text-white mb-3">{children}</ul>
+                                          ),
+                                          ol: ({ children }) => (
+                                              <ol className="list-decimal list-inside space-y-1 text-white mb-3">{children}</ol>
+                                          ),
+                                          h1: ({ children }) => (
+                                              <h1 className="text-lg font-bold mb-3 text-white">{children}</h1>
+                                          ),
+                                          h2: ({ children }) => (
+                                              <h2 className="text-base font-bold mb-2 text-white">{children}</h2>
+                                          ),
+                                          h3: ({ children }) => (
+                                              <h3 className="text-sm font-bold mb-2 text-white">{children}</h3>
+                                          ),
+                                        }}
+                                      >
+                                        {msg.content}
+                                      </ReactMarkdown>
+                                    </div>
+                                  )
+                                })()}
                               </div>
                             </div>
                           </div>
