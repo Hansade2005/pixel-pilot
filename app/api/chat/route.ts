@@ -1026,7 +1026,7 @@ async function buildOptimizedProjectContext(projectId: string, storageManager: a
     let context = `# Current Time
 ${currentTime}
 
-# Current Working Directory (c:/Users/DELL/Downloads/ai-app-builder) Files
+# Current Project Structure
 ${fileTree.join('\n')}
 
 ---`
