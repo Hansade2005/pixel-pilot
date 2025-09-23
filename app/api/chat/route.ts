@@ -4079,15 +4079,39 @@ You understand that users can see a live preview of their application while you 
 - End with a concise summary or next steps
 - Include visual hierarchy with headers, lists, and emphasis
 
-**⚠️ CRITICAL MARKDOWN FORMATTING RULES:**
+**⚠️ CRITICAL FRONTEND-FRIENDLY FORMATTING RULES:**
 - **Always put blank lines before and after headers** (##, ###)
-- **Ensure proper spacing around bold and italic formatting**
+- **Add blank lines between paragraphs** for proper spacing
+- **End sentences with periods** and add line breaks after long paragraphs
+- **Format numbered lists properly**: Use "1. ", "2. ", etc. with spaces
+- **Format bullet lists with**: "- " (dash + space) for consistency
+- **Add blank lines between list items** when they are long
+- **Use double line breaks** (\\n\\n) between major sections
+- **Never run sentences together** - each idea should be on its own line
 - **Use consistent bullet point style** with dashes (-) or asterisks (*)
-- **Add blank lines between different content blocks** (paragraphs, lists, code blocks)
-- **Never mix formatting styles within the same line**
 - **Keep headers concise and descriptive**
-- **Use only standard markdown syntax** - avoid complex HTML or special characters
 - **Start each major section with a clear header and emoji**
+
+**📝 SPECIFIC FORMATTING EXAMPLES:**
+
+❌ **Wrong (runs together):**
+
+I'll continue enhancing the application by implementing additional Supabase functionality and creating a user profile management system. Here's what I'll implement:Create a user profile table in Supabase2. Implement profile creation and editing3. Add profile picture upload functionality
+
+
+✅ **Correct (proper spacing):**
+
+I'll continue enhancing the application by implementing additional Supabase functionality and creating a user profile management system.
+
+Here's what I'll implement:
+
+1. Create a user profile table in Supabase
+2. Implement profile creation and editing  
+3. Add profile picture upload functionality
+4. Create a profile page component
+5. Update the dashboard to include profile management
+
+Let me implement these features step by step.
 
 **💬 CONVERSATION STYLE:**
 - Be conversational yet professional
@@ -6177,6 +6201,42 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
           })
         }
 
+        // Helper function to detect content type for better frontend handling
+        const detectContentType = (chunk: string): string => {
+          const trimmed = chunk.trim()
+          if (/^#{1,6}\s/.test(trimmed)) return 'header'
+          if (/^[\s]*[-*+]\s/.test(trimmed)) return 'list-item'
+          if (/^\d+\.\s/.test(trimmed)) return 'numbered-list-item'
+          if (/^>\s/.test(trimmed)) return 'blockquote'
+          if (/^```/.test(trimmed)) return 'code-block'
+          if (/\*\*.*\*\*/.test(trimmed)) return 'bold-text'
+          if (/\*.*\*/.test(trimmed)) return 'italic-text'
+          if (trimmed.includes('\n\n')) return 'paragraph-break'
+          if (trimmed.includes('\n')) return 'line-break'
+          return 'text'
+        }
+
+        // Helper function to preprocess content for better frontend rendering
+        const preprocessForFrontend = (chunk: string): string => {
+          let processed = chunk
+          
+          // Ensure proper spacing around headers
+          processed = processed.replace(/^(#{1,6}\s)/gm, '\n$1')
+          processed = processed.replace(/(#{1,6}\s.*$)/gm, '$1\n')
+          
+          // Ensure proper spacing around lists
+          processed = processed.replace(/^(\d+\.\s)/gm, '\n$1')
+          processed = processed.replace(/^([-*+]\s)/gm, '\n$1')
+          
+          // Add line breaks after sentences
+          processed = processed.replace(/([.!?])\s+([A-Z])/g, '$1\n\n$2')
+          
+          // Clean up multiple consecutive newlines
+          processed = processed.replace(/\n{3,}/g, '\n\n')
+          
+          return processed.trim()
+        }
+
         // Create a readable stream that handles both preprocessing results and XML commands
         const stream = new ReadableStream({
           async start(controller) {
@@ -6257,14 +6317,31 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
                 }
               }
               
-              // Send text delta (without XML commands)
+              // Send text delta (without XML commands) with enhanced formatting info
               const pilotRegex = /<pilot\w+[^>]*>.*?<\/pilot\w+>/gi
               const cleanChunk = chunk.replace(pilotRegex, '')
               if (cleanChunk.trim()) {
+                // Detect content type for better frontend handling
+                const contentType = detectContentType(cleanChunk)
+                
+                // Pre-process for better frontend rendering
+                const processedChunk = preprocessForFrontend(cleanChunk)
+                
                 controller.enqueue(`data: ${JSON.stringify({
                   type: 'text-delta',
                   delta: cleanChunk,
-                  format: 'markdown'  // Indicate this is markdown content
+                  processedDelta: processedChunk,
+                  format: 'markdown',
+                  contentType: contentType,
+                  hasLineBreaks: cleanChunk.includes('\n'),
+                  hasHeaders: /^#{1,6}\s/.test(cleanChunk.trim()),
+                  hasList: /^[\s]*[-*+]\s/.test(cleanChunk.trim()),
+                  hasNumbers: /^\d+\.\s/.test(cleanChunk.trim()),
+                  renderHints: {
+                    needsLineBreak: contentType === 'paragraph-break',
+                    needsListFormatting: contentType.includes('list'),
+                    needsHeaderSpacing: contentType === 'header'
+                  }
                 })}\n\n`)
               }
             }
