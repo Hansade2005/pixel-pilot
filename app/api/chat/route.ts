@@ -4120,6 +4120,101 @@ Let me implement these features step by step.
 - Provide context for decisions and recommendations
 - Acknowledge user's previous work and build upon it
 
+**🔧 CODE BLOCK FORMATTING RULES:**
+
+**CRITICAL**: Always use proper markdown code blocks with language identifiers for syntax highlighting and copy functionality.
+
+**✅ CORRECT CODE BLOCK SYNTAX:**
+
+For SQL queries and database operations:
+\`\`\`sql
+SELECT users.name, COUNT(orders.id) as order_count
+FROM users 
+LEFT JOIN orders ON users.id = orders.user_id
+WHERE users.created_at > '2024-01-01'
+GROUP BY users.id, users.name
+ORDER BY order_count DESC;
+\`\`\`
+
+For TypeScript/JavaScript:
+\`\`\`typescript
+interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: Date;
+}
+
+const fetchUserProfile = async (userId: string): Promise<UserProfile> => {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .single();
+  
+  if (error) throw error;
+  return data;
+};
+\`\`\`
+
+For React components:
+\`\`\`jsx
+export function UserCard({ user }: { user: UserProfile }) {
+  return (
+    <div className="bg-white rounded-lg shadow-md p-6">
+      <h3 className="text-lg font-semibold">{user.name}</h3>
+      <p className="text-gray-600">{user.email}</p>
+    </div>
+  );
+}
+\`\`\`
+
+For CSS/styling:
+\`\`\`css
+.dashboard-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+}
+\`\`\`
+
+**📋 SUPPORTED LANGUAGES:**
+- \`sql\` - For database queries and schema
+- \`typescript\` - For TypeScript code
+- \`javascript\` - For JavaScript code
+- \`jsx\` - For React components
+- \`tsx\` - For TypeScript React components
+- \`css\` - For styling
+- \`bash\` - For terminal commands
+- \`json\` - For configuration files
+- \`yaml\` - For YAML configurations
+- \`html\` - For HTML markup
+- \`python\` - For Python scripts
+
+**❌ NEVER USE:**
+- Plain text blocks without language identifiers
+- Inline code for multi-line examples
+- Inconsistent indentation within code blocks
+
+**💡 CODE BLOCK BEST PRACTICES:**
+- Always include the appropriate language identifier
+- Use consistent indentation (2 or 4 spaces)
+- Add comments to explain complex logic
+- Keep examples focused and concise
+- Ensure all brackets and quotes are properly closed
+- Format code for readability with proper spacing
+
+**🎯 WHEN TO USE CODE BLOCKS:**
+- SQL queries, database schemas, and migrations
+- Complete function implementations
+- React component examples
+- Configuration file contents
+- Terminal commands and scripts
+- CSS styling examples
+- API endpoint definitions
+- Any code snippet longer than one line
+
 **🎯 PERFECT MARKDOWN EXAMPLE:**
 
 🚀 **Creating Advanced Dashboard Component**
@@ -6208,7 +6303,30 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
           if (/^[\s]*[-*+]\s/.test(trimmed)) return 'list-item'
           if (/^\d+\.\s/.test(trimmed)) return 'numbered-list-item'
           if (/^>\s/.test(trimmed)) return 'blockquote'
-          if (/^```/.test(trimmed)) return 'code-block'
+          
+          // Enhanced code block detection with language identification
+          if (/^```/.test(trimmed)) {
+            const languageMatch = trimmed.match(/^```(\w+)/)
+            if (languageMatch) {
+              const language = languageMatch[1].toLowerCase()
+              switch (language) {
+                case 'sql': return 'code-block-sql'
+                case 'typescript': case 'ts': return 'code-block-typescript'
+                case 'javascript': case 'js': return 'code-block-javascript'
+                case 'jsx': return 'code-block-jsx'
+                case 'tsx': return 'code-block-tsx'
+                case 'css': return 'code-block-css'
+                case 'bash': case 'sh': return 'code-block-bash'
+                case 'json': return 'code-block-json'
+                case 'yaml': case 'yml': return 'code-block-yaml'
+                case 'html': return 'code-block-html'
+                case 'python': case 'py': return 'code-block-python'
+                default: return 'code-block-generic'
+              }
+            }
+            return 'code-block'
+          }
+          
           if (/\*\*.*\*\*/.test(trimmed)) return 'bold-text'
           if (/\*.*\*/.test(trimmed)) return 'italic-text'
           if (trimmed.includes('\n\n')) return 'paragraph-break'
@@ -6340,7 +6458,13 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
                   renderHints: {
                     needsLineBreak: contentType === 'paragraph-break',
                     needsListFormatting: contentType.includes('list'),
-                    needsHeaderSpacing: contentType === 'header'
+                    needsHeaderSpacing: contentType === 'header',
+                    needsCopyButton: contentType.includes('code-block'),
+                    isSQLCode: contentType === 'code-block-sql',
+                    isCodeBlock: contentType.includes('code-block'),
+                    codeLanguage: contentType.startsWith('code-block-') 
+                      ? contentType.replace('code-block-', '') 
+                      : null
                   }
                 })}\n\n`)
               }

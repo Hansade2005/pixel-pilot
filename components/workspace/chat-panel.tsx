@@ -3323,6 +3323,33 @@ const HighlightLoader = () => {
   return null
 }
 
+// Enhanced markdown preprocessing for better formatting and emoji support
+function preprocessMarkdownContent(content: string): string {
+  // Ensure proper spacing around headings
+  content = content.replace(/^(#{1,6})\s*(.+)$/gm, (match, hashes, text) => {
+    return `\n${hashes} ${text.trim()}\n`
+  })
+  
+  // Ensure proper spacing around lists
+  content = content.replace(/^(\*|\+|-|\d+\.)\s+(.+)$/gm, (match, marker, text) => {
+    return `${marker} ${text.trim()}`
+  })
+  
+  // Ensure proper spacing around code blocks
+  content = content.replace(/^```(\w*)\n([\s\S]*?)\n```$/gm, (match, language, code) => {
+    return `\n\`\`\`${language}\n${code.trim()}\n\`\`\`\n`
+  })
+  
+  // Ensure proper paragraph spacing
+  content = content.replace(/\n{3,}/g, '\n\n')
+  
+  // Enhance emoji spacing
+  content = content.replace(/([^\\s])([🎯📌▶◆💡🔍⭐️✅❌⚡️🚀🎉💪🤖🛠️📋🔧💻🎨📊🔒🌟💰🎪🎭🎨🎵🎮🎯🎲🎰🎳🎯🎪🎭🎨🎵🎮🎯🎲🎰🎳])/g, '$1 $2')
+  content = content.replace(/([🎯📌▶◆💡🔍⭐️✅❌⚡️🚀🎉💪🤖🛠️📋🔧💻🎨📊🔒🌟💰🎪🎭🎨🎵🎮🎯🎲🎰🎳🎯🎪🎭🎨🎵🎮🎯🎲🎰🎳])([^\\s])/g, '$1 $2')
+  
+  return content.trim()
+}
+
 export function ChatPanel({
   project,
   isMobile = false,
@@ -5510,47 +5537,197 @@ export function ChatPanel({
                                             const match = /language-(\w+)/.exec(className || '')
                                             const language = match ? match[1] : ''
                                             const isInline = !className
+                                            const codeString = String(children).replace(/\n$/, '')
+                                            
+                                            // Copy function for code blocks
+                                            const handleCopy = async () => {
+                                              try {
+                                                await navigator.clipboard.writeText(codeString)
+                                                toast({
+                                                  title: "✅ Copied!",
+                                                  description: "Code copied to clipboard",
+                                                  duration: 2000,
+                                                })
+                                              } catch (err) {
+                                                toast({
+                                                  title: "❌ Copy failed",
+                                                  description: "Failed to copy code to clipboard",
+                                                  variant: "destructive",
+                                                  duration: 3000,
+                                                })
+                                              }
+                                            }
                                             
                                             return isInline ? (
-                                                <code className="bg-gray-600 px-1.5 py-0.5 rounded text-sm font-mono border border-gray-500 text-white" {...props}>
+                                              <code className="bg-gray-700/80 px-2 py-1 rounded-md text-sm font-mono border border-gray-600 text-green-300 backdrop-blur-sm" {...props}>
                                                 {children}
                                               </code>
                                             ) : (
-                                              <div className="my-4">
-                                                  <div className="bg-gray-600 border border-gray-500 rounded-lg overflow-hidden">
-                                                    <div className="px-3 py-2 bg-gray-500 border-b border-gray-500 text-xs font-medium text-white">
-                                                    {language || 'code'}
+                                              <div className="my-6 group relative">
+                                                <div className="bg-gradient-to-r from-gray-800 to-gray-700 border border-gray-600 rounded-lg overflow-hidden shadow-lg">
+                                                  {/* Header with language and copy button */}
+                                                  <div className="flex items-center justify-between px-4 py-2 bg-gray-700/90 border-b border-gray-600">
+                                                    <div className="flex items-center gap-2">
+                                                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                                                      <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                                                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                                                      <span className="ml-2 text-xs font-semibold text-gray-300 uppercase tracking-wide">
+                                                        {language || 'code'}
+                                                      </span>
+                                                    </div>
+                                                    <button
+                                                      onClick={handleCopy}
+                                                      className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-gray-600 hover:bg-gray-500 text-gray-200 hover:text-white transition-all duration-200 opacity-0 group-hover:opacity-100"
+                                                      title="Copy code"
+                                                    >
+                                                      <Copy size={12} />
+                                                      Copy
+                                                    </button>
                                                   </div>
-                                                  <pre className="p-4 overflow-x-auto bg-[#2e2e2e]">
-                                                      <code className={`hljs ${language ? `language-${language}` : ''} text-sm text-white`}>
-                                                      {children}
-                                                    </code>
-                                                  </pre>
+                                                  
+                                                  {/* Code content */}
+                                                  <div className="relative">
+                                                    <pre className="p-4 overflow-x-auto bg-gray-900/50 backdrop-blur-sm">
+                                                      <code className={`hljs ${language ? `language-${language}` : ''} text-sm text-gray-100 leading-relaxed`}>
+                                                        {children}
+                                                      </code>
+                                                    </pre>
+                                                  </div>
                                                 </div>
                                               </div>
                                             );
                                           },
-                                          p: ({ children }) => (
-                                              <p className="text-white leading-[1.5]  text-sm mb-3 last:mb-0 font-medium">{children}</p>
-                                          ),
+                                          
+                                          // Enhanced paragraph rendering with proper spacing
+                                          p: ({ children }) => {
+                                            const text = String(children).trim()
+                                            // Add proper spacing for paragraphs
+                                            return (
+                                              <p className="text-gray-100 leading-[1.7] text-sm mb-4 last:mb-0 font-normal tracking-wide">
+                                                {children}
+                                                {/* Auto-add period if missing for long paragraphs */}
+                                                {text.length > 50 && !text.match(/[.!?]$/) && text.split(' ').length > 8 && '.'}
+                                              </p>
+                                            )
+                                          },
+                                          
+                                          // Enhanced list rendering with better spacing
                                           ul: ({ children }) => (
-                                              <ul className="list-disc list-inside space-y-1 text-white mb-3">{children}</ul>
+                                            <ul className="list-disc list-outside space-y-2 text-gray-100 mb-4 pl-6">
+                                              {children}
+                                            </ul>
                                           ),
+                                          
                                           ol: ({ children }) => (
-                                              <ol className="list-decimal list-inside space-y-1 text-white mb-3">{children}</ol>
+                                            <ol className="list-decimal list-outside space-y-2 text-gray-100 mb-4 pl-6">
+                                              {children}
+                                            </ol>
                                           ),
+                                          
+                                          // Enhanced list items with custom styling
+                                          li: ({ children }) => (
+                                            <li className="text-sm leading-relaxed mb-1">
+                                              <div className="flex items-start gap-2">
+                                                <div className="flex-1">{children}</div>
+                                              </div>
+                                            </li>
+                                          ),
+                                          
+                                          // Enhanced heading rendering with emojis and better spacing
                                           h1: ({ children }) => (
-                                              <h1 className="text-lg font-bold mb-3 text-white">{children}</h1>
+                                            <h1 className="text-xl font-bold mb-4 mt-6 text-white border-b border-gray-600 pb-2 flex items-center gap-2">
+                                              <span className="text-yellow-400">🎯</span>
+                                              {children}
+                                            </h1>
                                           ),
+                                          
                                           h2: ({ children }) => (
-                                              <h2 className="text-base font-bold mb-2 text-white">{children}</h2>
+                                            <h2 className="text-lg font-bold mb-3 mt-5 text-white flex items-center gap-2">
+                                              <span className="text-blue-400">📌</span>
+                                              {children}
+                                            </h2>
                                           ),
+                                          
                                           h3: ({ children }) => (
-                                              <h3 className="text-sm font-bold mb-2 text-white">{children}</h3>
+                                            <h3 className="text-base font-semibold mb-2 mt-4 text-gray-200 flex items-center gap-2">
+                                              <span className="text-green-400">▶</span>
+                                              {children}
+                                            </h3>
+                                          ),
+                                          
+                                          h4: ({ children }) => (
+                                            <h4 className="text-sm font-semibold mb-2 mt-3 text-gray-300 flex items-center gap-2">
+                                              <span className="text-purple-400">◆</span>
+                                              {children}
+                                            </h4>
+                                          ),
+                                          
+                                          // Enhanced blockquote with better styling
+                                          blockquote: ({ children }) => (
+                                            <blockquote className="border-l-4 border-blue-500 bg-gray-800/50 pl-4 pr-4 py-3 my-4 italic text-gray-300 rounded-r-lg backdrop-blur-sm">
+                                              <div className="flex items-start gap-2">
+                                                <span className="text-blue-400 text-lg">💡</span>
+                                                <div className="flex-1">{children}</div>
+                                              </div>
+                                            </blockquote>
+                                          ),
+                                          
+                                          // Enhanced table rendering
+                                          table: ({ children }) => (
+                                            <div className="my-4 overflow-x-auto rounded-lg border border-gray-600">
+                                              <table className="w-full text-sm">
+                                                {children}
+                                              </table>
+                                            </div>
+                                          ),
+                                          
+                                          thead: ({ children }) => (
+                                            <thead className="bg-gray-700">
+                                              {children}
+                                            </thead>
+                                          ),
+                                          
+                                          tbody: ({ children }) => (
+                                            <tbody className="bg-gray-800/50">
+                                              {children}
+                                            </tbody>
+                                          ),
+                                          
+                                          th: ({ children }) => (
+                                            <th className="px-4 py-2 text-left font-semibold text-gray-200 border-b border-gray-600">
+                                              {children}
+                                            </th>
+                                          ),
+                                          
+                                          td: ({ children }) => (
+                                            <td className="px-4 py-2 text-gray-300 border-b border-gray-700">
+                                              {children}
+                                            </td>
+                                          ),
+                                          
+                                          // Enhanced link rendering
+                                          a: ({ href, children }) => (
+                                            <a 
+                                              href={href} 
+                                              target="_blank" 
+                                              rel="noopener noreferrer"
+                                              className="text-blue-400 hover:text-blue-300 underline decoration-blue-400/50 hover:decoration-blue-300 transition-colors duration-200"
+                                            >
+                                              {children}
+                                            </a>
+                                          ),
+                                          
+                                          // Enhanced horizontal rule
+                                          hr: () => (
+                                            <div className="my-6 flex items-center">
+                                              <div className="flex-1 border-t border-gray-600"></div>
+                                              <span className="px-3 text-gray-500 text-xs">⬥</span>
+                                              <div className="flex-1 border-t border-gray-600"></div>
+                                            </div>
                                           ),
                                         }}
                                       >
-                                        {msg.content}
+                                        {preprocessMarkdownContent(msg.content)}
                                       </ReactMarkdown>
                                     </div>
                                   )
