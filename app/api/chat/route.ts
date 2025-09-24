@@ -42,7 +42,28 @@ const getMistralPixtralModel = () => {
   }
 }
 
-// Enhanced Memory System for AI Context Awareness (XML-Based)
+// JSON File Operation Interface for Memory System
+interface JSONFileOperation {
+  jsonTool: 'write_file' | 'edit_file' | 'delete_file'
+  filePath: string
+  fileName: string
+  purpose: string
+  changeSummary: string
+  contentPreview?: string
+  searchReplacePattern?: {
+    search: string
+    replace: string
+  }
+  searchReplaceBlocks?: Array<{
+    oldCode: string
+    newCode: string
+  }>
+  timestamp: string
+  extractedFromResponse: boolean
+  toolCallId?: string
+}
+
+// Enhanced Memory System for AI Context Awareness (JSON-Based)
 interface AIStreamMemory {
   id: string
   timestamp: string
@@ -50,7 +71,7 @@ interface AIStreamMemory {
   userId: string
   userMessage: string
   aiResponse?: string
-  xmlOperations: XMLFileOperation[]
+  jsonOperations: JSONFileOperation[]
   conversationContext: {
     semanticSummary: string
     keyInsights: string[]
@@ -65,7 +86,7 @@ interface AIStreamMemory {
     duplicateActions: string[]
     fileAccessPatterns: string[]
     userIntentPatterns: string[]
-    xmlCommandPatterns: string[]
+    jsonToolPatterns: string[]
   }
   actionSummary: {
     filesCreated: string[]
@@ -76,174 +97,176 @@ interface AIStreamMemory {
   }
 }
 
-interface XMLFileOperation {
-  xmlCommand: 'pilotwrite' | 'pilotedit' | 'pilotdelete'
-  filePath: string
-  fileName: string
-  purpose: string
-  changeSummary: string
-  contentPreview?: string
-  searchReplacePattern?: {
-    search: string
-    replace: string
-  }
-  timestamp: string
-  extractedFromResponse: boolean
-}
-
 // Memory Storage for streaming API
 const aiStreamMemoryStore = new Map<string, AIStreamMemory[]>() // projectId -> memory array
 
-// XML Command Analysis Functions
-function extractXMLOperationsFromResponse(aiResponse: string): XMLFileOperation[] {
-  const operations: XMLFileOperation[] = []
+// JSON Tool Analysis Functions
+function extractJSONOperationsFromResponse(aiResponse: string, toolCalls?: any[]): JSONFileOperation[] {
+  const operations: JSONFileOperation[] = []
   const timestamp = new Date().toISOString()
   
-  // Extract pilotwrite commands
-  const writeMatches = aiResponse.match(/<pilotwrite\s+path="([^"]+)"[^>]*>([\s\S]*?)<\/pilotwrite>/gi)
-  if (writeMatches) {
-    writeMatches.forEach(match => {
-      const pathMatch = match.match(/path="([^"]+)"/)
-      const contentMatch = match.match(/<pilotwrite[^>]*>([\s\S]*?)<\/pilotwrite>/i)
-      
-      if (pathMatch && contentMatch) {
-        const filePath = pathMatch[1]
-        const content = contentMatch[1]
+  // If we have actual tool calls from the AI stream, use those
+  if (toolCalls && toolCalls.length > 0) {
+    toolCalls.forEach(toolCall => {
+      if (toolCall.toolName && ['write_file', 'edit_file', 'delete_file'].includes(toolCall.toolName)) {
+        const args = toolCall.args || {}
+        const filePath = args.path || ''
         
-        operations.push({
-          xmlCommand: 'pilotwrite',
-          filePath,
-          fileName: filePath.split('/').pop() || filePath,
-          purpose: inferPurposeFromContent(content, filePath),
-          changeSummary: generateChangeSummary('create/update', filePath, content),
-          contentPreview: content.substring(0, 200) + (content.length > 200 ? '...' : ''),
-          timestamp,
-          extractedFromResponse: true
-        })
+        if (filePath) {
+          const operation: JSONFileOperation = {
+            jsonTool: toolCall.toolName as 'write_file' | 'edit_file' | 'delete_file',
+            filePath,
+            fileName: filePath.split('/').pop() || filePath,
+            purpose: inferPurposeFromTool(toolCall.toolName, args, filePath),
+            changeSummary: generateChangeSummary(toolCall.toolName, filePath, args),
+            timestamp,
+            extractedFromResponse: false,
+            toolCallId: toolCall.toolCallId
+          }
+          
+          // Add content preview for write/edit operations
+          if (args.content) {
+            operation.contentPreview = args.content.substring(0, 200) + (args.content.length > 200 ? '...' : '')
+          }
+          
+          // Add search/replace patterns for edit operations
+          if (toolCall.toolName === 'edit_file' && args.searchReplaceBlocks) {
+            operation.searchReplaceBlocks = args.searchReplaceBlocks.map((block: any) => ({
+              oldCode: block.oldCode || block.search || '',
+              newCode: block.newCode || block.replace || ''
+            }))
+          }
+          
+          operations.push(operation)
+        }
       }
     })
   }
   
-  // Extract pilotedit commands
-  const editMatches = aiResponse.match(/<pilotedit\s+[^>]*>/gi)
-  if (editMatches) {
-    editMatches.forEach(match => {
-      const pathMatch = match.match(/path="([^"]+)"/)
-      const searchMatch = match.match(/search="([^"]*)"/)
-      const replaceMatch = match.match(/replace="([^"]*)"/)
-      
-      if (pathMatch) {
-        const filePath = pathMatch[1]
-        const searchText = searchMatch ? searchMatch[1] : ''
-        const replaceText = replaceMatch ? replaceMatch[1] : ''
-        
-        operations.push({
-          xmlCommand: 'pilotedit',
-          filePath,
-          fileName: filePath.split('/').pop() || filePath,
-          purpose: inferPurposeFromEdit(searchText, replaceText, filePath),
-          changeSummary: generateChangeSummary('edit', filePath, `${searchText} → ${replaceText}`),
-          searchReplacePattern: {
-            search: searchText,
-            replace: replaceText
-          },
-          timestamp,
-          extractedFromResponse: true
-        })
-      }
-    })
-  }
-  
-  // Extract pilotdelete commands
-  const deleteMatches = aiResponse.match(/<pilotdelete\s+path="([^"]+)"[^>]*>/gi)
-  if (deleteMatches) {
-    deleteMatches.forEach(match => {
-      const pathMatch = match.match(/path="([^"]+)"/)
-      
-      if (pathMatch) {
-        const filePath = pathMatch[1]
-        
-        operations.push({
-          xmlCommand: 'pilotdelete',
-          filePath,
-          fileName: filePath.split('/').pop() || filePath,
-          purpose: `Delete file: ${filePath}`,
-          changeSummary: generateChangeSummary('delete', filePath, ''),
-          timestamp,
-          extractedFromResponse: true
-        })
-      }
-    })
+  // Fallback: Parse JSON tool calls from response text (for backward compatibility)
+  if (operations.length === 0) {
+    // Look for JSON code blocks that contain tool calls
+    const jsonBlocks = aiResponse.match(/```json\s*\n([\s\S]*?)\n```/gi)
+    if (jsonBlocks) {
+      jsonBlocks.forEach(block => {
+        try {
+          const jsonContent = block.replace(/```json\s*\n?/, '').replace(/\n?```/, '').trim()
+          const parsed = JSON.parse(jsonContent)
+          
+          if (parsed.tool && ['write_file', 'edit_file', 'delete_file'].includes(parsed.tool) && parsed.path) {
+            operations.push({
+              jsonTool: parsed.tool as 'write_file' | 'edit_file' | 'delete_file',
+              filePath: parsed.path,
+              fileName: parsed.path.split('/').pop() || parsed.path,
+              purpose: inferPurposeFromTool(parsed.tool, parsed, parsed.path),
+              changeSummary: generateChangeSummary(parsed.tool, parsed.path, parsed),
+              contentPreview: parsed.content ? parsed.content.substring(0, 200) + (parsed.content.length > 200 ? '...' : '') : undefined,
+              searchReplaceBlocks: parsed.searchReplaceBlocks,
+              timestamp,
+              extractedFromResponse: true
+            })
+          }
+        } catch (error) {
+          // Ignore invalid JSON blocks
+        }
+      })
+    }
   }
   
   return operations
 }
 
-// Helper function to infer purpose from file content
-function inferPurposeFromContent(content: string, filePath: string): string {
+// Helper function to infer purpose from JSON tool
+function inferPurposeFromTool(toolName: string, args: any, filePath: string): string {
   const fileExt = filePath.split('.').pop()?.toLowerCase()
   
-  // Analyze content for patterns
-  if (content.includes('export default') || content.includes('export function')) {
-    return `Create/update ${fileExt} component or utility`
+  switch (toolName) {
+    case 'write_file':
+      const content = args.content || ''
+      // Analyze content for patterns
+      if (content.includes('export default') || content.includes('export function')) {
+        return `Create/update ${fileExt} component or utility`
+      }
+      if (content.includes('interface ') || content.includes('type ')) {
+        return `Define TypeScript types and interfaces`
+      }
+      if (content.includes('useState') || content.includes('useEffect')) {
+        return `Create React component with hooks`
+      }
+      if (content.includes('API') || content.includes('fetch') || content.includes('POST')) {
+        return `Implement API functionality`
+      }
+      if (content.includes('style') || content.includes('className')) {
+        return `Add styling and UI elements`
+      }
+      return `Create/update ${fileExt} file`
+      
+    case 'edit_file':
+      const blocks = args.searchReplaceBlocks || []
+      if (blocks.length > 0) {
+        const firstBlock = blocks[0]
+        const oldCode = firstBlock.oldCode || firstBlock.search || ''
+        const newCode = firstBlock.newCode || firstBlock.replace || ''
+        
+        if (oldCode.includes('function') && newCode.includes('function')) {
+          return `Modify function logic in ${filePath}`
+        }
+        if (oldCode.includes('import') || newCode.includes('import')) {
+          return `Update imports in ${filePath}`
+        }
+        if (oldCode.includes('interface') || newCode.includes('interface')) {
+          return `Update type definitions in ${filePath}`
+        }
+        if (oldCode.includes('style') || newCode.includes('className')) {
+          return `Update styling in ${filePath}`
+        }
+      }
+      return `Edit content in ${filePath}`
+      
+    case 'delete_file':
+      return `Delete file: ${filePath}`
+      
+    default:
+      return `Update ${fileExt} file`
   }
-  if (content.includes('interface ') || content.includes('type ')) {
-    return `Define TypeScript types and interfaces`
-  }
-  if (content.includes('useState') || content.includes('useEffect')) {
-    return `Create React component with hooks`
-  }
-  if (content.includes('API') || content.includes('fetch') || content.includes('POST')) {
-    return `Implement API functionality`
-  }
-  if (content.includes('style') || content.includes('className')) {
-    return `Add styling and UI elements`
-  }
-  
-  return `Update ${fileExt} file`
-}
-
-// Helper function to infer purpose from edit operation
-function inferPurposeFromEdit(searchText: string, replaceText: string, filePath: string): string {
-  if (searchText.includes('function') && replaceText.includes('function')) {
-    return `Modify function logic in ${filePath}`
-  }
-  if (searchText.includes('import') || replaceText.includes('import')) {
-    return `Update imports in ${filePath}`
-  }
-  if (searchText.includes('interface') || replaceText.includes('interface')) {
-    return `Update type definitions in ${filePath}`
-  }
-  if (searchText.includes('style') || replaceText.includes('className')) {
-    return `Update styling in ${filePath}`
-  }
-  
-  return `Edit content in ${filePath}`
 }
 
 // Helper function to generate change summary
-function generateChangeSummary(operationType: string, filePath: string, content: string): string {
+function generateChangeSummary(toolName: string, filePath: string, args: any): string {
   const fileName = filePath.split('/').pop() || filePath
   
-  switch (operationType) {
-    case 'create/update':
+  switch (toolName) {
+    case 'write_file':
+      const content = args.content || ''
       const lines = content.split('\n').length
-      return `${operationType} ${fileName} (${lines} lines)`
-    case 'edit':
-      return `Edit ${fileName}: ${content.substring(0, 100)}${content.length > 100 ? '...' : ''}`
-    case 'delete':
+      return `Create/update ${fileName} (${lines} lines)`
+      
+    case 'edit_file':
+      const blocks = args.searchReplaceBlocks || []
+      if (blocks.length > 0) {
+        const summary = blocks.map((block: any, i: number) => {
+          const oldCode = (block.oldCode || block.search || '').substring(0, 50)
+          const newCode = (block.newCode || block.replace || '').substring(0, 50)
+          return `${i + 1}: ${oldCode}... → ${newCode}...`
+        }).join('; ')
+        return `Edit ${fileName}: ${summary}`
+      }
+      return `Edit ${fileName}`
+      
+    case 'delete_file':
       return `Delete ${fileName}`
+      
     default:
-      return `${operationType} ${fileName}`
+      return `${toolName} ${fileName}`
   }
 }
 
-// AI-Enhanced Memory Processing for XML Operations
+// AI-Enhanced Memory Processing for JSON Operations
 async function processStreamMemoryWithAI(
   userMessage: string,
   aiResponse: string,
   projectContext: string,
-  xmlOperations: XMLFileOperation[],
+  jsonOperations: JSONFileOperation[],
   projectId: string
 ) {
   try {
@@ -256,16 +279,16 @@ async function processStreamMemoryWithAI(
     const enhancedMemory = await generateText({
       model: mistralPixtral,
       messages: [
-        { role: 'system', content: 'You are an AI assistant analyzing development conversations and XML file operations.' },
+        { role: 'system', content: 'You are an AI assistant analyzing development conversations and JSON tool operations.' },
         { role: 'user', content: `Analyze this development interaction and provide intelligent insights:
 
 User Message: "${userMessage}"
 AI Response: "${aiResponse.substring(0, 1000)}${aiResponse.length > 1000 ? '...' : ''}"
 Project Context: ${projectContext}
-XML Operations: ${JSON.stringify(xmlOperations, null, 2)}
+JSON Tool Operations: ${JSON.stringify(jsonOperations, null, 2)}
 Previous Context: ${JSON.stringify(recentMemories.map(m => ({
   userMessage: m.userMessage,
-  xmlOps: m.xmlOperations.map(op => `${op.xmlCommand}: ${op.filePath}`),
+  jsonOps: m.jsonOperations.map(op => `${op.jsonTool}: ${op.filePath}`),
   purpose: m.actionSummary.mainPurpose
 })), null, 2)}
 
@@ -326,17 +349,17 @@ Focus on tracking what files were manipulated, why, and preventing duplicate wor
       console.warn('Failed to parse AI memory enhancement, using fallback:', parseError)
       return {
         semanticSummary: 'Development interaction completed',
-        keyInsights: ['XML operations executed'],
-        technicalPatterns: ['XML-based file operations'],
-        architecturalDecisions: ['File manipulation via XML commands'],
+        keyInsights: ['JSON tool operations executed'],
+        technicalPatterns: ['JSON-based file operations'],
+        architecturalDecisions: ['File manipulation via JSON tools'],
         nextLogicalSteps: ['Continue development'],
         potentialImprovements: ['Monitor for duplicates'],
         relevanceScore: 0.7,
-        contextForFuture: 'XML operations performed',
+        contextForFuture: 'JSON tool operations performed',
         duplicateActions: [],
-        fileAccessPatterns: xmlOperations.map(op => `${op.xmlCommand}:${op.filePath}`),
-        mainPurpose: 'File operations via XML',
-        keyChanges: xmlOperations.map(op => op.changeSummary)
+        fileAccessPatterns: jsonOperations.map(op => `${op.jsonTool}:${op.filePath}`),
+        mainPurpose: 'File operations via JSON tools',
+        keyChanges: jsonOperations.map(op => op.changeSummary)
       }
     }
   } catch (error) {
@@ -344,7 +367,7 @@ Focus on tracking what files were manipulated, why, and preventing duplicate wor
     return {
       semanticSummary: 'Memory processing completed',
       keyInsights: ['Development work tracked'],
-      technicalPatterns: ['XML operations'],
+      technicalPatterns: ['JSON tool operations'],
       architecturalDecisions: ['Client-side file manipulation'],
       nextLogicalSteps: ['Continue development'],
       potentialImprovements: ['Add error handling'],
@@ -366,15 +389,15 @@ async function storeStreamMemory(
   aiResponse: string,
   projectContext: string
 ): Promise<AIStreamMemory> {
-  // Extract XML operations from AI response
-  const xmlOperations = extractXMLOperationsFromResponse(aiResponse)
+  // Extract JSON operations from AI response
+  const jsonOperations = extractJSONOperationsFromResponse(aiResponse)
   
   // Process memory with AI
   const memoryAnalysis = await processStreamMemoryWithAI(
     userMessage,
     aiResponse,
     projectContext,
-    xmlOperations,
+    jsonOperations,
     projectId
   )
   
@@ -386,7 +409,7 @@ async function storeStreamMemory(
     userId,
     userMessage,
     aiResponse,
-    xmlOperations,
+    jsonOperations,
     conversationContext: {
       semanticSummary: memoryAnalysis.semanticSummary,
       keyInsights: memoryAnalysis.keyInsights,
@@ -401,12 +424,12 @@ async function storeStreamMemory(
       duplicateActions: memoryAnalysis.duplicateActions,
       fileAccessPatterns: memoryAnalysis.fileAccessPatterns,
       userIntentPatterns: [extractUserIntentPattern(userMessage)],
-      xmlCommandPatterns: xmlOperations.map(op => `${op.xmlCommand}:${op.fileName}`)
+      jsonToolPatterns: jsonOperations.map((op: JSONFileOperation) => `${op.jsonTool}:${op.fileName}`)
     },
     actionSummary: {
-      filesCreated: xmlOperations.filter(op => op.xmlCommand === 'pilotwrite').map(op => op.filePath),
-      filesModified: xmlOperations.filter(op => op.xmlCommand === 'pilotedit').map(op => op.filePath),
-      filesDeleted: xmlOperations.filter(op => op.xmlCommand === 'pilotdelete').map(op => op.filePath),
+      filesCreated: jsonOperations.filter((op: JSONFileOperation) => op.jsonTool === 'write_file').map((op: JSONFileOperation) => op.filePath),
+      filesModified: jsonOperations.filter((op: JSONFileOperation) => op.jsonTool === 'edit_file').map((op: JSONFileOperation) => op.filePath),
+      filesDeleted: jsonOperations.filter((op: JSONFileOperation) => op.jsonTool === 'delete_file').map((op: JSONFileOperation) => op.filePath),
       mainPurpose: memoryAnalysis.mainPurpose,
       keyChanges: memoryAnalysis.keyChanges
     }
@@ -471,8 +494,8 @@ function getStreamContextForRequest(projectId: string, userMessage: string): {
     }
     
     // Collect previous actions
-    memory.xmlOperations.forEach(op => {
-      previousActions.push(`${op.xmlCommand}: ${op.filePath} - ${op.purpose}`)
+    memory.jsonOperations.forEach(op => {
+  previousActions.push(`${op.jsonTool}: ${op.filePath} - ${op.purpose}`)
     })
   })
   
@@ -494,7 +517,7 @@ export function getMemoryState(projectId: string): {
   totalMemories: number
   recentMemories: AIStreamMemory[]
   memoryStats: {
-    totalXMLOperations: number
+    totalJSONOperations: number
     filesCreated: number
     filesModified: number
     filesDeleted: number
@@ -504,14 +527,14 @@ export function getMemoryState(projectId: string): {
   const memories = aiStreamMemoryStore.get(projectId) || []
   const recentMemories = memories.slice(-10)
   
-  let totalXMLOperations = 0
+  let totalJSONOperations = 0
   let filesCreated = 0
   let filesModified = 0
   let filesDeleted = 0
   let totalRelevanceScore = 0
   
   memories.forEach(memory => {
-    totalXMLOperations += memory.xmlOperations.length
+    totalJSONOperations += memory.jsonOperations.length
     filesCreated += memory.actionSummary.filesCreated.length
     filesModified += memory.actionSummary.filesModified.length
     filesDeleted += memory.actionSummary.filesDeleted.length
@@ -522,7 +545,7 @@ export function getMemoryState(projectId: string): {
     totalMemories: memories.length,
     recentMemories,
     memoryStats: {
-      totalXMLOperations,
+      totalJSONOperations,
       filesCreated,
       filesModified,
       filesDeleted,
@@ -4310,40 +4333,100 @@ ${memoryContext.relevantMemories?.length > 0
 
 </role>
 
-# XML Commands for File Operations
+# JSON Tool Commands for File Operations
 
-Do *not* tell the user to run shell commands. Instead, use XML commands for all file operations:
+Do *not* tell the user to run shell commands. Instead, use JSON tool commands for all file operations:
 
-- **pilotwrite**: Create or overwrite files with complete content
-- **pilotedit**: Edit existing files with search/replace operations  
-- **pilotdelete**: Delete files from the project
+- **write_file**: Create or overwrite files with complete content
+- **edit_file**: Edit existing files with search/replace operations  
+- **delete_file**: Delete files from the project
 
-You can use these commands by using XML tags directly in your response like this (DO NOT wrap them in code blocks):
+You can use these commands by embedding JSON tools in code blocks in your response like this:
 
-<pilotwrite path="src/components/Example.tsx">
-import React from 'react';
-
-export default function Example() {
-  return <div>Professional implementation</div>;
+\`\`\`json
+{
+  "tool": "write_file",
+  "path": "src/components/Example.tsx",
+  "content": "import React from 'react';\\n\\nexport default function Example() {\\n  return <div>Professional implementation</div>;\\n}"
 }
-</pilotwrite>
+\`\`\`
 
-<pilotedit path="src/App.tsx" operation="search_replace" search="old code here" replace="new code here">
-</pilotedit>
+**🚀 ADVANCED EDIT_FILE PARAMETERS:**
 
-<pilotdelete path="src/old-file.ts">
-</pilotdelete>
+Multi-operation editing with validation:
+\`\`\`json
+{
+  "tool": "edit_file",
+  "path": "src/components/Example.tsx",
+  "searchReplaceBlocks": [
+    {
+      "search": "const [count, setCount] = useState(0);",
+      "replace": "const [count, setCount] = useState(0);\\n  const [loading, setLoading] = useState(false);"
+    },
+    {
+      "search": "onClick={() => setCount(count + 1)}",
+      "replace": "onClick={() => {\\n    setLoading(true);\\n    setCount(count + 1);\\n    setLoading(false);\\n  }}",
+      "validateAfter": "setLoading(false)"
+    }
+  ],
+  "rollbackOnFailure": true
+}
+\`\`\`
+
+Target specific occurrences:
+\`\`\`json
+{
+  "tool": "edit_file",
+  "path": "src/utils/helpers.ts",
+  "search": "const result",
+  "replace": "const processedResult",
+  "occurrenceIndex": 2
+}
+\`\`\`
+
+Replace all occurrences with validation:
+\`\`\`json
+{
+  "tool": "edit_file",
+  "path": "src/types/index.ts",
+  "search": "UserData",
+  "replace": "ProfileData",
+  "replaceAll": true,
+  "validateAfter": "interface ProfileData"
+}
+\`\`\`
+
+Dry run preview (test changes without applying):
+\`\`\`json
+{
+  "tool": "edit_file",
+  "path": "src/App.tsx",
+  "dryRun": true,
+  "searchReplaceBlocks": [
+    {
+      "search": "function App()",
+      "replace": "async function App()"
+    }
+  ]
+}
+\`\`\`
+
+\`\`\`json
+{
+  "tool": "delete_file",
+  "path": "src/old-file.ts"
+}
+\`\`\`
 
 **CRITICAL FORMATTING RULES:**
-- Write XML commands directly in your response as plain text
-- DO NOT wrap XML commands in markdown code blocks (\`\`\`xml or \`\`\`)
-- DO NOT use backticks around XML commands
-- DO NOT add any extra formatting around XML commands
-- The XML tags should appear as regular text in your response
-- **ALWAYS use opening and closing tags for ALL XML commands (pilotwrite, pilotedit, pilotdelete)**
-- **NO self-closing tags - all XML commands must have both opening and closing tags**
-- **NEVER put comments or explanations inside pilotedit and pilotdelete tags - leave them empty**
-- **Only pilotwrite tags should contain the actual file content**
+- **ALWAYS wrap JSON tool commands in markdown code blocks with \`\`\`json**
+- Use proper JSON syntax with double quotes for all strings
+- Escape newlines in content as \\n for proper JSON formatting
+- Use the exact field names: "tool", "path", "content", "operation", "search", "replace"
+- **Supported tool names**: "write_file", "edit_file", "delete_file" (also supports legacy names: "pilotwrite", "pilotedit", "pilotdelete")
+- **Never use XML format** - only JSON in code blocks
+- Each tool command must be a separate JSON code block
+- The JSON must be valid and properly formatted
 
 # Guidelines
 
@@ -4375,16 +4458,18 @@ If new code needs to be written (i.e., the requested feature does not exist), yo
 
 - Briefly explain the needed changes in a few short sentences, without being too technical.
 - **Reference Memory Context**: Mention if you're building upon previous work or creating something new
-- Use <pilotwrite> for creating or updating files. Try to create small, focused files that will be easy to maintain.
-- Use <pilotedit> for modifying existing files with search/replace operations.
-- Use <pilotdelete> for removing files.
+- Use JSON tool commands in code blocks for file operations:
+  - \`\`\`json { "tool": "write_file", "path": "...", "content": "..." } \`\`\` for creating or updating files
+  - \`\`\`json { "tool": "edit_file", "path": "...", "operation": "search_replace", "search": "...", "replace": "..." } \`\`\` for modifying existing files
+  - \`\`\`json { "tool": "delete_file", "path": "..." } \`\`\` for removing files
+- Create small, focused files that will be easy to maintain.
 - After all of the code changes, provide a VERY CONCISE, non-technical summary of the changes made in one sentence.
 
 Before sending your final answer, review every import statement you output and do the following:
 
 First-party imports (modules that live in this project)
 - Only import files/modules that have already been described to you OR shown in your memory context.
-- If you need a project file that does not yet exist, create it immediately with <pilotwrite> before finishing your response.
+- If you need a project file that does not yet exist, create it immediately with JSON tool commands before finishing your response.
 
 Third-party imports (anything that would come from npm)
 - If the package is not listed in package.json, inform the user that the package needs to be installed.
@@ -4397,15 +4482,25 @@ Do not leave any import unresolved.
 
 Based on my memory context, I can see you already have a basic Button component. I'll enhance it with additional variants and functionality rather than creating a new one.
 
-<pilotedit path="src/components/Button.tsx" operation="search_replace" search="variant?: 'primary' | 'secondary' | 'danger';" replace="variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'warning';">
-</pilotedit>
+\`\`\`json
+{
+  "tool": "edit_file",
+  "path": "src/components/Button.tsx",
+  "operation": "search_replace",
+  "search": "variant?: 'primary' | 'secondary' | 'danger';",
+  "replace": "variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'warning';"
+}
+\`\`\`
 
-<pilotedit path="src/components/Button.tsx" operation="search_replace" search="const variantClasses = {
-    primary: \"bg-blue-600 hover:bg-blue-700 text-white\",
-    secondary: \"bg-gray-200 hover:bg-gray-300 text-gray-800\",
-    danger: \"bg-red-600 hover:bg-red-700 text-white\"
-  };" replace="const variantClasses = {
-    primary: \"bg-blue-600 hover:bg-blue-700 text-white\",
+\`\`\`json
+{
+  "tool": "edit_file",
+  "path": "src/components/Button.tsx", 
+  "operation": "search_replace",
+  "search": "const variantClasses = {\\n    primary: \\\"bg-blue-600 hover:bg-blue-700 text-white\\\",\\n    secondary: \\\"bg-gray-200 hover:bg-gray-300 text-gray-800\\\",\\n    danger: \\\"bg-red-600 hover:bg-red-700 text-white\\\"\\n  };",
+  "replace": "const variantClasses = {\\n    primary: \\\"bg-blue-600 hover:bg-blue-700 text-white\\\",\\n    secondary: \\\"bg-gray-200 hover:bg-gray-300 text-gray-800\\\",\\n    danger: \\\"bg-red-600 hover:bg-red-700 text-white\\\",\\n    success: \\\"bg-green-600 hover:bg-green-700 text-white\\\",\\n    warning: \\\"bg-yellow-600 hover:bg-yellow-700 text-white\\\"\\n  };"
+}
+\`\`\`
     secondary: \"bg-gray-200 hover:bg-gray-300 text-gray-800\",
     danger: \"bg-red-600 hover:bg-red-700 text-white\",
     success: \"bg-green-600 hover:bg-green-700 text-white\",
@@ -4419,8 +4514,15 @@ I've enhanced your existing Button component with success and warning variants, 
 
 Looking at my memory context, I can see you've already created several components in this session. I'll build upon your existing navigation structure rather than creating a new one.
 
-<pilotedit path="src/App.tsx" operation="search_replace" search="<nav className=\"mb-4\">" replace="<nav className=\"mb-4 border-b border-gray-200 pb-4\">">
-</pilotedit>
+\`\`\`json
+{
+  "tool": "edit_file",
+  "path": "src/App.tsx",
+  "operation": "search_replace", 
+  "search": "<nav className=\\\"mb-4\\\">",
+  "replace": "<nav className=\\\"mb-4 border-b border-gray-200 pb-4\\\">"
+}
+\`\`\`
 
 I've enhanced your existing navigation with better visual separation, maintaining the patterns you've already established.
 
@@ -4443,14 +4545,15 @@ Never add new components to existing files, even if they seem related.
 Aim for components that are 100 lines of code or less.
 Continuously be ready to refactor files that are getting too large.
 
-## Important Rules for XML operations:
+## Important Rules for JSON Tool Operations:
 - Only make changes that were directly requested by the user. Everything else in the files must stay exactly as it was.
 - **Memory-Guided Changes**: Use context from previous operations to make informed decisions
-- Always specify the correct file path when using XML commands.
+- Always specify the correct file path when using JSON tool commands.
 - Ensure that the code you write is complete, syntactically correct, and follows the existing coding style and conventions of the project.
-- IMPORTANT: Only use ONE <pilotwrite> block per file that you write!
+- IMPORTANT: Only use ONE write_file command per file that you write!
 - Prioritize creating small, focused files and components.
 - Do NOT be lazy and ALWAYS write the entire file. It needs to be a complete file.
+- Use proper JSON formatting with escaped newlines (\\n) in content fields.
 
 ## Coding guidelines
 - ALWAYS generate responsive designs.
@@ -5428,7 +5531,7 @@ ${memoryContext.potentialDuplicates.length > 0
 ### Relevant Previous Context:
 ${memoryContext.relevantMemories.length > 0 
   ? memoryContext.relevantMemories.map(memory => 
-      `- ${memory.conversationContext.semanticSummary} (${memory.xmlOperations.length} XML operations)`
+      `- ${memory.conversationContext.semanticSummary} (${memory.jsonOperations.length} XML operations)`
     ).join('\n')
   : 'No highly relevant previous context found.'}
 
@@ -6275,10 +6378,32 @@ ${preprocessingResults.toolResults?.map((result: any, index: number) => {
 
 ---
 
-Now respond to the user's request. If you need to create, edit, or delete files, use XML commands:
-- <pilotwrite path="file/path.ext">file content here</pilotwrite>
-- <pilotedit path="file/path.ext" operation="search_replace" search="old code" replace="new code"></pilotedit>
-- <pilotdelete path="file/path.ext"></pilotdelete>
+Now respond to the user's request. If you need to create, edit, or delete files, use JSON tool commands in code blocks:
+
+\`\`\`json
+{
+  "tool": "write_file",
+  "path": "file/path.ext", 
+  "content": "file content here"
+}
+\`\`\`
+
+\`\`\`json
+{
+  "tool": "edit_file",
+  "path": "file/path.ext",
+  "operation": "search_replace",
+  "search": "old code",
+  "replace": "new code"
+}
+\`\`\`
+
+\`\`\`json
+{
+  "tool": "delete_file",
+  "path": "file/path.ext"
+}
+\`\`\`
 
 Provide a comprehensive response addressing: "${currentUserMessage?.content || ''}"`
           
@@ -6485,9 +6610,9 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
               ).then((memory) => {
                 console.log('[MEMORY] Stream memory stored successfully:', {
                   memoryId: memory.id,
-                  xmlOperations: memory.xmlOperations.length,
+                  jsonOperations: memory.jsonOperations.length,
                   mainPurpose: memory.actionSummary.mainPurpose,
-                  filesAffected: memory.xmlOperations.map(op => `${op.xmlCommand}:${op.filePath}`)
+                  filesAffected: memory.jsonOperations.map(op => `${op.jsonTool}:${op.filePath}`)
                 })
               }).catch((error) => {
                 console.error('[MEMORY] Failed to store stream memory:', error)

@@ -51,6 +51,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { XMLToolAutoExecutor } from './xml-tool-auto-executor'
+import { jsonToolParser, JsonToolCall } from './json-tool-parser'
 
 interface Message {
   id: string
@@ -427,7 +429,7 @@ const ExpandableUserMessage = ({ content, messageId, onRevert, showRestore = fal
 }
 
 // Enhanced client-side XML tool detection and execution system
-interface XMLToolCall {
+export interface XMLToolCall {
   id: string
   name: string
   args: Record<string, any>
@@ -437,7 +439,7 @@ interface XMLToolCall {
   startTime?: number
   endTime?: number
   // Additional properties for pill rendering
-  command?: 'pilotwrite' | 'pilotedit' | 'pilotdelete'
+  command?: 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file'
   path?: string
   content?: string
 }
@@ -498,7 +500,310 @@ const XML_TOOL_CLOSING_PATTERNS = {
   run_tests: /<\/run_tests>/g,
 }
 
-// XMLToolPill component for displaying XML tool tags as pills
+// JSONToolPill component for displaying JSON tool commands as pills
+const JSONToolPill = ({ 
+  toolCall, 
+  status = 'completed',
+  autoExecutor,
+  project 
+}: { 
+  toolCall: JsonToolCall, 
+  status?: 'executing' | 'completed' | 'failed',
+  autoExecutor?: XMLToolAutoExecutor | null,
+  project: Project
+}) => {
+  const [executionStatus, setExecutionStatus] = useState<'executing' | 'completed' | 'failed'>(status)
+  const [hasExecuted, setHasExecuted] = useState(false)
+
+  // IMMEDIATE EXECUTION: Execute the tool as soon as the pill is rendered, just like specs route
+  useEffect(() => {
+    const executeImmediately = async () => {
+      // Only execute if not already executed and is a valid file operation
+      if (hasExecuted || executionStatus === 'failed' || !toolCall.tool || !toolCall.path) {
+        return
+      }
+
+      // Use project.id directly like specs route does - no need to wait for autoExecutor projectId
+      if (!project?.id) {
+        console.error('[JSONToolPill] No project.id available - cannot execute tool')
+        setExecutionStatus('failed')
+        return
+      }
+
+      console.log('[JSONToolPill] Executing tool immediately:', toolCall.tool, toolCall.path, 'projectId:', project.id)
+      setExecutionStatus('executing')
+      setHasExecuted(true)
+
+      try {
+        // Use project.id directly like specs route - get storage manager the same way
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        const projectId = project.id
+
+        // Generate unique execution ID to prevent duplicates (like specs route)
+        const executionId = `${toolCall.tool}_${toolCall.path.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        console.log('[JSONToolPill] Execution ID:', executionId)
+
+        // Execute file operation directly like specs route does
+        let result: any
+        
+        switch (toolCall.tool) {
+          case 'write_file':
+          case 'pilotwrite':
+            if (!toolCall.content) {
+              throw new Error('write_file requires content')
+            }
+            
+            // Check if file exists (same logic as specs route)
+            const existingFile = await storageManager.getFile(projectId, toolCall.path)
+            
+            if (existingFile) {
+              // Update existing file
+              await storageManager.updateFile(projectId, toolCall.path, { 
+                content: toolCall.content,
+                updatedAt: new Date().toISOString()
+              })
+              result = { message: `File ${toolCall.path} updated successfully`, action: 'updated' }
+            } else {
+              // Create new file (exact same logic as specs route)
+              const newFile = await storageManager.createFile({
+                workspaceId: projectId,
+                name: toolCall.path.split('/').pop() || toolCall.path,
+                path: toolCall.path,
+                content: toolCall.content,
+                fileType: toolCall.path.split('.').pop() || 'text',
+                type: toolCall.path.split('.').pop() || 'text',
+                size: toolCall.content.length,
+                isDirectory: false
+              })
+              result = { message: `File ${toolCall.path} created successfully`, action: 'created' }
+            }
+            break
+
+          case 'edit_file':
+          case 'pilotedit':
+            // Use the autoExecutor's advanced edit logic if available, otherwise fallback to simple update
+            if (autoExecutor) {
+              result = await autoExecutor.executeJsonTool({
+                ...toolCall,
+                id: executionId,
+                status: 'executing'
+              })
+            } else {
+              // Fallback: simple content replacement
+              if (!toolCall.content) {
+                throw new Error('edit_file requires content')
+              }
+              await storageManager.updateFile(projectId, toolCall.path, { 
+                content: toolCall.content,
+                updatedAt: new Date().toISOString()
+              })
+              result = { message: `File ${toolCall.path} edited successfully`, action: 'edited' }
+            }
+            break
+
+          case 'delete_file':
+          case 'pilotdelete':
+            await storageManager.deleteFile(projectId, toolCall.path)
+            result = { message: `File ${toolCall.path} deleted successfully`, action: 'deleted' }
+            break
+
+          default:
+            throw new Error(`Unsupported tool: ${toolCall.tool}`)
+        }
+        
+        console.log('[JSONToolPill] Tool executed successfully:', toolCall.path, result)
+        setExecutionStatus('completed')
+
+        // Dispatch events with proper projectId like specs route
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('json-tool-executed', {
+            detail: { 
+              toolCall: {...toolCall, status: 'completed', id: executionId}, 
+              result,
+              immediate: true,
+              projectId: projectId
+            }
+          }))
+
+          // Dispatch files-changed event with projectId (like specs route)
+          window.dispatchEvent(new CustomEvent('files-changed', {
+            detail: {
+              projectId: projectId,
+              action: toolCall.tool,
+              path: toolCall.path,
+              source: 'json-tool-immediate',
+              executionId
+            }
+          }))
+        }
+      } catch (error) {
+        console.error('[JSONToolPill] Immediate execution failed:', error)
+        setExecutionStatus('failed')
+      }
+    }
+
+    executeImmediately()
+  }, [toolCall, hasExecuted, project?.id, autoExecutor])
+
+  const getToolIcon = (toolName: string) => {
+    switch (toolName) {
+      case 'write_file': 
+      case 'pilotwrite': return FileText
+      case 'edit_file': 
+      case 'pilotedit': return Edit3
+      case 'delete_file': 
+      case 'pilotdelete': return X
+      default: return Wrench
+    }
+  }
+
+  const getToolAction = (toolName: string) => {
+    switch (toolName) {
+      case 'write_file': 
+      case 'pilotwrite': return 'Created'
+      case 'edit_file': 
+      case 'pilotedit': return 'Modified'
+      case 'delete_file': 
+      case 'pilotdelete': return 'Deleted'
+      default: return 'Executed'
+    }
+  }
+
+  const getToolDisplayName = (toolName: string) => {
+    switch (toolName) {
+      case 'write_file': 
+      case 'pilotwrite': return 'File Created'
+      case 'edit_file': 
+      case 'pilotedit': return 'File Modified'
+      case 'delete_file': 
+      case 'pilotdelete': return 'File Deleted'
+      default: return 'Tool Executed'
+    }
+  }
+
+  const isSuccess = executionStatus !== 'failed'
+  const fileName = toolCall.path ? (toolCall.path.split('/').pop() || toolCall.path) : `tool.${toolCall.id.split('_').pop()}`
+  const IconComponent = getToolIcon(toolCall.tool || toolCall.name || 'unknown')
+
+  // Special handling for write_file and edit_file with content
+  if (toolCall.tool === 'write_file' || toolCall.tool === 'edit_file' || toolCall.name === 'pilotwrite' || toolCall.name === 'pilotedit') {
+    const [isExpanded, setIsExpanded] = useState(false)
+    const fileExtension = toolCall.path ? (toolCall.path.split('.').pop() || 'text') : 'tsx'
+    const hasContent = toolCall.content && toolCall.content.trim().length > 0
+    
+    return (
+      <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
+        {/* Header - Clickable to toggle */}
+        <div
+          className={`px-4 py-3 border-b ${hasContent ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors ${
+            isSuccess
+              ? 'bg-muted border-l-4 border-l-primary'
+              : 'bg-red-900/20 border-l-4 border-l-red-500'
+          }`}
+          onClick={hasContent ? () => setIsExpanded(!isExpanded) : undefined}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-full transition-colors ${
+              executionStatus === 'executing' 
+                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white animate-pulse'
+                : isSuccess 
+                ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' 
+                : 'bg-red-500 text-white'
+            }`}>
+              <IconComponent className="w-4 h-4" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-foreground">{getToolDisplayName(toolCall.tool || toolCall.name || 'unknown')}</span>
+                <span className="text-xs text-muted-foreground">({fileName})</span>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <span>{getToolAction(toolCall.tool || toolCall.name || 'unknown')}</span>
+                <span>•</span>
+                <span>{executionStatus === 'executing' ? 'Processing...' : isSuccess ? 'Completed' : 'Failed'}</span>
+                {executionStatus === 'executing' && (
+                  <div className="ml-2 w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                )}
+              </div>
+            </div>
+            {hasContent && (
+              <div className="ml-2">
+                {isExpanded ? (
+                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* File Content - Collapsible with Syntax Highlighting */}
+        {hasContent && toolCall.content && isExpanded && (
+          <div className="p-4 bg-background border-t">
+            <div className="max-h-96 overflow-y-auto">
+              <div className="bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
+                <div className="px-3 py-2 bg-gray-700 border-b border-gray-600 text-xs font-medium text-white">
+                  {toolCall.path || fileName} • {fileExtension}
+                </div>
+                <pre className="p-4 overflow-x-auto bg-[#1e1e1e]">
+                  <code className={`hljs language-${fileExtension} text-sm text-white`}>
+                    {toolCall.content}
+                  </code>
+                </pre>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Simple pill for delete_file (no content to show)
+  return (
+    <div className="bg-background border rounded-lg shadow-sm mb-2 overflow-hidden">
+      <div className={`px-3 py-2 flex items-center gap-3 ${
+        isSuccess
+          ? 'bg-muted border-l-4 border-l-primary'
+          : 'bg-red-900/20 border-l-4 border-l-red-500'
+      }`}>
+        <div className={`p-2 rounded-full transition-colors ${
+          executionStatus === 'executing' 
+            ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white animate-pulse'
+            : isSuccess 
+            ? 'bg-gradient-to-r from-red-500 to-red-600 text-white' 
+            : 'bg-red-500 text-white'
+        }`}>
+          <IconComponent className={`w-4 h-4`} />
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-foreground">{getToolDisplayName(toolCall.tool || toolCall.name || 'unknown')}</span>
+            <span className="text-xs text-muted-foreground">({fileName})</span>
+          </div>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <span>{getToolAction(toolCall.tool || toolCall.name || 'unknown')}</span>
+            <span>•</span>
+            <span>{executionStatus === 'executing' ? 'Processing...' : isSuccess ? 'Completed' : 'Failed'}</span>
+            {executionStatus === 'executing' && (
+              <div className="ml-2 w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            )}
+          </div>
+        </div>
+        <div className={`p-1 rounded-full ${isSuccess ? 'bg-green-500' : 'bg-red-500'}`}>
+          {isSuccess ? (
+            <Check className="w-4 h-4 text-white" />
+          ) : (
+            <X className="w-4 h-4 text-white" />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// XMLToolPill component for displaying XML tool tags as pills (legacy support)
 const XMLToolPill = ({ toolCall, status = 'completed' }: { toolCall: XMLToolCall, status?: 'executing' | 'completed' | 'failed' }) => {
   // Validate the tool call before rendering to prevent corrupted pills
   if (!validateXMLToolCall(toolCall)) {
@@ -1441,190 +1746,44 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): 
   }
 }
 
-// Enhanced XML tool detection and parsing
+// Direct JSON tool detection - returns JsonToolCall[] directly (no XML conversion)
+function detectJsonTools(content: string): JsonToolCall[] {
+  console.log('[DEBUG] detectJsonTools called with content length:', content.length)
+  console.log('[DEBUG] Content preview:', content.substring(0, 200))
+
+  // Use JSON parser for reliable tool detection
+  const parseResult = jsonToolParser.parseJsonTools(content)
+  console.log('[DEBUG] JSON parser detected', parseResult.tools.length, 'tools')
+  
+  return parseResult.tools
+}
+
+// Enhanced tool detection using JSON parser (more reliable than XML) - Legacy support
 function detectXMLTools(content: string): XMLToolCall[] {
-  const detectedTools: XMLToolCall[] = []
-
-  // Reset all regex lastIndex to 0
-  Object.values(XML_TOOL_PATTERNS).forEach(regex => regex.lastIndex = 0)
-
   console.log('[DEBUG] detectXMLTools called with content length:', content.length)
   console.log('[DEBUG] Content preview:', content.substring(0, 200))
 
-  // Also check for XML wrapped in code blocks
-  const codeBlockPattern = /```(?:xml)?\s*([\s\S]*?)```/g
-  let codeBlockMatch
-  while ((codeBlockMatch = codeBlockPattern.exec(content)) !== null) {
-    console.log('[DEBUG] Found code block with XML:', codeBlockMatch[1].substring(0, 100))
-    // Process the content inside the code block (without recursion)
-    const codeBlockContent = codeBlockMatch[1]
-    for (const [toolName, pattern] of Object.entries(XML_TOOL_PATTERNS)) {
-      pattern.lastIndex = 0 // Reset regex
-      let match
-      while ((match = pattern.exec(codeBlockContent)) !== null) {
-        console.log('[DEBUG] Found match in code block for', toolName, ':', match[1])
-        // Process the match as normal
-        const toolId = `${toolName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-        const args: Record<string, any> = {}
-
-        // Extract arguments based on tool type
-        switch (toolName) {
-          case 'pilotwrite':
-            args.path = match[2]
-            args.content = match[3] || ''
-            break
-          case 'pilotedit':
-            args.path = match[2]
-            // Parse the content to extract searchReplaceBlocks
-            const editContent = match[3] || ''
-            // Parse as searchReplaceBlocks format
-            args.searchReplaceBlocks = [{
-              search: editContent,
-              replace: '',
-              replaceAll: false
-            }]
-            break
-          case 'pilotdelete':
-            args.path = match[2]
-            break
-          // Additional tool patterns (if used elsewhere)
-          case 'write_file':
-          case 'edit_file':
-            args.path = match[2]
-            args.content = match[3] || ''
-            break
-          case 'delete_file':
-          case 'read_file':
-            args.path = match[2]
-            break
-          case 'list_files':
-            args.path = match[2] || '/'
-            break
-          case 'create_directory':
-          case 'delete_directory':
-            args.path = match[2]
-            break
-          case 'search_files':
-            args.query = match[2]
-            args.path = match[3] || '/'
-            break
-          case 'grep_search':
-            args.pattern = match[2]
-            args.path = match[3] || '/'
-            break
-          case 'web_search':
-            args.query = match[2]
-            args.count = match[3] || '5'
-            break
-          case 'web_extract':
-            args.url = match[2]
-            args.selector = match[3] || ''
-            break
-          case 'analyze_code':
-          case 'check_syntax':
-            args.path = match[2]
-            break
-          case 'run_tests':
-            args.path = match[2] || '/'
-            break
-          default:
-            if (match[1]) args.path = match[1]
-            if (match[2]) args.content = match[2]
-        }
-
-        detectedTools.push({
-          id: toolId,
-          name: toolName,
-          args,
-          status: 'detected',
-          startTime: Date.now()
-        })
-      }
-    }
-  }
-
-  console.log('[DEBUG] Raw content for debugging:', JSON.stringify(content))
+  // Use JSON parser for reliable tool detection
+  const parseResult = jsonToolParser.parseJsonTools(content)
   
-  // Check each tool pattern
-  for (const [toolName, pattern] of Object.entries(XML_TOOL_PATTERNS)) {
-    console.log('[DEBUG] Checking pattern for:', toolName)
-    let match
-    while ((match = pattern.exec(content)) !== null) {
-      console.log('[DEBUG] Found match for', toolName, ':', match[1])
-      const toolId = `${toolName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-      const args: Record<string, any> = {}
-      
-      // Extract arguments based on tool type
-      switch (toolName) {
-        // Actual XML tags from chat route
-        case 'pilotwrite':
-          args.path = match[1]
-          args.content = match[2] || ''
-          break
-        case 'pilotedit':
-          args.path = match[1]
-          args.operation = match[2]
-          args.search = match[3]
-          args.replace = match[4]
-          break
-        case 'pilotdelete':
-          args.path = match[1]
-          break
-          
-        // Additional tool patterns (if used elsewhere)
-        case 'write_file':
-        case 'edit_file':
-          args.path = match[1]
-          args.content = match[2] || ''
-          break
-        case 'delete_file':
-        case 'read_file':
-          args.path = match[1]
-          break
-        case 'list_files':
-          args.path = match[1] || '/'
-          break
-        case 'create_directory':
-        case 'delete_directory':
-          args.path = match[1]
-          break
-        case 'search_files':
-          args.query = match[1]
-          args.path = match[2] || '/'
-          break
-        case 'grep_search':
-          args.pattern = match[1]
-          args.path = match[2] || '/'
-          break
-        case 'web_search':
-          args.query = match[1]
-          args.count = match[2] || '5'
-          break
-        case 'web_extract':
-          args.url = match[1]
-          args.selector = match[2] || ''
-          break
-        case 'analyze_code':
-        case 'check_syntax':
-          args.path = match[1]
-          break
-        case 'run_tests':
-          args.path = match[1] || '/'
-          break
-      }
-      
-      detectedTools.push({
-        id: toolId,
-        name: toolName,
-        args,
-        status: 'detected',
-        startTime: Date.now()
-      })
-    }
-  }
+  // Convert JsonToolCall to XMLToolCall format for backward compatibility
+  const detectedTools: XMLToolCall[] = parseResult.tools.map(tool => ({
+    id: tool.id,
+    name: tool.name || tool.tool,
+    command: tool.tool as 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file',
+    path: tool.path,
+    content: tool.content,
+    args: tool.args,
+    status: tool.status as 'detected' | 'processing' | 'executing' | 'completed' | 'failed',
+    startTime: tool.startTime
+  }))
+
+  console.log('[DEBUG] JSON parser detected', detectedTools.length, 'tools')
   
   return detectedTools
 }
+
+
 
 // Check if XML tool is complete (has closing tag)
 function isXMLToolComplete(content: string, toolName: string): boolean {
@@ -3370,6 +3529,7 @@ export function ChatPanel({
   const [isEditingRevertedMessage, setIsEditingRevertedMessage] = useState(false) // New state for edit mode
   const [showScrollToBottom, setShowScrollToBottom] = useState(false) // State for floating chevron visibility
   const [xmlCommands, setXmlCommands] = useState<any[]>([]) // State for XML tool commands
+  const [autoExecutor, setAutoExecutor] = useState<XMLToolAutoExecutor | null>(null) // XML Auto Executor
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null) // Ref for messages container
 
@@ -3401,6 +3561,52 @@ export function ChatPanel({
         setCurrentProjectId(project.id)
         // Clear restore state when project changes
         setRestoreMessageId(null)
+        
+        // Initialize XML Auto Executor for new project
+        const executor = new XMLToolAutoExecutor({
+          projectId: project.id,
+          onExecutionStart: (toolCall) => {
+            console.log(`[AutoExecutor] Starting execution for ${toolCall.command}:`, toolCall.path)
+          },
+          onExecutionComplete: (toolCall, result) => {
+            console.log(`[AutoExecutor] Completed execution for ${toolCall.command}:`, result)
+            // Update the UI to show completion
+            setMessages(prev => prev.map(msg => {
+              if (msg.metadata?.xmlCommands) {
+                return {
+                  ...msg,
+                  metadata: {
+                    ...msg.metadata,
+                    xmlCommands: msg.metadata.xmlCommands.map(cmd => 
+                      cmd.id === toolCall.id ? { ...cmd, status: 'completed', result } : cmd
+                    )
+                  }
+                }
+              }
+              return msg
+            }))
+          },
+          onExecutionError: (toolCall, error) => {
+            console.error(`[AutoExecutor] Error executing ${toolCall.command}:`, error)
+            // Update the UI to show error
+            setMessages(prev => prev.map(msg => {
+              if (msg.metadata?.xmlCommands) {
+                return {
+                  ...msg,
+                  metadata: {
+                    ...msg.metadata,
+                    xmlCommands: msg.metadata.xmlCommands.map(cmd => 
+                      cmd.id === toolCall.id ? { ...cmd, status: 'failed', error: error.message } : cmd
+                    )
+                  }
+                }
+              }
+              return msg
+            }))
+          }
+        })
+        setAutoExecutor(executor)
+        
         await loadChatHistory(project)
       }
     }
@@ -4781,6 +4987,74 @@ export function ChatPanel({
           }
         }
 
+        // Auto-execute detected JSON tools after streaming completes (DISABLED - NOW USING IMMEDIATE EXECUTION)
+        // JSON tools are now executed immediately when pills are rendered for faster response
+        /* 
+        if (autoExecutor && assistantContent) {
+          console.log('[AutoExecutor] Processing detected JSON tools after stream completion')
+          
+          const finalJsonTools = detectJsonTools(assistantContent)
+          if (finalJsonTools.length > 0) {
+            console.log('[AutoExecutor] Final detected JSON tools:', finalJsonTools.length)
+            
+            try {
+              await autoExecutor.processStreamingJsonTools(assistantContent)
+              console.log('[AutoExecutor] JSON tools processed successfully')
+            } catch (error) {
+              console.error('[AutoExecutor] Error processing JSON tools:', error)
+            }
+          }
+        }
+        */
+
+        // Auto-execute detected XML tools after streaming completes (LEGACY SUPPORT)
+        if (autoExecutor && assistantContent) {
+          console.log('[AutoExecutor] Processing detected XML tools after stream completion')
+          
+          const finalDetectedTools = detectXMLTools(assistantContent)
+          if (finalDetectedTools.length > 0) {
+            console.log('[AutoExecutor] Final detected XML tools:', finalDetectedTools.length)
+            
+            // Process each detected tool and wait for completion
+            for (const tool of finalDetectedTools) {
+              try {
+                // Only process completed tools (have closing tags)
+                if (isXMLToolComplete(assistantContent, tool.name)) {
+                  // Extract the actual content between tags
+                  const extractedContent = extractXMLToolContent(assistantContent, tool.name)
+                  
+                  // Convert to XMLToolCall format
+                  const xmlToolCall = {
+                    id: tool.id,
+                    name: tool.name,
+                    command: tool.name as 'pilotwrite' | 'pilotedit' | 'pilotdelete',
+                    path: tool.args.path || '',
+                    content: extractedContent || tool.args.content || '',
+                    args: {
+                      ...tool.args,
+                      content: extractedContent || tool.args.content || ''
+                    },
+                    status: 'detected' as const,
+                    startTime: tool.startTime || Date.now()
+                  }
+                  
+                  console.log('[AutoExecutor] Auto-executing tool:', xmlToolCall.command, xmlToolCall.path)
+                  console.log('[AutoExecutor] Tool content length:', xmlToolCall.content.length)
+                  
+                  // Execute the tool automatically and wait for completion
+                  const result = await autoExecutor.executeXMLTool(xmlToolCall)
+                  console.log('[AutoExecutor] Tool execution result:', result)
+                  
+                } else {
+                  console.log('[AutoExecutor] Incomplete tool detected, skipping:', tool.name)
+                }
+              } catch (error) {
+                console.error('[AutoExecutor] Error during post-stream auto-execution:', error)
+              }
+            }
+          }
+        }
+
         // Save assistant message to database after streaming completes - match specs pattern
         if (project && (assistantContent.trim() || hasToolCalls)) {
           const finalAssistantMessage: Message = {
@@ -5494,7 +5768,133 @@ export function ChatPanel({
                             <div className="bg-card text-card-foreground border rounded-xl shadow-sm overflow-hidden w-full">
                               <div className="p-4">
                                 {(() => {
-                                  // Check if content has valid XML tools (not just keywords)
+                                  // First check for JSON tools (new format)
+                                  const jsonTools = detectJsonTools(msg.content)
+                                  if (jsonTools.length > 0) {
+                                    console.log('[DEBUG] Rendering', jsonTools.length, 'JSON tools as pills')
+                                    
+                                    // Direct rendering of JSON tools as pills
+                                    const components: React.ReactNode[] = []
+                                    let remainingContent = msg.content
+                                    let elementKey = 0
+                                    
+                                    // Remove JSON code blocks from content and replace with pills
+                                    const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/gi
+                                    let match
+                                    let currentPosition = 0
+                                    let usedTools = new Set<string>() // Track used tools to avoid duplicates
+                                    
+                                    while ((match = codeBlockRegex.exec(msg.content)) !== null) {
+                                      // Add content before the code block
+                                      if (match.index > currentPosition) {
+                                        const beforeContent = msg.content.slice(currentPosition, match.index)
+                                        if (beforeContent.trim()) {
+                                          components.push(
+                                            <div key={`content-${elementKey++}`} className="markdown-content">
+                                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                {beforeContent}
+                                              </ReactMarkdown>
+                                            </div>
+                                          )
+                                        }
+                                      }
+                                      
+                                      // Find matching JSON tool for this code block
+                                      const jsonContent = match[1]
+                                      let matchingTool: JsonToolCall | undefined
+                                      
+                                      try {
+                                        const parsed = JSON.parse(jsonContent)
+                                        if (parsed.tool) {
+                                          // Find unused tool that matches
+                                          matchingTool = jsonTools.find(tool => 
+                                            !usedTools.has(tool.id) && 
+                                            tool.tool === parsed.tool && 
+                                            tool.path === parsed.path
+                                          )
+                                          
+                                          // If no exact match, find by tool type only
+                                          if (!matchingTool) {
+                                            matchingTool = jsonTools.find(tool => 
+                                              !usedTools.has(tool.id) && 
+                                              tool.tool === parsed.tool
+                                            )
+                                          }
+                                          
+                                          // If still no match, create a synthetic tool call from the JSON
+                                          if (!matchingTool && parsed.tool && (parsed.path || parsed.content)) {
+                                            matchingTool = {
+                                              id: `synthetic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                                              tool: parsed.tool,
+                                              name: parsed.tool,
+                                              path: parsed.path || '',
+                                              content: parsed.content || '',
+                                              args: parsed,
+                                              status: 'completed',
+                                              startTime: Date.now(),
+                                              search: parsed.search,
+                                              replace: parsed.replace,
+                                              operation: parsed.operation
+                                            }
+                                            console.log('[DEBUG] Created synthetic tool for code block:', matchingTool)
+                                          }
+                                        }
+                                      } catch (error) {
+                                        console.warn('[DEBUG] Failed to parse JSON in code block:', error, jsonContent)
+                                      }
+                                      
+                                      if (matchingTool) {
+                                        usedTools.add(matchingTool.id)
+                                        components.push(
+                                          project ? <JSONToolPill key={`json-tool-${elementKey++}`} toolCall={matchingTool} status="completed" autoExecutor={autoExecutor} project={project} /> : null
+                                        )
+                                        console.log('[DEBUG] Rendered JSONToolPill for:', matchingTool.tool, matchingTool.path)
+                                      } else {
+                                        console.warn('[DEBUG] No matching tool found for JSON block:', jsonContent)
+                                        // Render the code block as regular markdown if no tool match
+                                        components.push(
+                                          <div key={`code-${elementKey++}`} className="markdown-content">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                              {`\`\`\`json\n${jsonContent}\n\`\`\``}
+                                            </ReactMarkdown>
+                                          </div>
+                                        )
+                                      }
+                                      
+                                      currentPosition = match.index + match[0].length
+                                    }
+                                    
+                                    // Add any unused tools as pills (for bare JSON not in code blocks)
+                                    const unusedTools = jsonTools.filter(tool => !usedTools.has(tool.id))
+                                    unusedTools.forEach(tool => {
+                                      components.push(
+                                        project ? <JSONToolPill key={`unused-tool-${elementKey++}`} toolCall={tool} status="completed" autoExecutor={autoExecutor} project={project} /> : null
+                                      )
+                                      console.log('[DEBUG] Rendered unused tool as pill:', tool.tool, tool.path)
+                                    })
+                                    
+                                    // Add any remaining content
+                                    if (currentPosition < msg.content.length) {
+                                      const afterContent = msg.content.slice(currentPosition)
+                                      if (afterContent.trim()) {
+                                        components.push(
+                                          <div key={`content-${elementKey++}`} className="markdown-content">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                              {afterContent}
+                                            </ReactMarkdown>
+                                          </div>
+                                        )
+                                      }
+                                    }
+                                    
+                                    return (
+                                      <div className="space-y-3">
+                                        {components}
+                                      </div>
+                                    )
+                                  }
+                                  
+                                  // Check if content has valid XML tools (not just keywords) - Legacy support
                                   const hasXMLTools = hasValidXMLTools(msg.content)
                                   const hasExistingPlaceholders = /<!-- XMLTOOL_pilot\w+_\d+_[a-z0-9]+ -->/.test(msg.content)
                                   
