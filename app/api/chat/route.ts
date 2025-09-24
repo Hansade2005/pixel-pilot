@@ -5004,62 +5004,28 @@ Use read_file tool to read specific files when needed.`
     let enhancedIntentData = null
     let shouldUseAutonomousPlanning = false
     
+    // TEMPORARILY DISABLED: Enhanced Intent Detection (causing JSON payload errors)
     try {
-      // Import the enhanced intent detector
-      const { EnhancedIntentDetector } = await import('@/lib/enhanced-intent-detector')
+      // // Import the enhanced intent detector
+      // const { EnhancedIntentDetector } = await import('@/lib/enhanced-intent-detector')
+      // 
+      // // Get existing files for context
+      // const existingFiles = clientFiles.map((f: { path?: string }) => f.path).filter(Boolean)
+      // 
+      // // Use enhanced intent detection with autonomous planning capabilities
+      // enhancedIntentData = await EnhancedIntentDetector.detectEnhancedIntent(
+      //   userMessage,
+      //   projectContext,
+      //   conversationMemory ? conversationMemory.messages : [],
+      //   existingFiles,
+      //   body.packageJson
+      // )
       
-      // Get existing files for context
-      const existingFiles = clientFiles.map((f: { path?: string }) => f.path).filter(Boolean)
-      
-      // Use enhanced intent detection with autonomous planning capabilities
-      enhancedIntentData = await EnhancedIntentDetector.detectEnhancedIntent(
-        userMessage,
-        projectContext,
-        conversationMemory ? conversationMemory.messages : [],
-        existingFiles,
-        body.packageJson
-      )
-      
-      // Set legacy userIntent for backward compatibility
-      userIntent = {
-        intent: enhancedIntentData.intent,
-        required_tools: enhancedIntentData.required_tools,
-        file_operations: enhancedIntentData.file_operations,
-        complexity: enhancedIntentData.complexity,
-        action_plan: enhancedIntentData.action_plan,
-        confidence: enhancedIntentData.confidence,
-        tool_usage_rules: enhancedIntentData.tool_usage_rules,
-        enforcement_notes: enhancedIntentData.enforcement_notes
-      }
-      
-      // Determine execution strategy
-      shouldUseAutonomousPlanning = enhancedIntentData.requires_autonomous_planning
-      isToolRequest = enhancedIntentData.required_tools && enhancedIntentData.required_tools.length > 0
-      
-      console.log('[DEBUG] Enhanced Intent Detection:', {
-        userMessage: userMessage.substring(0, 100) + '...',
-        detectedIntent: enhancedIntentData.intent,
-        complexity: enhancedIntentData.complexity,
-        execution_mode: enhancedIntentData.execution_mode,
-        requires_autonomous_planning: shouldUseAutonomousPlanning,
-        confidence: enhancedIntentData.confidence,
-        planning_confidence: enhancedIntentData.planning_confidence,
-        estimated_duration: enhancedIntentData.estimated_duration,
-        isToolRequest
-      })
-      
-      // If autonomous planning is required, log the instructions
-      if (shouldUseAutonomousPlanning && enhancedIntentData.autonomous_instructions) {
-        console.log('[DEBUG] Autonomous Instructions Generated:', {
-          project_type: enhancedIntentData.project_type,
-          complexity: enhancedIntentData.complexity,
-          execution_mode: enhancedIntentData.execution_mode,
-          estimated_duration: enhancedIntentData.estimated_duration
-        })
-      }
+      // Skip enhanced detection and go directly to fallback
+      throw new Error('Enhanced intent detection temporarily disabled due to JSON payload issues')
       
     } catch (error) {
-      console.warn('Enhanced intent detection failed, falling back to basic intent detection:', error)
+      console.warn('Enhanced intent detection disabled/failed, using basic intent detection:', error instanceof Error ? error.message : String(error))
       
       // Fallback to original intent detection
       try {
@@ -5116,9 +5082,9 @@ Use read_file tool to read specific files when needed.`
 
       `\n\n🤖 **CURRENT MODE: AGENT MODE (FULL ACCESS)**\n- You have complete file system access\n- You can create, modify, and delete files\n- You can build complete applications\n- Use all available tools as needed`
 
-    // Add autonomous planning context if applicable
-    const autonomousPlanningContext = shouldUseAutonomousPlanning && enhancedIntentData?.autonomous_instructions ? 
-      `\n\n${enhancedIntentData.autonomous_instructions}` : ''
+    // Add autonomous planning context if applicable (disabled for now)
+    const autonomousPlanningContext = '' // shouldUseAutonomousPlanning && enhancedIntentData?.autonomous_instructions ? 
+      // `\n\n${enhancedIntentData.autonomous_instructions}` : ''
 
     // ULTRA-OPTIMIZED: 3-tools-per-step with metadata-only conversation
     const getOptimizedSystemMessage = (userIntent?: any, projectContext?: string) => {
