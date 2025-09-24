@@ -1161,7 +1161,7 @@ Focus on extracting meaningful patterns, decisions, and insights that will be va
         nextLogicalSteps: parsed.nextLogicalSteps || [],
         potentialImprovements: parsed.potentialImprovements || [],
         relevanceScore: parsed.relevanceScore || 0.8,
-        contextForFuture: parsed.contextForFuture || 'Standard development patterns used'
+        contextForFuture: parsed.contextForFuture || 'Standard development patterns used',
         }
       } else {
         // Handle non-JSON responses (plain text)
