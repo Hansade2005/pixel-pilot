@@ -4431,8 +4431,11 @@ Dry run preview (test changes without applying):
 ## 🎯 **CRITICAL: TOOL SELECTION STRATEGY - write_file vs edit_file**
 
 **🚀 PRIORITIZE write_file FOR:**
+- **Design Improvements**: Enhancing UI/UX, styling, layouts, or visual components
+- **New Features & Functionality**: Adding new capabilities, components, or major implementations
+- **Feature Enhancements**: Improving existing functionality with new capabilities
+- **Complete Functionality Additions**: Adding authentication, state management, API integrations
 - **Large Changes**: When modifying 30%+ of a file's content
-- **New Features**: Adding new functionality, components, or major implementations
 - **Complete Rewrites**: When updating file structure, imports, or overall architecture
 - **Significant Additions**: Adding multiple functions, methods, or properties
 - **Dependency Updates**: When adding or changing multiple imports/exports
@@ -4450,14 +4453,19 @@ Dry run preview (test changes without applying):
 
 **📋 DECISION FLOWCHART:**
 1. **Is this a new file?** → Use write_file
-2. **Are you adding new features/components to existing file?** → Use write_file  
-3. **Are you changing 30%+ of the file?** → Use write_file
-4. **Are you making a small, targeted fix?** → Use edit_file
-5. **Are you just updating a few lines?** → Use edit_file
+2. **Are you improving design, features, or functionality?** → Use write_file
+3. **Are you adding new features/components to existing file?** → Use write_file  
+4. **Are you enhancing existing functionality?** → Use write_file
+5. **Are you changing 30%+ of the file?** → Use write_file
+6. **Are you making a small, targeted fix?** → Use edit_file
+7. **Are you just updating a few lines?** → Use edit_file
 
 **💡 EXAMPLES:**
 
 **✅ Use write_file when:**
+- **Design Improvements**: Enhancing UI layouts, adding animations, improving styling
+- **New Feature Implementation**: Adding search functionality, user profiles, notifications
+- **Functionality Enhancements**: Improving form validation, adding data filtering, optimization
 - Adding authentication to a component (major feature)
 - Creating new API endpoints
 - Implementing new React components
