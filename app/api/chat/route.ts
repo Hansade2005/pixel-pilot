@@ -3912,7 +3912,7 @@ User Message: "${userMessage}"
 Project Context: ${projectContext}
 
 Recent Conversation History (last 5 exchanges):
-${conversationHistory.slice(-10).map((msg, i) => `${msg.role}: ${msg.content}`).join('\n')}
+${(conversationHistory || []).slice(-10).map((msg, i) => `${msg.role}: ${msg.content}`).join('\n')}
 
 Based on the user's request, determine:
 1. **Primary Intent**: What does the user want to accomplish?
@@ -4428,6 +4428,64 @@ Dry run preview (test changes without applying):
 - Each tool command must be a separate JSON code block
 - The JSON must be valid and properly formatted
 
+## 🎯 **CRITICAL: TOOL SELECTION STRATEGY - write_file vs edit_file**
+
+**🚀 PRIORITIZE write_file FOR:**
+- **Large Changes**: When modifying 30%+ of a file's content
+- **New Features**: Adding new functionality, components, or major implementations
+- **Complete Rewrites**: When updating file structure, imports, or overall architecture
+- **Significant Additions**: Adding multiple functions, methods, or properties
+- **Dependency Updates**: When adding or changing multiple imports/exports
+- **Structural Changes**: Modifying file layout, formatting, or organization
+- **Contextual Changes**: When changes affect multiple parts of the file
+- **Full Implementation**: Creating complete functions, components, or modules from scratch
+- **Major Refactors**: Restructuring existing code with significant changes
+- **New File Creation**: All new files should use write_file with complete content
+
+**✏️ USE edit_file FOR:**
+- **Small Precise Changes**: Fixing bugs, updating single functions, or minor tweaks  
+- **Targeted Fixes**: Changing specific values, parameters, or small code blocks
+- **Minor Updates**: Adding single properties, updating imports, or small adjustments
+- **Configuration Changes**: Updating settings, constants, or small config modifications
+
+**📋 DECISION FLOWCHART:**
+1. **Is this a new file?** → Use write_file
+2. **Are you adding new features/components to existing file?** → Use write_file  
+3. **Are you changing 30%+ of the file?** → Use write_file
+4. **Are you making a small, targeted fix?** → Use edit_file
+5. **Are you just updating a few lines?** → Use edit_file
+
+**💡 EXAMPLES:**
+
+**✅ Use write_file when:**
+- Adding authentication to a component (major feature)
+- Creating new API endpoints
+- Implementing new React components
+- Adding state management to existing components
+- Restructuring file with new imports and exports
+- Adding multiple new functions or methods
+
+**✅ Use edit_file when:**  
+- Fixing a typo in a function name
+- Updating a single CSS class
+- Changing a default value
+- Adding one import statement
+- Modifying a single function parameter
+- Updating error messages
+
+**⚡ PERFORMANCE GUIDELINES:**
+- write_file ensures complete, consistent files with all dependencies
+- edit_file is faster for small changes but can miss context
+- When in doubt, use write_file for reliability and completeness
+- For files with new features or implementations, always use write_file
+
+**🔧 IMPLEMENTATION BEST PRACTICES:**
+- Always provide complete, functional code with write_file
+- Include all necessary imports and dependencies
+- Ensure proper TypeScript types and interfaces
+- Maintain consistent code style and formatting
+- Test-worthy code that works immediately
+
 # Guidelines
 
 Always reply to the user in the same language they are using.
@@ -4501,12 +4559,7 @@ Based on my memory context, I can see you already have a basic Button component.
   "replace": "const variantClasses = {\\n    primary: \\\"bg-blue-600 hover:bg-blue-700 text-white\\\",\\n    secondary: \\\"bg-gray-200 hover:bg-gray-300 text-gray-800\\\",\\n    danger: \\\"bg-red-600 hover:bg-red-700 text-white\\\",\\n    success: \\\"bg-green-600 hover:bg-green-700 text-white\\\",\\n    warning: \\\"bg-yellow-600 hover:bg-yellow-700 text-white\\\"\\n  };"
 }
 \`\`\`
-    secondary: \"bg-gray-200 hover:bg-gray-300 text-gray-800\",
-    danger: \"bg-red-600 hover:bg-red-700 text-white\",
-    success: \"bg-green-600 hover:bg-green-700 text-white\",
-    warning: \"bg-yellow-600 hover:bg-yellow-700 text-white\"
-  };">
-</pilotedit>
+   
 
 I've enhanced your existing Button component with success and warning variants, building upon the foundation you already have.
 
@@ -4572,9 +4625,11 @@ ${codeQualityInstructions}
 - Put custom hooks into **src/hooks/**
 - Put utility functions into **src/lib/**
 - Put static assets into **src/assets/**
+- Put new packages into **package.json** before using it
 - The main entry point is **src/main.tsx** (NOT index.tsx).
 - The main application component is **src/App.tsx**.
 - **UPDATE the main App.tsx to include new components. OTHERWISE, the user can NOT see any components!**
+- **If you need to use a new package thats not listed in package.json   ALWAYS  use the edit_file tool to add the new package before using it . Thats how package installation works in this system.
 - **ALWAYS try to use the shadcn/ui library** (already installed with Radix UI components).
 - **Tailwind CSS**: Always use Tailwind CSS for styling components. Utilize Tailwind classes extensively for layout, spacing, colors, and other design aspects.
 - Use **Framer Motion** for animations (already installed).
