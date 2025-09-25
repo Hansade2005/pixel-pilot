@@ -482,20 +482,47 @@ export default function DeploymentClient() {
         return null
       }
 
-      // Get the most recent user message
-      const userMessages = messages
-        .filter(msg => msg.role === 'user')
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      // Get the last two messages (user + assistant) for better context
+      const sortedMessages = messages.sort((a, b) => 
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      )
+      
+      const lastTwoMessages = sortedMessages.slice(-2)
+      
+      if (lastTwoMessages.length === 0) {
+        return null
+      }
 
-      return userMessages.length > 0 ? userMessages[0].content : null
+      // Create context from the last two messages
+      let context = ''
+      
+      if (lastTwoMessages.length === 1) {
+        // Only one message available
+        context = `User: ${lastTwoMessages[0].content}`
+      } else {
+        // Two messages available - format as conversation
+        const [secondLast, last] = lastTwoMessages
+        if (secondLast.role === 'user' && last.role === 'assistant') {
+          context = `User request: ${secondLast.content}\n\nAI response: ${last.content.substring(0, 300)}...`
+        } else if (secondLast.role === 'assistant' && last.role === 'user') {
+          context = `Previous AI response: ${secondLast.content.substring(0, 200)}...\n\nUser request: ${last.content}`
+        } else {
+          // Both same role, just use the last user message
+          const userMessages = lastTwoMessages.filter(msg => msg.role === 'user')
+          context = userMessages.length > 0 ? `User: ${userMessages[userMessages.length - 1].content}` : lastTwoMessages[lastTwoMessages.length - 1].content
+        }
+      }
+
+      return context
+
     } catch (error) {
       console.error('Error fetching last chat message:', error)
       return null
     }
   }
 
-  // Generate AI-powered commit message from last chat message
-  const generateCommitMessageFromChat = async (chatMessage: string): Promise<string> => {
+  // Generate AI-powered commit message from chat conversation context
+  const generateCommitMessageFromChat = async (conversationContext: string): Promise<string> => {
     try {
       // Import AI dependencies dynamically
       const { generateText } = await import('ai')
@@ -511,7 +538,12 @@ export default function DeploymentClient() {
             role: 'system',
             content: `You are an expert software engineer creating professional, meaningful commit messages.
 
-Your task is to analyze a user's chat message about their development work and create a concise, professional commit message that follows conventional commit standards.
+Your task is to analyze a conversation between a user and an AI assistant about development work, and create a concise, professional commit message that follows conventional commit standards.
+
+You will receive the recent conversation context which may include:
+- User's request/question about what they want to implement
+- AI's response with implementation details or code suggestions
+- Description of changes that were made or will be made
 
 COMMIT MESSAGE GUIDELINES:
 - Keep it under 72 characters total
@@ -519,21 +551,28 @@ COMMIT MESSAGE GUIDELINES:
 - Use imperative mood (Add, Fix, Update, Remove, etc.)
 - Be specific and meaningful
 - Focus on WHAT was changed, not HOW
-- Avoid generic messages like "Update files" or "Fix bugs"
+- Use conventional commit prefixes: feat:, fix:, chore:, docs:, style:, refactor:, test:
 - Extract the core development task from the conversation
+- Prioritize the actual implementation over just discussion
 
-EXAMPLES:
-- User says: "please add a login form to the app" → "feat: Add user login form component"
-- User says: "I need to implement dark mode toggle" → "feat: Implement dark mode theme toggle"
-- User says: "fix the bug in user authentication" → "fix: Fix user authentication validation"
-- User says: "add error handling for API calls" → "feat: Add error handling for API requests"
-- User says: "update the styling of the header" → "feat: Update header component styling"
+EXAMPLES OF GOOD COMMIT MESSAGES:
+- "feat: Add user authentication system"
+- "fix: Resolve login validation error"
+- "feat: Implement dark mode toggle"
+- "refactor: Update API error handling"
+- "feat: Add responsive header component"
+- "fix: Fix deployment token persistence"
+- "feat: Add AI commit message generator"
 
 Return ONLY the commit message, no quotes or additional text.`
           },
           {
             role: 'user',
-            content: `Please create a professional commit message for this development work: "${chatMessage}"`
+            content: `Analyze this development conversation and create a professional commit message:
+
+${conversationContext}
+
+Create a commit message that captures the main development task or change discussed.`
           }
         ],
         temperature: 0.3, // Low temperature for consistent, professional output
@@ -553,7 +592,7 @@ Return ONLY the commit message, no quotes or additional text.`
       console.error('AI commit message generation failed:', error)
 
       // Fallback to simple text processing if AI fails
-      let cleaned = chatMessage
+      let cleaned = conversationContext
         .replace(/[^\w\s-]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
@@ -589,7 +628,7 @@ Return ONLY the commit message, no quotes or additional text.`
 
       toast({
         title: 'AI Commit Message Generated',
-        description: `Created professional commit message from your chat`,
+        description: `Created professional commit message from recent conversation`,
         variant: 'default'
       })
 
