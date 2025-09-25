@@ -246,3 +246,65 @@ export async function getDeploymentTokens(userId: string): Promise<{
     return null
   }
 }
+export async function storeDeploymentConnectionStates(
+  userId: string, 
+  states: {
+    github_connected?: boolean,
+    vercel_connected?: boolean,
+    netlify_connected?: boolean
+  }
+): Promise<boolean> {
+  try {
+    const updateData: any = {
+      user_id: userId,
+      updated_at: new Date().toISOString()
+    }
+    
+    if (states.github_connected !== undefined) updateData.github_connected = states.github_connected
+    if (states.vercel_connected !== undefined) updateData.vercel_connected = states.vercel_connected
+    if (states.netlify_connected !== undefined) updateData.netlify_connected = states.netlify_connected
+
+    const { error } = await supabase
+      .from('user_settings')
+      .upsert(updateData, {
+        onConflict: 'user_id'
+      })
+
+    if (error) throw error
+
+    return true
+  } catch (error) {
+    console.error("Error storing deployment connection states:", error)
+    return false
+  }
+}
+
+/**
+ * Retrieve deployment connection states for a user
+ */
+export async function getDeploymentConnectionStates(userId: string): Promise<{
+  github_connected?: boolean,
+  vercel_connected?: boolean,
+  netlify_connected?: boolean
+} | null> {
+  try {
+    const { data, error } = await supabase
+      .from('user_settings')
+      .select('github_connected, vercel_connected, netlify_connected')
+      .eq('user_id', userId)
+      .single()
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+      throw error
+    }
+
+    return data ? {
+      github_connected: data.github_connected || false,
+      vercel_connected: data.vercel_connected || false,
+      netlify_connected: data.netlify_connected || false
+    } : null
+  } catch (error) {
+    console.error("Error retrieving deployment connection states:", error)
+    return null
+  }
+}

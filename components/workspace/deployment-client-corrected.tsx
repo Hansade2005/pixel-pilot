@@ -556,25 +556,61 @@ export default function DeploymentClient() {
     }
   }
 
-  // Load available GitHub repositories
-  const loadAvailableRepos = async () => {
-    if (!githubForm.token) return
-
+  // Persist connection state to Supabase (similar to cloud sync)
+  const persistConnectionState = async (
+    provider: 'github' | 'vercel' | 'netlify',
+    connected: boolean
+  ) => {
     try {
-      const response = await fetch('/api/github/repos', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${githubForm.token}`,
-          'Content-Type': 'application/json',
-        },
-      })
+      if (!currentUserId) return
 
-      if (response.ok) {
-        const repos = await response.json()
-        setAvailableRepos(repos)
+      const supabase = createClient()
+
+      // Update user settings with connection state
+      const { error } = await supabase
+        .from('user_settings')
+        .upsert({
+          user_id: currentUserId,
+          [`${provider}_connected`]: connected,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
+        })
+
+      if (error) {
+        console.error(`Error persisting ${provider} connection state:`, error)
+      } else {
+        console.log(`Persisted ${provider} connection state: ${connected}`)
       }
     } catch (error) {
-      console.error('Error loading GitHub repos:', error)
+      console.error(`Error persisting ${provider} connection state:`, error)
+    }
+  }
+
+  // Load persisted connection state from Supabase
+  const loadPersistedConnectionState = async () => {
+    try {
+      if (!currentUserId) return
+
+      const supabase = createClient()
+
+      const { data: settings, error } = await supabase
+        .from('user_settings')
+        .select('github_connected, vercel_connected, netlify_connected')
+        .eq('user_id', currentUserId)
+        .single()
+
+      if (!error && settings) {
+        setDeploymentState(prev => ({
+          ...prev,
+          githubConnected: settings.github_connected || false,
+          vercelConnected: settings.vercel_connected || false,
+          netlifyConnected: settings.netlify_connected || false,
+        }))
+        console.log('Loaded persisted connection states:', settings)
+      }
+    } catch (error) {
+      console.error('Error loading persisted connection state:', error)
     }
   }
 
@@ -704,10 +740,79 @@ export default function DeploymentClient() {
     }
   }
 
+  // Validate and persist connection status for each provider
+  const validateAndPersistConnection = async (
+    provider: 'github' | 'vercel' | 'netlify',
+    tokenData: any
+  ): Promise<boolean> => {
+    if (!tokenData?.token) {
+      // No token, mark as disconnected and persist
+      setDeploymentState(prev => ({ ...prev, [`${provider}Connected`]: false }))
+      await persistConnectionState(provider, false)
+      return false
+    }
+
+    try {
+      let isValid = false
+
+      // Validate token by making API call
+      if (provider === 'github') {
+        const response = await fetch('https://api.github.com/user', {
+          headers: {
+            'Authorization': `token ${tokenData.token}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        })
+        isValid = response.ok
+      } else if (provider === 'vercel') {
+        const response = await fetch('https://api.vercel.com/v1/user', {
+          headers: {
+            'Authorization': `Bearer ${tokenData.token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        isValid = response.ok
+      } else if (provider === 'netlify') {
+        const response = await fetch('https://api.netlify.com/api/v1/user', {
+          headers: {
+            'Authorization': `Bearer ${tokenData.token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        isValid = response.ok
+      }
+
+      // Update and persist connection state based on validation
+      setDeploymentState(prev => ({ ...prev, [`${provider}Connected`]: isValid }))
+      await persistConnectionState(provider, isValid)
+
+      // If token is invalid, remove it from storage
+      if (!isValid) {
+        try {
+          await storageManager.deleteToken(tokenData.id)
+          console.log(`Removed invalid ${provider} token from storage`)
+        } catch (deleteError) {
+          console.error(`Error removing invalid ${provider} token:`, deleteError)
+        }
+      }
+
+      return isValid
+    } catch (error) {
+      console.error(`Error validating ${provider} token:`, error)
+      // On validation error, assume disconnected and persist
+      setDeploymentState(prev => ({ ...prev, [`${provider}Connected`]: false }))
+      await persistConnectionState(provider, false)
+      return false
+    }
+  }
+
   const loadData = async () => {
     try {
       setIsLoading(true)
       await storageManager.init()
+
+      // Load persisted connection states first
+      await loadPersistedConnectionState()
 
       const [projectsData, deployments, envVars] = await Promise.all([
         storageManager.getWorkspaces(currentUserId),
@@ -715,7 +820,7 @@ export default function DeploymentClient() {
         storageManager.getEnvironmentVariables()
       ])
 
-      // Load saved tokens
+      // Load saved tokens and validate them
       const [githubToken, vercelToken, netlifyToken] = await Promise.all([
         storageManager.getToken(currentUserId, 'github').catch(() => null),
         storageManager.getToken(currentUserId, 'vercel').catch(() => null),
@@ -728,18 +833,22 @@ export default function DeploymentClient() {
         netlify: netlifyToken ? { token: netlifyToken.token } : undefined,
       })
 
-      // Auto-populate forms with saved tokens
-      if (githubToken) {
+      // Validate tokens and update connection state (this will override persisted states if tokens are invalid)
+      const [githubValid, vercelValid, netlifyValid] = await Promise.all([
+        validateAndPersistConnection('github', githubToken),
+        validateAndPersistConnection('vercel', vercelToken),
+        validateAndPersistConnection('netlify', netlifyToken),
+      ])
+
+      // Auto-populate forms with valid tokens only
+      if (githubValid && githubToken) {
         setGithubForm(prev => ({ ...prev, token: githubToken.token }))
-        setDeploymentState(prev => ({ ...prev, githubConnected: true }))
       }
-      if (vercelToken) {
+      if (vercelValid && vercelToken) {
         setVercelForm(prev => ({ ...prev, token: vercelToken.token }))
-        setDeploymentState(prev => ({ ...prev, vercelConnected: true }))
       }
-      if (netlifyToken) {
+      if (netlifyValid && netlifyToken) {
         setNetlifyForm(prev => ({ ...prev, token: netlifyToken.token }))
-        setDeploymentState(prev => ({ ...prev, netlifyConnected: true }))
       }
 
       const projectsWithData: ProjectDisplay[] = projectsData.map(project => {

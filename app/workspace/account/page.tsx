@@ -69,6 +69,10 @@ import {
   isCloudSyncEnabled,
   setCloudSyncEnabled as setCloudSyncEnabledUtil,
   getLastBackupTime as getLastBackupTimeUtil,
+  storeDeploymentTokens,
+  getDeploymentTokens,
+  storeDeploymentConnectionStates,
+  getDeploymentConnectionStates,
 } from "@/lib/cloud-sync"
 import { useCloudSync } from "@/hooks/use-cloud-sync"
 import { 
@@ -280,29 +284,22 @@ export default function AccountSettingsPage() {
         userData = await response.json()
       }
 
-      // Save token to IndexedDB
-      await storageManager.init()
-      const existingToken = await storageManager.getToken(user.id, provider)
-      if (existingToken) {
-        await storageManager.updateToken(existingToken.id, { token })
-      } else {
-        await storageManager.createToken({ userId: user.id, provider, token })
+      // Save token to Supabase
+      const tokensToStore: any = {}
+      tokensToStore[provider] = token
+      const success = await storeDeploymentTokens(user.id, tokensToStore)
+      
+      if (!success) {
+        throw new Error(`Failed to store ${provider} token`)
       }
 
-      // Update connection status
-      setConnections(prev => ({
-        ...prev,
-        [provider]: {
-          connected: true,
-          username: provider === 'github' ? userData.login :
-                   provider === 'vercel' ? (userData.username || userData.name) :
-                   (userData.login || userData.email),
-          avatarUrl: provider === 'github' ? userData.avatar_url :
-                    provider === 'vercel' ? userData.avatar :
-                    userData.avatar_url,
-          loading: false
-        }
-      }))
+      // Store connection state
+      const statesToStore: any = {}
+      statesToStore[`${provider}_connected`] = true
+      await storeDeploymentConnectionStates(user.id, statesToStore)
+
+      // Auto-run auth back: re-check connection status to validate token and fetch user data
+      await checkConnectionStatus(user.id)
 
       // Clear form
       setConnectionForms(prev => ({
@@ -594,14 +591,22 @@ export default function AccountSettingsPage() {
         throw new Error(`Invalid ${provider} token`)
       }
 
-      // Store token
-      await storageManager.init()
-      const existingToken = await storageManager.getToken(user.id, provider)
-      if (existingToken) {
-        await storageManager.updateToken(existingToken.id, { token })
-      } else {
-        await storageManager.createToken({ userId: user.id, provider, token })
+      // Store token using Supabase
+      const tokensToStore: any = {}
+      tokensToStore[provider] = token
+      const success = await storeDeploymentTokens(user.id, tokensToStore)
+      
+      if (!success) {
+        throw new Error(`Failed to store ${provider} token`)
       }
+
+      // Store connection state
+      const statesToStore: any = {}
+      statesToStore[`${provider}_connected`] = true
+      await storeDeploymentConnectionStates(user.id, statesToStore)
+
+      // Auto-run auth back: re-check connection status to validate token and fetch user data
+      await checkConnectionStatus(user.id)
 
       // Update connection status
       setConnections(prev => ({
@@ -641,34 +646,116 @@ export default function AccountSettingsPage() {
     }
   }
 
-  // Fetch existing connection status
+  // Fetch existing connection status and validate tokens
   const checkConnectionStatus = async (userId: string) => {
     try {
-      await storageManager.init()
-      const githubToken = await storageManager.getToken(userId, 'github')
-      const vercelToken = await storageManager.getToken(userId, 'vercel')
-      const netlifyToken = await storageManager.getToken(userId, 'netlify')
+      // Get tokens and connection states from Supabase
+      const [tokens, connectionStates] = await Promise.all([
+        getDeploymentTokens(userId),
+        getDeploymentConnectionStates(userId)
+      ])
 
-      // Update connection status based on tokens
+      // Set loading state for all providers
       setConnections(prev => ({
-        github: {
-          ...prev.github,
-          connected: !!githubToken,
-          loading: false
-        },
-        vercel: {
-          ...prev.vercel,
-          connected: !!vercelToken,
-          loading: false
-        },
-        netlify: {
-          ...prev.netlify,
-          connected: !!netlifyToken,
-          loading: false
-        }
+        github: { ...prev.github, loading: true },
+        vercel: { ...prev.vercel, loading: true },
+        netlify: { ...prev.netlify, loading: true }
       }))
+
+      // Validate and fetch user data for each token
+      const validateAndFetchUserData = async (
+        provider: 'github' | 'vercel' | 'netlify'
+      ) => {
+        const token = tokens?.[provider]
+        const isConnected = connectionStates?.[`${provider}_connected`] || false
+        
+        if (!token || !isConnected) {
+          return { connected: false, username: '', avatarUrl: '', loading: false }
+        }
+
+        try {
+          let userData: any = {}
+
+          // Validate token and fetch user data
+          if (provider === 'github') {
+            const response = await fetch('https://api.github.com/user', {
+              headers: {
+                'Authorization': `token ${token}`,
+                'Accept': 'application/vnd.github.v3+json'
+              }
+            })
+            if (!response.ok) throw new Error('Invalid GitHub token')
+            userData = await response.json()
+          } else if (provider === 'vercel') {
+            const response = await fetch('https://api.vercel.com/v1/user', {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            })
+            if (!response.ok) throw new Error('Invalid Vercel token')
+            userData = await response.json()
+          } else if (provider === 'netlify') {
+            const response = await fetch('https://api.netlify.com/api/v1/user', {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            })
+            if (!response.ok) throw new Error('Invalid Netlify token')
+            userData = await response.json()
+          }
+
+          return {
+            connected: true,
+            username: provider === 'github' ? userData.login :
+                     provider === 'vercel' ? (userData.username || userData.name) :
+                     (userData.login || userData.email),
+            avatarUrl: provider === 'github' ? userData.avatar_url :
+                      provider === 'vercel' ? userData.avatar :
+                      userData.avatar_url,
+            loading: false
+          }
+        } catch (error) {
+          console.error(`Error validating ${provider} token:`, error)
+          // If token is invalid, remove it and update connection state from Supabase
+          try {
+            const tokensToUpdate: any = {}
+            tokensToUpdate[provider] = undefined
+            await storeDeploymentTokens(userId, tokensToUpdate)
+            
+            const statesToUpdate: any = {}
+            statesToUpdate[`${provider}_connected`] = false
+            await storeDeploymentConnectionStates(userId, statesToUpdate)
+          } catch (deleteError) {
+            console.error(`Error removing invalid ${provider} token:`, deleteError)
+          }
+          return { connected: false, username: '', avatarUrl: '', loading: false }
+        }
+      }
+
+      // Validate all tokens concurrently
+      const [githubStatus, vercelStatus, netlifyStatus] = await Promise.all([
+        validateAndFetchUserData('github'),
+        validateAndFetchUserData('vercel'),
+        validateAndFetchUserData('netlify')
+      ])
+
+      // Update connection status
+      setConnections({
+        github: githubStatus,
+        vercel: vercelStatus,
+        netlify: netlifyStatus
+      })
+
     } catch (error) {
       console.error("Error checking connection status:", error)
+      // Reset loading states on error
+      setConnections(prev => ({
+        github: { ...prev.github, loading: false },
+        vercel: { ...prev.vercel, loading: false },
+        netlify: { ...prev.netlify, loading: false }
+      }))
     }
   }
 
@@ -748,23 +835,23 @@ export default function AccountSettingsPage() {
     }
 
     try {
-      // Remove token from IndexedDB
-      await storageManager.init()
-      const existingToken = await storageManager.getToken(user.id, provider)
-      if (existingToken) {
-        await storageManager.deleteToken(existingToken.id)
-      }
+      // Remove token from Supabase
+      const tokensToUpdate: any = {}
+      tokensToUpdate[provider] = undefined
+      await storeDeploymentTokens(user.id, tokensToUpdate)
+      
+      // Update connection state
+      const statesToUpdate: any = {}
+      statesToUpdate[`${provider}_connected`] = false
+      await storeDeploymentConnectionStates(user.id, statesToUpdate)
+
+      // Auto-run auth back: re-check connection status
+      await checkConnectionStatus(user.id)
 
       // Clear the form input
       setConnectionForms(prev => ({
         ...prev,
         [provider]: { token: '', isValidating: false, error: '' }
-      }))
-
-      // Update connection status
-      setConnections(prev => ({
-        ...prev,
-        [provider]: { connected: false, username: '', avatarUrl: '', loading: false }
       }))
 
       toast({
