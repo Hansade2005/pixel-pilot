@@ -1328,6 +1328,17 @@ class IndexedDBStorage implements StorageInterface {
       req.onerror = () => reject(req.error)
     })
   }
+
+  async getAllTokens(): Promise<TokenEntry[]> {
+    if (!this.db) throw new Error('Database not initialized')
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['tokens'], 'readonly')
+      const store = transaction.objectStore('tokens')
+      const request = store.getAll()
+      request.onsuccess = () => resolve(request.result || [])
+      request.onerror = () => reject(request.error)
+    })
+  }
   async getEnvironmentVariables(workspaceId?: string): Promise<EnvironmentVariable[]> {
     if (!this.db) throw new Error('Database not initialized')
     return new Promise((resolve, reject) => {
@@ -1460,16 +1471,17 @@ class IndexedDBStorage implements StorageInterface {
     if (!this.db) throw new Error('Database not initialized')
     
     // Get all data from all tables
-    const [workspaces, files, chatSessions, messages, deployments, environmentVariables] = await Promise.all([
+    const [workspaces, files, chatSessions, messages, deployments, environmentVariables, tokens] = await Promise.all([
       this.getAllEntries('workspaces'),
       this.getAllEntries('files'),
       this.getAllEntries('chatSessions'),
       this.getAllEntries('messages'),
       this.getDeployments(), // This already gets all deployments when no workspaceId is provided
-      this.getEnvironmentVariables() // This already gets all environment variables when no workspaceId is provided
+      this.getEnvironmentVariables(), // This already gets all environment variables when no workspaceId is provided
+      this.getAllTokens()
     ])
     
-    return { workspaces, files, chatSessions, messages, deployments, environmentVariables }
+    return { workspaces, files, chatSessions, messages, deployments, environmentVariables, tokens }
   }
 
   private generateId(): string {

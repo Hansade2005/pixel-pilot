@@ -81,6 +81,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
   // Auto-restore state
   const [isAutoRestoring, setIsAutoRestoring] = useState(false)
+  const [justCreatedProject, setJustCreatedProject] = useState(false)
   
   // Preview-related state
   const [customUrl, setCustomUrl] = useState("")
@@ -163,8 +164,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         const projectId = searchParams.get('projectId')
         const isDeletingProject = searchParams.get('deleting') === 'true'
         
-        // Only auto-restore when in a project workspace and not during deletion
-        if (projectId && !isDeletingProject) {
+        // Only auto-restore when in a project workspace and not during deletion or creation
+        if (projectId && !isDeletingProject && !justCreatedProject) {
           console.log('WorkspaceLayout: In project workspace, checking cloud sync for user:', user.id)
           const cloudSyncEnabled = await isCloudSyncEnabled(user.id)
           console.log('WorkspaceLayout: Cloud sync enabled result:', cloudSyncEnabled)
@@ -372,6 +373,17 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         const params = new URLSearchParams(searchParams.toString())
         params.set('projectId', workspace.id)
         router.push(`/workspace?${params.toString()}`)
+        
+        // Prevent auto-restore for newly created project
+        setJustCreatedProject(true)
+        
+        // Trigger backup after project creation
+        if (triggerBackup) {
+          await triggerBackup()
+        }
+        
+        // Reset the flag after a short delay
+        setTimeout(() => setJustCreatedProject(false), 2000)
       }
       
       // Refresh projects list
@@ -562,6 +574,17 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                   params.set('projectId', newProject.id)
                   router.push(`/workspace?${params.toString()}`)
                   
+                  // Prevent auto-restore for newly created project
+                  setJustCreatedProject(true)
+                  
+                  // Trigger backup after project creation
+                  if (triggerBackup) {
+                    await triggerBackup()
+                  }
+                  
+                  // Reset the flag after a short delay
+                  setTimeout(() => setJustCreatedProject(false), 2000)
+                  
                   console.log('WorkspaceLayout: Auto-selected new project:', newProject.name)
                 }
               } catch (error) {
@@ -570,6 +593,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             }}
             collapsed={sidebarCollapsed}
             onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+            onTriggerBackup={triggerBackup}
           />
 
           {/* Main Content */}
@@ -612,6 +636,17 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     const params = new URLSearchParams(searchParams.toString())
                     params.set('projectId', newProject.id)
                     router.push(`/workspace?${params.toString()}`)
+                    
+                    // Prevent auto-restore for newly created project
+                    setJustCreatedProject(true)
+                    
+                    // Trigger backup after project creation
+                    if (triggerBackup) {
+                      await triggerBackup()
+                    }
+                    
+                    // Reset the flag after a short delay
+                    setTimeout(() => setJustCreatedProject(false), 2000)
                     
                     console.log('WorkspaceLayout: Auto-selected new project:', newProject.name)
                   }
@@ -922,6 +957,17 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           const params = new URLSearchParams(searchParams.toString())
                           params.set('projectId', newProject.id)
                           router.push(`/workspace?${params.toString()}`)
+                          
+                          // Prevent auto-restore for newly created project
+                          setJustCreatedProject(true)
+                          
+                          // Trigger backup after project creation
+                          if (triggerBackup) {
+                            await triggerBackup()
+                          }
+                          
+                          // Reset the flag after a short delay
+                          setTimeout(() => setJustCreatedProject(false), 2000)
                         }
                       } catch (error) {
                         console.error('Error refreshing projects after creation:', error)
@@ -930,6 +976,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     collapsed={false}
                     onToggleCollapse={() => {}}
                     isMobile={true}
+                    onTriggerBackup={triggerBackup}
                   />
                 </SheetContent>
               </Sheet>

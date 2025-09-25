@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
             ref: 'main',
           },
           projectSettings: {
-            framework: framework || 'nextjs',
+            framework: framework || 'vite',
           },
         }),
       });

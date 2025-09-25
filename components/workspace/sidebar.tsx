@@ -69,6 +69,7 @@ interface SidebarProps {
   collapsed: boolean
   onToggleCollapse: () => void
   isMobile?: boolean
+  onTriggerBackup?: () => Promise<boolean>
 }
 
 export function Sidebar({
@@ -80,6 +81,7 @@ export function Sidebar({
   collapsed,
   onToggleCollapse,
   isMobile = false,
+  onTriggerBackup,
 }: SidebarProps) {
   
   const [searchQuery, setSearchQuery] = useState("")
@@ -144,6 +146,12 @@ export function Sidebar({
       await storageManager.updateWorkspace(project.id, {
         isPinned: !project.isPinned
       })
+      
+      // Trigger backup before reload to save the updated state
+      if (onTriggerBackup) {
+        await onTriggerBackup()
+      }
+      
       // Refresh projects
       window.location.reload()
     } catch (error) {
@@ -174,6 +182,11 @@ export function Sidebar({
         }
       }
       
+      // Trigger backup before reload to save the updated state
+      if (onTriggerBackup) {
+        await onTriggerBackup()
+      }
+      
       // Refresh page to update project list
       window.location.reload()
       setDeleteProjectId(null)
@@ -199,6 +212,12 @@ export function Sidebar({
       
       setRenameProject(null)
       setRenameValue("")
+      
+      // Trigger backup before reload to save the updated state
+      if (onTriggerBackup) {
+        await onTriggerBackup()
+      }
+      
       window.location.reload()
     } catch (error) {
       console.error('Error renaming project:', error)
@@ -248,6 +267,11 @@ export function Sidebar({
       onSelectProject(newProject)
       if (onProjectCreated) {
         await onProjectCreated(newProject)
+      }
+      
+      // Trigger backup before reload to save the updated state
+      if (onTriggerBackup) {
+        await onTriggerBackup()
       }
       
       window.location.reload()

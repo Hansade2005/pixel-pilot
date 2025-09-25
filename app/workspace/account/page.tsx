@@ -69,8 +69,6 @@ import {
   isCloudSyncEnabled,
   setCloudSyncEnabled as setCloudSyncEnabledUtil,
   getLastBackupTime as getLastBackupTimeUtil,
-  storeDeploymentTokens,
-  getDeploymentTokens
 } from "@/lib/cloud-sync"
 import { useCloudSync } from "@/hooks/use-cloud-sync"
 import { 
@@ -282,11 +280,14 @@ export default function AccountSettingsPage() {
         userData = await response.json()
       }
 
-      // Save token to Supabase
-      const tokens = { [provider]: token }
-      const success = await storeDeploymentTokens(user?.id, tokens)
-
-      if (!success) throw new Error(`Failed to save ${provider} token`)
+      // Save token to IndexedDB
+      await storageManager.init()
+      const existingToken = await storageManager.getToken(user.id, provider)
+      if (existingToken) {
+        await storageManager.updateToken(existingToken.id, { token })
+      } else {
+        await storageManager.createToken({ userId: user.id, provider, token })
+      }
 
       // Update connection status
       setConnections(prev => ({
@@ -594,11 +595,12 @@ export default function AccountSettingsPage() {
       }
 
       // Store token
-      const tokens = { [provider]: token }
-      const success = await storeDeploymentTokens(user.id, tokens)
-
-      if (!success) {
-        throw new Error(`Failed to store ${provider} token`)
+      await storageManager.init()
+      const existingToken = await storageManager.getToken(user.id, provider)
+      if (existingToken) {
+        await storageManager.updateToken(existingToken.id, { token })
+      } else {
+        await storageManager.createToken({ userId: user.id, provider, token })
       }
 
       // Update connection status
@@ -642,25 +644,26 @@ export default function AccountSettingsPage() {
   // Fetch existing connection status
   const checkConnectionStatus = async (userId: string) => {
     try {
-      const tokens = await getDeploymentTokens(userId)
-
-      if (!tokens) return
+      await storageManager.init()
+      const githubToken = await storageManager.getToken(userId, 'github')
+      const vercelToken = await storageManager.getToken(userId, 'vercel')
+      const netlifyToken = await storageManager.getToken(userId, 'netlify')
 
       // Update connection status based on tokens
       setConnections(prev => ({
         github: {
           ...prev.github,
-          connected: !!tokens.github,
+          connected: !!githubToken,
           loading: false
         },
         vercel: {
           ...prev.vercel,
-          connected: !!tokens.vercel,
+          connected: !!vercelToken,
           loading: false
         },
         netlify: {
           ...prev.netlify,
-          connected: !!tokens.netlify,
+          connected: !!netlifyToken,
           loading: false
         }
       }))
@@ -745,11 +748,12 @@ export default function AccountSettingsPage() {
     }
 
     try {
-      // Remove token from database by setting it to null
-      const tokens = { [provider]: null }
-      const success = await storeDeploymentTokens(user.id, tokens)
-
-      if (!success) throw new Error(`Failed to disconnect ${provider}`)
+      // Remove token from IndexedDB
+      await storageManager.init()
+      const existingToken = await storageManager.getToken(user.id, provider)
+      if (existingToken) {
+        await storageManager.deleteToken(existingToken.id)
+      }
 
       // Clear the form input
       setConnectionForms(prev => ({
