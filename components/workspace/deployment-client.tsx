@@ -368,14 +368,29 @@ export default function DeploymentClient() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
-      if (!user) return
+      if (!user) {
+        console.log('loadStoredTokens: No user found')
+        return
+      }
 
+      console.log('loadStoredTokens: Loading tokens for user:', user.id)
       const tokens = await getDeploymentTokens(user.id)
+      console.log('loadStoredTokens: Retrieved tokens:', tokens)
+      
       if (tokens) {
-        setStoredTokens({
+        const newTokens = {
           github: tokens.github || undefined,
           vercel: tokens.vercel || undefined,
           netlify: tokens.netlify || undefined
+        }
+        console.log('loadStoredTokens: Setting stored tokens:', newTokens)
+        setStoredTokens(newTokens)
+      } else {
+        console.log('loadStoredTokens: No tokens found, clearing stored tokens')
+        setStoredTokens({
+          github: undefined,
+          vercel: undefined,
+          netlify: undefined
         })
       }
     } catch (error) {
@@ -851,6 +866,7 @@ Return ONLY the commit message, no quotes or additional text.`
   useEffect(() => {
     if (currentUserId) {
       loadData()
+      loadStoredTokens() // Also load tokens when user changes
     }
   }, [currentUserId])
 

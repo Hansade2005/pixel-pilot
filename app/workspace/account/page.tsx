@@ -721,7 +721,7 @@ export default function AccountSettingsPage() {
           // If token is invalid, remove it and update connection state from Supabase
           try {
             const tokensToUpdate: any = {}
-            tokensToUpdate[provider] = undefined
+            tokensToUpdate[provider] = null
             await storeDeploymentTokens(userId, tokensToUpdate)
             
             const statesToUpdate: any = {}
@@ -837,7 +837,7 @@ export default function AccountSettingsPage() {
     try {
       // Remove token from Supabase
       const tokensToUpdate: any = {}
-      tokensToUpdate[provider] = undefined
+      tokensToUpdate[provider] = null
       await storeDeploymentTokens(user.id, tokensToUpdate)
       
       // Update connection state

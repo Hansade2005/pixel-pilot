@@ -196,15 +196,20 @@ export async function storeDeploymentTokens(
   }
 ): Promise<boolean> {
   try {
+    // Build update object with only the provided tokens
+    const updateData: any = {
+      user_id: userId,
+      updated_at: new Date().toISOString()
+    }
+    
+    // Only update the tokens that are explicitly provided
+    if (tokens.github !== undefined) updateData.github_token = tokens.github
+    if (tokens.vercel !== undefined) updateData.vercel_token = tokens.vercel  
+    if (tokens.netlify !== undefined) updateData.netlify_token = tokens.netlify
+
     const { error } = await supabase
       .from('user_settings')
-      .upsert({
-        user_id: userId,
-        github_token: tokens.github || null,
-        vercel_token: tokens.vercel || null,
-        netlify_token: tokens.netlify || null,
-        updated_at: new Date().toISOString()
-      }, {
+      .upsert(updateData, {
         onConflict: 'user_id'
       })
 
@@ -246,6 +251,10 @@ export async function getDeploymentTokens(userId: string): Promise<{
     return null
   }
 }
+
+/**
+ * Store deployment connection states for a user
+ */
 export async function storeDeploymentConnectionStates(
   userId: string, 
   states: {
