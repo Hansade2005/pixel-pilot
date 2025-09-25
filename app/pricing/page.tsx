@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Script from "next/script"
 import { Logo } from "@/components/ui/logo"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -206,7 +207,10 @@ export default function PricingPage() {
   return (
     <>
       {/* Stripe.js script */}
-      <script async src="https://js.stripe.com/v3/pricing.js"></script>
+      <Script
+        src="https://js.stripe.com/v3/pricing.js"
+        strategy="afterInteractive"
+      />
 
     <div className="min-h-screen relative overflow-hidden">
       {/* Enhanced Gradient Background */}

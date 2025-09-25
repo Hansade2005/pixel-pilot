@@ -847,6 +847,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                             
                             <div className="relative">
                               <Input
+                                id="preview-url"
                                 placeholder="Preview URL..."
                                 value={syncedPreview.url || customUrl}
                                 onChange={(e) => setCustomUrl(e.target.value)}

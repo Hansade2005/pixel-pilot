@@ -1591,6 +1591,7 @@ Create a commit message that captures the main development task or change discus
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
+                    id="search-deployments"
                     placeholder="Search deployments..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -1634,8 +1635,9 @@ Create a commit message that captures the main development task or change discus
                         {/* Show Push Changes option if project has connected repo */}
                         {selectedProject?.githubRepoUrl ? (
                           <div className="p-3 bg-green-900/20 border border-green-700 rounded-lg">
-                            <label className="flex items-center space-x-2 cursor-pointer">
+                            <label htmlFor="deployment-push" className="flex items-center space-x-2 cursor-pointer">
                               <input
+                                id="deployment-push"
                                 type="radio"
                                 name="deploymentMode"
                                 value="push"
@@ -1656,8 +1658,9 @@ Create a commit message that captures the main development task or change discus
                           </div>
                         ) : null}
 
-                        <label className="flex items-center space-x-2 cursor-pointer">
+                        <label htmlFor="deployment-new" className="flex items-center space-x-2 cursor-pointer">
                           <input
+                            id="deployment-new"
                             type="radio"
                             name="deploymentMode"
                             value="new"
@@ -1667,8 +1670,9 @@ Create a commit message that captures the main development task or change discus
                           />
                           <span className="text-gray-300">Create New Repository</span>
                         </label>
-                        <label className="flex items-center space-x-2 cursor-pointer">
+                        <label htmlFor="deployment-existing" className="flex items-center space-x-2 cursor-pointer">
                           <input
+                            id="deployment-existing"
                             type="radio"
                             name="deploymentMode"
                             value="existing"

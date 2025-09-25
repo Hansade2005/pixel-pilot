@@ -1611,7 +1611,7 @@ enabled = false`
         <DialogTitle>Rename File</DialogTitle>
         <DialogDescription>Enter a new name for the file.</DialogDescription>
       </DialogHeader>
-      <Input value={renameValue} onChange={e => setRenameValue(e.target.value)} autoFocus />
+      <Input id="rename-file" value={renameValue} onChange={e => setRenameValue(e.target.value)} autoFocus />
       <DialogFooter>
         <Button onClick={handleRenameFile} disabled={!renameValue.trim()}>Rename</Button>
         <Button variant="ghost" onClick={() => setRenamingFile(null)}>Cancel</Button>
@@ -1747,6 +1747,7 @@ enabled = false`
       {showSearch && (
         <div className="mb-2">
           <Input
+            id="search-files"
             placeholder="Search files..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
