@@ -84,6 +84,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [isAutoRestoring, setIsAutoRestoring] = useState(false)
   const [justCreatedProject, setJustCreatedProject] = useState(false)
   const [hasAutoOpenedCreateDialog, setHasAutoOpenedCreateDialog] = useState(false)
+  const [hasProcessedInitialPrompt, setHasProcessedInitialPrompt] = useState(false)
   
   // Preview-related state
   const [customUrl, setCustomUrl] = useState("")
@@ -310,8 +311,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   // Handle initialPrompt - auto-generate project details and open create modal
   useEffect(() => {
     const generateAndOpenDialog = async () => {
-      if (initialPrompt) {
+      if (initialPrompt && !isAutoRestoring && !isLoadingProjects && !hasProcessedInitialPrompt) {
         console.log('WorkspaceLayout: Initial prompt detected, generating project suggestion:', initialPrompt)
+        console.log('WorkspaceLayout: Restoration status - isAutoRestoring:', isAutoRestoring, 'isLoadingProjects:', isLoadingProjects)
 
         try {
           // Call AI to generate project name and description
@@ -369,6 +371,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           }
         }
 
+        // Mark that we've processed this initial prompt
+        setHasProcessedInitialPrompt(true)
+
         // Remove prompt from URL after opening modal
         const params = new URLSearchParams(searchParams.toString())
         params.delete('prompt')
@@ -377,7 +382,14 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     }
 
     generateAndOpenDialog()
-  }, [initialPrompt, searchParams, router, isMobile, user.id])
+  }, [initialPrompt, searchParams, router, isMobile, user.id, isAutoRestoring, isLoadingProjects])
+
+  // Reset processed flag when initialPrompt changes (new prompt from homepage)
+  useEffect(() => {
+    if (initialPrompt) {
+      setHasProcessedInitialPrompt(false)
+    }
+  }, [initialPrompt])
 
   // Handle modal close - reset form fields
   const handleModalClose = (open: boolean) => {
@@ -386,6 +398,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       // Reset form when closing
       setNewProjectName("")
       setNewProjectDescription("")
+      setHasProcessedInitialPrompt(false) // Allow re-processing if user re-enters prompt
     }
   }
 
@@ -687,6 +700,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 if (!open) {
                   setProjectHeaderInitialName("")
                   setProjectHeaderInitialDescription("")
+                  setHasProcessedInitialPrompt(false) // Allow re-processing if user re-enters prompt
                 }
               }}
               onProjectCreated={async (newProject) => {
