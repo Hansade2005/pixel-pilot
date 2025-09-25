@@ -305,7 +305,7 @@ export default function DeploymentClient() {
     repoName: '',
     repoDescription: '',
     isPrivate: false,
-    deploymentMode: 'new' as 'new' | 'existing', // 'new' for creating new repo, 'existing' for pushing to existing
+    deploymentMode: 'new' as 'new' | 'existing' | 'push', // 'new' for creating new repo, 'existing' for pushing to existing, 'push' for connected repo
     selectedRepo: '',
     commitMessage: 'Update project files',
   })
@@ -350,6 +350,8 @@ export default function DeploymentClient() {
   const [userRepos, setUserRepos] = useState<GitHubRepo[]>([])
   const [isLoadingRepos, setIsLoadingRepos] = useState(false)
   const [isGeneratingCommitMessage, setIsGeneratingCommitMessage] = useState(false)
+
+
   const [selectedRepoForVercel, setSelectedRepoForVercel] = useState<string>('')
   const [selectedRepoForNetlify, setSelectedRepoForNetlify] = useState<string>('')
 
@@ -980,6 +982,15 @@ Return ONLY the commit message, no quotes or additional text.`
       return
     }
 
+    if (githubForm.deploymentMode === 'push' && !selectedProject?.githubRepoUrl) {
+      toast({
+        title: "No Connected Repository",
+        description: "No GitHub repository is connected to this project",
+        variant: "destructive"
+      })
+      return
+    }
+
     // Check if GitHub token is available in stored tokens
     if (!storedTokens.github) {
       toast({
@@ -1079,6 +1090,26 @@ Return ONLY the commit message, no quotes or additional text.`
         repoData = await repoResponse.json()
         repoOwner = repoData.fullName.split('/')[0]
         repoName = repoData.name
+      } else if (githubForm.deploymentMode === 'push') {
+        // Use connected repository for push
+        const connectedRepo = selectedProject.githubRepoUrl?.split('/').slice(-2).join('/') || ''
+        if (!connectedRepo) {
+          toast({
+            title: "No Connected Repository",
+            description: "No GitHub repository is connected to this project",
+            variant: "destructive"
+          })
+          setDeploymentState(prev => ({ ...prev, isDeploying: false }))
+          return
+        }
+
+        repoData = {
+          url: selectedProject.githubRepoUrl,
+          fullName: connectedRepo,
+          name: connectedRepo.split('/')[1]
+        }
+        repoOwner = connectedRepo.split('/')[0]
+        repoName = connectedRepo.split('/')[1]
       } else {
         // Use existing repository
         const selectedRepo = userRepos.find(repo => repo.fullName === githubForm.selectedRepo)
@@ -1143,15 +1174,17 @@ Return ONLY the commit message, no quotes or additional text.`
       }
 
       // Deploy code to the repository
-      const deployResponse = await fetch('/api/github/deploy', {
+      const deployResponse = await fetch('/api/deploy/github', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          repoName: repoName,
-          repoOwner: repoOwner,
-          token: storedTokens.github,
-          workspaceId: selectedProject.id,
-          files: projectFiles, // Include files in the request
+          projectId: selectedProject.id,
+          githubToken: storedTokens.github,
+          repoName: githubForm.deploymentMode === 'new' ? githubForm.repoName : repoName,
+          repoDescription: githubForm.deploymentMode === 'new' ? githubForm.repoDescription : '',
+          files: projectFiles,
+          mode: githubForm.deploymentMode === 'push' ? 'push' : 'create',
+          existingRepo: githubForm.deploymentMode === 'push' ? repoData.fullName : undefined,
           commitMessage: githubForm.commitMessage || 'Update project files',
         })
       })
@@ -1542,14 +1575,39 @@ Return ONLY the commit message, no quotes or additional text.`
                           </TooltipContent>
                         </Tooltip>
                       </Label>
-                      <div className="flex space-x-4 mt-2">
+                      <div className="flex flex-col space-y-2 mt-2">
+                        {/* Show Push Changes option if project has connected repo */}
+                        {selectedProject?.githubRepoUrl ? (
+                          <div className="p-3 bg-green-900/20 border border-green-700 rounded-lg">
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="deploymentMode"
+                                value="push"
+                                checked={githubForm.deploymentMode === 'push'}
+                                onChange={(e) => setGithubForm(prev => ({ ...prev, deploymentMode: e.target.value as 'new' | 'existing' | 'push' }))}
+                                className="text-green-500"
+                              />
+                              <div className="flex items-center space-x-2">
+                                <span className="text-green-300 font-medium">Push Changes</span>
+                                <Badge variant="secondary" className="bg-green-800 text-green-200">
+                                  Connected: {selectedProject.githubRepoName || selectedProject.githubRepoUrl?.split('/').slice(-1)[0]}
+                                </Badge>
+                              </div>
+                            </label>
+                            <p className="text-sm text-green-400 mt-1 ml-6">
+                              Push latest changes to your connected repository
+                            </p>
+                          </div>
+                        ) : null}
+
                         <label className="flex items-center space-x-2 cursor-pointer">
                           <input
                             type="radio"
                             name="deploymentMode"
                             value="new"
                             checked={githubForm.deploymentMode === 'new'}
-                            onChange={(e) => setGithubForm(prev => ({ ...prev, deploymentMode: e.target.value as 'new' | 'existing' }))}
+                            onChange={(e) => setGithubForm(prev => ({ ...prev, deploymentMode: e.target.value as 'new' | 'existing' | 'push' }))}
                             className="text-blue-600"
                           />
                           <span className="text-gray-300">Create New Repository</span>
@@ -1560,7 +1618,7 @@ Return ONLY the commit message, no quotes or additional text.`
                             name="deploymentMode"
                             value="existing"
                             checked={githubForm.deploymentMode === 'existing'}
-                            onChange={(e) => setGithubForm(prev => ({ ...prev, deploymentMode: e.target.value as 'new' | 'existing' }))}
+                            onChange={(e) => setGithubForm(prev => ({ ...prev, deploymentMode: e.target.value as 'new' | 'existing' | 'push' }))}
                             className="text-blue-600"
                           />
                           <span className="text-gray-300">Use Existing Repository</span>
@@ -1870,6 +1928,27 @@ Return ONLY the commit message, no quotes or additional text.`
                           </Link>
                         </div>
                       )}
+                      {/* Show connected project info */}
+                      {selectedProject?.vercelProjectId && (
+                        <div className="mt-2 p-2 bg-green-900/20 border border-green-700 rounded">
+                          <div className="flex items-center space-x-2">
+                            <CheckCircle2 className="h-3 w-3 text-green-400" />
+                            <span className="text-xs text-green-300">
+                              Project connected: {selectedProject.vercelProjectId}
+                            </span>
+                          </div>
+                          {selectedProject.vercelDeploymentUrl && (
+                            <a
+                              href={selectedProject.vercelDeploymentUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-400 hover:text-blue-300 underline mt-1 block"
+                            >
+                              {selectedProject.vercelDeploymentUrl}
+                            </a>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -1968,8 +2047,10 @@ Return ONLY the commit message, no quotes or additional text.`
                         return
                       }
 
-                      // Check if GitHub repository is selected
-                      if (!selectedRepoForVercel) {
+                      const isRedeploy = selectedProject.vercelProjectId && selectedProject.githubRepoUrl
+
+                      // Check if GitHub repository is selected (for new deployments)
+                      if (!isRedeploy && !selectedRepoForVercel) {
                         toast({
                           title: "GitHub Repository Required",
                           description: "Please select a GitHub repository to deploy from",
@@ -1978,9 +2059,14 @@ Return ONLY the commit message, no quotes or additional text.`
                         return
                       }
 
-                      // Check if Vercel token is available in stored tokens
-                      if (!storedTokens.vercel) {
-                        throw new Error('Vercel token not configured. Please set up your Vercel token in Account Settings.')
+                      // Check if project name is provided (for new deployments)
+                      if (!isRedeploy && !vercelForm.projectName) {
+                        toast({
+                          title: "Project Name Required",
+                          description: "Please enter a project name",
+                          variant: "destructive"
+                        })
+                        return
                       }
 
                       // Check plan limits for Vercel deployment
@@ -2000,13 +2086,15 @@ Return ONLY the commit message, no quotes or additional text.`
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
-                            projectName: vercelForm.projectName,
+                            projectName: isRedeploy ? undefined : vercelForm.projectName,
                             framework: vercelForm.framework,
                             token: storedTokens.vercel,
                             workspaceId: selectedProject.id,
-                            githubRepo: selectedRepoForVercel,
+                            githubRepo: isRedeploy ? selectedProject.githubRepoUrl?.split('/').slice(-2).join('/') : selectedRepoForVercel,
                             githubToken: storedTokens.github,
-                            environmentVariables: envVars,
+                            environmentVariables: isRedeploy ? undefined : envVars, // Don't update env vars on redeploy
+                            mode: isRedeploy ? 'redeploy' : 'deploy',
+                            existingProjectId: isRedeploy ? selectedProject.vercelProjectId : undefined,
                           })
                         })
 
@@ -2020,6 +2108,7 @@ Return ONLY the commit message, no quotes or additional text.`
                         // Update project with Vercel deployment URL
                         await storageManager.updateWorkspace(selectedProject.id, {
                           vercelDeploymentUrl: deployData.url,
+                          vercelProjectId: deployData.projectId || selectedProject.vercelProjectId,
                           deploymentStatus: 'deployed',
                           lastActivity: new Date().toISOString(),
                         })
@@ -2029,8 +2118,8 @@ Return ONLY the commit message, no quotes or additional text.`
                           workspaceId: selectedProject.id,
                           url: deployData.url,
                           status: 'ready',
-                          commitSha: deployData.commitSha || 'initial',
-                          commitMessage: deployData.commitMessage || 'Deployed to Vercel',
+                          commitSha: deployData.commitSha || 'latest',
+                          commitMessage: deployData.commitMessage || (isRedeploy ? 'Redeployed to Vercel' : 'Deployed to Vercel'),
                           branch: 'main',
                           environment: 'production',
                           provider: 'vercel'
@@ -2048,8 +2137,8 @@ Return ONLY the commit message, no quotes or additional text.`
                         }))
 
                         toast({
-                          title: 'Deployment Successful',
-                          description: `Successfully deployed to Vercel at ${deployData.url}`
+                          title: isRedeploy ? 'Redeployment Successful' : 'Deployment Successful',
+                          description: `Successfully ${isRedeploy ? 're' : ''}deployed to Vercel at ${deployData.url}`
                         })
                         setDeploymentState(prev => ({ ...prev, isDeploying: false, currentStep: 'complete' }))
 
@@ -2066,7 +2155,7 @@ Return ONLY the commit message, no quotes or additional text.`
                           const toastMessages = document.querySelectorAll('[data-toast]')
                           toastMessages.forEach(toast => {
                             const existingLink = toast.querySelector('a[href="' + deployData.url + '"]')
-                            if (!existingLink && toast.textContent?.includes('Successfully deployed')) {
+                            if (!existingLink && toast.textContent?.includes('Successfully')) {
                               toast.appendChild(viewLink.cloneNode(true))
                             }
                           })
@@ -2112,18 +2201,18 @@ Return ONLY the commit message, no quotes or additional text.`
                         setDeploymentState(prev => ({ ...prev, isDeploying: false }))
                       }
                     }}
-                    disabled={deploymentState.isDeploying || !storedTokens.vercel || !selectedRepoForVercel}
+                    disabled={deploymentState.isDeploying || !storedTokens.vercel || (!selectedProject?.vercelProjectId && !selectedRepoForVercel)}
                     className="sm:ml-auto bg-blue-600 hover:bg-blue-700"
                   >
                     {deploymentState.isDeploying ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Deploying...
+                        {selectedProject?.vercelProjectId ? 'Redeploying...' : 'Deploying...'}
                       </>
                     ) : (
                       <>
                         <Rocket className="mr-2 h-4 w-4" />
-                        Deploy to Vercel from Git
+                        {selectedProject?.vercelProjectId ? 'Redeploy to Vercel' : 'Deploy to Vercel from Git'}
                       </>
                     )}
                   </Button>
