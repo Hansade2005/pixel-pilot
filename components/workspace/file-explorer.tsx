@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react"
 import { useToast } from '@/hooks/use-toast'
+import { useAutoCloudBackup } from '@/hooks/use-auto-cloud-backup'
 
 // Type declaration for JSZip
 declare global {
@@ -94,6 +95,12 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
   const [isExporting, setIsExporting] = useState(false)
 
   const { toast } = useToast()
+  
+  // Auto cloud backup functionality
+  const { triggerAutoBackup, forceBackup } = useAutoCloudBackup({
+    debounceMs: 3000, // Wait 3 seconds after last change
+    silent: false // Show backup notifications
+  })
 
   // Drag-and-drop logic
   const handleDragStart = (e: React.DragEvent, node: FileNode) => {
@@ -120,6 +127,10 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
       const newPath = `${folderNode.path}/${file.name}`
       await storageManager.updateFile(project.id, filePath, { path: newPath })
       await fetchFiles()
+      
+      // Trigger auto cloud backup after file move
+      triggerAutoBackup(`Moved file: ${file.name} to ${folderNode.path}`)
+      
       toast({ title: 'Moved file', description: `Moved ${file.name} to ${folderNode.path}` })
     } catch (error) {
       console.error("Error moving file:", error)
@@ -138,7 +149,11 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
       setRenamingFile(null)
       setRenameValue("")
       await fetchFiles()
-  toast({ title: 'Renamed file', description: `Renamed ${file.name} → ${renameValue}` })
+      
+      // Trigger auto cloud backup after rename
+      triggerAutoBackup(`Renamed file: ${file.name} → ${renameValue}`)
+      
+      toast({ title: 'Renamed file', description: `Renamed ${file.name} → ${renameValue}` })
     } catch (error) {
       console.error("Error renaming file:", error)
     }
@@ -510,6 +525,9 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
           newExpanded.add(filePath)
           setExpandedFolders(newExpanded)
         }
+        
+        // Trigger auto cloud backup after file creation
+        triggerAutoBackup(`Created ${newFileType === "folder" ? "folder" : "file"}: ${fileName}`)
         
         toast({
           title: "Success",
@@ -1046,6 +1064,9 @@ enabled = false`
       if (selectedFile?.id === file.id) {
         onFileSelect(null)
       }
+      
+      // Trigger auto cloud backup after file deletion
+      triggerAutoBackup(`Deleted file: ${file.name}`)
     } catch (error) {
       console.error("Error deleting file from IndexedDB:", error);
     }
@@ -1078,6 +1099,9 @@ enabled = false`
       }
       
       console.log(`Deleted ${filesInFolder.length} files from folder: ${folderPath}`)
+      
+      // Trigger auto cloud backup after folder deletion
+      triggerAutoBackup(`Deleted folder: ${folderPath} (${filesInFolder.length} files)`)
       
       // Show success toast
       toast({
@@ -1156,6 +1180,9 @@ enabled = false`
       })
 
       await Promise.all(uploadPromises)
+
+      // Trigger auto cloud backup after file upload
+      triggerAutoBackup(`Uploaded ${files.length} file(s)${targetFolder ? ` to ${targetFolder}` : ''}`)
 
       toast({
         title: "Files Uploaded",

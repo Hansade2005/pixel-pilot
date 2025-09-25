@@ -20,6 +20,7 @@ import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useCloudSync } from '@/hooks/use-cloud-sync'
+import { useAutoCloudBackup } from '@/hooks/use-auto-cloud-backup'
 import { useCredits as useSubscription } from '@/hooks/use-credits'
 import { restoreBackupFromCloud, isCloudSyncEnabled } from '@/lib/cloud-sync'
 import { ModelSelector } from "@/components/ui/model-selector"
@@ -72,6 +73,12 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
   // Initialize auto cloud backup when user is available
   const { triggerBackup, getSyncStatus } = useCloudSync(user?.id || null)
+  
+  // Auto cloud backup for file operations
+  const { triggerAutoBackup } = useAutoCloudBackup({
+    debounceMs: 3000, // Wait 3 seconds after file save
+    silent: true // Don't show backup notifications for saves (to avoid spam)
+  })
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newProjectName, setNewProjectName] = useState("")
   const [newProjectDescription, setNewProjectDescription] = useState("")
@@ -907,6 +914,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           // Update the file content in state if needed
                           console.log("File saved:", file.name, content.length, "characters")
                           
+                          // Trigger auto cloud backup after file save
+                          triggerAutoBackup(`Saved file: ${file.name}`)
+                          
                           // Force file explorer refresh to show updated content
                           setFileExplorerKey(prev => prev + 1)
                           console.log("File saved successfully, triggering file explorer refresh")
@@ -1148,6 +1158,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     file={selectedFile}
                     onSave={(file, content) => {
                       console.log("File saved:", file.name, content.length, "characters")
+                      
+                      // Trigger auto cloud backup after file save
+                      triggerAutoBackup(`Saved file: ${file.name}`)
+                      
                       setFileExplorerKey(prev => prev + 1)
                     }}
                   />
