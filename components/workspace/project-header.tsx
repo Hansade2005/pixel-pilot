@@ -33,6 +33,7 @@ interface ProjectHeaderProps {
   user?: any
   onProjectCreated?: (newProject: Project) => Promise<void>
   openDialog?: boolean
+  initialName?: string
   initialDescription?: string
   onDialogOpenChange?: (open: boolean) => void
 }
@@ -49,6 +50,7 @@ export function ProjectHeader({
   user,
   onProjectCreated,
   openDialog,
+  initialName,
   initialDescription,
   onDialogOpenChange
 }: ProjectHeaderProps) {
@@ -71,12 +73,17 @@ export function ProjectHeader({
     }
   }, [openDialog])
 
-  // Handle initial description from external control
+  // Handle initial name and description from external control
   React.useEffect(() => {
-    if (initialDescription && openDialog) {
-      setNewProjectDescription(initialDescription)
+    if (openDialog) {
+      if (initialName) {
+        setNewProjectName(initialName)
+      }
+      if (initialDescription) {
+        setNewProjectDescription(initialDescription)
+      }
     }
-  }, [initialDescription, openDialog])
+  }, [initialName, initialDescription, openDialog])
 
   const handleShareClick = async () => {
     if (!project) return
@@ -149,10 +156,67 @@ export function ProjectHeader({
   }
   if (!project) {
     return (
-      <div className="h-16 border-b border-border bg-card flex items-center justify-center">
-        <div className="flex items-center space-x-3">
+      <div className="h-16 border-b border-border bg-card px-6 flex items-center justify-between">
+        <div className="flex items-center space-x-4">
           <Logo variant="icon" size="sm" />
-          <p className="text-muted-foreground">Select a project to get started</p>
+          <div>
+            <h1 className="text-lg font-semibold text-card-foreground">Welcome to PixelPilot</h1>
+            <p className="text-sm text-muted-foreground">Create your first project to get started</p>
+          </div>
+        </div>
+        <div className="flex items-center space-x-2">
+          {/* Model selector even when no project */}
+          {selectedModel && onModelChange && (
+            <ModelSelector
+              selectedModel={selectedModel}
+              onModelChange={onModelChange}
+            />
+          )}
+          {/* Create project button */}
+          <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+            setIsCreateDialogOpen(open)
+            onDialogOpenChange?.(open)
+          }}>
+            <DialogTrigger asChild>
+              <Button variant="default" size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Create Project
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Create New Project</DialogTitle>
+                <DialogDescription>
+                  Start building your next app with AI assistance.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="name">Project Name</Label>
+                  <Input
+                    id="name"
+                    placeholder="My Awesome App"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="description">Description (Optional)</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="A brief description of your project"
+                    value={newProjectDescription}
+                    onChange={(e) => setNewProjectDescription(e.target.value)}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleCreateProject} disabled={!newProjectName.trim() || isCreating}>
+                  {isCreating ? "Creating..." : "Create Project"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     )

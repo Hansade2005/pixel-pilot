@@ -77,11 +77,13 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [newProjectDescription, setNewProjectDescription] = useState("")
   const [isCreating, setIsCreating] = useState(false)
   const [openProjectHeaderDialog, setOpenProjectHeaderDialog] = useState(false)
+  const [projectHeaderInitialName, setProjectHeaderInitialName] = useState("")
   const [projectHeaderInitialDescription, setProjectHeaderInitialDescription] = useState("")
 
   // Auto-restore state
   const [isAutoRestoring, setIsAutoRestoring] = useState(false)
   const [justCreatedProject, setJustCreatedProject] = useState(false)
+  const [hasAutoOpenedCreateDialog, setHasAutoOpenedCreateDialog] = useState(false)
   
   // Preview-related state
   const [customUrl, setCustomUrl] = useState("")
@@ -305,27 +307,77 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     }
   }, [newProjectId, user.id, searchParams, router])
 
-  // Handle initialPrompt - auto-open create modal when prompt is provided
+  // Handle initialPrompt - auto-generate project details and open create modal
   useEffect(() => {
-    if (initialPrompt) {
-      console.log('WorkspaceLayout: Initial prompt detected, opening create dialog:', initialPrompt)
-      
-      if (isMobile) {
-        // For mobile, use the mobile dialog
-        setNewProjectDescription(initialPrompt)
-        setIsCreateDialogOpen(true)
-      } else {
-        // For desktop, trigger ProjectHeader dialog
-        setProjectHeaderInitialDescription(initialPrompt)
-        setOpenProjectHeaderDialog(true)
+    const generateAndOpenDialog = async () => {
+      if (initialPrompt) {
+        console.log('WorkspaceLayout: Initial prompt detected, generating project suggestion:', initialPrompt)
+
+        try {
+          // Call AI to generate project name and description
+          const response = await fetch('/api/project-suggestions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              prompt: initialPrompt,
+              userId: user.id,
+            }),
+          })
+
+          if (!response.ok) {
+            throw new Error('Failed to generate project suggestion')
+          }
+
+          const data = await response.json()
+
+          if (data.success && data.suggestion) {
+            console.log('WorkspaceLayout: AI generated suggestion:', data.suggestion)
+
+            if (isMobile) {
+              // For mobile, use the mobile dialog
+              setNewProjectName(data.suggestion.name)
+              setNewProjectDescription(data.suggestion.description)
+              setIsCreateDialogOpen(true)
+            } else {
+              // For desktop, trigger ProjectHeader dialog with generated details
+              setProjectHeaderInitialName(data.suggestion.name)
+              setProjectHeaderInitialDescription(data.suggestion.description)
+              setOpenProjectHeaderDialog(true)
+            }
+          } else {
+            // Fallback: use original prompt as description
+            console.warn('WorkspaceLayout: AI generation failed, using fallback')
+            if (isMobile) {
+              setNewProjectDescription(initialPrompt)
+              setIsCreateDialogOpen(true)
+            } else {
+              setProjectHeaderInitialDescription(initialPrompt)
+              setOpenProjectHeaderDialog(true)
+            }
+          }
+        } catch (error) {
+          console.error('WorkspaceLayout: Error generating project suggestion:', error)
+          // Fallback: use original prompt as description
+          if (isMobile) {
+            setNewProjectDescription(initialPrompt)
+            setIsCreateDialogOpen(true)
+          } else {
+            setProjectHeaderInitialDescription(initialPrompt)
+            setOpenProjectHeaderDialog(true)
+          }
+        }
+
+        // Remove prompt from URL after opening modal
+        const params = new URLSearchParams(searchParams.toString())
+        params.delete('prompt')
+        router.replace(`/workspace?${params.toString()}`)
       }
-      
-      // Remove prompt from URL after opening modal
-      const params = new URLSearchParams(searchParams.toString())
-      params.delete('prompt')
-      router.replace(`/workspace?${params.toString()}`)
     }
-  }, [initialPrompt, searchParams, router, isMobile])
+
+    generateAndOpenDialog()
+  }, [initialPrompt, searchParams, router, isMobile, user.id])
 
   // Handle modal close - reset form fields
   const handleModalClose = (open: boolean) => {
@@ -445,6 +497,22 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   React.useEffect(() => {
     console.log('Selected project changed:', selectedProject)
   }, [selectedProject])
+
+  // Auto-open create project dialog when user has no projects
+  React.useEffect(() => {
+    if (clientProjects.length === 0 && !isLoadingProjects && !isCreateDialogOpen && !hasAutoOpenedCreateDialog) {
+      console.log('WorkspaceLayout: No projects found, auto-opening create project dialog')
+      setIsCreateDialogOpen(true)
+      setHasAutoOpenedCreateDialog(true)
+    }
+  }, [clientProjects.length, isLoadingProjects, isCreateDialogOpen, hasAutoOpenedCreateDialog])
+
+  // Reset auto-open flag when projects are loaded
+  React.useEffect(() => {
+    if (clientProjects.length > 0) {
+      setHasAutoOpenedCreateDialog(false)
+    }
+  }, [clientProjects.length])
 
   // Check GitHub connection status on mount
   React.useEffect(() => {
@@ -612,10 +680,12 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               onDeploy={() => router.push(`/workspace/deployment?project=${selectedProject?.id}`)}
               user={user}
               openDialog={openProjectHeaderDialog}
+              initialName={projectHeaderInitialName}
               initialDescription={projectHeaderInitialDescription}
               onDialogOpenChange={(open) => {
                 setOpenProjectHeaderDialog(open)
                 if (!open) {
+                  setProjectHeaderInitialName("")
                   setProjectHeaderInitialDescription("")
                 }
               }}
@@ -1007,44 +1077,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             </div>
             
             <div className="flex items-center space-x-2">
-              <Dialog open={isCreateDialogOpen} onOpenChange={handleModalClose}>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="z-50">
-                  <DialogHeader>
-                    <DialogTitle>Create New Project</DialogTitle>
-                    <DialogDescription>Start building your next app with AI assistance.</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="mobile-name">Project Name</Label>
-                      <Input
-                        id="mobile-name"
-                        placeholder="My Awesome App"
-                        value={newProjectName}
-                        onChange={(e) => setNewProjectName(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="mobile-description">Description (Optional)</Label>
-                      <Textarea
-                        id="mobile-description"
-                        placeholder="Describe what your app will do..."
-                        value={newProjectDescription}
-                        onChange={(e) => setNewProjectDescription(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button onClick={handleCreateProject} disabled={!newProjectName.trim() || isCreating}>
-                      {isCreating ? "Creating..." : "Create Project"}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
              
               <Button
                 variant="ghost"
@@ -1166,6 +1198,41 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         </div>
       )}
 
+      {/* Create Project Dialog - available for both desktop and mobile */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={handleModalClose}>
+        <DialogContent className="z-50">
+          <DialogHeader>
+            <DialogTitle>Create New Project</DialogTitle>
+            <DialogDescription>Start building your next app with AI assistance.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="project-name">Project Name</Label>
+              <Input
+                id="project-name"
+                placeholder="My Awesome App"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="project-description">Description (Optional)</Label>
+              <Textarea
+                id="project-description"
+                placeholder="Describe what your app will do..."
+                value={newProjectDescription}
+                onChange={(e) => setNewProjectDescription(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleCreateProject} disabled={!newProjectName.trim() || isCreating}>
+              {isCreating ? "Creating..." : "Create Project"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
-  )
-}
+  );
+};
