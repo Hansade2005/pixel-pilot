@@ -4072,7 +4072,6 @@ Remember: This is the INFORMATION GATHERING phase. Your job is to understand and
 
 
 function getStreamingSystemPrompt(projectContext?: string, memoryContext?: any): string {
-  // Refined system prompt for PIXEL FORGE AI assistant
 
   return `<role>
   You are PIXEL FORGE, an AI development assistant that creates and modifies web applications in real-time. You assist users by chatting with them and making changes to their code through JSON tool commands that execute immediately during our conversation.
@@ -4272,9 +4271,6 @@ Successfully implemented a professional dashboard with advanced features and opt
 
 **🔑 CRITICAL**: Notice the blank lines before and after each header (##, ###) and the consistent spacing throughout. This is EXACTLY how you should format all responses.
 
-## ✅ Summary
-Successfully implemented a professional dashboard with advanced features and optimal performance.🎯
-
 
 ${projectContext ? `
 
@@ -4301,7 +4297,7 @@ ${memoryContext.potentialDuplicates?.length > 0
 ### Relevant Previous Context:
 ${memoryContext.relevantMemories?.length > 0 
   ? memoryContext.relevantMemories.map((memory: any) => 
-      `- ${memory.conversationContext.semanticSummary} (${memory.xmlOperations.length} XML operations)`
+      `- ${memory.conversationContext.semanticSummary} (${memory.jsonOperations.length} JSON operations)`
     ).join('\n')
   : 'No highly relevant previous context found.'}
 
@@ -4321,7 +4317,7 @@ ${memoryContext.relevantMemories?.length > 0
 
 **📊 Memory-Driven Development:**
 - Before implementing new features, consider what you've already built
-- Reference previous XML operations to understand file structure and patterns
+- Reference previous JSON operations to understand file structure and patterns
 - Avoid recreating components or functions that already exist
 - Build incrementally on established foundation
 
@@ -4329,7 +4325,7 @@ ${memoryContext.relevantMemories?.length > 0
 1. **Analyze Context**: Review previous actions and current request
 2. **Check for Duplicates**: Ensure you're not repeating previous work
 3. **Plan Efficiently**: Build upon existing code rather than starting from scratch
-4. **Execute Smartly**: Use XML commands to make targeted, precise changes
+4. **Execute Smartly**: Use JSON commands to make targeted, precise changes
 
 </role>
 
@@ -4422,9 +4418,8 @@ Dry run preview (test changes without applying):
 - **ALWAYS wrap JSON tool commands in markdown code blocks with \`\`\`json**
 - Use proper JSON syntax with double quotes for all strings
 - Escape newlines in content as \\n for proper JSON formatting
-- Use the exact field names: "tool", "path", "content", "operation", "search", "replace"
-- **Supported tool names**: "write_file", "edit_file", "delete_file" (also supports legacy names: "pilotwrite", "pilotedit", "pilotdelete")
-- **Never use XML format** - only JSON in code blocks
+- Use the exact field names: "tool", "path", "content", "searchReplaceBlocks", "search", "replace"
+- **Supported tool names**: "write_file", "edit_file", "delete_file"
 - Each tool command must be a separate JSON code block
 - The JSON must be valid and properly formatted
 
@@ -4444,6 +4439,8 @@ Dry run preview (test changes without applying):
 - **Full Implementation**: Creating complete functions, components, or modules from scratch
 - **Major Refactors**: Restructuring existing code with significant changes
 - **New File Creation**: All new files should use write_file with complete content
+- **Environment Files**: ALWAYS use write_file for .env.local, .env, or any environment configuration files
+- **🚨 App.tsx Updates**: ALWAYS use write_file when updating src/App.tsx - never use edit_file for App.tsx
 
 **✏️ USE edit_file FOR:**
 - **Small Precise Changes**: Fixing bugs, updating single functions, or minor tweaks  
@@ -4453,12 +4450,13 @@ Dry run preview (test changes without applying):
 
 **📋 DECISION FLOWCHART:**
 1. **Is this a new file?** → Use write_file
-2. **Are you improving design, features, or functionality?** → Use write_file
-3. **Are you adding new features/components to existing file?** → Use write_file  
-4. **Are you enhancing existing functionality?** → Use write_file
-5. **Are you changing 30%+ of the file?** → Use write_file
-6. **Are you making a small, targeted fix?** → Use edit_file
-7. **Are you just updating a few lines?** → Use edit_file
+2. **Is this src/App.tsx?** → Use write_file (ALWAYS)
+3. **Are you improving design, features, or functionality?** → Use write_file
+4. **Are you adding new features/components to existing file?** → Use write_file  
+5. **Are you enhancing existing functionality?** → Use write_file
+6. **Are you changing 30%+ of the file?** → Use write_file
+7. **Are you making a small, targeted fix?** → Use edit_file
+8. **Are you just updating a few lines?** → Use edit_file
 
 **💡 EXAMPLES:**
 
@@ -4551,10 +4549,7 @@ If new code needs to be written (i.e., the requested feature does not exist), yo
 
 - Briefly explain the needed changes in a few short sentences, without being too technical.
 - **Reference Memory Context**: Mention if you're building upon previous work or creating something new
-- Use JSON tool commands in code blocks for file operations:
-  - \`\`\`json { "tool": "write_file", "path": "...", "content": "..." } \`\`\` for creating or updating files
-  - \`\`\`json { "tool": "edit_file", "path": "...", "operation": "search_replace", "search": "...", "replace": "..." } \`\`\` for modifying existing files
-  - \`\`\`json { "tool": "delete_file", "path": "..." } \`\`\` for removing files
+- Use JSON tool commands in code blocks for file operations
 - Create small, focused files that will be easy to maintain.
 - After all of the code changes, provide a VERY CONCISE, non-technical summary of the changes made in one sentence.
 
@@ -4579,36 +4574,26 @@ Based on my memory context, I can see you already have a basic Button component.
 {
   "tool": "edit_file",
   "path": "src/components/Button.tsx",
-  "operation": "search_replace",
-  "search": "variant?: 'primary' | 'secondary' | 'danger';",
-  "replace": "variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'warning';"
+  "searchReplaceBlocks": [
+    {
+      "search": "variant?: 'primary' | 'secondary' | 'danger';",
+      "replace": "variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'warning';"
+    }
+  ]
 }
 \`\`\`
-
-\`\`\`json
-{
-  "tool": "edit_file",
-  "path": "src/components/Button.tsx", 
-  "operation": "search_replace",
-  "search": "const variantClasses = {\\n    primary: \\\"bg-blue-600 hover:bg-blue-700 text-white\\\",\\n    secondary: \\\"bg-gray-200 hover:bg-gray-300 text-gray-800\\\",\\n    danger: \\\"bg-red-600 hover:bg-red-700 text-white\\\"\\n  };",
-  "replace": "const variantClasses = {\\n    primary: \\\"bg-blue-600 hover:bg-blue-700 text-white\\\",\\n    secondary: \\\"bg-gray-200 hover:bg-gray-300 text-gray-800\\\",\\n    danger: \\\"bg-red-600 hover:bg-red-700 text-white\\\",\\n    success: \\\"bg-green-600 hover:bg-green-700 text-white\\\",\\n    warning: \\\"bg-yellow-600 hover:bg-yellow-700 text-white\\\"\\n  };"
-}
-\`\`\`
-   
 
 I've enhanced your existing Button component with success and warning variants, building upon the foundation you already have.
 
 ## Example 2: Context-Aware Development
 
-Looking at my memory context, I can see you've already created several components in this session. I'll build upon your existing navigation structure rather than creating a new one.
+Looking at my memory context, I can see you've already created several components in this session. I'll build upon your existing navigation structure by updating the entire App.tsx file.
 
 \`\`\`json
 {
-  "tool": "edit_file",
+  "tool": "write_file",
   "path": "src/App.tsx",
-  "operation": "search_replace", 
-  "search": "<nav className=\\\"mb-4\\\">",
-  "replace": "<nav className=\\\"mb-4 border-b border-gray-200 pb-4\\\">"
+  "content": "import React from 'react';\\n\\nfunction App() {\\n  return (\\n    <div className=\\\"App\\\">\\n      <nav className=\\\"mb-4 border-b border-gray-200 pb-4\\\">\\n        {/* Enhanced navigation */}\\n      </nav>\\n    </div>\\n  );\\n}\\n\\nexport default App;"
 }
 \`\`\`
 
@@ -4663,25 +4648,40 @@ ${codeQualityInstructions}
 - Before using a new package, add it as a dependency in **package.json**. Always check **package.json** to see which packages are already installed.
 - The main entry point is **src/main.tsx** (NOT index.tsx).
 - The main application component is **src/App.tsx**.
+- **🚨 CRITICAL: ALWAYS use write_file when updating src/App.tsx - NEVER use edit_file for App.tsx**
 - **UPDATE the main App.tsx to include new components. OTHERWISE, the user can NOT see any components!**
-- **If you need to use a new package thats not listed in package.json   ALWAYS  use the edit_file tool to add the new package before using it . Thats how package installation works in this system.
+- **If you need to use a new package thats not listed in package.json ALWAYS use the edit_file tool to add the new package before using it. Thats how package installation works in this system.**
 - **ALWAYS try to use the shadcn/ui library** (already installed with Radix UI components).
 - **Tailwind CSS**: Always use Tailwind CSS for styling components. Utilize Tailwind classes extensively for layout, spacing, colors, and other design aspects.
 - Use **Framer Motion** for animations (already installed).
 - Use **Lucide React** for icons (already installed).
 
-# REMEMBER
+## 🏗️ **SUPABASE INTEGRATION REQUIREMENTS**
 
-> **XML FORMATTING IS NON-NEGOTIABLE:**
-> **NEVER, EVER** use markdown code blocks (\`\`\`) for code.
-> **ONLY** use XML commands for **ALL** code output.
-> Using \`\`\` for code is **PROHIBITED**.
-> Using XML commands for code is **MANDATORY**.
-> Any instance of code within \`\`\` is a **CRITICAL FAILURE**.
-> **REPEAT: NO MARKDOWN CODE BLOCKS. USE XML COMMANDS EXCLUSIVELY FOR CODE.**
-> Do NOT use any other tags in the output. ALWAYS use XML commands to generate code.
+**CRITICAL: Vite templates DO NOT come with Supabase pre-installed. You must integrate Supabase from scratch:**
 
-**CRITICAL: XML commands must be written directly in your response, NOT wrapped in markdown code blocks. The XML tags should appear as plain text in your response , do not write xml comments before tags   write only the tag alone .**
+**📦 Supabase Setup Steps:**
+1. **Install Supabase**: Add **@supabase/supabase-js** to package.json first
+2. **Create Configuration**: Setup Supabase client configuration in **src/lib/supabase.ts**
+3. **Environment Variables**: Create/update **.env.local** with Supabase credentials
+4. **Authentication Setup**: Implement auth hooks and components if needed
+5. **Database Integration**: Set up database queries and real-time subscriptions
+
+**🔧 Environment Variables Rule:**
+- **ALWAYS use write_file tool to update .env.local file**
+- Never use edit_file for .env.local - always provide complete environment configuration
+- Include all necessary Supabase variables:
+  - **VITE_SUPABASE_URL=your_supabase_url**
+  - **VITE_SUPABASE_ANON_KEY=your_supabase_anon_key**
+- Add any additional environment variables the project needs
+
+**💡 Supabase Integration Example:**
+When user requests database functionality, authentication, or real-time features:
+1. Add Supabase dependency to package.json
+2. Create complete Supabase client setup in src/lib/supabase.ts
+3. Use write_file to create/update .env.local with all required variables
+4. Implement necessary auth/database components
+5. Update App.tsx to include new functionality
 
 ## 🧠 **FINAL MEMORY CHECKPOINT**
 Before implementing any solution:
@@ -4691,140 +4691,6 @@ Before implementing any solution:
 4. Ensure your approach aligns with previously established architectural decisions
 
 Remember: You have access to comprehensive context about previous work through the memory system. Use it to be more efficient, consistent, and avoid unnecessary duplication.`
-}
-
-// XML Command Processing System for Streaming File Operations
-interface XMLCommand {
-  type: 'write' | 'edit' | 'delete'
-  path: string
-  content?: string
-  operation?: string
-  search?: string
-  replace?: string
-  fullMatch: string
-}
-
-function extractXMLCommands(text: string): XMLCommand[] {
-  const commands: XMLCommand[] = []
-  
-  // Extract pilotwrite commands - use Array.from with RegExp exec
-  const writeRegex = /<pilotwrite\s+path=["']([^"']+)["'][^>]*>(.*?)<\/pilotwrite>/gi
-  let writeMatch
-  while ((writeMatch = writeRegex.exec(text)) !== null) {
-    commands.push({
-      type: 'write',
-      path: writeMatch[1],
-      content: writeMatch[2],
-      fullMatch: writeMatch[0]
-    })
-  }
-  
-  // Extract pilotedit commands
-  const editRegex = /<pilotedit\s+path=["']([^"']+)["']\s+operation=["']([^"']+)["']\s+search=["']([^"']*?)["']\s+replace=["']([^"']*?)["'][^>]*\s*\/>/gi
-  let editMatch
-  while ((editMatch = editRegex.exec(text)) !== null) {
-    commands.push({
-      type: 'edit',
-      path: editMatch[1],
-      operation: editMatch[2],
-      search: editMatch[3],
-      replace: editMatch[4],
-      fullMatch: editMatch[0]
-    })
-  }
-  
-  // Extract pilotdelete commands
-  const deleteRegex = /<pilotdelete\s+path=["']([^"']+)["'][^>]*\s*\/>/gi
-  let deleteMatch
-  while ((deleteMatch = deleteRegex.exec(text)) !== null) {
-    commands.push({
-      type: 'delete',
-      path: deleteMatch[1],
-      fullMatch: deleteMatch[0]
-    })
-  }
-  
-  return commands
-}
-
-async function executeXMLCommand(command: XMLCommand, projectId: string): Promise<{success: boolean, message: string, error?: string}> {
-  try {
-    const { storageManager } = await import('@/lib/storage-manager')
-    await storageManager.init()
-    
-    console.log(`[XML COMMAND] Executing ${command.type} on ${command.path}`)
-    
-    switch (command.type) {
-      case 'write':
-        if (!command.content) {
-          return { success: false, message: 'No content provided for write command', error: 'Missing content' }
-        }
-        
-        // Check if file exists
-        const existingFile = await storageManager.getFile(projectId, command.path)
-        
-        if (existingFile) {
-          // Update existing file
-          await storageManager.updateFile(projectId, command.path, { content: command.content })
-          return { success: true, message: `✅ File ${command.path} updated successfully` }
-        } else {
-          // Create new file
-          await storageManager.createFile({
-            workspaceId: projectId,
-            name: command.path.split('/').pop() || command.path,
-            path: command.path,
-            content: command.content,
-            fileType: command.path.split('.').pop() || 'text',
-            type: command.path.split('.').pop() || 'text',
-            size: command.content.length,
-            isDirectory: false
-          })
-          return { success: true, message: `✅ File ${command.path} created successfully` }
-        }
-        
-      case 'edit':
-        if (!command.search || command.replace === undefined) {
-          return { success: false, message: 'Search and replace parameters required for edit command', error: 'Missing parameters' }
-        }
-        
-        const fileToEdit = await storageManager.getFile(projectId, command.path)
-        if (!fileToEdit) {
-          return { success: false, message: `File not found: ${command.path}`, error: 'File not found' }
-        }
-        
-        if (!fileToEdit.content.includes(command.search)) {
-          return { success: false, message: `Search text not found in ${command.path}`, error: 'Search text not found' }
-        }
-        
-        const updatedContent = fileToEdit.content.replace(command.search, command.replace)
-        await storageManager.updateFile(projectId, command.path, { content: updatedContent })
-        return { success: true, message: `✅ File ${command.path} edited successfully` }
-        
-      case 'delete':
-        const fileToDelete = await storageManager.getFile(projectId, command.path)
-        if (!fileToDelete) {
-          return { success: false, message: `File not found: ${command.path}`, error: 'File not found' }
-        }
-        
-        const deleteResult = await storageManager.deleteFile(projectId, command.path)
-        if (deleteResult) {
-          return { success: true, message: `✅ File ${command.path} deleted successfully` }
-        } else {
-          return { success: false, message: `Failed to delete ${command.path}`, error: 'Delete operation failed' }
-        }
-        
-      default:
-        return { success: false, message: `Unknown command type: ${command.type}`, error: 'Invalid command type' }
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    console.error(`[XML COMMAND ERROR] ${command.type} failed for ${command.path}:`, error)
-    return { 
-      success: false, 
-      message: `Failed to execute ${command.type} on ${command.path}: ${errorMessage}`,
-      error: errorMessage
-    }
-  }
 }
 
 export async function POST(req: Request) {
@@ -5587,7 +5453,7 @@ ${memoryContext.potentialDuplicates.length > 0
 ### Relevant Previous Context:
 ${memoryContext.relevantMemories.length > 0 
   ? memoryContext.relevantMemories.map(memory => 
-      `- ${memory.conversationContext.semanticSummary} (${memory.jsonOperations.length} XML operations)`
+      `- ${memory.conversationContext.semanticSummary} (${memory.jsonOperations.length} JSON operations)`
     ).join('\n')
   : 'No highly relevant previous context found.'}
 
@@ -6414,8 +6280,8 @@ Please respond to the user's request above, taking into account the project cont
           toolResultsRaw: JSON.stringify(preprocessingResults?.toolResults, null, 2)
         })
 
-        // Step 3: Now use streamText with XML command system for all responses
-        console.log('[STREAMING] Starting XML-enhanced streaming response')
+        // Step 3: Now use streamText with JSON command system for all responses
+        console.log('[STREAMING] Starting JSON-enhanced streaming response')
         
         // Create enhanced messages with preprocessing context
         let enhancedMessages = [...finalMessages]
@@ -6468,7 +6334,7 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
             content: preprocessingContext
           })
         } else {
-          // Add XML command instructions for cases without preprocessing using focused prompt
+          // Add JSON command instructions for cases without preprocessing using focused prompt
           const streamingPrompt = getStreamingSystemPrompt(projectContext, memoryContext)
           
           enhancedMessages.push({
@@ -6536,7 +6402,7 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
           return processed.trim()
         }
 
-        // Create a readable stream that handles both preprocessing results and XML commands
+        // Create a readable stream that handles both preprocessing results and JSON commands
         const stream = new ReadableStream({
           async start(controller) {
             // First, send preprocessing tool results if available
@@ -6572,7 +6438,7 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
               controller.enqueue(`data: ${JSON.stringify(toolData)}\n\n`)
             }
             
-            // Start streaming the main response with XML command support
+            // Start streaming the main response with JSON command support
             const result = await streamText({
               model: model,
               messages: enhancedMessages,
@@ -6580,62 +6446,25 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
               abortSignal: abortController.signal,
             })
             
-            let responseBuffer = ''
-            
             for await (const chunk of result.textStream) {
-              responseBuffer += chunk
-              
-              // Check for complete XML commands in the buffer
-              const xmlCommands = extractXMLCommands(responseBuffer)
-              
-              if (xmlCommands.length > 0) {
-                for (const command of xmlCommands) {
-                  // Send XML command detected event
-                  controller.enqueue(`data: ${JSON.stringify({
-                    type: 'xml-command-detected',
-                    command: command.type,
-                    path: command.path,
-                    status: 'executing'
-                  })}\n\n`)
-                  
-                  // Execute XML command and send results
-                  const commandResult = await executeXMLCommand(command, projectId)
-                  
-                  controller.enqueue(`data: ${JSON.stringify({
-                    type: 'xml-command-result',
-                    command: command.type,
-                    path: command.path,
-                    success: commandResult.success,
-                    message: commandResult.message,
-                    status: commandResult.success ? 'completed' : 'failed',
-                    error: commandResult.error
-                  })}\n\n`)
-                  
-                  // Remove executed command from buffer
-                  responseBuffer = responseBuffer.replace(command.fullMatch, '')
-                }
-              }
-              
-              // Send text delta (without XML commands) with enhanced formatting info
-              const pilotRegex = /<pilot\w+[^>]*>.*?<\/pilot\w+>/gi
-              const cleanChunk = chunk.replace(pilotRegex, '')
-              if (cleanChunk.trim()) {
+              // Send text delta with enhanced formatting info
+              if (chunk.trim()) {
                 // Detect content type for better frontend handling
-                const contentType = detectContentType(cleanChunk)
+                const contentType = detectContentType(chunk)
                 
                 // Pre-process for better frontend rendering
-                const processedChunk = preprocessForFrontend(cleanChunk)
+                const processedChunk = preprocessForFrontend(chunk)
                 
                 controller.enqueue(`data: ${JSON.stringify({
                   type: 'text-delta',
-                  delta: cleanChunk,
+                  delta: chunk,
                   processedDelta: processedChunk,
                   format: 'markdown',
                   contentType: contentType,
-                  hasLineBreaks: cleanChunk.includes('\n'),
-                  hasHeaders: /^#{1,6}\s/.test(cleanChunk.trim()),
-                  hasList: /^[\s]*[-*+]\s/.test(cleanChunk.trim()),
-                  hasNumbers: /^\d+\.\s/.test(cleanChunk.trim()),
+                  hasLineBreaks: chunk.includes('\n'),
+                  hasHeaders: /^#{1,6}\s/.test(chunk.trim()),
+                  hasList: /^[\s]*[-*+]\s/.test(chunk.trim()),
+                  hasNumbers: /^\d+\.\s/.test(chunk.trim()),
                   renderHints: {
                     needsLineBreak: contentType === 'paragraph-break',
                     needsListFormatting: contentType.includes('list'),
@@ -6661,7 +6490,7 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
                 projectId,
                 user?.id || 'anonymous',
                 userMessage,
-                responseBuffer,
+                '', // No response buffer in new system
                 projectContext || ''
               ).then((memory) => {
                 console.log('[MEMORY] Stream memory stored successfully:', {
