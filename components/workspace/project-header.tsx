@@ -2,11 +2,13 @@
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Play, GitBranch, Share, Settings, Plus, Rocket } from "lucide-react"
+import { Play, GitBranch, Share, Settings, Plus, Rocket, Upload } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
-import React, { useState } from 'react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import React, { useState, useEffect } from 'react'
 import type { Workspace as Project } from "@/lib/storage-manager"
 import { ModelSelector } from "@/components/ui/model-selector"
+import { useGitHubPush } from "@/hooks/use-github-push"
 import {
   Dialog,
   DialogContent,
@@ -61,10 +63,29 @@ export function ProjectHeader({
   const [newProjectName, setNewProjectName] = useState("")
   const [newProjectDescription, setNewProjectDescription] = useState("")
   const [isCreating, setIsCreating] = useState(false)
+  const [gitHubConnected, setGitHubConnected] = useState(false)
+
+  // GitHub push functionality
+  const { pushToGitHub, checkGitHubConnection, isPushing } = useGitHubPush()
 
   React.useEffect(() => {
     setNameInput(project?.name || "")
   }, [project?.name])
+
+  // Check GitHub connection status when project changes
+  useEffect(() => {
+    const checkConnection = async () => {
+      if (!project) {
+        setGitHubConnected(false)
+        return
+      }
+
+      const connectionStatus = await checkGitHubConnection(project)
+      setGitHubConnected(connectionStatus.connected)
+    }
+
+    checkConnection()
+  }, [project, checkGitHubConnection])
 
   // Handle external dialog open control
   React.useEffect(() => {
@@ -114,6 +135,20 @@ export function ProjectHeader({
       console.error("Failed to update project name", err)
       setEditing(false)
     }
+  }
+
+  const handlePushToGitHub = async () => {
+    if (!project) return
+    
+    await pushToGitHub(project, {
+      commitMessage: `Update project files - ${new Date().toLocaleString()}`,
+      onSuccess: (data) => {
+        // Optionally refresh or update UI state
+      },
+      onError: (error) => {
+        console.error('Push failed:', error)
+      }
+    })
   }
 
   const handleCreateProject = async () => {
@@ -281,9 +316,19 @@ export function ProjectHeader({
           }
         }}>
           <DialogTrigger asChild>
-            <Button size="sm" variant="outline" className="h-8 w-8 p-0">
-              <Plus className="h-4 w-4" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="sm" variant="outline" className="h-8 w-8 p-0 sm:w-auto sm:px-3">
+                    <Plus className="h-4 w-4" />
+                    <span className="hidden sm:inline ml-2">New</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>Create New Project</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </DialogTrigger>
           <DialogContent className="z-50">
             <DialogHeader>
@@ -318,24 +363,91 @@ export function ProjectHeader({
           </DialogContent>
         </Dialog>
         
-        <Button variant="outline" size="sm" onClick={handleShareClick}
-          disabled={!project}
-          title={copied ? 'Copied!' : 'Share'}
-        >
-          <Share className="h-4 w-4" />
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleShareClick}
+                disabled={!project}
+                className="h-8 w-8 p-0 sm:w-auto sm:px-3"
+              >
+                <Share className="h-4 w-4" />
+                <span className="hidden sm:inline ml-2">
+                  {copied ? 'Copied!' : 'Share'}
+                </span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>{copied ? 'Link copied to clipboard!' : 'Share project'}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         
-        <Button variant="outline" size="sm" onClick={onSettings}
-          disabled={!project}
-          title="Settings"
-        >
-          <Settings className="h-4 w-4" />
-        </Button>
-        <Button size="sm" onClick={onDeploy} disabled={!project}
-          title="Deploy"
-        >
-          <Rocket className="h-4 w-4" />
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onSettings}
+                disabled={!project}
+                className="h-8 w-8 p-0 sm:w-auto sm:px-3"
+              >
+                <Settings className="h-4 w-4" />
+                <span className="hidden sm:inline ml-2">Settings</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Project Settings</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        
+        {/* GitHub Push Button - only show when connected */}
+        {gitHubConnected && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handlePushToGitHub}
+                  disabled={!project || isPushing}
+                  className="h-8 w-8 p-0 sm:w-auto sm:px-3 transition-all"
+                >
+                  <Upload className={`h-4 w-4 ${isPushing ? 'animate-pulse' : ''}`} />
+                  <span className="hidden sm:inline ml-2">
+                    {isPushing ? "Pushing..." : "Push"}
+                  </span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                <p>{isPushing ? "Pushing changes to GitHub..." : "Push latest changes to GitHub repository"}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+        
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                size="sm" 
+                onClick={onDeploy} 
+                disabled={!project}
+                className="h-8 px-3"
+              >
+                <Rocket className="h-4 w-4" />
+                <span className="hidden sm:inline ml-2">Deploy</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Deploy Project</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
     </div>
   )
