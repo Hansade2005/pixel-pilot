@@ -158,38 +158,8 @@ export default function AccountSettingsPage() {
       checkConnectionStatus(user.id)
       fetchSubscriptionStatus(user.id)
 
-      // Auto-restore latest backup on login if cloud sync is enabled
-      const performAutoRestore = async () => {
-        try {
-          const cloudSyncEnabled = await isCloudSyncEnabled(user.id)
-          if (cloudSyncEnabled) {
-            setIsAutoRestoring(true)
-            console.log('Account page: Auto-restore enabled, attempting to restore latest backup...')
-
-            const restoreSuccess = await restoreBackupFromCloud(user.id)
-            if (restoreSuccess) {
-              console.log('Account page: Successfully restored latest backup from cloud')
-              toast({
-                title: "Auto-restore completed",
-                description: "Your latest data has been restored from the cloud.",
-              })
-            } else {
-              console.log('Account page: No backup found or restore failed')
-            }
-          }
-        } catch (restoreError) {
-          console.error('Account page: Error during auto-restore:', restoreError)
-          toast({
-            title: "Auto-restore failed",
-            description: "Could not restore from cloud. Using local data.",
-            variant: "destructive"
-          })
-        } finally {
-          setIsAutoRestoring(false)
-        }
-      }
-
-      performAutoRestore()
+      // Auto-restore is disabled on account page - only available in workspace with project ID
+      console.log('Account page: Auto-restore is disabled on this page')
     }
   }, [user])
 

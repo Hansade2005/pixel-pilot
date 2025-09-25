@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { storageManager } from '@/lib/storage-manager';
+import { Octokit } from '@octokit/rest';
 
 /**
  * Vercel Deployment API - Git-Only Deployment
@@ -12,16 +13,17 @@ import { storageManager } from '@/lib/storage-manager';
  * - token: Vercel personal access token
  * - workspaceId: Project workspace ID
  * - githubRepo: GitHub repository in "owner/repo" format
+ * - githubToken: GitHub personal access token
  * - environmentVariables: Array of env vars to add to the project
  */
 
 export async function POST(request: NextRequest) {
   try {
-    const { projectName, framework, token, workspaceId, githubRepo, environmentVariables } = await request.json();
+    const { projectName, framework, token, workspaceId, githubRepo, githubToken, environmentVariables } = await request.json();
 
-    if (!projectName || !token || !workspaceId || !githubRepo) {
+    if (!projectName || !token || !workspaceId || !githubRepo || !githubToken) {
       return NextResponse.json({
-        error: 'Project name, token, workspace ID, and GitHub repository are required'
+        error: 'Project name, token, workspace ID, GitHub repository, and GitHub token are required'
       }, { status: 400 });
     }
 
@@ -64,7 +66,7 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         name: projectName,
-        framework: framework || 'nextjs',
+        framework: framework || 'vite',
         gitRepository: githubRepo ? {
           type: 'github',
           repo: githubRepo,
@@ -144,6 +146,57 @@ export async function POST(request: NextRequest) {
           // Continue with deployment even if env var fails
         }
       }
+    }
+
+    // Trigger deployment by pushing a dummy commit to GitHub
+    try {
+      const octokit = new Octokit({
+        auth: githubToken,
+      });
+
+      const [owner, repo] = githubRepo.split('/');
+
+      // Get the latest commit on main branch
+      const { data: ref } = await octokit.rest.git.getRef({
+        owner,
+        repo,
+        ref: 'heads/main',
+      });
+
+      // Create a dummy commit by updating a file or creating an empty commit
+      // We'll create/update a .vercel-trigger file to trigger the webhook
+      const triggerFilePath = '.vercel-deployment-trigger';
+      const triggerContent = `Triggered at ${new Date().toISOString()}\n`;
+
+      // Check if file exists
+      let sha;
+      try {
+        const { data: existingFile } = await octokit.rest.repos.getContent({
+          owner,
+          repo,
+          path: triggerFilePath,
+        });
+        sha = (existingFile as any).sha;
+      } catch (error) {
+        // File doesn't exist, sha will be undefined
+      }
+
+      // Create or update the trigger file
+      const { data: updatedFile } = await octokit.rest.repos.createOrUpdateFileContents({
+        owner,
+        repo,
+        path: triggerFilePath,
+        message: 'Trigger Vercel deployment',
+        content: Buffer.from(triggerContent).toString('base64'),
+        sha,
+        branch: 'main',
+      });
+
+      console.log('Successfully triggered deployment by updating file:', updatedFile.commit.sha);
+
+    } catch (triggerError) {
+      console.error('Failed to trigger deployment:', triggerError);
+      // Don't fail the entire deployment if trigger fails
     }
 
     // Return project info with GitHub integration

@@ -1957,6 +1957,7 @@ export default function DeploymentClient() {
                               token: vercelForm.token,
                               workspaceId: selectedProject.id,
                               githubRepo: selectedRepoForVercel,
+                              githubToken: savedTokens.github?.token,
                             })
                           })
 
@@ -1990,6 +1991,7 @@ export default function DeploymentClient() {
                               token: vercelForm.token,
                               workspaceId: selectedProject.id,
                               githubRepo: selectedRepoForVercel && selectedRepoForVercel !== 'none' ? selectedRepoForVercel : undefined,
+                              githubToken: savedTokens.github?.token,
                               files: (!selectedRepoForVercel || selectedRepoForVercel === 'none') ? projectFiles : undefined,
                             })
                           })

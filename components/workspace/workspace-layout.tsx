@@ -159,41 +159,49 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         await storageManager.init()
         console.log('WorkspaceLayout: Storage manager initialized')
 
-        // Check if cloud sync is enabled and auto-restore latest backup
-        console.log('WorkspaceLayout: Checking cloud sync for user:', user.id)
-        const cloudSyncEnabled = await isCloudSyncEnabled(user.id)
-        console.log('WorkspaceLayout: Cloud sync enabled result:', cloudSyncEnabled)
+        // Check if we're in a specific project workspace (has projectId in URL)
+        const projectId = searchParams.get('projectId')
+        const isDeletingProject = searchParams.get('deleting') === 'true'
+        
+        // Only auto-restore when in a project workspace and not during deletion
+        if (projectId && !isDeletingProject) {
+          console.log('WorkspaceLayout: In project workspace, checking cloud sync for user:', user.id)
+          const cloudSyncEnabled = await isCloudSyncEnabled(user.id)
+          console.log('WorkspaceLayout: Cloud sync enabled result:', cloudSyncEnabled)
 
-        if (cloudSyncEnabled) {
-          setIsAutoRestoring(true)
-          console.log('WorkspaceLayout: Auto-restore enabled, attempting to restore latest backup...')
+          if (cloudSyncEnabled) {
+            setIsAutoRestoring(true)
+            console.log('WorkspaceLayout: Auto-restore enabled for project workspace, attempting to restore latest backup...')
 
-          try {
-            console.log('WorkspaceLayout: Calling restoreBackupFromCloud...')
-            const restoreSuccess = await restoreBackupFromCloud(user.id)
-            console.log('WorkspaceLayout: restoreBackupFromCloud returned:', restoreSuccess)
+            try {
+              console.log('WorkspaceLayout: Calling restoreBackupFromCloud...')
+              const restoreSuccess = await restoreBackupFromCloud(user.id)
+              console.log('WorkspaceLayout: restoreBackupFromCloud returned:', restoreSuccess)
 
-            if (restoreSuccess) {
-              console.log('WorkspaceLayout: Successfully restored latest backup from cloud')
+              if (restoreSuccess) {
+                console.log('WorkspaceLayout: Successfully restored latest backup from cloud')
+                toast({
+                  title: "Auto-restore completed",
+                  description: "Your latest project data has been restored from the cloud.",
+                })
+              } else {
+                console.log('WorkspaceLayout: No backup found or restore failed, using local data')
+              }
+            } catch (restoreError) {
+              console.error('WorkspaceLayout: Error during auto-restore:', restoreError)
               toast({
-                title: "Auto-restore completed",
-                description: "Your latest data has been restored from the cloud.",
+                title: "Auto-restore failed",
+                description: "Could not restore from cloud. Using local data.",
+                variant: "destructive"
               })
-            } else {
-              console.log('WorkspaceLayout: No backup found or restore failed, using local data')
+            } finally {
+              setIsAutoRestoring(false)
             }
-          } catch (restoreError) {
-            console.error('WorkspaceLayout: Error during auto-restore:', restoreError)
-            toast({
-              title: "Auto-restore failed",
-              description: "Could not restore from cloud. Using local data.",
-              variant: "destructive"
-            })
-          } finally {
-            setIsAutoRestoring(false)
+          } else {
+            console.log('WorkspaceLayout: Cloud sync is disabled, skipping auto-restore')
           }
         } else {
-          console.log('WorkspaceLayout: Cloud sync is disabled, skipping auto-restore')
+          console.log('WorkspaceLayout: Not in project workspace or project is being deleted, skipping auto-restore')
         }
 
         const workspaces = await storageManager.getWorkspaces(user.id)

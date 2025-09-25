@@ -41,11 +41,11 @@ export async function POST(req: Request) {
           type: 'github',
           repo: githubRepoName,
         },
-        framework: 'nextjs',
+        framework: 'vite',
         buildCommand: 'npm run build',
         devCommand: 'npm run dev',
         installCommand: 'npm install',
-        outputDirectory: '.next',
+        outputDirectory: 'dist',
       }),
     })
 
@@ -75,11 +75,11 @@ export async function POST(req: Request) {
           ref: 'main',
         },
         projectSettings: {
-          framework: 'nextjs',
+          framework: 'vite',
           buildCommand: 'npm run build',
           devCommand: 'npm run dev',
           installCommand: 'npm install',
-          outputDirectory: '.next',
+          outputDirectory: 'dist',
         },
       }),
     })

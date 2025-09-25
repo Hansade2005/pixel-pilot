@@ -312,7 +312,7 @@ export default function DeploymentClient() {
 
   const [vercelForm, setVercelForm] = useState({
     projectName: '',
-    framework: 'nextjs',
+    framework: 'vite',
   })
 
   const [netlifyForm, setNetlifyForm] = useState({
@@ -2005,6 +2005,7 @@ Return ONLY the commit message, no quotes or additional text.`
                             token: storedTokens.vercel,
                             workspaceId: selectedProject.id,
                             githubRepo: selectedRepoForVercel,
+                            githubToken: storedTokens.github,
                             environmentVariables: envVars,
                           })
                         })
