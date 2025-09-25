@@ -1183,7 +1183,7 @@ body {
         theme: 'dark',
         hideDevTools: false,
         hideExplorer: false,
-        terminalHeight: 40
+        terminalHeight: 20
       })
       
       toast({
