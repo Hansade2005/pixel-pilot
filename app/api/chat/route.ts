@@ -6783,12 +6783,11 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
               
               console.log(`[A0-DEV] Sending ${a0Messages.length} messages (${enhancedMessages.length} total, limited for performance)`);
               
-              // Create custom streaming response for a0.dev that matches chat panel expectations
+              // Direct generate: fetch once, yield full completion at once (no stream)
               result = {
                 textStream: (async function* () {
                   try {
                     console.log('[A0-DEV] Making API request to a0.dev with', a0Messages.length, 'messages');
-                    
                     const response = await fetch('https://api.a0.dev/ai/llm', {
                       method: 'POST',
                       headers: {
@@ -6797,14 +6796,11 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
                       body: JSON.stringify({
                         messages: a0Messages,
                         temperature: 0.3,
-                        stream: true
+                        stream: false
                       }),
-                      // Increase timeout to prevent 504 errors - a0.dev can be slower
-                      signal: AbortSignal.timeout(32000) // 32 second timeout
+                      signal: AbortSignal.timeout(32000)
                     });
-                    
                     console.log('[A0-DEV] API response status:', response.status);
-                    
                     if (!response.ok) {
                       const errorText = await response.text().catch(() => 'Unknown error');
                       console.error('[A0-DEV] API error details:', {
@@ -6814,42 +6810,12 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
                       });
                       throw new Error(`a0.dev API error: ${response.status} ${response.statusText}`);
                     }
-                    
-                    const reader = response.body?.getReader();
-                    const decoder = new TextDecoder();
-                    
-                    if (reader) {
-                      let fullContent = '';
-                      
-                      while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-                        
-                        const chunk = decoder.decode(value, { stream: true });
-                        
-                        // a0.dev returns {"completion": "full text"}, so we need to extract and stream it
-                        try {
-                          const data = JSON.parse(chunk);
-                          if (data.completion) {
-                            // Stream the completion text word by word (preserving spaces)
-                            const words = data.completion.split(/(\s+)/);
-                            for (const word of words) {
-                              if (word) { // Yield all words including spaces (but not empty strings)
-                                fullContent += word;
-                                yield word;
-                              }
-                            }
-                          }
-                        } catch (e) {
-                          // If not JSON, yield the raw chunk
-                          yield chunk;
-                        }
-                      }
-                      
-                      console.log('[A0-DEV] Streaming completed, total content length:', fullContent.length);
+                    const data = await response.json();
+                    if (data.completion) {
+                      yield data.completion;
                     }
                   } catch (error) {
-                    console.error('[A0-DEV] Streaming error:', error);
+                    console.error('[A0-DEV] Generate error:', error);
                     throw error;
                   }
                 })()
