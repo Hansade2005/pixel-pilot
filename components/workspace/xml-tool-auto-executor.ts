@@ -55,13 +55,38 @@ class XMLToolAutoExecutor {
     }
 
     try {
+      // AI Code Validation and Auto-Fix
+      const validation = await this.validateAndFixCode(toolCall.path, toolCall.content, 'create')
+
+      if (!validation.isValid) {
+        // Log validation issues but don't block - allow manual override
+        console.warn(`[XMLToolAutoExecutor] Code validation issues for ${toolCall.path}:`, validation.errors)
+        console.info(`[XMLToolAutoExecutor] Suggestions:`, validation.suggestions)
+
+        // Emit validation warning event
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('code-validation-warning', {
+            detail: {
+              projectId: this.options.projectId,
+              filePath: toolCall.path,
+              errors: validation.errors,
+              suggestions: validation.suggestions,
+              autoFixed: validation.autoFixed
+            }
+          }))
+        }
+      }
+
+      // Use auto-fixed content if available
+      const contentToSave = validation.fixedContent || toolCall.content
+
       // Check if file already exists
       const existingFile = await this.storageManager.getFile(this.options.projectId, toolCall.path)
 
       if (existingFile) {
         // Update existing file
         await this.storageManager.updateFile(this.options.projectId, toolCall.path, { 
-          content: toolCall.content,
+          content: contentToSave,
           updatedAt: new Date().toISOString()
         })
 
@@ -74,7 +99,13 @@ class XMLToolAutoExecutor {
           success: true,
           action: 'updated',
           path: toolCall.path,
-          message: `✅ File ${toolCall.path} updated successfully.`
+          message: `✅ File ${toolCall.path} updated successfully.`,
+          validation: {
+            hadIssues: !validation.isValid,
+            autoFixed: validation.autoFixed,
+            errors: validation.errors,
+            suggestions: validation.suggestions
+          }
         }
       } else {
         // Create new file
@@ -82,10 +113,10 @@ class XMLToolAutoExecutor {
           workspaceId: this.options.projectId,
           name: toolCall.path.split('/').pop() || toolCall.path,
           path: toolCall.path,
-          content: toolCall.content,
+          content: contentToSave,
           fileType: toolCall.path.split('.').pop() || 'text',
           type: toolCall.path.split('.').pop() || 'text',
-          size: toolCall.content.length,
+          size: contentToSave.length,
           isDirectory: false
         })
 
@@ -99,7 +130,13 @@ class XMLToolAutoExecutor {
           action: 'created',
           path: toolCall.path,
           fileId: newFile.id,
-          message: `✅ File ${toolCall.path} created successfully.`
+          message: `✅ File ${toolCall.path} created successfully.`,
+          validation: {
+            hadIssues: !validation.isValid,
+            autoFixed: validation.autoFixed,
+            errors: validation.errors,
+            suggestions: validation.suggestions
+          }
         }
       }
     } catch (error) {
@@ -121,10 +158,35 @@ class XMLToolAutoExecutor {
         throw new Error(`File not found: ${toolCall.path}`)
       }
 
+      // AI Code Validation and Auto-Fix
+      const validation = await this.validateAndFixCode(toolCall.path, toolCall.content, 'edit')
+
+      if (!validation.isValid) {
+        // Log validation issues but don't block - allow manual override
+        console.warn(`[XMLToolAutoExecutor] Code validation issues for ${toolCall.path}:`, validation.errors)
+        console.info(`[XMLToolAutoExecutor] Suggestions:`, validation.suggestions)
+
+        // Emit validation warning event
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('code-validation-warning', {
+            detail: {
+              projectId: this.options.projectId,
+              filePath: toolCall.path,
+              errors: validation.errors,
+              suggestions: validation.suggestions,
+              autoFixed: validation.autoFixed
+            }
+          }))
+        }
+      }
+
+      // Use auto-fixed content if available
+      const contentToSave = validation.fixedContent || toolCall.content
+
       // For simplicity, we'll replace the entire content for pilotedit
       // In a more sophisticated implementation, we could parse search/replace operations
       await this.storageManager.updateFile(this.options.projectId, toolCall.path, { 
-        content: toolCall.content,
+        content: contentToSave,
         updatedAt: new Date().toISOString()
       })
 
@@ -137,7 +199,13 @@ class XMLToolAutoExecutor {
         success: true,
         action: 'edited',
         path: toolCall.path,
-        message: `✅ File ${toolCall.path} edited successfully.`
+        message: `✅ File ${toolCall.path} edited successfully.`,
+        validation: {
+          hadIssues: !validation.isValid,
+          autoFixed: validation.autoFixed,
+          errors: validation.errors,
+          suggestions: validation.suggestions
+        }
       }
     } catch (error) {
       throw new Error(`Failed to edit file ${toolCall.path}: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -306,7 +374,17 @@ class XMLToolAutoExecutor {
   }
 
   // Execute a single JSON tool call
-  public async executeJsonTool(toolCall: JsonToolCall): Promise<{ skipped?: boolean; message?: string; error?: any }> {
+  public async executeJsonTool(toolCall: JsonToolCall): Promise<{ 
+    skipped?: boolean; 
+    message?: string; 
+    error?: any;
+    validation?: {
+      hadIssues: boolean;
+      autoFixed: boolean;
+      errors: string[];
+      suggestions: string[];
+    }
+  }> {
     // Check if already executing
     if (this.executionQueue.has(toolCall.id)) {
       console.warn(`[XMLToolAutoExecutor] Tool ${toolCall.id} already in execution queue, skipping`)
@@ -330,13 +408,38 @@ class XMLToolAutoExecutor {
           if (!toolCall.path || !toolCall.content) {
             throw new Error('write_file requires path and content')
           }
+
+          // AI Code Validation and Auto-Fix
+          const writeValidation = await this.validateAndFixCode(toolCall.path, toolCall.content, 'create')
+
+          if (!writeValidation.isValid) {
+            // Log validation issues but don't block - allow manual override
+            console.warn(`[XMLToolAutoExecutor] Code validation issues for ${toolCall.path}:`, writeValidation.errors)
+            console.info(`[XMLToolAutoExecutor] Suggestions:`, writeValidation.suggestions)
+
+            // Emit validation warning event
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('code-validation-warning', {
+                detail: {
+                  projectId: this.options.projectId,
+                  filePath: toolCall.path,
+                  errors: writeValidation.errors,
+                  suggestions: writeValidation.suggestions,
+                  autoFixed: writeValidation.autoFixed
+                }
+              }))
+            }
+          }
+
+          // Use auto-fixed content if available
+          const contentToSave = writeValidation.fixedContent || toolCall.content
           
           // Check if file exists
           try {
             const existingFile = await storageManager.getFile(projectId, toolCall.path)
             if (existingFile) {
               // File exists, update it
-              await storageManager.updateFile(projectId, toolCall.path, { content: toolCall.content })
+              await storageManager.updateFile(projectId, toolCall.path, { content: contentToSave })
             } else {
               // File doesn't exist, create it
               const fileExtension = toolCall.path.split('.').pop() || 'text'
@@ -344,10 +447,10 @@ class XMLToolAutoExecutor {
                 workspaceId: projectId,
                 name: toolCall.path.split('/').pop() || toolCall.path,
                 path: toolCall.path,
-                content: toolCall.content,
+                content: contentToSave,
                 fileType: fileExtension,
                 type: fileExtension,
-                size: toolCall.content.length,
+                size: contentToSave.length,
                 isDirectory: false
               })
             }
@@ -358,10 +461,10 @@ class XMLToolAutoExecutor {
               workspaceId: projectId,
               name: toolCall.path.split('/').pop() || toolCall.path,
               path: toolCall.path,
-              content: toolCall.content,
+              content: contentToSave,
               fileType: fileExtension,
               type: fileExtension,
-              size: toolCall.content.length,
+              size: contentToSave.length,
               isDirectory: false
             })
           }
@@ -373,7 +476,15 @@ class XMLToolAutoExecutor {
             }))
           }
           
-          return { message: `File ${toolCall.path} created successfully` }
+          return {
+            message: `File ${toolCall.path} created successfully`,
+            validation: {
+              hadIssues: !writeValidation.isValid,
+              autoFixed: writeValidation.autoFixed,
+              errors: writeValidation.errors,
+              suggestions: writeValidation.suggestions
+            }
+          }
 
         case 'edit_file':
         case 'pilotedit':
@@ -502,9 +613,42 @@ class XMLToolAutoExecutor {
 
     // Handle direct content replacement
     if (toolCall.content && !toolCall.searchReplaceBlocks) {
-      await storageManager.updateFile(projectId, path, { content: toolCall.content })
+      // AI Code Validation and Auto-Fix for direct content replacement
+      const editValidation = await this.validateAndFixCode(path, toolCall.content, 'edit')
+
+      if (!editValidation.isValid) {
+        // Log validation issues but don't block - allow manual override
+        console.warn(`[XMLToolAutoExecutor] Code validation issues for ${path}:`, editValidation.errors)
+        console.info(`[XMLToolAutoExecutor] Suggestions:`, editValidation.suggestions)
+
+        // Emit validation warning event
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('code-validation-warning', {
+            detail: {
+              projectId: this.options.projectId,
+              filePath: path,
+              errors: editValidation.errors,
+              suggestions: editValidation.suggestions,
+              autoFixed: editValidation.autoFixed
+            }
+          }))
+        }
+      }
+
+      // Use auto-fixed content if available
+      const contentToSave = editValidation.fixedContent || toolCall.content
+
+      await storageManager.updateFile(projectId, path, { content: contentToSave })
       this.emitFilesChangedEvent()
-      return { message: `File ${path} updated with new content` }
+      return {
+        message: `File ${path} updated with new content`,
+        validation: {
+          hadIssues: !editValidation.isValid,
+          autoFixed: editValidation.autoFixed,
+          errors: editValidation.errors,
+          suggestions: editValidation.suggestions
+        }
+      }
     }
 
     // Handle advanced search/replace blocks
@@ -547,14 +691,45 @@ class XMLToolAutoExecutor {
       throw new Error(`Validation failed: expected text "${validateAfter}" not found after operation`)
     }
 
+    // AI Code Validation and Auto-Fix for modified content
+    const legacyValidation = await this.validateAndFixCode(path, modifiedContent, 'edit')
+
+    if (!legacyValidation.isValid) {
+      // Log validation issues but don't block - allow manual override
+      console.warn(`[XMLToolAutoExecutor] Code validation issues for ${path}:`, legacyValidation.errors)
+      console.info(`[XMLToolAutoExecutor] Suggestions:`, legacyValidation.suggestions)
+
+      // Emit validation warning event
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('code-validation-warning', {
+          detail: {
+            projectId: this.options.projectId,
+            filePath: path,
+            errors: legacyValidation.errors,
+            suggestions: legacyValidation.suggestions,
+            autoFixed: legacyValidation.autoFixed
+          }
+        }))
+      }
+    }
+
+    // Use auto-fixed content if available
+    const contentToSave = legacyValidation.fixedContent || modifiedContent
+
     // Update file
-    await storageManager.updateFile(projectId, path, { content: modifiedContent })
+    await storageManager.updateFile(projectId, path, { content: contentToSave })
     this.emitFilesChangedEvent()
 
     const replacedCount = replaceAll ? occurrences : 1
     return { 
       message: `File ${path} edited successfully. Replaced ${replacedCount} occurrence(s)`,
-      replacedOccurrences: replacedCount
+      replacedOccurrences: replacedCount,
+      validation: {
+        hadIssues: !legacyValidation.isValid,
+        autoFixed: legacyValidation.autoFixed,
+        errors: legacyValidation.errors,
+        suggestions: legacyValidation.suggestions
+      }
     }
   }
 
@@ -706,8 +881,33 @@ class XMLToolAutoExecutor {
       throw new Error('No changes could be applied. All operations failed.')
     }
 
+    // AI Code Validation and Auto-Fix for final modified content
+    const advancedValidation = await this.validateAndFixCode(path, modifiedContent, 'edit')
+
+    if (!advancedValidation.isValid) {
+      // Log validation issues but don't block - allow manual override
+      console.warn(`[XMLToolAutoExecutor] Code validation issues for ${path}:`, advancedValidation.errors)
+      console.info(`[XMLToolAutoExecutor] Suggestions:`, advancedValidation.suggestions)
+
+      // Emit validation warning event
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('code-validation-warning', {
+          detail: {
+            projectId: this.options.projectId,
+            filePath: path,
+            errors: advancedValidation.errors,
+            suggestions: advancedValidation.suggestions,
+            autoFixed: advancedValidation.autoFixed
+          }
+        }))
+      }
+    }
+
+    // Use auto-fixed content if available
+    const contentToSave = advancedValidation.fixedContent || modifiedContent
+
     // Update file
-    await storageManager.updateFile(projectId, path, { content: modifiedContent })
+    await storageManager.updateFile(projectId, path, { content: contentToSave })
     this.emitFilesChangedEvent()
 
     return {
@@ -715,7 +915,13 @@ class XMLToolAutoExecutor {
       appliedEdits,
       failedEdits: failedEdits.length > 0 ? failedEdits : undefined,
       validationResults,
-      totalReplacements: appliedEdits.reduce((sum, edit) => sum + edit.replacedCount, 0)
+      totalReplacements: appliedEdits.reduce((sum, edit) => sum + edit.replacedCount, 0),
+      validation: {
+        hadIssues: !advancedValidation.isValid,
+        autoFixed: advancedValidation.autoFixed,
+        errors: advancedValidation.errors,
+        suggestions: advancedValidation.suggestions
+      }
     }
   }
 
@@ -762,6 +968,372 @@ class XMLToolAutoExecutor {
       window.dispatchEvent(new CustomEvent('files-changed', {
         detail: { projectId: this.options.projectId }
       }))
+    }
+  }
+
+  /**
+   * AI-Powered Code Validation and Auto-Fix
+   * Validates code syntax, file extension compatibility, and provides auto-fixes
+   */
+  private async validateAndFixCode(filePath: string, content: string, operation: 'create' | 'edit' = 'create'): Promise<{
+    isValid: boolean
+    errors: string[]
+    fixedContent?: string
+    suggestions: string[]
+    autoFixed: boolean
+  }> {
+    const errors: string[] = []
+    const suggestions: string[] = []
+    let fixedContent = content
+    let autoFixed = false
+
+    try {
+      // 1. Basic file extension validation
+      const fileExt = filePath.split('.').pop()?.toLowerCase()
+      const hasJSX = /<[^>]*>[\s\S]*?<\/[^>]*>|<[^>]*\/>/.test(content)
+      const hasTSXSyntax = /\.(tsx?|jsx?)$/.test(filePath)
+
+      // Check for JSX in .ts files (not .tsx)
+      if (fileExt === 'ts' && hasJSX && !filePath.endsWith('.tsx')) {
+        errors.push(`JSX syntax detected in .ts file. Use .tsx extension for React components.`)
+        suggestions.push(`Rename file to .tsx extension or remove JSX syntax`)
+      }
+
+      // Check for TypeScript syntax in .js files
+      if (fileExt === 'js' && (content.includes(': ') || content.includes('interface ') || content.includes('type '))) {
+        errors.push(`TypeScript syntax detected in .js file. Use .ts extension.`)
+        suggestions.push(`Rename file to .ts extension`)
+      }
+
+      // 2. Attempt auto-fixes for common syntax errors
+      const autoFixResult = this.performBasicAutoFixes(content, filePath)
+      if (autoFixResult.fixed) {
+        fixedContent = autoFixResult.content
+        autoFixed = true
+        console.log(`[XMLToolAutoExecutor] Applied basic auto-fixes for ${filePath}`)
+      }
+
+      // 3. AI-powered advanced validation and additional fixes
+      const validationResult = await this.performAISyntaxValidation(filePath, fixedContent, operation)
+
+      if (!validationResult.isValid) {
+        errors.push(...validationResult.errors)
+        suggestions.push(...validationResult.suggestions)
+
+        // Attempt additional AI-powered auto-fix if basic fixes didn't resolve all issues
+        if (validationResult.fixedContent && validationResult.canAutoFix && !autoFixed) {
+          fixedContent = validationResult.fixedContent
+          autoFixed = true
+          console.log(`[XMLToolAutoExecutor] Applied AI auto-fixes for ${filePath}`)
+        }
+      }
+
+      // Final validation check on the (potentially) fixed content
+      const finalErrors = this.performFinalValidation(fixedContent, filePath)
+      if (finalErrors.length > 0) {
+        errors.push(...finalErrors)
+      }
+
+      return {
+        isValid: errors.length === 0,
+        errors,
+        fixedContent: autoFixed ? fixedContent : undefined,
+        suggestions,
+        autoFixed
+      }
+
+    } catch (error) {
+      console.error('[XMLToolAutoExecutor] Code validation failed:', error)
+      // Return as valid if validation fails to avoid blocking operations
+      return {
+        isValid: true,
+        errors: [],
+        suggestions: ['Code validation temporarily unavailable'],
+        autoFixed: false
+      }
+    }
+  }
+
+  /**
+   * Perform basic auto-fixes for common syntax errors
+   */
+  private performBasicAutoFixes(content: string, filePath: string): { fixed: boolean; content: string } {
+    let fixedContent = content
+    let hasFixes = false
+
+    try {
+      // Fix 1: Balance braces {}
+      const openBraces = (fixedContent.match(/\{/g) || []).length
+      const closeBraces = (fixedContent.match(/\}/g) || []).length
+
+      if (openBraces > closeBraces) {
+        const missingCount = openBraces - closeBraces
+        // Add missing closing braces at the end
+        fixedContent += '\n' + '}'.repeat(missingCount)
+        hasFixes = true
+        console.log(`[AutoFix] Added ${missingCount} missing closing braces`)
+      }
+
+      // Fix 2: Balance parentheses ()
+      const openParens = (fixedContent.match(/\(/g) || []).length
+      const closeParens = (fixedContent.match(/\)/g) || []).length
+
+      if (openParens > closeParens) {
+        const missingCount = openParens - closeParens
+        // Add missing closing parentheses
+        fixedContent += ')'.repeat(missingCount)
+        hasFixes = true
+        console.log(`[AutoFix] Added ${missingCount} missing closing parentheses`)
+      }
+
+      // Fix 3: Balance square brackets []
+      const openBrackets = (fixedContent.match(/\[/g) || []).length
+      const closeBrackets = (fixedContent.match(/\]/g) || []).length
+
+      if (openBrackets > closeBrackets) {
+        const missingCount = openBrackets - closeBrackets
+        fixedContent += ']'.repeat(missingCount)
+        hasFixes = true
+        console.log(`[AutoFix] Added ${missingCount} missing closing brackets`)
+      }
+
+      // Fix 4: Fix unclosed JSX tags in return statements
+      const returnMatch = fixedContent.match(/return\s*\([\s\S]*?\)/g)
+      if (returnMatch) {
+        let jsxContent = returnMatch[0]
+        const originalJsxContent = jsxContent
+
+        // Find JSX tags in return statement
+        const jsxTags = jsxContent.match(/<[^>]*>/g) || []
+        const openingTags = jsxTags.filter(tag =>
+          !tag.startsWith('</') && !tag.endsWith('/>') && !tag.includes('<!')
+        )
+        const closingTags = jsxTags.filter(tag => tag.startsWith('</'))
+
+        // Add missing closing tags
+        if (openingTags.length > closingTags.length) {
+          const missingCount = openingTags.length - closingTags.length
+          // Add missing closing tags for the last opened tags
+          for (let i = 0; i < missingCount && openingTags.length - i - 1 >= 0; i++) {
+            const lastOpeningTag = openingTags[openingTags.length - 1 - i]
+            const tagName = lastOpeningTag.slice(1, -1).split(' ')[0] // Extract tag name
+            jsxContent += `\n</${tagName}>`
+          }
+          hasFixes = true
+          console.log(`[AutoFix] Added ${missingCount} missing closing JSX tags`)
+
+          // Replace the return statement in the original content
+          fixedContent = fixedContent.replace(originalJsxContent, jsxContent)
+        }
+      }
+
+      // Fix 5: Add missing semicolons at end of statements (basic)
+      // This is conservative - only add semicolons where clearly missing
+      const lines = fixedContent.split('\n')
+      const fixedLines = lines.map(line => {
+        const trimmed = line.trim()
+        // Add semicolon if line ends with variable assignment/return but no semicolon
+        if ((trimmed.includes('=') || trimmed.startsWith('return ')) &&
+            !trimmed.endsWith(';') &&
+            !trimmed.endsWith(',') &&
+            !trimmed.endsWith('{') &&
+            !trimmed.endsWith('}') &&
+            !trimmed.endsWith('(') &&
+            !trimmed.endsWith(')') &&
+            !trimmed.includes('//') &&
+            trimmed.length > 0) {
+          return line + ';'
+        }
+        return line
+      })
+
+      if (fixedLines.some((line, i) => line !== lines[i])) {
+        fixedContent = fixedLines.join('\n')
+        hasFixes = true
+        console.log(`[AutoFix] Added missing semicolons`)
+      }
+
+      // Fix 6: Fix incomplete JSX expressions
+      fixedContent = fixedContent.replace(/\{([^}]*)$/gm, '{$1}') // Close incomplete JSX expressions
+
+      return { fixed: hasFixes, content: fixedContent }
+
+    } catch (error) {
+      console.error('[AutoFix] Basic auto-fix failed:', error)
+      return { fixed: false, content: fixedContent }
+    }
+  }
+
+  /**
+   * Perform final validation on potentially fixed content
+   */
+  private performFinalValidation(content: string, filePath: string): string[] {
+    const errors: string[] = []
+
+    try {
+      // Check braces balance
+      const openBraces = (content.match(/\{/g) || []).length
+      const closeBraces = (content.match(/\}/g) || []).length
+      if (openBraces !== closeBraces) {
+        errors.push(`Braces still unbalanced: ${openBraces} opening, ${closeBraces} closing`)
+      }
+
+      // Check parentheses balance
+      const openParens = (content.match(/\(/g) || []).length
+      const closeParens = (content.match(/\)/g) || []).length
+      if (openParens !== closeParens) {
+        errors.push(`Parentheses still unbalanced: ${openParens} opening, ${closeParens} closing`)
+      }
+
+      // Check JSX tags in return statements
+      const returnMatch = content.match(/return\s*\([\s\S]*?\)/g)
+      if (returnMatch) {
+        const jsxContent = returnMatch[0]
+        const jsxTags = jsxContent.match(/<[^>]*>/g) || []
+        const openingTags = jsxTags.filter(tag =>
+          !tag.startsWith('</') && !tag.endsWith('/>') && !tag.includes('<!')
+        )
+        const closingTags = jsxTags.filter(tag => tag.startsWith('</'))
+
+        if (openingTags.length !== closingTags.length) {
+          errors.push(`JSX tags still unbalanced in return statement: ${openingTags.length} opening, ${closingTags.length} closing`)
+        }
+      }
+
+    } catch (error) {
+      console.error('[FinalValidation] Validation failed:', error)
+    }
+
+    return errors
+  }
+
+  /**
+   * Perform AI-powered syntax validation using Mistral Pixtral
+   */
+  private async performAISyntaxValidation(filePath: string, content: string, operation: 'create' | 'edit'): Promise<{
+    isValid: boolean
+    errors: string[]
+    suggestions: string[]
+    fixedContent?: string
+    canAutoFix: boolean
+  }> {
+    try {
+      // Import AI functions dynamically (similar to route.ts pattern)
+      const { generateText } = await import('ai')
+      const { getModel } = await import('@/lib/ai-providers')
+
+      // Use Mistral Pixtral for code analysis
+      const model = getModel('pixtral-12b-2409')
+
+      const fileExt = filePath.split('.').pop()?.toLowerCase()
+      const language = this.getLanguageFromPath(filePath)
+
+      const prompt = `You are an expert code validator. Analyze the following ${language} code for syntax errors, structural issues, and best practices.
+
+File: ${filePath}
+Operation: ${operation}
+Language: ${language}
+
+CODE TO VALIDATE:
+\`\`\`${language}
+${content}
+\`\`\`
+
+Please respond with a JSON object containing:
+{
+  "isValid": boolean,
+  "errors": ["error1", "error2"],
+  "suggestions": ["suggestion1", "suggestion2"],
+  "fixedContent": "corrected code if auto-fixable",
+  "canAutoFix": boolean,
+  "severity": "low|medium|high"
+}
+
+Focus on:
+- Syntax errors (missing brackets, braces, semicolons, quotes)
+- JSX structure issues (unclosed tags, improper nesting)
+- TypeScript errors (type mismatches, missing types)
+- Import/export issues
+- Logic errors that would cause runtime failures
+- File extension compatibility
+
+Only provide auto-fix for clearly fixable issues like missing closing brackets, quotes, or semicolons.`
+
+      const result = await generateText({
+        model,
+        prompt,
+        temperature: 0.1, // Low temperature for consistent analysis
+      })
+
+      const response = result.text.trim()
+
+      // Try to parse JSON response
+      try {
+        const validation = JSON.parse(response)
+        return {
+          isValid: validation.isValid ?? true,
+          errors: Array.isArray(validation.errors) ? validation.errors : [],
+          suggestions: Array.isArray(validation.suggestions) ? validation.suggestions : [],
+          fixedContent: validation.fixedContent,
+          canAutoFix: validation.canAutoFix ?? false
+        }
+      } catch (parseError) {
+        // If JSON parsing fails, try to extract information from text response
+        console.warn('[XMLToolAutoExecutor] AI validation returned non-JSON response, using fallback parsing')
+        return this.parseTextValidationResponse(response)
+      }
+
+    } catch (error) {
+      console.error('[XMLToolAutoExecutor] AI validation error:', error)
+      // Return valid if AI validation fails
+      return {
+        isValid: true,
+        errors: [],
+        suggestions: ['AI validation temporarily unavailable'],
+        canAutoFix: false
+      }
+    }
+  }
+
+  /**
+   * Fallback parser for non-JSON AI validation responses
+   */
+  private parseTextValidationResponse(response: string): {
+    isValid: boolean
+    errors: string[]
+    suggestions: string[]
+    canAutoFix: boolean
+  } {
+    const errors: string[] = []
+    const suggestions: string[] = []
+
+    // Simple text analysis for common issues
+    const lines = response.toLowerCase().split('\n')
+
+    for (const line of lines) {
+      if (line.includes('error') || line.includes('invalid') || line.includes('missing')) {
+        if (line.includes('bracket') || line.includes('brace') || line.includes('parentheses')) {
+          errors.push('Possible bracket/brace/parentheses mismatch')
+        } else if (line.includes('jsx') || line.includes('tag')) {
+          errors.push('Possible JSX structure issue')
+        } else if (line.includes('syntax')) {
+          errors.push('Syntax error detected')
+        }
+      }
+
+      if (line.includes('suggest') || line.includes('recommend') || line.includes('should')) {
+        suggestions.push(line.trim())
+      }
+    }
+
+    // If no specific errors found, assume valid
+    const isValid = errors.length === 0
+
+    return {
+      isValid,
+      errors,
+      suggestions,
+      canAutoFix: false // Don't auto-fix with fallback parsing
     }
   }
 }
