@@ -100,35 +100,71 @@ interface AIStreamMemory {
 // Memory Storage for streaming API
 const aiStreamMemoryStore = new Map<string, AIStreamMemory[]>() // projectId -> memory array
 
-// JSON Tool Analysis Functions
-function extractJSONOperationsFromResponse(aiResponse: string, toolCalls?: any[]): JSONFileOperation[] {
+// Extract pre-tool-call descriptions and JSON operations from AI response
+function extractContextAndOperationsFromResponse(aiResponse: string, toolCalls?: any[]): {
+  operations: JSONFileOperation[]
+  preToolDescriptions: string[]
+  overallPurpose: string
+} {
   const operations: JSONFileOperation[] = []
+  const preToolDescriptions: string[] = []
   const timestamp = new Date().toISOString()
-  
+
+  // Extract text before JSON tool calls - this contains the AI's description of what it will do
+  const jsonBlockRegex = /```json\s*\n([\s\S]*?)\n```/gi
+  let lastIndex = 0
+  let match
+
+  while ((match = jsonBlockRegex.exec(aiResponse)) !== null) {
+    // Extract text before this JSON block
+    const textBeforeBlock = aiResponse.substring(lastIndex, match.index).trim()
+    if (textBeforeBlock) {
+      // Clean up the description - remove excessive whitespace and normalize
+      const cleanDescription = textBeforeBlock
+        .replace(/\n{3,}/g, '\n\n') // Replace 3+ newlines with 2
+        .replace(/^\s*[-*+]\s*/gm, '') // Remove list markers
+        .replace(/^\s*\d+\.\s*/gm, '') // Remove numbered list markers
+        .trim()
+
+      if (cleanDescription.length > 10) { // Only include substantial descriptions
+        preToolDescriptions.push(cleanDescription)
+      }
+    }
+    lastIndex = match.index + match[0].length
+  }
+
+  // Extract overall purpose from the beginning of the response (before any tool calls)
+  const overallPurpose = aiResponse.split(/```json/)[0]?.trim() || 'Development work'
+
   // If we have actual tool calls from the AI stream, use those
   if (toolCalls && toolCalls.length > 0) {
-    toolCalls.forEach(toolCall => {
+    toolCalls.forEach((toolCall, index) => {
       if (toolCall.toolName && ['write_file', 'edit_file', 'delete_file'].includes(toolCall.toolName)) {
         const args = toolCall.args || {}
         const filePath = args.path || ''
-        
+
         if (filePath) {
+          // Use pre-tool description as purpose if available
+          const descriptionIndex = Math.min(index, preToolDescriptions.length - 1)
+          const purposeFromDescription = preToolDescriptions[descriptionIndex] ||
+            inferPurposeFromTool(toolCall.toolName, args, filePath)
+
           const operation: JSONFileOperation = {
             jsonTool: toolCall.toolName as 'write_file' | 'edit_file' | 'delete_file',
             filePath,
             fileName: filePath.split('/').pop() || filePath,
-            purpose: inferPurposeFromTool(toolCall.toolName, args, filePath),
+            purpose: purposeFromDescription,
             changeSummary: generateChangeSummary(toolCall.toolName, filePath, args),
             timestamp,
             extractedFromResponse: false,
             toolCallId: toolCall.toolCallId
           }
-          
+
           // Add content preview for write/edit operations
           if (args.content) {
             operation.contentPreview = args.content.substring(0, 200) + (args.content.length > 200 ? '...' : '')
           }
-          
+
           // Add search/replace patterns for edit operations
           if (toolCall.toolName === 'edit_file' && args.searchReplaceBlocks) {
             operation.searchReplaceBlocks = args.searchReplaceBlocks.map((block: any) => ({
@@ -136,29 +172,34 @@ function extractJSONOperationsFromResponse(aiResponse: string, toolCalls?: any[]
               newCode: block.newCode || block.replace || ''
             }))
           }
-          
+
           operations.push(operation)
         }
       }
     })
   }
-  
+
   // Fallback: Parse JSON tool calls from response text (for backward compatibility)
   if (operations.length === 0) {
     // Look for JSON code blocks that contain tool calls
     const jsonBlocks = aiResponse.match(/```json\s*\n([\s\S]*?)\n```/gi)
     if (jsonBlocks) {
-      jsonBlocks.forEach(block => {
+      jsonBlocks.forEach((block, index) => {
         try {
           const jsonContent = block.replace(/```json\s*\n?/, '').replace(/\n?```/, '').trim()
           const parsed = JSON.parse(jsonContent)
-          
+
           if (parsed.tool && ['write_file', 'edit_file', 'delete_file'].includes(parsed.tool) && parsed.path) {
+            // Use pre-tool description as purpose if available
+            const descriptionIndex = Math.min(index, preToolDescriptions.length - 1)
+            const purposeFromDescription = preToolDescriptions[descriptionIndex] ||
+              inferPurposeFromTool(parsed.tool, parsed, parsed.path)
+
             operations.push({
               jsonTool: parsed.tool as 'write_file' | 'edit_file' | 'delete_file',
               filePath: parsed.path,
               fileName: parsed.path.split('/').pop() || parsed.path,
-              purpose: inferPurposeFromTool(parsed.tool, parsed, parsed.path),
+              purpose: purposeFromDescription,
               changeSummary: generateChangeSummary(parsed.tool, parsed.path, parsed),
               contentPreview: parsed.content ? parsed.content.substring(0, 200) + (parsed.content.length > 200 ? '...' : '') : undefined,
               searchReplaceBlocks: parsed.searchReplaceBlocks,
@@ -172,8 +213,17 @@ function extractJSONOperationsFromResponse(aiResponse: string, toolCalls?: any[]
       })
     }
   }
-  
-  return operations
+
+  return {
+    operations,
+    preToolDescriptions,
+    overallPurpose
+  }
+}
+
+// Legacy function for backward compatibility
+function extractJSONOperationsFromResponse(aiResponse: string, toolCalls?: any[]): JSONFileOperation[] {
+  return extractContextAndOperationsFromResponse(aiResponse, toolCalls).operations
 }
 
 // Helper function to infer purpose from JSON tool
@@ -267,7 +317,9 @@ async function processStreamMemoryWithAI(
   aiResponse: string,
   projectContext: string,
   jsonOperations: JSONFileOperation[],
-  projectId: string
+  projectId: string,
+  preToolDescriptions?: string[],
+  overallPurpose?: string
 ) {
   try {
     const mistralPixtral = getMistralPixtralModel()
@@ -283,6 +335,8 @@ async function processStreamMemoryWithAI(
         { role: 'user', content: `Analyze this development interaction and provide intelligent insights:
 
 User Message: "${userMessage}"
+Overall AI Purpose: "${overallPurpose || 'Development work'}"
+Pre-Tool Descriptions: ${preToolDescriptions ? JSON.stringify(preToolDescriptions, null, 2) : '[]'}
 AI Response: "${aiResponse.substring(0, 1000)}${aiResponse.length > 1000 ? '...' : ''}"
 Project Context: ${projectContext}
 JSON Tool Operations: ${JSON.stringify(jsonOperations, null, 2)}
@@ -390,16 +444,18 @@ async function storeStreamMemory(
   projectContext: string,
   executedToolCalls?: any[]
 ): Promise<AIStreamMemory> {
-  // Extract JSON operations from AI response and executed tool calls
-  const jsonOperations = extractJSONOperationsFromResponse(aiResponse, executedToolCalls)
-  
-  // Process memory with AI
+  // Extract JSON operations AND pre-tool-call descriptions from AI response
+  const { operations: jsonOperations, preToolDescriptions, overallPurpose } = extractContextAndOperationsFromResponse(aiResponse, executedToolCalls)
+
+  // Process memory with AI, now including the extracted context
   const memoryAnalysis = await processStreamMemoryWithAI(
     userMessage,
     aiResponse,
     projectContext,
     jsonOperations,
-    projectId
+    projectId,
+    preToolDescriptions,
+    overallPurpose
   )
   
   // Create memory record
@@ -4753,14 +4809,14 @@ ${memoryContext.currentProjectState.recentChanges.length > 0
   ? memoryContext.currentProjectState.recentChanges.map((change: string, index: number) => `${index + 1}. ${change}`).join('\n')
   : 'No recent changes recorded'}
 
-### Previous Request Contexts (What was the overall goal?):
+### Recent AI Intentions (What the AI planned to accomplish):
 ${memoryContext.relevantMemories?.length > 0
-  ? memoryContext.relevantMemories.slice(-5).map((memory: any, index: number) =>
-      `${index + 1}. **Request**: "${memory.userMessage}"\n   **Overall Purpose**: ${memory.actionSummary.mainPurpose}\n   **Key Changes**: ${memory.actionSummary.keyChanges?.join(', ') || 'Various improvements'}`
+  ? memoryContext.relevantMemories.slice(-3).map((memory: any, index: number) =>
+      `${index + 1}. **User Request**: "${memory.userMessage}"\n   **AI's Stated Plan**: ${memory.actionSummary.mainPurpose || 'Development work'}`
     ).join('\n\n')
-  : 'No previous request contexts available.'}
+  : 'No recent AI intentions recorded.'}
 
-### Previous File Operations (Last 10 actions):
+### Previous File Operations (What was actually done):
 **IMPORTANT**: Review these carefully to understand what has already been implemented and avoid duplication.
 
 ${memoryContext.previousActions?.length > 0
@@ -4780,26 +4836,25 @@ ${memoryContext.relevantMemories?.length > 0
   : 'No highly relevant previous context found.'}
 
 ### Smart Context Guidelines:
-- **Review Previous Work First**: Always check the "Previous Request Contexts" and "Previous File Operations" before starting new work
-- **Understand What Was Already Done**: Look at the overall purpose and key changes from previous requests
-- **Avoid Duplication**: If a similar goal was already accomplished, build upon it instead of recreating
-- **Context-Aware Decisions**: Consider the architectural patterns and decisions already established
-- **Know Current State**: Be aware of what files exist and what has been modified
-- **Purpose-Driven Actions**: Each file operation should have a clear purpose - reference previous purposes when similar
+- **Review AI's Previous Plans**: Check the "Recent AI Intentions" to understand what the AI previously planned to accomplish
+- **Check What Was Actually Done**: Review "Previous File Operations" to see what was implemented
+- **Avoid Repeating Plans**: Don't implement features that the AI already described planning to do
+- **Build Upon Completed Work**: Reference and extend implementations that were actually completed
+- **Context-Aware Decisions**: Consider the AI's stated intentions and actual outcomes
 
 ### 🚫 What NOT to Do (Based on Previous Actions):
 ${memoryContext && memoryContext.previousActions.length > 0 ? `
+- Do NOT implement features that the AI already described planning to create
 - Do NOT recreate files that already exist: ${memoryContext.currentProjectState.filesCreated.join(', ')}
 - Do NOT reimplement functionality that was already completed
 - Do NOT repeat the same operations on files already modified
 - Do NOT create duplicate components or features
-- Do NOT work on goals that were already accomplished in previous requests
-- Always check if the requested task has already been accomplished
+- Always check if the requested task has already been planned or accomplished
 ` : 'No previous actions to avoid repeating.'}
 
 ### 📝 Memory Acknowledgment Required:
 **Before proceeding with any implementation, you MUST acknowledge what you have learned from the memory context above by stating:**
-1. What previous work is relevant to this request
+1. What previous plans or intentions are relevant to this request
 2. What has already been accomplished that you should build upon
 3. What you will NOT do to avoid duplication
 4. How this request fits into the existing project context
