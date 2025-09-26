@@ -6337,12 +6337,12 @@ export function ChatPanel({
             {/* Main input row: textarea + mode selector */}
             <div className="flex items-center w-full relative">
               {/* Mode selector at bottom left inside input */}
-            <AiModeSelector
-  selectedMode={aiMode}
+          {/*<AiModeSelector
+  selectedMode={bbbbbbbbbbbaiMode}
   onModeChange={onModeChange ?? (() => {})}
   compact
   className="absolute left-0 bottom-0 z-10 mt-12"
-/>
+/>*/}
 
               <textarea
                 ref={textareaRef}
