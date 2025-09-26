@@ -508,9 +508,11 @@ function getStreamContextForRequest(projectId: string, userMessage: string): {
       potentialDuplicates.push(`Similar ${currentIntent} request: "${memory.userMessage}"`)
     }
 
-    // Collect detailed previous actions
+    // Collect detailed previous actions with clear context
     memory.jsonOperations.forEach(op => {
-      const actionDetail = `${op.jsonTool}: ${op.filePath}${op.purpose ? ` - ${op.purpose}` : ''}${op.changeSummary ? ` (${op.changeSummary})` : ''}`
+      const actionDetail = `**${op.jsonTool.toUpperCase()}**: ${op.filePath}
+      **Purpose**: ${op.purpose}
+      **What was changed**: ${op.changeSummary}${op.contentPreview ? `\n      **Content**: ${op.contentPreview}` : ''}`
       previousActions.push(actionDetail)
 
       // Track project state
@@ -4751,9 +4753,18 @@ ${memoryContext.currentProjectState.recentChanges.length > 0
   ? memoryContext.currentProjectState.recentChanges.map((change: string, index: number) => `${index + 1}. ${change}`).join('\n')
   : 'No recent changes recorded'}
 
+### Previous Request Contexts (What was the overall goal?):
+${memoryContext.relevantMemories?.length > 0
+  ? memoryContext.relevantMemories.slice(-5).map((memory: any, index: number) =>
+      `${index + 1}. **Request**: "${memory.userMessage}"\n   **Overall Purpose**: ${memory.actionSummary.mainPurpose}\n   **Key Changes**: ${memory.actionSummary.keyChanges?.join(', ') || 'Various improvements'}`
+    ).join('\n\n')
+  : 'No previous request contexts available.'}
+
 ### Previous File Operations (Last 10 actions):
+**IMPORTANT**: Review these carefully to understand what has already been implemented and avoid duplication.
+
 ${memoryContext.previousActions?.length > 0
-  ? memoryContext.previousActions.slice(-10).map((action: string, index: number) => `${index + 1}. ${action}`).join('\n')
+  ? memoryContext.previousActions.slice(-10).map((action: string, index: number) => `${index + 1}. ${action}`).join('\n\n')
   : 'No previous file operations in this session.'}
 
 ### Potential Duplicate Work Detection:
@@ -4769,11 +4780,12 @@ ${memoryContext.relevantMemories?.length > 0
   : 'No highly relevant previous context found.'}
 
 ### Smart Context Guidelines:
-- **Avoid Duplication**: Check previous actions before creating similar functionality
-- **Build Upon Previous Work**: Reference and extend existing implementations
-- **Context-Aware Decisions**: Consider architectural patterns already established
-- **Efficient Development**: Don't recreate what already exists
+- **Review Previous Work First**: Always check the "Previous Request Contexts" and "Previous File Operations" before starting new work
+- **Understand What Was Already Done**: Look at the overall purpose and key changes from previous requests
+- **Avoid Duplication**: If a similar goal was already accomplished, build upon it instead of recreating
+- **Context-Aware Decisions**: Consider the architectural patterns and decisions already established
 - **Know Current State**: Be aware of what files exist and what has been modified
+- **Purpose-Driven Actions**: Each file operation should have a clear purpose - reference previous purposes when similar
 
 ### 🚫 What NOT to Do (Based on Previous Actions):
 ${memoryContext && memoryContext.previousActions.length > 0 ? `
@@ -4781,8 +4793,16 @@ ${memoryContext && memoryContext.previousActions.length > 0 ? `
 - Do NOT reimplement functionality that was already completed
 - Do NOT repeat the same operations on files already modified
 - Do NOT create duplicate components or features
+- Do NOT work on goals that were already accomplished in previous requests
 - Always check if the requested task has already been accomplished
 ` : 'No previous actions to avoid repeating.'}
+
+### 📝 Memory Acknowledgment Required:
+**Before proceeding with any implementation, you MUST acknowledge what you have learned from the memory context above by stating:**
+1. What previous work is relevant to this request
+2. What has already been accomplished that you should build upon
+3. What you will NOT do to avoid duplication
+4. How this request fits into the existing project context
 
 ` : ''}
 
