@@ -331,7 +331,7 @@ async function processStreamMemoryWithAI(
     const enhancedMemory = await generateText({
       model: mistralPixtral,
       messages: [
-        { role: 'system', content: 'You are an AI assistant analyzing development conversations and JSON tool operations.' },
+        { role: 'system', content: 'You are an AI assistant analyzing development conversations and JSON tool operations. You MUST respond with VALID JSON only. Do NOT include any markdown formatting, code blocks, or explanatory text. Return only the JSON object.' },
         { role: 'user', content: `Analyze this development interaction and provide intelligent insights:
 
 User Message: "${userMessage}"
@@ -346,7 +346,8 @@ Previous Context: ${JSON.stringify(recentMemories.map(m => ({
   purpose: m.actionSummary.mainPurpose
 })), null, 2)}
 
-Provide a JSON response with enhanced memory analysis:
+IMPORTANT: Respond with VALID JSON only. No markdown, no code blocks, no explanations. Just the JSON object:
+
 {
   "semanticSummary": "Intelligent summary of what was accomplished in this interaction",
   "keyInsights": ["insight1", "insight2", "insight3"],
@@ -360,29 +361,42 @@ Provide a JSON response with enhanced memory analysis:
   "fileAccessPatterns": ["pattern of file usage"],
   "mainPurpose": "Primary goal of this interaction",
   "keyChanges": ["change1", "change2"]
-}
-
-Focus on tracking what files were manipulated, why, and preventing duplicate work.` }
+}` }
       ],
       temperature: 0.3
     })
 
     try {
-      // Parse AI response
+      // Parse AI response - handle various formats
       let jsonText = enhancedMemory.text || ''
+
+      // First, try to extract JSON from code blocks
       if (jsonText.includes('```json')) {
-        jsonText = jsonText.replace(/```json\s*/, '').replace(/\s*```$/, '')
+        jsonText = jsonText.replace(/```json\s*/i, '').replace(/\s*```$/, '')
       } else if (jsonText.includes('```')) {
         jsonText = jsonText.replace(/```\s*/, '').replace(/\s*```$/, '')
       }
+
+      // Clean up markdown headers and other formatting
       jsonText = jsonText.trim()
-      
-      // Remove any text after the JSON object
+
+      // Remove markdown headers that might precede JSON
+      jsonText = jsonText.replace(/^#+\s*JSON\s*R.*$/gm, '').trim()
+      jsonText = jsonText.replace(/^#+\s*.*$/gm, '').trim()
+
+      // Find the JSON object boundaries
+      const jsonStartIndex = jsonText.indexOf('{')
       const jsonEndIndex = jsonText.lastIndexOf('}')
-      if (jsonEndIndex !== -1) {
-        jsonText = jsonText.substring(0, jsonEndIndex + 1)
+
+      if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
+        jsonText = jsonText.substring(jsonStartIndex, jsonEndIndex + 1)
       }
-      
+
+      // Clean up any remaining non-JSON text
+      jsonText = jsonText.trim()
+
+      console.log('[MEMORY] Attempting to parse JSON:', jsonText.substring(0, 200) + '...')
+
       const parsed = JSON.parse(jsonText)
       
       return {
