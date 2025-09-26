@@ -572,7 +572,9 @@ Return ONLY the commit message, no quotes or additional text.`
 
 ${conversationContext}
 
-Create a commit message that captures the main development task or change discussed.`
+Create a commit message that captures the main development task or change discussed.    ensure to focus on what the ai implementedd and avoid saying the user requested for    instead focus n thee implementation the ai  didi by look at the end of each ai message  it contains a summarry of changes the ai gave to the user , use that as a good reference to craft a good technicall commmit message 
+
+`
           }
         ],
         temperature: 0.3, // Low temperature for consistent, professional output
