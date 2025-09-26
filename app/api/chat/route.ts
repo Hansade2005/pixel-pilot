@@ -441,11 +441,11 @@ async function storeStreamMemory(
   userId: string,
   userMessage: string,
   aiResponse: string,
-  projectContext: string,
-  executedToolCalls?: any[]
+  projectContext: string
 ): Promise<AIStreamMemory> {
-  // Extract JSON operations AND pre-tool-call descriptions from AI response
-  const { operations: jsonOperations, preToolDescriptions, overallPurpose } = extractContextAndOperationsFromResponse(aiResponse, executedToolCalls)
+  // Extract JSON operations AND pre-tool-call descriptions from AI response only
+  // Note: Tools are executed on frontend during streaming, so we only track from AI response text
+  const { operations: jsonOperations, preToolDescriptions, overallPurpose } = extractContextAndOperationsFromResponse(aiResponse)
 
   // Process memory with AI, now including the extracted context
   const memoryAnalysis = await processStreamMemoryWithAI(
@@ -7165,8 +7165,7 @@ Use this context to provide accurate, file-aware responses to the user's request
                 user?.id || 'anonymous',
                 userMessage,
                 accumulatedResponse, // Full accumulated AI response
-                projectContext || '',
-                executedToolCalls // Tool calls executed during streaming
+                projectContext || ''
               ).then((memory) => {
                 console.log('[MEMORY] Stream memory stored successfully:', {
                   memoryId: memory.id,
