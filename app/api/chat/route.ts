@@ -6766,12 +6766,83 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
             }
             
             // Start streaming the main response with JSON command support
-            const result = await streamText({
-              model: model,
-              messages: enhancedMessages,
-              temperature: 0.3,
-              abortSignal: abortController.signal,
-            })
+            let result;
+            
+            // SPECIAL HANDLING: a0.dev uses custom streaming, not AI SDK streamText
+            if (modelId === 'a0-dev-llm') {
+              console.log('[A0-DEV] Using custom a0.dev streaming instead of AI SDK streamText');
+              
+              // Convert AI SDK messages to a0.dev format
+              const a0Messages = enhancedMessages.map((msg: any) => ({
+                role: msg.role,
+                content: msg.content
+              }));
+              
+              // Create custom streaming response for a0.dev that matches chat panel expectations
+              result = {
+                textStream: (async function* () {
+                  try {
+                    const response = await fetch('https://api.a0.dev/ai/llm', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify({
+                        messages: a0Messages,
+                        temperature: 0.3,
+                        stream: true
+                      })
+                    });
+                    
+                    if (!response.ok) {
+                      throw new Error(`a0.dev API error: ${response.status} ${response.statusText}`);
+                    }
+                    
+                    const reader = response.body?.getReader();
+                    const decoder = new TextDecoder();
+                    
+                    if (reader) {
+                      let fullContent = '';
+                      
+                      while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        
+                        const chunk = decoder.decode(value, { stream: true });
+                        
+                        // a0.dev returns {"completion": "full text"}, so we need to extract and stream it
+                        try {
+                          const data = JSON.parse(chunk);
+                          if (data.completion) {
+                            // Stream the completion text character by character
+                            for (const char of data.completion) {
+                              fullContent += char;
+                              yield char;
+                            }
+                          }
+                        } catch (e) {
+                          // If not JSON, yield the raw chunk
+                          yield chunk;
+                        }
+                      }
+                      
+                      console.log('[A0-DEV] Streaming completed, total content length:', fullContent.length);
+                    }
+                  } catch (error) {
+                    console.error('[A0-DEV] Streaming error:', error);
+                    throw error;
+                  }
+                })()
+              };
+            } else {
+              // Standard AI SDK streaming for all other providers
+              result = await streamText({
+                model: model,
+                messages: enhancedMessages,
+                temperature: 0.3,
+                abortSignal: abortController.signal,
+              });
+            }
             
             for await (const chunk of result.textStream) {
               // Send text delta with enhanced formatting info

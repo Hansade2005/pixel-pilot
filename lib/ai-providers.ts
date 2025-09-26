@@ -6,43 +6,6 @@ import { createTogetherAI } from '@ai-sdk/togetherai';
 import { createCohere } from '@ai-sdk/cohere';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 
-// Helper function to create streaming chunks from text
-function createStreamingChunks(text: string): string[] {
-  if (!text) return [];
-
-  const chunks: string[] = [];
-  let remaining = text;
-
-  // Try to break at natural boundaries: sentences, then words, then characters
-  while (remaining.length > 0) {
-    // Look for sentence endings first (sentence + following space)
-    const sentenceMatch = remaining.match(/^[^.!?]*[.!?]\s+/);
-    if (sentenceMatch && sentenceMatch[0].length < 100) {
-      const chunk = sentenceMatch[0];
-      chunks.push(chunk);
-      remaining = remaining.slice(chunk.length);
-      continue;
-    }
-
-    // Look for word boundaries (word + space)
-    const wordMatch = remaining.match(/^\S+\s+/);
-    if (wordMatch && wordMatch[0].length < 50) {
-      const chunk = wordMatch[0];
-      chunks.push(chunk);
-      remaining = remaining.slice(chunk.length);
-      continue;
-    }
-
-    // Fall back to character chunks
-    const chunkSize = Math.min(20, remaining.length);
-    const chunk = remaining.slice(0, chunkSize);
-    chunks.push(chunk);
-    remaining = remaining.slice(chunkSize);
-  }
-
-  return chunks;
-}
-
 // Custom a0.dev provider implementation (no API key required)
 function createA0Dev(options: { apiKey?: string } = {}) {
   // a0.dev doesn't require API key authentication
@@ -111,7 +74,7 @@ function createA0Dev(options: { apiKey?: string } = {}) {
           const body = {
             messages,
             temperature: otherOptions.temperature || 0.7,
-            stream: true, // a0.dev accepts this but returns complete response
+            stream: true,
             ...otherOptions
           };
 
@@ -128,32 +91,23 @@ function createA0Dev(options: { apiKey?: string } = {}) {
             throw new Error(`a0.dev streaming API error: ${response.status} ${response.statusText}`);
           }
 
-          // a0.dev doesn't actually stream - it returns complete response
-          // We simulate streaming by breaking response into chunks
-          const result = await response.json();
-          const fullText = result.completion || '';
+          if (!response.body) {
+            throw new Error('Response body is null - streaming not supported');
+          }
 
-          // Convert to streaming events that chat panel expects
-          // Break text into chunks for realistic streaming experience
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+
           return {
             [Symbol.asyncIterator]() {
-              let chunkIndex = 0;
-              const chunks = createStreamingChunks(fullText);
-
               return {
                 async next() {
-                  if (chunkIndex >= chunks.length) {
+                  const { done, value } = await reader.read();
+                  if (done) {
                     return { done: true, value: undefined };
                   }
 
-                  const chunk = chunks[chunkIndex];
-                  chunkIndex++;
-
-                  // Add small delay between chunks for realistic streaming
-                  if (chunkIndex > 1) {
-                    await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
-                  }
-
+                  const chunk = decoder.decode(value, { stream: true });
                   return {
                     done: false,
                     value: {
