@@ -3869,30 +3869,290 @@ ${analyzeDependencies ? '6. **Circular Dependencies**: Detect potential circular
 }
 const codeQualityInstructions = `
 **🔧 PRODUCTION-READY CODE REQUIREMENTS:**
-• **Syntax Perfection**: Generate 100% syntactically correct code - no unclosed tags, unmatched brackets, or parsing errors
-• **Import/Export Consistency**: Always use correct import/export syntax matching the actual module definitions
-• **Type Safety**: Full TypeScript compliance with proper type annotations and no 'any' types
-• **Complete Implementation**: Never generate incomplete code, partial functions, or unfinished logic
-• **Error Prevention**: Include proper error handling, validation, and null checks
-• **Code Validation**: Use validation tools automatically after code generation to catch and fix issues
-• **Import Accuracy**: Verify all imports exist and match the actual file structure
-• **Export Matching**: Ensure exports match exactly how they're defined (default vs named exports)
-• **No Trailing Code**: Never leave incomplete statements, unfinished functions, or dangling code
-• **Proper Escaping**: All strings, quotes, and special characters must be properly escaped
-• **Complete Structures**: Always close all brackets, parentheses, and tags properly
-• **Consistent Formatting**: Use consistent indentation, spacing, and code style throughout
-• **Dependency Management**: Ensure all required imports are included and dependencies are properly declared
+# Comprehensive AI Code Validation Rules for Error-Free Web Apps
 
-**🧪 AUTOMATED QUALITY WORKFLOW:**
-• After ANY code generation, run analyze_dependencies and scan_code_imports automatically
-• Validate syntax and fix detected issues before presenting results to user
-• Check import/export relationships and correct mismatches immediately
-• Never present broken, incomplete, or syntactically incorrect code
-• Use tools proactively to ensure code quality, not just reactively when issues occur
-• **IMMEDIATE VALIDATION**: Always validate code syntax and imports immediately after generation
-• **MANDATORY VALIDATION**: You MUST use validation tools after any file creation or modification
-• **PRODUCTION STANDARD**: Only present code that passes all validation checks
-• **ERROR PREVENTION**: Identify and fix issues during generation, not after presentation`;
+## **CRITICAL REQUIREMENTS - NO EXCEPTIONS**
+
+### **File Structure & Extensions**
+- **NEVER** use JSX syntax in \`.ts\` files - only in \`.tsx\` files
+- Use \`.tsx\` extension for React components with JSX
+- Use \`.ts\` extension for utility functions, types, and non-React code
+- Ensure proper file naming: PascalCase for components, camelCase for utilities
+
+### **TypeScript Strict Compliance**
+**Reject any code that:**
+- Uses \`var\` or implicit \`any\` types
+- Has unhandled promise rejections
+- Contains \`console.log\`, \`console.warn\`, \`console.error\` in production code
+- Uses inline styles instead of Tailwind classes
+- References undefined variables/imports
+- Has missing return type annotations on functions
+- Uses \`Function\` type instead of specific function signatures
+- Contains \`@ts-ignore\` or \`@ts-nocheck\` comments
+- Uses \`object\` type instead of specific object shapes
+
+### **React & JSX Validation**
+**Enforce strict JSX compliance:**
+- All JSX elements must be properly closed (self-closing for void elements)
+- Boolean attributes must use proper syntax: \`disabled={true}\` not \`disabled\`
+- Event handlers must have correct typing: \`(e: React.MouseEvent<HTMLButtonElement>) => void\`
+- No mixing of HTML attributes and React props incorrectly
+- Proper key props for list items with unique, stable values
+- Fragment syntax \`<>\` or \`<React.Fragment>\` - never empty wrapper divs
+- Conditional rendering must handle all possible states
+- No dangerouslySetInnerHTML without proper sanitization
+
+### **Import/Export Standards**
+**All imports must:**
+- Be actually used in the file (no unused imports)
+- Use correct paths (relative for local files, exact package names)
+- Follow consistent import ordering: React, third-party, local imports
+- Use named imports where possible over default imports
+- Include proper type imports with \`import type\` when needed
+- Never import entire libraries when only specific functions are needed
+
+### **Error Handling & Async Operations**
+**Every async operation must:**
+- Have proper try-catch blocks or .catch() handlers
+- Include loading and error states in components
+- Use proper TypeScript Promise typing
+- Handle network failures gracefully
+- Include timeout handling for long-running operations
+- Use AbortController for cancellable requests
+
+### **Component Architecture**
+**All React components must:**
+- Use proper TypeScript interfaces for props
+- Include default props where appropriate
+- Handle all possible prop combinations
+- Use proper event handler signatures
+- Include proper accessibility attributes (ARIA)
+- Follow React Hooks rules (no conditional hooks)
+- Use proper dependency arrays in useEffect
+- Handle cleanup in useEffect when needed
+
+### **State Management**
+**State handling must:**
+- Use proper TypeScript typing for useState
+- Handle all state update scenarios
+- Include proper state initialization
+- Use functional updates when referencing previous state
+- Avoid direct state mutations
+- Include proper error boundaries where needed
+
+### **Performance & Bundle Optimization**
+**Code must avoid:**
+- Unnecessary re-renders (proper memoization)
+- Heavy computations in render functions
+- Large bundle sizes from unnecessary imports
+- Memory leaks from unremoved event listeners
+- Unused dependencies in package.json
+
+### **Vercel Deployment Compatibility**
+**Ensure compatibility by:**
+- Using proper environment variable handling (see Vite Environment Variables section)
+- Including necessary build scripts in package.json
+- Avoiding Node.js specific APIs in client code
+- Using proper dynamic imports for code splitting
+- Including proper TypeScript configuration
+- Ensuring all dependencies are in package.json
+- Using compatible Node.js version specifications
+
+### **Vite Environment Variables - CRITICAL REQUIREMENTS**
+
+**Environment Variable Naming:**
+- **MUST** prefix all client-side env vars with \`VITE_\`
+- Example: \`VITE_API_URL\`, \`VITE_APP_TITLE\`, \`VITE_STRIPE_PUBLIC_KEY\`
+- Server-only variables (without \`VITE_\` prefix) are NOT accessible in client code
+
+**File Structure & Priority (Vite loads in this order):**
+\`\`\`
+.env                # loaded in all cases
+.env.local          # loaded in all cases, ignored by git
+.env.[mode]         # only loaded in specified mode
+.env.[mode].local   # only loaded in specified mode, ignored by git
+\`\`\`
+
+**Proper Usage in Code:**
+\`\`\`typescript
+// ✅ CORRECT - Using import.meta.env
+const apiUrl = import.meta.env.VITE_API_URL as string;
+const isDev = import.meta.env.DEV; // Built-in Vite variable
+const isProd = import.meta.env.PROD; // Built-in Vite variable
+
+// ❌ WRONG - Never use process.env in Vite
+const apiUrl = process.env.VITE_API_URL; // Will be undefined!
+\`\`\`
+
+**TypeScript Environment Variable Typing:**
+- **MUST** create \`src/vite-env.d.ts\` or extend existing one:
+\`\`\`typescript
+/// <reference types="vite/client" />
+
+interface ImportMetaEnv {
+  readonly VITE_API_URL: string
+  readonly VITE_APP_TITLE: string
+  readonly VITE_STRIPE_PUBLIC_KEY: string
+  // Add all your VITE_ prefixed variables here
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv
+}
+\`\`\`
+
+**Validation Requirements:**
+- **MUST** validate required environment variables at app startup
+- Include fallback values or throw descriptive errors
+- Never assume environment variables exist without checking
+
+**Example Validation Pattern:**
+\`\`\`typescript
+// utils/env.ts
+function getEnvVar(key: keyof ImportMetaEnv, fallback?: string): string {
+  const value = import.meta.env[key];
+  if (!value && !fallback) {
+    throw new Error(\`Missing required environment variable: \${key}\`);
+  }
+  return value || fallback!;
+}
+
+export const config = {
+  apiUrl: getEnvVar('VITE_API_URL'),
+  appTitle: getEnvVar('VITE_APP_TITLE', 'My App'),
+  isDevelopment: import.meta.env.DEV,
+  isProduction: import.meta.env.PROD,
+} as const;
+\`\`\`
+
+**Security Best Practices:**
+- **NEVER** put sensitive data in \`VITE_\` prefixed variables (they're public!)
+- Use \`VITE_\` only for public configuration (API URLs, public keys, feature flags)
+- Keep secrets in server-side environment variables (without \`VITE_\` prefix)
+- Always validate and sanitize environment variable values
+
+**Vercel-Specific Environment Variable Setup:**
+- Set environment variables in Vercel dashboard for each environment
+- Use Vercel CLI: \`vercel env add VITE_API_URL\`
+- Include \`.env.example\` file in repository with dummy values
+- Ensure preview deployments use appropriate environment variables
+
+**Common Vite Environment Variables:**
+\`\`\`bash
+# Built-in Vite variables (always available)
+import.meta.env.MODE          # 'development' or 'production'
+import.meta.env.BASE_URL      # Base URL for the app
+import.meta.env.PROD          # boolean, true in production
+import.meta.env.DEV           # boolean, true in development
+import.meta.env.SSR           # boolean, true if server-side rendering
+\`\`\`
+
+**Forbidden Environment Variable Patterns:**
+- ❌ Using \`process.env\` in client-side code
+- ❌ Accessing non-\`VITE_\` prefixed variables in client code
+- ❌ Hardcoding sensitive information instead of using env vars
+- ❌ Not validating required environment variables
+- ❌ Using environment variables without proper TypeScript typing
+
+### **Styling & UI Standards**
+**All styling must:**
+- Use only Tailwind CSS classes (no inline styles)
+- Include responsive design considerations
+- Use proper CSS Grid/Flexbox patterns
+- Include hover, focus, and active states
+- Follow accessibility color contrast requirements
+- Use consistent spacing and typography scales
+
+### **Data Validation & Security**
+**All data handling must:**
+- Validate user inputs client-side and assume server validation
+- Sanitize any user-generated content
+- Use proper HTTPS for external API calls
+- Include proper error messages for users
+- Handle edge cases (empty arrays, null values, etc.)
+- Use proper input types for form elements
+
+### **Testing Considerations**
+**Code must be testable:**
+- Functions should be pure where possible
+- Components should accept props for external dependencies
+- Include proper test IDs for elements when building test-heavy apps
+- Avoid hard-coded values that prevent testing
+- Use proper mocking patterns for external dependencies
+
+## **MANDATORY VALIDATION PIPELINE**
+
+**All generated code MUST pass:**
+1. \`tsc --noEmit --strict\` (strict TypeScript compilation)
+2. \`eslint\` with \`@typescript-eslint/recommended\` and \`@typescript-eslint/strict\`
+3. \`prettier --check\` (consistent formatting)
+4. React Hooks ESLint rules validation
+5. Import/export validation
+6. Bundle size analysis (no unnecessary heavy imports)
+
+## **ADDITIONAL QUALITY GATES**
+
+### **Code Completeness**
+- **NO** placeholder comments like \`// TODO\` or \`// Implement this\`
+- **NO** incomplete function implementations
+- **NO** missing error handling
+- **NO** hardcoded values that should be configurable
+- All components must be fully functional on first generation
+
+### **Production Readiness**
+- Include proper loading states
+- Include proper error boundaries
+- Handle empty states and edge cases
+- Include proper meta tags for SEO when applicable
+- Use proper semantic HTML elements
+- Include proper form validation and submission handling
+
+### **Modern Best Practices**
+- Use modern React patterns (functional components, hooks)
+- Use modern JavaScript features (optional chaining, nullish coalescing)
+- Follow React 18+ patterns (concurrent features when applicable)
+- Use proper TypeScript utility types (Partial, Pick, Omit, etc.)
+- Include proper tree-shaking friendly exports
+
+## **FORBIDDEN PATTERNS**
+
+**NEVER generate code with:**
+- \`any\` type annotations
+- Suppressed TypeScript errors
+- Missing dependency arrays in hooks
+- Unhandled promise rejections
+- Missing key props in lists
+- Direct DOM manipulation in React
+- Mutating props or state directly
+- Using indexes as keys for dynamic lists
+- Missing alt tags on images
+- Inaccessible form controls
+- Hardcoded API endpoints without environment variables
+- Missing error handling for network requests
+- Blocking synchronous operations
+- Memory leaks from uncleaned subscriptions
+- **\`process.env\` usage in Vite projects (use \`import.meta.env\` instead)**
+- **Environment variables without \`VITE_\` prefix in client-side code**
+- **Missing TypeScript typing for environment variables**
+- **Unvalidated environment variable access**
+
+## **SUCCESS CRITERIA**
+
+**Generated code is considered successful ONLY when:**
+- ✅ Passes all TypeScript strict mode checks
+- ✅ Runs without console errors or warnings
+- ✅ Handles all user interaction scenarios
+- ✅ Includes proper loading and error states
+- ✅ Is accessible (keyboard navigation, screen readers)
+- ✅ Is responsive across device sizes
+- ✅ Deploys successfully to Vercel without build errors
+- ✅ Has no runtime JavaScript errors
+- ✅ Follows all modern React and TypeScript best practices
+- ✅ Is maintainable and follows consistent patterns
+
+**Deliver only complete, production-ready, fully-functional files with comprehensive error handling and no placeholders.**
+
+`;
 
 // NLP Intent Detection using Mistral Pixtral
 async function detectUserIntent(userMessage: string, projectContext: string, conversationHistory: any[]) {
