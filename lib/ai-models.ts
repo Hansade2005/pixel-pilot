@@ -12,15 +12,15 @@ export const chatModels: Array<ChatModel> = [
   {
     id: 'auto',
     name: 'Auto',
-    description: 'Automatically uses the best model for code generation (Codestral)',
+    description: 'Automatically uses the best model for code generation ',
     provider: 'auto',
   },
   
   // a0.dev Models
   {
     id: 'a0-dev-llm',
-    name: 'a0.dev LLM',
-    description: 'a0.dev language model with streaming support',
+    name: 'Pixela',
+    description: 'Pixela model from PiPilot with strong code generation capabilities',
     provider: 'a0dev',
   },
   
