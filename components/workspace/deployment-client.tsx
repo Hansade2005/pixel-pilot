@@ -574,7 +574,14 @@ ${conversationContext}
 
 Create a commit message that captures the main development task or change discussed.    ensure to focus on what the ai implementedd and avoid saying the user requested for    instead focus n thee implementation the ai  didi by look at the end of each ai message  it contains a summarry of changes the ai gave to the user , use that as a good reference to craft a good technicall commmit message 
 
-`
+EXAMPLES OF GOOD COMMIT MESSAGES:
+- "feat: Add user authentication system"
+- "fix: Resolve login validation error"
+- "feat: Implement dark mode toggle"
+- "refactor: Update API error handling"
+- "feat: Add responsive header component"
+- "fix: Fix deployment token persistence"
+- "feat: Add AI commit message generator"`
           }
         ],
         temperature: 0.3, // Low temperature for consistent, professional output
