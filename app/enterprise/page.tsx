@@ -403,7 +403,7 @@ export default function EnterprisePage() {
             <div className="text-center mb-16">
               <h2 className="text-4xl font-bold text-white mb-4">Success Stories</h2>
               <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-                See how leading enterprises transformed their development workflows with Pixel Pilot.
+                See how leading enterprises transformed their development workflows with PiPilot.
               </p>
             </div>
 

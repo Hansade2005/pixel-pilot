@@ -94,7 +94,7 @@ export function Logo({ size = 'md', variant = 'icon', className }: LogoProps) {
         <PixelPilotIcon className="h-6 w-6" />
         <div className="flex flex-col">
           <span className={cn('font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 bg-clip-text text-transparent', textSizes[size])}>
-            Pixel Pilot
+            PiPilot
           </span>
           <span className={cn('text-gray-300 font-medium text-xs', size === 'sm' ? 'text-xs' : size === 'md' ? 'text-xs' : size === 'lg' ? 'text-sm' : 'text-sm')}>
             Plan,build & ship faster.

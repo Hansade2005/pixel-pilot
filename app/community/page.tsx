@@ -175,7 +175,7 @@ export default function BlogPage() {
               </div>
             </div>
             <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
-              Pixel Pilot Blog
+              PiPilot Blog
             </h1>
             <p className="text-xl text-white/80 max-w-3xl mx-auto">
               Discover the latest insights, tutorials, and updates from the world of AI-powered development.

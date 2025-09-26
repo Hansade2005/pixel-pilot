@@ -244,7 +244,7 @@ export default function DocsPage() {
               </div>
             </div>
             <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
-              Pixel Pilot Documentation
+              PiPilot Documentation
             </h1>
             <p className="text-xl text-white/80 max-w-3xl mx-auto mb-8">
               Everything you need to build amazing applications with AI-powered development tools.
@@ -421,7 +421,7 @@ export default function DocsPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
                 {
-                  title: "Getting Started with Pixel Pilot",
+                  title: "Getting Started with PiPilot",
                   duration: "5:23",
                   thumbnail: "bg-gradient-to-br from-purple-500 to-pink-600"
                 },
@@ -460,7 +460,7 @@ export default function DocsPage() {
             </div>
             <h2 className="text-3xl font-bold text-white mb-4">Need Help?</h2>
             <p className="text-gray-300 mb-6 max-w-2xl mx-auto">
-              Join our community of developers and get help from fellow Pixel Pilot users, or contact our support team directly.
+              Join our community of developers and get help from fellow  Pilot users, or contact our support team directly.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button

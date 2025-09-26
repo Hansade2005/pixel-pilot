@@ -14,11 +14,11 @@ import { ThemeProvider } from "@/components/theme-provider"
 // })
 
 export const metadata: Metadata = {
-  title: 'Pixel Pilot - Plan, build & ship faster with AI',
-  description: 'Plan, build & ship faster with Pixel Pilot. Create webapps by chatting with AI.',
-  keywords: ['AI', 'app development',"mobile development","Canadian Vibe Coding Agent", 'web development', 'chat to code', 'pixel pilot'],
-  authors: [{ name: 'Pixel Pilot' }],
-  creator: 'Pixel Pilot',
+  title: 'PiPilot - Plan, build & ship faster with AI',
+  description: 'Plan, build & ship faster with PiPilot. Create webapps by chatting with AI.',
+  keywords: ['AI', 'app development',"mobile development","Canadian Vibe Coding Agent", 'web development', 'chat to code', 'pipilot'],
+  authors: [{ name: 'PiPilot' }],
+  creator: 'PiPilot',
   publisher: 'Anye Happiness Ade',
   formatDetection: {
     email: false,
@@ -27,16 +27,16 @@ export const metadata: Metadata = {
   },
   metadataBase: new URL('https://pipilot.dev'),
   openGraph: {
-    title: 'Pixel Pilot - AI-Powered App Development',
+    title: 'PiPilot - AI-Powered App Development',
     description: 'Plan, build & ship faster with AI-powered app development. Create webapps by chatting with AI.',
     url: 'https://pipilot.dev',
-    siteName: 'Pixel Pilot',
+    siteName: 'PiPilot',
     type: 'website',
     locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Pixel Pilot - AI-Powered App Development',
+    title: 'PiPilot - AI-Powered App Development',
     description: 'Plan, build & ship faster with AI-powered app development. Create webapps by chatting with AI.',
     creator: '@anyehappinessade',
   },

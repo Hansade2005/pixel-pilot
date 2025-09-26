@@ -55,7 +55,7 @@ interface InvoiceData {
 
 export default function InvoicePage() {
   const [invoiceData, setInvoiceData] = useState<InvoiceData>({
-    companyName: 'Pixel Pilot',
+    companyName: 'PiPilot',
     companyAddress: '123 Innovation Drive',
     companyCity: 'Tech Valley',
     companyState: 'CA',

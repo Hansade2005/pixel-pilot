@@ -66,7 +66,7 @@ export default function LoginPage() {
         <Card>
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
-                            <CardDescription>Sign in to your Pixel Pilot account</CardDescription>
+                            <CardDescription>Sign in to your PiPilot account</CardDescription>
           </CardHeader>
           <CardContent>
             {/* GitHub OAuth Button */}

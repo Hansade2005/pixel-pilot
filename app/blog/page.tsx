@@ -156,11 +156,11 @@ export default function BlogPage() {
           {/* Header */}
           <div className="text-center mb-16">
             <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 leading-tight">
-              Pixel Pilot Blog
+              PiPilot Blog
             </h1>
             <p className="text-xl text-gray-300 leading-relaxed max-w-3xl mx-auto mb-8">
               Insights, tutorials, and stories from the world of AI-powered development.
-              Discover how Pixel Pilot is transforming software creation.
+              Discover how PiPilot is transforming software creation.
             </p>
             <div className="flex items-center justify-center space-x-4 text-gray-400">
               <div className="flex items-center space-x-2">
