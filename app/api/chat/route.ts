@@ -6772,11 +6772,16 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
             if (modelId === 'a0-dev-llm') {
               console.log('[A0-DEV] Using custom a0.dev streaming instead of AI SDK streamText');
               
-              // Convert AI SDK messages to a0.dev format
-              const a0Messages = enhancedMessages.map((msg: any) => ({
+              // Convert AI SDK messages to a0.dev format with message limit
+              // a0.dev may timeout with too many messages, so limit to recent conversation
+              const maxMessages = 6; // Keep only the most recent messages
+              const recentMessages = enhancedMessages.slice(-maxMessages);
+              const a0Messages = recentMessages.map((msg: any) => ({
                 role: msg.role,
                 content: msg.content
               }));
+              
+              console.log(`[A0-DEV] Sending ${a0Messages.length} messages (${enhancedMessages.length} total, limited for performance)`);
               
               // Create custom streaming response for a0.dev that matches chat panel expectations
               result = {
@@ -6794,8 +6799,8 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
                         temperature: 0.3,
                         stream: true
                       }),
-                      // Increase timeout to prevent 504 errors
-                      signal: AbortSignal.timeout(30000) // 30 second timeout
+                      // Increase timeout to prevent 504 errors - a0.dev can be slower
+                      signal: AbortSignal.timeout(32000) // 32 second timeout
                     });
                     
                     console.log('[A0-DEV] API response status:', response.status);
