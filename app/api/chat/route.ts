@@ -3867,9 +3867,7 @@ ${analyzeDependencies ? '6. **Circular Dependencies**: Detect potential circular
 
   return tools
 }
-const codeQualityInstructions = `
-**🔧 PRODUCTION-READY CODE REQUIREMENTS:**
-# Comprehensive AI Code Validation Rules for Error-Free Web Apps
+const codeQualityInstructions = `# Comprehensive AI Code Validation Rules for Error-Free Web Apps
 
 ## **CRITICAL REQUIREMENTS - NO EXCEPTIONS**
 
@@ -3894,6 +3892,10 @@ const codeQualityInstructions = `
 ### **React & JSX Validation**
 **Enforce strict JSX compliance:**
 - All JSX elements must be properly closed (self-closing for void elements)
+- **Every JSX tag MUST be properly closed**: \`<div></div>\` or \`<input />\`
+- **No unclosed JSX tags**: \`<span>text\` ❌, \`<span>text</span>\` ✅
+- **Proper JSX nesting**: Tags must be properly nested, no overlapping
+- **Self-closing tags**: Use \`<img />\`, \`<br />\`, \`<input />\` not \`<img>\`, \`<br>\`, \`<input>\`
 - Boolean attributes must use proper syntax: \`disabled={true}\` not \`disabled\`
 - Event handlers must have correct typing: \`(e: React.MouseEvent<HTMLButtonElement>) => void\`
 - No mixing of HTML attributes and React props incorrectly
@@ -3901,6 +3903,8 @@ const codeQualityInstructions = `
 - Fragment syntax \`<>\` or \`<React.Fragment>\` - never empty wrapper divs
 - Conditional rendering must handle all possible states
 - No dangerouslySetInnerHTML without proper sanitization
+- **JSX expressions in curly braces must be properly closed**: \`{value}\` not \`{value\`
+- **JSX attribute values must be properly quoted**: \`className="container"\` not \`className="container\`
 
 ### **Import/Export Standards**
 **All imports must:**
@@ -3910,6 +3914,28 @@ const codeQualityInstructions = `
 - Use named imports where possible over default imports
 - Include proper type imports with \`import type\` when needed
 - Never import entire libraries when only specific functions are needed
+- **NEVER have trailing semicolons after import statements** (\`import React from 'react'\` not \`import React from 'react';\`)
+- Have proper syntax: \`import { useState } from 'react'\` not \`import { useState } from 'react';\`
+- Use consistent quote style (single quotes preferred for imports)
+
+### **Syntax & Punctuation Validation - CRITICAL**
+**Every line of code MUST have:**
+- **Properly closed brackets**: \`[]\`, \`{}\`, \`()\` - every opening bracket must have matching closing bracket
+- **Properly closed quotes**: All strings must have matching opening and closing quotes (\`'\`, \`"\`, or \`\\\`\`)
+- **Properly closed JSX tags**: Every \`<tag>\` must have corresponding \`</tag>\` or be self-closing \`<tag />\`
+- **Correct semicolon usage**: Use semicolons at end of statements, NOT after imports
+- **Proper brace matching**: Every \`{\` must have matching \`}\`
+- **Proper parentheses matching**: Every \`(\` must have matching \`)\`
+- **Proper array bracket matching**: Every \`[\` must have matching \`]\`
+
+**Common syntax errors to NEVER make:**
+- Missing closing braces: \`function test() { console.log('hello')\` ❌
+- Missing closing brackets: \`const arr = [1, 2, 3\` ❌
+- Missing closing parentheses: \`if (condition { return true; }\` ❌
+- Missing closing quotes: \`const str = 'hello\` ❌
+- Unclosed JSX tags: \`<div><span>text</div>\` ❌
+- Trailing semicolons on imports: \`import React from 'react';\` ❌
+- Mixed quote styles: \`import React from "react"; import { useState } from 'react'\` ❌
 
 ### **Error Handling & Async Operations**
 **Every async operation must:**
@@ -4135,6 +4161,25 @@ import.meta.env.SSR           # boolean, true if server-side rendering
 - **Environment variables without \`VITE_\` prefix in client-side code**
 - **Missing TypeScript typing for environment variables**
 - **Unvalidated environment variable access**
+- **Unclosed brackets, braces, parentheses, or quotes**
+- **Trailing semicolons after import statements**
+- **Unclosed JSX tags or improperly nested JSX**
+- **Mixed quote styles in same file**
+- **Missing closing syntax for any code block**
+
+## **SYNTAX VALIDATION CHECKLIST**
+
+**Before delivering ANY code, verify:**
+- ✅ Every \`{\` has matching \`}\`
+- ✅ Every \`[\` has matching \`]\`
+- ✅ Every \`(\` has matching \`)\`
+- ✅ Every quote (\`'\`, \`"\`, \`\\\`\`) has matching closing quote
+- ✅ Every JSX tag \`<tag>\` has matching \`</tag>\` or is self-closing \`<tag />\`
+- ✅ All import statements end without semicolons
+- ✅ All other statements end WITH semicolons where appropriate
+- ✅ No mixed quote styles within same file
+- ✅ Proper JSX expression syntax with closed curly braces
+- ✅ All function parameters and return types are properly typed
 
 ## **SUCCESS CRITERIA**
 
@@ -4149,8 +4194,21 @@ import.meta.env.SSR           # boolean, true if server-side rendering
 - ✅ Has no runtime JavaScript errors
 - ✅ Follows all modern React and TypeScript best practices
 - ✅ Is maintainable and follows consistent patterns
+- ✅ **Has perfect syntax with all brackets, braces, quotes, and tags properly closed**
+- ✅ **Uses correct import syntax without trailing semicolons**
+- ✅ **Has consistent quote style throughout the file**
+- ✅ **All JSX tags are properly opened and closed**
 
-**Deliver only complete, production-ready, fully-functional files with comprehensive error handling and no placeholders.**
+**FINAL VALIDATION STEP:**
+Before delivering code, perform a character-by-character syntax check:
+1. Count opening vs closing brackets: \`{\` vs \`}\`, \`[\` vs \`]\`, \`(\` vs \`)\`
+2. Verify quote pairs: every opening quote has a closing quote
+3. Validate JSX tag pairs: every \`<tag>\` has \`</tag>\` or is self-closing
+4. Check import statements end without semicolons
+5. Ensure consistent quote usage (prefer single quotes)
+
+**Deliver only complete, production-ready, fully-functional files with comprehensive error handling, perfect syntax, and no placeholders.**
+
 
 `;
 
