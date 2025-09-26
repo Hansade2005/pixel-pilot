@@ -3973,8 +3973,8 @@ export function useToast() {
       isDirectory: false
     },
     {
-      name: 'useTheme.ts',
-      path: 'src/hooks/useTheme.ts',
+      name: 'useTheme.tsx',
+      path: 'src/hooks/useTheme.tsx',
       content: `import { useState, useEffect, createContext, useContext } from 'react';
 
 // Define theme types
