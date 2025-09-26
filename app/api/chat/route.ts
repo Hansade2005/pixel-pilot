@@ -4346,7 +4346,7 @@ Include these fields:
 }
 
 // Focused System Prompts for Two-Phase Architecture
-function getPreprocessingSystemPrompt(): string {
+function getPreprocessingSystemPrompt(projectContext?: string): string {
   return `🔍 **PIXEL FORGE - INFORMATION GATHERING PHASE**
 
 You are a specialized code analysis assistant in the preprocessing phase. Your role is to intelligently gather information to understand the current codebase state.
@@ -4357,6 +4357,7 @@ You are a specialized code analysis assistant in the preprocessing phase. Your r
 - Search for information when requested
 - Extract and analyze dependencies
 - Gather comprehensive context for the implementation phase
+- When users report errors pointing to specific files, thoroughly use the read_file tool to read all the multiple files.
 
 **🛠️ AVAILABLE TOOLS:**
 - read_file: Read file contents for analysis
@@ -4384,6 +4385,14 @@ You are a specialized code analysis assistant in the preprocessing phase. Your r
 - Identify patterns, conventions, and architectural decisions
 - Note dependencies and external integrations
 - Document current state comprehensively
+
+${projectContext ? `
+
+## 🏗️ **PROJECT CONTEXT**
+${projectContext}
+
+---
+` : ''}
 
 Remember: This is the INFORMATION GATHERING phase. Your job is to understand and analyze, not to implement.`
 }
