@@ -1080,6 +1080,87 @@ Unable to load project structure. Use list_files tool to explore the project.`
   }
 }
 
+// SMART CONTEXT PROVIDER: Use Mistral Pixtral to select relevant files and produce a src patch
+async function buildSmartContextForA0(projectId: string, userMessage: string, storageManager: any) {
+  try {
+    // Load files and limit candidate set
+    const allFiles = await storageManager.getFiles(projectId)
+    // Prioritize src/ files and recently modified files
+    const candidateFiles = allFiles
+      .filter((f: any) => f.path.startsWith('src/') || f.path.endsWith('.ts') || f.path.endsWith('.tsx') || f.path.endsWith('.js') || f.path.endsWith('.jsx'))
+      .slice(-200) // cap candidates
+
+    // Read small previews for the model to analyze
+    const filePreviews: string[] = []
+    for (const f of candidateFiles) {
+      try {
+        const fileObj = await storageManager.getFile(projectId, f.path)
+        if (fileObj && fileObj.content) {
+          // Limit per-file content to avoid huge prompts
+          const snippet = fileObj.content.substring(0, 2000)
+          filePreviews.push(`File: ${f.path}\n${snippet}`)
+        }
+      } catch (e) {
+        // ignore read errors
+      }
+    }
+
+    const mistralPixtral = getMistralPixtralModel()
+
+    const selectionPrompt = `You are a code-context selector. Given the user's request and a list of project file previews, choose up to 10 files most relevant to the user's request. Return JSON: { "selected": [{"path":"...","reason":"short reason"}], "srcPatch": "text description of src structure changes (if any)" }\n\nUser Request: ${userMessage}\n\nFILES:\n${filePreviews.join('\n\n---\n\n')}`
+
+    const selection = await generateText({
+      model: mistralPixtral,
+      messages: [
+        { role: 'system', content: 'You are an assistant that selects most relevant project files for a code-edit request.' },
+        { role: 'user', content: selectionPrompt }
+      ],
+      temperature: 0.0
+    })
+
+    // Parse selection JSON from response
+    let parsed: any = { selected: [], srcPatch: '' }
+    try {
+      let text = selection.text || ''
+      if (text.includes('```json')) {
+        text = text.replace(/```json\s*/, '').replace(/\s*```$/, '')
+      } else if (text.includes('```')) {
+        text = text.replace(/```\s*/, '').replace(/\s*```$/, '')
+      }
+      text = text.trim()
+      const start = text.indexOf('{')
+      const end = text.lastIndexOf('}')
+      if (start !== -1 && end !== -1) {
+        const jsonText = text.substring(start, end + 1)
+        parsed = JSON.parse(jsonText)
+      }
+    } catch (e) {
+      console.warn('[SMART-CONTEXT] Failed to parse selection JSON, falling back to simple heuristic')
+    }
+
+    // Build final selectedFiles with content
+    const selectedFiles: Array<any> = []
+    const maxSelected = 10
+    const paths = (parsed.selected || []).slice(0, maxSelected).map((s: any) => s.path)
+    for (const p of paths) {
+      try {
+        const fileObj = await storageManager.getFile(projectId, p)
+        if (fileObj) selectedFiles.push({ path: p, content: fileObj.content || '' })
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    return {
+      selectedFiles,
+      srcPatch: parsed.srcPatch || ''
+    }
+  } catch (error) {
+    console.error('[SMART-CONTEXT] Error building smart context:', error)
+    return { selectedFiles: [], srcPatch: '' }
+  }
+}
+
 // Helper function to get file extension for syntax highlighting
 function getFileExtension(filePath: string): string {
   const ext = filePath.split('.').pop()?.toLowerCase()
@@ -6783,11 +6864,16 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
               
               console.log(`[A0-DEV] Sending ${a0Messages.length} messages (${enhancedMessages.length} total, limited for performance)`);
               
+              // Smart Context: select relevant files and src patch for a0.dev
+              const { storageManager } = await import('@/lib/storage-manager');
+              await storageManager.init();
+              const userMsg = messages[messages.length - 1]?.content || '';
+              const smartContext = await buildSmartContextForA0(projectId, userMsg, storageManager);
               // Direct generate: fetch once, yield full completion at once (no stream)
               result = {
                 textStream: (async function* () {
                   try {
-                    console.log('[A0-DEV] Making API request to a0.dev with', a0Messages.length, 'messages');
+                    console.log('[A0-DEV] Making API request to a0.dev with', a0Messages.length, 'messages and', smartContext.selectedFiles.length, 'context files');
                     const response = await fetch('https://api.a0.dev/ai/llm', {
                       method: 'POST',
                       headers: {
@@ -6796,7 +6882,9 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
                       body: JSON.stringify({
                         messages: a0Messages,
                         temperature: 0.3,
-                        stream: false
+                        stream: false,
+                        projectFiles: smartContext.selectedFiles,
+                        srcPatch: smartContext.srcPatch
                       }),
                       signal: AbortSignal.timeout(32000)
                     });
