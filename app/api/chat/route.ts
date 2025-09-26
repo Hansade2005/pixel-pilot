@@ -6782,6 +6782,8 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
               result = {
                 textStream: (async function* () {
                   try {
+                    console.log('[A0-DEV] Making API request to a0.dev with', a0Messages.length, 'messages');
+                    
                     const response = await fetch('https://api.a0.dev/ai/llm', {
                       method: 'POST',
                       headers: {
@@ -6791,10 +6793,20 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
                         messages: a0Messages,
                         temperature: 0.3,
                         stream: true
-                      })
+                      }),
+                      // Increase timeout to prevent 504 errors
+                      signal: AbortSignal.timeout(30000) // 30 second timeout
                     });
                     
+                    console.log('[A0-DEV] API response status:', response.status);
+                    
                     if (!response.ok) {
+                      const errorText = await response.text().catch(() => 'Unknown error');
+                      console.error('[A0-DEV] API error details:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        errorText: errorText.substring(0, 200)
+                      });
                       throw new Error(`a0.dev API error: ${response.status} ${response.statusText}`);
                     }
                     
