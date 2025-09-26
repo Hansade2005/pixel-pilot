@@ -6,6 +6,174 @@ import { createTogetherAI } from '@ai-sdk/togetherai';
 import { createCohere } from '@ai-sdk/cohere';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 
+// Helper function to create streaming chunks from text
+function createStreamingChunks(text: string): string[] {
+  if (!text) return [];
+
+  const chunks: string[] = [];
+  let remaining = text;
+
+  // Try to break at natural boundaries: sentences, then words, then characters
+  while (remaining.length > 0) {
+    // Look for sentence endings first (sentence + following space)
+    const sentenceMatch = remaining.match(/^[^.!?]*[.!?]\s+/);
+    if (sentenceMatch && sentenceMatch[0].length < 100) {
+      const chunk = sentenceMatch[0];
+      chunks.push(chunk);
+      remaining = remaining.slice(chunk.length);
+      continue;
+    }
+
+    // Look for word boundaries (word + space)
+    const wordMatch = remaining.match(/^\S+\s+/);
+    if (wordMatch && wordMatch[0].length < 50) {
+      const chunk = wordMatch[0];
+      chunks.push(chunk);
+      remaining = remaining.slice(chunk.length);
+      continue;
+    }
+
+    // Fall back to character chunks
+    const chunkSize = Math.min(20, remaining.length);
+    const chunk = remaining.slice(0, chunkSize);
+    chunks.push(chunk);
+    remaining = remaining.slice(chunkSize);
+  }
+
+  return chunks;
+}
+
+// Custom a0.dev provider implementation (no API key required)
+function createA0Dev(options: { apiKey?: string } = {}) {
+  // a0.dev doesn't require API key authentication
+  return {
+    languageModel(model: string) {
+      return {
+        specificationVersion: 'v1',
+        provider: 'a0-dev',
+        modelId: model,
+        defaultObjectGenerationMode: 'json',
+
+        async doGenerate(options: any) {
+          const { prompt, mode, ...otherOptions } = options;
+
+          // Convert AI SDK messages to a0.dev format
+          const messages = prompt.map((msg: any) => ({
+            role: msg.role,
+            content: msg.content
+          }));
+
+          const body = {
+            messages,
+            temperature: otherOptions.temperature || 0.7,
+            ...otherOptions
+          };
+
+          const response = await fetch('https://api.a0.dev/ai/llm', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+              // No Authorization header needed for a0.dev
+            },
+            body: JSON.stringify(body)
+          });
+
+          if (!response.ok) {
+            throw new Error(`a0.dev API error: ${response.status} ${response.statusText}`);
+          }
+
+          const result = await response.json();
+
+          return {
+            text: result.completion || result.message || JSON.stringify(result),
+            finishReason: 'stop',
+            usage: {
+              promptTokens: 0, // a0.dev doesn't provide token counts
+              completionTokens: 0,
+              totalTokens: 0
+            },
+            rawCall: {
+              rawPrompt: prompt,
+              rawSettings: otherOptions
+            }
+          };
+        },
+
+        async doStream(options: any) {
+          const { prompt, ...otherOptions } = options;
+
+          // Convert AI SDK messages to a0.dev format
+          const messages = prompt.map((msg: any) => ({
+            role: msg.role,
+            content: msg.content
+          }));
+
+          const body = {
+            messages,
+            temperature: otherOptions.temperature || 0.7,
+            stream: true, // a0.dev accepts this but returns complete response
+            ...otherOptions
+          };
+
+          const response = await fetch('https://api.a0.dev/ai/llm', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+              // No Authorization header needed for a0.dev
+            },
+            body: JSON.stringify(body)
+          });
+
+          if (!response.ok) {
+            throw new Error(`a0.dev streaming API error: ${response.status} ${response.statusText}`);
+          }
+
+          // a0.dev doesn't actually stream - it returns complete response
+          // We simulate streaming by breaking response into chunks
+          const result = await response.json();
+          const fullText = result.completion || '';
+
+          // Convert to streaming events that chat panel expects
+          // Break text into chunks for realistic streaming experience
+          return {
+            [Symbol.asyncIterator]() {
+              let chunkIndex = 0;
+              const chunks = createStreamingChunks(fullText);
+
+              return {
+                async next() {
+                  if (chunkIndex >= chunks.length) {
+                    return { done: true, value: undefined };
+                  }
+
+                  const chunk = chunks[chunkIndex];
+                  chunkIndex++;
+
+                  // Add small delay between chunks for realistic streaming
+                  if (chunkIndex > 1) {
+                    await new Promise(resolve => setTimeout(resolve, 50 + Math.random() * 100));
+                  }
+
+                  return {
+                    done: false,
+                    value: {
+                      type: 'text-delta',
+                      textDelta: chunk
+                    }
+                  };
+                }
+              };
+            }
+          };
+        }
+      };
+    }
+  };
+}
+
+// Create the a0.dev provider instance (no API key required)
+const a0devProvider = createA0Dev();
+
 // Create the default Codestral client
 const codestral = createOpenAICompatible({
   name: 'codestral',
@@ -41,6 +209,7 @@ const cohereProvider = createCohere({
 // Debug function to check environment variables
 function checkProviderKeys() {
   const keys = {
+    a0dev: process.env.A0_DEV_API_KEY || 'Not required',
     codestral: process.env.CODESTRAL_API_KEY || 'DXfXAjwNIZcAv1ESKtoDwWZZF98lJxho',
     openai: process.env.OPENAI_API_KEY || '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',
     mistral: process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr',
@@ -55,6 +224,7 @@ function checkProviderKeys() {
     console.log('================================');
     Object.entries(keys).forEach(([provider, key]) => {
       const envVarMap: Record<string, string> = {
+        a0dev: 'A0_DEV_API_KEY',
         codestral: 'CODESTRAL_API_KEY',
         openai: 'OPENAI_API_KEY',
         mistral: 'MISTRAL_API_KEY',
@@ -83,6 +253,9 @@ if (process.env.NODE_ENV === 'development') {
 const modelProviders: Record<string, any> = {
   // Auto/Default Option - uses Codestral
   'auto': codestral('codestral-latest'), // Auto selection uses Codestral endpoint
+  
+  // a0.dev Models
+  'a0-dev-llm': a0devProvider.languageModel('a0-dev-llm'),
   
   // Mistral Models - Default uses Codestral endpoint
   'open-codestral-mamba': codestral('codestral-latest'), // Direct Codestral model selection
@@ -143,6 +316,7 @@ export function getModel(modelId: string) {
 
 // Export individual providers for direct use if needed
 export {
+  a0devProvider as a0dev,
   openaiProvider as openai,
   mistralProvider as mistral,
   googleProvider as google,

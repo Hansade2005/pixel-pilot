@@ -16,6 +16,14 @@ export const chatModels: Array<ChatModel> = [
     provider: 'auto',
   },
   
+  // a0.dev Models
+  {
+    id: 'a0-dev-llm',
+    name: 'a0.dev LLM',
+    description: 'a0.dev language model with streaming support',
+    provider: 'a0dev',
+  },
+  
   // Mistral Models (Default - Code-focused)
   {
     id: 'open-codestral-mamba',
