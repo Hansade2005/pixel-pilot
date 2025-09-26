@@ -5271,14 +5271,11 @@ ${codeQualityInstructions}
 - **Date-fns 4.1.0** - Modern date utility library
 - **React Day Picker 9.8.0** - Date picker component
 
-**📱 NAVIGATION (React Native Ready):**
-- **React Navigation Native 7.0.14** - Core navigation library
-- **React Navigation Native Stack 7.2.0** - Native-optimized stack navigation
-- **React Navigation Bottom Tabs 7.4.7** - Bottom tab navigation
-- **React Navigation Drawer 7.1.1** - Side drawer navigation
-- **React Navigation Material Top Tabs 7.1.0** - Material design top tabs
-- **React Native Screens 4.4.0** - Native screen management
-- **React Native Safe Area Context 5.0.0** - Safe area handling
+**📱 NAVIGATION:**
+- **React Router DOM 6.28.0** - Client-side routing for web applications
+- ⚠️ **React Navigation packages are NOT available** - These are for React Native mobile apps only
+- For web navigation, use React Router DOM with BrowserRouter, Routes, Route, Link, and NavLink
+- For tabbed interfaces, use Radix UI Tabs component or create custom tab components
 
 **🔧 DEVELOPMENT TOOLS:**
 - **ESLint 8.55.0** - Code linting
@@ -5305,6 +5302,13 @@ ${codeQualityInstructions}
 - When adding new packages, use write_file to update package.json with the correct latest versions available in the npm registry
 - After adding to package.json, you can then use the package in your code
 - Always prefer existing dependencies over adding new ones
+
+**🚫 AUTONOMOUS PACKAGE INSTALLATION RULE:**
+**🚨 CRITICAL: NEVER ask the user to run "npm install" or any package installation commands.**
+- Handle all package installations autonomously by updating package.json first using write_file
+- Do not instruct users to run terminal commands for package installation
+- If you need a new package, add it to package.json and proceed with implementation
+- Users should never see messages like "Please run npm install" or "Run the following command in your terminal to install the package"
 
 ## 🏗️ **SUPABASE INTEGRATION REQUIREMENTS**
 

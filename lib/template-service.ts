@@ -83,14 +83,8 @@ export class TemplateService {
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
 
-    "@tanstack/react-table": "^8.20.5",
-    "@react-navigation/native": "^7.0.14",
-    "@react-navigation/native-stack": "^7.2.0",
-    "@react-navigation/bottom-tabs": "^7.4.7",
-    "@react-navigation/drawer": "^7.1.1",
-    "@react-navigation/material-top-tabs": "^7.1.0",
-    "react-native-screens": "^4.4.0",
-    "react-native-safe-area-context": "^5.0.0"
+    "@tanstack/react-table": "^8.20.5"
+
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
