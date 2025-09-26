@@ -4897,10 +4897,18 @@ ${memoryContext && memoryContext.previousActions.length > 0 ? `
 
 # JSON Tool Commands for File Operations
 
+**🔧 AVAILABLE TOOLS: You have access to write_file and delete_file tools to work on the workspace.**
+
+**📝 TOOL USAGE:**
+- **write_file**: Use for creating new files and updating existing files with complete content
+- **delete_file**: Use for removing files from the project
+
+// **⚠️ TEMPORARILY DISABLED: edit_file tool is currently disabled for focused development**
+
 Do *not* tell the user to run shell commands. Instead, use JSON tool commands for all file operations:
 
 - **write_file**: Create or overwrite files with complete content
-- **edit_file**: Edit existing files with search/replace operations  
+// - **edit_file**: Edit existing files with search/replace operations (TEMPORARILY DISABLED)
 - **delete_file**: Delete files from the project
 
 You can use these commands by embedding JSON tools in code blocks in your response like this:
@@ -4913,65 +4921,65 @@ You can use these commands by embedding JSON tools in code blocks in your respon
 }
 \`\`\`
 
-**🚀 ADVANCED EDIT_FILE PARAMETERS:**
+// **🚀 ADVANCED EDIT_FILE PARAMETERS: (TEMPORARILY DISABLED)**
 
-Multi-operation editing with validation:
-\`\`\`json
-{
-  "tool": "edit_file",
-  "path": "src/components/Example.tsx",
-  "searchReplaceBlocks": [
-    {
-      "search": "const [count, setCount] = useState(0);",
-      "replace": "const [count, setCount] = useState(0);\\n  const [loading, setLoading] = useState(false);"
-    },
-    {
-      "search": "onClick={() => setCount(count + 1)}",
-      "replace": "onClick={() => {\\n    setLoading(true);\\n    setCount(count + 1);\\n    setLoading(false);\\n  }}",
-      "validateAfter": "setLoading(false)"
-    }
-  ],
-  "rollbackOnFailure": true
-}
-\`\`\`
+// Multi-operation editing with validation:
+// \`\`\`json
+// {
+//   "tool": "edit_file",
+//   "path": "src/components/Example.tsx",
+//   "searchReplaceBlocks": [
+//     {
+//       "search": "const [count, setCount] = useState(0);",
+//       "replace": "const [count, setCount] = useState(0);\\n  const [loading, setLoading] = useState(false);"
+//     },
+//     {
+//       "search": "onClick={() => setCount(count + 1)}",
+//       "replace": "onClick={() => {\\n    setLoading(true);\\n    setCount(count + 1);\\n    setLoading(false);\\n  }}",
+//       "validateAfter": "setLoading(false)"
+//     }
+//   ],
+//   "rollbackOnFailure": true
+// }
+// \`\`\`
 
-Target specific occurrences:
-\`\`\`json
-{
-  "tool": "edit_file",
-  "path": "src/utils/helpers.ts",
-  "search": "const result",
-  "replace": "const processedResult",
-  "occurrenceIndex": 2
-}
-\`\`\`
+// Target specific occurrences:
+// \`\`\`json
+// {
+//   "tool": "edit_file",
+//   "path": "src/utils/helpers.ts",
+//   "search": "const result",
+//   "replace": "const processedResult",
+//   "occurrenceIndex": 2
+// }
+// \`\`\`
 
-Replace all occurrences with validation:
-\`\`\`json
-{
-  "tool": "edit_file",
-  "path": "src/types/index.ts",
-  "search": "UserData",
-  "replace": "ProfileData",
-  "replaceAll": true,
-  "validateAfter": "interface ProfileData"
-}
-\`\`\`
+// Replace all occurrences with validation:
+// \`\`\`json
+// {
+//   "tool": "edit_file",
+//   "path": "src/types/index.ts",
+//   "search": "UserData",
+//   "replace": "ProfileData",
+//   "replaceAll": true,
+//   "validateAfter": "interface ProfileData"
+// }
+// \`\`\`
 
-Dry run preview (test changes without applying):
-\`\`\`json
-{
-  "tool": "edit_file",
-  "path": "src/App.tsx",
-  "dryRun": true,
-  "searchReplaceBlocks": [
-    {
-      "search": "function App()",
-      "replace": "async function App()"
-    }
-  ]
-}
-\`\`\`
+// Dry run preview (test changes without applying):
+// \`\`\`json
+// {
+//   "tool": "edit_file",
+//   "path": "src/App.tsx",
+//   "dryRun": true,
+//   "searchReplaceBlocks": [
+//     {
+//       "search": "function App()",
+//       "replace": "async function App()"
+//     }
+//   ]
+// }
+// \`\`\`
 
 \`\`\`json
 {
@@ -4985,18 +4993,20 @@ Dry run preview (test changes without applying):
 - Use proper JSON syntax with double quotes for all strings
 - Escape newlines in content as \\n for proper JSON formatting
 - Use the exact field names: "tool", "path", "content", "searchReplaceBlocks", "search", "replace"
-- **Supported tool names**: "write_file", "edit_file", "delete_file"
+- **Supported tool names**: "write_file", "delete_file" // "edit_file" TEMPORARILY DISABLED
 - Each tool command must be a separate JSON code block
 - The JSON must be valid and properly formatted
 
-## 🎯 **CRITICAL: TOOL SELECTION STRATEGY - write_file vs edit_file**
+## 🎯 **CRITICAL: TOOL SELECTION STRATEGY - write_file ONLY**
 
-**🚀 PRIORITIZE write_file FOR:**
+**🚀 ALWAYS USE write_file FOR ALL FILE OPERATIONS:**
+- **Creating Files**: Use write_file to create new files with complete content
+- **Updating Files**: Use write_file to update existing files with complete content
 - **Design Improvements**: Enhancing UI/UX, styling, layouts, or visual components
 - **New Features & Functionality**: Adding new capabilities, components, or major implementations
 - **Feature Enhancements**: Improving existing functionality with new capabilities
 - **Complete Functionality Additions**: Adding authentication, state management, API integrations
-- **Large Changes**: When modifying 30%+ of a file's content
+- **Large Changes**: When modifying any part of a file's content
 - **Complete Rewrites**: When updating file structure, imports, or overall architecture
 - **Significant Additions**: Adding multiple functions, methods, or properties
 - **Dependency Updates**: When adding or changing multiple imports/exports
@@ -5006,27 +5016,25 @@ Dry run preview (test changes without applying):
 - **Major Refactors**: Restructuring existing code with significant changes
 - **New File Creation**: All new files should use write_file with complete content
 - **Environment Files**: ALWAYS use write_file for .env.local, .env, or any environment configuration files
-- **🚨 App.tsx Updates**: ALWAYS use write_file when updating src/App.tsx - never use edit_file for App.tsx
+- **🚨 App.tsx Updates**: ALWAYS use write_file when updating src/App.tsx
+- **Small Changes**: Even small fixes, updates, or tweaks should use write_file with complete file content
 
-**✏️ USE edit_file FOR:**
-- **Small Precise Changes**: Fixing bugs, updating single functions, or minor tweaks  
-- **Targeted Fixes**: Changing specific values, parameters, or small code blocks
-- **Minor Updates**: Adding single properties, updating imports, or small adjustments
-- **Configuration Changes**: Updating settings, constants, or small config modifications
+// **✏️ EDIT_FILE DISABLED:** (TEMPORARILY DISABLED)
+// - **Small Precise Changes**: Fixing bugs, updating single functions, or minor tweaks (DISABLED)
+// - **Targeted Fixes**: Changing specific values, parameters, or small code blocks (DISABLED)
+// - **Minor Updates**: Adding single properties, updating imports, or small adjustments (DISABLED)
+// - **Configuration Changes**: Updating settings, constants, or small config modifications (DISABLED)
 
 **📋 DECISION FLOWCHART:**
-1. **Is this a new file?** → Use write_file
-2. **Is this src/App.tsx?** → Use write_file (ALWAYS)
-3. **Are you improving design, features, or functionality?** → Use write_file
-4. **Are you adding new features/components to existing file?** → Use write_file  
-5. **Are you enhancing existing functionality?** → Use write_file
-6. **Are you changing 30%+ of the file?** → Use write_file
-7. **Are you making a small, targeted fix?** → Use edit_file
-8. **Are you just updating a few lines?** → Use edit_file
+1. **Any file operation needed?** → Use write_file
+2. **Creating new file?** → Use write_file
+3. **Updating existing file?** → Use write_file
+4. **Making any changes to code?** → Use write_file
+5. **Need to delete a file?** → Use delete_file
 
 **💡 EXAMPLES:**
 
-**✅ Use write_file when:**
+**✅ Use write_file for ALL operations:**
 - **Design Improvements**: Enhancing UI layouts, adding animations, improving styling
 - **New Feature Implementation**: Adding search functionality, user profiles, notifications
 - **Functionality Enhancements**: Improving form validation, adding data filtering, optimization
@@ -5036,20 +5044,22 @@ Dry run preview (test changes without applying):
 - Adding state management to existing components
 - Restructuring file with new imports and exports
 - Adding multiple new functions or methods
+- **Small fixes**: Even fixing a typo or updating a single line
+- **Configuration updates**: Changing any settings or constants
 
-**✅ Use edit_file when:**  
-- Fixing a typo in a function name
-- Updating a single CSS class
-- Changing a default value
-- Adding one import statement
-- Modifying a single function parameter
-- Updating error messages
+// **✅ EDIT_FILE EXAMPLES: (TEMPORARILY DISABLED)**
+// - Fixing a typo in a function name (DISABLED)
+// - Updating a single CSS class (DISABLED)
+// - Changing a default value (DISABLED)
+// - Adding one import statement (DISABLED)
+// - Modifying a single function parameter (DISABLED)
+// - Updating error messages (DISABLED)
 
 **⚡ PERFORMANCE GUIDELINES:**
 - write_file ensures complete, consistent files with all dependencies
-- edit_file is faster for small changes but can miss context
-- When in doubt, use write_file for reliability and completeness
-- For files with new features or implementations, always use write_file
+- Always use write_file for reliability and completeness
+- Provide complete file content for all operations
+- For files with any changes, always use write_file
 
 **🔧 IMPLEMENTATION BEST PRACTICES:**
 - Always provide complete, functional code with write_file
@@ -5084,6 +5094,9 @@ Dry run preview (test changes without applying):
 - Adding configuration options or customization features
 
 **Rule: If it makes the application better, more functional, or more user-friendly → Use write_file**
+
+// **EDIT_FILE RULE DISABLED: (TEMPORARILY DISABLED)**
+// **NEVER use edit_file for design or functionality enhancements**
 
 # Guidelines
 
@@ -5214,9 +5227,9 @@ ${codeQualityInstructions}
 - Before using a new package, add it as a dependency in **package.json**. Always check **package.json** to see which packages are already installed.
 - The main entry point is **src/main.tsx** (NOT index.tsx).
 - The main application component is **src/App.tsx**.
-- **🚨 CRITICAL: ALWAYS use write_file when updating src/App.tsx - NEVER use edit_file for App.tsx**
+- **🚨 CRITICAL: ALWAYS use write_file when updating src/App.tsx**
 - **UPDATE the main App.tsx to include new components. OTHERWISE, the user can NOT see any components!**
-- **If you need to use a new package thats not listed in package.json ALWAYS use the edit_file tool to add the new package before using it. Thats how package installation works in this system.**
+- **If you need to use a new package thats not listed in package.json ALWAYS use write_file tool to add the new package before using it. Thats how package installation works in this system.**
 - **ALWAYS try to use the shadcn/ui library** (already installed with Radix UI components).
 - **Tailwind CSS**: Always use Tailwind CSS for styling components. Utilize Tailwind classes extensively for layout, spacing, colors, and other design aspects.
 - Use **Framer Motion** for animations (already installed).
@@ -5235,7 +5248,7 @@ ${codeQualityInstructions}
 
 **🔧 Environment Variables Rule:**
 - **ALWAYS use write_file tool to update .env.local file**
-- Never use edit_file for .env.local - always provide complete environment configuration
+- Always provide complete environment configuration
 - Include all necessary Supabase variables:
   - **VITE_SUPABASE_URL=your_supabase_url**
   - **VITE_SUPABASE_ANON_KEY=your_supabase_anon_key**
