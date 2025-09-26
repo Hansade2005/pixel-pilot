@@ -6834,7 +6834,7 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
                             // Stream the completion text word by word (preserving spaces)
                             const words = data.completion.split(/(\s+)/);
                             for (const word of words) {
-                              if (word.trim()) { // Yield non-empty words/spaces
+                              if (word) { // Yield all words including spaces (but not empty strings)
                                 fullContent += word;
                                 yield word;
                               }
