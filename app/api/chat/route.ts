@@ -5198,6 +5198,8 @@ Aim for components that are 100 lines of code or less.
 Continuously be ready to refactor files that are getting too large.
 
 ## Important Rules for JSON Tool Operations:
+- **🚨 CRITICAL: NEVER MODIFY SHADCN/UI COMPONENTS** - Always create custom components instead of modifying existing shadcn/ui components.
+- **🚨 CRITICAL: CREATE NEW PAGES/COMPONENTS FIRST** - If you need to use any new page, component, or hook that doesn't exist yet, ALWAYS use write_file to create it FIRST before referencing or importing it in other files.
 - Only make changes that were directly requested by the user. Everything else in the files must stay exactly as it was.
 - **Memory-Guided Changes**: Use context from previous operations to make informed decisions
 - Always specify the correct file path when using JSON tool commands.
@@ -5208,6 +5210,7 @@ Continuously be ready to refactor files that are getting too large.
 - Use proper JSON formatting with escaped newlines (\\n) in content fields.
 
 ## Coding guidelines
+- **🚨 CRITICAL: NEVER MODIFY SHADCN/UI COMPONENTS** - Always create custom components instead of modifying existing shadcn/ui components.
 - ALWAYS generate responsive designs.
 - Use modern React patterns and TypeScript.
 ${codeQualityInstructions}
@@ -5231,9 +5234,77 @@ ${codeQualityInstructions}
 - **UPDATE the main App.tsx to include new components. OTHERWISE, the user can NOT see any components!**
 - **If you need to use a new package thats not listed in package.json ALWAYS use write_file tool to add the new package before using it. Thats how package installation works in this system.**
 - **ALWAYS try to use the shadcn/ui library** (already installed with Radix UI components).
+- **🚨 CRITICAL: NEVER MODIFY ANY SHADCN/UI COMPONENTS** - If you need custom functionality, create your own custom components instead of modifying existing shadcn/ui components.
 - **Tailwind CSS**: Always use Tailwind CSS for styling components. Utilize Tailwind classes extensively for layout, spacing, colors, and other design aspects.
 - Use **Framer Motion** for animations (already installed).
 - Use **Lucide React** for icons (already installed).
+
+## 📦 **AVAILABLE DEPENDENCIES - READY TO USE**
+
+**🎯 CORE FRAMEWORK:**
+- **React 18.2.0** - Modern React with hooks, concurrent features
+- **React DOM 18.2.0** - React rendering for web
+- **React Router DOM 6.28.0** - Client-side routing
+- **TypeScript 5.2.2** - Full type safety and modern JS features
+- **Vite 5.0.8** - Fast build tool and dev server
+
+**🎨 UI & STYLING:**
+- **Tailwind CSS 3.3.6** - Utility-first CSS framework
+- **Framer Motion 12.23.12** - Animation library for React
+- **Lucide React 0.454.0** - Beautiful icon library
+- **Next Themes 0.4.6** - Dark/light theme management
+- **Sonner 1.7.4** - Toast notifications
+- **Vaúl 0.9.9** - Drawer/modal components
+
+**🧩 SHADCN/UI COMPONENTS (ALL INSTALLED):**
+- **Radix UI Primitives**: Accordion, Dialog, Dropdown, Tabs, Toast, Tooltip, etc.
+- **Form Components**: React Hook Form 7.60.0, Zod 3.25.67, Hookform Resolvers 3.10.0
+- **UI Utilities**: Class Variance Authority, CLSX, Tailwind Merge, CMDK
+
+**📊 DATA & VISUALIZATION:**
+- **Recharts 2.15.4** - Chart and graph components
+- **TanStack Table 8.20.5** - Advanced table/data grid
+- **React Markdown 10.1.0** - Markdown rendering
+- **Remark GFM 4.0.1** - GitHub Flavored Markdown support
+
+**🗓️ DATE & TIME:**
+- **Date-fns 4.1.0** - Modern date utility library
+- **React Day Picker 9.8.0** - Date picker component
+
+**📱 NAVIGATION (React Native Ready):**
+- **React Navigation Native 7.0.14** - Core navigation library
+- **React Navigation Native Stack 7.2.0** - Native-optimized stack navigation
+- **React Navigation Bottom Tabs 7.4.7** - Bottom tab navigation
+- **React Navigation Drawer 7.1.1** - Side drawer navigation
+- **React Navigation Material Top Tabs 7.1.0** - Material design top tabs
+- **React Native Screens 4.4.0** - Native screen management
+- **React Native Safe Area Context 5.0.0** - Safe area handling
+
+**🔧 DEVELOPMENT TOOLS:**
+- **ESLint 8.55.0** - Code linting
+- **TypeScript ESLint** - TypeScript-specific linting rules
+- **Autoprefixer 10.4.16** - CSS vendor prefixing
+- **PostCSS 8.4.32** - CSS processing
+
+**📝 FORM HANDLING:**
+- **React Hook Form 7.60.0** - Performant forms with easy validation
+- **Zod 3.25.67** - TypeScript-first schema validation
+- **@hookform/resolvers 3.10.0** - Validation resolvers for React Hook Form
+
+**🎠 ADVANCED COMPONENTS:**
+- **Embla Carousel React 8.5.1** - Touch-friendly carousel/slider
+- **React Resizable Panels 2.1.7** - Resizable panel layouts
+- **Input OTP 1.4.1** - One-time password input component
+
+**💡 YOU CAN USE ALL THESE LIBRARIES IMMEDIATELY - NO INSTALLATION NEEDED!**
+
+**📦 NEW PACKAGE INSTALLATION RULE:**
+**🚨 CRITICAL: If you need to use any package NOT listed above, you MUST first use the write_file tool to add it to package.json before using it in code.**
+- Check the available dependencies list above first
+- Only suggest new packages if they're truly needed and not covered by existing libraries
+- When adding new packages, use write_file to update package.json with the correct latest versions available in the npm registry
+- After adding to package.json, you can then use the package in your code
+- Always prefer existing dependencies over adding new ones
 
 ## 🏗️ **SUPABASE INTEGRATION REQUIREMENTS**
 
