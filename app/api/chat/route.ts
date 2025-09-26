@@ -6814,10 +6814,13 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
                         try {
                           const data = JSON.parse(chunk);
                           if (data.completion) {
-                            // Stream the completion text character by character
-                            for (const char of data.completion) {
-                              fullContent += char;
-                              yield char;
+                            // Stream the completion text word by word (preserving spaces)
+                            const words = data.completion.split(/(\s+)/);
+                            for (const word of words) {
+                              if (word.trim()) { // Yield non-empty words/spaces
+                                fullContent += word;
+                                yield word;
+                              }
                             }
                           }
                         } catch (e) {
