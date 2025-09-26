@@ -6571,7 +6571,7 @@ Please respond to the user's request above, taking into account the project cont
           console.log('[PREPROCESSING] Executing read-only tools with generateText')
           
           // Execute read-only tools first with focused system prompt
-          const preprocessingPrompt = getPreprocessingSystemPrompt()
+          const preprocessingPrompt = getPreprocessingSystemPrompt(projectContext)
 
           const preprocessingMessages = [
             { role: 'system' as const, content: preprocessingPrompt },
