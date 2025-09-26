@@ -6909,10 +6909,31 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
                 })()
               };
             } else {
+              // Smart Context: select relevant files and src patch for standard AI SDK streaming
+              const { storageManager } = await import('@/lib/storage-manager');
+              await storageManager.init();
+              const userMsg = messages[messages.length - 1]?.content || '';
+              const smartContext = await buildSmartContextForA0(projectId, userMsg, storageManager);
+              
+              // Add smart context to enhanced messages for standard providers
+              const smartContextMessage = {
+                role: 'system' as const,
+                content: `## Smart Context - Relevant Project Files
+
+${smartContext.srcPatch ? `**Source Structure Changes:** ${smartContext.srcPatch}\n\n` : ''}**Selected Files for Context:**
+${smartContext.selectedFiles.map((file: any) => 
+  `### ${file.path}\n\`\`\`\n${file.content}\n\`\`\``
+).join('\n\n')}
+
+Use this context to provide accurate, file-aware responses to the user's request.`
+              };
+              
+              const enhancedMessagesWithContext = [smartContextMessage, ...enhancedMessages];
+              
               // Standard AI SDK streaming for all other providers
               result = await streamText({
                 model: model,
-                messages: enhancedMessages,
+                messages: enhancedMessagesWithContext,
                 temperature: 0.3,
                 abortSignal: abortController.signal,
               });
