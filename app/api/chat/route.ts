@@ -387,10 +387,11 @@ async function storeStreamMemory(
   userId: string,
   userMessage: string,
   aiResponse: string,
-  projectContext: string
+  projectContext: string,
+  executedToolCalls?: any[]
 ): Promise<AIStreamMemory> {
-  // Extract JSON operations from AI response
-  const jsonOperations = extractJSONOperationsFromResponse(aiResponse)
+  // Extract JSON operations from AI response and executed tool calls
+  const jsonOperations = extractJSONOperationsFromResponse(aiResponse, executedToolCalls)
   
   // Process memory with AI
   const memoryAnalysis = await processStreamMemoryWithAI(
@@ -478,37 +479,75 @@ function getStreamContextForRequest(projectId: string, userMessage: string): {
   suggestedApproach: string
   potentialDuplicates: string[]
   relevantMemories: AIStreamMemory[]
+  currentProjectState: {
+    filesCreated: string[]
+    filesModified: string[]
+    filesDeleted: string[]
+    recentChanges: string[]
+    totalOperations: number
+  }
 } {
   const memories = aiStreamMemoryStore.get(projectId) || []
   const recentMemories = memories.slice(-10) // Last 10 interactions
-  
+
   // Check for potential duplicates
   const currentIntent = extractUserIntentPattern(userMessage)
   const potentialDuplicates: string[] = []
   const previousActions: string[] = []
-  
+
+  // Track current project state
+  const filesCreated = new Set<string>()
+  const filesModified = new Set<string>()
+  const filesDeleted = new Set<string>()
+  const recentChanges: string[] = []
+  let totalOperations = 0
+
   recentMemories.forEach(memory => {
     // Check for similar intents
     if (memory.patterns.userIntentPatterns.includes(currentIntent)) {
       potentialDuplicates.push(`Similar ${currentIntent} request: "${memory.userMessage}"`)
     }
-    
-    // Collect previous actions
+
+    // Collect detailed previous actions
     memory.jsonOperations.forEach(op => {
-  previousActions.push(`${op.jsonTool}: ${op.filePath} - ${op.purpose}`)
+      const actionDetail = `${op.jsonTool}: ${op.filePath}${op.purpose ? ` - ${op.purpose}` : ''}${op.changeSummary ? ` (${op.changeSummary})` : ''}`
+      previousActions.push(actionDetail)
+
+      // Track project state
+      if (op.jsonTool === 'write_file') {
+        filesCreated.add(op.filePath)
+      } else if (op.jsonTool === 'edit_file') {
+        filesModified.add(op.filePath)
+      } else if (op.jsonTool === 'delete_file') {
+        filesDeleted.add(op.filePath)
+      }
+
+      totalOperations++
     })
+
+    // Add recent changes summary
+    if (memory.actionSummary.mainPurpose) {
+      recentChanges.push(`${memory.timestamp}: ${memory.actionSummary.mainPurpose} (${memory.jsonOperations.length} operations)`)
+    }
   })
-  
+
   // Generate suggested approach
-  const suggestedApproach = potentialDuplicates.length > 0 
+  const suggestedApproach = potentialDuplicates.length > 0
     ? `Consider reviewing previous similar work before proceeding: ${potentialDuplicates[0]}`
     : 'Proceed with implementation based on request'
-  
+
   return {
     previousActions: [...new Set(previousActions)], // Remove duplicates
     suggestedApproach,
     potentialDuplicates,
-    relevantMemories: recentMemories.filter(m => m.conversationContext.relevanceScore > 0.6)
+    relevantMemories: recentMemories.filter(m => m.conversationContext.relevanceScore > 0.6),
+    currentProjectState: {
+      filesCreated: Array.from(filesCreated),
+      filesModified: Array.from(filesModified),
+      filesDeleted: Array.from(filesDeleted),
+      recentChanges: recentChanges.slice(-5), // Last 5 changes
+      totalOperations
+    }
   }
 }
 
@@ -4692,19 +4731,39 @@ ${projectContext}
 You have access to an advanced memory system that tracks all your previous actions and decisions. Use this context to:
 
 ${memoryContext ? `
+### 📁 Current Project State:
+**Files Created:** ${memoryContext.currentProjectState.filesCreated.length > 0
+  ? memoryContext.currentProjectState.filesCreated.join(', ')
+  : 'None in recent sessions'}
+
+**Files Modified:** ${memoryContext.currentProjectState.filesModified.length > 0
+  ? memoryContext.currentProjectState.filesModified.join(', ')
+  : 'None in recent sessions'}
+
+**Files Deleted:** ${memoryContext.currentProjectState.filesDeleted.length > 0
+  ? memoryContext.currentProjectState.filesDeleted.join(', ')
+  : 'None in recent sessions'}
+
+**Total Operations:** ${memoryContext.currentProjectState.totalOperations}
+
+### Recent Changes (Last 5):
+${memoryContext.currentProjectState.recentChanges.length > 0
+  ? memoryContext.currentProjectState.recentChanges.map((change: string, index: number) => `${index + 1}. ${change}`).join('\n')
+  : 'No recent changes recorded'}
+
 ### Previous File Operations (Last 10 actions):
-${memoryContext.previousActions?.length > 0 
+${memoryContext.previousActions?.length > 0
   ? memoryContext.previousActions.slice(-10).map((action: string, index: number) => `${index + 1}. ${action}`).join('\n')
   : 'No previous file operations in this session.'}
 
 ### Potential Duplicate Work Detection:
-${memoryContext.potentialDuplicates?.length > 0 
+${memoryContext.potentialDuplicates?.length > 0
   ? `⚠️ **POTENTIAL DUPLICATES DETECTED:**\n${memoryContext.potentialDuplicates.map((dup: string) => `- ${dup}`).join('\n')}\n\n**RECOMMENDATION:** ${memoryContext.suggestedApproach}`
   : '✅ No duplicate work patterns detected. Proceed with implementation.'}
 
 ### Relevant Previous Context:
-${memoryContext.relevantMemories?.length > 0 
-  ? memoryContext.relevantMemories.map((memory: any) => 
+${memoryContext.relevantMemories?.length > 0
+  ? memoryContext.relevantMemories.map((memory: any) =>
       `- ${memory.conversationContext.semanticSummary} (${memory.jsonOperations.length} JSON operations)`
     ).join('\n')
   : 'No highly relevant previous context found.'}
@@ -4714,6 +4773,16 @@ ${memoryContext.relevantMemories?.length > 0
 - **Build Upon Previous Work**: Reference and extend existing implementations
 - **Context-Aware Decisions**: Consider architectural patterns already established
 - **Efficient Development**: Don't recreate what already exists
+- **Know Current State**: Be aware of what files exist and what has been modified
+
+### 🚫 What NOT to Do (Based on Previous Actions):
+${memoryContext && memoryContext.previousActions.length > 0 ? `
+- Do NOT recreate files that already exist: ${memoryContext.currentProjectState.filesCreated.join(', ')}
+- Do NOT reimplement functionality that was already completed
+- Do NOT repeat the same operations on files already modified
+- Do NOT create duplicate components or features
+- Always check if the requested task has already been accomplished
+` : 'No previous actions to avoid repeating.'}
 
 ` : ''}
 
@@ -6939,7 +7008,36 @@ Use this context to provide accurate, file-aware responses to the user's request
               });
             }
             
+            // Initialize response accumulation and tool tracking for memory
+            let accumulatedResponse = ''
+            const executedToolCalls: any[] = []
+            
+            // Listen for tool execution events during streaming
+            const handleToolExecution = (event: CustomEvent) => {
+              console.log('[MEMORY] Tool executed during streaming:', event.detail)
+              executedToolCalls.push({
+                toolCallId: event.detail.toolCall?.id || `tool_${Date.now()}`,
+                toolName: event.detail.action || event.detail.toolCall?.tool || 'unknown',
+                args: {
+                  path: event.detail.path,
+                  content: event.detail.result?.contentPreview || event.detail.toolCall?.content,
+                  ...event.detail.toolCall?.args
+                },
+                timestamp: new Date().toISOString(),
+                result: event.detail.result
+              })
+            }
+            
+            // Add event listeners for tool executions
+            if (typeof window !== 'undefined') {
+              window.addEventListener('json-tool-executed', handleToolExecution as EventListener)
+              window.addEventListener('xml-tool-executed', handleToolExecution as EventListener)
+            }
+            
             for await (const chunk of result.textStream) {
+              // Accumulate response for memory
+              accumulatedResponse += chunk
+              
               // Send text delta with enhanced formatting info
               if (chunk.trim()) {
                 // Detect content type for better frontend handling
@@ -6973,18 +7071,27 @@ Use this context to provide accurate, file-aware responses to the user's request
               }
             }
             
+            // Clean up event listeners
+            if (typeof window !== 'undefined') {
+              window.removeEventListener('json-tool-executed', handleToolExecution as EventListener)
+              window.removeEventListener('xml-tool-executed', handleToolExecution as EventListener)
+            }
+            
             // After streaming is complete, store memory with full AI response
             try {
               const userMessage = messages[messages.length - 1]?.content || ''
               console.log('[MEMORY] Processing stream memory for AI response analysis...')
+              console.log('[MEMORY] Accumulated response length:', accumulatedResponse.length)
+              console.log('[MEMORY] Executed tool calls:', executedToolCalls.length)
               
               // Store memory asynchronously (don't block response)
               storeStreamMemory(
                 projectId,
                 user?.id || 'anonymous',
                 userMessage,
-                '', // No response buffer in new system
-                projectContext || ''
+                accumulatedResponse, // Full accumulated AI response
+                projectContext || '',
+                executedToolCalls // Tool calls executed during streaming
               ).then((memory) => {
                 console.log('[MEMORY] Stream memory stored successfully:', {
                   memoryId: memory.id,
