@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "re
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
-import { Code, Eye, FileText, Download, ExternalLink, RotateCcw, Play, Square, Terminal, Package, Trash2 } from "lucide-react"
+import { Code, Eye, FileText, Download, ExternalLink, RotateCcw, Play, Square, Terminal, Package, Trash2, Copy } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { Workspace as Project } from "@/lib/storage-manager"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -704,6 +704,23 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
 
   const clearAllLogs = () => {
     setConsoleOutput([])
+  }
+
+  const copyConsoleOutput = async () => {
+    try {
+      const consoleText = consoleOutput.join('\n')
+      await navigator.clipboard.writeText(consoleText)
+      toast({
+        title: "Console output copied!",
+        description: "The console logs have been copied to your clipboard.",
+      })
+    } catch (error) {
+      toast({
+        title: "Copy failed",
+        description: "Failed to copy console output to clipboard.",
+        variant: "destructive",
+      })
+    }
   }
 
   // Console resize handlers
@@ -1513,6 +1530,15 @@ export default function TodoApp() {
                           {backgroundProcess.isRunning ? 'Streaming live from E2B sandbox...' : 'Console output captured'}
                         </div>
                         <div className={`flex space-x-2 ${isMobile ? 'space-x-1' : 'space-x-2'}`}>
+                          <Button
+                            variant="outline"
+                            size={isMobile ? "sm" : "sm"}
+                            onClick={copyConsoleOutput}
+                            className={`${isMobile ? 'text-xs px-2 py-1 touch-manipulation' : 'text-xs'}`}
+                          >
+                            <Copy className={`${isMobile ? 'h-3 w-3 mr-1' : 'h-3 w-3 mr-1'}`} />
+                            Copy Logs
+                          </Button>
                           <Button
                             variant="outline"
                             size={isMobile ? "sm" : "sm"}
