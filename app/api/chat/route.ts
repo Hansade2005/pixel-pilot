@@ -4767,6 +4767,73 @@ const mixed = "It\'s working \\"perfectly\\" with \\\\backslashes\\\\";
 - Always check strings containing: \`' " \`
 - Test your code mentally: Would this string parse correctly in JavaScript?
 - When in doubt, use the safer approach: escape ALL special characters
+## **CRITICAL REQUIREMENTS - NO EXCEPTIONS**
+
+### **File Structure & Extensions**
+- **NEVER** use JSX syntax in \`.ts\` files - only in \`.tsx\` files
+- Use \`.tsx\` extension for React components with JSX
+- Use \`.ts\` extension for utility functions, types, and non-React code
+- Ensure proper file naming: PascalCase for components, camelCase for utilities
+
+### **TypeScript Strict Compliance**
+**Reject any code that:**
+- Uses \`var\` or implicit \`any\` types
+- Has unhandled promise rejections
+- Contains \`console.log\`, \`console.warn\`, \`console.error\` in production code
+- Uses inline styles instead of Tailwind classes
+- References undefined variables/imports
+- Has missing return type annotations on functions
+- Uses \`Function\` type instead of specific function signatures
+- Contains \`@ts-ignore\` or \`@ts-nocheck\` comments
+- Uses \`object\` type instead of specific object shapes
+
+### **React & JSX Validation**
+**Enforce strict JSX compliance:**
+- All JSX elements must be properly closed (self-closing for void elements)
+- **Every JSX tag MUST be properly closed**: \`<div></div>\` or \`<input />\`
+- **No unclosed JSX tags**: \`<span>text\` ❌, \`<span>text</span>\` ✅
+- **Proper JSX nesting**: Tags must be properly nested, no overlapping
+- **Self-closing tags**: Use \`<img />\`, \`<br />\`, \`<input />\` not \`<img>\`, \`<br>\`, \`<input>\`
+- Boolean attributes must use proper syntax: \`disabled={true}\` not \`disabled\`
+- Event handlers must have correct typing: \`(e: React.MouseEvent<HTMLButtonElement>) => void\`
+- No mixing of HTML attributes and React props incorrectly
+- Proper key props for list items with unique, stable values
+- Fragment syntax \`<>\` or \`<React.Fragment>\` - never empty wrapper divs
+- Conditional rendering must handle all possible states
+- No dangerouslySetInnerHTML without proper sanitization
+- **JSX expressions in curly braces must be properly closed**: \`{value}\` not \`{value\`
+- **JSX attribute values must be properly quoted**: \`className="container"\` not \`className="container\`
+
+### **Import/Export Standards**
+**All imports must:**
+- Be actually used in the file (no unused imports)
+- Use correct paths (relative for local files, exact package names)
+- Follow consistent import ordering: React, third-party, local imports
+- Use named imports where possible over default imports
+- Include proper type imports with \`import type\` when needed
+- Never import entire libraries when only specific functions are needed
+- **NEVER have trailing semicolons after import statements** (\`import React from 'react'\` not \`import React from 'react';\`)
+- Have proper syntax: \`import { useState } from 'react'\` not \`import { useState } from 'react';\`
+- Use consistent quote style (single quotes preferred for imports)
+
+### **Syntax & Punctuation Validation - CRITICAL**
+**Every line of code MUST have:**
+- **Properly closed brackets**: \`[]\`, \`{}\`, \`()\` - every opening bracket must have matching closing bracket
+- **Properly closed quotes**: All strings must have matching opening and closing quotes (\`'\`, \`"\`, or \`\\\`\`)
+- **Properly closed JSX tags**: Every \`<tag>\` must have corresponding \`</tag>\` or be self-closing \`<tag />\`
+- **Correct semicolon usage**: Use semicolons at end of statements, NOT after imports
+- **Proper brace matching**: Every \`{\` must have matching \`}\`
+- **Proper parentheses matching**: Every \`(\` must have matching \`)\`
+- **Proper array bracket matching**: Every \`[\` must have matching \`]\`
+
+**Common syntax errors to NEVER make:**
+- Missing closing braces: \`function test() { console.log('hello')\` ❌
+- Missing closing brackets: \`const arr = [1, 2, 3\` ❌
+- Missing closing parentheses: \`if (condition { return true; }\` ❌
+- Missing closing quotes: \`const str = 'hello\` ❌
+- Unclosed JSX tags: \`<div><span>text</div>\` ❌
+- Trailing semicolons on imports: \`import React from 'react';\` ❌
+- Mixed quote styles: \`import React from "react"; import { useState } from 'react'\` ❌
 
 **🎯 WHEN TO USE CODE BLOCKS:**
 - SQL queries, database schemas, and migrations
