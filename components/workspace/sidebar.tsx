@@ -33,6 +33,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { 
@@ -351,90 +357,98 @@ export function Sidebar({
 
       {/* Subscription Status Section */}
       {!subscriptionLoading && subscription && (
-        <div className="px-4 py-3 border-b bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <Crown className="h-4 w-4 text-purple-500" />
-              <span className="text-sm font-medium">
-                {subscription.plan === 'pro' ? 'Pro Plan' :
-                 subscription.plan === 'enterprise' ? 'Enterprise Plan' :
-                 'Free Plan'}
-              </span>
-            </div>
-            {subscription.plan === 'free' && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-6 px-2 text-xs"
-                onClick={() => router.push('/pricing')}
-              >
-                Upgrade
-              </Button>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            {/* Deployment Limits */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Globe className="h-3 w-3 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">
-                  Deployments: {subscription.deploymentsThisMonth || 0} / {subscription.plan === 'pro' ? 10 : 5}
-                </span>
-              </div>
-            </div>
-
-            {/* GitHub Push Limits for Free users */}
-            {subscription.plan === 'free' && (
-              <div className="flex items-center justify-between">
+        <Accordion type="single" collapsible className="border-b">
+          <AccordionItem value="subscription" className="border-0">
+            <AccordionTrigger className="px-4 py-3 hover:no-underline bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20">
+              <div className="flex items-center justify-between w-full mr-4">
                 <div className="flex items-center gap-2">
-                  <Github className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">
-                    GitHub Pushes: {subscription.githubPushesThisMonth || 0} / 2
+                  <Crown className="h-4 w-4 text-purple-500" />
+                  <span className="text-sm font-medium">
+                    {subscription.plan === 'pro' ? 'Pro Plan' :
+                     subscription.plan === 'enterprise' ? 'Enterprise Plan' :
+                     'Free Plan'}
                   </span>
                 </div>
+                {subscription.plan === 'free' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-xs"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      router.push('/pricing')
+                    }}
+                  >
+                    Upgrade
+                  </Button>
+                )}
               </div>
-            )}
+            </AccordionTrigger>
+            <AccordionContent className="px-4 pb-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20">
+              <div className="space-y-2">
+                {/* Deployment Limits */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">
+                      Deployments: {subscription.deploymentsThisMonth || 0} / {subscription.plan === 'pro' ? 10 : 5}
+                    </span>
+                  </div>
+                </div>
 
-            {/* Plan Features */}
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
-                {subscription.plan === 'pro' ? 'Full Access' :
-                 subscription.plan === 'enterprise' ? 'Enterprise Features' :
-                 'Limited Access'}
-              </span>
-              {subscription.plan === 'pro' ? (
-                <div className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
-                  <Crown className="h-3 w-3" />
-                  <span className="text-xs">Pro</span>
-                </div>
-              ) : subscription.plan === 'enterprise' ? (
-                <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
-                  <Shield className="h-3 w-3" />
-                  <span className="text-xs">Enterprise</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
-                  <CheckCircle className="h-3 w-3" />
-                  <span className="text-xs">Free</span>
-                </div>
-              )}
-            </div>
+                {/* GitHub Push Limits for Free users */}
+                {subscription.plan === 'free' && (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Github className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">
+                        GitHub Pushes: {subscription.githubPushesThisMonth || 0} / 2
+                      </span>
+                    </div>
+                  </div>
+                )}
 
-            {/* Status Messages */}
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
-                {subscription.status === 'active' ? 'Active' : subscription.status}
-              </span>
-              {subscription.plan === 'free' && (subscription.githubPushesThisMonth || 0) >= 2 && (
-                <div className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
-                  <AlertTriangle className="h-3 w-3" />
-                  <span className="text-xs">Limit Reached</span>
+                {/* Plan Features */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    {subscription.plan === 'pro' ? 'Full Access' :
+                     subscription.plan === 'enterprise' ? 'Enterprise Features' :
+                     'Limited Access'}
+                  </span>
+                  {subscription.plan === 'pro' ? (
+                    <div className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
+                      <Crown className="h-3 w-3" />
+                      <span className="text-xs">Pro</span>
+                    </div>
+                  ) : subscription.plan === 'enterprise' ? (
+                    <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                      <Shield className="h-3 w-3" />
+                      <span className="text-xs">Enterprise</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
+                      <CheckCircle className="h-3 w-3" />
+                      <span className="text-xs">Free</span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
+
+                {/* Status Messages */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    {subscription.status === 'active' ? 'Active' : subscription.status}
+                  </span>
+                  {subscription.plan === 'free' && (subscription.githubPushesThisMonth || 0) >= 2 && (
+                    <div className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
+                      <AlertTriangle className="h-3 w-3" />
+                      <span className="text-xs">Limit Reached</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       )}
 
       {/* Search and Sort */}
