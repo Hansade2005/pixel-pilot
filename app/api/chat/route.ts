@@ -4413,7 +4413,7 @@ async function detectUserIntent(userMessage: string, projectContext: string, con
 
 🚨 CRITICAL RULES - READ FIRST:
 - NEVER recommend web_search or web_extract unless user EXPLICITLY asks for web research
-- For file modifications, product additions, or code changes, recommend ONLY list_files, read_file, write_file, edit_file
+- For file modifications, product additions, or code changes, recommend ONLY list_files, read_file, write_file
 - Web tools are FORBIDDEN for basic development tasks
 - If user wants to add products, edit files, or modify code, use file operations only
 
@@ -4426,18 +4426,18 @@ ${(conversationHistory || []).slice(-10).map((msg, i) => `${msg.role}: ${msg.con
 
 Based on the user's request, determine:
 1. **Primary Intent**: What does the user want to accomplish?
-2. **Required Tools**: Which tools should be used? (PREFER list_files, read_file, write_file, edit_file, delete_file - AVOID web_search, web_extract unless explicitly requested)
+2. **Required Tools**: Which tools should be used? (PREFER list_files, read_file, write_file, delete_file - AVOID web_search, web_extract unless explicitly requested)
 3. **File Operations**: What files need to be created, modified, or deleted?
 4. **Complexity Level**: Simple, Medium, or Complex task?
 5. **Action Plan**: Step-by-step plan to accomplish the task
 
 📝 **TOOL SELECTION RULES:**
-- File operations (add products, edit code) → use read_file + write_file/edit_file
+- File operations (add products, edit code) → use read_file + write_file
 - Web research (search online, external content) → use web_search + web_extract
 - When in doubt, choose file operations over web tools
 
 📋 **EXAMPLE SCENARIOS:**
-- User: "add more products" → required_tools: ["read_file", "edit_file"], tool_usage_rules: "Use file operations only. NO web tools needed."
+- User: "add more products" → required_tools: ["read_file", "write_file"], tool_usage_rules: "Use file operations only. NO web tools needed."
 - User: "search for jewelry trends online" → required_tools: ["web_search", "web_extract"], tool_usage_rules: "Web research requested - use web tools appropriately."
 
 Respond in JSON format:
@@ -4463,7 +4463,7 @@ Include these fields:
 
 🚨 CRITICAL RULES:
 - NEVER recommend web_search or web_extract unless user EXPLICITLY asks for web research
-- For file modifications, product additions, or code changes, recommend ONLY list_files, read_file, write_file, edit_file
+- For file modifications, product additions, or code changes, recommend ONLY list_files, read_file, write_file
 - Web tools are FORBIDDEN for basic development tasks
 - When in doubt, choose file operations over web tools` },
         { role: 'user', content: intentPrompt }
@@ -4518,7 +4518,7 @@ Include these fields:
         complexity: 'medium',
         action_plan: ['Analyze current project state', 'Provide guidance'],
         confidence: 0.7,
-        tool_usage_rules: 'Use list_files, read_file, write_file, and edit_file for file operations. Avoid web tools unless explicitly requested.',
+        tool_usage_rules: 'Use list_files, read_file, write_file for file operations. Avoid web tools unless explicitly requested.',
         enforcement_notes: 'Web tools (web_search, web_extract) are FORBIDDEN for basic development tasks. Stick to file operations.'
       }
     }
@@ -4531,7 +4531,7 @@ Include these fields:
       complexity: 'medium',
       action_plan: ['Analyze current project state', 'Provide guidance'],
       confidence: 0.5,
-      tool_usage_rules: 'Use list_files, read_file, write_file, and edit_file for file operations. Avoid web tools unless explicitly requested.',
+      tool_usage_rules: 'Use list_files, read_file, write_file for file operations. Avoid web tools unless explicitly requested.',
       enforcement_notes: 'Web tools (web_search, web_extract) are FORBIDDEN for basic development tasks. Stick to file operations.'
     }
   }
@@ -4992,12 +4992,9 @@ ${memoryContext && memoryContext.previousActions.length > 0 ? `
 - **write_file**: Use for creating new files and updating existing files with complete content
 - **delete_file**: Use for removing files from the project
 
-// **⚠️ TEMPORARILY DISABLED: edit_file tool is currently disabled for focused development**
-
 Do *not* tell the user to run shell commands. Instead, use JSON tool commands for all file operations:
 
 - **write_file**: Create or overwrite files with complete content
-// - **edit_file**: Edit existing files with search/replace operations (TEMPORARILY DISABLED)
 - **delete_file**: Delete files from the project
 
 You can use these commands by embedding JSON tools in code blocks in your response like this:
@@ -5009,66 +5006,6 @@ You can use these commands by embedding JSON tools in code blocks in your respon
   "content": "import React from 'react';\\n\\nexport default function Example() {\\n  return <div>Professional implementation</div>;\\n}"
 }
 \`\`\`
-
-// **🚀 ADVANCED EDIT_FILE PARAMETERS: (TEMPORARILY DISABLED)**
-
-// Multi-operation editing with validation:
-// \`\`\`json
-// {
-//   "tool": "edit_file",
-//   "path": "src/components/Example.tsx",
-//   "searchReplaceBlocks": [
-//     {
-//       "search": "const [count, setCount] = useState(0);",
-//       "replace": "const [count, setCount] = useState(0);\\n  const [loading, setLoading] = useState(false);"
-//     },
-//     {
-//       "search": "onClick={() => setCount(count + 1)}",
-//       "replace": "onClick={() => {\\n    setLoading(true);\\n    setCount(count + 1);\\n    setLoading(false);\\n  }}",
-//       "validateAfter": "setLoading(false)"
-//     }
-//   ],
-//   "rollbackOnFailure": true
-// }
-// \`\`\`
-
-// Target specific occurrences:
-// \`\`\`json
-// {
-//   "tool": "edit_file",
-//   "path": "src/utils/helpers.ts",
-//   "search": "const result",
-//   "replace": "const processedResult",
-//   "occurrenceIndex": 2
-// }
-// \`\`\`
-
-// Replace all occurrences with validation:
-// \`\`\`json
-// {
-//   "tool": "edit_file",
-//   "path": "src/types/index.ts",
-//   "search": "UserData",
-//   "replace": "ProfileData",
-//   "replaceAll": true,
-//   "validateAfter": "interface ProfileData"
-// }
-// \`\`\`
-
-// Dry run preview (test changes without applying):
-// \`\`\`json
-// {
-//   "tool": "edit_file",
-//   "path": "src/App.tsx",
-//   "dryRun": true,
-//   "searchReplaceBlocks": [
-//     {
-//       "search": "function App()",
-//       "replace": "async function App()"
-//     }
-//   ]
-// }
-// \`\`\`
 
 \`\`\`json
 {
@@ -5082,7 +5019,7 @@ You can use these commands by embedding JSON tools in code blocks in your respon
 - Use proper JSON syntax with double quotes for all strings
 - Escape newlines in content as \\n for proper JSON formatting
 - Use the exact field names: "tool", "path", "content", "searchReplaceBlocks", "search", "replace"
-- **Supported tool names**: "write_file", "delete_file" // "edit_file" TEMPORARILY DISABLED
+- **Supported tool names**: "write_file", "delete_file"
 - Each tool command must be a separate JSON code block
 - The JSON must be valid and properly formatted
 
@@ -5108,12 +5045,6 @@ You can use these commands by embedding JSON tools in code blocks in your respon
 - **🚨 App.tsx Updates**: ALWAYS use write_file when updating src/App.tsx
 - **Small Changes**: Even small fixes, updates, or tweaks should use write_file with complete file content
 
-// **✏️ EDIT_FILE DISABLED:** (TEMPORARILY DISABLED)
-// - **Small Precise Changes**: Fixing bugs, updating single functions, or minor tweaks (DISABLED)
-// - **Targeted Fixes**: Changing specific values, parameters, or small code blocks (DISABLED)
-// - **Minor Updates**: Adding single properties, updating imports, or small adjustments (DISABLED)
-// - **Configuration Changes**: Updating settings, constants, or small config modifications (DISABLED)
-
 **📋 DECISION FLOWCHART:**
 1. **Any file operation needed?** → Use write_file
 2. **Creating new file?** → Use write_file
@@ -5135,14 +5066,6 @@ You can use these commands by embedding JSON tools in code blocks in your respon
 - Adding multiple new functions or methods
 - **Small fixes**: Even fixing a typo or updating a single line
 - **Configuration updates**: Changing any settings or constants
-
-// **✅ EDIT_FILE EXAMPLES: (TEMPORARILY DISABLED)**
-// - Fixing a typo in a function name (DISABLED)
-// - Updating a single CSS class (DISABLED)
-// - Changing a default value (DISABLED)
-// - Adding one import statement (DISABLED)
-// - Modifying a single function parameter (DISABLED)
-// - Updating error messages (DISABLED)
 
 **⚡ PERFORMANCE GUIDELINES:**
 - write_file ensures complete, consistent files with all dependencies
@@ -5183,9 +5106,6 @@ You can use these commands by embedding JSON tools in code blocks in your respon
 - Adding configuration options or customization features
 
 **Rule: If it makes the application better, more functional, or more user-friendly → Use write_file**
-
-// **EDIT_FILE RULE DISABLED: (TEMPORARILY DISABLED)**
-// **NEVER use edit_file for design or functionality enhancements**
 
 # Guidelines
 
@@ -5236,22 +5156,18 @@ Do not leave any import unresolved.
 
 ## Example 1: Memory-Aware Component Creation
 
-Based on my memory context, I can see you already have a basic Button component. I'll enhance it with additional variants and functionality rather than creating a new one.
+Based on my memory context, I can see you already have a basic Button component. I'll create an enhanced version with additional variants and functionality.
 
 \`\`\`json
 {
-  "tool": "edit_file",
-  "path": "src/components/Button.tsx",
-  "searchReplaceBlocks": [
-    {
-      "search": "variant?: 'primary' | 'secondary' | 'danger';",
-      "replace": "variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'warning';"
-    }
-  ]
+  "tool": "write_file",
+  "path": "src/components/EnhancedButton.tsx",
+  "content": "import React from 'react';\n\ntype ButtonVariant = 'primary' | 'secondary' | 'danger' | 'success' | 'warning';\n\ninterface EnhancedButtonProps {\n  variant?: ButtonVariant;\n  children: React.ReactNode;\n  onClick?: () => void;\n}\n\nexport const EnhancedButton: React.FC<EnhancedButtonProps> = ({ \n  variant = 'primary', \n  children, \n  onClick \n}) => {\n  const baseClasses = 'px-4 py-2 rounded font-medium transition-colors';\n  const variantClasses = {\n    primary: 'bg-blue-500 text-white hover:bg-blue-600',\n    secondary: 'bg-gray-500 text-white hover:bg-gray-600',\n    danger: 'bg-red-500 text-white hover:bg-red-600',\n    success: 'bg-green-500 text-white hover:bg-green-600',\n    warning: 'bg-yellow-500 text-black hover:bg-yellow-600'\n  };\n  return (\n    React.createElement('button', { className: baseClasses + ' ' + variantClasses[variant], onClick: onClick }, children)\n  );\n};"
 }
+
 \`\`\`
 
-I've enhanced your existing Button component with success and warning variants, building upon the foundation you already have.
+I've created an enhanced Button component with success and warning variants, building upon the patterns you already have.
 
 ## Example 2: Context-Aware Development
 
@@ -6069,7 +5985,7 @@ ${codeQualityInstructions}
 
 CRITICAL EXECUTION RULES:
 • **TOOL PRIORITY SYSTEM**:
-  1. **HIGH PRIORITY**: read_file, write_file, edit_file (actual development)
+  1. **HIGH PRIORITY**: read_file, write_file (actual development)
   2. **MEDIUM PRIORITY**: analyze_dependencies (code validation)
   3. **WEB TOOLS**: web_search, web_extract (when explicitly requested for information)
 
@@ -6106,19 +6022,11 @@ TOOL EXECUTION RULES:
 • **EDUCATIONAL VALUE**: Help users learn professional development practices through your explanations
 • **IMMEDIATE EXECUTION**: After explaining, call the tool immediately in the same response
 
-EDIT_FILE TOOL RULES (PREVENT DUPLICATE EDITS):
-• ALWAYS check file content first with read_file before using edit_file
-• NEVER add duplicate imports - check if they already exist
-• Use unique, specific search strings that won't match multiple times
-• For import additions: Search for the LAST import line, not generic patterns
-• Example: Instead of searching "import React from 'react'", search for the complete existing import block
-• If imports already exist, SKIP adding them again
-
 PACKAGE INSTALLATION WORKFLOW:
 • When user requests package installation, FIRST edit package.json to add dependencies
 • THEN instruct user to run 'npm install' or 'yarn install' manually
 • NEVER suggest non-existent tools like 'install_package' or 'npm_install'
-• Use write_file or edit_file to modify package.json with proper dependency versions
+• Use write_file to modify package.json with proper dependency versions
 
 FILE TARGETING PRECISION:
 • Always work on the EXACT file mentioned by the user
@@ -6128,10 +6036,10 @@ FILE TARGETING PRECISION:
 • Examples: list_files({path: "/"}) for root, list_files({path: "src"}) for src folder, list_files({path: "components"}) for components
 
 FALLBACK STRATEGY (WHEN EDIT FAILS):
-• If edit_file fails repeatedly (>2 attempts) on the same file, use write_file instead
-• When using write_file as fallback: Read the existing file first, then create complete new content
-• This ensures the operation succeeds even when edit_file encounters issues
-• Example: If edit_file keeps failing due to duplicate detection, use write_file with full file content
+• If write_file fails repeatedly (>2 attempts) on the same file, read the existing file first and try again
+• When operations fail: Check file paths, ensure proper JSON formatting, and verify file permissions
+• This ensures the operation succeeds even when encountering issues
+• Example: If write_file keeps failing, verify the file path and content formatting
 
 TASK EXECUTION WORKFLOW (STREAMLINED):
 • **WORK FIRST, REPORT LAST**: Complete all development work before any user communication
@@ -6141,7 +6049,7 @@ TASK EXECUTION WORKFLOW (STREAMLINED):
 • **EFFICIENCY PRIORITY**: Focus on development speed and quality over constant status updates
 
 **🚨 CRITICAL TOOL USAGE RULES:**
-1. **DEVELOPMENT TOOLS FIRST**: Use read_file, write_file, edit_file for actual work
+1. **DEVELOPMENT TOOLS FIRST**: Use read_file, write_file for actual work
 2. **VALIDATION SECOND**: Use analyze_dependencies after any code generation
 3. **NO REDUNDANT CALLS**: Never call the same tool twice with identical parameters
 4. **BATCH COMPLETION**: Complete all related operations before final communication
