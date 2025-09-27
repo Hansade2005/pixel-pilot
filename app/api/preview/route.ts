@@ -105,7 +105,7 @@ async function handleStreamingPreview(req: Request) {
 
           // 🔹 Create sandbox
           const sandbox = await createEnhancedSandbox({
-            template: "base",
+            template: "code-interpreter-v1",
             timeoutMs: 900000,
             env: envVars
           })
@@ -281,7 +281,7 @@ async function handleRegularPreview(req: Request) {
     let sandbox
     try {
       sandbox = await createEnhancedSandbox({
-        template: 'base',
+        template: 'code-interpreter-v1',
         timeoutMs: 900000, // 15 minutes for sandbox creation and operations
         env: envVars // Pass environment variables to sandbox
       })

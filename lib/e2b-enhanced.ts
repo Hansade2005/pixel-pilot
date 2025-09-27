@@ -654,7 +654,7 @@ export async function createEnhancedSandbox(config?: {
     try {
       // Create sandbox using @e2b/code-interpreter API
       sandbox = await Sandbox.create(
-        config?.template || 'base',
+        config?.template || 'code-interpreter-v1',
         {
           apiKey: process.env.E2B_API_KEY,
           timeoutMs: config?.timeoutMs,
