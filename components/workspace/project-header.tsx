@@ -282,7 +282,7 @@ export function ProjectHeader({
               {project.name}
             </h1>
           )}
-          {project.description && <p className="text-sm text-muted-foreground">{project.description}</p>}
+          {project.description && <p className="text-sm text-muted-foreground">{project.description.length > 20 ? `${project.description.substring(0, 20)}...` : project.description}</p>}
         </div>
         <Badge variant="secondary">
           <GitBranch className="h-3 w-3 mr-1" />
