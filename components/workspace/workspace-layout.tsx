@@ -322,6 +322,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         console.log('WorkspaceLayout: Initial prompt detected, generating project suggestion:', initialPrompt)
         console.log('WorkspaceLayout: Restoration status - isAutoRestoring:', isAutoRestoring, 'isLoadingProjects:', isLoadingProjects)
 
+        // Immediately clear the prompt from URL to prevent re-processing on refresh
+        const params = new URLSearchParams(searchParams.toString())
+        params.delete('prompt')
+        router.replace(`/workspace?${params.toString()}`)
+
         try {
           // Call AI to generate project name and description
           const response = await fetch('/api/project-suggestions', {
@@ -380,11 +385,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
         // Mark that we've processed this initial prompt
         setHasProcessedInitialPrompt(true)
-
-        // Remove prompt from URL after opening modal
-        const params = new URLSearchParams(searchParams.toString())
-        params.delete('prompt')
-        router.replace(`/workspace?${params.toString()}`)
       }
     }
 
@@ -520,12 +520,13 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
   // Auto-open create project dialog when user has no projects
   React.useEffect(() => {
-    if (clientProjects.length === 0 && !isLoadingProjects && !isCreateDialogOpen && !hasAutoOpenedCreateDialog) {
-      console.log('WorkspaceLayout: No projects found, auto-opening create project dialog')
+    const projectId = searchParams.get('projectId')
+    if (clientProjects.length === 0 && !isLoadingProjects && !isCreateDialogOpen && !hasAutoOpenedCreateDialog && !projectId) {
+      console.log('WorkspaceLayout: No projects found and not viewing specific project, auto-opening create project dialog')
       setIsCreateDialogOpen(true)
       setHasAutoOpenedCreateDialog(true)
     }
-  }, [clientProjects.length, isLoadingProjects, isCreateDialogOpen, hasAutoOpenedCreateDialog])
+  }, [clientProjects.length, isLoadingProjects, isCreateDialogOpen, hasAutoOpenedCreateDialog, searchParams])
 
   // Reset auto-open flag when projects are loaded
   React.useEffect(() => {
