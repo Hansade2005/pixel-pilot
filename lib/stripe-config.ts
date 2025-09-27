@@ -56,7 +56,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
       canUseNetlify: true,
       canUseGitHub: true,
       unlimitedPrompts: false,
-      allowedModels: ['auto']
+      allowedModels: ['auto', 'a0-dev-llm']
     },
     prices: {
       monthly: {
