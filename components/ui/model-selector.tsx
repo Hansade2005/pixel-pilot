@@ -73,9 +73,9 @@ export function ModelSelector({
         <Select value={selectedModel} onValueChange={onModelChange}>
           {/* Match AiModeSelector compact trigger: small height, tight padding, no border, rely on shared chevron */}
           <SelectTrigger className="h-6 px-2 min-w-[56px] border-0 bg-transparent text-xs shadow-none focus:ring-0 p-0">
-            <div className="flex items-center justify-center">
+            <div className="flex items-center justify-center w-full">
               <SelectValue>
-                <span className="font-medium text-sm leading-none">{truncateModelName(currentModel?.name || selectedModel)}</span>
+                <span className="font-medium text-sm leading-none text-center">{truncateModelName(currentModel?.name || selectedModel)}</span>
               </SelectValue>
             </div>
           </SelectTrigger>
