@@ -439,7 +439,7 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
 
   // Inline chat functions
   const openInlineChat = (error: string, lineNumber: number) => {
-    if (!editorRef.current) return
+    if (!editorRef.current || !file) return
 
     const editor = editorRef.current
     const position = editor.getPosition()
@@ -956,7 +956,7 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
               // Path mapping to match our tsconfig.json
               baseUrl: '.',
               paths: {
-                '@/*': ['*']
+                '@/*': ['./*']
               },
               // Enable import resolution for local files
               allowNonTsExtensions: false,
@@ -1050,7 +1050,7 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
             const extraLibs: { content: string; filePath: string }[] = []
 
             projectFiles.forEach(file => {
-              if (file.path.endsWith('.ts') || file.path.endsWith('.tsx') || file.path.endsWith('.js') || file.path.endsWith('.jsx')) {
+              if (file.path.endsWith('.ts') || file.path.endsWith('.tsx') || file.path.endsWith('.js') || file.path.endsWith('.jsx') || file.path.endsWith('.d.ts')) {
                 const normalizedPath = file.path.startsWith('/') ? file.path.slice(1) : file.path
                 extraLibs.push({
                   content: file.content,
@@ -1139,7 +1139,7 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
                 if (isInImport) {
                   // Provide export-based completions
                   const suggestions = projectFiles
-                    .filter(file => file.path.endsWith('.ts') || file.path.endsWith('.tsx') || file.path.endsWith('.js') || file.path.endsWith('.jsx'))
+                    .filter(file => file.path.endsWith('.ts') || file.path.endsWith('.tsx') || file.path.endsWith('.js') || file.path.endsWith('.jsx') || file.path.endsWith('.d.ts'))
                     .flatMap(file => {
                       const relativePath = file.path.startsWith('/') ? file.path.slice(1) : file.path
                       const importPath = relativePath.replace(/\.(ts|tsx|js|jsx)$/, '')
@@ -1199,7 +1199,7 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
                 if (isInImport) {
                   // Provide export-based completions
                   const suggestions = projectFiles
-                    .filter(file => file.path.endsWith('.ts') || file.path.endsWith('.tsx') || file.path.endsWith('.js') || file.path.endsWith('.jsx'))
+                    .filter(file => file.path.endsWith('.ts') || file.path.endsWith('.tsx') || file.path.endsWith('.js') || file.path.endsWith('.jsx') || file.path.endsWith('.d.ts'))
                     .flatMap(file => {
                       const relativePath = file.path.startsWith('/') ? file.path.slice(1) : file.path
                       const importPath = relativePath.replace(/\.(ts|tsx|js|jsx)$/, '')
@@ -1377,10 +1377,10 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
             overviewRulerLanes: 0,
             hideCursorInOverviewRuler: true,
             overviewRulerBorder: false,
-            // Disable all validation and error reporting
-            'semanticHighlighting.enabled': false,
+            // Enable semantic highlighting for better code understanding
+            'semanticHighlighting.enabled': 'configuredByTheme',
             quickSuggestions: false,
-            parameterHints: { enabled: false },
+            parameterHints: { enabled: true },
             suggestOnTriggerCharacters: false,
             acceptSuggestionOnEnter: 'off',
             tabCompletion: 'off',
@@ -1389,26 +1389,26 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
             hover: { enabled: true },
             // Disable code lens
             codeLens: false,
-            // Additional validation disabling
-            renderValidationDecorations: 'off',
+            // Enable validation decorations for better error display
+            renderValidationDecorations: 'on',
             showUnused: false,
-            showDeprecated: false,
-            occurrencesHighlight: 'off',
-            selectionHighlight: false,
-            links: false,
+            showDeprecated: true,
+            occurrencesHighlight: 'singleFile',
+            selectionHighlight: true,
+            links: true,
             colorDecorators: false,
             quickSuggestionsDelay: 0,
             suggest: {
-              showMethods: false,
-              showFunctions: false,
-              showConstructors: false,
-              showFields: false,
-              showVariables: false,
-              showClasses: false,
-              showStructs: false,
-              showInterfaces: false,
-              showModules: false,
-              showProperties: false,
+              showMethods: true,
+              showFunctions: true,
+              showConstructors: true,
+              showFields: true,
+              showVariables: true,
+              showClasses: true,
+              showStructs: true,
+              showInterfaces: true,
+              showModules: true,
+              showProperties: true,
               showEvents: false,
               showOperators: false,
               showUnits: false,
@@ -1440,7 +1440,7 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
       </div>
 
       {/* Inline Chat */}
-      {showInlineChat && (
+      {showInlineChat && file && (
         <InlineChat
           position={inlineChatPosition}
           error={inlineChatError}

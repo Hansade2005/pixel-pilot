@@ -70,6 +70,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_CHAT_MODEL)
   const [aiMode, setAiMode] = useState<AIMode>('agent')
+  const [projectFiles, setProjectFiles] = useState<File[]>([])
 
   // Initialize auto cloud backup when user is available
   const { triggerBackup, getSyncStatus } = useCloudSync(user?.id || null)
@@ -397,6 +398,28 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       setHasProcessedInitialPrompt(false)
     }
   }, [initialPrompt])
+
+  // Load project files when selected project changes
+  useEffect(() => {
+    const loadProjectFiles = async () => {
+      if (selectedProject && typeof window !== 'undefined') {
+        try {
+          console.log('WorkspaceLayout: Loading files for project:', selectedProject.name)
+          await storageManager.init()
+          const files = await storageManager.getFiles(selectedProject.id)
+          console.log('WorkspaceLayout: Loaded', files?.length || 0, 'files for project')
+          setProjectFiles(files || [])
+        } catch (error) {
+          console.error('WorkspaceLayout: Error loading project files:', error)
+          setProjectFiles([])
+        }
+      } else {
+        setProjectFiles([])
+      }
+    }
+
+    loadProjectFiles()
+  }, [selectedProject])
 
   // Handle modal close - reset form fields
   const handleModalClose = (open: boolean) => {
@@ -912,9 +935,20 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     {activeTab === "code" ? (
                       <CodeEditor
                         file={selectedFile}
+                        projectFiles={projectFiles}
                         onSave={(file, content) => {
                           // Update the file content in state if needed
                           console.log("File saved:", file.name, content.length, "characters")
+                          
+                          // Refresh project files to update Monaco's extra libraries
+                          if (selectedProject) {
+                            storageManager.getFiles(selectedProject.id).then(files => {
+                              setProjectFiles(files || [])
+                              console.log("Refreshed project files after save:", files?.length || 0, "files")
+                            }).catch(error => {
+                              console.error("Error refreshing project files:", error)
+                            })
+                          }
                           
                           // Trigger auto cloud backup after file save
                           triggerAutoBackup(`Saved file: ${file.name}`)
