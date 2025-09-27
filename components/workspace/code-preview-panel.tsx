@@ -1527,7 +1527,7 @@ export default function TodoApp() {
                     {consoleOutput.length > 0 && (
                       <div className={`flex justify-between items-center mt-2 ${isMobile ? 'mt-2' : 'mt-2'}`}>
                         <div className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-xs'}`}>
-                          {backgroundProcess.isRunning ? 'Streaming live from E2B sandbox...' : 'Console output captured'}
+                          Console output captured
                         </div>
                         <div className={`flex space-x-2 ${isMobile ? 'space-x-1' : 'space-x-2'}`}>
                           <Button
