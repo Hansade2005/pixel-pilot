@@ -306,30 +306,26 @@ export function ProjectHeader({
       </div>
 
       <div className="flex items-center space-x-2">
-        <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
-          setIsCreateDialogOpen(open)
-          onDialogOpenChange?.(open)
-          if (!open) {
-            // Reset form when closing
-            setNewProjectName("")
-            setNewProjectDescription("")
-          }
-        }}>
-          <DialogTrigger asChild>
-            <TooltipProvider>
+           {/* Create project button */}
+          <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+            setIsCreateDialogOpen(open)
+            onDialogOpenChange?.(open)
+          }}>
+            <DialogTrigger asChild>
+               <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="sm" variant="outline" className="h-8 w-8 p-0 sm:w-auto sm:px-3">
+              <Button size="sm" variant="outline" className="h-8 w-8 p-0 sm:w-auto sm:px-3">
                     <Plus className="h-4 w-4" />
                     <span className="hidden sm:inline ml-2">New</span>
                   </Button>
-                </TooltipTrigger>
+                   </TooltipTrigger>
                 <TooltipContent side="bottom">
                   <p>Create New Project</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-          </DialogTrigger>
+            </DialogTrigger>
           <DialogContent className="z-50">
             <DialogHeader>
               <DialogTitle>Create New Project</DialogTitle>
