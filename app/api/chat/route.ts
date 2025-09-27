@@ -4720,18 +4720,7 @@ For CSS/styling:
 }
 \`\`\`
 
-**📋 SUPPORTED LANGUAGES:**
-- \`sql\` - For database queries and schema
-- \`typescript\` - For TypeScript code
-- \`javascript\` - For JavaScript code
-- \`jsx\` - For React components
-- \`tsx\` - For TypeScript React components
-- \`css\` - For styling
-- \`bash\` - For terminal commands
-- \`json\` - For configuration files
-- \`yaml\` - For YAML configurations
-- \`html\` - For HTML markup
-- \`python\` - For Python scripts
+
 
 **❌ NEVER USE:**
 - Plain text blocks without language identifiers
@@ -4745,6 +4734,39 @@ For CSS/styling:
 - Keep examples focused and concise
 - Ensure all brackets and quotes are properly closed
 - Format code for readability with proper spacing
+
+**🚨 CRITICAL STRING ESCAPING RULES     WHEN CREATING OR UPDATING FILES USING write_file tool:**
+
+**⚠️ ALWAYS PROPERLY ESCAPE QUOTES IN GENERATED CODE:**
+- **Single quotes in strings**: Use \`\'\` instead of just \`'\`
+example 
+- **Double quotes in strings**: Use \`\"\` instead of just \`"\`
+- **Template literals**: Use backticks \` for multi-line strings and interpolation
+**❌ BROKEN EXAMPLES (WILL BREAK FILES):**
+
+// WRONG - Unescaped quotes break the string
+and entire file gets corrupted
+// WRONG - Unescaped apostrophe breaks the string  and entire file gets corrupted
+It's a beautiful day  // THROWS A SYNTAX ERROR!
+
+
+**✅ CORRECT EXAMPLES (PROPERLY ESCAPED):**
+\`\`\`javascript
+// CORRECT - Properly escaped quotes
+const message = "He said \\"Hello\\" to me";
+
+// CORRECT - Properly escaped apostrophe
+const text = 'It\'s a beautiful day';
+
+// CORRECT - Mixed quotes work too
+const mixed = "It\'s working \\"perfectly\\" with \\\\backslashes\\\\";
+\`\`\`
+
+**🔥 CRITICAL RULE: Never forget to escape quotes!**
+- Unescaped quotes will break the entire file and cause syntax errors
+- Always check strings containing: \`' " \`
+- Test your code mentally: Would this string parse correctly in JavaScript?
+- When in doubt, use the safer approach: escape ALL special characters
 
 **🎯 WHEN TO USE CODE BLOCKS:**
 - SQL queries, database schemas, and migrations
