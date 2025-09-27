@@ -397,6 +397,9 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
       'py': 'python',
       'yml': 'yaml',
       'yaml': 'yaml',
+      'sql': 'sql',
+      'cjs': 'javascript',
+      'env': 'plaintext',
     }
     return languageMap[ext || ''] || 'plaintext'
   }

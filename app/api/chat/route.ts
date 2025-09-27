@@ -1299,6 +1299,10 @@ function getFileExtension(filePath: string): string {
       return 'yaml'
     case 'sql':
       return 'sql'
+    case 'cjs':
+      return 'javascript'
+    case 'env':
+      return 'text'
     default:
       return ext || 'text'
   }
