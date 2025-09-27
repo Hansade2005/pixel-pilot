@@ -41,15 +41,11 @@ export function ModelSelector({
   // Determine allowed models based on subscription status and plan
   const userLimits = getLimits(userPlan)
 
-  // ONLY Pro plan users with ACTIVE status can access all models
-  // All other users (Free, inactive Pro, canceled, etc.) only get auto model
-  const isProActive = userPlan === 'pro' && effectiveStatus === 'active'
-
-  // If user has Pro plan with active status, allow all models
-  // Otherwise, only allow auto model
-  const allowedModels = isProActive
+  // Pro plan users need active status to access all models
+  // Free users get their configured allowed models
+  const allowedModels = (userPlan === 'pro' && effectiveStatus === 'active')
     ? userLimits.allowedModels || []
-    : ['auto']
+    : userLimits.allowedModels || ['auto']
 
   // Helper function to check if model is allowed
   const isModelAllowed = (modelId: string) => allowedModels.includes(modelId)
@@ -98,7 +94,7 @@ export function ModelSelector({
                       <div className="flex items-center justify-between w-full">
                         <span>{model.name}</span>
                         {!allowed && <Lock className="h-3 w-3 text-muted-foreground ml-2" />}
-                        {allowed && isProActive && (
+                        {allowed && (userPlan === 'pro' && effectiveStatus === 'active') && (
                           <Crown className="h-3 w-3 text-yellow-500 ml-2" />
                         )}
                       </div>
@@ -152,7 +148,7 @@ export function ModelSelector({
                       </div>
                       <div className="flex items-center gap-2">
                         {!allowed && <Lock className="h-4 w-4 text-muted-foreground" />}
-                        {allowed && isProActive && (
+                        {allowed && (userPlan === 'pro' && effectiveStatus === 'active') && (
                           <Crown className="h-4 w-4 text-yellow-500" />
                         )}
                       </div>
