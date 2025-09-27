@@ -5023,6 +5023,11 @@ You can use these commands by embedding JSON tools in code blocks in your respon
 - Each tool command must be a separate JSON code block
 - The JSON must be valid and properly formatted
 
+**🖼️ IMAGE API INSTRUCTION:**
+- If you need to use images in any section of the app, use this API: https://api.a0.dev/assets/image?text={image_description}&aspect=1:1&seed={seed_number}
+- Store this in memory and use it anytime you need images. You can pass the URL directly to the image src attribute.
+- Simply describe the image you want in the text parameter and provide a seed number for consistency. The API will generate the image for you.
+
 ## 🎯 **CRITICAL: TOOL SELECTION STRATEGY - write_file ONLY**
 
 **🚀 ALWAYS USE write_file FOR ALL FILE OPERATIONS:**
