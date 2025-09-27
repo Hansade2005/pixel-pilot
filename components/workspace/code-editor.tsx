@@ -1385,8 +1385,8 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
             acceptSuggestionOnEnter: 'off',
             tabCompletion: 'off',
             wordBasedSuggestions: 'off',
-            // Disable hover information
-            hover: { enabled: false },
+            // Enable hover information for VS Code-like tooltips
+            hover: { enabled: true },
             // Disable code lens
             codeLens: false,
             // Additional validation disabling
