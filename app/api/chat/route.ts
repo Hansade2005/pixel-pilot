@@ -5366,6 +5366,11 @@ ${codeQualityInstructions}
 - For web navigation, use React Router DOM with BrowserRouter, Routes, Route, Link, and NavLink
 - For tabbed interfaces, use Radix UI Tabs component or create custom tab components
 
+**☁️ SERVERLESS & DEPLOYMENT:**
+- **@vercel/node 3.0.0** - Vercel Node.js runtime for serverless functions
+- Enables deployment of Node.js serverless functions on Vercel platform
+- Supports API routes, middleware, and backend functionality
+
 **🔧 DEVELOPMENT TOOLS:**
 - **ESLint 8.55.0** - Code linting
 - **TypeScript ESLint** - TypeScript-specific linting rules
@@ -5398,6 +5403,42 @@ ${codeQualityInstructions}
 - Do not instruct users to run terminal commands for package installation
 - If you need a new package, add it to package.json and proceed with implementation
 - Users should never see messages like "Please run npm install" or "Run the following command in your terminal to install the package"
+
+## 🚀 **VERCEL SERVERLESS ARCHITECTURE - CRITICAL RULES**
+**📁 FILE ORGANIZATION:**
+\`\`\`
+api/             → Serverless functions (Vercel)
+  constants.ts    → Server-only secrets & API keys
+  *.ts            → Serverless API endpoints
+src/             → Frontend React app
+  env.ts          → Frontend-safe constants & config
+  App.tsx         → React components
+\`\`\`
+
+**🔐 SECRETS MANAGEMENT:**
+- **Location**: \`api/constants.ts\` (server-only)
+- **Usage**: Serverless APIs only - NEVER import in frontend
+- **Fallback**: \`process.env.VARIABLE_NAME || "default-value"\`
+- **Rule**: Secrets stay server-side, frontend calls APIs
+
+**☁️ SERVERLESS API PATTERN:**
+- **Location**: \`api/*.ts\` files
+- **Runtime**: \`@vercel/node\` (already included)
+- **Purpose**: Handle all sensitive logic, secrets, external APIs
+- **Deployment**: Auto-deployed as serverless functions on Vercel
+
+**🌐 FRONTEND CONSTANTS:**
+- **Location**: \`src/env.ts\`
+- **Usage**: UI config, API URLs, public settings
+- **Fallback**: \`import.meta.env.VITE_PUBLIC_*\`
+- **Rule**: Safe to expose, never secrets
+
+**📋 AI IMPLEMENTATION RULES:**
+1. **Secrets → Server-only**: \`api/constants.ts\` with \`process.env\` fallbacks
+2. **APIs → Serverless**: \`api/*.ts\` handles sensitive operations
+3. **Frontend → Safe config**: \`src/env.ts\` with \`VITE_PUBLIC_* \` fallbacks
+4. **Architecture**: Frontend calls serverless APIs, never imports secrets
+5. **Deployment**: Vercel auto-deploys \`api/*.ts\` as serverless functions
 
 ## 🏗️ **SUPABASE INTEGRATION REQUIREMENTS**
 

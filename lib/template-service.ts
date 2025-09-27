@@ -83,7 +83,8 @@ export class TemplateService {
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
 
-    "@tanstack/react-table": "^8.20.5"
+    "@tanstack/react-table": "^8.20.5",
+    "@vercel/node": "^3.0.0"
 
   },
   "devDependencies": {
