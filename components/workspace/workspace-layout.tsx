@@ -1107,6 +1107,16 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               <Button
                 variant="ghost"
                 size="sm"
+                className="h-8 px-3"
+                onClick={() => setIsCreateDialogOpen(true)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                New
+              </Button>
+             
+              <Button
+                variant="ghost"
+                size="sm"
                 className="h-8 w-8 p-0"
                 onClick={() => router.push(`/workspace/deployment?project=${selectedProject?.id}`)}
                 disabled={!selectedProject}
