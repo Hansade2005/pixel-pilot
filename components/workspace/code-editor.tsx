@@ -29,6 +29,7 @@ interface InlineChatProps {
   streamingResponse?: string
   selectedModel?: string
   onModelChange?: (model: string) => void
+  mode?: 'inline' | 'modal' // New prop to control positioning
 }
 
 function InlineChat({ 
@@ -44,7 +45,8 @@ function InlineChat({
   fileName,
   streamingResponse,
   selectedModel = 'auto',
-  onModelChange
+  onModelChange,
+  mode = 'inline' // Default to inline mode
 }: InlineChatProps) {
   const [input, setInput] = useState("")
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -79,18 +81,22 @@ function InlineChat({
 
   return (
     <div 
-      className="fixed z-50 bg-popover border border-border rounded-lg shadow-lg w-96 max-w-[90vw]"
+      className={`fixed z-50 bg-popover border border-border rounded-lg shadow-lg ${
+        mode === 'modal' ? 'w-[600px] max-w-[90vw] max-h-[80vh]' : 'w-96 max-w-[90vw]'
+      }`}
       style={{ 
         top: position.top, 
         left: position.left,
-        transform: 'translate(-50%, -100%)' // Position above the error
+        transform: mode === 'modal' ? 'translate(-50%, -50%)' : 'translate(-50%, -100%)'
       }}
     >
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b border-border">
         <div className="flex items-center space-x-2">
           <Sparkles className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">AI Fix</span>
+          <span className="text-sm font-medium">
+            {mode === 'modal' ? 'AI Assistant' : 'AI Fix'}
+          </span>
         </div>
         <div className="flex items-center space-x-2">
           {onModelChange && (
@@ -128,8 +134,8 @@ function InlineChat({
       {/* Streaming Response */}
       {streamingResponse && (
         <div className="p-3 border-b border-border">
-          <div className="text-xs text-muted-foreground mb-2">AI Suggestion:</div>
-          <ScrollArea className="max-h-32">
+          <div className="text-xs text-muted-foreground mb-2">AI Response:</div>
+          <ScrollArea className={mode === 'modal' ? "max-h-64" : "max-h-32"}>
             <pre className="text-sm font-mono bg-muted p-2 rounded whitespace-pre-wrap">
               {streamingResponse}
             </pre>
@@ -168,14 +174,23 @@ function InlineChat({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Describe how to fix this error..."
-            className="min-h-[80px] resize-none border-none shadow-none focus-visible:ring-0 p-0"
+            placeholder={
+              mode === 'modal' 
+                ? "Ask me to refactor this file, add features, fix issues, or rewrite entire sections..." 
+                : "Describe how to fix this error..."
+            }
+            className={`resize-none border-none shadow-none focus-visible:ring-0 p-0 ${
+              mode === 'modal' ? 'min-h-[120px]' : 'min-h-[80px]'
+            }`}
             disabled={isLoading}
           />
           
           <div className="flex items-center justify-between mt-3">
             <div className="text-xs text-muted-foreground">
-              Press Enter to send, Esc to cancel
+              {mode === 'modal' 
+                ? "Ask questions or request file changes. Use 'rewrite' for full file changes." 
+                : "Press Enter to send, Esc to cancel"
+              }
             </div>
             <Button 
               size="sm" 
@@ -438,7 +453,7 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
   }
 
   // Inline chat functions
-  const openInlineChat = (error: string, lineNumber: number) => {
+  const openInlineChat = (error: string, lineNumber: number, mode: 'inline' | 'modal' = 'inline') => {
     if (!editorRef.current || !file) return
 
     const editor = editorRef.current
@@ -449,15 +464,23 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
     if (!editorDomNode) return
 
     const editorRect = editorDomNode.getBoundingClientRect()
-    const lineHeight = editor.getOption(61) // EditorOption.lineHeight = 61
     
-    // Calculate position above the current line
-    const top = editorRect.top + (lineNumber - 1) * lineHeight
-    const left = editorRect.left + editorRect.width / 2
+    let top: number, left: number
+    
+    if (mode === 'modal') {
+      // Center the modal in the editor
+      top = editorRect.top + editorRect.height / 2
+      left = editorRect.left + editorRect.width / 2
+    } else {
+      // Position above the current line (for inline fixes)
+      const lineHeight = editor.getOption(61) // EditorOption.lineHeight = 61
+      top = editorRect.top + (lineNumber - 1) * lineHeight
+      left = editorRect.left + editorRect.width / 2
+    }
 
     setInlineChatPosition({ top, left })
     setInlineChatError(error)
-    setInlineChatLine(lineNumber)
+    setInlineChatLine(mode === 'inline' ? lineNumber : null)
     setShowInlineChat(true)
     setInlineChatInput("")
     setIsInlineChatLoading(false)
@@ -700,6 +723,23 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
     setIsInlineChatLoading(true)
     setInlineChatInput("")
 
+    // Check if user wants full file rewrite
+    const isFullFileRewrite = message.toLowerCase().includes('rewrite') || 
+                             message.toLowerCase().includes('refactor entire') ||
+                             message.toLowerCase().includes('rewrite the whole') ||
+                             message.toLowerCase().includes('complete rewrite')
+
+    if (isFullFileRewrite) {
+      // Trigger full file streaming
+      const editor = editorRef.current
+      const model = editor.getModel()
+      const totalLines = model.getLineCount()
+      
+      await handleInlineStreaming(message, 1, totalLines)
+      setIsInlineChatLoading(false)
+      return
+    }
+
     try {
       // Prepare context for AI
       const context = {
@@ -869,12 +909,9 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
             variant="ghost" 
             size="sm" 
             onClick={() => {
-              const position = editorRef.current?.getPosition()
-              if (position) {
-                openInlineChat("AI Code Assistant", position.lineNumber)
-              }
+              openInlineChat("AI Code Assistant - Ask me anything about this file or request changes", 1, 'modal')
             }}
-            title="AI Fix (Ctrl+Shift+I)"
+            title="AI Assistant (Ctrl+Shift+I)"
           >
             <Sparkles className="h-4 w-4" />
           </Button>
@@ -1324,8 +1361,13 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
               run: (editor, ...args) => {
                 const errorMessage = args[0] as string
                 const lineNumber = args[1] as number
-                openInlineChat(errorMessage, lineNumber)
+                openInlineChat(errorMessage, lineNumber, 'inline')
               }
+            })
+
+            // Add keyboard shortcut for AI Assistant (Ctrl+Shift+I)
+            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyI, () => {
+              openInlineChat("AI Code Assistant - Ask me anything about this file or request changes", 1, 'modal')
             })
             
             // Enable quick suggestions
@@ -1455,6 +1497,7 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
           streamingResponse={inlineChatInput}
           selectedModel={selectedModel}
           onModelChange={setSelectedModel}
+          mode={inlineChatLine ? 'inline' : 'modal'}
         />
       )}
     </div>
