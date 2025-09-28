@@ -30,6 +30,11 @@ interface InlineChatProps {
   selectedModel?: string
   onModelChange?: (model: string) => void
   mode?: 'inline' | 'modal' // New prop to control positioning
+  conversationHistory?: Array<{
+    role: 'user' | 'assistant'
+    content: string
+    timestamp: Date
+  }>
 }
 
 function InlineChat({ 
@@ -46,7 +51,8 @@ function InlineChat({
   streamingResponse,
   selectedModel = 'auto',
   onModelChange,
-  mode = 'inline' // Default to inline mode
+  mode = 'inline', // Default to inline mode
+  conversationHistory = []
 }: InlineChatProps) {
   const [input, setInput] = useState("")
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -82,7 +88,7 @@ function InlineChat({
   return (
     <div 
       className={`fixed z-50 bg-popover border border-border rounded-lg shadow-lg ${
-        mode === 'modal' ? 'w-[600px] max-w-[90vw] max-h-[80vh]' : 'w-96 max-w-[90vw]'
+        mode === 'modal' ? 'w-[700px] max-w-[95vw] h-[600px] max-h-[85vh]' : 'w-96 max-w-[90vw]'
       }`}
       style={{ 
         top: position.top, 
@@ -119,8 +125,88 @@ function InlineChat({
         </div>
       </div>
 
-      {/* Error Context */}
-      {error && (
+      {/* Modal Conversation Area */}
+      {mode === 'modal' && (
+        <div className="flex-1 flex flex-col h-[calc(100%-120px)]">
+          {/* Conversation History */}
+          <ScrollArea className="flex-1 p-3">
+            <div className="space-y-4">
+              {conversationHistory.map((message, index) => (
+                <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] rounded-lg p-3 ${
+                    message.role === 'user' 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'bg-muted'
+                  }`}>
+                    <div className="text-xs opacity-70 mb-1">
+                      {message.role === 'user' ? 'You' : 'AI Assistant'}
+                    </div>
+                    <div className="text-sm whitespace-pre-wrap">
+                      {message.content}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {/* Current streaming response */}
+              {streamingResponse && (
+                <div className="flex justify-start">
+                  <div className="max-w-[80%] rounded-lg p-3 bg-muted">
+                    <div className="text-xs opacity-70 mb-1">AI Assistant</div>
+                    <div className="text-sm whitespace-pre-wrap">
+                      {streamingResponse}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Loading indicator */}
+              {isLoading && !streamingResponse && (
+                <div className="flex justify-start">
+                  <div className="max-w-[80%] rounded-lg p-3 bg-muted">
+                    <div className="text-xs opacity-70 mb-1">AI Assistant</div>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-current rounded-full animate-pulse"></div>
+                      <span className="text-sm">Thinking...</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+
+          {/* Input Area - Fixed at bottom */}
+          <div className="border-t border-border p-3 bg-background">
+            <Textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask me to refactor this file, add features, fix issues, or rewrite entire sections..."
+              className="resize-none border-none shadow-none focus-visible:ring-0 p-0 min-h-[80px]"
+              disabled={isLoading}
+            />
+            
+            <div className="flex items-center justify-between mt-3">
+              <div className="text-xs text-muted-foreground">
+                Press Enter to send, Shift+Enter for new line
+              </div>
+              <Button 
+                size="sm" 
+                onClick={handleSubmit}
+                disabled={!input.trim() || isLoading}
+                className="h-7 px-3"
+              >
+                <Send className="h-3 w-3 mr-1" />
+                Send
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inline Mode - Original Layout */}
+      {mode === 'inline' && (
         <div className="p-3 border-b border-border bg-destructive/10">
           <div className="text-xs text-muted-foreground mb-1">
             Line {lineNumber} • {fileName}
@@ -234,6 +320,12 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
   const [inlineChatLine, setInlineChatLine] = useState<number | null>(null)
   const [inlineChatInput, setInlineChatInput] = useState("")
   const [isInlineChatLoading, setIsInlineChatLoading] = useState(false)
+  // Conversation history for modal mode
+  const [conversationHistory, setConversationHistory] = useState<Array<{
+    role: 'user' | 'assistant'
+    content: string
+    timestamp: Date
+  }>>([])
   // AI Model selection state
   const [selectedModel, setSelectedModel] = useState(DEFAULT_CHAT_MODEL)
   
@@ -492,6 +584,8 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
     setInlineChatLine(null)
     setInlineChatInput("")
     setIsInlineChatLoading(false)
+    // Clear conversation history when closing modal
+    setConversationHistory([])
   }
 
   const handleApplyFix = (fix: string) => {
@@ -723,6 +817,16 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
     setIsInlineChatLoading(true)
     setInlineChatInput("")
 
+    // Add user message to conversation history if in modal mode
+    const isModalMode = !inlineChatLine
+    if (isModalMode) {
+      setConversationHistory(prev => [...prev, {
+        role: 'user',
+        content: message,
+        timestamp: new Date()
+      }])
+    }
+
     // Check if user wants full file rewrite
     const isFullFileRewrite = message.toLowerCase().includes('rewrite') || 
                              message.toLowerCase().includes('refactor entire') ||
@@ -793,13 +897,32 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
         // Store the fix for potential application
         setInlineChatInput(accumulatedResponse)
 
+        // Add AI response to conversation history if in modal mode
+        if (isModalMode) {
+          setConversationHistory(prev => [...prev, {
+            role: 'assistant',
+            content: accumulatedResponse.trim(),
+            timestamp: new Date()
+          }])
+        }
+
         // Optionally auto-apply simple fixes or show apply button
         // For now, we'll show the suggestion and let user decide
       }
 
     } catch (error) {
       console.error('Error getting AI fix:', error)
-      setInlineChatInput(`Error: ${error instanceof Error ? error.message : 'Failed to get AI suggestion'}`)
+      const errorMessage = `Error: ${error instanceof Error ? error.message : 'Failed to get AI suggestion'}`
+      setInlineChatInput(errorMessage)
+      
+      // Add error message to conversation history if in modal mode
+      if (isModalMode) {
+        setConversationHistory(prev => [...prev, {
+          role: 'assistant',
+          content: errorMessage,
+          timestamp: new Date()
+        }])
+      }
     } finally {
       setIsInlineChatLoading(false)
     }
@@ -1498,6 +1621,7 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
           selectedModel={selectedModel}
           onModelChange={setSelectedModel}
           mode={inlineChatLine ? 'inline' : 'modal'}
+          conversationHistory={conversationHistory}
         />
       )}
     </div>
