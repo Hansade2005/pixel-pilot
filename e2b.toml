@@ -14,3 +14,7 @@ team_id = "ff70324b-51eb-42dc-ad33-d062bf0099e7"
 dockerfile = "e2b.Dockerfile"
 template_name = "pipilot"
 template_id = "z585f2vd5jfirs0qpl4x"
+
+# CPU and RAM configuration (Pro plan required for customization)
+cpu_count = 2
+memory_mb = 4096

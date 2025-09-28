@@ -17,9 +17,6 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     nodejs \
     npm \
-    firefox \
-    x11-apps \
-    xvfb \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js dependencies
