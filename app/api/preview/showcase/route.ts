@@ -116,7 +116,7 @@ async function handleStreamingShowcasePreview(req: Request) {
 
           // 🔹 Create sandbox
           const sandbox = await createEnhancedSandbox({
-            template: "code-interpreter-v1",
+            template: "pipilot",
             timeoutMs: 900000,
             env: envVars
           })
@@ -292,7 +292,7 @@ async function handleRegularShowcasePreview(req: Request) {
 
       // Create enhanced E2B sandbox with environment variables
       const sandbox = await createEnhancedSandbox({
-        template: 'code-interpreter-v1',
+        template: 'pipilot',
         timeoutMs: 900000,
         env: envVars
       })
