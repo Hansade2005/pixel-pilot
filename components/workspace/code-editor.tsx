@@ -127,10 +127,10 @@ function InlineChat({
 
       {/* Modal Conversation Area */}
       {mode === 'modal' && (
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 flex flex-col overflow-hidden">
           {/* Conversation History - Fixed height with scrolling */}
-          <ScrollArea className="flex-1 min-h-0">
-            <div className="p-3 space-y-4 min-h-full">
+          <ScrollArea className="flex-1">
+            <div className="p-3 space-y-4">
               {conversationHistory.map((message, index) => (
                 <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[80%] rounded-lg p-3 ${
