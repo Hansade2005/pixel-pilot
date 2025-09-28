@@ -1449,6 +1449,23 @@ export default function TodoApp() {
                           <Trash2 className={`${isMobile ? 'h-4 w-4' : 'h-3 w-3'}`} />
                         </Button>
                       )}
+                      {/* Copy console button */}
+                      {(consoleOutput.length > 0 || browserLogs.length > 0) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            copyConsoleOutput()
+                          }}
+                          className={`h-6 w-6 p-0 hover:bg-primary hover:text-primary-foreground ${
+                            isMobile ? 'h-7 w-7' : 'h-6 w-6'
+                          }`}
+                          title="Copy console output"
+                        >
+                          <Copy className={`${isMobile ? 'h-4 w-4' : 'h-3 w-3'}`} />
+                        </Button>
+                      )}
                     </div>
                     {/* Show latest output when collapsed - mobile optimized */}
                     {!isConsoleOpen && consoleOutput.length > 0 && (
