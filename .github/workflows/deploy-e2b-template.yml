@@ -3,8 +3,8 @@ name: Deploy E2B Template
 on:
   workflow_dispatch:
     inputs:
-      e2b_api_key:
-        description: 'E2B API Key'
+      e2b_access_token:
+        description: 'E2B Access Token (from https://e2b.dev/dashboard?tab=personal)'
         required: true
         type: string
       template_name:
@@ -32,10 +32,10 @@ jobs:
     - name: Install E2B CLI
       run: pnpm add @e2b/cli
 
-    - name: Set E2B API Key
-      run: echo "E2B_API_KEY=${{ inputs.e2b_api_key }}" >> $GITHUB_ENV
+    - name: Set E2B Access Token
+      run: echo "E2B_ACCESS_TOKEN=${{ inputs.e2b_access_token }}" >> $GITHUB_ENV
 
     - name: Build and deploy E2B template
       run: npx e2b template build --name ${{ inputs.template_name }}
       env:
-        E2B_API_KEY: ${{ inputs.e2b_api_key }}
+        E2B_ACCESS_TOKEN: ${{ inputs.e2b_access_token }}
