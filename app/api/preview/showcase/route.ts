@@ -370,7 +370,7 @@ async function handleRegularShowcasePreview(req: Request) {
         }
 
         // Install dependencies with enhanced tracking
-        console.log('Installing dependencies using robust npm installation...')
+        console.log('Installing dependencies using robust pnpm installation...')
 
         // Check sandbox health before starting installation
         const isHealthy = await sandbox.checkHealth(envVars)
@@ -382,7 +382,7 @@ async function handleRegularShowcasePreview(req: Request) {
         const installResult = await sandbox.installDependenciesRobust('/project', { timeoutMs: 0, envVars })
 
         if (installResult.exitCode !== 0) {
-          console.error('npm install failed:', installResult.stderr)
+          console.error('pnpm install failed:', installResult.stderr)
           throw new Error(`npm dependency installation failed with exit code ${installResult.exitCode}`)
         }
 
