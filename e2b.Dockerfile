@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM node:18-slim
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -15,12 +15,10 @@ RUN apt-get update && apt-get install -y \
     git \
     python3 \
     python3-pip \
-    nodejs \
-    npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js dependencies
-RUN npm install -g yarn pnpm
+RUN npm install -g pnpm
 
 # Set up Python environment
 RUN python3 -m pip install --upgrade pip
