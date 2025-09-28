@@ -12,6 +12,16 @@ on:
         required: true
         type: string
         default: 'pipilot'
+      cpu_count:
+        description: 'CPU Cores (default: 2, Pro plan required for >2)'
+        required: false
+        type: string
+        default: '2'
+      memory_mb:
+        description: 'Memory in MB (default: 4096, Pro plan required for >4096)'
+        required: false
+        type: string
+        default: '4096'
 
 jobs:
   deploy:
@@ -36,6 +46,6 @@ jobs:
       run: echo "E2B_ACCESS_TOKEN=${{ inputs.e2b_access_token }}" >> $GITHUB_ENV
 
     - name: Build and deploy E2B template
-      run: npx e2b template build --name ${{ inputs.template_name }}
+      run: npx e2b template build --name ${{ inputs.template_name }} --cpu-count ${{ inputs.cpu_count }} --memory-mb ${{ inputs.memory_mb }}
       env:
         E2B_ACCESS_TOKEN: ${{ inputs.e2b_access_token }}

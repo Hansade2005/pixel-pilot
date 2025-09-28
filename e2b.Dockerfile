@@ -1,5 +1,13 @@
 FROM ubuntu:22.04
 
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBCONF_NONINTERACTIVE_SEEN=true
+
+# Pre-configure keyboard settings to avoid prompts
+RUN echo 'keyboard-configuration keyboard-configuration/layout select English (US)' | debconf-set-selections
+RUN echo 'keyboard-configuration keyboard-configuration/layoutcode select us' | debconf-set-selections
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     wget \
