@@ -1,0 +1,41 @@
+name: Deploy E2B Template
+
+on:
+  workflow_dispatch:
+    inputs:
+      e2b_api_key:
+        description: 'E2B API Key'
+        required: true
+        type: string
+      template_name:
+        description: 'Template Name'
+        required: true
+        type: string
+        default: 'pipilot'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install pnpm
+      run: npm install -g pnpm
+
+    - name: Install E2B CLI
+      run: pnpm add @e2b/cli
+
+    - name: Set E2B API Key
+      run: echo "E2B_API_KEY=${{ inputs.e2b_api_key }}" >> $GITHUB_ENV
+
+    - name: Build and deploy E2B template
+      run: npx e2b template build --name ${{ inputs.template_name }}
+      env:
+        E2B_API_KEY: ${{ inputs.e2b_api_key }}
