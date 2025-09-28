@@ -127,10 +127,10 @@ function InlineChat({
 
       {/* Modal Conversation Area */}
       {mode === 'modal' && (
-        <div className="flex-1 flex flex-col h-[calc(100%-120px)]">
-          {/* Conversation History */}
-          <ScrollArea className="flex-1 p-3">
-            <div className="space-y-4">
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Conversation History - Fixed height with scrolling */}
+          <ScrollArea className="flex-1 min-h-0">
+            <div className="p-3 space-y-4 min-h-full">
               {conversationHistory.map((message, index) => (
                 <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[80%] rounded-lg p-3 ${
@@ -148,19 +148,7 @@ function InlineChat({
                 </div>
               ))}
               
-              {/* Current streaming response */}
-              {streamingResponse && (
-                <div className="flex justify-start">
-                  <div className="max-w-[80%] rounded-lg p-3 bg-muted">
-                    <div className="text-xs opacity-70 mb-1">AI Assistant</div>
-                    <div className="text-sm whitespace-pre-wrap">
-                      {streamingResponse}
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* Loading indicator */}
+              {/* Loading indicator - only show when not streaming */}
               {isLoading && !streamingResponse && (
                 <div className="flex justify-start">
                   <div className="max-w-[80%] rounded-lg p-3 bg-muted">
@@ -176,7 +164,7 @@ function InlineChat({
           </ScrollArea>
 
           {/* Input Area - Fixed at bottom */}
-          <div className="border-t border-border p-3 bg-background">
+          <div className="border-t border-border p-3 bg-background flex-shrink-0">
             <Textarea
               ref={inputRef}
               value={input}
@@ -207,91 +195,85 @@ function InlineChat({
 
       {/* Inline Mode - Original Layout */}
       {mode === 'inline' && (
-        <div className="p-3 border-b border-border bg-destructive/10">
-          <div className="text-xs text-muted-foreground mb-1">
-            Line {lineNumber} • {fileName}
-          </div>
-          <div className="text-sm text-destructive font-medium">
-            {error}
-          </div>
-        </div>
-      )}
-
-      {/* Streaming Response */}
-      {streamingResponse && (
-        <div className="p-3 border-b border-border">
-          <div className="text-xs text-muted-foreground mb-2">AI Response:</div>
-          <ScrollArea className={mode === 'modal' ? "max-h-64" : "max-h-32"}>
-            <pre className="text-sm font-mono bg-muted p-2 rounded whitespace-pre-wrap">
-              {streamingResponse}
-            </pre>
-          </ScrollArea>
-          <div className="flex gap-2 mt-2">
-            <Button size="sm" onClick={handleApplyFix} className="h-7 px-3">
-              Apply Fix
-            </Button>
-            <Button 
-              size="sm" 
-              variant="outline" 
-              onClick={() => {
-                if (onStartStreaming && lineNumber) {
-                  onClose()
-                  const startLine = lineNumber
-                  const endLine = startLine + 20 // Default range
-                  onStartStreaming(streamingResponse || "Please improve this code", startLine, endLine)
-                }
-              }} 
-              className="h-7 px-3"
-            >
-              Stream Inline
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setInput("")} className="h-7 px-3">
-              Ask Again
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Input Area */}
-      {!streamingResponse && (
-        <div className="p-3">
-          <Textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              mode === 'modal' 
-                ? "Ask me to refactor this file, add features, fix issues, or rewrite entire sections..." 
-                : "Describe how to fix this error..."
-            }
-            className={`resize-none border-none shadow-none focus-visible:ring-0 p-0 ${
-              mode === 'modal' ? 'min-h-[120px]' : 'min-h-[80px]'
-            }`}
-            disabled={isLoading}
-          />
-          
-          <div className="flex items-center justify-between mt-3">
-            <div className="text-xs text-muted-foreground">
-              {mode === 'modal' 
-                ? "Ask questions or request file changes. Use 'rewrite' for full file changes." 
-                : "Press Enter to send, Esc to cancel"
-              }
+        <>
+          {/* Error Context */}
+          <div className="p-3 border-b border-border bg-destructive/10">
+            <div className="text-xs text-muted-foreground mb-1">
+              Line {lineNumber} • {fileName}
             </div>
-            <Button 
-              size="sm" 
-              onClick={handleSubmit}
-              disabled={!input.trim() || isLoading}
-              className="h-7 px-3"
-            >
-              {isLoading ? (
-                <div className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
-              ) : (
-                <Send className="h-3 w-3" />
-              )}
-            </Button>
+            <div className="text-sm text-destructive font-medium">
+              {error}
+            </div>
           </div>
-        </div>
+
+          {/* Streaming Response */}
+          {streamingResponse && (
+            <div className="p-3 border-b border-border">
+              <div className="text-xs text-muted-foreground mb-2">AI Response:</div>
+              <ScrollArea className="max-h-32">
+                <pre className="text-sm font-mono bg-muted p-2 rounded whitespace-pre-wrap">
+                  {streamingResponse}
+                </pre>
+              </ScrollArea>
+              <div className="flex gap-2 mt-2">
+                <Button size="sm" onClick={handleApplyFix} className="h-7 px-3">
+                  Apply Fix
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => {
+                    if (onStartStreaming && lineNumber) {
+                      onClose()
+                      const startLine = lineNumber
+                      const endLine = startLine + 20 // Default range
+                      onStartStreaming(streamingResponse || "Please improve this code", startLine, endLine)
+                    }
+                  }} 
+                  className="h-7 px-3"
+                >
+                  Stream Inline
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setInput("")} className="h-7 px-3">
+                  Ask Again
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Input Area */}
+          {!streamingResponse && (
+            <div className="p-3">
+              <Textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Describe how to fix this error..."
+                className="resize-none border-none shadow-none focus-visible:ring-0 p-0 min-h-[80px]"
+                disabled={isLoading}
+              />
+              
+              <div className="flex items-center justify-between mt-3">
+                <div className="text-xs text-muted-foreground">
+                  Press Enter to send, Esc to cancel
+                </div>
+                <Button 
+                  size="sm" 
+                  onClick={handleSubmit}
+                  disabled={!input.trim() || isLoading}
+                  className="h-7 px-3"
+                >
+                  {isLoading ? (
+                    <div className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
+                  ) : (
+                    <Send className="h-3 w-3" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
@@ -904,6 +886,8 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
             content: accumulatedResponse.trim(),
             timestamp: new Date()
           }])
+          // Clear the streaming response to avoid duplication
+          setInlineChatInput("")
         }
 
         // Optionally auto-apply simple fixes or show apply button
@@ -922,6 +906,8 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
           content: errorMessage,
           timestamp: new Date()
         }])
+        // Clear the streaming response to avoid duplication
+        setInlineChatInput("")
       }
     } finally {
       setIsInlineChatLoading(false)
