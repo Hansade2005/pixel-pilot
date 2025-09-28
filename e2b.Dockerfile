@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y \
 RUN npm install -g pnpm
 
 # Set up Python environment
-RUN python3 -m pip install --upgrade pip
+RUN python3 -m pip install --upgrade pip --break-system-packages
 
 # Install desktop environment components
 RUN apt-get update && apt-get install -y \
