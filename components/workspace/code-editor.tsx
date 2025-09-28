@@ -88,26 +88,31 @@ function InlineChat({
   return (
     <div 
       className={`fixed z-50 bg-popover border border-border rounded-lg shadow-lg ${
-        mode === 'modal' ? 'w-[700px] max-w-[95vw] h-[600px] max-h-[85vh]' : 'w-96 max-w-[90vw]'
+        mode === 'modal' 
+          ? 'w-[95vw] sm:w-[700px] h-[90vh] sm:h-[600px] max-w-[95vw] max-h-[90vh] sm:max-h-[85vh]' 
+          : 'w-96 max-w-[90vw]'
       }`}
       style={{ 
         top: position.top, 
         left: position.left,
-        transform: mode === 'modal' ? 'translate(-50%, -50%)' : 'translate(-50%, -100%)'
+        transform: mode === 'modal' ? 'translate(-50%, -50%)' : 'translate(-50%, -100%)',
+        // Ensure modal doesn't go off-screen on mobile
+        maxHeight: mode === 'modal' ? 'calc(100vh - 2rem)' : undefined,
+        maxWidth: mode === 'modal' ? 'calc(100vw - 2rem)' : undefined
       }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-border">
+      <div className="flex items-center justify-between p-3 sm:p-4 border-b border-border">
         <div className="flex items-center space-x-2">
           <Sparkles className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">
+          <span className="text-sm sm:text-base font-medium">
             {mode === 'modal' ? 'AI Assistant' : 'AI Fix'}
           </span>
         </div>
         <div className="flex items-center space-x-2">
           {onModelChange && (
             <Select value={selectedModel} onValueChange={onModelChange}>
-              <SelectTrigger className="w-32 h-7 text-xs">
+              <SelectTrigger className="w-28 sm:w-32 h-8 sm:h-7 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -119,7 +124,12 @@ function InlineChat({
               </SelectContent>
             </Select>
           )}
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={onClose}
+            className="h-8 w-8 sm:h-7 sm:w-7 p-0 touch-manipulation"
+          >
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -130,10 +140,10 @@ function InlineChat({
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Conversation History - Fixed height with scrolling */}
           <ScrollArea className="flex-1">
-            <div className="p-3 space-y-4">
+            <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
               {conversationHistory.map((message, index) => (
                 <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] rounded-lg p-3 ${
+                  <div className={`max-w-[85%] sm:max-w-[80%] rounded-lg p-3 ${
                     message.role === 'user' 
                       ? 'bg-primary text-primary-foreground' 
                       : 'bg-muted'
@@ -151,7 +161,7 @@ function InlineChat({
               {/* Loading indicator - only show when not streaming */}
               {isLoading && !streamingResponse && (
                 <div className="flex justify-start">
-                  <div className="max-w-[80%] rounded-lg p-3 bg-muted">
+                  <div className="max-w-[85%] sm:max-w-[80%] rounded-lg p-3 bg-muted">
                     <div className="text-xs opacity-70 mb-1">AI Assistant</div>
                     <div className="flex items-center space-x-2">
                       <div className="w-2 h-2 bg-current rounded-full animate-pulse"></div>
@@ -164,29 +174,33 @@ function InlineChat({
           </ScrollArea>
 
           {/* Input Area - Fixed at bottom */}
-          <div className="border-t border-border p-3 bg-background flex-shrink-0">
+          <div className="border-t border-border p-3 sm:p-4 bg-background flex-shrink-0">
             <Textarea
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Ask me to refactor this file, add features, fix issues, or rewrite entire sections..."
-              className="resize-none border-none shadow-none focus-visible:ring-0 p-0 min-h-[80px]"
+              className="resize-none border-none shadow-none focus-visible:ring-0 p-0 min-h-[60px] sm:min-h-[80px] text-base sm:text-sm"
               disabled={isLoading}
             />
             
             <div className="flex items-center justify-between mt-3">
-              <div className="text-xs text-muted-foreground">
+              <div className="text-xs text-muted-foreground hidden sm:block">
                 Press Enter to send, Shift+Enter for new line
+              </div>
+              <div className="text-xs text-muted-foreground sm:hidden">
+                Tap Send to submit
               </div>
               <Button 
                 size="sm" 
                 onClick={handleSubmit}
                 disabled={!input.trim() || isLoading}
-                className="h-7 px-3"
+                className="h-8 px-4 sm:h-7 sm:px-3 touch-manipulation"
               >
                 <Send className="h-3 w-3 mr-1" />
-                Send
+                <span className="hidden sm:inline">Send</span>
+                <span className="sm:hidden">Send</span>
               </Button>
             </div>
           </div>
