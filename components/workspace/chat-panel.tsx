@@ -514,12 +514,15 @@ const JSONToolPill = ({
 }) => {
   const [executionStatus, setExecutionStatus] = useState<'executing' | 'completed' | 'failed'>(status)
   const [hasExecuted, setHasExecuted] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   // IMMEDIATE EXECUTION: Execute the tool as soon as the pill is rendered, just like specs route
   useEffect(() => {
     const executeImmediately = async () => {
-      // Only execute if not already executed and is a valid file operation
-      if (hasExecuted || executionStatus === 'failed' || !toolCall.tool || !toolCall.path) {
+      // Only execute if not already executed and is a valid operation
+      // Allow execute_sql without path, but require path for file operations
+      const requiresPath = toolCall.tool !== 'execute_sql'
+      if (hasExecuted || executionStatus === 'failed' || !toolCall.tool || (requiresPath && !toolCall.path)) {
         return
       }
 
@@ -541,7 +544,7 @@ const JSONToolPill = ({
         const projectId = project.id
 
         // Generate unique execution ID to prevent duplicates (like specs route)
-        const executionId = `${toolCall.tool}_${toolCall.path.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        const executionId = `${toolCall.tool}_${toolCall.path?.replace(/[^a-zA-Z0-9]/g, '_') || 'unknown'}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
         console.log('[JSONToolPill] Execution ID:', executionId)
 
         // Execute file operation directly like specs route does
@@ -555,11 +558,11 @@ const JSONToolPill = ({
             }
             
             // Check if file exists (same logic as specs route)
-            const existingFile = await storageManager.getFile(projectId, toolCall.path)
+            const existingFile = await storageManager.getFile(projectId, toolCall.path!)
             
             if (existingFile) {
               // Update existing file
-              await storageManager.updateFile(projectId, toolCall.path, { 
+              await storageManager.updateFile(projectId, toolCall.path!, { 
                 content: toolCall.content,
                 updatedAt: new Date().toISOString()
               })
@@ -568,11 +571,11 @@ const JSONToolPill = ({
               // Create new file (exact same logic as specs route)
               const newFile = await storageManager.createFile({
                 workspaceId: projectId,
-                name: toolCall.path.split('/').pop() || toolCall.path,
-                path: toolCall.path,
+                name: toolCall.path!.split('/').pop() || toolCall.path!,
+                path: toolCall.path!,
                 content: toolCall.content,
-                fileType: toolCall.path.split('.').pop() || 'text',
-                type: toolCall.path.split('.').pop() || 'text',
+                fileType: toolCall.path!.split('.').pop() || 'text',
+                type: toolCall.path!.split('.').pop() || 'text',
                 size: toolCall.content.length,
                 isDirectory: false
               })
@@ -594,7 +597,7 @@ const JSONToolPill = ({
               if (!toolCall.content) {
                 throw new Error('edit_file requires content')
               }
-              await storageManager.updateFile(projectId, toolCall.path, { 
+              await storageManager.updateFile(projectId, toolCall.path!, { 
                 content: toolCall.content,
                 updatedAt: new Date().toISOString()
               })
@@ -604,7 +607,7 @@ const JSONToolPill = ({
 
           case 'delete_file':
           case 'pilotdelete':
-            await storageManager.deleteFile(projectId, toolCall.path)
+            await storageManager.deleteFile(projectId, toolCall.path!)
             result = { message: `File ${toolCall.path} deleted successfully`, action: 'deleted' }
             break
 
@@ -704,7 +707,6 @@ const JSONToolPill = ({
 
   // Special handling for write_file and edit_file with content
   if (toolCall.tool === 'write_file' || toolCall.tool === 'edit_file' || toolCall.name === 'pilotwrite' || toolCall.name === 'pilotedit') {
-    const [isExpanded, setIsExpanded] = useState(false)
     const fileExtension = toolCall.path ? (toolCall.path.split('.').pop() || 'text') : 'tsx'
     const hasContent = toolCall.content && toolCall.content.trim().length > 0
     
@@ -758,8 +760,9 @@ const JSONToolPill = ({
 
   // Special handling for execute_sql with SQL query display
   if (toolCall.tool === 'execute_sql') {
-    const [isExpanded, setIsExpanded] = useState(false)
-    const hasContent = toolCall.content && toolCall.content.trim().length > 0
+    // Extract SQL content from various possible locations
+    const sqlContent = toolCall.content || (toolCall as any).sql || (toolCall as any).args?.sql
+    const hasContent = sqlContent && sqlContent.trim().length > 0
     
     return (
       <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
@@ -801,7 +804,7 @@ const JSONToolPill = ({
           <div className="p-4 bg-muted/30">
             <div className="text-xs text-muted-foreground mb-2">SQL Query:</div>
             <pre className="text-xs bg-background p-3 rounded border overflow-x-auto max-h-60">
-              <code className="language-sql">{toolCall.content}</code>
+              <code className="language-sql">{sqlContent}</code>
             </pre>
           </div>
         )}
@@ -811,7 +814,6 @@ const JSONToolPill = ({
 
   // Default tool pill for other tools
   const hasContent = toolCall.content && toolCall.content.trim().length > 0
-  const [isExpanded, setIsExpanded] = useState(false)
   const fileExtension = toolCall.path ? (toolCall.path.split('.').pop() || 'text') : 'tsx'
 
   return (

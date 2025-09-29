@@ -252,8 +252,11 @@ class XMLToolAutoExecutor {
 
   // Execute SQL operation
   private async executeSql(toolCall: JsonToolCall | XMLToolCall): Promise<any> {
-    if (!toolCall.content) {
-      throw new Error('Missing SQL content for execute_sql')
+    // Get SQL content from various possible locations
+    const sql = toolCall.content || (toolCall as any).sql || (toolCall as any).args?.sql
+
+    if (!sql) {
+      throw new Error('Missing SQL content for execute_sql. Expected in content, sql, or args.sql property.')
     }
 
     try {
@@ -324,9 +327,9 @@ class XMLToolAutoExecutor {
       }
 
       // Parse the SQL to determine the operation type
-      const sql = toolCall.content.trim()
+      const sqlContent = sql.trim()
 
-      if (sql.toUpperCase().startsWith('SELECT')) {
+      if (sqlContent.toUpperCase().startsWith('SELECT')) {
         throw new Error('SELECT operations are not allowed. Only CREATE, INSERT, UPDATE, DELETE operations are permitted.')
       }
 
@@ -342,7 +345,7 @@ class XMLToolAutoExecutor {
           body: JSON.stringify({ 
             token: accessToken, 
             projectId: projectDetails.selectedProjectId,
-            sql: sql
+            sql: sqlContent
           }),
         })
 
