@@ -2808,6 +2808,118 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
     )
   }
 
+  // Special handling for execute_sql tool
+  if (toolCall.name === 'execute_sql') {
+    const [isExpanded, setIsExpanded] = useState(false)
+    const sqlResult = toolCall.result || {}
+    const sqlQuery = sqlResult.sql || toolCall.args?.content || 'SQL query executed'
+    const operation = sqlResult.operation || sqlResult.result?.operation || 'SQL'
+    const executionStatus = sqlResult.status || (isSuccess ? 'completed' : 'failed')
+
+    return (
+      <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
+        {/* Header - Clickable to toggle */}
+        <div
+          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
+            isSuccess
+              ? 'bg-muted border-l-4 border-l-blue-500'
+              : 'bg-red-900/20 border-l-4 border-l-red-500'
+          }`}
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-full ${
+              isSuccess ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white' : 'bg-red-500 text-white'
+            }`}>
+              <Database className="w-4 h-4" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-foreground">SQL Execution</span>
+                <span className="text-xs text-muted-foreground">({operation})</span>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <span>Database operation</span>
+                <span>•</span>
+                <span>{isSuccess ? 'Success' : 'Failed'}</span>
+              </div>
+            </div>
+            {/* Chevron indicator */}
+            <div className="ml-2">
+              {isExpanded ? (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* SQL Execution Details - Collapsible */}
+        {isExpanded && (
+          <div className="p-4 bg-background border-t">
+            <div className="max-h-96 overflow-y-auto space-y-4">
+              {/* SQL Query */}
+              <div>
+                <h3 className="text-sm font-medium text-foreground mb-2">SQL Query</h3>
+                <div className="bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-gray-700 border-b border-gray-600 text-xs font-medium text-white">
+                    SQL Command
+                  </div>
+                  <pre className="p-4 overflow-x-auto bg-[#1e1e1e]">
+                    <code className="text-sm text-white font-mono">
+                      {sqlQuery}
+                    </code>
+                  </pre>
+                </div>
+              </div>
+
+              {/* Execution Result */}
+              <div>
+                <h3 className="text-sm font-medium text-foreground mb-2">Execution Result</h3>
+                <div className={`p-3 rounded-lg border ${
+                  isSuccess
+                    ? 'bg-green-900/10 border-green-700 text-green-200'
+                    : 'bg-red-900/20 border-red-700 text-red-200'
+                }`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    {isSuccess ? (
+                      <Check className="w-4 h-4 text-green-400" />
+                    ) : (
+                      <X className="w-4 h-4 text-red-400" />
+                    )}
+                    <span className="font-medium">
+                      {isSuccess ? 'Execution Successful' : 'Execution Failed'}
+                    </span>
+                  </div>
+                  <p className="text-sm">
+                    {sqlResult.message || sqlResult.result?.note || (isSuccess ? 'Database operation completed successfully.' : 'Database operation failed.')}
+                  </p>
+                  {sqlResult.result?.executionResult && (
+                    <div className="mt-2 text-xs opacity-80">
+                      <strong>Details:</strong> {JSON.stringify(sqlResult.result.executionResult, null, 2)}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Additional Info */}
+              {sqlResult.result && (
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <div><strong>Operation:</strong> {sqlResult.result.operation || operation}</div>
+                  <div><strong>Status:</strong> {sqlResult.result.status || executionStatus}</div>
+                  {sqlResult.result.note && (
+                    <div><strong>Note:</strong> {sqlResult.result.note}</div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   // Regular tool pill for other tools
   return (
     <div className="bg-background border rounded-lg shadow-sm mb-2 overflow-hidden">
