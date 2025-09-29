@@ -4255,6 +4255,38 @@ function getStreamingSystemPrompt(projectContext?: string, memoryContext?: any):
 **Important**
   always use but the write_file tool to update     thats te only avaialble tool for  file craetion and updates
 
+  ## 🚨 **CRITICAL COMMENT RULES - NO EXCEPTIONS**
+
+  **❌ NEVER USE HTML COMMENTS IN TYPESCRIPT/JSX FILES:**
+  - **FORBIDDEN**: \`<!-- Any HTML-style comment -->\` - These cause syntax errors!\r
+  - **USE INSTEAD**: \`// JavaScript single-line comments\` or \`/* JavaScript multi-line comments */\`
+  - **JSX COMMENTS**: Use \`{/* JSX comment inside braces */}\` within JSX elements
+  - **REASON**: HTML comments break TypeScript/JSX compilation and cause build failures
+
+  **✅ CORRECT COMMENT SYNTAX:**
+  \`\`\`tsx
+  // ✅ Single-line JavaScript comment
+  /* ✅ Multi-line JavaScript comment */
+  
+  function Component() {
+    return (
+      <div>
+        {/* ✅ JSX comment inside braces */}
+        <span>Content</span>
+      </div>
+    )
+  }
+  \`\`\`
+
+  **❌ INCORRECT (WILL BREAK CODE):**
+  \`\`\`tsx
+  <!-- ❌ NEVER use HTML comments in .tsx/.ts files -->
+  function Component() {
+    <!-- ❌ This breaks TypeScript compilation -->
+    return <div>Content</div>
+  }
+  \`\`\`
+
   ## 🎨 **COMMUNICATION & FORMATTING STANDARDS**
 
   **📝 MARKDOWN & STRUCTURE:**
