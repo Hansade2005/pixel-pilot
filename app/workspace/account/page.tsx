@@ -173,9 +173,20 @@ function AccountSettingsPageContent() {
   useEffect(() => {
     const handleOAuthCallback = async () => {
       const token = searchParams.get('token')
+      const processed = searchParams.get('processed')
+      
+      console.log('[OAUTH] Current URL:', window.location.href)
+      console.log('[OAUTH] handleOAuthCallback called:', { 
+        hasToken: !!token, 
+        tokenLength: token?.length || 0,
+        hasUser: !!user?.id, 
+        userId: user?.id,
+        processed: processed 
+      })
       
       // Only process if we have a token and haven't processed it yet
-      if (token && user?.id && !searchParams.get('processed')) {
+      if (token && user?.id && !processed) {
+        console.log('[OAUTH] Starting OAuth callback processing...')
         try {
           // Mark as processed to prevent re-processing
           const newUrl = new URL(window.location.href)
@@ -188,52 +199,98 @@ function AccountSettingsPageContent() {
           const client = new SupabaseManagementAPI({ accessToken: token })
           
           // Try to fetch projects to validate the token
+          console.log('[OAUTH] Fetching projects to validate token...')
           const projects = await client.getProjects()
           console.log('[OAUTH] Token validation successful, found', projects?.length || 0, 'projects')
 
           // Store the Supabase access token only after validation
+          console.log('[OAUTH] Storing token and connection state...')
           const tokensToStore: any = { supabase: token }
           const success = await storeDeploymentTokens(user.id, tokensToStore)
           
-          if (success) {
-            // Store connection state
-            const statesToStore: any = { supabase_connected: true }
-            await storeDeploymentConnectionStates(user.id, statesToStore)
-
-            // Refresh connection status to show the new connection
-            console.log('[OAUTH] Calling checkConnectionStatus after successful token storage...')
-            await checkConnectionStatus(user.id)
-            console.log('[OAUTH] checkConnectionStatus completed')
-
-            // Clear URL parameters
-            window.history.replaceState({}, document.title, window.location.pathname)
-
-            toast({
-              title: "Connected to Supabase",
-              description: `Successfully connected to Supabase via OAuth (${projects?.length || 0} projects available)`,
-            })
-          } else {
-            throw new Error('Failed to store Supabase token')
+          if (!success) {
+            console.error('[OAUTH] Failed to store token in database')
+            throw new Error('Failed to save your Supabase token to the database. Please try again or contact support if the issue persists.')
           }
+
+          console.log('[OAUTH] Token stored successfully')
+          // Store connection state
+          const statesToStore: any = { supabase_connected: true }
+          const connectionSuccess = await storeDeploymentConnectionStates(user.id, statesToStore)
+          
+          if (!connectionSuccess) {
+            console.error('[OAUTH] Failed to store connection state')
+            throw new Error('Token saved but failed to update connection status. Please refresh the page.')
+          }
+          
+          console.log('[OAUTH] Connection state stored successfully')
+
+          // Refresh connection status to show the new connection
+          console.log('[OAUTH] Calling checkConnectionStatus after successful token storage...')
+          try {
+            await checkConnectionStatus(user.id)
+            console.log('[OAUTH] checkConnectionStatus completed successfully')
+          } catch (connectionCheckError: any) {
+            console.error('[OAUTH] checkConnectionStatus failed:', connectionCheckError)
+            // Don't throw here, as the token was saved successfully
+            // Just log the error and continue
+          }
+
+          // Clear URL parameters
+          window.history.replaceState({}, document.title, window.location.pathname)
+
+          toast({
+            title: "Connected to Supabase",
+            description: `Successfully connected to Supabase via OAuth (${projects?.length || 0} projects available)`,
+          })
         } catch (error: any) {
           console.error("Error handling OAuth callback:", error)
           
           // Clear URL parameters even on error
           window.history.replaceState({}, document.title, window.location.pathname)
           
+          // Provide specific error messages based on the error type
+          let errorMessage = "Failed to complete Supabase connection. Please try again."
+          
+          if (error.message?.toLowerCase().includes('unauthorized') || 
+              error.message?.toLowerCase().includes('invalid') || 
+              error.message?.toLowerCase().includes('403')) {
+            errorMessage = "The OAuth token received is invalid or expired. Please try connecting again through OAuth."
+          } else if (error.message?.toLowerCase().includes('network') || 
+                     error.message?.toLowerCase().includes('fetch') ||
+                     error.message?.toLowerCase().includes('timeout')) {
+            errorMessage = "Network error during token validation. Please check your internet connection and try again."
+          } else if (error.message?.includes('Failed to store')) {
+            errorMessage = "Token validation succeeded but failed to save your connection. Please try again."
+          } else if (error.message?.toLowerCase().includes('projects')) {
+            errorMessage = "Failed to fetch your Supabase projects. Your token may not have the required permissions."
+          } else if (error.message) {
+            // Use the actual error message if it's descriptive
+            errorMessage = `Connection failed: ${error.message}`
+          }
+          
           toast({
             title: "Connection Failed",
-            description: error.message?.includes('Invalid') 
-              ? "The OAuth token received is invalid. Please try connecting again."
-              : "Failed to complete Supabase connection. Please try again.",
+            description: errorMessage,
             variant: "destructive"
           })
+        }
+      } else {
+        if (token && !user?.id) {
+          console.log('[OAUTH] Token found but no user available yet, waiting...')
+        } else if (!token) {
+          console.log('[OAUTH] No token in URL parameters')
+        } else if (processed) {
+          console.log('[OAUTH] Token already processed, skipping')
         }
       }
     }
 
     if (user?.id) {
+      console.log('[OAUTH] User available, starting OAuth callback handler...')
       handleOAuthCallback()
+    } else {
+      console.log('[OAUTH] No user available yet for OAuth callback')
     }
   }, [user?.id])
 
