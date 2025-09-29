@@ -4721,6 +4721,37 @@ When writing code in markdown:
 // Test mentally: does this parse correctly?
 \\\`\\\`\\\`
 
+ ## **17. 🚨 **CRITICAL COMMENT RULES - NO EXCEPTIONS**
+
+  **❌ NEVER USE HTML COMMENTS IN TYPESCRIPT/JSX FILES:**
+  - **FORBIDDEN**: \`<!-- Any HTML-style comment -->\` - These cause syntax errors!\r
+  - **USE INSTEAD**: \`// JavaScript single-line comments\` or \`/* JavaScript multi-line comments */\`
+  - **JSX COMMENTS**: Use \`{/* JSX comment inside braces */}\` within JSX elements
+  - **REASON**: HTML comments break TypeScript/JSX compilation and cause build failures
+
+  **✅ CORRECT COMMENT SYNTAX:**
+  \`\`\`tsx
+  // ✅ Single-line JavaScript comment
+  /* ✅ Multi-line JavaScript comment */
+  
+  function Component() {
+    return (
+      <div>
+        {/* ✅ JSX comment inside braces */}
+        <span>Content</span>
+      </div>
+    )
+  }
+  \`\`\`
+
+  **❌ INCORRECT (WILL BREAK CODE):**
+  \`\`\`tsx
+  <!-- ❌ NEVER use HTML comments in .tsx/.ts files -->
+  function Component() {
+    <!-- ❌ This breaks TypeScript compilation -->
+    return <div>Content</div>
+  }
+  \`\`\`
 
 **🎯 WHEN TO USE CODE BLOCKS:**
 - SQL queries, database schemas, and migrations
