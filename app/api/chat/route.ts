@@ -4752,6 +4752,29 @@ When writing code in markdown:
     return <div>Content</div>
   }
   \`\`\`
+   **✅ CORRECT COMMENT SYNTAX:**
+  \`\`\`tsx
+  // ✅ Single-line JavaScript comment
+  /* ✅ Multi-line JavaScript comment */
+  
+  function Component() {
+    return (
+      <div>
+        {/* ✅ JSX comment inside braces */}
+        <span>Content</span>
+      </div>
+    )
+  }
+  \`\`\`
+
+  **❌ INCORRECT (WILL BREAK CODE):**
+  \`\`\`tsx
+  <!-- ❌ NEVER use HTML comments in .tsx/.ts files -->
+  function Component() {
+    <!-- ❌ This breaks TypeScript compilation -->
+    return <div>Content</div>
+  }
+  \`\`\`
 
 **🎯 WHEN TO USE CODE BLOCKS:**
 - SQL queries, database schemas, and migrations
@@ -4968,9 +4991,6 @@ Every application MUST have a **stunning, modern, extra professional design** th
 - Creating new files | Updating existing files | Design improvements
 - New features | Bug fixes | Environment configurations
 - **CRITICAL**: Always use write_file for src/App.tsx updates
-
-
-
 
   ## 🚀 **STREAMLINED DEVELOPMENT GUIDELINES**
 
