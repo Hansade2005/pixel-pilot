@@ -4777,7 +4777,6 @@ You can use these commands by embedding JSON tools in code blocks in your respon
 - **ALWAYS wrap JSON tool commands in markdown code blocks with \`\`\`json**
 - Use proper JSON syntax with double quotes for all strings
 - Escape newlines in content as \\n for proper JSON formatting
-- Use the exact field names: "tool", "path", "content", "searchReplaceBlocks", "search", "replace"
 - **Supported tool names**: "write_file", "delete_file"
 - Each tool command must be a separate JSON code block
 - The JSON must be valid and properly formatted
