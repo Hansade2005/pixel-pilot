@@ -173,12 +173,25 @@ function AccountSettingsPageContent() {
   useEffect(() => {
     const handleOAuthCallback = async () => {
       const token = searchParams.get('token')
-      const refreshToken = searchParams.get('refreshToken')
-      const expiresIn = searchParams.get('expiresIn')
-
-      if (token && user?.id) {
+      
+      // Only process if we have a token and haven't processed it yet
+      if (token && user?.id && !searchParams.get('processed')) {
         try {
-          // Store the Supabase access token
+          // Mark as processed to prevent re-processing
+          const newUrl = new URL(window.location.href)
+          newUrl.searchParams.set('processed', 'true')
+          window.history.replaceState({}, document.title, newUrl.pathname + newUrl.search)
+
+          // First validate the token before storing it
+          console.log('[OAUTH] Validating Supabase OAuth token...')
+          const { SupabaseManagementAPI } = await import('@dyad-sh/supabase-management-js')
+          const client = new SupabaseManagementAPI({ accessToken: token })
+          
+          // Try to fetch projects to validate the token
+          const projects = await client.getProjects()
+          console.log('[OAUTH] Token validation successful, found', projects?.length || 0, 'projects')
+
+          // Store the Supabase access token only after validation
           const tokensToStore: any = { supabase: token }
           const success = await storeDeploymentTokens(user.id, tokensToStore)
           
@@ -188,21 +201,31 @@ function AccountSettingsPageContent() {
             await storeDeploymentConnectionStates(user.id, statesToStore)
 
             // Refresh connection status to show the new connection
+            console.log('[OAUTH] Calling checkConnectionStatus after successful token storage...')
             await checkConnectionStatus(user.id)
+            console.log('[OAUTH] checkConnectionStatus completed')
 
             // Clear URL parameters
             window.history.replaceState({}, document.title, window.location.pathname)
 
             toast({
               title: "Connected to Supabase",
-              description: "Successfully connected to Supabase via OAuth",
+              description: `Successfully connected to Supabase via OAuth (${projects?.length || 0} projects available)`,
             })
+          } else {
+            throw new Error('Failed to store Supabase token')
           }
         } catch (error: any) {
           console.error("Error handling OAuth callback:", error)
+          
+          // Clear URL parameters even on error
+          window.history.replaceState({}, document.title, window.location.pathname)
+          
           toast({
             title: "Connection Failed",
-            description: "Failed to complete Supabase connection",
+            description: error.message?.includes('Invalid') 
+              ? "The OAuth token received is invalid. Please try connecting again."
+              : "Failed to complete Supabase connection. Please try again.",
             variant: "destructive"
           })
         }
@@ -212,7 +235,7 @@ function AccountSettingsPageContent() {
     if (user?.id) {
       handleOAuthCallback()
     }
-  }, [user?.id, searchParams])
+  }, [user?.id])
 
   useEffect(() => {
     fetchUser()
@@ -353,10 +376,21 @@ function AccountSettingsPageContent() {
         
         try {
           // Try to fetch projects to validate the token
-          await client.getProjects()
-          userData = { name: 'Supabase User' } // We don't get user data from this API
-        } catch (error) {
-          throw new Error('Invalid Supabase access token')
+          console.log('[SUPABASE] Validating manual access token...')
+          const projects = await client.getProjects()
+          console.log('[SUPABASE] Manual token validation successful, found', projects?.length || 0, 'projects')
+          userData = { name: 'Supabase User', projects } // Include projects in userData
+        } catch (error: any) {
+          console.error('[SUPABASE] Manual token validation failed:', error)
+          const errorMessage = error.message?.toLowerCase() || ''
+          
+          if (errorMessage.includes('unauthorized') || errorMessage.includes('invalid') || errorMessage.includes('403')) {
+            throw new Error(`Invalid Supabase Management API token. Please ensure you're using a Management API token from https://supabase.com/dashboard/account/tokens, not an anon or service role key.`)
+          } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+            throw new Error('Network error while validating token. Please check your internet connection and try again.')
+          } else {
+            throw new Error(`Failed to validate Supabase token: ${error.message || 'Unknown error'}. Please ensure you have the correct Management API token.`)
+          }
         }
       }
 
@@ -786,13 +820,16 @@ function AccountSettingsPageContent() {
             // Use Dyad Supabase Management API to validate token and fetch projects
             const { SupabaseManagementAPI } = await import('@dyad-sh/supabase-management-js')
             const client = new SupabaseManagementAPI({ accessToken: token })
-            
+
             try {
               // Fetch projects to validate token and get project data
+              console.log('[SUPABASE] Validating access token...')
               const projects = await client.getProjects()
+              console.log('[SUPABASE] Token validation successful, found', projects?.length || 0, 'projects')
               userData = { name: 'Supabase User', projects }
-            } catch (error) {
-              throw new Error('Invalid Supabase access token')
+            } catch (error: any) {
+              console.error('[SUPABASE] Token validation failed:', error)
+              throw new Error(`Invalid Supabase Management API access token. Please ensure you're using a Management API token from https://supabase.com/dashboard/account/tokens, not an anon or service role key.`)
             }
           }
 
@@ -829,14 +866,22 @@ function AccountSettingsPageContent() {
       }
 
       // Validate all tokens concurrently
+      console.log('[CONNECTION_STATUS] Starting validation for all providers...')
       const [githubStatus, vercelStatus, netlifyStatus, supabaseStatus] = await Promise.all([
         validateAndFetchUserData('github'),
         validateAndFetchUserData('vercel'),
         validateAndFetchUserData('netlify'),
         validateAndFetchUserData('supabase')
       ])
+      console.log('[CONNECTION_STATUS] Validation results:', {
+        github: githubStatus.connected,
+        vercel: vercelStatus.connected,
+        netlify: netlifyStatus.connected,
+        supabase: supabaseStatus.connected
+      })
 
       // Update connection status
+      console.log('[CONNECTION_STATUS] Updating UI state...')
       setConnections({
         github: githubStatus,
         vercel: vercelStatus,
@@ -849,6 +894,7 @@ function AccountSettingsPageContent() {
           } : supabaseStatus.selectedProject
         }
       })
+      console.log('[CONNECTION_STATUS] UI state updated')
 
     } catch (error) {
       console.error("Error checking connection status:", error)
@@ -1923,7 +1969,7 @@ function AccountSettingsPageContent() {
                     <div className="flex gap-2">
                       <Input
                         type="password"
-                        placeholder={connections.supabase.connected ? "Token saved and secured" : "Enter your Supabase access token"}
+                        placeholder={connections.supabase.connected ? "Token saved and secured" : "Enter Supabase Management API token (not anon/service_role key)"}
                         value={connections.supabase.connected ? "••••••••••••••••••••••••••••••••" : connectionForms.supabase.token}
                         onChange={(e) => setConnectionForms(prev => ({
                           ...prev,
@@ -2097,7 +2143,16 @@ function AccountSettingsPageContent() {
                       {connections.supabase.connected ? (
                         "Your token is securely stored. API keys are fetched automatically when selecting a project."
                       ) : (
-                        <>Need a token? <a href="https://api.optimaai.cc/supabase-auth/login" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Get OAuth token here</a></>
+                        <>
+                          Enter your Supabase Management API token from{" "}
+                          <a href="https://supabase.com/dashboard/account/tokens" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                            supabase.com/dashboard/account/tokens
+                          </a>{" "}
+                          or use{" "}
+                          <a href="https://api.optimaai.cc/supabase-auth/login" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                            OAuth login
+                          </a>
+                        </>
                       )}
                       </p>
                     </div>
