@@ -91,6 +91,36 @@ File deleted successfully.
 const result4 = jsonToolParser.parseJsonTools(testContent4)
 console.log('✅ Test 4 - delete_file:', result4.tools.length, 'tools detected')
 
+// Test case 5: Malformed JSON (missing quotes, unescaped content)
+const testContent5 = `
+Here's a malformed JSON that should still be parsed:
+
+{
+ "tool": "write_file",
+ "path": "src/pages/RideDetails.tsx",
+content": "import { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/hooks/useAuth'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { MapPin, Calendar, Clock, Users, Car, Star, MessageSquare } from 'lucide-react'
+import { toast } from 'sonner'
+
+export function RideDetails() {
+  return <div>Test</div>
+}"
+}
+`
+
+const result5 = jsonToolParser.parseJsonTools(testContent5)
+console.log('✅ Test 5 - Malformed JSON:', result5.tools.length, 'tools detected')
+if (result5.tools.length > 0) {
+  console.log('Tool parsed successfully:', result5.tools[0].tool)
+  console.log('Path:', result5.tools[0].path)
+  console.log('Content length:', result5.tools[0].content?.length || 0)
+}
+
 console.log('🎉 All JSON tool parser tests completed!')
-console.log('📊 Total tools detected across all tests:', 
-  result1.tools.length + result2.tools.length + result3.tools.length + result4.tools.length)
+console.log('📊 Total tools detected across all tests:',
+  result1.tools.length + result2.tools.length + result3.tools.length + result4.tools.length + result5.tools.length)

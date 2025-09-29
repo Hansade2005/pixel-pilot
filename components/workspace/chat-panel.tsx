@@ -608,6 +608,19 @@ const JSONToolPill = ({
             result = { message: `File ${toolCall.path} deleted successfully`, action: 'deleted' }
             break
 
+          case 'execute_sql':
+            // Use autoExecutor for SQL execution (server-side API calls)
+            if (autoExecutor) {
+              result = await autoExecutor.executeJsonTool({
+                ...toolCall,
+                id: executionId,
+                status: 'executing'
+              })
+            } else {
+              throw new Error('execute_sql requires auto executor for server-side API calls')
+            }
+            break
+
           default:
             throw new Error(`Unsupported tool: ${toolCall.tool}`)
         }
@@ -654,6 +667,7 @@ const JSONToolPill = ({
       case 'pilotedit': return Edit3
       case 'delete_file': 
       case 'pilotdelete': return X
+      case 'execute_sql': return Database
       default: return Wrench
     }
   }
@@ -666,6 +680,7 @@ const JSONToolPill = ({
       case 'pilotedit': return 'Modified'
       case 'delete_file': 
       case 'pilotdelete': return 'Deleted'
+      case 'execute_sql': return 'Executed'
       default: return 'Executed'
     }
   }
@@ -678,6 +693,7 @@ const JSONToolPill = ({
       case 'pilotedit': return 'File Modified'
       case 'delete_file': 
       case 'pilotdelete': return 'File Deleted'
+      case 'execute_sql': return 'SQL Executed'
       default: return 'Tool Executed'
     }
   }
@@ -703,102 +719,157 @@ const JSONToolPill = ({
           }`}
           onClick={hasContent ? () => setIsExpanded(!isExpanded) : undefined}
         >
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-full transition-colors ${
-              executionStatus === 'executing' 
-                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white animate-pulse'
-                : isSuccess 
-                ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' 
-                : 'bg-red-500 text-white'
-            }`}>
-              <IconComponent className="w-4 h-4" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <IconComponent className={`w-4 h-4 ${isSuccess ? 'text-primary' : 'text-red-500'}`} />
+              <span className="font-medium text-sm">
+                {getToolDisplayName(toolCall.tool || toolCall.name || 'unknown')}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {fileName}
+              </span>
             </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-foreground">{getToolDisplayName(toolCall.tool || toolCall.name || 'unknown')}</span>
-                <span className="text-xs text-muted-foreground">({fileName})</span>
-              </div>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <span>{getToolAction(toolCall.tool || toolCall.name || 'unknown')}</span>
-                <span>•</span>
-                <span>{executionStatus === 'executing' ? 'Processing...' : isSuccess ? 'Completed' : 'Failed'}</span>
-                {executionStatus === 'executing' && (
-                  <div className="ml-2 w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                )}
-              </div>
+            <div className="flex items-center gap-2">
+              {executionStatus === 'executing' && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                  Executing...
+                </div>
+              )}
+              {hasContent && (
+                <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+              )}
             </div>
-            {hasContent && (
-              <div className="ml-2">
-                {isExpanded ? (
-                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                )}
-              </div>
-            )}
           </div>
         </div>
-        
-        {/* File Content - Collapsible with Syntax Highlighting */}
-        {hasContent && toolCall.content && isExpanded && (
-          <div className="p-4 bg-background border-t">
-            <div className="max-h-96 overflow-y-auto">
-              <div className="bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
-                <div className="px-3 py-2 bg-gray-700 border-b border-gray-600 text-xs font-medium text-white">
-                  {toolCall.path || fileName} • {fileExtension}
-                </div>
-                <pre className="p-4 overflow-x-auto bg-[#1e1e1e]">
-                  <code className={`hljs language-${fileExtension} text-sm text-white`}>
-                    {toolCall.content}
-                  </code>
-                </pre>
-              </div>
-            </div>
+
+        {/* Content Preview */}
+        {hasContent && isExpanded && (
+          <div className="p-4 bg-muted/30">
+            <div className="text-xs text-muted-foreground mb-2">Content:</div>
+            <pre className="text-xs bg-background p-3 rounded border overflow-x-auto max-h-60">
+              <code className={`language-${fileExtension}`}>{toolCall.content}</code>
+            </pre>
           </div>
         )}
       </div>
     )
   }
 
-  // Simple pill for delete_file (no content to show)
+  // Special handling for execute_sql with SQL query display
+  if (toolCall.tool === 'execute_sql') {
+    const [isExpanded, setIsExpanded] = useState(false)
+    const hasContent = toolCall.content && toolCall.content.trim().length > 0
+    
+    return (
+      <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
+        {/* Header - Clickable to toggle */}
+        <div
+          className={`px-4 py-3 border-b ${hasContent ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors ${
+            isSuccess
+              ? 'bg-muted border-l-4 border-l-primary'
+              : 'bg-red-900/20 border-l-4 border-l-red-500'
+          }`}
+          onClick={hasContent ? () => setIsExpanded(!isExpanded) : undefined}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <IconComponent className={`w-4 h-4 ${isSuccess ? 'text-primary' : 'text-red-500'}`} />
+              <span className="font-medium text-sm">
+                {getToolDisplayName(toolCall.tool)}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Database Query
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {executionStatus === 'executing' && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                  Executing...
+                </div>
+              )}
+              {hasContent && (
+                <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* SQL Query Preview */}
+        {hasContent && isExpanded && (
+          <div className="p-4 bg-muted/30">
+            <div className="text-xs text-muted-foreground mb-2">SQL Query:</div>
+            <pre className="text-xs bg-background p-3 rounded border overflow-x-auto max-h-60">
+              <code className="language-sql">{toolCall.content}</code>
+            </pre>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Default tool pill for other tools
+  const hasContent = toolCall.content && toolCall.content.trim().length > 0
+  const [isExpanded, setIsExpanded] = useState(false)
+  const fileExtension = toolCall.path ? (toolCall.path.split('.').pop() || 'text') : 'tsx'
+
   return (
-    <div className="bg-background border rounded-lg shadow-sm mb-2 overflow-hidden">
-      <div className={`px-3 py-2 flex items-center gap-3 ${
-        isSuccess
-          ? 'bg-muted border-l-4 border-l-primary'
-          : 'bg-red-900/20 border-l-4 border-l-red-500'
-      }`}>
-        <div className={`p-2 rounded-full transition-colors ${
-          executionStatus === 'executing' 
-            ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white animate-pulse'
-            : isSuccess 
-            ? 'bg-gradient-to-r from-red-500 to-red-600 text-white' 
-            : 'bg-red-500 text-white'
-        }`}>
-          <IconComponent className={`w-4 h-4`} />
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-foreground">{getToolDisplayName(toolCall.tool || toolCall.name || 'unknown')}</span>
-            <span className="text-xs text-muted-foreground">({fileName})</span>
+    <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
+      {/* Header - Clickable to toggle */}
+      <div
+        className={`px-4 py-3 border-b ${hasContent ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors ${
+          isSuccess
+            ? 'bg-muted border-l-4 border-l-primary'
+            : 'bg-red-900/20 border-l-4 border-l-red-500'
+        }`}
+        onClick={hasContent ? () => setIsExpanded(!isExpanded) : undefined}
+      >
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-full transition-colors ${
+            executionStatus === 'executing'
+              ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white animate-pulse'
+              : isSuccess
+              ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white'
+              : 'bg-red-500 text-white'
+          }`}>
+            <IconComponent className="w-4 h-4" />
           </div>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <span>{getToolAction(toolCall.tool || toolCall.name || 'unknown')}</span>
-            <span>•</span>
-            <span>{executionStatus === 'executing' ? 'Processing...' : isSuccess ? 'Completed' : 'Failed'}</span>
-            {executionStatus === 'executing' && (
-              <div className="ml-2 w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-            )}
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-foreground">{getToolDisplayName(toolCall.tool || toolCall.name || 'unknown')}</span>
+              <span className="text-xs text-muted-foreground">({fileName})</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <span>{getToolAction(toolCall.tool || toolCall.name || 'unknown')}</span>
+              <span>•</span>
+              <span>{executionStatus === 'executing' ? 'Processing...' : isSuccess ? 'Completed' : 'Failed'}</span>
+              {executionStatus === 'executing' && (
+                <div className="ml-2 w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              )}
+            </div>
           </div>
-        </div>
-        <div className={`p-1 rounded-full ${isSuccess ? 'bg-green-500' : 'bg-red-500'}`}>
-          {isSuccess ? (
-            <Check className="w-4 h-4 text-white" />
-          ) : (
-            <X className="w-4 h-4 text-white" />
+          {hasContent && (
+            <div className="ml-2">
+              {isExpanded ? (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              )}
+            </div>
           )}
         </div>
       </div>
+
+      {/* Content Preview */}
+      {hasContent && isExpanded && (
+        <div className="p-4 bg-muted/30">
+          <div className="text-xs text-muted-foreground mb-2">Content:</div>
+          <pre className="text-xs bg-background p-3 rounded border overflow-x-auto max-h-60">
+            <code className={`language-${fileExtension}`}>{toolCall.content}</code>
+          </pre>
+        </div>
+      )}
     </div>
   )
 }

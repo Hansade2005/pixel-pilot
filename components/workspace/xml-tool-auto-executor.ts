@@ -251,7 +251,7 @@ class XMLToolAutoExecutor {
   }
 
   // Execute SQL operation
-  private async executeSql(toolCall: XMLToolCall): Promise<any> {
+  private async executeSql(toolCall: JsonToolCall | XMLToolCall): Promise<any> {
     if (!toolCall.content) {
       throw new Error('Missing SQL content for execute_sql')
     }
@@ -624,6 +624,9 @@ class XMLToolAutoExecutor {
           }
           
           return { message: `File ${toolCall.path} deleted successfully` }
+
+        case 'execute_sql':
+          return await this.executeSql(toolCall)
 
         default:
           throw new Error(`Unsupported JSON tool: ${toolCall.tool}`)

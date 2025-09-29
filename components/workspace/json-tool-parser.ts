@@ -47,7 +47,8 @@ export class JsonToolParser {
   private supportedTools = [
     'write_file', 'edit_file', 'delete_file',
     'read_file', 'list_files', 'create_directory',
-    'pilotwrite', 'pilotedit', 'pilotdelete'
+    'pilotwrite', 'pilotedit', 'pilotdelete',
+    'execute_sql'
   ]
 
   /**
@@ -83,36 +84,52 @@ export class JsonToolParser {
   }
 
   /**
-   * Find JSON tool blocks in content
+   * Find JSON tool blocks in content with enhanced pattern matching
    * Looks for patterns like: {"tool": "write_file", ...}
    */
   private findJsonToolBlocks(content: string): Array<{ json: string; startIndex: number }> {
     const blocks: Array<{ json: string; startIndex: number }> = []
-    
-    // Pattern to find JSON objects with "tool" property
-    const jsonToolPattern = /\{\s*["\']tool["\']\s*:\s*["\']([^"\']+)["\']\s*[,}][\s\S]*?\}/g
-    
-    let match
-    while ((match = jsonToolPattern.exec(content)) !== null) {
-      const toolName = match[1]
-      if (this.supportedTools.includes(toolName)) {
-        // Try to extract the complete JSON object
-        const completeJson = this.extractCompleteJson(content, match.index)
-        if (completeJson) {
-          blocks.push({
-            json: completeJson,
-            startIndex: match.index
-          })
+
+    // Multiple patterns to catch various JSON formats
+    const patterns = [
+      // Standard JSON: {"tool": "write_file", ...}
+      /\{\s*["\']tool["\']\s*:\s*["\']([^"\']+)["\']\s*[,}][\s\S]*?\}/g,
+
+      // Malformed JSON with missing quotes: {tool: "write_file", ...}
+      /\{\s*tool\s*:\s*["\']([^"\']+)["\']\s*[,}][\s\S]*?\}/g,
+
+      // JSON with unquoted property names: {"tool": "write_file", path: "...", ...}
+      /\{\s*["\']?tool["\']?\s*:\s*["\']([^"\']+)["\']\s*,[\s\S]*?\}/g,
+
+      // Very malformed: {tool:"write_file",content:"...",...}
+      /\{\s*tool\s*:\s*["\']([^"\']+)["\']\s*,[\s\S]*?\}/g
+    ]
+
+    for (const pattern of patterns) {
+      let match
+      while ((match = pattern.exec(content)) !== null) {
+        const toolName = match[1]
+        if (this.supportedTools.includes(toolName)) {
+          // Try to extract the complete JSON object
+          const completeJson = this.extractCompleteJson(content, match.index)
+          if (completeJson) {
+            blocks.push({
+              json: completeJson,
+              startIndex: match.index
+            })
+          }
         }
       }
     }
 
     // Also look for code blocks containing JSON
     const codeBlockPattern = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/g
+    let match
     while ((match = codeBlockPattern.exec(content)) !== null) {
       try {
         const jsonContent = match[1]
-        const parsed = JSON.parse(jsonContent)
+        // Try to parse directly first
+        let parsed = JSON.parse(jsonContent)
         if (parsed.tool && this.supportedTools.includes(parsed.tool)) {
           blocks.push({
             json: jsonContent,
@@ -120,23 +137,57 @@ export class JsonToolParser {
           })
         }
       } catch (error) {
-        // Ignore malformed JSON in code blocks
+        // If direct parsing fails, try repair
+        console.warn('[JsonToolParser] Code block JSON parsing failed, attempting repair')
+        const repairedJson = this.repairJson(match[1])
+        if (repairedJson) {
+          try {
+            const parsed = JSON.parse(repairedJson)
+            if (parsed.tool && this.supportedTools.includes(parsed.tool)) {
+              blocks.push({
+                json: repairedJson,
+                startIndex: match.index
+              })
+            }
+          } catch (repairError) {
+            console.error('[JsonToolParser] Code block JSON repair failed:', repairError)
+          }
+        }
       }
     }
 
-    return blocks
+    // Remove duplicates based on startIndex
+    const uniqueBlocks = blocks.filter((block, index, self) =>
+      index === self.findIndex(b => b.startIndex === block.startIndex)
+    )
+
+    return uniqueBlocks
   }
 
   /**
-   * Extract complete JSON object from content starting at index
+   * Extract complete JSON object from content starting at index with enhanced error handling
    */
   private extractCompleteJson(content: string, startIndex: number): string | null {
     let braceCount = 0
     let inString = false
     let escapeNext = false
     let jsonEnd = -1
+    let inMultilineString = false
 
+    // Find the actual start of the JSON object
+    let actualStart = startIndex
     for (let i = startIndex; i < content.length; i++) {
+      if (content[i] === '{') {
+        actualStart = i
+        break
+      }
+      // Skip whitespace and potential malformed prefixes
+      if (!/\s/.test(content[i])) {
+        break
+      }
+    }
+
+    for (let i = actualStart; i < content.length; i++) {
       const char = content[i]
 
       if (escapeNext) {
@@ -149,11 +200,17 @@ export class JsonToolParser {
         continue
       }
 
+      // Handle string literals
       if (char === '"' || char === "'") {
-        inString = !inString
+        if (!inString) {
+          inString = true
+        } else if (!escapeNext) {
+          inString = false
+        }
         continue
       }
 
+      // Only process structural characters when not in a string
       if (!inString) {
         if (char === '{') {
           braceCount++
@@ -167,11 +224,88 @@ export class JsonToolParser {
       }
     }
 
-    if (jsonEnd > startIndex) {
-      return content.substring(startIndex, jsonEnd + 1)
+    if (jsonEnd > actualStart) {
+      const jsonString = content.substring(actualStart, jsonEnd + 1)
+
+      // Validate that we have a reasonable JSON structure
+      const openBraces = (jsonString.match(/\{/g) || []).length
+      const closeBraces = (jsonString.match(/\}/g) || []).length
+
+      if (openBraces === closeBraces && openBraces > 0) {
+        return jsonString
+      }
     }
 
     return null
+  }
+
+  /**
+   * Repair common JSON syntax errors with enhanced robustness
+   */
+  private repairJson(jsonString: string): string | null {
+    try {
+      let repaired = jsonString.trim()
+
+      // Fix 0: Handle malformed opening quotes (like "{ instead of {)
+      if (repaired.startsWith('"{') && repaired.endsWith('}"')) {
+        repaired = repaired.slice(1, -1) // Remove outer quotes
+      }
+
+      // Fix 1: Add missing quotes around unquoted property names at start of object
+      // Match patterns like: tool: "write_file" -> "tool": "write_file"
+      repaired = repaired.replace(/^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:/gm, '"$1":')
+
+      // Fix 2: Add missing quotes around unquoted property names after commas
+      repaired = repaired.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
+
+      // Fix 3: Add missing quotes around unquoted string values
+      // Match patterns like: "path": src/file.js -> "path": "src/file.js"
+      // But be careful not to quote already quoted strings or numbers/booleans
+      repaired = repaired.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_\/\-\.]+)(\s*[,}])/g, (match, value, end) => {
+        // Don't quote if it's already quoted, a number, boolean, or null
+        if (value.startsWith('"') || value.startsWith("'") ||
+            /^-?\d+(\.\d+)?$/.test(value) ||
+            value === 'true' || value === 'false' || value === 'null') {
+          return match
+        }
+        return `: "${value}"${end}`
+      })
+
+      // Fix 4: Handle multiline content fields by properly escaping
+      // Look for content fields that span multiple lines
+      const contentMatch = repaired.match(/"content"\s*:\s*"([\s\S]*?)"(\s*[,}])/);
+      if (contentMatch) {
+        const contentValue = contentMatch[1];
+        // If content contains unescaped quotes or newlines, we need to handle it carefully
+        if (contentValue.includes('"') && !contentValue.includes('\\"')) {
+          // Replace unescaped quotes with escaped ones
+          const escapedContent = contentValue.replace(/"/g, '\\"');
+          repaired = repaired.replace(contentMatch[0], `"content": "${escapedContent}"${contentMatch[2]}`);
+        }
+      }
+
+      // Fix 5: Remove trailing commas before closing braces/brackets
+      repaired = repaired.replace(/,(\s*[}\]])/g, '$1')
+
+      // Fix 6: Ensure proper quote consistency (convert single quotes to double)
+      repaired = repaired.replace(/'/g, '"')
+
+      // Fix 7: Handle incomplete JSON by ensuring it ends properly
+      if (!repaired.trim().endsWith('}')) {
+        // Try to find where the JSON should end
+        const lastBrace = repaired.lastIndexOf('}');
+        if (lastBrace > 0) {
+          repaired = repaired.substring(0, lastBrace + 1);
+        }
+      }
+
+      console.log('[JsonToolParser] Repaired JSON:', repaired)
+      return repaired
+
+    } catch (error) {
+      console.error('[JsonToolParser] JSON repair failed:', error)
+      return null
+    }
   }
 
   /**
@@ -179,8 +313,9 @@ export class JsonToolParser {
    */
   private parseJsonBlock(jsonString: string, startIndex: number): Omit<JsonToolCall, 'id' | 'startTime'> | null {
     try {
-      const parsed = JSON.parse(jsonString)
-      
+      // First try to parse as-is
+      let parsed = JSON.parse(jsonString)
+
       if (!parsed.tool || !this.supportedTools.includes(parsed.tool)) {
         return null
       }
@@ -197,12 +332,55 @@ export class JsonToolParser {
         operation: parsed.operation,
         search: parsed.search,
         replace: parsed.replace,
+        searchReplaceBlocks: parsed.searchReplaceBlocks,
+        replaceAll: parsed.replaceAll,
+        occurrenceIndex: parsed.occurrenceIndex,
+        validateAfter: parsed.validateAfter,
+        dryRun: parsed.dryRun,
+        rollbackOnFailure: parsed.rollbackOnFailure,
         args,
         status: 'detected' as const
       }
 
     } catch (error) {
-      console.error('[JsonToolParser] JSON parsing failed:', error)
+      // If parsing fails, try to repair the JSON
+      console.warn('[JsonToolParser] JSON parsing failed, attempting repair:', error)
+
+      try {
+        const repairedJson = this.repairJson(jsonString)
+        if (repairedJson) {
+          const parsed = JSON.parse(repairedJson)
+
+          if (!parsed.tool || !this.supportedTools.includes(parsed.tool)) {
+            return null
+          }
+
+          // Build standardized args object
+          const args: Record<string, any> = { ...parsed }
+          delete args.tool // Remove tool from args since it's a separate field
+
+          return {
+            tool: parsed.tool,
+            name: parsed.tool, // For compatibility
+            path: parsed.path || args.file || args.filename,
+            content: parsed.content || args.content,
+            operation: parsed.operation,
+            search: parsed.search,
+            replace: parsed.replace,
+            searchReplaceBlocks: parsed.searchReplaceBlocks,
+            replaceAll: parsed.replaceAll,
+            occurrenceIndex: parsed.occurrenceIndex,
+            validateAfter: parsed.validateAfter,
+            dryRun: parsed.dryRun,
+            rollbackOnFailure: parsed.rollbackOnFailure,
+            args,
+            status: 'detected' as const
+          }
+        }
+      } catch (repairError) {
+        console.error('[JsonToolParser] JSON repair also failed:', repairError)
+      }
+
       return null
     }
   }
