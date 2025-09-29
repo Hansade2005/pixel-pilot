@@ -22,8 +22,8 @@ export function Logo({ size = 'md', variant = 'icon', className }: LogoProps) {
     xl: 'text-3xl'
   }
 
-  // Enhanced Pixel Pilot Icon Component
-  const PixelPilotIcon = ({ className }: { className?: string }) => (
+  // Enhanced Pipilot Icon Component
+  const PipilotIcon = ({ className }: { className?: string }) => (
     <div className={cn('relative group', className)}>
       {/* Main container with gradient background */}
       <div className="relative w-full h-full">
@@ -83,7 +83,7 @@ export function Logo({ size = 'md', variant = 'icon', className }: LogoProps) {
   if (variant === 'icon') {
     return (
       <div className={cn('flex items-center justify-center', className)}>
-        <PixelPilotIcon className={sizeClasses[size]} />
+        <PipilotIcon className={sizeClasses[size]} />
       </div>
     )
   }
@@ -91,7 +91,7 @@ export function Logo({ size = 'md', variant = 'icon', className }: LogoProps) {
   if (variant === 'text') {
     return (
       <div className={cn('flex items-center space-x-3', className)}>
-        <PixelPilotIcon className="h-6 w-6" />
+        <PipilotIcon className="h-6 w-6" />
         <div className="flex flex-col">
           <span className={cn('font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 bg-clip-text text-transparent', textSizes[size])}>
             PiPilot
@@ -107,10 +107,10 @@ export function Logo({ size = 'md', variant = 'icon', className }: LogoProps) {
   // Full variant with larger logo and text
   return (
     <div className={cn('flex items-center space-x-4', className)}>
-      <PixelPilotIcon className={size === 'sm' ? 'h-8 w-8' : size === 'md' ? 'h-12 w-12' : size === 'lg' ? 'h-16 w-16' : 'h-20 w-20'} />
+      <PipilotIcon className={size === 'sm' ? 'h-8 w-8' : size === 'md' ? 'h-12 w-12' : size === 'lg' ? 'h-16 w-16' : 'h-20 w-20'} />
       <div className="flex flex-col">
         <span className={cn('font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 bg-clip-text text-transparent', textSizes[size])}>
-          Pixel Pilot
+          Pipilot
         </span>
         <span className={cn('text-gray-300 font-medium', size === 'sm' ? 'text-xs' : size === 'md' ? 'text-sm' : size === 'lg' ? 'text-base' : 'text-lg')}>
           AI-Powered App Development

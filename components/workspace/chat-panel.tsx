@@ -439,7 +439,7 @@ export interface XMLToolCall {
   startTime?: number
   endTime?: number
   // Additional properties for pill rendering
-  command?: 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file'
+  command?: 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file' | 'execute_sql'
   path?: string
   content?: string
 }

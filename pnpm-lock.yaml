@@ -35,6 +35,9 @@ importers:
       '@codesandbox/sandpack-react':
         specifier: ^2.20.0
         version: 2.20.0(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
+      '@dyad-sh/supabase-management-js':
+        specifier: ^1.0.0
+        version: 1.0.0
       '@e2b/cli':
         specifier: ^2.2.4
         version: 2.2.4(@types/node@22.17.2)
@@ -425,6 +428,10 @@ packages:
 
   '@date-fns/tz@1.2.0':
     resolution: {integrity: sha512-LBrd7MiJZ9McsOgxqWX7AaxrDjcFVjWH/tIKJd7pnR7McaslGYOP1QmmiBXdJH/H/yLCT+rcQ7FaPBUxRGUtrg==}
+
+  '@dyad-sh/supabase-management-js@1.0.0':
+    resolution: {integrity: sha512-v/DupITKhM0/pmXJPFYFtjCoKzD5ZAQn1Haay1hXTSBP3SoEv1Ff7bQS7q7Ee30JCZllHy6dQFa6loqJKdkXOg==}
+    engines: {node: '>=18.0.0'}
 
   '@e2b/cli@2.2.4':
     resolution: {integrity: sha512-O3zIRxUaFPDsUYp/8bDcyKZL8mGpSQae6ebQ+M7olAupJ2CdLqQbm/rghtSRmzZYSerA9WhTVVJcF+4dZNXwWA==}
@@ -3051,6 +3058,9 @@ packages:
     resolution: {integrity: sha512-OS+QTnw1/4vrf+9hh1jc1jnYjzSG4ttTBB8UxOwAnInG3Uo4ssetzC1ihqaIHjLJnA5GGlRl6QlZXOTQhRBUvg==}
     engines: {node: '>=14.16'}
 
+  openapi-fetch@0.6.2:
+    resolution: {integrity: sha512-Faj29Kzh7oCbt1bz6vAGNKtRJlV/GolOQTx87eYUnfCK7eVXdN9jQVojroc7tcJ5OQgyhbeOqD7LS/8UtGBnMQ==}
+
   openapi-fetch@0.9.8:
     resolution: {integrity: sha512-zM6elH0EZStD/gSiNlcPrzXcVQ/pZo3BDvC6CDwRDUt1dDzxlshpmQnpD6cZaJ39THaSmwVCxxRrPKNM1hHrDg==}
 
@@ -4046,6 +4056,10 @@ snapshots:
       '@bufbuild/protobuf': 2.7.0
 
   '@date-fns/tz@1.2.0': {}
+
+  '@dyad-sh/supabase-management-js@1.0.0':
+    dependencies:
+      openapi-fetch: 0.6.2
 
   '@e2b/cli@2.2.4(@types/node@22.17.2)':
     dependencies:
@@ -6915,6 +6929,8 @@ snapshots:
       define-lazy-prop: 3.0.0
       is-inside-container: 1.0.0
       is-wsl: 2.2.0
+
+  openapi-fetch@0.6.2: {}
 
   openapi-fetch@0.9.8:
     dependencies:

@@ -1,5 +1,5 @@
 {
-  "name": "my-v0-project",
+  "name": "pipilot",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -18,6 +18,7 @@
     "@ai-sdk/togetherai": "^1.0.11",
     "@ai-sdk/ui-utils": "^1.2.11",
     "@codesandbox/sandpack-react": "^2.20.0",
+    "@dyad-sh/supabase-management-js": "^1.0.0",
     "@e2b/cli": "^2.2.4",
     "@e2b/code-interpreter": "^2.0.0",
     "@hookform/resolvers": "^3.10.0",

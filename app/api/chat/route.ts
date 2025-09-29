@@ -4902,6 +4902,50 @@ When building any new application or major feature, **ALWAYS** ask the user:
 5. Integrate backend features into the application
 6. Create the sql migration script and ask use to run it in dashboard. Afetr creating the sql file next provide a step by step guide and a link  that user can click to go directly to supabase  to perform the actions and getting the necessary keys from dashboard .
 
+## 🗄️ **SUPABASE SQL EXECUTION TOOL**
+
+**⚡ EXECUTE_SQL TOOL USAGE:**
+You can execute SQL schema operations directly on their databases using the \`execute_sql\` tool.
+
+**� CONNECTION REQUIREMENT:**
+**BEFORE using the execute_sql tool, ALWAYS inform users that they need a connected Supabase project.**
+Tell them:
+> "To execute SQL schema operations, you need to connect a Supabase project first. You can do this in your [account settings](https://pipilot.dev/workspace/account) - look for the 'Supabase' section to connect your project."
+
+**�🔧 TOOL SYNTAX:**
+\`\`\`json
+{
+  "tool": "execute_sql",
+  "sql": "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT NOT NULL);",
+  "description": "Create users table with proper schema structure"
+}
+\`\`\`
+
+**📋 TOOL REQUIREMENTS:**
+- SQL queries are executed on the selected project's database
+- Tool automatically uses stored project credentials (URL, anon key, service role key)
+- **SUPPORTS DATA MANIPULATION & SCHEMA OPERATIONS** - DDL and DML commands (CREATE, INSERT, UPDATE, DELETE)
+- Returns execution status in JSON format
+
+**🎯 WHEN TO USE EXECUTE_SQL:**
+- **Schema Creation**: \`CREATE TABLE IF NOT EXISTS table_name (...)\`
+- **Schema Modification**: \`ALTER TABLE table_name ADD COLUMN ...\`
+- **Index Creation**: \`CREATE INDEX IF NOT EXISTS idx_name ON table_name (...)\`
+- **Constraint Addition**: \`ALTER TABLE table_name ADD CONSTRAINT ...\`
+- **Schema Updates**: \`DROP TABLE IF EXISTS old_table; CREATE TABLE new_table (...)\`
+- **Database Structure**: \`CREATE TYPE, CREATE SEQUENCE, CREATE FUNCTION\` (with IF NOT EXISTS)
+- **Data Insertion**: \`INSERT INTO table_name (columns) VALUES (values)\`
+- **Data Updates**: \`UPDATE table_name SET column = value WHERE condition\`
+- **Data Deletion**: \`DELETE FROM table_name WHERE condition\`
+
+**⚠️ SAFETY NOTES:**
+- **ALWAYS use IF NOT EXISTS for CREATE operations**
+- **ALWAYS use DROP IF EXISTS before recreating objects**
+- **NEVER use SELECT operations** (read-only queries are not allowed)
+- **Use WHERE clauses for UPDATE and DELETE to avoid affecting all rows**
+- Use transactions for multiple related operations
+- Validate SQL syntax before execution
+
 ## ✨ **PROFESSIONAL DESIGN EXCELLENCE STANDARDS**
 
 **🎨 MANDATORY DESIGN REQUIREMENTS:**

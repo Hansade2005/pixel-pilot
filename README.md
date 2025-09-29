@@ -1,4 +1,4 @@
-# Pixel Pilot - AI-Powered App Development Platform
+# Pipilot - AI-Powered App Development Platform
 
 A modern web application that allows users to create apps and websites by chatting with AI. Built with Next.js, TypeScript, Tailwind CSS, and Supabase.
 
@@ -12,7 +12,7 @@ A modern web application that allows users to create apps and websites by chatti
 - **File Management**: Advanced file explorer with VS Code-like interface
 - **Custom Hooks**: 10+ reusable React hooks for common patterns
 - **UI Components**: 25+ shadcn/ui components for building stunning interfaces
-- **Logo System**: Custom Pixel Pilot logo with multiple variants and animations
+- **Logo System**: Custom Pipilot logo with multiple variants and animations
 
 ## Available Templates
 
@@ -34,11 +34,11 @@ A modern web application that allows users to create apps and websites by chatti
 
 ## Logo Component
 
-The Pixel Pilot logo is a sophisticated, animated component that represents AI-powered development:
+The Pipilot logo is a sophisticated, animated component that represents AI-powered development:
 
 ### Variants
 - **Icon**: Just the animated logo icon
-- **Text**: Logo icon with "Pixel Pilot" text and tagline
+- **Text**: Logo icon with "Pipilot" text and tagline
 - **Full**: Large logo with full branding
 
 ### Sizes

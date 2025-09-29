@@ -40,10 +40,11 @@ class XMLToolAutoExecutor {
     if (this.executionQueue.has(toolCall.id)) return false
     if (!toolCall.path || !toolCall.command) return false
     
-    // Only execute valid file operations (support both pilot and specs tool names)
+    // Only execute valid file operations and SQL operations (support both pilot and specs tool names)
     const validCommands = [
       'pilotwrite', 'pilotedit', 'pilotdelete',
-      'write_file', 'edit_file', 'delete_file'
+      'write_file', 'edit_file', 'delete_file',
+      'execute_sql'
     ]
     return validCommands.includes(toolCall.command)
   }
@@ -249,6 +250,113 @@ class XMLToolAutoExecutor {
     }
   }
 
+  // Execute SQL operation
+  private async executeSql(toolCall: XMLToolCall): Promise<any> {
+    if (!toolCall.content) {
+      throw new Error('Missing SQL content for execute_sql')
+    }
+
+    try {
+      // Get Supabase project details for the current user
+      const { getSupabaseProjectDetails, getDeploymentTokens } = await import('@/lib/cloud-sync')
+      const projectDetails = await getSupabaseProjectDetails(this.options.projectId)
+
+      if (!projectDetails?.selectedProjectId) {
+        throw new Error('No Supabase project selected. Please select a project in your account settings.')
+      }
+
+      // Get the access token to fetch API keys automatically
+      const tokens = await getDeploymentTokens(this.options.projectId)
+      const accessToken = tokens?.supabase
+
+      if (!accessToken) {
+        throw new Error('No Supabase access token found. Please reconnect to Supabase in your account settings.')
+      }
+
+      // Use Dyad Supabase Management API to fetch API keys automatically
+      const { SupabaseManagementAPI } = await import('@dyad-sh/supabase-management-js')
+      const client = new SupabaseManagementAPI({ accessToken })
+
+      let anonKey: string
+      let serviceRoleKey: string
+      let projectUrl: string
+
+      try {
+        // Fetch API keys for the selected project
+        const apiKeys = await client.getProjectApiKeys(projectDetails.selectedProjectId)
+
+        // Find the anon and service_role keys
+        const anonKeyObj = apiKeys?.find((key: any) => key.name === 'anon')
+        const serviceRoleKeyObj = apiKeys?.find((key: any) => key.name === 'service_role')
+
+        if (!anonKeyObj?.api_key || !serviceRoleKeyObj?.api_key) {
+          throw new Error('Could not retrieve API keys from Supabase Management API')
+        }
+
+        anonKey = anonKeyObj.api_key
+        serviceRoleKey = serviceRoleKeyObj.api_key
+
+        // Construct project URL
+        projectUrl = `https://${projectDetails.selectedProjectId}.supabase.co`
+
+        // Store the fetched keys for future use
+        await import('@/lib/cloud-sync').then(async ({ storeSupabaseProjectDetails }) => {
+          await storeSupabaseProjectDetails(this.options.projectId, {
+            projectUrl,
+            anonKey,
+            serviceRoleKey
+          })
+        })
+
+      } catch (apiError) {
+        console.error('Error fetching API keys from Management API:', apiError)
+
+        // Fallback to manually stored keys if available
+        if (projectDetails.anonKey && projectDetails.serviceRoleKey && projectDetails.projectUrl) {
+          anonKey = projectDetails.anonKey
+          serviceRoleKey = projectDetails.serviceRoleKey
+          projectUrl = projectDetails.projectUrl
+        } else {
+          throw new Error('Failed to fetch API keys automatically and no manual keys stored. Please check your Supabase connection.')
+        }
+      }
+
+      // Parse the SQL to determine the operation type
+      const sql = toolCall.content.trim()
+
+      if (sql.toUpperCase().startsWith('SELECT')) {
+        throw new Error('SELECT operations are not allowed. Only CREATE, INSERT, UPDATE, DELETE operations are permitted.')
+      }
+
+      // For SQL execution, use the Supabase Management API's runQuery method
+      // This executes SQL directly using service role permissions
+      try {
+        // Execute the SQL using the Management API's runQuery method
+        const result = await client.runQuery(projectDetails.selectedProjectId, sql)
+
+        // Return success result
+        return {
+          success: true,
+          action: 'executed',
+          sql: sql,
+          message: `✅ SQL executed successfully using service role permissions.`,
+          result: {
+            operation: sql.split(' ')[0].toUpperCase(),
+            status: 'completed',
+            note: 'Database operation completed via Supabase Management API',
+            executionResult: result
+          }
+        }
+      } catch (execError) {
+        // If execution fails, provide detailed error but don't simulate success
+        console.error('SQL execution error:', execError)
+        throw new Error(`SQL execution failed: ${execError instanceof Error ? execError.message : 'Unknown error'}`)
+      }
+    } catch (error) {
+      throw new Error(`Failed to execute SQL: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
   // Main execution method
   public async executeXMLTool(toolCall: XMLToolCall): Promise<any> {
     if (!this.shouldAutoExecute(toolCall)) {
@@ -277,6 +385,9 @@ class XMLToolAutoExecutor {
         case 'pilotdelete':
         case 'delete_file':
           result = await this.executePilotDelete(toolCall)
+          break
+        case 'execute_sql':
+          result = await this.executeSql(toolCall)
           break
         default:
           throw new Error(`Unknown command: ${toolCall.command}`)

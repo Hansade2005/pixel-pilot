@@ -192,7 +192,11 @@ export async function storeDeploymentTokens(
   tokens: {
     github?: string, 
     vercel?: string, 
-    netlify?: string
+    netlify?: string,
+    supabase?: string,
+    supabase_project_url?: string,
+    supabase_anon_key?: string,
+    supabase_service_role_key?: string
   }
 ): Promise<boolean> {
   try {
@@ -206,6 +210,10 @@ export async function storeDeploymentTokens(
     if (tokens.github !== undefined) updateData.github_token = tokens.github
     if (tokens.vercel !== undefined) updateData.vercel_token = tokens.vercel  
     if (tokens.netlify !== undefined) updateData.netlify_token = tokens.netlify
+    if (tokens.supabase !== undefined) updateData.supabase_token = tokens.supabase
+    if (tokens.supabase_project_url !== undefined) updateData.supabase_project_url = tokens.supabase_project_url
+    if (tokens.supabase_anon_key !== undefined) updateData.supabase_anon_key = tokens.supabase_anon_key
+    if (tokens.supabase_service_role_key !== undefined) updateData.supabase_service_role_key = tokens.supabase_service_role_key
 
     const { error } = await supabase
       .from('user_settings')
@@ -228,12 +236,16 @@ export async function storeDeploymentTokens(
 export async function getDeploymentTokens(userId: string): Promise<{
   github?: string, 
   vercel?: string, 
-  netlify?: string
+  netlify?: string,
+  supabase?: string,
+  supabase_project_url?: string,
+  supabase_anon_key?: string,
+  supabase_service_role_key?: string
 } | null> {
   try {
     const { data, error } = await supabase
       .from('user_settings')
-      .select('github_token, vercel_token, netlify_token')
+      .select('github_token, vercel_token, netlify_token, supabase_token, supabase_project_url, supabase_anon_key, supabase_service_role_key')
       .eq('user_id', userId)
       .single()
 
@@ -244,7 +256,11 @@ export async function getDeploymentTokens(userId: string): Promise<{
     return data ? {
       github: data.github_token || undefined,
       vercel: data.vercel_token || undefined,
-      netlify: data.netlify_token || undefined
+      netlify: data.netlify_token || undefined,
+      supabase: data.supabase_token || undefined,
+      supabase_project_url: data.supabase_project_url || undefined,
+      supabase_anon_key: data.supabase_anon_key || undefined,
+      supabase_service_role_key: data.supabase_service_role_key || undefined
     } : null
   } catch (error) {
     console.error("Error retrieving deployment tokens:", error)
@@ -260,7 +276,8 @@ export async function storeDeploymentConnectionStates(
   states: {
     github_connected?: boolean,
     vercel_connected?: boolean,
-    netlify_connected?: boolean
+    netlify_connected?: boolean,
+    supabase_connected?: boolean
   }
 ): Promise<boolean> {
   try {
@@ -272,6 +289,7 @@ export async function storeDeploymentConnectionStates(
     if (states.github_connected !== undefined) updateData.github_connected = states.github_connected
     if (states.vercel_connected !== undefined) updateData.vercel_connected = states.vercel_connected
     if (states.netlify_connected !== undefined) updateData.netlify_connected = states.netlify_connected
+    if (states.supabase_connected !== undefined) updateData.supabase_connected = states.supabase_connected
 
     const { error } = await supabase
       .from('user_settings')
@@ -294,12 +312,13 @@ export async function storeDeploymentConnectionStates(
 export async function getDeploymentConnectionStates(userId: string): Promise<{
   github_connected?: boolean,
   vercel_connected?: boolean,
-  netlify_connected?: boolean
+  netlify_connected?: boolean,
+  supabase_connected?: boolean
 } | null> {
   try {
     const { data, error } = await supabase
       .from('user_settings')
-      .select('github_connected, vercel_connected, netlify_connected')
+      .select('github_connected, vercel_connected, netlify_connected, supabase_connected')
       .eq('user_id', userId)
       .single()
 
@@ -310,10 +329,81 @@ export async function getDeploymentConnectionStates(userId: string): Promise<{
     return data ? {
       github_connected: data.github_connected || false,
       vercel_connected: data.vercel_connected || false,
-      netlify_connected: data.netlify_connected || false
+      netlify_connected: data.netlify_connected || false,
+      supabase_connected: data.supabase_connected || false
     } : null
   } catch (error) {
     console.error("Error retrieving deployment connection states:", error)
+    return null
+  }
+}
+export async function storeSupabaseProjectDetails(
+  userId: string,
+  projectDetails: {
+    projectUrl?: string,
+    anonKey?: string,
+    serviceRoleKey?: string,
+    selectedProjectId?: string,
+    selectedProjectName?: string
+  }
+): Promise<boolean> {
+  try {
+    const updateData: any = {
+      user_id: userId,
+      updated_at: new Date().toISOString()
+    }
+
+    if (projectDetails.projectUrl !== undefined) updateData.supabase_project_url = projectDetails.projectUrl
+    if (projectDetails.anonKey !== undefined) updateData.supabase_anon_key = projectDetails.anonKey
+    if (projectDetails.serviceRoleKey !== undefined) updateData.supabase_service_role_key = projectDetails.serviceRoleKey
+    if (projectDetails.selectedProjectId !== undefined) updateData.supabase_selected_project_id = projectDetails.selectedProjectId
+    if (projectDetails.selectedProjectName !== undefined) updateData.supabase_selected_project_name = projectDetails.selectedProjectName
+
+    const { error } = await supabase
+      .from('user_settings')
+      .upsert(updateData, {
+        onConflict: 'user_id'
+      })
+
+    if (error) throw error
+
+    return true
+  } catch (error) {
+    console.error("Error storing Supabase project details:", error)
+    return false
+  }
+}
+
+/**
+ * Retrieve Supabase project details for a user
+ */
+export async function getSupabaseProjectDetails(userId: string): Promise<{
+  projectUrl?: string,
+  anonKey?: string,
+  serviceRoleKey?: string,
+  selectedProjectId?: string,
+  selectedProjectName?: string
+} | null> {
+  try {
+    const { data, error } = await supabase
+      .from('user_settings')
+      .select('supabase_project_url, supabase_anon_key, supabase_service_role_key, supabase_selected_project_id, supabase_selected_project_name')
+      .eq('user_id', userId)
+      .single()
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+      throw error
+    }
+
+    return data ? {
+      projectUrl: data.supabase_project_url || undefined,
+      anonKey: data.supabase_anon_key || undefined,
+      serviceRoleKey: data.supabase_service_role_key || undefined,
+      selectedProjectId: data.supabase_selected_project_id || undefined,
+      selectedProjectName: data.supabase_selected_project_name || undefined
+    } : null
+  } catch (error) {
+    console.error("Error retrieving Supabase project details:", error)
     return null
   }
 }

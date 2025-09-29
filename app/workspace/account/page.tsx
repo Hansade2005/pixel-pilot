@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -34,7 +35,8 @@ import {
   Crown,
   BarChart3,
   Receipt,
-  AlertTriangle
+  AlertTriangle,
+  Plus
 } from "lucide-react"
 
 // Custom SVG Icons
@@ -58,6 +60,13 @@ const NetlifyIcon = ({ className }: { className?: string }) => (
     <path d="M6.49 19.04h-.23L5.13 17.9v-.23l1.73-1.71h1.2l.15.15v1.2L6.5 19.04ZM5.13 6.31V6.1l1.13-1.13h.23L8.2 6.68v1.2l-.15.15h-1.2L5.13 6.31Zm9.96 9.09h-1.65l-.14-.13v-3.83c0-.68-.27-1.2-1.1-1.23-.42 0-.9 0-1.43.02l-.07.08v4.96l-.14.14H8.9l-.13-.14V8.73l.13-.14h3.7a2.6 2.6 0 0 1 2.61 2.6v4.08l-.13.14Zm-8.37-2.44H.14L0 12.82v-1.64l.14-.14h6.58l.14.14v1.64l-.14.14Zm17.14 0h-6.58l-.14-.14v-1.64l.14-.14h6.58l.14.14v1.64l-.14.14ZM11.05 6.55V1.64l.14-.14h1.65l.14.14v4.9l-.14.14h-1.65l-.14-.13Zm0 15.81v-4.9l.14-.14h1.65l.14.13v4.91l-.14.14h-1.65l-.14-.14Z"/>
   </svg>
 )
+
+const SupabaseIcon = ({ className }: { className?: string }) => (
+  <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className={className}>
+    <title>Supabase</title>
+    <path d="M21.362 9.354H12V.396a.396.396 0 0 0-.716-.233L2.724 9.355H.642A.643.643 0 0 0 0 10v4a.64.64 0 0 0 .643.643h2.724l8.56 9.192a.396.396 0 0 0 .716-.233V14.61h9.362a.643.643 0 0 0 .643-.643v-4a.643.643 0 0 0-.643-.643Z"/>
+  </svg>
+)
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { storageManager } from "@/lib/storage-manager"
@@ -73,6 +82,8 @@ import {
   getDeploymentTokens,
   storeDeploymentConnectionStates,
   getDeploymentConnectionStates,
+  storeSupabaseProjectDetails,
+  getSupabaseProjectDetails
 } from "@/lib/cloud-sync"
 import { useCloudSync } from "@/hooks/use-cloud-sync"
 import { 
@@ -116,17 +127,24 @@ export default function AccountSettingsPage() {
   const { triggerBackup, getSyncStatus } = useCloudSync(user?.id || null)
 
   // Connection status states
-  const [connections, setConnections] = useState({
+  const [connections, setConnections] = useState<{
+    github: { connected: boolean; username: string; avatarUrl: string; loading: boolean };
+    vercel: { connected: boolean; username: string; avatarUrl: string; loading: boolean };
+    netlify: { connected: boolean; username: string; avatarUrl: string; loading: boolean };
+    supabase: { connected: boolean; username: string; avatarUrl: string; loading: boolean; projects: any[]; selectedProject: any | null };
+  }>({
     github: { connected: false, username: '', avatarUrl: '', loading: false },
     vercel: { connected: false, username: '', avatarUrl: '', loading: false },
-    netlify: { connected: false, username: '', avatarUrl: '', loading: false }
+    netlify: { connected: false, username: '', avatarUrl: '', loading: false },
+    supabase: { connected: false, username: '', avatarUrl: '', loading: false, projects: [], selectedProject: null }
   })
 
   // Connection form states
   const [connectionForms, setConnectionForms] = useState({
     github: { token: '', isValidating: false, error: '' },
     vercel: { token: '', isValidating: false, error: '' },
-    netlify: { token: '', isValidating: false, error: '' }
+    netlify: { token: '', isValidating: false, error: '' },
+    supabase: { token: '', anonKey: '', serviceRoleKey: '', isValidating: false, error: '' }
   })
   
   // Password change form state
@@ -149,6 +167,52 @@ export default function AccountSettingsPage() {
   const [deleteConfirmation, setDeleteConfirmation] = useState("")
 
   const supabase = createClient()
+  const searchParams = useSearchParams()
+
+  // Handle OAuth callback parameters
+  useEffect(() => {
+    const handleOAuthCallback = async () => {
+      const token = searchParams.get('token')
+      const refreshToken = searchParams.get('refreshToken')
+      const expiresIn = searchParams.get('expiresIn')
+
+      if (token && user?.id) {
+        try {
+          // Store the Supabase access token
+          const tokensToStore: any = { supabase: token }
+          const success = await storeDeploymentTokens(user.id, tokensToStore)
+          
+          if (success) {
+            // Store connection state
+            const statesToStore: any = { supabase_connected: true }
+            await storeDeploymentConnectionStates(user.id, statesToStore)
+
+            // Refresh connection status to show the new connection
+            await checkConnectionStatus(user.id)
+
+            // Clear URL parameters
+            window.history.replaceState({}, document.title, window.location.pathname)
+
+            toast({
+              title: "Connected to Supabase",
+              description: "Successfully connected to Supabase via OAuth",
+            })
+          }
+        } catch (error: any) {
+          console.error("Error handling OAuth callback:", error)
+          toast({
+            title: "Connection Failed",
+            description: "Failed to complete Supabase connection",
+            variant: "destructive"
+          })
+        }
+      }
+    }
+
+    if (user?.id) {
+      handleOAuthCallback()
+    }
+  }, [user?.id, searchParams])
 
   useEffect(() => {
     fetchUser()
@@ -236,7 +300,7 @@ export default function AccountSettingsPage() {
   }
 
   // Validate and connect to a provider
-  const handleConnect = async (provider: 'github' | 'vercel' | 'netlify') => {
+  const handleConnect = async (provider: 'github' | 'vercel' | 'netlify' | 'supabase') => {
     const token = connectionForms[provider].token
     if (!token.trim()) {
       setConnectionForms(prev => ({
@@ -282,6 +346,18 @@ export default function AccountSettingsPage() {
         })
         if (!response.ok) throw new Error('Invalid Netlify token')
         userData = await response.json()
+      } else if (provider === 'supabase') {
+        // Use Dyad Supabase Management API to validate token
+        const { SupabaseManagementAPI } = await import('@dyad-sh/supabase-management-js')
+        const client = new SupabaseManagementAPI({ accessToken: token })
+        
+        try {
+          // Try to fetch projects to validate the token
+          await client.getProjects()
+          userData = { name: 'Supabase User' } // We don't get user data from this API
+        } catch (error) {
+          throw new Error('Invalid Supabase access token')
+        }
       }
 
       // Save token to Supabase
@@ -649,28 +725,30 @@ export default function AccountSettingsPage() {
   // Fetch existing connection status and validate tokens
   const checkConnectionStatus = async (userId: string) => {
     try {
-      // Get tokens and connection states from Supabase
-      const [tokens, connectionStates] = await Promise.all([
+      // Get tokens, connection states, and Supabase project details from Supabase
+      const [tokens, connectionStates, supabaseProjectDetails] = await Promise.all([
         getDeploymentTokens(userId),
-        getDeploymentConnectionStates(userId)
+        getDeploymentConnectionStates(userId),
+        getSupabaseProjectDetails(userId)
       ])
 
       // Set loading state for all providers
       setConnections(prev => ({
         github: { ...prev.github, loading: true },
         vercel: { ...prev.vercel, loading: true },
-        netlify: { ...prev.netlify, loading: true }
+        netlify: { ...prev.netlify, loading: true },
+        supabase: { ...prev.supabase, loading: true }
       }))
 
       // Validate and fetch user data for each token
       const validateAndFetchUserData = async (
-        provider: 'github' | 'vercel' | 'netlify'
+        provider: 'github' | 'vercel' | 'netlify' | 'supabase'
       ) => {
         const token = tokens?.[provider]
         const isConnected = connectionStates?.[`${provider}_connected`] || false
         
         if (!token || !isConnected) {
-          return { connected: false, username: '', avatarUrl: '', loading: false }
+          return { connected: false, username: '', avatarUrl: '', loading: false, projects: undefined, selectedProject: null }
         }
 
         try {
@@ -704,17 +782,33 @@ export default function AccountSettingsPage() {
             })
             if (!response.ok) throw new Error('Invalid Netlify token')
             userData = await response.json()
+          } else if (provider === 'supabase') {
+            // Use Dyad Supabase Management API to validate token and fetch projects
+            const { SupabaseManagementAPI } = await import('@dyad-sh/supabase-management-js')
+            const client = new SupabaseManagementAPI({ accessToken: token })
+            
+            try {
+              // Fetch projects to validate token and get project data
+              const projects = await client.getProjects()
+              userData = { name: 'Supabase User', projects }
+            } catch (error) {
+              throw new Error('Invalid Supabase access token')
+            }
           }
 
           return {
             connected: true,
             username: provider === 'github' ? userData.login :
                      provider === 'vercel' ? (userData.username || userData.name) :
+                     provider === 'supabase' ? userData.name :
                      (userData.login || userData.email),
             avatarUrl: provider === 'github' ? userData.avatar_url :
                       provider === 'vercel' ? userData.avatar :
+                      provider === 'supabase' ? '' :
                       userData.avatar_url,
-            loading: false
+            loading: false,
+            projects: provider === 'supabase' ? userData.projects : undefined,
+            selectedProject: provider === 'supabase' ? null : undefined
           }
         } catch (error) {
           console.error(`Error validating ${provider} token:`, error)
@@ -730,22 +824,30 @@ export default function AccountSettingsPage() {
           } catch (deleteError) {
             console.error(`Error removing invalid ${provider} token:`, deleteError)
           }
-          return { connected: false, username: '', avatarUrl: '', loading: false }
+          return { connected: false, username: '', avatarUrl: '', loading: false, projects: undefined, selectedProject: null }
         }
       }
 
       // Validate all tokens concurrently
-      const [githubStatus, vercelStatus, netlifyStatus] = await Promise.all([
+      const [githubStatus, vercelStatus, netlifyStatus, supabaseStatus] = await Promise.all([
         validateAndFetchUserData('github'),
         validateAndFetchUserData('vercel'),
-        validateAndFetchUserData('netlify')
+        validateAndFetchUserData('netlify'),
+        validateAndFetchUserData('supabase')
       ])
 
       // Update connection status
       setConnections({
         github: githubStatus,
         vercel: vercelStatus,
-        netlify: netlifyStatus
+        netlify: netlifyStatus,
+        supabase: {
+          ...supabaseStatus,
+          selectedProject: supabaseProjectDetails?.selectedProjectId && supabaseProjectDetails?.selectedProjectName ? {
+            id: supabaseProjectDetails.selectedProjectId,
+            name: supabaseProjectDetails.selectedProjectName
+          } : supabaseStatus.selectedProject
+        }
       })
 
     } catch (error) {
@@ -754,7 +856,8 @@ export default function AccountSettingsPage() {
       setConnections(prev => ({
         github: { ...prev.github, loading: false },
         vercel: { ...prev.vercel, loading: false },
-        netlify: { ...prev.netlify, loading: false }
+        netlify: { ...prev.netlify, loading: false },
+        supabase: { ...prev.supabase, loading: false }
       }))
     }
   }
@@ -824,7 +927,7 @@ export default function AccountSettingsPage() {
   }
 
   // Disconnect from a provider
-  const handleDisconnect = async (provider: 'github' | 'vercel' | 'netlify') => {
+  const handleDisconnect = async (provider: 'github' | 'vercel' | 'netlify' | 'supabase') => {
     if (!user?.id) {
       toast({
         title: "Error",
@@ -868,9 +971,50 @@ export default function AccountSettingsPage() {
     }
   }
 
+  const handleCreateSupabaseProject = async () => {
+    if (!user?.id || !connections.supabase.connected) {
+      toast({
+        title: "Error",
+        description: "Not connected to Supabase",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      // Get the access token
+      const tokens = await getDeploymentTokens(user.id)
+      const accessToken = tokens?.supabase
+
+      if (!accessToken) {
+        throw new Error("No Supabase access token found")
+      }
+
+      // Use Dyad Supabase Management API to create project
+      const { SupabaseManagementAPI } = await import('@dyad-sh/supabase-management-js')
+      const client = new SupabaseManagementAPI({ accessToken })
+
+      // For now, we'll open Supabase dashboard for project creation
+      // In a future implementation, we could use the API to create projects programmatically
+      window.open('https://supabase.com/dashboard/projects', '_blank')
+
+      toast({
+        title: "Opening Supabase Dashboard",
+        description: "Please create your new project in the Supabase dashboard, then refresh this page to see it in the list."
+      })
+    } catch (error: any) {
+      console.error("Error creating Supabase project:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create Supabase project",
+        variant: "destructive"
+      })
+    }
+  }
+
   // Validate deployment token (you'll need to implement this)
   const validateDeploymentToken = async (
-    provider: 'github' | 'vercel' | 'netlify',
+    provider: 'github' | 'vercel' | 'netlify' | 'supabase',
     token: string
   ): Promise<boolean> => {
     // Implement token validation logic for each provider
@@ -894,7 +1038,8 @@ export default function AccountSettingsPage() {
         try {
           const response = await fetch('https://api.vercel.com/v1/user', {
             headers: {
-              'Authorization': `Bearer ${token}`
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
             }
           })
           return response.ok
@@ -906,10 +1051,21 @@ export default function AccountSettingsPage() {
         try {
           const response = await fetch('https://api.netlify.com/api/v1/user', {
             headers: {
-              'Authorization': `Bearer ${token}`
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
             }
           })
           return response.ok
+        } catch {
+          return false
+        }
+      case 'supabase':
+        // Supabase token validation using Dyad SDK
+        try {
+          const { SupabaseManagementAPI } = await import('@dyad-sh/supabase-management-js')
+          const client = new SupabaseManagementAPI({ accessToken: token })
+          await client.getProjects() // This will throw if token is invalid
+          return true
         } catch {
           return false
         }
@@ -1739,6 +1895,209 @@ export default function AccountSettingsPage() {
                         "Your token is securely stored. Click disconnect to change it."
                       ) : (
                         <>Need a token? <a href="https://app.netlify.com/user/applications#personal-access-tokens" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Create one here</a></>
+                      )}
+                      </p>
+                    </div>
+                </div>
+
+                {/* Supabase Connection */}
+                <div className="p-4 border rounded-lg">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-green-500 rounded-full flex items-center justify-center">
+                        <SupabaseIcon className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Supabase</p>
+                        <p className="text-sm text-muted-foreground">
+                          {connections.supabase.connected
+                            ? `${connections.supabase.projects?.length || 0} projects available`
+                            : "Connect your Supabase account for database operations"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {/* Token Input - Always visible but disabled when connected */}
+                    <div className="flex gap-2">
+                      <Input
+                        type="password"
+                        placeholder={connections.supabase.connected ? "Token saved and secured" : "Enter your Supabase access token"}
+                        value={connections.supabase.connected ? "••••••••••••••••••••••••••••••••" : connectionForms.supabase.token}
+                        onChange={(e) => setConnectionForms(prev => ({
+                          ...prev,
+                          supabase: { ...prev.supabase, token: e.target.value, error: '' }
+                        }))}
+                        disabled={connections.supabase.connected}
+                        className={connections.supabase.connected
+                          ? "bg-green-50 border-green-200 cursor-not-allowed"
+                          : connectionForms.supabase.error ? "border-red-500" : ""
+                        }
+                      />
+                  {connections.supabase.connected ? (
+                      <Button
+                          variant="destructive"
+                        onClick={() => handleDisconnect('supabase')}
+                        disabled={connections.supabase.loading}
+                      >
+                        {connections.supabase.loading ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Unlink className="h-4 w-4 mr-2" />
+                        )}
+                        Disconnect
+                      </Button>
+                      ) : (
+                        <Button
+                          onClick={() => handleConnect('supabase')}
+                          disabled={connectionForms.supabase.isValidating || !connectionForms.supabase.token.trim()}
+                        >
+                          {connectionForms.supabase.isValidating ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            "Connect"
+                          )}
+                        </Button>
+                      )}
+                      </div>
+
+                    {/* Connection Status */}
+                    {connections.supabase.connected && (
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span className="text-sm text-green-600 font-medium">Connected and secured</span>
+                      </div>
+                    )}
+
+                    {/* Project Selection - Only show when connected */}
+                    {connections.supabase.connected && connections.supabase.projects && connections.supabase.projects.length > 0 && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Select Project</Label>
+                        <select
+                          className="w-full p-2 border rounded-md text-sm"
+                          value={connections.supabase.selectedProject?.id || ''}
+                          onChange={async (e) => {
+                            const selectedProject = connections.supabase.projects?.find(p => p.id === e.target.value)
+                            if (selectedProject && user?.id) {
+                              try {
+                                // Get the access token
+                                const tokens = await getDeploymentTokens(user.id)
+                                const accessToken = tokens?.supabase
+
+                                if (accessToken) {
+                                  // Use Dyad Supabase Management API to fetch project details and API keys
+                                  const { SupabaseManagementAPI } = await import('@dyad-sh/supabase-management-js')
+                                  const client = new SupabaseManagementAPI({ accessToken })
+
+                                  try {
+                                    // Fetch API keys automatically
+                                    const apiKeys = await client.getProjectApiKeys(selectedProject.id)
+
+                                    // Find the anon and service_role keys
+                                    const anonKeyObj = apiKeys?.find((key: any) => key.name === 'anon')
+                                    const serviceRoleKeyObj = apiKeys?.find((key: any) => key.name === 'service_role')
+
+                                    if (anonKeyObj?.api_key && serviceRoleKeyObj?.api_key) {
+                                      // Store project details with automatically fetched keys
+                                      await storeSupabaseProjectDetails(user.id, {
+                                        selectedProjectId: selectedProject.id,
+                                        selectedProjectName: selectedProject.name,
+                                        projectUrl: `https://${selectedProject.id}.supabase.co`,
+                                        anonKey: anonKeyObj.api_key,
+                                        serviceRoleKey: serviceRoleKeyObj.api_key
+                                      })
+
+                                      toast({
+                                        title: "Project Selected",
+                                        description: `Selected ${selectedProject.name}. API keys fetched automatically.`,
+                                      })
+                                    } else {
+                                      throw new Error('Could not find required API keys')
+                                    }
+                                  } catch (apiError) {
+                                    console.error("Error fetching API keys from API:", apiError)
+                                    // Fallback: store basic project info only
+                                    await storeSupabaseProjectDetails(user.id, {
+                                      selectedProjectId: selectedProject.id,
+                                      selectedProjectName: selectedProject.name
+                                    })
+
+                                    toast({
+                                      title: "Project Selected",
+                                      description: `Selected ${selectedProject.name}. API keys could not be fetched automatically.`,
+                                      variant: "destructive"
+                                    })
+                                  }
+                                }
+                              } catch (error: any) {
+                                console.error("Error selecting project:", error)
+                                toast({
+                                  title: "Error",
+                                  description: "Failed to select project. Please try again.",
+                                  variant: "destructive"
+                                })
+                              }
+                            }
+
+                            setConnections(prev => ({
+                              ...prev,
+                              supabase: { ...prev.supabase, selectedProject }
+                            }))
+                          }}
+                        >
+                          <option value="">Select a project...</option>
+                          {connections.supabase.projects.map((project: any) => (
+                            <option key={project.id} value={project.id}>
+                              {project.name}
+                            </option>
+                          ))}
+                        </select>
+                        {connections.supabase.selectedProject && (
+                          <p className="text-xs text-muted-foreground">
+                            Selected: {connections.supabase.selectedProject.name}
+                            {(() => {
+                              // Check if API keys are available
+                              const checkKeys = async () => {
+                                try {
+                                  const details = await getSupabaseProjectDetails(user?.id || '')
+                                  return details?.anonKey && details?.serviceRoleKey
+                                } catch {
+                                  return false
+                                }
+                              }
+                              // This will be checked asynchronously
+                              return null
+                            })()}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Create New Project Button */}
+                    {connections.supabase.connected && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCreateSupabaseProject()}
+                        className="w-full"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create New Project
+                      </Button>
+                    )}
+
+                    {/* Error Message */}
+                      {connectionForms.supabase.error && (
+                        <p className="text-sm text-red-600">{connectionForms.supabase.error}</p>
+                      )}
+
+                    {/* Help Text */}
+                      <p className="text-xs text-muted-foreground">
+                      {connections.supabase.connected ? (
+                        "Your token is securely stored. API keys are fetched automatically when selecting a project."
+                      ) : (
+                        <>Need a token? <a href="https://api.optimaai.cc/supabase-auth/login" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Get OAuth token here</a></>
                       )}
                       </p>
                     </div>
