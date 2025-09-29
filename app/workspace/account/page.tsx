@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -106,7 +106,7 @@ import {
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 
-export default function AccountSettingsPage() {
+function AccountSettingsPageContent() {
   const { toast } = useToast()
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -2170,5 +2170,21 @@ export default function AccountSettingsPage() {
       <Footer />
     </div>
     </div>
+  )
+}
+
+// Wrapper component with Suspense boundary for useSearchParams
+export default function AccountSettingsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading account settings...</p>
+        </div>
+      </div>
+    }>
+      <AccountSettingsPageContent />
+    </Suspense>
   )
 }
