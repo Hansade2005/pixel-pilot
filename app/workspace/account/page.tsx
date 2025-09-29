@@ -195,13 +195,25 @@ function AccountSettingsPageContent() {
 
           // First validate the token before storing it
           console.log('[OAUTH] Validating Supabase OAuth token...')
-          const { SupabaseManagementAPI } = await import('@dyad-sh/supabase-management-js')
-          const client = new SupabaseManagementAPI({ accessToken: token })
           
-          // Try to fetch projects to validate the token
-          console.log('[OAUTH] Fetching projects to validate token...')
-          const projects = await client.getProjects()
-          console.log('[OAUTH] Token validation successful, found', projects?.length || 0, 'projects')
+          // Call our server-side API to validate the token (avoids CORS issues)
+          console.log('[OAUTH] Calling server API to validate token...')
+          const validateResponse = await fetch('/api/supabase/validate-token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token }),
+          })
+          
+          const validateResult = await validateResponse.json()
+          
+          if (!validateResponse.ok || !validateResult.valid) {
+            throw new Error(validateResult.error || 'Token validation failed')
+          }
+          
+          const projects = validateResult.projects || []
+          console.log('[OAUTH] Token validation successful, found', projects.length, 'projects')
 
           // Store the Supabase access token only after validation
           console.log('[OAUTH] Storing token and connection state...')
@@ -427,28 +439,38 @@ function AccountSettingsPageContent() {
         if (!response.ok) throw new Error('Invalid Netlify token')
         userData = await response.json()
       } else if (provider === 'supabase') {
-        // Use Dyad Supabase Management API to validate token
-        const { SupabaseManagementAPI } = await import('@dyad-sh/supabase-management-js')
-        const client = new SupabaseManagementAPI({ accessToken: token })
+        // Use server-side API to validate token (avoids CORS issues)
+        console.log('[SUPABASE] Validating manual access token...')
         
-        try {
-          // Try to fetch projects to validate the token
-          console.log('[SUPABASE] Validating manual access token...')
-          const projects = await client.getProjects()
-          console.log('[SUPABASE] Manual token validation successful, found', projects?.length || 0, 'projects')
-          userData = { name: 'Supabase User', projects } // Include projects in userData
-        } catch (error: any) {
-          console.error('[SUPABASE] Manual token validation failed:', error)
-          const errorMessage = error.message?.toLowerCase() || ''
+        const validateResponse = await fetch('/api/supabase/validate-token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token }),
+        })
+        
+        const validateResult = await validateResponse.json()
+        
+        if (!validateResponse.ok || !validateResult.valid) {
+          const errorMessage = validateResult.error || 'Token validation failed'
+          console.error('[SUPABASE] Manual token validation failed:', errorMessage)
           
-          if (errorMessage.includes('unauthorized') || errorMessage.includes('invalid') || errorMessage.includes('403')) {
+          if (errorMessage.toLowerCase().includes('unauthorized') || 
+              errorMessage.toLowerCase().includes('invalid') || 
+              errorMessage.toLowerCase().includes('403')) {
             throw new Error(`Invalid Supabase Management API token. Please ensure you're using a Management API token from https://supabase.com/dashboard/account/tokens, not an anon or service role key.`)
-          } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+          } else if (errorMessage.toLowerCase().includes('network') || 
+                     errorMessage.toLowerCase().includes('fetch')) {
             throw new Error('Network error while validating token. Please check your internet connection and try again.')
           } else {
-            throw new Error(`Failed to validate Supabase token: ${error.message || 'Unknown error'}. Please ensure you have the correct Management API token.`)
+            throw new Error(`Failed to validate Supabase token: ${errorMessage}. Please ensure you have the correct Management API token.`)
           }
         }
+        
+        const projects = validateResult.projects || []
+        console.log('[SUPABASE] Manual token validation successful, found', projects.length, 'projects')
+        userData = { name: 'Supabase User', projects } // Include projects in userData
       }
 
       // Save token to Supabase
@@ -874,20 +896,26 @@ function AccountSettingsPageContent() {
             if (!response.ok) throw new Error('Invalid Netlify token')
             userData = await response.json()
           } else if (provider === 'supabase') {
-            // Use Dyad Supabase Management API to validate token and fetch projects
-            const { SupabaseManagementAPI } = await import('@dyad-sh/supabase-management-js')
-            const client = new SupabaseManagementAPI({ accessToken: token })
-
-            try {
-              // Fetch projects to validate token and get project data
-              console.log('[SUPABASE] Validating access token...')
-              const projects = await client.getProjects()
-              console.log('[SUPABASE] Token validation successful, found', projects?.length || 0, 'projects')
-              userData = { name: 'Supabase User', projects }
-            } catch (error: any) {
-              console.error('[SUPABASE] Token validation failed:', error)
-              throw new Error(`Invalid Supabase Management API access token. Please ensure you're using a Management API token from https://supabase.com/dashboard/account/tokens, not an anon or service role key.`)
+            // Use server-side API to validate token and fetch projects (avoids CORS issues)
+            console.log('[SUPABASE] Validating access token...')
+            
+            const validateResponse = await fetch('/api/supabase/validate-token', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ token }),
+            })
+            
+            const validateResult = await validateResponse.json()
+            
+            if (!validateResponse.ok || !validateResult.valid) {
+              throw new Error(validateResult.error || 'Invalid Supabase Management API access token. Please ensure you\'re using a Management API token from https://supabase.com/dashboard/account/tokens, not an anon or service role key.')
             }
+            
+            const projects = validateResult.projects || []
+            console.log('[SUPABASE] Token validation successful, found', projects.length, 'projects')
+            userData = { name: 'Supabase User', projects }
           }
 
           return {
@@ -1163,12 +1191,18 @@ function AccountSettingsPageContent() {
           return false
         }
       case 'supabase':
-        // Supabase token validation using Dyad SDK
+        // Supabase token validation using server-side API (avoids CORS issues)
         try {
-          const { SupabaseManagementAPI } = await import('@dyad-sh/supabase-management-js')
-          const client = new SupabaseManagementAPI({ accessToken: token })
-          await client.getProjects() // This will throw if token is invalid
-          return true
+          const validateResponse = await fetch('/api/supabase/validate-token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token }),
+          })
+          
+          const validateResult = await validateResponse.json()
+          return validateResponse.ok && validateResult.valid
         } catch {
           return false
         }
@@ -2089,26 +2123,30 @@ function AccountSettingsPageContent() {
                                 const accessToken = tokens?.supabase
 
                                 if (accessToken) {
-                                  // Use Dyad Supabase Management API to fetch project details and API keys
-                                  const { SupabaseManagementAPI } = await import('@dyad-sh/supabase-management-js')
-                                  const client = new SupabaseManagementAPI({ accessToken })
-
+                                  // Use server-side API to fetch project details and API keys (avoids CORS issues)
                                   try {
-                                    // Fetch API keys automatically
-                                    const apiKeys = await client.getProjectApiKeys(selectedProject.id)
+                                    // Fetch API keys automatically using server-side API
+                                    const apiResponse = await fetch('/api/supabase/fetch-api-keys', {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({ 
+                                        token: accessToken, 
+                                        projectId: selectedProject.id 
+                                      }),
+                                    })
 
-                                    // Find the anon and service_role keys
-                                    const anonKeyObj = apiKeys?.find((key: any) => key.name === 'anon')
-                                    const serviceRoleKeyObj = apiKeys?.find((key: any) => key.name === 'service_role')
+                                    const apiResult = await apiResponse.json()
 
-                                    if (anonKeyObj?.api_key && serviceRoleKeyObj?.api_key) {
+                                    if (apiResponse.ok && apiResult.success) {
                                       // Store project details with automatically fetched keys
                                       await storeSupabaseProjectDetails(user.id, {
                                         selectedProjectId: selectedProject.id,
                                         selectedProjectName: selectedProject.name,
-                                        projectUrl: `https://${selectedProject.id}.supabase.co`,
-                                        anonKey: anonKeyObj.api_key,
-                                        serviceRoleKey: serviceRoleKeyObj.api_key
+                                        projectUrl: apiResult.projectUrl,
+                                        anonKey: apiResult.anonKey,
+                                        serviceRoleKey: apiResult.serviceRoleKey
                                       })
 
                                       toast({
@@ -2116,7 +2154,7 @@ function AccountSettingsPageContent() {
                                         description: `Selected ${selectedProject.name}. API keys fetched automatically.`,
                                       })
                                     } else {
-                                      throw new Error('Could not find required API keys')
+                                      throw new Error(apiResult.error || 'Could not fetch API keys')
                                     }
                                   } catch (apiError) {
                                     console.error("Error fetching API keys from API:", apiError)
