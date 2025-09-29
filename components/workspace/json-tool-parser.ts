@@ -15,7 +15,7 @@ export interface JsonToolCall {
   id: string
   tool: string
   name?: string
-  path?: string
+  path?: string  
   content?: string
   operation?: string
   search?: string
@@ -54,16 +54,16 @@ export class JsonToolParser {
   /**
    * Extract and parse JSON tool calls from content
    */
-  public parseJsonTools(content: string): JsonParseResult {
+  public async parseJsonTools(content: string): Promise<JsonParseResult> {
     const tools: JsonToolCall[] = []
     let processedContent = content
 
     // Find JSON tool patterns in the content
-    const toolMatches = this.findJsonToolBlocks(content)
+    const toolMatches = await this.findJsonToolBlocks(content)
 
     for (const match of toolMatches) {
       try {
-        const parsedTool = this.parseJsonBlock(match.json, match.startIndex)
+        const parsedTool = await this.parseJsonBlock(match.json, match.startIndex)
         if (parsedTool) {
           tools.push({
             ...parsedTool,
@@ -87,7 +87,7 @@ export class JsonToolParser {
    * Find JSON tool blocks in content with enhanced pattern matching
    * Looks for patterns like: {"tool": "write_file", ...}
    */
-  private findJsonToolBlocks(content: string): Array<{ json: string; startIndex: number }> {
+  private async findJsonToolBlocks(content: string): Promise<Array<{ json: string; startIndex: number }>> {
     const blocks: Array<{ json: string; startIndex: number }> = []
 
     // Multiple patterns to catch various JSON formats
@@ -139,7 +139,7 @@ export class JsonToolParser {
       } catch (error) {
         // If direct parsing fails, try repair
         console.warn('[JsonToolParser] Code block JSON parsing failed, attempting repair')
-        const repairedJson = this.repairJson(match[1])
+        const repairedJson = await this.repairJson(match[1])
         if (repairedJson) {
           try {
             const parsed = JSON.parse(repairedJson)
@@ -242,7 +242,7 @@ export class JsonToolParser {
   /**
    * Repair common JSON syntax errors with enhanced robustness
    */
-  private repairJson(jsonString: string): string | null {
+  private async repairJson(jsonString: string): Promise<string | null> {
     try {
       let repaired = jsonString.trim()
 
@@ -251,24 +251,27 @@ export class JsonToolParser {
         repaired = repaired.slice(1, -1) // Remove outer quotes
       }
 
+      // Fix 0.5: Remove invalid escape sequences (keep only valid JSON escapes)
+      repaired = repaired.replace(/\\(?!["\\/bfnrt]|u[0-9a-fA-F]{4})/g, '')
+
       // Fix 1: Add missing quotes around unquoted property names at start of object
       // Match patterns like: tool: "write_file" -> "tool": "write_file"
-      repaired = repaired.replace(/^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:/gm, '"$1":')
+      repaired = repaired.replace(/^\s*([a-zA-Z_@][a-zA-Z0-9_@/\-]*)\s*:/gm, '"$1":')
 
       // Fix 2: Add missing quotes around unquoted property names after commas
-      repaired = repaired.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
+      repaired = repaired.replace(/([{,]\s*)([a-zA-Z_@][a-zA-Z0-9_@/\-]*)\s*:/g, '$1"$2":')
 
       // Fix 3: Add missing quotes around unquoted string values
       // Match patterns like: "path": src/file.js -> "path": "src/file.js"
       // But be careful not to quote already quoted strings or numbers/booleans
-      repaired = repaired.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_\/\-\.]+)(\s*[,}])/g, (match, value, end) => {
+      repaired = repaired.replace(/:\s*([a-zA-Z_@][a-zA-Z0-9_@/\-\.]*)(?=\s*[,}])/g, (match, value) => {
         // Don't quote if it's already quoted, a number, boolean, or null
         if (value.startsWith('"') || value.startsWith("'") ||
             /^-?\d+(\.\d+)?$/.test(value) ||
             value === 'true' || value === 'false' || value === 'null') {
           return match
         }
-        return `: "${value}"${end}`
+        return `: "${value}"`
       })
 
       // Fix 4: Handle multiline content fields by properly escaping
@@ -299,11 +302,90 @@ export class JsonToolParser {
         }
       }
 
+      // Fix 8: Remove extra spaces after opening braces and before keys
+      repaired = repaired.replace(/\{\s+/g, '{')
+
+      // Fix 9: Remove extra spaces before closing braces
+      repaired = repaired.replace(/\s+\}/g, '}')
+
       console.log('[JsonToolParser] Repaired JSON:', repaired)
-      return repaired
+
+
+      // Try to parse the repaired JSON
+      try {
+        JSON.parse(repaired)
+        return repaired
+      } catch (parseError) {
+        console.warn('[JsonToolParser] Manual repair failed, attempting AI repair:', parseError)
+        // If manual repair fails, try AI-powered repair
+        return this.repairJsonWithAI(jsonString)
+      }
 
     } catch (error) {
       console.error('[JsonToolParser] JSON repair failed:', error)
+      // Try AI repair as last resort
+      return this.repairJsonWithAI(jsonString)
+    }
+  }
+
+  /**
+   * AI-powered JSON repair using Mistral Pixtral
+   */
+  private async repairJsonWithAI(jsonString: string): Promise<string | null> {
+    try {
+      // Import AI functions dynamically
+      const { generateText } = await import('ai')
+      const { getModel } = await import('@/lib/ai-providers')
+
+      // Use Mistral Pixtral for JSON repair
+      const model = getModel('pixtral-12b-2409')
+
+      const prompt = `You are an expert JSON repair specialist. The following JSON string has syntax errors and needs to be repaired to be valid JSON.
+
+MALFORMED JSON:
+\`\`\`json
+${jsonString}
+\`\`\`
+
+Please repair this JSON by:
+1. Fixing any syntax errors (missing quotes, brackets, braces, commas)
+2. Properly escaping special characters in strings
+3. Ensuring all property names are quoted
+4. Removing any invalid escape sequences
+5. Fixing structural issues
+
+Respond with ONLY the repaired JSON string, no explanations or additional text. The response should be valid JSON that can be parsed.
+
+REPAIRED JSON:`
+
+      const result = await generateText({
+        model,
+        prompt,
+        temperature: 0.1, // Low temperature for consistent repair
+      })
+
+      const repairedJson = result.text.trim()
+
+      // Clean up the response (remove any markdown formatting)
+      let cleanJson = repairedJson
+      if (cleanJson.startsWith('```json')) {
+        cleanJson = cleanJson.replace(/^```json\s*/, '').replace(/\s*```$/, '')
+      } else if (cleanJson.startsWith('```')) {
+        cleanJson = cleanJson.replace(/^```\s*/, '').replace(/\s*```$/, '')
+      }
+
+      // Validate the repaired JSON
+      try {
+        JSON.parse(cleanJson)
+        console.log('[JsonToolParser] AI successfully repaired JSON')
+        return cleanJson
+      } catch (validationError) {
+        console.error('[JsonToolParser] AI repair produced invalid JSON:', validationError)
+        return null
+      }
+
+    } catch (error) {
+      console.error('[JsonToolParser] AI JSON repair failed:', error)
       return null
     }
   }
@@ -311,7 +393,7 @@ export class JsonToolParser {
   /**
    * Parse individual JSON block
    */
-  private parseJsonBlock(jsonString: string, startIndex: number): Omit<JsonToolCall, 'id' | 'startTime'> | null {
+  private async parseJsonBlock(jsonString: string, startIndex: number): Promise<Omit<JsonToolCall, 'id' | 'startTime'> | null> {
     try {
       // First try to parse as-is
       let parsed = JSON.parse(jsonString)
@@ -347,7 +429,7 @@ export class JsonToolParser {
       console.warn('[JsonToolParser] JSON parsing failed, attempting repair:', error)
 
       try {
-        const repairedJson = this.repairJson(jsonString)
+        const repairedJson = await this.repairJson(jsonString)
         if (repairedJson) {
           const parsed = JSON.parse(repairedJson)
 
@@ -413,7 +495,7 @@ export class JsonToolParser {
 export const jsonToolParser = new JsonToolParser()
 
 // Export utility function
-export function parseJsonTools(content: string): JsonToolCall[] {
-  const result = jsonToolParser.parseJsonTools(content)
+export async function parseJsonTools(content: string): Promise<JsonToolCall[]> {
+  const result = await jsonToolParser.parseJsonTools(content)
   return result.tools
 }

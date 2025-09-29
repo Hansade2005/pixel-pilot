@@ -451,12 +451,12 @@ class XMLToolAutoExecutor {
   // Process multiple JSON tool calls from streaming content - Direct JSON support
   public async processStreamingJsonTools(content: string): Promise<JsonToolCall[]> {
     const executedTools: JsonToolCall[] = []
-    
+
     try {
       // Use JSON parser for reliable tool parsing
-      const parseResult = jsonToolParser.parseJsonTools(content)
+      const parseResult = await jsonToolParser.parseJsonTools(content)
       const toolCalls = parseResult.tools
-      
+
       // Execute each tool directly
       for (const toolCall of toolCalls) {
         try {
@@ -647,12 +647,12 @@ class XMLToolAutoExecutor {
   // Legacy: Process multiple tool calls from streaming content (XML compatibility)
   public async processStreamingXMLTools(content: string): Promise<XMLToolCall[]> {
     const executedTools: XMLToolCall[] = []
-    
+
     try {
       // Use JSON parser for reliable tool parsing
-      const parseResult = jsonToolParser.parseJsonTools(content)
+      const parseResult = await jsonToolParser.parseJsonTools(content)
       const toolCalls = this.convertJsonToolsToXMLToolCalls(parseResult.tools)
-      
+
       // Execute each tool
       for (const toolCall of toolCalls) {
         try {
