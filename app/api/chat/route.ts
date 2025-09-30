@@ -311,100 +311,53 @@ function generateChangeSummary(toolName: string, filePath: string, args: any): s
   }
 }
 
-// Simplified Memory Processing - Use AI to craft concise past tense summary
-async function processStreamMemoryWithAI(
+// Simplified Memory Processing - No AI dependency, just track user message and files affected
+function processStreamMemorySimple(
   userMessage: string,
-  aiResponse: string,
-  projectContext: string,
-  jsonOperations: JSONFileOperation[],
-  projectId: string,
-  preToolDescriptions?: string[],
-  overallPurpose?: string
-) {
-  try {
-    // Use AI to generate a concise past tense summary
-    const hasToolCalls = jsonOperations.length > 0
+  jsonOperations: JSONFileOperation[]
+): {
+  semanticSummary: string
+  keyInsights: string[]
+  technicalPatterns: string[]
+  architecturalDecisions: string[]
+  nextLogicalSteps: string[]
+  potentialImprovements: string[]
+  relevanceScore: number
+  contextForFuture: string
+  duplicateActions: string[]
+  fileAccessPatterns: string[]
+  mainPurpose: string
+  keyChanges: string[]
+} {
+  // Simple format: just track what user said and files affected
+  const filesAffected = jsonOperations.map(op => `${op.jsonTool}:${op.filePath}`)
 
-    let summaryPrompt
-    if (hasToolCalls) {
-      // Format for interactions with tool calls
-      const createdFiles = jsonOperations.filter(op => op.jsonTool === 'write_file').map(op => op.filePath)
-      const updatedFiles = jsonOperations.filter(op => op.jsonTool === 'edit_file').map(op => op.filePath)
-      const deletedFiles = jsonOperations.filter(op => op.jsonTool === 'delete_file').map(op => op.filePath)
+  const semanticSummary = filesAffected.length > 0
+    ? `UserMessage in last request: ${userMessage}
 
-      const toolActions = []
-      if (createdFiles.length > 0) toolActions.push(`created ${createdFiles.join(', ')}`)
-      if (updatedFiles.length > 0) toolActions.push(`updated ${updatedFiles.join(', ')}`)
-      if (deletedFiles.length > 0) toolActions.push(`deleted ${deletedFiles.join(', ')}`)
+Note: Files you affected are outlined below
+filesAffected: [
+${filesAffected.map(f => `  "${f}"`).join(',\n')}
+]`
+    : `UserMessage in last request: ${userMessage}
 
-      // Get unique tools used
-      const uniqueTools = [...new Set(jsonOperations.map(op => op.jsonTool))]
-      const toolsText = uniqueTools.length === 1 ? `${uniqueTools[0]} tool` : `${uniqueTools.join(' and ')} tools`
+Note: No files were affected in this request`
 
-      summaryPrompt = `Generate a summary in this exact format: "Note that in your last request you ${toolActions.join(', ')} using the write_file tool, following user request instructions strictly. Remember: only write_file and delete_file tools are available - always use write_file for all file operations. Pay attention to system instructions and do what the user asked."
+  const keyChanges = jsonOperations.map(op => op.changeSummary)
 
-Examples:
-"Note that in your last request you created src/components/TodoApp.tsx, updated src/App.tsx using the write_file tool, following user request instructions strictly. Remember: only write_file and delete_file tools are available - always use write_file for all file operations. Pay attention to system instructions and do what the user asked."
-
-"Note that in your last request you updated package.json using the write_file tool, following user request instructions strictly. Remember: only write_file and delete_file tools are available - always use write_file for all file operations. Pay attention to system instructions and do what the user asked."
-
-Files affected: ${jsonOperations.map(op => op.filePath).join(', ') || 'None'}
-Tools used: ${jsonOperations.map(op => op.jsonTool).join(', ') || 'None'}
-
-Keep it factual and follow the format exactly. Include the tool availability reminder.`
-    } else {
-      // Format for interactions with no tool calls
-      summaryPrompt = `Generate a summary in this exact format: "Note that in previous interaction no changes were made, just conversation. Pay attention to system instructions and do what the user asked."
-
-This is for an AI response with no tool calls or file operations. Include the reminder about system instructions.`
-    }
-
-    const model = getAIModel() // Use default model for summary generation
-    const { text: conciseSummary } = await generateText({
-      model,
-      prompt: summaryPrompt,
-      temperature: 0.1 // Very low temperature for exact format adherence
-    })
-
-    // Extract files affected for separate tracking
-    const filesAffected = jsonOperations.map(op => `${op.jsonTool}:${op.filePath}`)
-    const keyChanges = jsonOperations.map(op => op.changeSummary)
-
-    return {
-      semanticSummary: conciseSummary.trim(),
-      keyInsights: preToolDescriptions || ['Development work completed'],
-      technicalPatterns: ['Standard development patterns'],
-      architecturalDecisions: ['Following established patterns'],
-      nextLogicalSteps: [], // Don't suggest next steps to avoid confusion
-      potentialImprovements: [],
-      relevanceScore: 0.8,
-      contextForFuture: conciseSummary.trim(),
-      duplicateActions: [],
-      fileAccessPatterns: filesAffected,
-      mainPurpose: overallPurpose || conciseSummary.trim(),
-      keyChanges: keyChanges
-    }
-  } catch (error) {
-    console.error('[MEMORY] Failed to generate AI summary, falling back to simple tracking:', error)
-    // Fallback to simple template if AI generation fails
-    const mainPurpose = overallPurpose || 'Development work'
-    const filesAffected = jsonOperations.map(op => `${op.jsonTool}:${op.filePath}`)
-    const keyChanges = jsonOperations.map(op => op.changeSummary)
-
-    return {
-      semanticSummary: `Completed: ${mainPurpose}`,
-      keyInsights: preToolDescriptions || ['Development work completed'],
-      technicalPatterns: ['Standard development patterns'],
-      architecturalDecisions: ['Following established patterns'],
-      nextLogicalSteps: [],
-      potentialImprovements: [],
-      relevanceScore: 0.8,
-      contextForFuture: mainPurpose,
-      duplicateActions: [],
-      fileAccessPatterns: filesAffected,
-      mainPurpose: mainPurpose,
-      keyChanges: keyChanges
-    }
+  return {
+    semanticSummary,
+    keyInsights: ['Simple memory tracking - no AI analysis'],
+    technicalPatterns: ['Direct file operation tracking'],
+    architecturalDecisions: ['Simplified memory system'],
+    nextLogicalSteps: [],
+    potentialImprovements: [],
+    relevanceScore: 1.0,
+    contextForFuture: semanticSummary,
+    duplicateActions: [],
+    fileAccessPatterns: filesAffected,
+    mainPurpose: userMessage,
+    keyChanges: keyChanges
   }
 }
 
@@ -420,17 +373,12 @@ async function storeStreamMemory(
   // Note: Tools are executed on frontend during streaming, so we only track from AI response text
   const { operations: jsonOperations, preToolDescriptions, overallPurpose } = extractContextAndOperationsFromResponse(aiResponse)
 
-  // Process memory with AI, now including the extracted context
-  const memoryAnalysis = await processStreamMemoryWithAI(
+  // Process memory with simple tracking - no AI dependency
+  const memoryAnalysis = processStreamMemorySimple(
     userMessage,
-    aiResponse,
-    projectContext,
-    jsonOperations,
-    projectId,
-    preToolDescriptions,
-    overallPurpose
+    jsonOperations
   )
-  
+
   // Create memory record
   const memory: AIStreamMemory = {
     id: `memory_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -464,22 +412,20 @@ async function storeStreamMemory(
       keyChanges: memoryAnalysis.keyChanges
     }
   }
-  
+
   // Store memory
   const memories = aiStreamMemoryStore.get(projectId) || []
   memories.push(memory)
-  
+
   // Keep only last 50 memories to prevent memory bloat
   if (memories.length > 50) {
     memories.splice(0, memories.length - 50)
   }
-  
-  aiStreamMemoryStore.set(projectId, memories)
-  
-  return memory
-}
 
-// Helper function to extract user intent pattern
+  aiStreamMemoryStore.set(projectId, memories)
+
+  return memory
+}// Helper function to extract user intent pattern
 function extractUserIntentPattern(userMessage: string): string {
   const message = userMessage.toLowerCase()
   
