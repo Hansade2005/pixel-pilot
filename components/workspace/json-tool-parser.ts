@@ -61,11 +61,11 @@ export class YamlToolParser {
     let processedContent = content
 
     try {
-      const toolBlocks = this.findToolBlocks(content)
+      const yamlBlocks = this.findYamlToolBlocks(content)
 
-      for (const block of toolBlocks) {
+      for (const block of yamlBlocks) {
         try {
-          const parsedTool = this.parseToolBlock(block.content, block.format)
+          const parsedTool = this.parseYamlBlock(block.yaml)
           if (parsedTool) {
             const validation = this.validateToolCall(parsedTool)
             if (validation.valid) {
@@ -76,21 +76,21 @@ export class YamlToolParser {
               })
 
               const placeholder = this.createPlaceholder(parsedTool)
-              processedContent = processedContent.replace(block.content, placeholder)
+              processedContent = processedContent.replace(block.yaml, placeholder)
             } else {
               errors.push({
                 message: `Invalid tool call: ${validation.reason}`,
-                context: this.truncateContext(block.content)
+                context: this.truncateContext(block.yaml)
               })
             }
           }
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error'
           errors.push({
-            message: `Failed to parse ${block.format.toUpperCase()} block: ${errorMessage}`,
-            context: this.truncateContext(block.content)
+            message: `Failed to parse YAML block: ${errorMessage}`,
+            context: this.truncateContext(block.yaml)
           })
-          console.error(`[YamlToolParser] Failed to parse ${block.format.toUpperCase()} block:`, error)
+          console.error('[YamlToolParser] Failed to parse YAML block:', error)
         }
       }
     } catch (error) {
@@ -106,44 +106,27 @@ export class YamlToolParser {
   }
 
   /**
-   * Find tool blocks in content (supports both JSON and YAML)
+   * Find YAML tool blocks in content
    */
-  private findToolBlocks(content: string): Array<{ content: string; startIndex: number; format: 'json' | 'yaml' }> {
-    const blocks: Array<{ content: string; startIndex: number; format: 'json' | 'yaml' }> = []
-    const toolBlockPattern = /```(?:json|yaml|tool)\s*([\s\S]*?)```/g
+  private findYamlToolBlocks(content: string): Array<{ yaml: string; startIndex: number }> {
+    const blocks: Array<{ yaml: string; startIndex: number }> = []
+    const yamlBlockPattern = /```(?:yaml|tool)\s*([\s\S]*?)```/g
 
     let match
-    while ((match = toolBlockPattern.exec(content)) !== null) {
-      const blockContent = match[1].trim()
-      if (blockContent) {
-        // Determine format based on the opening tag
-        const fullMatch = match[0]
-        let format: 'json' | 'yaml' = 'yaml'
-        if (fullMatch.startsWith('```json')) {
-          format = 'json'
-        } else if (fullMatch.startsWith('```yaml') || fullMatch.startsWith('```tool')) {
-          format = 'yaml'
-        }
-
+    while ((match = yamlBlockPattern.exec(content)) !== null) {
+      const yamlContent = match[1].trim()
+      if (yamlContent) {
         try {
-          // Try to parse to validate it's a valid tool block
-          let parsed: any
-          if (format === 'json') {
-            parsed = JSON.parse(blockContent)
-          } else {
-            parsed = load(blockContent) as any
-          }
-
+          const parsed = load(yamlContent) as any
           if (parsed && parsed.tool && this.supportedTools.includes(parsed.tool)) {
             blocks.push({
-              content: fullMatch,
-              startIndex: match.index,
-              format
+              yaml: match[0],
+              startIndex: match.index
             })
           }
         } catch (error) {
-          // Invalid format, skip
-          console.warn('[YamlToolParser] Invalid tool block:', error)
+          // Invalid YAML, skip
+          console.warn('[YamlToolParser] Invalid YAML block:', error)
         }
       }
     }
@@ -152,23 +135,16 @@ export class YamlToolParser {
   }
 
   /**
-   * Parse a single tool block (supports both JSON and YAML)
+   * Parse a single YAML block
    */
-  private parseToolBlock(toolBlock: string, format: 'json' | 'yaml'): JsonToolCall | null {
+  private parseYamlBlock(yamlBlock: string): JsonToolCall | null {
     try {
-      // Extract the content from the code block
-      const contentMatch = toolBlock.match(/```(?:json|yaml|tool)\s*([\s\S]*?)```/)
-      if (!contentMatch) return null
+      // Extract the YAML content from the code block
+      const yamlMatch = yamlBlock.match(/```(?:yaml|tool)\s*([\s\S]*?)```/)
+      if (!yamlMatch) return null
 
-      const blockContent = contentMatch[1].trim()
-      let parsed: any
-
-      // Parse based on format
-      if (format === 'json') {
-        parsed = JSON.parse(blockContent)
-      } else {
-        parsed = load(blockContent) as any
-      }
+      const yamlContent = yamlMatch[1].trim()
+      const parsed = load(yamlContent) as any
 
       if (!parsed || !parsed.tool) return null
 
@@ -202,7 +178,7 @@ export class YamlToolParser {
 
       return toolCall as JsonToolCall
     } catch (error) {
-      console.error(`[YamlToolParser] Failed to parse ${format.toUpperCase()}:`, error)
+      console.error('[YamlToolParser] Failed to parse YAML:', error)
       return null
     }
   }
@@ -241,14 +217,14 @@ export class YamlToolParser {
   }
 
   /**
-   * Check if content has tool blocks (supports both JSON and YAML)
+   * Check if content has YAML tools
    */
-  public hasToolBlocks(content: string): boolean {
-    return this.findToolBlocks(content).length > 0
+  public hasYamlTools(content: string): boolean {
+    return this.findYamlToolBlocks(content).length > 0
   }
 
   /**
-   * Parse and validate a single tool block
+   * Parse and validate a single YAML tool
    */
   public parseAndValidateSingle(yamlString: string): JsonToolCall | null {
     const result = this.parseJsonTools(yamlString)
@@ -270,5 +246,5 @@ export function parseAndValidateJsonTool(jsonString: string): JsonToolCall | nul
 }
 
 export function hasJsonTools(content: string): boolean {
-  return jsonToolParser.hasToolBlocks(content)
+  return jsonToolParser.hasYamlTools(content)
 }
