@@ -251,12 +251,9 @@ class XMLToolAutoExecutor {
   }
 
   // Execute SQL operation
-  private async executeSql(toolCall: JsonToolCall | XMLToolCall): Promise<any> {
-    // Get SQL content from various possible locations
-    const sql = toolCall.content || (toolCall as any).sql || (toolCall as any).args?.sql
-
-    if (!sql) {
-      throw new Error('Missing SQL content for execute_sql. Expected in content, sql, or args.sql property.')
+  private async executeSql(toolCall: XMLToolCall): Promise<any> {
+    if (!toolCall.content) {
+      throw new Error('Missing SQL content for execute_sql')
     }
 
     try {
@@ -327,9 +324,9 @@ class XMLToolAutoExecutor {
       }
 
       // Parse the SQL to determine the operation type
-      const sqlContent = sql.trim()
+      const sql = toolCall.content.trim()
 
-      if (sqlContent.toUpperCase().startsWith('SELECT')) {
+      if (sql.toUpperCase().startsWith('SELECT')) {
         throw new Error('SELECT operations are not allowed. Only CREATE, INSERT, UPDATE, DELETE operations are permitted.')
       }
 
@@ -345,7 +342,7 @@ class XMLToolAutoExecutor {
           body: JSON.stringify({ 
             token: accessToken, 
             projectId: projectDetails.selectedProjectId,
-            sql: sqlContent
+            sql: sql
           }),
         })
 
@@ -451,12 +448,12 @@ class XMLToolAutoExecutor {
   // Process multiple JSON tool calls from streaming content - Direct JSON support
   public async processStreamingJsonTools(content: string): Promise<JsonToolCall[]> {
     const executedTools: JsonToolCall[] = []
-
+    
     try {
       // Use JSON parser for reliable tool parsing
-      const parseResult = await jsonToolParser.parseJsonTools(content)
+      const parseResult = jsonToolParser.parseJsonTools(content)
       const toolCalls = parseResult.tools
-
+      
       // Execute each tool directly
       for (const toolCall of toolCalls) {
         try {
@@ -628,9 +625,6 @@ class XMLToolAutoExecutor {
           
           return { message: `File ${toolCall.path} deleted successfully` }
 
-        case 'execute_sql':
-          return await this.executeSql(toolCall)
-
         default:
           throw new Error(`Unsupported JSON tool: ${toolCall.tool}`)
       }
@@ -647,12 +641,12 @@ class XMLToolAutoExecutor {
   // Legacy: Process multiple tool calls from streaming content (XML compatibility)
   public async processStreamingXMLTools(content: string): Promise<XMLToolCall[]> {
     const executedTools: XMLToolCall[] = []
-
+    
     try {
       // Use JSON parser for reliable tool parsing
-      const parseResult = await jsonToolParser.parseJsonTools(content)
+      const parseResult = jsonToolParser.parseJsonTools(content)
       const toolCalls = this.convertJsonToolsToXMLToolCalls(parseResult.tools)
-
+      
       // Execute each tool
       for (const toolCall of toolCalls) {
         try {
