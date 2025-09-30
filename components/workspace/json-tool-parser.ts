@@ -1,6 +1,6 @@
 /**
  * Enhanced JSON-based Tool Parser for AI-generated tool calls
- * Improved reliability and accuracy for parsing tool calls from AI responses
+ * Handles escaped content and multi-line strings reliably
  */
 
 export interface SearchReplaceBlock {
@@ -81,7 +81,7 @@ export class JsonToolParser {
             } else {
               errors.push({
                 message: `Invalid tool call: ${validation.reason}`,
-                context: match.json.substring(0, 100)
+                context: this.truncateContext(match.json)
               })
             }
           }
@@ -89,16 +89,16 @@ export class JsonToolParser {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error'
           errors.push({
             message: `Failed to parse JSON block: ${errorMessage}`,
-            context: match.json.substring(0, 100)
+            context: this.truncateContext(match.json)
           })
-          console.error('[JsonToolParser] Failed to parse JSON block:', error, match.json.substring(0, 200))
+          console.error('[JsonToolParser] Failed to parse JSON block:', error)
         }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       errors.push({
         message: `Critical parsing error: ${errorMessage}`,
-        context: content.substring(0, 100)
+        context: this.truncateContext(content)
       })
       console.error('[JsonToolParser] Critical parsing error:', error)
     }
@@ -113,11 +113,11 @@ export class JsonToolParser {
     const blocks: Array<{ json: string; startIndex: number }> = []
     const foundIndices = new Set<number>()
 
-    // Method 1: Find standalone JSON objects with "tool" property
-    this.findStandaloneJsonBlocks(content, blocks, foundIndices)
-
-    // Method 2: Find JSON in code blocks (```json or ```)
+    // Method 1: Find JSON in code blocks (most reliable for large content)
     this.findCodeBlockJsonBlocks(content, blocks, foundIndices)
+
+    // Method 2: Find standalone JSON objects with "tool" property
+    this.findStandaloneJsonBlocks(content, blocks, foundIndices)
 
     // Method 3: Find JSON objects on single lines
     this.findSingleLineJsonBlocks(content, blocks, foundIndices)
@@ -128,6 +128,80 @@ export class JsonToolParser {
       .filter((block, index, self) => 
         index === 0 || block.startIndex !== self[index - 1].startIndex
       )
+  }
+
+  /**
+   * Find JSON blocks within code blocks - MOST RELIABLE METHOD
+   */
+  private findCodeBlockJsonBlocks(
+    content: string,
+    blocks: Array<{ json: string; startIndex: number }>,
+    foundIndices: Set<number>
+  ): void {
+    // Match both ```json and ``` code blocks
+    const codeBlockPattern = /```(?:json)?\s*([\s\S]*?)```/g
+    
+    let match
+    while ((match = codeBlockPattern.exec(content)) !== null) {
+      if (foundIndices.has(match.index)) continue
+
+      try {
+        const jsonContent = match[1].trim()
+        
+        // Skip if empty
+        if (!jsonContent) continue
+        
+        // Try to parse directly first
+        let parsed
+        try {
+          parsed = JSON.parse(jsonContent)
+        } catch (firstError) {
+          // If direct parse fails, try to extract and clean
+          const extracted = this.extractJsonFromCodeBlock(jsonContent)
+          if (extracted) {
+            try {
+              parsed = JSON.parse(extracted)
+            } catch (secondError) {
+              console.warn('[JsonToolParser] Failed to parse code block JSON:', secondError)
+              continue
+            }
+          } else {
+            continue
+          }
+        }
+        
+        if (parsed && parsed.tool && this.supportedTools.includes(parsed.tool)) {
+          blocks.push({
+            json: JSON.stringify(parsed), // Use the successfully parsed version
+            startIndex: match.index
+          })
+          foundIndices.add(match.index)
+        }
+      } catch (error) {
+        console.warn('[JsonToolParser] Error processing code block:', error)
+      }
+    }
+  }
+
+  /**
+   * Extract JSON from code block content, handling common issues
+   */
+  private extractJsonFromCodeBlock(content: string): string | null {
+    // Remove comments
+    let cleaned = content.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')
+    
+    // Remove trailing commas
+    cleaned = cleaned.replace(/,(\s*[}\]])/g, '$1')
+    
+    // Find the first { and last }
+    const firstBrace = cleaned.indexOf('{')
+    const lastBrace = cleaned.lastIndexOf('}')
+    
+    if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+      return null
+    }
+    
+    return cleaned.substring(firstBrace, lastBrace + 1)
   }
 
   /**
@@ -152,62 +226,14 @@ export class JsonToolParser {
       if (completeJson) {
         // Verify it's valid JSON
         try {
-          JSON.parse(completeJson)
+          const parsed = JSON.parse(completeJson)
           blocks.push({
-            json: completeJson,
+            json: JSON.stringify(parsed), // Use stringified version for consistency
             startIndex: match.index
           })
           foundIndices.add(match.index)
         } catch (e) {
-          // Invalid JSON, skip
-          console.warn('[JsonToolParser] Found invalid JSON at index', match.index)
-        }
-      }
-    }
-  }
-
-  /**
-   * Find JSON blocks within code blocks
-   */
-  private findCodeBlockJsonBlocks(
-    content: string,
-    blocks: Array<{ json: string; startIndex: number }>,
-    foundIndices: Set<number>
-  ): void {
-    // Match both ```json and ``` code blocks
-    const codeBlockPattern = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/g
-    
-    let match
-    while ((match = codeBlockPattern.exec(content)) !== null) {
-      if (foundIndices.has(match.index)) continue
-
-      try {
-        const jsonContent = match[1].trim()
-        const parsed = JSON.parse(jsonContent)
-        
-        if (parsed.tool && this.supportedTools.includes(parsed.tool)) {
-          blocks.push({
-            json: jsonContent,
-            startIndex: match.index
-          })
-          foundIndices.add(match.index)
-        }
-      } catch (error) {
-        // Try to extract valid JSON from the code block
-        const extracted = this.tryExtractValidJson(match[1])
-        if (extracted) {
-          try {
-            const parsed = JSON.parse(extracted)
-            if (parsed.tool && this.supportedTools.includes(parsed.tool)) {
-              blocks.push({
-                json: extracted,
-                startIndex: match.index
-              })
-              foundIndices.add(match.index)
-            }
-          } catch (e) {
-            // Still invalid, skip
-          }
+          console.warn('[JsonToolParser] Found invalid standalone JSON at index', match.index)
         }
       }
     }
@@ -229,11 +255,11 @@ export class JsonToolParser {
       if (trimmedLine.startsWith('{') && trimmedLine.endsWith('}')) {
         try {
           const parsed = JSON.parse(trimmedLine)
-          if (parsed.tool && this.supportedTools.includes(parsed.tool)) {
+          if (parsed && parsed.tool && this.supportedTools.includes(parsed.tool)) {
             const lineIndex = content.indexOf(line, currentIndex)
             if (!foundIndices.has(lineIndex)) {
               blocks.push({
-                json: trimmedLine,
+                json: JSON.stringify(parsed),
                 startIndex: lineIndex
               })
               foundIndices.add(lineIndex)
@@ -248,68 +274,47 @@ export class JsonToolParser {
   }
 
   /**
-   * Try to extract valid JSON from potentially malformed content
-   */
-  private tryExtractValidJson(content: string): string | null {
-    // Remove common issues
-    let cleaned = content.trim()
-    
-    // Remove trailing commas
-    cleaned = cleaned.replace(/,(\s*[}\]])/g, '$1')
-    
-    // Try to find the outermost braces
-    const firstBrace = cleaned.indexOf('{')
-    const lastBrace = cleaned.lastIndexOf('}')
-    
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-      const extracted = cleaned.substring(firstBrace, lastBrace + 1)
-      try {
-        JSON.parse(extracted)
-        return extracted
-      } catch (e) {
-        return null
-      }
-    }
-    
-    return null
-  }
-
-  /**
-   * Extract complete JSON object with improved brace matching
+   * Extract complete JSON object with IMPROVED brace and string handling
    */
   private extractCompleteJson(content: string, startIndex: number): string | null {
     let braceCount = 0
     let inString = false
     let escapeNext = false
-    let stringChar = ''
+    let stringDelimiter = ''
     let jsonEnd = -1
     let started = false
 
     for (let i = startIndex; i < content.length; i++) {
       const char = content[i]
+      const prevChar = i > 0 ? content[i - 1] : ''
 
+      // Handle escape sequences
       if (escapeNext) {
         escapeNext = false
         continue
       }
 
+      // Check for escape character, but only if in string
       if (char === '\\' && inString) {
         escapeNext = true
         continue
       }
 
-      if ((char === '"' || char === "'") && !inString) {
-        inString = true
-        stringChar = char
+      // Handle string delimiters
+      if ((char === '"' || char === "'") && !escapeNext) {
+        if (!inString) {
+          // Starting a string
+          inString = true
+          stringDelimiter = char
+        } else if (char === stringDelimiter) {
+          // Ending a string (must match the opening delimiter)
+          inString = false
+          stringDelimiter = ''
+        }
         continue
       }
 
-      if (char === stringChar && inString) {
-        inString = false
-        stringChar = ''
-        continue
-      }
-
+      // Only count braces outside of strings
       if (!inString) {
         if (char === '{') {
           braceCount++
@@ -327,18 +332,61 @@ export class JsonToolParser {
     if (jsonEnd > startIndex) {
       const extracted = content.substring(startIndex, jsonEnd + 1)
       
-      // Final validation
+      // Try to parse the extracted JSON
       try {
-        JSON.parse(extracted)
-        return extracted
+        const parsed = JSON.parse(extracted)
+        return JSON.stringify(parsed) // Return clean stringified version
       } catch (e) {
-        console.warn('[JsonToolParser] Extracted invalid JSON, attempting repair...')
-        const repaired = this.tryExtractValidJson(extracted)
-        return repaired
+        console.warn('[JsonToolParser] Extracted JSON failed to parse, attempting repair...')
+        // Try to repair common issues
+        const repaired = this.repairJson(extracted)
+        if (repaired) {
+          try {
+            const parsed = JSON.parse(repaired)
+            return JSON.stringify(parsed)
+          } catch (e2) {
+            console.warn('[JsonToolParser] Repair failed')
+            return null
+          }
+        }
+        return null
       }
     }
 
     return null
+  }
+
+  /**
+   * Attempt to repair common JSON issues
+   */
+  private repairJson(jsonString: string): string | null {
+    try {
+      let repaired = jsonString.trim()
+      
+      // Remove trailing commas before closing braces/brackets
+      repaired = repaired.replace(/,(\s*[}\]])/g, '$1')
+      
+      // Remove comments (single line and multi-line)
+      repaired = repaired.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')
+      
+      // Try to find and extract just the JSON object
+      const firstBrace = repaired.indexOf('{')
+      const lastBrace = repaired.lastIndexOf('}')
+      
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        repaired = repaired.substring(firstBrace, lastBrace + 1)
+      }
+      
+      // Remove any garbage after the last closing brace
+      const finalCloseBrace = repaired.lastIndexOf('}')
+      if (finalCloseBrace !== -1 && finalCloseBrace < repaired.length - 1) {
+        repaired = repaired.substring(0, finalCloseBrace + 1)
+      }
+      
+      return repaired
+    } catch (error) {
+      return null
+    }
   }
 
   /**
@@ -368,6 +416,9 @@ export class JsonToolParser {
       const path = parsed.path || parsed.file || parsed.filename || args.path
       const content = parsed.content || args.content
 
+      // IMPORTANT: Content should already be properly unescaped by JSON.parse()
+      // JSON.parse() automatically converts "\\n" to "\n", "\\"" to "\"", etc.
+
       // Handle search/replace blocks
       const searchReplaceBlocks = parsed.searchReplaceBlocks || 
                                   parsed.search_replace_blocks ||
@@ -377,7 +428,7 @@ export class JsonToolParser {
         tool: parsed.tool,
         name: parsed.name || parsed.tool,
         path,
-        content,
+        content, // This is already properly unescaped
         operation: parsed.operation || args.operation,
         search: parsed.search || args.search,
         replace: parsed.replace || args.replace,
@@ -393,7 +444,7 @@ export class JsonToolParser {
 
     } catch (error) {
       console.error('[JsonToolParser] JSON parsing failed:', error)
-      console.error('[JsonToolParser] Failed JSON string:', jsonString.substring(0, 200))
+      console.error('[JsonToolParser] Failed JSON string (first 500 chars):', jsonString.substring(0, 500))
       return null
     }
   }
@@ -454,6 +505,14 @@ export class JsonToolParser {
     const toolName = tool.tool.toUpperCase()
     const target = tool.path || tool.args.path || 'unknown'
     return `[${toolName}: ${target}]`
+  }
+
+  /**
+   * Truncate context for error messages
+   */
+  private truncateContext(text: string, maxLength: number = 200): string {
+    if (text.length <= maxLength) return text
+    return text.substring(0, maxLength) + '...'
   }
 
   /**
