@@ -106,7 +106,7 @@ export class YamlToolParser {
   }
 
   /**
-   * Find YAML tool blocks in content
+   * Find YAML tool blocks in content - more lenient parsing
    */
   private findYamlToolBlocks(content: string): Array<{ yaml: string; startIndex: number }> {
     const blocks: Array<{ yaml: string; startIndex: number }> = []
@@ -116,22 +116,82 @@ export class YamlToolParser {
     while ((match = yamlBlockPattern.exec(content)) !== null) {
       const yamlContent = match[1].trim()
       if (yamlContent) {
-        try {
-          const parsed = load(yamlContent) as any
-          if (parsed && parsed.tool && this.supportedTools.includes(parsed.tool)) {
-            blocks.push({
-              yaml: match[0],
-              startIndex: match.index
-            })
+        // Try lenient parsing first
+        const toolInfo = this.parseYamlLeniently(yamlContent)
+        if (toolInfo && this.supportedTools.includes(toolInfo.tool)) {
+          blocks.push({
+            yaml: match[0],
+            startIndex: match.index
+          })
+        } else {
+          // Fallback: try strict parsing
+          try {
+            const parsed = load(yamlContent) as any
+            if (parsed && parsed.tool && this.supportedTools.includes(parsed.tool)) {
+              blocks.push({
+                yaml: match[0],
+                startIndex: match.index
+              })
+            }
+          } catch (error) {
+            // Invalid YAML, skip
+            console.warn('[YamlToolParser] Invalid YAML block:', error)
           }
-        } catch (error) {
-          // Invalid YAML, skip
-          console.warn('[YamlToolParser] Invalid YAML block:', error)
         }
       }
     }
 
     return blocks
+  }
+
+  /**
+   * Parse YAML leniently to handle minor formatting issues
+   */
+  private parseYamlLeniently(yamlContent: string): { tool: string; path?: string; content?: string } | null {
+    try {
+      // First try normal parsing
+      const parsed = load(yamlContent) as any
+      if (parsed && parsed.tool) {
+        return {
+          tool: parsed.tool,
+          path: parsed.path,
+          content: parsed.content
+        }
+      }
+    } catch (error) {
+      // If normal parsing fails, try to extract basic info with regex
+      console.warn('[YamlToolParser] Normal parsing failed, trying lenient parsing:', error)
+
+      const lines = yamlContent.split('\n')
+      let tool: string | undefined
+      let path: string | undefined
+      let content: string | undefined
+
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (trimmed.startsWith('tool:')) {
+          tool = trimmed.substring(5).trim().replace(/^["']|["']$/g, '')
+        } else if (trimmed.startsWith('path:')) {
+          path = trimmed.substring(5).trim().replace(/^["']|["']$/g, '')
+        } else if (trimmed.startsWith('content:') && trimmed.includes('|')) {
+          // Extract content after |
+          const contentStart = yamlContent.indexOf('content: |')
+          if (contentStart !== -1) {
+            content = yamlContent.substring(contentStart + 10).trim()
+            if (content.startsWith('|')) {
+              content = content.substring(1).trim()
+            }
+            break // Stop parsing after content
+          }
+        }
+      }
+
+      if (tool && this.supportedTools.includes(tool)) {
+        return { tool, path, content }
+      }
+    }
+
+    return null
   }
 
   /**
@@ -144,9 +204,19 @@ export class YamlToolParser {
       if (!yamlMatch) return null
 
       const yamlContent = yamlMatch[1].trim()
-      const parsed = load(yamlContent) as any
 
-      if (!parsed || !parsed.tool) return null
+      // Try strict parsing first
+      let parsed = load(yamlContent) as any
+
+      // If strict parsing fails, try lenient parsing
+      if (!parsed || !parsed.tool) {
+        const lenientResult = this.parseYamlLeniently(yamlContent)
+        if (lenientResult) {
+          parsed = lenientResult
+        } else {
+          return null
+        }
+      }
 
       // Convert to JsonToolCall format
       const toolCall: Partial<JsonToolCall> = {
