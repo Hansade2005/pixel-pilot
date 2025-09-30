@@ -341,22 +341,22 @@ async function processStreamMemoryWithAI(
       const uniqueTools = [...new Set(jsonOperations.map(op => op.jsonTool))]
       const toolsText = uniqueTools.length === 1 ? `${uniqueTools[0]} tool` : `${uniqueTools.join(' and ')} tools`
 
-      summaryPrompt = `Generate a summary in this exact format: "Note that in your last request you ${toolActions.join(', ')} using the ${toolsText}, following user request instructions strictly."
+      summaryPrompt = `Generate a summary in this exact format: "Note that in your last request you ${toolActions.join(', ')} using the ${toolsText}, following user request instructions strictly. Pay attention to system instructions and do what the user asked."
 
 Examples:
-"Note that in your last request you created src/components/TodoApp.tsx, updated src/App.tsx using the write_file tool, following user request instructions strictly."
+"Note that in your last request you created src/components/TodoApp.tsx, updated src/App.tsx using the write_file tool, following user request instructions strictly. Pay attention to system instructions and do what the user asked."
 
-"Note that in your last request you updated package.json using the edit_file tool, following user request instructions strictly."
+"Note that in your last request you updated package.json using the edit_file tool, following user request instructions strictly. Pay attention to system instructions and do what the user asked."
 
 Files affected: ${jsonOperations.map(op => op.filePath).join(', ') || 'None'}
 Tools used: ${jsonOperations.map(op => op.jsonTool).join(', ') || 'None'}
 
-Keep it factual and follow the format exactly.`
+Keep it factual and follow the format exactly. Include the reminder about system instructions.`
     } else {
       // Format for interactions with no tool calls
-      summaryPrompt = `Generate a summary in this exact format: "Note that in previous interaction no changes were made, just conversation."
+      summaryPrompt = `Generate a summary in this exact format: "Note that in previous interaction no changes were made, just conversation. Pay attention to system instructions and do what the user asked."
 
-This is for an AI response with no tool calls or file operations.`
+This is for an AI response with no tool calls or file operations. Include the reminder about system instructions.`
     }
 
     const model = getAIModel() // Use default model for summary generation
