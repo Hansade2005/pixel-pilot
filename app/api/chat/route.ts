@@ -4496,7 +4496,7 @@ ${projectContext}
 - **write_file**: Use for ALL file operations - creating new files, updating existing files, and modifying content with complete content
 - **delete_file**: Use for removing files from the project
 
-**⚠️ CRITICAL: Always use write_file for file modifications. Never use edit_file or other invalid file editing tools.**
+**⚠️ CRITICAL: Always use write_file for file modifications. 
 
 Do *not* tell the user to run shell commands. Instead, use JSON tool commands for all file operations:
 
@@ -5874,15 +5874,7 @@ Now respond to the user's request. If you need to create, edit, or delete files,
 }
 \`\`\`
 
-\`\`\`json
-{
-  "tool": "edit_file",
-  "path": "file/path.ext",
-  "operation": "search_replace",
-  "search": "old code",
-  "replace": "new code"
-}
-\`\`\`
+
 
 \`\`\`json
 {
