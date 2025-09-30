@@ -311,7 +311,7 @@ function generateChangeSummary(toolName: string, filePath: string, args: any): s
   }
 }
 
-// Simplified Memory Processing - Just track what AI did, files affected, and reason
+// Simplified Memory Processing - Use AI to craft concise past tense summary
 async function processStreamMemoryWithAI(
   userMessage: string,
   aiResponse: string,
@@ -321,24 +321,86 @@ async function processStreamMemoryWithAI(
   preToolDescriptions?: string[],
   overallPurpose?: string
 ) {
-  // Simple memory - no complex AI analysis, just basic tracking
-  const mainPurpose = overallPurpose || 'Development work'
-  const keyChanges = jsonOperations.map(op => op.changeSummary)
-  const filesAffected = jsonOperations.map(op => `${op.jsonTool}:${op.filePath}`)
+  try {
+    // Use AI to generate a concise past tense summary
+    const hasToolCalls = jsonOperations.length > 0
 
-  return {
-    semanticSummary: `Completed: ${mainPurpose}`,
-    keyInsights: preToolDescriptions || ['Development work completed'],
-    technicalPatterns: ['Standard development patterns'],
-    architecturalDecisions: ['Following established patterns'],
-    nextLogicalSteps: [], // Don't suggest next steps to avoid confusion
-    potentialImprovements: [],
-    relevanceScore: 0.8,
-    contextForFuture: mainPurpose,
-    duplicateActions: [],
-    fileAccessPatterns: filesAffected,
-    mainPurpose: mainPurpose,
-    keyChanges: keyChanges
+    let summaryPrompt
+    if (hasToolCalls) {
+      // Format for interactions with tool calls
+      const createdFiles = jsonOperations.filter(op => op.jsonTool === 'write_file').map(op => op.filePath)
+      const updatedFiles = jsonOperations.filter(op => op.jsonTool === 'edit_file').map(op => op.filePath)
+      const deletedFiles = jsonOperations.filter(op => op.jsonTool === 'delete_file').map(op => op.filePath)
+
+      const toolActions = []
+      if (createdFiles.length > 0) toolActions.push(`created ${createdFiles.join(', ')}`)
+      if (updatedFiles.length > 0) toolActions.push(`updated ${updatedFiles.join(', ')}`)
+      if (deletedFiles.length > 0) toolActions.push(`deleted ${deletedFiles.join(', ')}`)
+
+      summaryPrompt = `Generate a summary in this exact format: "Note that in your last request you ${toolActions.join(', ')} using the ${jsonOperations[0].jsonTool} tool, following user request instructions strictly."
+
+Examples:
+"Note that in your last request you created src/components/TodoApp.tsx, updated src/App.tsx using the write_file tool, following user request instructions strictly."
+
+"Note that in your last request you updated package.json using the edit_file tool, following user request instructions strictly."
+
+Files affected: ${jsonOperations.map(op => op.filePath).join(', ') || 'None'}
+Tools used: ${jsonOperations.map(op => op.jsonTool).join(', ') || 'None'}
+
+Keep it factual and follow the format exactly.`
+    } else {
+      // Format for interactions with no tool calls
+      summaryPrompt = `Generate a summary in this exact format: "Note that in previous interaction no changes were made, just conversation."
+
+This is for an AI response with no tool calls or file operations.`
+    }
+
+    const model = getAIModel() // Use default model for summary generation
+    const { text: conciseSummary } = await generateText({
+      model,
+      prompt: summaryPrompt,
+      temperature: 0.1 // Very low temperature for exact format adherence
+    })
+
+    // Extract files affected for separate tracking
+    const filesAffected = jsonOperations.map(op => `${op.jsonTool}:${op.filePath}`)
+    const keyChanges = jsonOperations.map(op => op.changeSummary)
+
+    return {
+      semanticSummary: conciseSummary.trim(),
+      keyInsights: preToolDescriptions || ['Development work completed'],
+      technicalPatterns: ['Standard development patterns'],
+      architecturalDecisions: ['Following established patterns'],
+      nextLogicalSteps: [], // Don't suggest next steps to avoid confusion
+      potentialImprovements: [],
+      relevanceScore: 0.8,
+      contextForFuture: conciseSummary.trim(),
+      duplicateActions: [],
+      fileAccessPatterns: filesAffected,
+      mainPurpose: overallPurpose || conciseSummary.trim(),
+      keyChanges: keyChanges
+    }
+  } catch (error) {
+    console.error('[MEMORY] Failed to generate AI summary, falling back to simple tracking:', error)
+    // Fallback to simple template if AI generation fails
+    const mainPurpose = overallPurpose || 'Development work'
+    const filesAffected = jsonOperations.map(op => `${op.jsonTool}:${op.filePath}`)
+    const keyChanges = jsonOperations.map(op => op.changeSummary)
+
+    return {
+      semanticSummary: `Completed: ${mainPurpose}`,
+      keyInsights: preToolDescriptions || ['Development work completed'],
+      technicalPatterns: ['Standard development patterns'],
+      architecturalDecisions: ['Following established patterns'],
+      nextLogicalSteps: [],
+      potentialImprovements: [],
+      relevanceScore: 0.8,
+      contextForFuture: mainPurpose,
+      duplicateActions: [],
+      fileAccessPatterns: filesAffected,
+      mainPurpose: mainPurpose,
+      keyChanges: keyChanges
+    }
   }
 }
 
