@@ -341,17 +341,17 @@ async function processStreamMemoryWithAI(
       const uniqueTools = [...new Set(jsonOperations.map(op => op.jsonTool))]
       const toolsText = uniqueTools.length === 1 ? `${uniqueTools[0]} tool` : `${uniqueTools.join(' and ')} tools`
 
-      summaryPrompt = `Generate a summary in this exact format: "Note that in your last request you ${toolActions.join(', ')} using the ${toolsText}, following user request instructions strictly. Pay attention to system instructions and do what the user asked."
+      summaryPrompt = `Generate a summary in this exact format: "Note that in your last request you ${toolActions.join(', ')} using the write_file tool, following user request instructions strictly. Remember: only write_file and delete_file tools are available - always use write_file for all file operations. Pay attention to system instructions and do what the user asked."
 
 Examples:
-"Note that in your last request you created src/components/TodoApp.tsx, updated src/App.tsx using the write_file tool, following user request instructions strictly. Pay attention to system instructions and do what the user asked."
+"Note that in your last request you created src/components/TodoApp.tsx, updated src/App.tsx using the write_file tool, following user request instructions strictly. Remember: only write_file and delete_file tools are available - always use write_file for all file operations. Pay attention to system instructions and do what the user asked."
 
-"Note that in your last request you updated package.json using the edit_file tool, following user request instructions strictly. Pay attention to system instructions and do what the user asked."
+"Note that in your last request you updated package.json using the write_file tool, following user request instructions strictly. Remember: only write_file and delete_file tools are available - always use write_file for all file operations. Pay attention to system instructions and do what the user asked."
 
 Files affected: ${jsonOperations.map(op => op.filePath).join(', ') || 'None'}
 Tools used: ${jsonOperations.map(op => op.jsonTool).join(', ') || 'None'}
 
-Keep it factual and follow the format exactly. Include the reminder about system instructions.`
+Keep it factual and follow the format exactly. Include the tool availability reminder.`
     } else {
       // Format for interactions with no tool calls
       summaryPrompt = `Generate a summary in this exact format: "Note that in previous interaction no changes were made, just conversation. Pay attention to system instructions and do what the user asked."
@@ -4215,7 +4215,7 @@ You make efficient and effective changes to codebases while following best pract
 
 You understand that users can see a live preview of their application while you make code changes, and all file operations execute immediately through JSON commands.
 
-**AVAILABLE TOOLS: write_file, edit_file, delete_file**
+**AVAILABLE TOOLS: write_file, delete_file**
 
 ## 🚨 **CRITICAL COMMENT RULES - NO EXCEPTIONS**
 
@@ -4493,8 +4493,10 @@ ${projectContext}
 **🔧 AVAILABLE TOOLS: You have access to write_file and delete_file tools to work on the workspace.**
 
 **📝 TOOL USAGE:**
-- **write_file**: Use for creating new files and updating existing files with complete content
+- **write_file**: Use for ALL file operations - creating new files, updating existing files, and modifying content with complete content
 - **delete_file**: Use for removing files from the project
+
+**⚠️ CRITICAL: Always use write_file for file modifications. Never use edit_file or other invalid file editing tools.**
 
 Do *not* tell the user to run shell commands. Instead, use JSON tool commands for all file operations:
 
@@ -4508,16 +4510,6 @@ You can use these commands by embedding JSON tools in code blocks in your respon
   "tool": "write_file",
   "path": "src/components/Example.tsx",
   "content": "import React from 'react';\\n\\nexport default function Example() {\\n  return <div>Professional implementation</div>;\\n}"
-}
-\`\`\`
-
-\`\`\`json
-{
-  "tool": "edit_file",
-  "path": "src/components/Example.tsx",
-  "operation": "search_replace",
-  "search": "old code",
-  "replace": "new code"
 }
 \`\`\`
 
@@ -4548,133 +4540,16 @@ You can use these commands by embedding JSON tools in code blocks in your respon
 }
 \`\`\`
 
-**✅ CORRECT edit_file usage:**
-\`\`\`json
-{
-  "tool": "edit_file",
-  "path": "src/components/Component.tsx",
-  "operation": "search_replace",
-  "search": "old code here",
-  "replace": "new code here"
-}
-\`\`\`
-
-**❌ WRONG edit_file usage:**
-\`\`\`json
-{
-  "tool": "edit_file",
-  "path": "src/components/Component.tsx",
-  "operation": "search_replace",
-  "search": "old code here",
-  "replace": "new code here"
-}
-\`\`\`
 
 **CRITICAL FORMATTING RULES:**
 - **ALWAYS wrap JSON tool commands in markdown code blocks with \`\`\`json**
 - Use proper JSON syntax with double quotes for all strings
 - Escape newlines in content as \\n for proper JSON formatting
-- **Supported tool names**: "write_file", "edit_file", "delete_file"
+- **Supported tool names**: "write_file", "delete_file"
 - Each tool command must be a separate JSON code block
 - The JSON must be valid and properly formatted
 - **write_file content**: Escape quotes as \\" and newlines as \\n
-- **edit_file**: search/replace strings must be properly escaped
 - **NEVER use single quotes** in JSON - always double quotes
-
-## 🔧 **EDIT_FILE TOOL CAPABILITIES & EXAMPLES**
-
-**🎯 EDIT_FILE FEATURES:**
-- **Precise Search & Replace**: Target specific code sections with exact string matching
-- **Multiple Operations**: Perform several replacements in one command using \`searchReplaceBlocks\` array
-- **Bulk Operations**: Use \`replaceAll: true\` for global find/replace within a file
-- **Safe Editing**: Only replaces exact matches, preserving surrounding code
-
-**✅ REMOVE ENTIRE FUNCTION:**
-\`\`\`json
-{
-  "tool": "edit_file",
-  "path": "src/deprecated.ts",
-  "searchReplaceBlocks": [
-    {
-      "search": "function deprecatedFunction() {\n  // old code\n}",
-      "replace": ""
-    }
-  ]
-}
-\`\`\`
-
-**✅ REMOVE UNUSED IMPORT:**
-\`\`\`json
-{
-  "tool": "edit_file",
-  "path": "src/components/Component.tsx",
-  "searchReplaceBlocks": [
-    {
-      "search": "import { unused } from 'unused-lib';",
-      "replace": ""
-    }
-  ]
-}
-\`\`\`
-
-**✅ REMOVE ALL CONSOLE.LOG STATEMENTS:**
-\`\`\`json
-{
-  "tool": "edit_file",
-  "path": "src/utils/helpers.ts",
-  "searchReplaceBlocks": [
-    {
-      "search": "console.log",
-      "replace": "",
-      "replaceAll": true
-    }
-  ]
-}
-\`\`\`
-
-**✅ MULTIPLE REPLACEMENTS IN ONE FILE:**
-\`\`\`json
-{
-  "tool": "edit_file",
-  "path": "src/components/TestComponent.tsx",
-  "searchReplaceBlocks": [
-    {
-      "search": "const [",
-      "replace": "let [",
-      "replaceAll": true
-    },
-    {
-      "search": "function ",
-      "replace": "const ",
-      "replaceAll": true
-    },
-    {
-      "search": "useState",
-      "replace": "useImmer",
-      "replaceAll": true
-    }
-  ]
-}
-\`\`\`
-
-**✅ COMBINED SINGLE & BULK OPERATIONS:**
-\`\`\`json
-{
-  "tool": "edit_file",
-  "path": "src/components/Example.tsx",
-  "searchReplaceBlocks": [
-    {
-      "search": "old code here",
-      "replace": "new code here"
-    },
-    {
-      "search": "console.log('debug');",
-      "replace": "",
-      "replaceAll": true
-    }
-  ]
-}
-\`\`\`
 
 **🖼️ IMAGE API:** Use https://api.a0.dev/assets/image?text={description}&aspect=1:1&seed={number} for any images needed
 
@@ -4771,50 +4646,10 @@ Every application MUST have a **stunning, modern, extra professional design** th
 - **Define styles directly in components** - no external CSS files or @apply directives
 - **Create unique visual identities** for every application - avoid repetitive designs
 - **Leverage both Tailwind utilities AND inline styles** creatively for professional effects
-
-**Examples of Professional Styling Combinations:**
-\`\`\`jsx
-// Unique glass card with dynamic opacity
-<div 
-  className="backdrop-blur-xl border border-white/10 rounded-2xl p-8 transition-all duration-500 hover:scale-[1.02]"
-  style={{
-    background: \`linear-gradient(135deg, rgba(255,255,255,\${opacity}) 0%, rgba(255,255,255,\${opacity * 0.5}) 100%)\`,
-    boxShadow: \`0 8px 32px rgba(0,0,0,0.12), 0 2px 16px rgba(\${accentColor}, 0.2)\`
-  }}
->
-
-// Dynamic hero with calculated animations
-<section 
-  className="min-h-screen flex items-center justify-center relative overflow-hidden"
-  style={{
-    background: \`radial-gradient(circle at \${mouseX}px \${mouseY}px, rgba(99, 102, 241, 0.3), transparent 50%),
-                 linear-gradient(135deg, #1e1b4b, #312e81, #4c1d95)\`,
-    transform: \`perspective(1000px) rotateX(\${tiltX}deg) rotateY(\${tiltY}deg)\`
-  }}
->
-
-// Interactive button with computed states
-<button 
-  className="px-8 py-4 rounded-xl font-semibold transition-all duration-300 relative overflow-hidden group"
-  style={{
-    background: \`linear-gradient(45deg, \${primaryColor}, \${secondaryColor})\`,
-    boxShadow: \`0 4px 15px \${primaryColor}40, 0 0 20px \${primaryColor}20\`,
-    transform: \`translateY(\${isPressed ? 2 : 0}px) scale(\${isHovered ? 1.05 : 1})\`
-  }}
->
-\`\`\`
-
 **🚀 When to Use Each Approach:**
 - **Tailwind Classes**: Static layouts, responsive design, standard effects
 - **Inline Styles**: Dynamic colors, calculated positions, animation values, theme variables
 - **Combined**: Complex components needing both structure and dynamic behavior
-
-**💡 Professional Effects Examples:**
-- **Dynamic Gradients**: \`style={{ background: \\\`linear-gradient(\\\${angle}deg, \\\${color1}, \\\${color2})\\\` }}\`
-- **Calculated Shadows**: \`style={{ boxShadow: \\\`0 \\\${depth}px \\\${blur}px rgba(\\\${r},\\\${g},\\\${b},\\\${alpha})\\\` }}\`
-- **Responsive Values**: \`style={{ fontSize: \\\`clamp(1rem, \\\${vw}vw, 3rem)\\\` }}\`
-- **3D Transforms**: \`style={{ transform: \\\`perspective(1000px) rotateX(\\\${x}deg) rotateY(\\\${y}deg)\\\` }}\`
-
 **💫 REQUIRED VISUAL ELEMENTS:**
 - **Hero Sections**: Compelling headlines with gradient text effects
 - **Interactive Buttons**: 3D effects, hover animations, smooth transitions
@@ -4928,7 +4763,9 @@ When user requests database functionality, authentication, or real-time features
 2. Create complete Supabase client setup in src/lib/supabase.ts
 3. Use write_file to create/update .env.local with all required variables
 4. Implement necessary auth/database components
-5. Update App.tsx to include new functionality`
+5. Update App.tsx to include new functionality
+6. Never forget to check and update the index.html to include app branding if not yet done , also update name in package.json and also endeavor to update the readme file  with about app and features of the app.
+`
 }
 
 
