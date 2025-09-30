@@ -337,7 +337,11 @@ async function processStreamMemoryWithAI(
       if (updatedFiles.length > 0) toolActions.push(`updated ${updatedFiles.join(', ')}`)
       if (deletedFiles.length > 0) toolActions.push(`deleted ${deletedFiles.join(', ')}`)
 
-      summaryPrompt = `Generate a summary in this exact format: "Note that in your last request you ${toolActions.join(', ')} using the ${jsonOperations[0].jsonTool} tool, following user request instructions strictly."
+      // Get unique tools used
+      const uniqueTools = [...new Set(jsonOperations.map(op => op.jsonTool))]
+      const toolsText = uniqueTools.length === 1 ? `${uniqueTools[0]} tool` : `${uniqueTools.join(' and ')} tools`
+
+      summaryPrompt = `Generate a summary in this exact format: "Note that in your last request you ${toolActions.join(', ')} using the ${toolsText}, following user request instructions strictly."
 
 Examples:
 "Note that in your last request you created src/components/TodoApp.tsx, updated src/App.tsx using the write_file tool, following user request instructions strictly."
