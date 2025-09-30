@@ -1,0 +1,5 @@
+{
+    "tool": "write_file",
+    "path": "src/components/Example.tsx",
+    "content": "<<<CONTENT>>>\nimport React from 'react';\n\nexport default function Example() {\n  return <div>Professional implementation</div>;\n}\n<<<END>>>"
+}

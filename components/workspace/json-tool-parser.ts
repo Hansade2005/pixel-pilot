@@ -1,9 +1,7 @@
 /**
- * Production-Ready YAML Tool Parser
- * Handles YAML tool calls from AI output
+ * JSON-based Tool Parser for AI-generated tool calls
+ * Replaces XML parsing with reliable JSON parsing similar to specs route
  */
-
-import { load } from 'js-yaml'
 
 export interface SearchReplaceBlock {
   search: string
@@ -39,13 +37,13 @@ export interface JsonToolCall {
 export interface JsonParseResult {
   tools: JsonToolCall[]
   processedContent: string
-  errors: Array<{ message: string; context: string }>
 }
 
 /**
- * Parse YAML tool calls with error recovery
+ * Parse JSON tool calls from AI streaming content
+ * Supports JSON format like: {"tool": "write_file", "path": "...", "content": "..."}
  */
-export class YamlToolParser {
+export class JsonToolParser {
   private supportedTools = [
     'write_file', 'edit_file', 'delete_file',
     'read_file', 'list_files', 'create_directory',
@@ -53,91 +51,76 @@ export class YamlToolParser {
   ]
 
   /**
-   * Main parsing method with comprehensive error handling
+   * Extract and parse JSON tool calls from content
    */
   public parseJsonTools(content: string): JsonParseResult {
     const tools: JsonToolCall[] = []
-    const errors: Array<{ message: string; context: string }> = []
     let processedContent = content
 
-    try {
-      const yamlBlocks = this.findYamlToolBlocks(content)
+    // Find JSON tool patterns in the content
+    const toolMatches = this.findJsonToolBlocks(content)
 
-      for (const block of yamlBlocks) {
-        try {
-          const parsedTool = this.parseYamlBlock(block.yaml)
-          if (parsedTool) {
-            const validation = this.validateToolCall(parsedTool)
-            if (validation.valid) {
-              tools.push({
-                ...parsedTool,
-                id: this.generateId(),
-                startTime: Date.now()
-              })
-
-              const placeholder = this.createPlaceholder(parsedTool)
-              processedContent = processedContent.replace(block.yaml, placeholder)
-            } else {
-              errors.push({
-                message: `Invalid tool call: ${validation.reason}`,
-                context: this.truncateContext(block.yaml)
-              })
-            }
-          }
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-          errors.push({
-            message: `Failed to parse YAML block: ${errorMessage}`,
-            context: this.truncateContext(block.yaml)
+    for (const match of toolMatches) {
+      try {
+        const parsedTool = this.parseJsonBlock(match.json, match.startIndex)
+        if (parsedTool) {
+          tools.push({
+            ...parsedTool,
+            id: this.generateId(),
+            startTime: Date.now()
           })
-          console.error('[YamlToolParser] Failed to parse YAML block:', error)
+
+          // Replace JSON block with placeholder in processed content
+          const placeholder = `[${parsedTool.tool.toUpperCase()}: ${parsedTool.path || parsedTool.args.path || 'unknown'}]`
+          processedContent = processedContent.replace(match.json, placeholder)
         }
+      } catch (error) {
+        console.error('[JsonToolParser] Failed to parse JSON block:', error, match.json)
       }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      errors.push({
-        message: `Critical parsing error: ${errorMessage}`,
-        context: this.truncateContext(content)
-      })
-      console.error('[YamlToolParser] Critical parsing error:', error)
     }
 
-    return { tools, processedContent, errors }
+    return { tools, processedContent }
   }
 
   /**
-   * Find YAML tool blocks in content - more lenient parsing
+   * Find JSON tool blocks in content
+   * Looks for patterns like: {"tool": "write_file", ...}
    */
-  private findYamlToolBlocks(content: string): Array<{ yaml: string; startIndex: number }> {
-    const blocks: Array<{ yaml: string; startIndex: number }> = []
-    const yamlBlockPattern = /```(?:yaml|tool)\s*([\s\S]*?)```/g
-
+  private findJsonToolBlocks(content: string): Array<{ json: string; startIndex: number }> {
+    const blocks: Array<{ json: string; startIndex: number }> = []
+    
+    // Pattern to find JSON objects with "tool" property
+    const jsonToolPattern = /\{\s*["\']tool["\']\s*:\s*["\']([^"\']+)["\']\s*[,}][\s\S]*?\}/g
+    
     let match
-    while ((match = yamlBlockPattern.exec(content)) !== null) {
-      const yamlContent = match[1].trim()
-      if (yamlContent) {
-        // Try lenient parsing first
-        const toolInfo = this.parseYamlLeniently(yamlContent)
-        if (toolInfo && this.supportedTools.includes(toolInfo.tool)) {
+    while ((match = jsonToolPattern.exec(content)) !== null) {
+      const toolName = match[1]
+      if (this.supportedTools.includes(toolName)) {
+        // Try to extract the complete JSON object
+        const completeJson = this.extractCompleteJson(content, match.index)
+        if (completeJson) {
           blocks.push({
-            yaml: match[0],
+            json: completeJson,
             startIndex: match.index
           })
-        } else {
-          // Fallback: try strict parsing
-          try {
-            const parsed = load(yamlContent) as any
-            if (parsed && parsed.tool && this.supportedTools.includes(parsed.tool)) {
-              blocks.push({
-                yaml: match[0],
-                startIndex: match.index
-              })
-            }
-          } catch (error) {
-            // Invalid YAML, skip
-            console.warn('[YamlToolParser] Invalid YAML block:', error)
-          }
         }
+      }
+    }
+
+    // Also look for code blocks containing JSON
+    const codeBlockPattern = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/g
+    while ((match = codeBlockPattern.exec(content)) !== null) {
+      try {
+        const jsonContent = match[1]
+        const parsed = JSON.parse(jsonContent)
+        if (parsed.tool && this.supportedTools.includes(parsed.tool)) {
+          blocks.push({
+            json: jsonContent,
+            startIndex: match.index
+          })
+        }
+      } catch (error) {
+        // Ignore malformed JSON in code blocks
       }
     }
 
@@ -145,176 +128,149 @@ export class YamlToolParser {
   }
 
   /**
-   * Parse YAML leniently to handle minor formatting issues
+   * Extract complete JSON object from content starting at index
    */
-  private parseYamlLeniently(yamlContent: string): { tool: string; path?: string; content?: string } | null {
-    try {
-      // First try normal parsing
-      const parsed = load(yamlContent) as any
-      if (parsed && parsed.tool) {
-        return {
-          tool: parsed.tool,
-          path: parsed.path,
-          content: parsed.content
-        }
+  private extractCompleteJson(content: string, startIndex: number): string | null {
+    let braceCount = 0
+    let inString = false
+    let escapeNext = false
+    let jsonEnd = -1
+
+    for (let i = startIndex; i < content.length; i++) {
+      const char = content[i]
+
+      if (escapeNext) {
+        escapeNext = false
+        continue
       }
-    } catch (error) {
-      // If normal parsing fails, try to extract basic info with regex
-      console.warn('[YamlToolParser] Normal parsing failed, trying lenient parsing:', error)
 
-      const lines = yamlContent.split('\n')
-      let tool: string | undefined
-      let path: string | undefined
-      let content: string | undefined
+      if (char === '\\') {
+        escapeNext = true
+        continue
+      }
 
-      for (const line of lines) {
-        const trimmed = line.trim()
-        if (trimmed.startsWith('tool:')) {
-          tool = trimmed.substring(5).trim().replace(/^["']|["']$/g, '')
-        } else if (trimmed.startsWith('path:')) {
-          path = trimmed.substring(5).trim().replace(/^["']|["']$/g, '')
-        } else if (trimmed.startsWith('content:') && trimmed.includes('|')) {
-          // Extract content after |
-          const contentStart = yamlContent.indexOf('content: |')
-          if (contentStart !== -1) {
-            content = yamlContent.substring(contentStart + 10).trim()
-            if (content.startsWith('|')) {
-              content = content.substring(1).trim()
-            }
-            break // Stop parsing after content
+      if (char === '"' || char === "'") {
+        inString = !inString
+        continue
+      }
+
+      if (!inString) {
+        if (char === '{') {
+          braceCount++
+        } else if (char === '}') {
+          braceCount--
+          if (braceCount === 0) {
+            jsonEnd = i
+            break
           }
         }
       }
+    }
 
-      if (tool && this.supportedTools.includes(tool)) {
-        return { tool, path, content }
-      }
+    if (jsonEnd > startIndex) {
+      return content.substring(startIndex, jsonEnd + 1)
     }
 
     return null
   }
 
   /**
-   * Parse a single YAML block
+   * Parse individual JSON block
    */
-  private parseYamlBlock(yamlBlock: string): JsonToolCall | null {
+  private parseJsonBlock(jsonString: string, startIndex: number): Omit<JsonToolCall, 'id' | 'startTime'> | null {
     try {
-      // Extract the YAML content from the code block
-      const yamlMatch = yamlBlock.match(/```(?:yaml|tool)\s*([\s\S]*?)```/)
-      if (!yamlMatch) return null
-
-      const yamlContent = yamlMatch[1].trim()
-
-      // Try strict parsing first
-      let parsed = load(yamlContent) as any
-
-      // If strict parsing fails, try lenient parsing
-      if (!parsed || !parsed.tool) {
-        const lenientResult = this.parseYamlLeniently(yamlContent)
-        if (lenientResult) {
-          parsed = lenientResult
-        } else {
-          return null
-        }
+      const parsed = JSON.parse(jsonString)
+      
+      if (!parsed.tool || !this.supportedTools.includes(parsed.tool)) {
+        return null
       }
 
-      // Convert to JsonToolCall format
-      const toolCall: Partial<JsonToolCall> = {
+      // Build standardized args object
+      const args: Record<string, any> = { ...parsed }
+      delete args.tool // Remove tool from args since it's a separate field
+
+      // Extract fenced content for write_file operations
+      let content = parsed.content || args.content
+      if (parsed.tool === 'write_file' && content && typeof content === 'string') {
+        content = this.extractFencedContent(content)
+      }
+
+      return {
         tool: parsed.tool,
-        name: parsed.tool,
-        args: {},
-        status: 'detected'
+        name: parsed.tool, // For compatibility
+        path: parsed.path || args.file || args.filename,
+        content: content,
+        operation: parsed.operation,
+        search: parsed.search,
+        replace: parsed.replace,
+        args,
+        status: 'detected' as const
       }
 
-      // Copy known fields
-      if (parsed.path) toolCall.path = parsed.path
-      if (parsed.content) toolCall.content = parsed.content
-      if (parsed.operation) toolCall.operation = parsed.operation
-      if (parsed.search) toolCall.search = parsed.search
-      if (parsed.replace) toolCall.replace = parsed.replace
-      if (parsed.searchReplaceBlocks) toolCall.searchReplaceBlocks = parsed.searchReplaceBlocks
-      if (parsed.replaceAll !== undefined) toolCall.replaceAll = parsed.replaceAll
-      if (parsed.occurrenceIndex !== undefined) toolCall.occurrenceIndex = parsed.occurrenceIndex
-      if (parsed.validateAfter) toolCall.validateAfter = parsed.validateAfter
-      if (parsed.dryRun !== undefined) toolCall.dryRun = parsed.dryRun
-      if (parsed.rollbackOnFailure !== undefined) toolCall.rollbackOnFailure = parsed.rollbackOnFailure
-
-      // Put any extra fields in args
-      for (const [key, value] of Object.entries(parsed)) {
-        if (!['tool', 'path', 'content', 'operation', 'search', 'replace', 'searchReplaceBlocks', 'replaceAll', 'occurrenceIndex', 'validateAfter', 'dryRun', 'rollbackOnFailure'].includes(key)) {
-          toolCall.args![key] = value
-        }
-      }
-
-      return toolCall as JsonToolCall
     } catch (error) {
-      console.error('[YamlToolParser] Failed to parse YAML:', error)
+      console.error('[JsonToolParser] JSON parsing failed:', error)
       return null
     }
   }
 
   /**
-   * Validate a tool call
+   * Extract fenced content from write_file operations
+   * Handles content wrapped in <<<CONTENT>>> and <<<END>>> markers
    */
-  private validateToolCall(toolCall: Partial<JsonToolCall>): { valid: boolean; reason?: string } {
-    if (!toolCall.tool || !this.supportedTools.includes(toolCall.tool)) {
-      return { valid: false, reason: `Unsupported tool: ${toolCall.tool}` }
+  private extractFencedContent(content: string): string {
+    if (!content || typeof content !== 'string') {
+      return content
     }
 
-    // Add more validation as needed
-    return { valid: true }
+    // Check if content uses the fenced format
+    const fenceStart = '<<<CONTENT>>>'
+    const fenceEnd = '<<<END>>>'
+
+    const startIndex = content.indexOf(fenceStart)
+    const endIndex = content.indexOf(fenceEnd)
+
+    if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+      // Extract content between fences
+      const fencedContent = content.substring(
+        startIndex + fenceStart.length,
+        endIndex
+      )
+      return fencedContent.trim()
+    }
+
+    // If no fences found, return content as-is (backward compatibility)
+    return content
   }
 
   /**
-   * Create a placeholder for processed content
+   * Validate if content contains supported JSON tools
    */
-  private createPlaceholder(toolCall: JsonToolCall): string {
-    return `[Tool executed: ${toolCall.tool}]`
+  public hasJsonTools(content: string): boolean {
+    const toolPattern = this.supportedTools.join('|')
+    const jsonToolRegex = new RegExp(`\\{[^}]*["\']tool["\']\s*:\s*["\'](?:${toolPattern})["\']`, 'i')
+    return jsonToolRegex.test(content)
   }
 
   /**
-   * Generate a unique ID
+   * Get supported tool names
+   */
+  public getSupportedTools(): string[] {
+    return [...this.supportedTools]
+  }
+
+  /**
+   * Generate unique ID for tool call
    */
   private generateId(): string {
-    return `tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-  }
-
-  /**
-   * Truncate context for error messages
-   */
-  private truncateContext(content: string): string {
-    return content.length > 100 ? content.substring(0, 100) + '...' : content
-  }
-
-  /**
-   * Check if content has YAML tools
-   */
-  public hasYamlTools(content: string): boolean {
-    return this.findYamlToolBlocks(content).length > 0
-  }
-
-  /**
-   * Parse and validate a single YAML tool
-   */
-  public parseAndValidateSingle(yamlString: string): JsonToolCall | null {
-    const result = this.parseJsonTools(yamlString)
-    return result.tools.length > 0 ? result.tools[0] : null
+    return `json_tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   }
 }
 
 // Export singleton instance
-export const jsonToolParser = new YamlToolParser()
+export const jsonToolParser = new JsonToolParser()
 
-// Export utility functions
+// Export utility function
 export function parseJsonTools(content: string): JsonToolCall[] {
   const result = jsonToolParser.parseJsonTools(content)
   return result.tools
-}
-
-export function parseAndValidateJsonTool(jsonString: string): JsonToolCall | null {
-  return jsonToolParser.parseAndValidateSingle(jsonString)
-}
-
-export function hasJsonTools(content: string): boolean {
-  return jsonToolParser.hasYamlTools(content)
 }

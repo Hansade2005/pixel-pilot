@@ -33,7 +33,6 @@ import { FileSearchResult } from "@/lib/file-lookup-service"
 import { useToast } from "@/hooks/use-toast"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { load } from 'js-yaml'
 import type { Workspace as Project } from "@/lib/storage-manager"
 import { AuthModal } from "@/components/auth-modal"
 import { ChatDiagnostics } from "./chat-diagnostics"
@@ -53,7 +52,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { XMLToolAutoExecutor } from './xml-tool-auto-executor'
-import { jsonToolParser, JsonToolCall, parseJsonTools } from './json-tool-parser'
+import { jsonToolParser, JsonToolCall } from './json-tool-parser'
 
 interface Message {
   id: string
@@ -1747,15 +1746,15 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): 
   }
 }
 
-// Direct YAML tool detection - returns JsonToolCall[] directly (no XML conversion)
+// Direct JSON tool detection - returns JsonToolCall[] directly (no XML conversion)
 function detectJsonTools(content: string): JsonToolCall[] {
   console.log('[DEBUG] detectJsonTools called with content length:', content.length)
   console.log('[DEBUG] Content preview:', content.substring(0, 200))
 
-  // Use YAML parser for reliable tool detection
+  // Use JSON parser for reliable tool detection
   const parseResult = jsonToolParser.parseJsonTools(content)
-  console.log('[DEBUG] YAML parser detected', parseResult.tools.length, 'tools')
-
+  console.log('[DEBUG] JSON parser detected', parseResult.tools.length, 'tools')
+  
   return parseResult.tools
 }
 
@@ -5881,22 +5880,22 @@ export function ChatPanel({
                             <div className="bg-card text-card-foreground border rounded-xl shadow-sm overflow-hidden w-full">
                               <div className="p-4">
                                 {(() => {
-                                  // First check for YAML tools (new format)
-                                  const jsonTools = jsonToolParser.parseJsonTools(msg.content).tools
+                                  // First check for JSON tools (new format)
+                                  const jsonTools = detectJsonTools(msg.content)
                                   if (jsonTools.length > 0) {
-                                    console.log('[DEBUG] Rendering', jsonTools.length, 'YAML tools as pills')
-
-                                    // Direct rendering of YAML tools as pills
+                                    console.log('[DEBUG] Rendering', jsonTools.length, 'JSON tools as pills')
+                                    
+                                    // Direct rendering of JSON tools as pills
                                     const components: React.ReactNode[] = []
                                     let remainingContent = msg.content
                                     let elementKey = 0
-
-                                    // Remove YAML code blocks from content and replace with pills
-                                    const codeBlockRegex = /```(?:yaml|tool)\s*([\s\S]*?)```/gi
+                                    
+                                    // Remove JSON code blocks from content and replace with pills
+                                    const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/gi
                                     let match
                                     let currentPosition = 0
                                     let usedTools = new Set<string>() // Track used tools to avoid duplicates
-
+                                    
                                     while ((match = codeBlockRegex.exec(msg.content)) !== null) {
                                       // Add content before the code block
                                       if (match.index > currentPosition) {
@@ -5911,31 +5910,30 @@ export function ChatPanel({
                                           )
                                         }
                                       }
-
-                                      // Find matching YAML tool for this code block
-                                      const yamlContent = match[1]
+                                      
+                                      // Find matching JSON tool for this code block
+                                      const jsonContent = match[1]
                                       let matchingTool: JsonToolCall | undefined
-
+                                      
                                       try {
-                                        // Parse the YAML content to find the tool
-                                        const parsed = load(yamlContent) as any
-                                        if (parsed && parsed.tool) {
+                                        const parsed = JSON.parse(jsonContent)
+                                        if (parsed.tool) {
                                           // Find unused tool that matches
-                                          matchingTool = jsonTools.find(tool =>
-                                            !usedTools.has(tool.id) &&
-                                            tool.tool === parsed.tool &&
+                                          matchingTool = jsonTools.find(tool => 
+                                            !usedTools.has(tool.id) && 
+                                            tool.tool === parsed.tool && 
                                             tool.path === parsed.path
                                           )
-
+                                          
                                           // If no exact match, find by tool type only
                                           if (!matchingTool) {
-                                            matchingTool = jsonTools.find(tool =>
-                                              !usedTools.has(tool.id) &&
+                                            matchingTool = jsonTools.find(tool => 
+                                              !usedTools.has(tool.id) && 
                                               tool.tool === parsed.tool
                                             )
                                           }
-
-                                          // If still no match, create a synthetic tool call from the YAML
+                                          
+                                          // If still no match, create a synthetic tool call from the JSON
                                           if (!matchingTool && parsed.tool && (parsed.path || parsed.content)) {
                                             matchingTool = {
                                               id: `synthetic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -5950,35 +5948,35 @@ export function ChatPanel({
                                               replace: parsed.replace,
                                               operation: parsed.operation
                                             }
-                                            console.log('[DEBUG] Created synthetic tool for YAML block:', matchingTool)
+                                            console.log('[DEBUG] Created synthetic tool for code block:', matchingTool)
                                           }
                                         }
                                       } catch (error) {
-                                        console.warn('[DEBUG] Failed to parse YAML in code block:', error, yamlContent)
+                                        console.warn('[DEBUG] Failed to parse JSON in code block:', error, jsonContent)
                                       }
-
+                                      
                                       if (matchingTool) {
                                         usedTools.add(matchingTool.id)
                                         components.push(
-                                          project ? <JSONToolPill key={`yaml-tool-${elementKey++}`} toolCall={matchingTool} status="completed" autoExecutor={autoExecutor} project={project} /> : null
+                                          project ? <JSONToolPill key={`json-tool-${elementKey++}`} toolCall={matchingTool} status="completed" autoExecutor={autoExecutor} project={project} /> : null
                                         )
-                                        console.log('[DEBUG] Rendered JSONToolPill for YAML tool:', matchingTool.tool, matchingTool.path)
+                                        console.log('[DEBUG] Rendered JSONToolPill for:', matchingTool.tool, matchingTool.path)
                                       } else {
-                                        console.warn('[DEBUG] No matching tool found for YAML block:', yamlContent)
+                                        console.warn('[DEBUG] No matching tool found for JSON block:', jsonContent)
                                         // Render the code block as regular markdown if no tool match
                                         components.push(
                                           <div key={`code-${elementKey++}`} className="markdown-content">
                                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                              {`\`\`\`yaml\n${yamlContent}\n\`\`\``}
+                                              {`\`\`\`json\n${jsonContent}\n\`\`\``}
                                             </ReactMarkdown>
                                           </div>
                                         )
                                       }
-
+                                      
                                       currentPosition = match.index + match[0].length
                                     }
-
-                                    // Add any unused tools as pills (for bare YAML not in code blocks)
+                                    
+                                    // Add any unused tools as pills (for bare JSON not in code blocks)
                                     const unusedTools = jsonTools.filter(tool => !usedTools.has(tool.id))
                                     unusedTools.forEach(tool => {
                                       components.push(
@@ -5986,7 +5984,7 @@ export function ChatPanel({
                                       )
                                       console.log('[DEBUG] Rendered unused tool as pill:', tool.tool, tool.path)
                                     })
-
+                                    
                                     // Add any remaining content
                                     if (currentPosition < msg.content.length) {
                                       const afterContent = msg.content.slice(currentPosition)
@@ -6000,13 +5998,15 @@ export function ChatPanel({
                                         )
                                       }
                                     }
-
+                                    
                                     return (
                                       <div className="space-y-3">
                                         {components}
                                       </div>
                                     )
-                                  }                                  // Check if content has valid XML tools (not just keywords) - Legacy support
+                                  }
+                                  
+                                  // Check if content has valid XML tools (not just keywords) - Legacy support
                                   const hasXMLTools = hasValidXMLTools(msg.content)
                                   const hasExistingPlaceholders = /<!-- XMLTOOL_pilot\w+_\d+_[a-z0-9]+ -->/.test(msg.content)
                                   
