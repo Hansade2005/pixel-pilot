@@ -5882,126 +5882,39 @@ export function ChatPanel({
                                 {(() => {
                                   // First check for JSON tools (new format)
                                   const jsonTools = detectJsonTools(msg.content)
+                                  console.log('[DEBUG] Message content preview:', msg.content.substring(0, 500))
+                                  console.log('[DEBUG] Detected JSON tools:', jsonTools.length, jsonTools.map(t => ({ tool: t.tool, path: t.path })))
                                   if (jsonTools.length > 0) {
                                     console.log('[DEBUG] Rendering', jsonTools.length, 'JSON tools as pills')
-                                    
-                                    // Direct rendering of JSON tools as pills
-                                    const components: React.ReactNode[] = []
-                                    let remainingContent = msg.content
-                                    let elementKey = 0
-                                    
-                                    // Remove JSON code blocks from content and replace with pills
-                                    const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/gi
-                                    let match
-                                    let currentPosition = 0
-                                    let usedTools = new Set<string>() // Track used tools to avoid duplicates
-                                    
-                                    while ((match = codeBlockRegex.exec(msg.content)) !== null) {
-                                      // Add content before the code block
-                                      if (match.index > currentPosition) {
-                                        const beforeContent = msg.content.slice(currentPosition, match.index)
-                                        if (beforeContent.trim()) {
-                                          components.push(
-                                            <div key={`content-${elementKey++}`} className="markdown-content">
-                                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                                {beforeContent}
-                                              </ReactMarkdown>
-                                            </div>
-                                          )
-                                        }
-                                      }
-                                      
-                                      // Find matching JSON tool for this code block
-                                      const jsonContent = match[1]
-                                      let matchingTool: JsonToolCall | undefined
-                                      
-                                      try {
-                                        const parsed = JSON.parse(jsonContent)
-                                        if (parsed.tool) {
-                                          // Find unused tool that matches
-                                          matchingTool = jsonTools.find(tool => 
-                                            !usedTools.has(tool.id) && 
-                                            tool.tool === parsed.tool && 
-                                            tool.path === parsed.path
-                                          )
-                                          
-                                          // If no exact match, find by tool type only
-                                          if (!matchingTool) {
-                                            matchingTool = jsonTools.find(tool => 
-                                              !usedTools.has(tool.id) && 
-                                              tool.tool === parsed.tool
-                                            )
-                                          }
-                                          
-                                          // If still no match, create a synthetic tool call from the JSON
-                                          if (!matchingTool && parsed.tool && (parsed.path || parsed.content)) {
-                                            matchingTool = {
-                                              id: `synthetic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                                              tool: parsed.tool,
-                                              name: parsed.tool,
-                                              path: parsed.path || '',
-                                              content: parsed.content || '',
-                                              args: parsed,
-                                              status: 'completed',
-                                              startTime: Date.now(),
-                                              search: parsed.search,
-                                              replace: parsed.replace,
-                                              operation: parsed.operation
-                                            }
-                                            console.log('[DEBUG] Created synthetic tool for code block:', matchingTool)
-                                          }
-                                        }
-                                      } catch (error) {
-                                        console.warn('[DEBUG] Failed to parse JSON in code block:', error, jsonContent)
-                                      }
-                                      
-                                      if (matchingTool) {
-                                        usedTools.add(matchingTool.id)
-                                        components.push(
-                                          project ? <JSONToolPill key={`json-tool-${elementKey++}`} toolCall={matchingTool} status="completed" autoExecutor={autoExecutor} project={project} /> : null
-                                        )
-                                        console.log('[DEBUG] Rendered JSONToolPill for:', matchingTool.tool, matchingTool.path)
-                                      } else {
-                                        console.warn('[DEBUG] No matching tool found for JSON block:', jsonContent)
-                                        // Render the code block as regular markdown if no tool match
-                                        components.push(
-                                          <div key={`code-${elementKey++}`} className="markdown-content">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                              {`\`\`\`json\n${jsonContent}\n\`\`\``}
-                                            </ReactMarkdown>
-                                          </div>
-                                        )
-                                      }
-                                      
-                                      currentPosition = match.index + match[0].length
-                                    }
-                                    
-                                    // Add any unused tools as pills (for bare JSON not in code blocks)
-                                    const unusedTools = jsonTools.filter(tool => !usedTools.has(tool.id))
-                                    unusedTools.forEach(tool => {
-                                      components.push(
-                                        project ? <JSONToolPill key={`unused-tool-${elementKey++}`} toolCall={tool} status="completed" autoExecutor={autoExecutor} project={project} /> : null
-                                      )
-                                      console.log('[DEBUG] Rendered unused tool as pill:', tool.tool, tool.path)
-                                    })
-                                    
-                                    // Add any remaining content
-                                    if (currentPosition < msg.content.length) {
-                                      const afterContent = msg.content.slice(currentPosition)
-                                      if (afterContent.trim()) {
-                                        components.push(
-                                          <div key={`content-${elementKey++}`} className="markdown-content">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                              {afterContent}
-                                            </ReactMarkdown>
-                                          </div>
-                                        )
-                                      }
-                                    }
-                                    
+
+                                    // Get processed content with tool placeholders
+                                    const parseResult = jsonToolParser.parseJsonTools(msg.content)
+                                    const processedContent = parseResult.processedContent
+                                    console.log('[DEBUG] Processed content:', processedContent.substring(0, 200))
+
                                     return (
                                       <div className="space-y-3">
-                                        {components}
+                                        {/* Render all detected JSON tools as pills */}
+                                        {jsonTools.map((tool, index) => (
+                                          project ? (
+                                            <JSONToolPill
+                                              key={`json-tool-${tool.id}`}
+                                              toolCall={tool}
+                                              status="completed"
+                                              autoExecutor={autoExecutor}
+                                              project={project}
+                                            />
+                                          ) : null
+                                        ))}
+
+                                        {/* Render remaining content as markdown if any */}
+                                        {processedContent.trim() && (
+                                          <div className="markdown-content">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                              {processedContent}
+                                            </ReactMarkdown>
+                                          </div>
+                                        )}
                                       </div>
                                     )
                                   }
