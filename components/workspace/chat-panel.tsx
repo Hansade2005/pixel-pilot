@@ -33,6 +33,7 @@ import { FileSearchResult } from "@/lib/file-lookup-service"
 import { useToast } from "@/hooks/use-toast"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { load } from 'js-yaml'
 import type { Workspace as Project } from "@/lib/storage-manager"
 import { AuthModal } from "@/components/auth-modal"
 import { ChatDiagnostics } from "./chat-diagnostics"
@@ -5879,7 +5880,7 @@ export function ChatPanel({
                             {/* Message content */}
                             <div className="bg-card text-card-foreground border rounded-xl shadow-sm overflow-hidden w-full">
                               <div className="p-4">
-                                {(async () => {
+                                {(() => {
                                   // First check for YAML tools (new format)
                                   const jsonTools = jsonToolParser.parseJsonTools(msg.content).tools
                                   if (jsonTools.length > 0) {
@@ -5917,7 +5918,6 @@ export function ChatPanel({
 
                                       try {
                                         // Parse the YAML content to find the tool
-                                        const { load } = await import('js-yaml')
                                         const parsed = load(yamlContent) as any
                                         if (parsed && parsed.tool) {
                                           // Find unused tool that matches
