@@ -496,6 +496,8 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
       'scss': 'scss',
       'html': 'html',
       'json': 'json',
+      'jsonc': 'json',
+      'json5': 'json',
       'md': 'markdown',
       'py': 'python',
       'yml': 'yaml',
