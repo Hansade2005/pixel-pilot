@@ -4895,7 +4895,163 @@ You can use these commands by embedding JSON tools in code blocks in your respon
 - Each tool command must be a separate JSON code block
 - The JSON must be valid and properly formatted
 
-**📝 CONTENT FENCING FOR write_file:**
+**� CRITICAL: ALL CODE IN write_file/edit_file TOOLS MUST FOLLOW TSX/TYPESCRIPT RULES ABOVE**
+
+**When using write_file or edit_file tools, ALL code content MUST strictly follow the TypeScript/JSX formatting rules defined in this prompt:**
+
+### ✅ CORRECT EXAMPLES (Always Use These Patterns):
+
+**Component Structure:**
+\`\`\`json
+{
+  "tool": "write_file",
+  "path": "src/components/UserCard.tsx",
+  "content": "<<<CONTENT>>>import React from 'react'
+import type { User } from '@/types'
+
+interface UserCardProps {
+  user: User
+  onEdit?: (id: string) => void
+}
+
+const UserCard = ({ user, onEdit }: UserCardProps): JSX.Element => {
+  const handleEdit = (e: React.MouseEvent<HTMLButtonElement>): void => {
+    e.preventDefault()
+    onEdit?.(user.id)
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-md p-4">
+      <h3 className="text-lg font-semibold">{user.name}</h3>
+      <p className="text-gray-600">{user.email}</p>
+      <button
+        onClick={handleEdit}
+        className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+      >
+        Edit
+      </button>
+    </div>
+  )
+}
+
+export default UserCard
+<<<END>>>"
+}
+\`\`\`
+
+**Hook Implementation:**
+\`\`\`json
+{
+  "tool": "write_file",
+  "path": "src/hooks/useLocalStorage.ts",
+  "content": "<<<CONTENT>>>import { useState, useEffect } from 'react'
+
+const useLocalStorage = <T>(key: string, initialValue: T): [T, (value: T) => void] => {
+  const [storedValue, setStoredValue] = useState<T>(() => {
+    try {
+      const item = window.localStorage.getItem(key)
+      return item ? JSON.parse(item) : initialValue
+    } catch (error) {
+      console.error(\`Error reading localStorage key "\${key}":\`, error)
+      return initialValue
+    }
+  })
+
+  const setValue = (value: T): void => {
+    try {
+      setStoredValue(value)
+      window.localStorage.setItem(key, JSON.stringify(value))
+    } catch (error) {
+      console.error(\`Error setting localStorage key "\${key}":\`, error)
+    }
+  }
+
+  return [storedValue, setValue]
+}
+
+export default useLocalStorage
+<<<END>>>"
+}
+\`\`\`
+
+### ❌ WRONG EXAMPLES (NEVER Use These - Will Break Code):
+
+**❌ Wrong: HTML comments in TSX**
+\`\`\`json
+{
+  "tool": "write_file",
+  "path": "src/components/Broken.tsx",
+  "content": "<<<CONTENT>>>import React from 'react'
+
+const BrokenComponent = () => {
+  <!-- ❌ NEVER use HTML comments in .tsx files -->
+  return (
+    <div>
+      <!-- ❌ This breaks TypeScript compilation -->
+      <span>Content</span>
+    </div>
+  )
+}
+
+export default BrokenComponent
+<<<END>>>"
+}
+\`\`\`
+
+**❌ Wrong: Missing semicolons, wrong quotes, var usage**
+\`\`\`json
+{
+  "tool": "write_file",
+  "path": "src/utils/broken.ts",
+  "content": "<<<CONTENT>>>import React from "react";  // ❌ Semicolon + double quotes
+
+var count = 0;  // ❌ var instead of const/let
+function broken() {  // ❌ Missing return type
+  console.log("broken");  // ❌ console.log in production code
+}
+
+export default broken;
+<<<END>>>"
+}
+\`\`\`
+
+**❌ Wrong: Incorrect JSX syntax**
+\`\`\`json
+{
+  "tool": "write_file",
+  "path": "src/components/BrokenJSX.tsx",
+  "content": "<<<CONTENT>>>import React from 'react'
+
+const BrokenJSX = () => {
+  return (
+    <div class="container">  {/* ❌ class instead of className */}
+      <img src="image.jpg">  {/* ❌ Not self-closed */}
+      <input type="text">    {/* ❌ Not self-closed */}
+      <span>{name}           {/* ❌ Unclosed JSX expression */}
+    </div>
+  )
+}
+
+export default BrokenJSX
+<<<END>>>"
+}
+\`\`\`
+
+### 📋 **MANDATORY CHECKLIST - Before Using Any Tool:**
+
+**For EVERY write_file or edit_file operation:**
+- [ ] **NO semicolons** after import statements
+- [ ] **Single quotes** for all strings and imports
+- [ ] **Explicit TypeScript types** - never use \`any\`, \`var\`, or missing types
+- [ ] **Proper JSX syntax** - self-closing tags, className not class, proper nesting
+- [ ] **NO HTML comments** - use \`//\` or \`{/* */}\` only
+- [ ] **NO console.log statements** in production code
+- [ ] **Proper event handler typing** - React.MouseEvent<T>, React.ChangeEvent<T>, etc.
+- [ ] **PascalCase for components**, **camelCase for utilities**
+- [ ] **Complete file content** - never partial updates that break syntax
+- [ ] **Test mentally**: "Does this parse correctly as valid TypeScript/JSX?"
+
+**�📝 CONTENT FENCING FOR write_file:**
 Use the special fence format to avoid JSON escaping issues:
 
 \`\`\`json
@@ -4912,6 +5068,152 @@ Use the special fence format to avoid JSON escaping issues:
 - Escaping issues with newlines and backslashes
 
 **🖼️ IMAGE API:** Use https://api.a0.dev/assets/image?text={description}&aspect=1:1&seed={number} for any images needed
+
+## 🚨 **CRITICAL JSON RULES - PREVENT PARSING FAILURES**
+
+**ALL JSON tool commands MUST follow these rules to prevent "Bad control character" and other parsing errors:**
+
+### ✅ **VALID JSON SYNTAX RULES:**
+
+**1. Always use DOUBLE QUOTES for ALL strings:**
+\`\`\`json
+{
+  "tool": "write_file",        // ✅ Correct
+  "path": "src/file.ts",       // ✅ Correct
+  "content": "text"            // ✅ Correct
+}
+\`\`\`
+
+**❌ NEVER use single quotes:**
+\`\`\`json
+{
+  "tool": 'write_file',        // ❌ WRONG - Single quotes break JSON
+  "path": 'src/file.ts',       // ❌ WRONG - Single quotes break JSON
+  "content": 'text'            // ❌ WRONG - Single quotes break JSON
+}
+\`\`\`
+
+**2. Properly escape ALL special characters in strings:**
+\`\`\`json
+{
+  "tool": "edit_file",
+  "path": "src/utils/helpers.ts",
+  "operation": "search_replace",
+  "search": "console.log('debug')",           // ✅ Properly escaped quotes
+  "replace": "console.log(\\"production\\")"   // ✅ Escaped quotes in replacement
+}
+\`\`\`
+
+**3. Handle newlines and control characters:**
+\`\`\`json
+{
+  "tool": "write_file",
+  "path": "src/components/Code.tsx",
+  "content": "<<<CONTENT>>>const code = \`line 1\\nline 2\\n  indented\`
+return <pre>{code}</pre>
+<<<END>>>"
+}
+\`\`\`
+**❌ NEVER put unescaped newlines in JSON strings:**
+\`\`\`json
+{
+  "content": "line 1
+line 2"  // ❌ WRONG - Unescaped newlines break JSON parsing
+}
+\`\`\`
+
+**4. Valid tool names and required parameters:**
+\`\`\`json
+// ✅ CORRECT - All required fields present
+{
+  "tool": "write_file",
+  "path": "src/components/Component.tsx",
+  "content": "<<<CONTENT>>>import React from 'react'\n\nexport default function Component() {\n  return <div>Hello</div>\n}\n<<<END>>>"
+}
+
+// ✅ CORRECT - All required fields for edit_file
+{
+  "tool": "edit_file",
+  "path": "src/components/Component.tsx",
+  "operation": "search_replace",
+  "search": "old code",
+  "replace": "new code"
+}
+\`\`\`
+
+**❌ INVALID tool usage:**
+\`\`\`json
+{
+  "tool": "write",              // ❌ WRONG - Invalid tool name
+  "file": "component.tsx",      // ❌ WRONG - Wrong parameter name
+  "code": "content"             // ❌ WRONG - Wrong parameter name
+}
+\`\`\`
+
+**5. Content fencing for write_file - ALWAYS required:**
+\`\`\`json
+{
+  "tool": "write_file",
+  "path": "src/components/Component.tsx",
+  "content": "<<<CONTENT>>>// Your complete file content here\n// With proper newlines and formatting\n<<<END>>>"
+}
+\`\`\`
+
+**❌ NEVER put code directly in JSON without fencing:**
+\`\`\`json
+{
+  "tool": "write_file",
+  "path": "src/components/Component.tsx",
+  "content": "import React from 'react'\n\nexport default function Component() {\n  return <div>Hello</div>\n}"  // ❌ WRONG - No fencing, quotes break JSON
+}
+\`\`\`
+
+### 📋 **JSON VALIDATION CHECKLIST - Before Every Tool Use:**
+
+**For EVERY JSON tool command:**
+- [ ] **Double quotes only** - No single quotes anywhere in JSON
+- [ ] **All special characters escaped** - \`\"\` for quotes, \`\\\` for backslashes, \`\\n\` for newlines
+- [ ] **No unescaped control characters** - No tabs, newlines, or special chars in JSON strings
+- [ ] **Valid tool names** - Only "write_file", "edit_file", "delete_file"
+- [ ] **Required parameters present** - path, content (for write_file), search/replace (for edit_file)
+- [ ] **Content fencing used** - \`<<<CONTENT>>>...<<<END>>>\` for all write_file operations
+- [ ] **Proper JSON structure** - Valid JSON syntax, no trailing commas, matching braces/brackets
+- [ ] **Test parsing** - Mentally verify: "Can this be parsed as valid JSON?"
+
+### 🚨 **COMMON JSON ERRORS TO AVOID:**
+
+**❌ Control Character Errors:**
+\`\`\`json
+{
+  "content": "Line 1\nLine 2"  // ❌ Unescaped newline breaks JSON
+}
+\`\`\`
+
+**❌ Quote Escaping Errors:**
+\`\`\`json
+{
+  "search": "console.log('hello')",    // ❌ Unescaped single quotes
+  "replace": "console.log("world")"    // ❌ Unescaped double quotes
+}
+\`\`\`
+
+**❌ Invalid Tool Structure:**
+\`\`\`json
+{
+  "tool": "write_file",
+  "path": "file.tsx",
+  "content": "import React from 'react'"  // ❌ No content fencing
+}
+\`\`\`
+
+**✅ CORRECTED VERSIONS:**
+\`\`\`json
+{
+  "tool": "write_file",
+  "path": "src/components/Component.tsx",
+  "content": "<<<CONTENT>>>import React from 'react'\n\nexport default function Component() {\n  return <div>Hello World</div>\n}\n<<<END>>>"
+}
+\`\`\`
 
 ## 🏗️ **BACKEND INTEGRATION PROTOCOL**
 

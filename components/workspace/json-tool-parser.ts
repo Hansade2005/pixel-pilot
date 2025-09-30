@@ -179,8 +179,10 @@ export class JsonToolParser {
    */
   private parseJsonBlock(jsonString: string, startIndex: number): Omit<JsonToolCall, 'id' | 'startTime'> | null {
     try {
-      const parsed = JSON.parse(jsonString)
-      
+      // Preprocess JSON string to handle fenced content before parsing
+      const preprocessedJson = this.preprocessJsonForFencedContent(jsonString)
+      const parsed = JSON.parse(preprocessedJson)
+
       if (!parsed.tool || !this.supportedTools.includes(parsed.tool)) {
         return null
       }
@@ -240,6 +242,67 @@ export class JsonToolParser {
 
     // If no fences found, return content as-is (backward compatibility)
     return content
+  }
+
+  /**
+   * Preprocess JSON string to handle fenced content before parsing
+   * This prevents JSON parsing errors from unescaped control characters in fenced content
+   */
+  private preprocessJsonForFencedContent(jsonString: string): string {
+    // Check if the JSON contains fenced content markers
+    if (!jsonString.includes('<<<CONTENT>>>') || !jsonString.includes('<<<END>>>')) {
+      return jsonString; // No fenced content, return as-is
+    }
+
+    // Find the content field and replace fenced content with escaped version
+    // Use a more robust approach that doesn't rely on complex regex for quoted strings
+
+    const fenceStart = '<<<CONTENT>>>'
+    const fenceEnd = '<<<END>>>'
+
+    // Find the start of the content field
+    const contentFieldStart = jsonString.indexOf('"content":')
+    if (contentFieldStart === -1) {
+      return jsonString
+    }
+
+    // Find the opening quote of the content value
+    const contentValueStart = jsonString.indexOf('"', contentFieldStart + 10) // Skip "content":
+    if (contentValueStart === -1) {
+      return jsonString
+    }
+
+    // Now find the fenced content within this content value
+    const fencedStart = jsonString.indexOf(fenceStart, contentValueStart)
+    const fencedEnd = jsonString.indexOf(fenceEnd, fencedStart)
+
+    if (fencedStart === -1 || fencedEnd === -1 || fencedEnd <= fencedStart) {
+      return jsonString
+    }
+
+    // Extract the fenced content
+    const fencedContent = jsonString.substring(
+      fencedStart + fenceStart.length,
+      fencedEnd
+    ).trim()
+
+    // Escape the fenced content for JSON
+    const escapedContent = fencedContent
+      .replace(/\\/g, '\\\\')  // Escape backslashes first
+      .replace(/"/g, '\\"')    // Escape quotes
+      .replace(/\n/g, '\\n')   // Escape newlines
+      .replace(/\r/g, '\\r')   // Escape carriage returns
+      .replace(/\t/g, '\\t')   // Escape tabs
+      .replace(/\f/g, '\\f')   // Escape form feeds
+      .replace(/\x08/g, '\\b') // Escape backspaces (use \x08 for actual backspace char)
+
+    // Replace the entire fenced content block with the escaped content
+    const beforeFenced = jsonString.substring(0, fencedStart)
+    const afterFenced = jsonString.substring(fencedEnd + fenceEnd.length)
+
+    const processedJson = beforeFenced + escapedContent + afterFenced
+
+    return processedJson
   }
 
   /**
