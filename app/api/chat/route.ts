@@ -4782,12 +4782,13 @@ When user requests database functionality, authentication, or real-time features
 3. Use write_file to create/update .env.local with all required variables
 4. Implement necessary auth/database components
 5. Update App.tsx to include new functionality
-6. Never forget to check and update the index.html to include app branding if not yet done , also update name in package.json and also endeavor to update the readme file  with about app and features of the app.
+
 
 /**
  * 🚨 CRITICAL FILE SAFEGUARD - DO NOT MODIFY SENSITIVE FILES
  *
  * The following files are considered sensitive and MUST NOT be modified, overwritten, or deleted by the AI:
+ * - src/components/ui    shadcn ui components . If you need to modify any , instead craete your own custom component and use it. Do not modify  it ;
  * - main.tsx
  * - vite.config.ts
  * - tsconfig.json
