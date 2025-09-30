@@ -4257,6 +4257,8 @@ function getStreamingSystemPrompt(projectContext?: string, memoryContext?: any):
 **Important**
   always use but the write_file tool to update     thats te only avaialble tool for  file craetion and updates
 
+  **AVAILABLE TOOLS: write_file, edit_file, delete_file**
+
   ## 🚨 **CRITICAL COMMENT RULES - NO EXCEPTIONS**
 
   **❌ NEVER USE HTML COMMENTS IN TYPESCRIPT/JSX FILES:**
@@ -4859,8 +4861,60 @@ You can use these commands by embedding JSON tools in code blocks in your respon
 
 \`\`\`json
 {
+  "tool": "edit_file",
+  "path": "src/components/Example.tsx",
+  "operation": "search_replace",
+  "search": "old code",
+  "replace": "new code"
+}
+\`\`\`
+
+\`\`\`json
+{
   "tool": "delete_file",
   "path": "src/old-file.ts"
+}
+\`\`\`
+
+## 📋 **SHORT JSON TOOL RULES - CRITICAL**
+
+**✅ CORRECT write_file usage:**
+\`\`\`json
+{
+  "tool": "write_file",
+  "path": "src/components/Component.tsx",
+  "content": "import React from 'react'\\n\\nexport default function Component() {\\n  return <div>Hello</div>\\n}"
+}
+\`\`\`
+
+**❌ WRONG write_file usage:**
+\`\`\`json
+{
+  "tool": "write_file",
+  "path": "src/components/Component.tsx",
+  "content": "import React from 'react'\\n\\nexport default function Component() {\\n  return <div>Hello</div>\\n"
+}
+\`\`\`
+
+**✅ CORRECT edit_file usage:**
+\`\`\`json
+{
+  "tool": "edit_file",
+  "path": "src/components/Component.tsx",
+  "operation": "search_replace",
+  "search": "old code here",
+  "replace": "new code here"
+}
+\`\`\`
+
+**❌ WRONG edit_file usage:**
+\`\`\`json
+{
+  "tool": "edit_file",
+  "path": "src/components/Component.tsx",
+  "operation": "search_replace",
+  "search": "old code here",
+  "replace": "new code here"
 }
 \`\`\`
 
@@ -4868,9 +4922,107 @@ You can use these commands by embedding JSON tools in code blocks in your respon
 - **ALWAYS wrap JSON tool commands in markdown code blocks with \`\`\`json**
 - Use proper JSON syntax with double quotes for all strings
 - Escape newlines in content as \\n for proper JSON formatting
-- **Supported tool names**: "write_file", "delete_file"
+- **Supported tool names**: "write_file", "edit_file", "delete_file"
 - Each tool command must be a separate JSON code block
 - The JSON must be valid and properly formatted
+- **write_file content**: Escape quotes as \\" and newlines as \\n
+- **edit_file**: search/replace strings must be properly escaped
+- **NEVER use single quotes** in JSON - always double quotes
+
+## 🔧 **EDIT_FILE TOOL CAPABILITIES & EXAMPLES**
+
+**🎯 EDIT_FILE FEATURES:**
+- **Precise Search & Replace**: Target specific code sections with exact string matching
+- **Multiple Operations**: Perform several replacements in one command using \`searchReplaceBlocks\` array
+- **Bulk Operations**: Use \`replaceAll: true\` for global find/replace within a file
+- **Safe Editing**: Only replaces exact matches, preserving surrounding code
+
+**✅ REMOVE ENTIRE FUNCTION:**
+\`\`\`json
+{
+  "tool": "edit_file",
+  "path": "src/deprecated.ts",
+  "searchReplaceBlocks": [
+    {
+      "search": "function deprecatedFunction() {\n  // old code\n}",
+      "replace": ""
+    }
+  ]
+}
+\`\`\`
+
+**✅ REMOVE UNUSED IMPORT:**
+\`\`\`json
+{
+  "tool": "edit_file",
+  "path": "src/components/Component.tsx",
+  "searchReplaceBlocks": [
+    {
+      "search": "import { unused } from 'unused-lib';",
+      "replace": ""
+    }
+  ]
+}
+\`\`\`
+
+**✅ REMOVE ALL CONSOLE.LOG STATEMENTS:**
+\`\`\`json
+{
+  "tool": "edit_file",
+  "path": "src/utils/helpers.ts",
+  "searchReplaceBlocks": [
+    {
+      "search": "console.log",
+      "replace": "",
+      "replaceAll": true
+    }
+  ]
+}
+\`\`\`
+
+**✅ MULTIPLE REPLACEMENTS IN ONE FILE:**
+\`\`\`json
+{
+  "tool": "edit_file",
+  "path": "src/components/TestComponent.tsx",
+  "searchReplaceBlocks": [
+    {
+      "search": "const [",
+      "replace": "let [",
+      "replaceAll": true
+    },
+    {
+      "search": "function ",
+      "replace": "const ",
+      "replaceAll": true
+    },
+    {
+      "search": "useState",
+      "replace": "useImmer",
+      "replaceAll": true
+    }
+  ]
+}
+\`\`\`
+
+**✅ COMBINED SINGLE & BULK OPERATIONS:**
+\`\`\`json
+{
+  "tool": "edit_file",
+  "path": "src/components/Example.tsx",
+  "searchReplaceBlocks": [
+    {
+      "search": "old code here",
+      "replace": "new code here"
+    },
+    {
+      "search": "console.log('debug');",
+      "replace": "",
+      "replaceAll": true
+    }
+  ]
+}
+\`\`\`
 
 **🖼️ IMAGE API:** Use https://api.a0.dev/assets/image?text={description}&aspect=1:1&seed={number} for any images needed
 
