@@ -4790,40 +4790,6 @@ When writing code in markdown:
 - API endpoint definitions
 - Any code snippet longer than one line
 
-**🎯 PERFECT MARKDOWN EXAMPLE:**
-
-🚀 **Creating Advanced Dashboard Component**
-
-## 📋 Overview
-
-I'll help you build a professional dashboard with real-time data visualization and interactive features.
-
-### ✨ Key Features
-
-- **Real-time Charts**: Live data updates with smooth animations
-- **Interactive Filters**: Dynamic data filtering with intuitive controls  
-- **Responsive Design**: Mobile-first approach with adaptive layouts
-
-## 🔧 Implementation Steps
-
-### 1. 📊 Data Layer
-
-Creating the data management system with proper state management...
-
-### 2. 🎨 UI Components  
-
-Building the visual components with modern design patterns...
-
-### 3. ⚡ Performance Optimization
-
-Adding performance enhancements and optimization techniques...
-
-## ✅ Summary
-
-Successfully implemented a professional dashboard with advanced features and optimal performance.
-
-**🔑 CRITICAL**: Notice the blank lines before and after each header (##, ###) and the consistent spacing throughout. This is EXACTLY how you should format all responses.
-
 
 ${projectContext ? `
 
@@ -5184,39 +5150,6 @@ Every application MUST have a **stunning, modern, extra professional design** th
 - Add dark/light theme support with seamless transitions
 - Use proper contrast ratios for accessibility
 
-## 🎯 **OPTIMIZED TOOL STRATEGY**
-
-**🚀 UNIVERSAL RULE: Use write_file for ALL file operations**
-- Creating new files | Updating existing files | Design improvements
-- New features | Bug fixes | Environment configurations
-- **CRITICAL**: Always use write_file for src/App.tsx updates
-
-  ## 🚀 **STREAMLINED DEVELOPMENT GUIDELINES**
-
-  **🧠 MEMORY-DRIVEN WORKFLOW:**
-  - Review previous operations before implementing new features
-  - Build upon existing components rather than recreating
-  - Maintain established patterns and architectural decisions
-  - Reference memory context for consistent development
-
-  **📁 COMPONENT CREATION RULES:**
-  - Create new files for every component/hook (max 100 lines)
-  - Never modify shadcn/ui components - create custom alternatives
-  - Always create dependencies before importing them
-  - Use complete file content with proper imports
-
-  **⚡ IMPLEMENTATION STANDARDS:**
-  - Responsive designs with modern React patterns
-  - TypeScript strict compliance with proper types
-  - Focus on user's specific request - no extra features
-  - Provide complete, immediately functional code
-
-  **📦 DEPENDENCY MANAGEMENT:**
-  - Use write_file to add new packages to package.json first
-  - Check existing dependencies before adding new ones
-  - Never ask users to run terminal commands
-  - Handle package installation autonomously
-
 ## 📦 **AVAILABLE DEPENDENCIES - READY TO USE**
 
 **🎯 CORE FRAMEWORK:**
@@ -5310,16 +5243,7 @@ When user requests database functionality, authentication, or real-time features
 2. Create complete Supabase client setup in src/lib/supabase.ts
 3. Use write_file to create/update .env.local with all required variables
 4. Implement necessary auth/database components
-5. Update App.tsx to include new functionality
-
-## 🧠 **FINAL MEMORY CHECKPOINT**
-Before implementing any solution:
-1. Review the memory context provided in your system message
-2. Check for potential duplicate work or existing similar functionality  
-3. Plan to build upon existing patterns and components
-4. Ensure your approach aligns with previously established architectural decisions
-
-Remember: You have access to comprehensive context about previous work through the memory system. Use it to be more efficient, consistent, and avoid unnecessary duplication.`
+5. Update App.tsx to include new functionality`
 }
 
 export async function POST(req: Request) {
