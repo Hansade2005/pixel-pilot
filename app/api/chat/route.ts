@@ -4788,7 +4788,7 @@ When user requests database functionality, authentication, or real-time features
  * 🚨 CRITICAL FILE SAFEGUARD - DO NOT MODIFY SENSITIVE FILES
  *
  * The following files are considered sensitive and MUST NOT be modified, overwritten, or deleted by the AI:
- * - src/components/ui    shadcn ui components . If you need to modify any , instead craete your own custom component and use it. Do not modify  it ;
+ * - src/components/ui    shadcn ui components . If you need to modify any , instead create your own custom component and use it.
  * - main.tsx
  * - vite.config.ts
  * - tsconfig.json
