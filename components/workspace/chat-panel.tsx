@@ -6539,7 +6539,7 @@ export function ChatPanel({
                     handleSendMessage(e)
                   }
                 }}
-                placeholder={isEditingRevertedMessage ? "Editing reverted message... Make changes and press Enter to send" : "Plan, build and ship faster. Type @ to attach files."}
+                placeholder={isEditingRevertedMessage ? "Editing reverted message... Make changes and press Enter to send" : isLoading ? "PiPilot is working..." : "Plan, build and ship faster. Type @ to attach files."}
                 className={`flex-1 bg-transparent border-none outline-none text-white placeholder-gray-400 text-[15px] resize-none rounded-md px-2 py-2 leading-[1.5] min-h-[48px] max-h-[140px] ${
                   isEditingRevertedMessage ? 'border-yellow-500 ring-yellow-500 ring-2' : ''
                 }`}

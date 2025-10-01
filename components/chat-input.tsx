@@ -9,7 +9,8 @@ import {
   Image as ImageIcon,
   Zap,
   AlertTriangle,
-  Crown
+  Crown,
+  Square
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -21,15 +22,57 @@ interface ChatInputProps {
   onProjectCreated?: (project: any) => void
 }
 
+interface PromptSuggestion {
+  display: string
+  prompt: string
+}
+
 export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) {
   const [prompt, setPrompt] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [suggestions, setSuggestions] = useState<PromptSuggestion[]>([])
+  const [isGenerating, setIsGenerating] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
 
   // Subscription status hook
   const { subscription, loading: subscriptionLoading } = useSubscription()
+
+  // Fetch prompt suggestions on component mount
+  useEffect(() => {
+    fetchPromptSuggestions()
+  }, [])
+
+  const fetchPromptSuggestions = async () => {
+    try {
+      const response = await fetch('/api/prompt-suggestions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ count: 6 }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.suggestions) {
+          setSuggestions(data.suggestions)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch prompt suggestions:', error)
+      // Fallback suggestions
+      setSuggestions([
+        { display: "Landing page", prompt: "Create a modern landing page for my startup" },
+        { display: "Portfolio site", prompt: "Build a portfolio website to showcase my work" },
+        { display: "Restaurant menu", prompt: "Design a restaurant website with menu" },
+        { display: "E-commerce store", prompt: "Make an e-commerce store for clothing" },
+        { display: "Blog with dark mode", prompt: "Create a blog website with dark mode" },
+        { display: "Business website", prompt: "Build a business website with contact forms" }
+      ])
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,7 +86,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       return
     }
 
-    setIsLoading(true)
+    setIsGenerating(true)
 
     try {
       console.log('🚀 ChatInput: Generating project details with Pixtral for prompt:', prompt)
@@ -108,7 +151,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       console.error('❌ Error:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to create project')
     } finally {
-      setIsLoading(false)
+      setIsGenerating(false)
     }
   }
 
@@ -124,6 +167,16 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       {/* Main Chat Input */}
       <div className="relative">
         <div className="bg-gray-800/80 chat-input-container border border-gray-700/50 rounded-2xl p-4 shadow-2xl">
+          {/* Loading Overlay */}
+          {isGenerating && (
+            <div className="absolute inset-0 bg-gray-800/96 backdrop-blur-sm rounded-2xl flex items-center justify-center z-20 border border-gray-700/50">
+              <div className="flex items-center gap-3 text-white">
+                <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-lg font-medium">PiPilot is working...</span>
+              </div>
+            </div>
+          )}
+
           {/* Subscription Status Display */}
           {!subscriptionLoading && subscription && (
             <div className="mb-4 p-3 rounded-lg bg-gray-700/30 border border-gray-600/30">
@@ -186,12 +239,12 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
               <input
                 type="text"
                 ref={inputRef}
-                placeholder={isLoading ? "Opening workspace..." : "Describe your app idea..."}
+                placeholder={isGenerating ? "PiPilot is working..." : "Describe your app idea..."}
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={handleKeyDown}
                 className="w-full bg-transparent outline-none text-lg text-white placeholder-gray-400 py-3 px-4"
-                disabled={isLoading}
+                disabled={isGenerating}
               />
             </div>
 
@@ -217,11 +270,11 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
               {/* Right Side - Send Button */}
               <button 
                 type="submit" 
-                disabled={!prompt.trim() || isLoading}
+                disabled={!prompt.trim() || isGenerating}
                 className="w-8 h-8 rounded-full bg-gray-700/50 hover:bg-gray-600/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-gray-400 hover:text-white transition-colors"
               >
-                {isLoading ? (
-                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                {isGenerating ? (
+                  <Square className="w-4 h-4" />
                 ) : (
                   <ArrowUp className="w-4 h-4" />
                 )}
@@ -230,6 +283,23 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
           </form>
         </div>
       </div>
+
+      {/* Suggestion Pills */}
+      {suggestions.length > 0 && (
+        <div className="mt-6 flex flex-wrap gap-3 justify-center">
+          {suggestions.map((suggestion, index) => (
+            <button
+              key={index}
+              onClick={() => setPrompt(suggestion.prompt)}
+              disabled={isGenerating}
+              className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 text-white text-sm font-medium hover:bg-white/20 hover:border-white/30 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed max-w-xs truncate"
+              title={suggestion.prompt}
+            >
+              {suggestion.display}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
