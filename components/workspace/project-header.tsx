@@ -309,21 +309,24 @@ export function ProjectHeader({
             setIsCreateDialogOpen(open)
             onDialogOpenChange?.(open)
           }}>
-            <DialogTrigger asChild>
-               <TooltipProvider>
+            <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-              <Button size="sm" variant="outline" className="h-8 px-3">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="h-8 px-3"
+                    onClick={() => setIsCreateDialogOpen(true)}
+                  >
                     <Plus className="h-4 w-4" />
                     <span className="ml-2">New</span>
                   </Button>
-                   </TooltipTrigger>
+                </TooltipTrigger>
                 <TooltipContent side="bottom">
                   <p>Create New Project</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            </DialogTrigger>
           <DialogContent className="z-50">
             <DialogHeader>
               <DialogTitle>Create New Project</DialogTitle>
