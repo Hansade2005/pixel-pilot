@@ -111,6 +111,10 @@ interface ChatPanelProps {
   onModeChange?: (mode: AIMode) => void
   onClearChat?: () => void
   initialPrompt?: string
+  initialAttachments?: {
+    images: Array<{ filename: string; description: string }>
+    files: Array<{ name: string; content: string }>
+  }
 }
 
 // Workflow Message Component for sophisticated workflow rendering
@@ -3629,7 +3633,8 @@ export function ChatPanel({
   aiMode = 'agent',
   onModeChange,
   onClearChat: externalOnClearChat,
-  initialPrompt
+  initialPrompt,
+  initialAttachments
 }: ChatPanelProps) {
   const { toast } = useToast()
   
@@ -3747,6 +3752,39 @@ export function ChatPanel({
       if (initialPrompt && project && messages.length === 0 && !isLoading) {
         console.log(`[ChatPanel] Auto-sending initial prompt: "${initialPrompt}"`)
         
+        // Handle attachments if provided
+        if (initialAttachments) {
+          // Add image attachments
+          if (initialAttachments.images && initialAttachments.images.length > 0) {
+            const imageFiles: FileSearchResult[] = initialAttachments.images.map((img, index) => ({
+              id: `initial-image-${index}`,
+              name: img.filename,
+              path: img.filename,
+              extension: img.filename.split('.').pop() || '',
+              type: 'image',
+              size: 0,
+              matchScore: 1,
+              isDirectory: false
+            }))
+            setAttachedFiles(prev => [...prev, ...imageFiles])
+          }
+          
+          // Add file attachments
+          if (initialAttachments.files && initialAttachments.files.length > 0) {
+            const fileAttachments: FileSearchResult[] = initialAttachments.files.map((file, index) => ({
+              id: `initial-file-${index}`,
+              name: file.name,
+              path: file.name,
+              extension: file.name.split('.').pop() || '',
+              type: 'file',
+              size: file.content.length,
+              matchScore: 1,
+              isDirectory: false
+            }))
+            setAttachedFiles(prev => [...prev, ...fileAttachments])
+          }
+        }
+        
         // Set the input message and trigger send
         setInputMessage(initialPrompt)
         
@@ -3763,7 +3801,7 @@ export function ChatPanel({
     }
 
     autoSendInitialPrompt()
-  }, [initialPrompt, project, messages.length, isLoading])
+  }, [initialPrompt, initialAttachments, project, messages.length, isLoading])
 
   // Load chat history from IndexedDB for a specific project
   const loadChatHistory = async (projectToLoad: Project | null = null) => {

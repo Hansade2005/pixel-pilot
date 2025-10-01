@@ -44,9 +44,13 @@ interface WorkspaceLayoutProps {
   projects: Workspace[]
   newProjectId?: string
   initialPrompt?: string
+  initialAttachments?: {
+    images: Array<{ filename: string; description: string }>
+    files: Array<{ name: string; content: string }>
+  }
 }
 
-export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }: WorkspaceLayoutProps) {
+export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt, initialAttachments }: WorkspaceLayoutProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [selectedProject, setSelectedProject] = useState<Workspace | null>(null)
@@ -90,6 +94,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
   // Initial prompt to auto-send to chat when project is created
   const [initialChatPrompt, setInitialChatPrompt] = useState<string | undefined>(undefined)
+  const [initialChatAttachments, setInitialChatAttachments] = useState<{
+    images: Array<{ filename: string; description: string }>
+    files: Array<{ name: string; content: string }>
+  } | undefined>(undefined)
 
   // Auto-restore state
   const [isAutoRestoring, setIsAutoRestoring] = useState(false)
@@ -270,12 +278,25 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             params.delete('prompt') // Remove prompt from URL after extracting
           }
           
+          // Extract and set initial chat attachments if provided
+          const attachmentsParam = searchParams.get('attachments')
+          if (attachmentsParam) {
+            try {
+              const attachments = JSON.parse(decodeURIComponent(attachmentsParam))
+              setInitialChatAttachments(attachments)
+              params.delete('attachments') // Remove attachments from URL after extracting
+            } catch (error) {
+              console.error('Failed to parse attachments from URL:', error)
+            }
+          }
+          
           router.replace(`/workspace?${params.toString()}`)
         }
         
-        // Clear initial chat prompt after a delay to prevent re-sending
+        // Clear initial chat prompt and attachments after a delay to prevent re-sending
         setTimeout(() => {
           setInitialChatPrompt(undefined)
+          setInitialChatAttachments(undefined)
         }, 5000)
       } else {
         // Project not found, might be a newly created project that's not loaded yet
@@ -822,6 +843,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       aiMode={aiMode}
                       onModeChange={setAiMode}
                       initialPrompt={initialChatPrompt}
+                      initialAttachments={initialChatAttachments}
                     />
                   </div>
                 </ResizablePanel>
@@ -1248,6 +1270,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       onClearChat={handleClearChat}
                       aiMode={aiMode}
                       initialPrompt={initialChatPrompt}
+                      initialAttachments={initialChatAttachments}
                     />
                   </div>
                 </TabsContent>

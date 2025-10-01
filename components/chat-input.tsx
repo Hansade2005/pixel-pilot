@@ -10,12 +10,17 @@ import {
   Zap,
   AlertTriangle,
   Crown,
-  Square
+  Square,
+  X,
+  FileText,
+  Paperclip
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { useSubscription } from "@/hooks/use-subscription"
+import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
+import { FileSearchResult } from "@/lib/file-lookup-service"
 
 interface ChatInputProps {
   onAuthRequired: () => void
@@ -27,12 +32,34 @@ interface PromptSuggestion {
   prompt: string
 }
 
+interface AttachedImage {
+  id: string
+  file: File
+  preview: string
+  description?: string
+}
+
+interface AttachedFile {
+  id: string
+  name: string
+  path: string
+  content: string
+  fileType: string
+  type: string
+  size: number
+  isDirectory: boolean
+}
+
 export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) {
   const [prompt, setPrompt] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [suggestions, setSuggestions] = useState<PromptSuggestion[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
+  const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([])
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -74,6 +101,140 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     }
   }
 
+  // Handle image attachment
+  const handleImageAttach = () => {
+    if (imageInputRef.current) {
+      imageInputRef.current.click()
+    }
+  }
+
+  // Handle file attachment
+  const handleFileAttach = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click()
+    }
+  }
+
+  // Process selected images
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    // Check if adding these images would exceed the limit
+    if (attachedImages.length + files.length > 2) {
+      toast.error('Maximum 2 images allowed')
+      return
+    }
+
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) {
+        toast.error('Only image files are allowed')
+        continue
+      }
+
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const preview = event.target?.result as string
+        const attachedImage: AttachedImage = {
+          id: Date.now().toString() + Math.random(),
+          file,
+          preview
+        }
+        setAttachedImages(prev => [...prev, attachedImage])
+      }
+      reader.readAsDataURL(file)
+    }
+
+    // Clear the input
+    e.target.value = ''
+  }
+
+  // Process selected files
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    for (const file of files) {
+      try {
+        const content = await file.text()
+        const attachedFile: AttachedFile = {
+          id: Date.now().toString() + Math.random(),
+          name: file.name,
+          path: file.name,
+          content,
+          fileType: file.type,
+          type: 'file',
+          size: file.size,
+          isDirectory: false
+        }
+        setAttachedFiles(prev => [...prev, attachedFile])
+      } catch (error) {
+        console.error('Error reading file:', error)
+        toast.error(`Failed to read file: ${file.name}`)
+      }
+    }
+
+    // Clear the input
+    e.target.value = ''
+  }
+
+  // Remove attached image
+  const removeAttachedImage = (id: string) => {
+    setAttachedImages(prev => prev.filter(img => img.id !== id))
+  }
+
+  // Remove attached file
+  const removeAttachedFile = (id: string) => {
+    setAttachedFiles(prev => prev.filter(file => file.id !== id))
+  }
+
+  // Process images with Pixtral for descriptions
+  const processImagesWithPixtral = async (images: AttachedImage[]): Promise<AttachedImage[]> => {
+    const processedImages = []
+
+    for (const image of images) {
+      try {
+        console.log('🖼️ Processing image with Pixtral for description...')
+        
+        // Convert image to base64
+        const base64 = image.preview.split(',')[1]
+        
+        const response = await fetch('/api/image-description', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            imageBase64: base64,
+            filename: image.file.name
+          }),
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          processedImages.push({
+            ...image,
+            description: data.description
+          })
+        } else {
+          console.error('Failed to get image description, using filename')
+          processedImages.push({
+            ...image,
+            description: `Image: ${image.file.name}`
+          })
+        }
+      } catch (error) {
+        console.error('Error processing image:', error)
+        processedImages.push({
+          ...image,
+          description: `Image: ${image.file.name}`
+        })
+      }
+    }
+
+    return processedImages
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -89,7 +250,33 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     setIsGenerating(true)
 
     try {
-      console.log('🚀 ChatInput: Generating project details with Pixtral for prompt:', prompt)
+      // Process images with Pixtral for descriptions
+      let processedImages = attachedImages
+      if (attachedImages.length > 0) {
+        console.log('�️ Processing', attachedImages.length, 'images with Pixtral...')
+        processedImages = await processImagesWithPixtral(attachedImages)
+      }
+
+      // Build enhanced prompt with attachments
+      let enhancedPrompt = prompt
+
+      // Add image descriptions
+      if (processedImages.length > 0) {
+        enhancedPrompt += '\n\nAttached Images:'
+        processedImages.forEach((img, index) => {
+          enhancedPrompt += `\nImage ${index + 1}: ${img.description || `Image: ${img.file.name}`}`
+        })
+      }
+
+      // Add file contents
+      if (attachedFiles.length > 0) {
+        enhancedPrompt += '\n\nAttached Files:'
+        attachedFiles.forEach((file, index) => {
+          enhancedPrompt += `\nFile ${index + 1} (${file.name}):\n${file.content}`
+        })
+      }
+
+      console.log('�🚀 ChatInput: Generating project details with Pixtral for enhanced prompt:', enhancedPrompt)
       
       // Generate project name and description using Pixtral
       const response = await fetch('/api/project-suggestions', {
@@ -98,7 +285,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt: prompt,
+          prompt: enhancedPrompt,
           userId: user.id,
         }),
       })
@@ -140,9 +327,24 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         
         toast.success('Project created and saved!')
         
-        // Clear the input and redirect to workspace with the new project
+        // Clear form and navigate
         setPrompt("")
-        router.push(`/workspace?newProject=${workspace.id}&prompt=${encodeURIComponent(prompt)}`)
+        setAttachedImages([])
+        setAttachedFiles([])
+        
+        // Navigate with attachments data
+        const attachmentsData = {
+          images: processedImages.map(img => ({
+            filename: img.file.name,
+            description: img.description
+          })),
+          files: attachedFiles.map(file => ({
+            name: file.name,
+            content: file.content
+          }))
+        }
+        
+        router.push(`/workspace?newProject=${workspace.id}&prompt=${encodeURIComponent(prompt)}&attachments=${encodeURIComponent(JSON.stringify(attachmentsData))}`)
       } else {
         throw new Error('Failed to generate project suggestion')
       }
@@ -254,15 +456,21 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
               <div className="flex items-center space-x-3">
                 <button 
                   type="button"
-                  className="w-8 h-8 rounded-full bg-gray-700/50 hover:bg-gray-600/50 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                  onClick={handleImageAttach}
+                  disabled={attachedImages.length >= 2 || isGenerating}
+                  className="w-8 h-8 rounded-full bg-gray-700/50 hover:bg-gray-600/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                  title="Attach images (max 2)"
                 >
-                  <Plus className="w-4 h-4" />
+                  <ImageIcon className="w-4 h-4" />
                 </button>
                 <button 
                   type="button"
-                  className="flex items-center space-x-2 text-gray-400 hover:text-white transition-colors"
+                  onClick={handleFileAttach}
+                  disabled={attachedImages.length > 0 || isGenerating}
+                  className="flex items-center space-x-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title={attachedImages.length > 0 ? "File attachment disabled when images are attached" : "Attach files"}
                 >
-                  <ImageIcon className="w-4 h-4" />
+                  <Paperclip className="w-4 h-4" />
                   <span className="text-sm">Attach</span>
                 </button>
               </div>
@@ -280,7 +488,53 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                 )}
               </button>
             </div>
+
+            {/* Hidden file inputs */}
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
           </form>
+
+          {/* Attachment Pills */}
+          {(attachedImages.length > 0 || attachedFiles.length > 0) && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {attachedImages.map((image) => (
+                <div key={image.id} className="flex items-center gap-2 bg-gray-700/50 rounded-full px-3 py-1">
+                  <ImageIcon className="w-3 h-3 text-green-400" />
+                  <span className="text-sm text-white truncate max-w-32">{image.file.name}</span>
+                  <button
+                    onClick={() => removeAttachedImage(image.id)}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              {attachedFiles.map((file) => (
+                <div key={file.id} className="flex items-center gap-2 bg-gray-700/50 rounded-full px-3 py-1">
+                  <FileText className="w-3 h-3 text-blue-400" />
+                  <span className="text-sm text-white truncate max-w-32">{file.name}</span>
+                  <button
+                    onClick={() => removeAttachedFile(file.id)}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
