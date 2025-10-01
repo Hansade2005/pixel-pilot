@@ -3668,8 +3668,13 @@ export function ChatPanel({
   // Speech-to-text state
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
+  const recognitionRef = useRef<any>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
+
+  // Check if Web Speech API is supported
+  const isWebSpeechSupported = typeof window !== 'undefined' && 
+    ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)
 
   // Auth modal state
   const [showAuthModal, setShowAuthModal] = useState(false)
@@ -3688,6 +3693,14 @@ export function ChatPanel({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showAttachmentMenu]);
+
+  // Reset textarea height when input is cleared
+  useEffect(() => {
+    if (!inputMessage && textareaRef.current) {
+      textareaRef.current.style.height = '90px';
+      textareaRef.current.style.overflowY = 'hidden';
+    }
+  }, [inputMessage]);
 
   // Handle project changes - load chat history when project changes
   React.useEffect(() => {
@@ -4326,8 +4339,132 @@ export function ChatPanel({
     setAttachedUploadedFiles(prev => prev.filter(f => f.id !== fileId));
   };
 
-  // Speech-to-text handlers
-  const startRecording = async () => {
+  // Speech-to-text handlers using Web Speech API (with Deepgram fallback)
+  const startWebSpeechRecognition = () => {
+    try {
+      // @ts-ignore - Web Speech API types
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      
+      // Enable continuous recognition for better accuracy
+      recognition.continuous = true;
+      recognition.interimResults = true; // Show results in real-time
+      recognition.lang = 'en-US';
+      recognition.maxAlternatives = 1;
+      
+      let finalTranscript = '';
+      let interimTranscript = '';
+      
+      recognition.onstart = () => {
+        setIsRecording(true);
+        finalTranscript = '';
+        interimTranscript = '';
+        toast({
+          title: "Listening...",
+          description: "Speak now, click mic again to stop"
+        });
+      };
+      
+      recognition.onresult = (event: any) => {
+        interimTranscript = '';
+        
+        // Process all results
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' ';
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        
+        // Update input with final transcript + interim (for real-time feedback)
+        const currentInput = inputMessage || '';
+        const newText = finalTranscript + interimTranscript;
+        
+        if (newText.trim()) {
+          setInputMessage(currentInput ? `${currentInput} ${newText.trim()}` : newText.trim());
+          
+          // Auto-resize textarea
+          if (textareaRef.current) {
+            textareaRef.current.style.height = '90px';
+            const newHeight = Math.min(textareaRef.current.scrollHeight, 160);
+            textareaRef.current.style.height = newHeight + 'px';
+            textareaRef.current.style.overflowY = textareaRef.current.scrollHeight > 160 ? 'auto' : 'hidden';
+          }
+        }
+      };
+      
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+          toast({
+            title: "Microphone access denied",
+            description: "Please allow microphone access to use voice input",
+            variant: "destructive"
+          });
+        } else if (event.error === 'no-speech') {
+          toast({
+            title: "No speech detected",
+            description: "Please try speaking again",
+            variant: "destructive"
+          });
+        } else if (event.error === 'aborted') {
+          // User stopped, don't show error
+        } else {
+          toast({
+            title: "Recognition error",
+            description: `Error: ${event.error}. Please try again.`,
+            variant: "destructive"
+          });
+        }
+        setIsRecording(false);
+      };
+      
+      recognition.onend = () => {
+        if (finalTranscript.trim()) {
+          // Save the final transcript
+          setInputMessage(prev => {
+            const combined = prev ? `${prev} ${finalTranscript.trim()}` : finalTranscript.trim();
+            return combined;
+          });
+          
+          toast({
+            title: "Speech recognized",
+            description: "Your speech has been converted to text"
+          });
+        }
+        
+        setIsRecording(false);
+        recognitionRef.current = null;
+        
+        // Ensure textarea height is correct after recognition ends
+        if (textareaRef.current) {
+          setTimeout(() => {
+            if (textareaRef.current) {
+              textareaRef.current.style.height = '90px';
+              const newHeight = Math.min(textareaRef.current.scrollHeight, 160);
+              textareaRef.current.style.height = newHeight + 'px';
+              textareaRef.current.style.overflowY = textareaRef.current.scrollHeight > 160 ? 'auto' : 'hidden';
+            }
+          }, 100);
+        }
+      };
+      
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (error) {
+      console.error('Error starting Web Speech Recognition:', error);
+      toast({
+        title: "Speech recognition not available",
+        description: "Your browser doesn't support speech recognition",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const startDeepgramRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -4342,7 +4479,7 @@ export function ChatPanel({
 
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-        await transcribeAudio(audioBlob);
+        await transcribeWithDeepgram(audioBlob);
         
         // Stop all tracks to release microphone
         stream.getTracks().forEach(track => track.stop());
@@ -4365,7 +4502,7 @@ export function ChatPanel({
     }
   };
 
-  const stopRecording = () => {
+  const stopDeepgramRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
@@ -4373,7 +4510,7 @@ export function ChatPanel({
     }
   };
 
-  const transcribeAudio = async (audioBlob: Blob) => {
+  const transcribeWithDeepgram = async (audioBlob: Blob) => {
     try {
       // Convert blob to base64
       const reader = new FileReader();
@@ -4382,7 +4519,7 @@ export function ChatPanel({
       reader.onloadend = async () => {
         const base64Audio = (reader.result as string).split(',')[1];
 
-        // Send to speech-to-text API
+        // Send to Deepgram API
         const response = await fetch('/api/speech-to-text', {
           method: 'POST',
           headers: {
@@ -4427,9 +4564,25 @@ export function ChatPanel({
 
   const handleMicrophoneClick = () => {
     if (isRecording) {
-      stopRecording();
+      // Stop recording
+      if (isWebSpeechSupported && recognitionRef.current) {
+        recognitionRef.current.stop();
+      } else {
+        stopDeepgramRecording();
+      }
     } else {
-      startRecording();
+      // Start recording - use Web Speech API if available, otherwise use Deepgram
+      if (isWebSpeechSupported) {
+        startWebSpeechRecognition();
+      } else {
+        // Fallback to Deepgram for browsers without Web Speech API (like Firefox)
+        console.log('Web Speech API not supported, using Deepgram fallback');
+        toast({
+          title: "Using Deepgram",
+          description: "Your browser doesn't support Web Speech API"
+        });
+        startDeepgramRecording();
+      }
     }
   };
 
@@ -4561,7 +4714,7 @@ export function ChatPanel({
 
     // Reset textarea height to default during loading
     if (textareaRef.current) {
-      textareaRef.current.style.height = '64px'
+      textareaRef.current.style.height = '90px'
       textareaRef.current.style.overflowY = 'hidden'
     }
 
@@ -7026,12 +7179,12 @@ export function ChatPanel({
                     }
                   }
                   
-                  // Reset to baseline then expand up to the max (90px)
-                  textarea.style.height = '64px';
-                  const newHeight = Math.min(textarea.scrollHeight, 140)
+                  // Reset to baseline then expand up to the max
+                  textarea.style.height = '90px';
+                  const newHeight = Math.min(textarea.scrollHeight, 160)
                   textarea.style.height = newHeight + 'px';
                   // Only show a vertical scrollbar when content exceeds the max height
-                  textarea.style.overflowY = textarea.scrollHeight > 140 ? 'auto' : 'hidden'
+                  textarea.style.overflowY = textarea.scrollHeight > 160 ? 'auto' : 'hidden'
                   if (isEditingRevertedMessage) {
                     const revertedMessage = messages.find(m => m.id === revertMessageId)?.content || '';
                     if (e.target.value !== revertedMessage) {
@@ -7041,10 +7194,10 @@ export function ChatPanel({
                 }}
                 onInput={(e) => {
                   const textarea = e.target as HTMLTextAreaElement;
-                  textarea.style.height = '54px';
-                  const newHeight = Math.min(textarea.scrollHeight, 140)
+                  textarea.style.height = '90px';
+                  const newHeight = Math.min(textarea.scrollHeight, 160)
                   textarea.style.height = newHeight + 'px';
-                  textarea.style.overflowY = textarea.scrollHeight > 140 ? 'auto' : 'hidden'
+                  textarea.style.overflowY = textarea.scrollHeight > 160 ? 'auto' : 'hidden'
                 }}
                 onClick={(e) => {
                   // Handle cursor position changes for @ command detection
@@ -7082,15 +7235,15 @@ export function ChatPanel({
                   }
                 }}
                 placeholder={isEditingRevertedMessage ? "Editing reverted message... Make changes and press Enter to send" : isLoading ? "PiPilot is working..." : "Type, speak, or attach. Use @ for files, + for images/files, 🎤 for voice."}
-                className={`flex-1 bg-transparent border-none outline-none text-white placeholder-gray-400 text-[15px] resize-none rounded-md py-2 leading-[1.5] min-h-[48px] max-h-[140px] ${
+                className={`flex-1 bg-transparent border-none outline-none text-white placeholder-gray-400 text-[15px] resize-none rounded-md py-2 leading-[1.5] min-h-[90px] max-h-[160px] ${
                   isEditingRevertedMessage ? 'border-yellow-500 ring-yellow-500 ring-2' : ''
                 }`}
                 disabled={isLoading}
                 rows={1}
                 style={{
-                  height: '77px',
-                  minHeight: '48px',
-                  maxHeight: '140px',
+                  height: '90px',
+                  minHeight: '90px',
+                  maxHeight: '160px',
                   overflowY: 'hidden', // hide scrollbar until content exceeds maxHeight
                   resize: 'none',
                   boxSizing: 'border-box',

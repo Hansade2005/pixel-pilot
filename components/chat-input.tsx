@@ -41,11 +41,16 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   // Speech-to-text state
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
+  const recognitionRef = useRef<any>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
 
   // Subscription status hook
   const { subscription, loading: subscriptionLoading } = useSubscription()
+
+  // Check if Web Speech API is supported
+  const isWebSpeechSupported = typeof window !== 'undefined' && 
+    ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)
 
   // Fetch prompt suggestions on component mount
   useEffect(() => {
@@ -82,8 +87,102 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     }
   }
 
-  // Speech-to-text handlers
-  const startRecording = async () => {
+  // Speech-to-text handlers using Web Speech API (with Deepgram fallback)
+  const startWebSpeechRecognition = () => {
+    try {
+      // @ts-ignore - Web Speech API types
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+      const recognition = new SpeechRecognition()
+      
+      // Enable continuous recognition for better accuracy
+      recognition.continuous = true
+      recognition.interimResults = true // Show results in real-time
+      recognition.lang = 'en-US'
+      recognition.maxAlternatives = 1
+      
+      let finalTranscript = ''
+      let interimTranscript = ''
+      
+      recognition.onstart = () => {
+        setIsRecording(true)
+        finalTranscript = ''
+        interimTranscript = ''
+        toast.success("Listening...", {
+          description: "Speak now, click mic again to stop"
+        })
+      }
+      
+      recognition.onresult = (event: any) => {
+        interimTranscript = ''
+        
+        // Process all results
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript
+          
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' '
+          } else {
+            interimTranscript += transcript
+          }
+        }
+        
+        // Update input with final transcript + interim (for real-time feedback)
+        const currentInput = prompt || ''
+        const newText = finalTranscript + interimTranscript
+        
+        if (newText.trim()) {
+          setPrompt(currentInput ? `${currentInput} ${newText.trim()}` : newText.trim())
+        }
+      }
+      
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error)
+        if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+          toast.error("Microphone access denied", {
+            description: "Please allow microphone access to use voice input"
+          })
+        } else if (event.error === 'no-speech') {
+          toast.error("No speech detected", {
+            description: "Please try speaking again"
+          })
+        } else if (event.error === 'aborted') {
+          // User stopped, don't show error
+        } else {
+          toast.error("Recognition error", {
+            description: `Error: ${event.error}. Please try again.`
+          })
+        }
+        setIsRecording(false)
+      }
+      
+      recognition.onend = () => {
+        if (finalTranscript.trim()) {
+          // Save the final transcript
+          setPrompt(prev => {
+            const combined = prev ? `${prev} ${finalTranscript.trim()}` : finalTranscript.trim()
+            return combined
+          })
+          
+          toast.success("Speech recognized", {
+            description: "Your speech has been converted to text"
+          })
+        }
+        
+        setIsRecording(false)
+        recognitionRef.current = null
+      }
+      
+      recognitionRef.current = recognition
+      recognition.start()
+    } catch (error) {
+      console.error('Error starting Web Speech Recognition:', error)
+      toast.error("Speech recognition not available", {
+        description: "Your browser doesn't support speech recognition"
+      })
+    }
+  }
+
+  const startDeepgramRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mediaRecorder = new MediaRecorder(stream)
@@ -98,7 +197,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' })
-        await transcribeAudio(audioBlob)
+        await transcribeWithDeepgram(audioBlob)
         
         // Stop all tracks to release microphone
         stream.getTracks().forEach(track => track.stop())
@@ -118,7 +217,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     }
   }
 
-  const stopRecording = () => {
+  const stopDeepgramRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop()
       setIsRecording(false)
@@ -126,7 +225,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     }
   }
 
-  const transcribeAudio = async (audioBlob: Blob) => {
+  const transcribeWithDeepgram = async (audioBlob: Blob) => {
     try {
       // Convert blob to base64
       const reader = new FileReader()
@@ -135,7 +234,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       reader.onloadend = async () => {
         const base64Audio = (reader.result as string).split(',')[1]
 
-        // Send to speech-to-text API
+        // Send to Deepgram API
         const response = await fetch('/api/speech-to-text', {
           method: 'POST',
           headers: {
@@ -177,9 +276,24 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
   const handleMicrophoneClick = () => {
     if (isRecording) {
-      stopRecording()
+      // Stop recording
+      if (isWebSpeechSupported && recognitionRef.current) {
+        recognitionRef.current.stop()
+      } else {
+        stopDeepgramRecording()
+      }
     } else {
-      startRecording()
+      // Start recording - use Web Speech API if available, otherwise use Deepgram
+      if (isWebSpeechSupported) {
+        startWebSpeechRecognition()
+      } else {
+        // Fallback to Deepgram for browsers without Web Speech API (like Firefox)
+        console.log('Web Speech API not supported, using Deepgram fallback')
+        toast.info("Using Deepgram", {
+          description: "Your browser doesn't support Web Speech API"
+        })
+        startDeepgramRecording()
+      }
     }
   }
 
