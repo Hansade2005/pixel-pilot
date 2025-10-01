@@ -245,6 +245,38 @@ export const chatModels: Array<ChatModel> = [
     description: 'Cohere advanced reasoning model (v2 compatible)',
     provider: 'cohere',
   },
+
+  // xAI Grok Models
+  {
+    id: 'grok-code-fast-1',
+    name: 'Grok Code Fast 1',
+    description: 'xAI Grok specialized code generation model with fast inference',
+    provider: 'xai',
+  },
+  {
+    id: 'grok-3',
+    name: 'Grok 3',
+    description: 'xAI Grok 3 model with advanced reasoning and live search capabilities',
+    provider: 'xai',
+  },
+  {
+    id: 'grok-3-mini',
+    name: 'Grok 3 Mini',
+    description: 'Compact xAI Grok 3 model with reasoning effort control',
+    provider: 'xai',
+  },
+  {
+    id: 'grok-3-mini-fast',
+    name: 'Grok 3 Mini Fast',
+    description: 'Fast version of xAI Grok 3 Mini with reasoning capabilities',
+    provider: 'xai',
+  },
+  {
+    id: 'grok-3-latest',
+    name: 'Grok 3 Latest',
+    description: 'Latest xAI Grok 3 model with live search and comprehensive capabilities',
+    provider: 'xai',
+  },
 ];
 
 export function getModelById(modelId: string): ChatModel | undefined {

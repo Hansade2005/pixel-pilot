@@ -4,6 +4,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createGroq } from '@ai-sdk/groq';
 import { createTogetherAI } from '@ai-sdk/togetherai';
 import { createCohere } from '@ai-sdk/cohere';
+import { createXai } from '@ai-sdk/xai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 
 // Custom a0.dev provider implementation (no API key required)
@@ -160,6 +161,10 @@ const cohereProvider = createCohere({
   apiKey: process.env.COHERE_API_KEY || 'LMzu7i1zyxk5LWzBE1iDXRSwFwHvMLwZDhFhpP7q',
 });
 
+const xaiProvider = createXai({
+  apiKey: process.env.XAI_API_KEY || 'xai-your-api-key-here',
+});
+
 // Debug function to check environment variables
 function checkProviderKeys() {
   const keys = {
@@ -171,6 +176,7 @@ function checkProviderKeys() {
     groq: process.env.GROQ_API_KEY || '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',
     togetherai: process.env.TOGETHER_AI_API_KEY || 'c0c4d20f02dc71fdc2526f83049d0ed742b9cecbd1973abfe88610f6d0e9be2f',
     cohere: process.env.COHERE_API_KEY || 'LMzu7i1zyxk5LWzBE1iDXRSwFwHvMLwZDhFhpP7q',
+    xai: process.env.XAI_API_KEY || 'xai-your-api-key-here',
   };
 
   if (process.env.NODE_ENV === 'development') {
@@ -186,6 +192,7 @@ function checkProviderKeys() {
         groq: 'GROQ_API_KEY',
         togetherai: 'TOGETHER_AI_API_KEY',
         cohere: 'COHERE_API_KEY',
+        xai: 'XAI_API_KEY',
       };
       const isEnvVar = !!process.env[envVarMap[provider]];
       const status = isEnvVar ? '✅ Env' : '🔄 Fallback';
@@ -257,6 +264,13 @@ const modelProviders: Record<string, any> = {
   'command-r': cohereProvider('command-r-08-2024'),
   'command': cohereProvider('command-nightly'),
   'command-a-reasoning-08-2025': cohereProvider('command-a-03-2025'),
+
+  // xAI Grok Models
+  'grok-code-fast-1': xaiProvider('grok-code-fast-1'),
+  'grok-3': xaiProvider('grok-3'),
+  'grok-3-mini': xaiProvider('grok-3-mini'),
+  'grok-3-mini-fast': xaiProvider('grok-3-mini-fast'),
+  'grok-3-latest': xaiProvider('grok-3-latest'),
 };
 
 // Helper function to get a model by ID
@@ -277,6 +291,7 @@ export {
   groqProvider as groq,
   togetheraiProvider as togetherai,
   cohereProvider as cohere,
+  xaiProvider as xai,
   codestral,
   createOpenAICompatible,
 };
