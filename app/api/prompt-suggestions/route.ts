@@ -58,12 +58,24 @@ Generate ${count} unique suggestions:`,
 
     console.log('🤖 Codestral generated suggestions:', result.text)
 
-    // Parse the JSON response
+    // Parse the JSON response - handle markdown code blocks
     let suggestions
     try {
-      suggestions = JSON.parse(result.text)
+      let jsonText = result.text.trim()
+      
+      // Check if response is wrapped in markdown code blocks
+      if (jsonText.startsWith('```json') && jsonText.endsWith('```')) {
+        // Extract JSON from markdown code block
+        jsonText = jsonText.slice(7, -3).trim() // Remove ```json and ```
+      } else if (jsonText.startsWith('```') && jsonText.endsWith('```')) {
+        // Handle generic code blocks
+        jsonText = jsonText.slice(3, -3).trim() // Remove ``` and ```
+      }
+      
+      suggestions = JSON.parse(jsonText)
     } catch (parseError) {
       console.error('❌ Failed to parse Codestral response:', parseError)
+      console.error('Raw response:', result.text)
       // Fallback suggestions if parsing fails
       suggestions = [
         { display: "Landing page", prompt: "Create a modern landing page for my startup" },

@@ -88,6 +88,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [projectHeaderInitialName, setProjectHeaderInitialName] = useState("")
   const [projectHeaderInitialDescription, setProjectHeaderInitialDescription] = useState("")
 
+  // Initial prompt to auto-send to chat when project is created
+  const [initialChatPrompt, setInitialChatPrompt] = useState<string | undefined>(undefined)
+
   // Auto-restore state
   const [isAutoRestoring, setIsAutoRestoring] = useState(false)
   const [justCreatedProject, setJustCreatedProject] = useState(false)
@@ -259,8 +262,21 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           const params = new URLSearchParams(searchParams.toString())
           params.delete('newProject')
           params.set('projectId', projectId)
+          
+          // Extract and set initial chat prompt if provided
+          const promptParam = searchParams.get('prompt')
+          if (promptParam) {
+            setInitialChatPrompt(decodeURIComponent(promptParam))
+            params.delete('prompt') // Remove prompt from URL after extracting
+          }
+          
           router.replace(`/workspace?${params.toString()}`)
         }
+        
+        // Clear initial chat prompt after a delay to prevent re-sending
+        setTimeout(() => {
+          setInitialChatPrompt(undefined)
+        }, 5000)
       } else {
         // Project not found, might be a newly created project that's not loaded yet
         console.log('WorkspaceLayout: Project not found in current projects, might be newly created')
@@ -805,6 +821,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       selectedModel={selectedModel}
                       aiMode={aiMode}
                       onModeChange={setAiMode}
+                      initialPrompt={initialChatPrompt}
                     />
                   </div>
                 </ResizablePanel>
@@ -1230,6 +1247,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       selectedModel={selectedModel}
                       onClearChat={handleClearChat}
                       aiMode={aiMode}
+                      initialPrompt={initialChatPrompt}
                     />
                   </div>
                 </TabsContent>

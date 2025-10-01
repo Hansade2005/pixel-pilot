@@ -3628,7 +3628,8 @@ export function ChatPanel({
   selectedModel = DEFAULT_CHAT_MODEL,
   aiMode = 'agent',
   onModeChange,
-  onClearChat: externalOnClearChat
+  onClearChat: externalOnClearChat,
+  initialPrompt
 }: ChatPanelProps) {
   const { toast } = useToast()
   
@@ -3740,6 +3741,30 @@ export function ChatPanel({
     return () => window.removeEventListener('chat-cleared', handleChatCleared as EventListener)
   }, [project?.id])
 
+  // Auto-send initial prompt when provided and no messages exist
+  React.useEffect(() => {
+    const autoSendInitialPrompt = async () => {
+      if (initialPrompt && project && messages.length === 0 && !isLoading) {
+        console.log(`[ChatPanel] Auto-sending initial prompt: "${initialPrompt}"`)
+        
+        // Set the input message and trigger send
+        setInputMessage(initialPrompt)
+        
+        // Small delay to ensure state is updated
+        setTimeout(() => {
+          // Create a synthetic form event to trigger handleSendMessage
+          const syntheticEvent = {
+            preventDefault: () => {},
+          } as React.FormEvent
+          
+          handleSendMessage(syntheticEvent)
+        }, 100)
+      }
+    }
+
+    autoSendInitialPrompt()
+  }, [initialPrompt, project, messages.length, isLoading])
+
   // Load chat history from IndexedDB for a specific project
   const loadChatHistory = async (projectToLoad: Project | null = null) => {
     const targetProject = projectToLoad || project
@@ -3804,15 +3829,25 @@ export function ChatPanel({
         // Don't clear restoreMessageId here as it should persist across reloads
       } else {
         console.log(`[ChatPanel] No active session found for project ${targetProject.id}, starting fresh`)
-        setMessages([])
-        // Clear restore state when there's no active session
-        setRestoreMessageId(null)
+        // Don't clear messages if there's an ongoing request (loading indicator is showing)
+        if (!isLoading) {
+          setMessages([])
+          // Clear restore state when there's no active session
+          setRestoreMessageId(null)
+        } else {
+          console.log(`[ChatPanel] Not clearing messages because loading is in progress`)
+        }
       }
     } catch (error) {
       console.error(`[ChatPanel] Error loading chat history for project ${targetProject?.id}:`, error)
-      setMessages([])
-      // Clear restore state on error
-      setRestoreMessageId(null)
+      // Don't clear messages if there's an ongoing request
+      if (!isLoading) {
+        setMessages([])
+        // Clear restore state on error
+        setRestoreMessageId(null)
+      } else {
+        console.log(`[ChatPanel] Not clearing messages due to error because loading is in progress`)
+      }
     }
   }
 
