@@ -59,7 +59,8 @@ import {
   MoreHorizontal,
   ArrowUpDown,
   Calendar,
-  Star
+  Star,
+  Home
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -327,6 +328,15 @@ export function Sidebar({
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b">
         <div className="flex items-center space-x-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push('/')}
+            className="h-8 w-8 p-0"
+            title="Go to Home"
+          >
+            <Home className="h-4 w-4" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"
