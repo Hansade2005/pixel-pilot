@@ -1,8 +1,5 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { createMistral } from '@ai-sdk/mistral';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { createGroq } from '@ai-sdk/groq';
-import { createTogetherAI } from '@ai-sdk/togetherai';
 import { createCohere } from '@ai-sdk/cohere';
 import { createXai } from '@ai-sdk/xai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
@@ -145,18 +142,6 @@ const mistralProvider = createMistral({
   apiKey: process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr',
 });
 
-const googleProvider = createGoogleGenerativeAI({
-  apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || 'AIzaSyAepjq9CgCOBhBBvZ8Vf0cxrqa_RFX60mE',
-});
-
-const groqProvider = createGroq({
-  apiKey: process.env.GROQ_API_KEY || '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',
-});
-
-const togetheraiProvider = createTogetherAI({
-  apiKey: process.env.TOGETHER_AI_API_KEY || 'c0c4d20f02dc71fdc2526f83049d0ed742b9cecbd1973abfe88610f6d0e9be2f',
-});
-
 const cohereProvider = createCohere({
   apiKey: process.env.COHERE_API_KEY || 'LMzu7i1zyxk5LWzBE1iDXRSwFwHvMLwZDhFhpP7q',
 });
@@ -172,9 +157,7 @@ function checkProviderKeys() {
     codestral: process.env.CODESTRAL_API_KEY || 'DXfXAjwNIZcAv1ESKtoDwWZZF98lJxho',
     openai: process.env.OPENAI_API_KEY || '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',
     mistral: process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr',
-    google: process.env.GOOGLE_GENERATIVE_AI_API_KEY || 'AIzaSyAepjq9CgCOBhBBvZ8Vf0cxrqa_RFX60mE',
-    groq: process.env.GROQ_API_KEY || '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',
-    togetherai: process.env.TOGETHER_AI_API_KEY || 'c0c4d20f02dc71fdc2526f83049d0ed742b9cecbd1973abfe88610f6d0e9be2f',
+
     cohere: process.env.COHERE_API_KEY || 'LMzu7i1zyxk5LWzBE1iDXRSwFwHvMLwZDhFhpP7q',
     xai: process.env.XAI_API_KEY || 'xai-your-api-key-here',
   };
@@ -188,9 +171,6 @@ function checkProviderKeys() {
         codestral: 'CODESTRAL_API_KEY',
         openai: 'OPENAI_API_KEY',
         mistral: 'MISTRAL_API_KEY',
-        google: 'GOOGLE_GENERATIVE_AI_API_KEY',
-        groq: 'GROQ_API_KEY',
-        togetherai: 'TOGETHER_AI_API_KEY',
         cohere: 'COHERE_API_KEY',
         xai: 'XAI_API_KEY',
       };
@@ -231,36 +211,10 @@ const modelProviders: Record<string, any> = {
   // OpenAI Models
   'gpt-4o': openaiProvider('gpt-4o'),
   'gpt-4o-mini': openaiProvider('gpt-4o-mini'),
-  'gpt-4-turbo': openaiProvider('gpt-4-turbo'),
-  'gpt-3.5-turbo': openaiProvider('gpt-3.5-turbo'),
   'gpt-5-mini': openaiProvider('gpt-5-mini'),
   'gpt-4.1-nano': openaiProvider('gpt-4.1-nano'),
   'gpt-5-nano': openaiProvider('gpt-5-nano'),
   'gpt-4.1-mini': openaiProvider('gpt-4.1-mini'),
-
-  // Google Gemini Models
-  'gemini-2.0-flash': googleProvider('gemini-2.0-flash'),
-  'gemini-1.5-pro': googleProvider('gemini-1.5-pro'),
-  'gemini-1.5-flash': googleProvider('gemini-1.5-flash'),
-  'gemini-2.5-flash-lite': googleProvider('gemini-2.5-flash-lite'),
-
-  // Groq Models
-  'llama-3.3-70b-versatile': groqProvider('llama-3.3-70b-versatile'),
-  'llama-3.1-8b-instant': groqProvider('llama-3.1-8b-instant'),
-  'mixtral-8x7b-32768': groqProvider('mixtral-8x7b-32768'),
-  'gemma2-9b-it': groqProvider('gemma2-9b-it'),
-  'deepseek-r1-distill-llama-70b': groqProvider('deepseek-r1-distill-llama-70b'),
-  'moonshotai/kimi-k2-instruct': groqProvider('moonshotai/kimi-k2-instruct'),
-  'qwen/qwen3-32b': groqProvider('qwen/qwen3-32b'),
-  'meta-llama/llama-4-scout-17b-16e-instruct': groqProvider('meta-llama/llama-4-scout-17b-16e-instruct'),
-
-  // Together.ai Models
-  'meta-llama/Llama-3.3-70B-Instruct-Turbo': togetheraiProvider('meta-llama/Llama-3.3-70B-Instruct-Turbo'),
-  'meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo': togetheraiProvider('meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo'),
-  'codellama/CodeLlama-34b-Instruct-hf': togetheraiProvider('codellama/CodeLlama-34b-Instruct-hf'),
-  'meta-llama/Llama-3.3-70B-Instruct-Turbo-Free': togetheraiProvider('meta-llama/Llama-3.3-70B-Instruct-Turbo-Free'),
-  'meta-llama/Llama-Vision-Free': togetheraiProvider('meta-llama/Llama-Vision-Free'),
-  'deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free': togetheraiProvider('deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free'),
 
   // Cohere Models (v2 compatible with AI SDK 5 - confirmed working)
   'command-r-plus': cohereProvider('command-r-plus-04-2024'),
@@ -274,6 +228,7 @@ const modelProviders: Record<string, any> = {
   'grok-3-mini': xaiProvider('grok-3-mini'),
   'grok-3-mini-fast': xaiProvider('grok-3-mini-fast'),
   'grok-3-latest': xaiProvider('grok-3-latest'),
+  'grok-4-fast-non-reasoning': xaiProvider('grok-4-fast-non-reasoning'),
 };
 
 // Helper function to get a model by ID
@@ -290,9 +245,6 @@ export {
   a0devProvider as a0dev,
   openaiProvider as openai,
   mistralProvider as mistral,
-  googleProvider as google,
-  groqProvider as groq,
-  togetheraiProvider as togetherai,
   cohereProvider as cohere,
   xaiProvider as xai,
   codestral,
