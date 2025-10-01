@@ -762,42 +762,83 @@ export function Sidebar({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Rename Project Dialog */}
-      <Dialog open={!!renameProject} onOpenChange={(open) => {
-        if (!open) setRenameProject(null)
-        // Close sidebar on mobile when modal opens
-        if (open && isMobile && onToggleCollapse) {
-          onToggleCollapse()
-        }
-      }}>
-        <DialogContent className={isMobile ? 'z-[80]' : ''}>
-          <DialogHeader>
-            <DialogTitle>Rename Project</DialogTitle>
-            <DialogDescription>
-              Enter a new name for "{renameProject?.name}".
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="rename">Project Name</Label>
-              <Input
-                id="rename"
-                value={renameValue}
-                onChange={(e) => setRenameValue(e.target.value)}
-                placeholder="Enter new project name"
-              />
+            {/* Rename Project Dialog */}
+      {renameProject && (
+        <Dialog open={!!renameProject} onOpenChange={(open) => {
+          if (!open) setRenameProject(null)
+          // Close sidebar on mobile when modal opens
+          if (open && isMobile && onToggleCollapse) {
+            onToggleCollapse()
+          }
+        }}>
+          <DialogContent className={isMobile ? 'z-[80]' : ''}>
+            <DialogHeader>
+              <DialogTitle>Rename Project</DialogTitle>
+              <DialogDescription>
+                Enter a new name for "{renameProject?.name}".
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="rename">Project Name</Label>
+                <Input
+                  id="rename"
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  placeholder="Enter new project name"
+                />
+              </div>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameProject(null)}>
-              Cancel
-            </Button>
-            <Button onClick={handleRenameProject} disabled={!renameValue.trim()}>
-              Rename Project
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRenameProject(null)}>
+                Cancel
+              </Button>
+              <Button onClick={handleRenameProject} disabled={!renameValue.trim()}>
+                Rename Project
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Clone Project Dialog */}
+      {cloneProject && (
+        <Dialog open={!!cloneProject} onOpenChange={(open) => {
+          if (!open) setCloneProject(null)
+          // Close sidebar on mobile when modal opens
+          if (open && isMobile && onToggleCollapse) {
+            onToggleCollapse()
+          }
+        }}>
+          <DialogContent className={isMobile ? 'z-[80]' : ''}>
+            <DialogHeader>
+              <DialogTitle>Clone Project</DialogTitle>
+              <DialogDescription>
+                Create a copy of "{cloneProject?.name}" with all its files.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="clone">New Project Name</Label>
+                <Input
+                  id="clone"
+                  value={cloneName}
+                  onChange={(e) => setCloneName(e.target.value)}
+                  placeholder="Enter name for cloned project"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCloneProject(null)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCloneProject} disabled={!cloneName.trim()}>
+                Clone Project
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Clone Project Dialog */}
       <Dialog open={!!cloneProject} onOpenChange={(open) => {
