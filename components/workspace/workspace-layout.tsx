@@ -319,7 +319,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   // Handle initialPrompt - auto-generate project details and open create modal
   useEffect(() => {
     const generateAndOpenDialog = async () => {
-      if (initialPrompt && !isAutoRestoring && !isLoadingProjects && !hasProcessedInitialPrompt) {
+      // Skip auto-modal opening for newly created projects (created instantly on homepage)
+      const hasNewProject = searchParams.get('newProject') || newProjectId
+
+      if (initialPrompt && !isAutoRestoring && !isLoadingProjects && !hasProcessedInitialPrompt && !hasNewProject) {
         console.log('WorkspaceLayout: Initial prompt detected, generating project suggestion:', initialPrompt)
         console.log('WorkspaceLayout: Restoration status - isAutoRestoring:', isAutoRestoring, 'isLoadingProjects:', isLoadingProjects)
 
@@ -390,7 +393,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     }
 
     generateAndOpenDialog()
-  }, [initialPrompt, searchParams, router, isMobile, user.id, isAutoRestoring, isLoadingProjects])
+  }, [initialPrompt, searchParams, router, isMobile, user.id, isAutoRestoring, isLoadingProjects, newProjectId])
 
   // Reset processed flag when initialPrompt changes (new prompt from homepage)
   useEffect(() => {
@@ -541,15 +544,16 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     console.log('Selected project changed:', selectedProject)
   }, [selectedProject])
 
-  // Auto-open create project dialog when user has no projects
-  React.useEffect(() => {
-    const projectId = searchParams.get('projectId')
-    if (clientProjects.length === 0 && !isLoadingProjects && !isCreateDialogOpen && !hasAutoOpenedCreateDialog && !projectId) {
-      console.log('WorkspaceLayout: No projects found and not viewing specific project, auto-opening create project dialog')
-      setIsCreateDialogOpen(true)
-      setHasAutoOpenedCreateDialog(true)
-    }
-  }, [clientProjects.length, isLoadingProjects, isCreateDialogOpen, hasAutoOpenedCreateDialog, searchParams])
+  // Auto-open create project dialog when user has no projects - DISABLED
+  // React.useEffect(() => {
+  //   const projectId = searchParams.get('projectId')
+  //   const newProject = searchParams.get('newProject')
+  //   if (clientProjects.length === 0 && !isLoadingProjects && !isCreateDialogOpen && !hasAutoOpenedCreateDialog && !projectId && !newProject) {
+  //     console.log('WorkspaceLayout: No projects found and not viewing specific project, auto-opening create project dialog')
+  //     setIsCreateDialogOpen(true)
+  //     setHasAutoOpenedCreateDialog(true)
+  //   }
+  // }, [clientProjects.length, isLoadingProjects, isCreateDialogOpen, hasAutoOpenedCreateDialog, searchParams])
 
   // Reset auto-open flag when projects are loaded
   React.useEffect(() => {
@@ -789,7 +793,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             )}
 
             {/* Main Workspace */}
-            {!isLoadingProjects && (
+            {!isLoadingProjects && clientProjects.length > 0 && (
               <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
                 {/* Left Panel - Chat (Resizable) */}
                 <ResizablePanel defaultSize={35} minSize={20} maxSize={40}>
@@ -964,6 +968,29 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                   </div>
                 </ResizablePanel>
               </ResizablePanelGroup>
+            )}
+
+            {/* Empty State - No Projects */}
+            {!isLoadingProjects && clientProjects.length === 0 && (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center max-w-md mx-auto p-8">
+                  <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-muted flex items-center justify-center">
+                    <Plus className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <h2 className="text-2xl font-semibold text-foreground mb-2">No projects yet</h2>
+                  <p className="text-muted-foreground mb-6">
+                    Create your first project to start building amazing web applications with AI.
+                  </p>
+                  <Button
+                    onClick={() => setIsCreateDialogOpen(true)}
+                    size="lg"
+                    className="px-8"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Your First Project
+                  </Button>
+                </div>
+              </div>
             )}
 
             {/* Status Bar */}
@@ -1170,62 +1197,85 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
           {/* Mobile Content with top padding for fixed header and bottom padding for fixed tabs */}
           <div className="flex-1 min-h-0 pt-14 pb-12">
-            <Tabs value={mobileTab} onValueChange={(value) => setMobileTab(value as any)} className="h-full flex flex-col">
-              <TabsContent value="chat" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
-                <div className="h-full overflow-hidden">
-                  <ChatPanel 
-                    project={selectedProject} 
-                    isMobile={true}
-                    selectedModel={selectedModel}
-                    onClearChat={handleClearChat}
-                    aiMode={aiMode}
-                  />
+            {clientProjects.length === 0 ? (
+              /* Empty State - No Projects */
+              <div className="flex-1 flex items-center justify-center p-8">
+                <div className="text-center max-w-md mx-auto">
+                  <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-muted flex items-center justify-center">
+                    <Plus className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <h2 className="text-2xl font-semibold text-foreground mb-2">No projects yet</h2>
+                  <p className="text-muted-foreground mb-6">
+                    Create your first project to start building amazing web applications with AI.
+                  </p>
+                  <Button
+                    onClick={() => setIsCreateDialogOpen(true)}
+                    size="lg"
+                    className="px-8"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Your First Project
+                  </Button>
                 </div>
-              </TabsContent>
-              
-              <TabsContent value="files" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
-                <div className="h-full overflow-hidden">
-                  <FileExplorer
-                    key={fileExplorerKey}
-                    project={selectedProject}
-                    onFileSelect={(file) => {
-                      setSelectedFile(file)
-                      // Auto-switch to editor tab when file is selected
-                      setMobileTab("editor")
-                    }}
-                    selectedFile={selectedFile}
-                  />
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="editor" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
-                <div className="h-full overflow-hidden">
-                  <CodeEditor
-                    file={selectedFile}
-                    onSave={(file, content) => {
-                      console.log("File saved:", file.name, content.length, "characters")
-                      
-                      // Trigger auto cloud backup after file save
-                      triggerAutoBackup(`Saved file: ${file.name}`)
-                      
-                      setFileExplorerKey(prev => prev + 1)
-                    }}
-                  />
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="preview" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
-                <div className="h-full overflow-hidden">
-                  <CodePreviewPanel
-                    ref={codePreviewRef}
-                    project={selectedProject}
-                    activeTab="preview"
-                    onTabChange={() => {}}
-                    previewViewMode={previewViewMode}
-                  />
-                </div>
-              </TabsContent>
-            </Tabs>
+              </div>
+            ) : (
+              <Tabs value={mobileTab} onValueChange={(value) => setMobileTab(value as any)} className="h-full flex flex-col">
+                <TabsContent value="chat" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
+                  <div className="h-full overflow-hidden">
+                    <ChatPanel 
+                      project={selectedProject} 
+                      isMobile={true}
+                      selectedModel={selectedModel}
+                      onClearChat={handleClearChat}
+                      aiMode={aiMode}
+                    />
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="files" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
+                  <div className="h-full overflow-hidden">
+                    <FileExplorer
+                      key={fileExplorerKey}
+                      project={selectedProject}
+                      onFileSelect={(file) => {
+                        setSelectedFile(file)
+                        // Auto-switch to editor tab when file is selected
+                        setMobileTab("editor")
+                      }}
+                      selectedFile={selectedFile}
+                    />
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="editor" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
+                  <div className="h-full overflow-hidden">
+                    <CodeEditor
+                      file={selectedFile}
+                      onSave={(file, content) => {
+                        console.log("File saved:", file.name, content.length, "characters")
+                        
+                        // Trigger auto cloud backup after file save
+                        triggerAutoBackup(`Saved file: ${file.name}`)
+                        
+                        setFileExplorerKey(prev => prev + 1)
+                      }}
+                    />
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="preview" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
+                  <div className="h-full overflow-hidden">
+                    <CodePreviewPanel
+                      ref={codePreviewRef}
+                      project={selectedProject}
+                      activeTab="preview"
+                      onTabChange={() => {}}
+                      previewViewMode={previewViewMode}
+                    />
+                  </div>
+                </TabsContent>
+              </Tabs>
+            )}
           </div>
 
           {/* Fixed Mobile Bottom Tab Navigation */}

@@ -555,9 +555,6 @@ export function Sidebar({
                         <div className="font-medium text-sm truncate">
                           {project.name.length > 12 ? `${project.name.substring(0, 12)}...` : project.name}
                         </div>
-                        {project.description && (
-                          <div className="text-xs text-muted-foreground truncate">{project.description}</div>
-                        )}
                         <div className="text-xs text-muted-foreground">
                           {new Date(project.lastActivity).toLocaleDateString()}
                         </div>
@@ -641,9 +638,6 @@ export function Sidebar({
                         <div className="font-medium text-sm truncate">
                           {project.name.length > 12 ? `${project.name.substring(0, 12)}...` : project.name}
                         </div>
-                        {project.description && (
-                          <div className="text-xs text-muted-foreground truncate">{project.description}</div>
-                        )}
                         <div className="text-xs text-muted-foreground">
                           {new Date(project.lastActivity).toLocaleDateString()}
                         </div>
