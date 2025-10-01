@@ -25,7 +25,11 @@ import {
   BookOpen,
   Database,
   User,
-  Clock
+  Clock,
+  Plus,
+  Image as ImageIcon,
+  Mic,
+  MicOff
 } from "lucide-react"
 import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown"
 import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
@@ -111,10 +115,6 @@ interface ChatPanelProps {
   onModeChange?: (mode: AIMode) => void
   onClearChat?: () => void
   initialPrompt?: string
-  initialAttachments?: {
-    images: Array<{ filename: string; description: string }>
-    files: Array<{ name: string; content: string }>
-  }
 }
 
 // Workflow Message Component for sophisticated workflow rendering
@@ -3633,8 +3633,7 @@ export function ChatPanel({
   aiMode = 'agent',
   onModeChange,
   onClearChat: externalOnClearChat,
-  initialPrompt,
-  initialAttachments
+  initialPrompt
 }: ChatPanelProps) {
   const { toast } = useToast()
   
@@ -3659,8 +3658,36 @@ export function ChatPanel({
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 })
   const [atCommandStartIndex, setAtCommandStartIndex] = useState(-1)
 
+  // Image and file upload attachment state
+  const [attachedImages, setAttachedImages] = useState<Array<{ id: string; name: string; base64: string; description?: string; isProcessing?: boolean }>>([])
+  const [attachedUploadedFiles, setAttachedUploadedFiles] = useState<Array<{ id: string; name: string; content: string; size: number }>>([])
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Speech-to-text state
+  const [isRecording, setIsRecording] = useState(false)
+  const [isTranscribing, setIsTranscribing] = useState(false)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+
   // Auth modal state
   const [showAuthModal, setShowAuthModal] = useState(false)
+
+  // Close attachment menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showAttachmentMenu) {
+        const target = e.target as HTMLElement;
+        if (!target.closest('.attachment-menu-container')) {
+          setShowAttachmentMenu(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showAttachmentMenu]);
 
   // Handle project changes - load chat history when project changes
   React.useEffect(() => {
@@ -3752,39 +3779,6 @@ export function ChatPanel({
       if (initialPrompt && project && messages.length === 0 && !isLoading) {
         console.log(`[ChatPanel] Auto-sending initial prompt: "${initialPrompt}"`)
         
-        // Handle attachments if provided
-        if (initialAttachments) {
-          // Add image attachments
-          if (initialAttachments.images && initialAttachments.images.length > 0) {
-            const imageFiles: FileSearchResult[] = initialAttachments.images.map((img, index) => ({
-              id: `initial-image-${index}`,
-              name: img.filename,
-              path: img.filename,
-              extension: img.filename.split('.').pop() || '',
-              type: 'image',
-              size: 0,
-              matchScore: 1,
-              isDirectory: false
-            }))
-            setAttachedFiles(prev => [...prev, ...imageFiles])
-          }
-          
-          // Add file attachments
-          if (initialAttachments.files && initialAttachments.files.length > 0) {
-            const fileAttachments: FileSearchResult[] = initialAttachments.files.map((file, index) => ({
-              id: `initial-file-${index}`,
-              name: file.name,
-              path: file.name,
-              extension: file.name.split('.').pop() || '',
-              type: 'file',
-              size: file.content.length,
-              matchScore: 1,
-              isDirectory: false
-            }))
-            setAttachedFiles(prev => [...prev, ...fileAttachments])
-          }
-        }
-        
         // Set the input message and trigger send
         setInputMessage(initialPrompt)
         
@@ -3801,7 +3795,7 @@ export function ChatPanel({
     }
 
     autoSendInitialPrompt()
-  }, [initialPrompt, initialAttachments, project, messages.length, isLoading])
+  }, [initialPrompt, project, messages.length, isLoading])
 
   // Load chat history from IndexedDB for a specific project
   const loadChatHistory = async (projectToLoad: Project | null = null) => {
@@ -4136,6 +4130,309 @@ export function ChatPanel({
     setAtCommandStartIndex(-1);
   };
 
+  // Image attachment handlers
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    // Check max 2 images limit
+    if (attachedImages.length + files.length > 2) {
+      toast({
+        title: "Maximum images reached",
+        description: "You can attach a maximum of 2 images",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Process each image
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid file type",
+          description: `${file.name} is not a valid image file`,
+          variant: "destructive"
+        });
+        continue;
+      }
+
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: `${file.name} is too large. Maximum size is 10MB`,
+          variant: "destructive"
+        });
+        continue;
+      }
+
+      // Convert to base64
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64 = event.target?.result as string;
+        const imageId = `img_${Date.now()}_${i}`;
+
+        // Add image to state with processing flag
+        setAttachedImages(prev => [...prev, {
+          id: imageId,
+          name: file.name,
+          base64: base64,
+          isProcessing: true
+        }]);
+
+        // Send to Pixtral for description
+        try {
+          const response = await fetch('/api/describe-image', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              image: base64,
+              prompt: "Describe this image in detail, including layout, colors, text, UI elements, and any other relevant information that would help recreate or understand this design."
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to describe image');
+          }
+
+          const data = await response.json();
+
+          // Update image with description
+          setAttachedImages(prev => prev.map(img => 
+            img.id === imageId 
+              ? { ...img, description: data.description, isProcessing: false }
+              : img
+          ));
+
+          toast({
+            title: "Image processed",
+            description: `${file.name} processed successfully`
+          });
+        } catch (error) {
+          console.error('Error describing image:', error);
+          toast({
+            title: "Processing failed",
+            description: `Failed to process ${file.name}`,
+            variant: "destructive"
+          });
+          // Remove failed image
+          setAttachedImages(prev => prev.filter(img => img.id !== imageId));
+        }
+      };
+
+      reader.onerror = () => {
+        toast({
+          title: "Read error",
+          description: `Failed to read ${file.name}`,
+          variant: "destructive"
+        });
+      };
+
+      reader.readAsDataURL(file);
+    }
+
+    // Reset input
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveImage = (imageId: string) => {
+    setAttachedImages(prev => prev.filter(img => img.id !== imageId));
+  };
+
+  // File upload attachment handlers
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    // Check if images are attached
+    if (attachedImages.length > 0) {
+      toast({
+        title: "Cannot attach files",
+        description: "Remove attached images first before attaching files",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check max 10 files limit
+    if (attachedUploadedFiles.length + files.length > 10) {
+      toast({
+        title: "Maximum files reached",
+        description: "You can attach a maximum of 10 files",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Process each file
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: `${file.name} is too large. Maximum size is 5MB`,
+          variant: "destructive"
+        });
+        continue;
+      }
+
+      // Read file content
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const content = event.target?.result as string;
+        const fileId = `file_${Date.now()}_${i}`;
+
+        // Add file to state
+        setAttachedUploadedFiles(prev => [...prev, {
+          id: fileId,
+          name: file.name,
+          content: content,
+          size: file.size
+        }]);
+
+        toast({
+          title: "File attached",
+          description: `${file.name} attached successfully`
+        });
+      };
+
+      reader.onerror = () => {
+        toast({
+          title: "Read error",
+          description: `Failed to read ${file.name}`,
+          variant: "destructive"
+        });
+      };
+
+      reader.readAsText(file);
+    }
+
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveUploadedFile = (fileId: string) => {
+    setAttachedUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+  };
+
+  // Speech-to-text handlers
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        await transcribeAudio(audioBlob);
+        
+        // Stop all tracks to release microphone
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+
+      toast({
+        title: "Recording started",
+        description: "Speak now... Click again to stop"
+      });
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      toast({
+        title: "Recording failed",
+        description: "Could not access microphone. Please check permissions.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      setIsTranscribing(true);
+    }
+  };
+
+  const transcribeAudio = async (audioBlob: Blob) => {
+    try {
+      // Convert blob to base64
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      
+      reader.onloadend = async () => {
+        const base64Audio = (reader.result as string).split(',')[1];
+
+        // Send to speech-to-text API
+        const response = await fetch('/api/speech-to-text', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ audio: base64Audio }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to transcribe audio');
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.text) {
+          // Append transcribed text to input
+          setInputMessage(prev => prev ? `${prev} ${data.text}` : data.text);
+          
+          toast({
+            title: "Transcription complete",
+            description: "Your speech has been converted to text"
+          });
+        } else {
+          throw new Error('No transcription received');
+        }
+      };
+
+      reader.onerror = () => {
+        throw new Error('Failed to read audio file');
+      };
+    } catch (error) {
+      console.error('Error transcribing audio:', error);
+      toast({
+        title: "Transcription failed",
+        description: "Could not convert speech to text",
+        variant: "destructive"
+      });
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
+  const handleMicrophoneClick = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!inputMessage.trim() || isLoading) return
@@ -4184,10 +4481,43 @@ export function ChatPanel({
       }
     }
 
-    // Prepare message content with attached files
+    // Prepare message content with attached files, images, and uploaded files
     let messageContent = inputMessage.trim();
     
-    // If there are attached files, append their content to the message
+    // Check if images are still processing
+    if (attachedImages.some(img => img.isProcessing)) {
+      toast({
+        title: "Images processing",
+        description: "Please wait for images to finish processing",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Add image descriptions first
+    if (attachedImages.length > 0) {
+      const imageDescriptions = attachedImages
+        .filter(img => img.description)
+        .map(img => `\n\n--- Image: ${img.name} ---\n${img.description}\n--- End of Image ---`)
+        .join('');
+      
+      if (imageDescriptions) {
+        messageContent = `${messageContent}\n\n=== ATTACHED IMAGES CONTEXT ===${imageDescriptions}\n=== END ATTACHED IMAGES ===`;
+      }
+    }
+    
+    // Add uploaded file contents
+    if (attachedUploadedFiles.length > 0) {
+      const uploadedFileContexts = attachedUploadedFiles
+        .map(file => `\n\n--- Uploaded File: ${file.name} ---\n${file.content}\n--- End of ${file.name} ---`)
+        .join('');
+      
+      if (uploadedFileContexts) {
+        messageContent = `${messageContent}\n\n=== UPLOADED FILES CONTEXT ===${uploadedFileContexts}\n=== END UPLOADED FILES ===`;
+      }
+    }
+    
+    // Add project files attached via @ command
     if (attachedFiles.length > 0) {
       const fileContexts: string[] = [];
       
@@ -4199,16 +4529,16 @@ export function ChatPanel({
           try {
             const fileData = await storageManager.getFile(project.id, attachedFile.path);
             if (fileData && fileData.content) {
-              fileContexts.push(`\n\n--- File: ${attachedFile.path} ---\n${fileData.content}\n--- End of ${attachedFile.name} ---`);
+              fileContexts.push(`\n\n--- Project File: ${attachedFile.path} ---\n${fileData.content}\n--- End of ${attachedFile.name} ---`);
             }
           } catch (error) {
             console.error(`Error loading attached file ${attachedFile.path}:`, error);
-            fileContexts.push(`\n\n--- File: ${attachedFile.path} ---\n[Error loading file content]\n--- End of ${attachedFile.name} ---`);
+            fileContexts.push(`\n\n--- Project File: ${attachedFile.path} ---\n[Error loading file content]\n--- End of ${attachedFile.name} ---`);
           }
         }
         
         if (fileContexts.length > 0) {
-          messageContent = `${messageContent}\n\n=== ATTACHED FILES CONTEXT ===${fileContexts.join('')}\n=== END ATTACHED FILES ===`;
+          messageContent = `${messageContent}\n\n=== PROJECT FILES CONTEXT ===${fileContexts.join('')}\n=== END PROJECT FILES ===`;
         }
       } catch (error) {
         console.error('Error loading attached files:', error);
@@ -4225,6 +4555,8 @@ export function ChatPanel({
     setMessages(prev => [...prev, userMessage])
     setInputMessage("")
     setAttachedFiles([]) // Clear attached files after sending
+    setAttachedImages([]) // Clear attached images after sending
+    setAttachedUploadedFiles([]) // Clear uploaded files after sending
     setIsLoading(true)
 
     // Reset textarea height to default during loading
@@ -6506,7 +6838,7 @@ export function ChatPanel({
       }`}>
         
         <form onSubmit={handleSendMessage} className="space-y-3">
-          {/* Attached Files Display */}
+          {/* Attached Files Display (@ command) */}
           {attachedFiles.length > 0 && (
             <div className="flex flex-wrap gap-2 px-2">
               {attachedFiles.map((file) => (
@@ -6519,9 +6851,146 @@ export function ChatPanel({
             </div>
           )}
 
+          {/* Attached Images Display */}
+          {attachedImages.length > 0 && (
+            <div className="flex flex-wrap gap-2 px-2">
+              {attachedImages.map((img) => (
+                <div
+                  key={img.id}
+                  className="flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 rounded-lg px-3 py-2 text-sm"
+                >
+                  <ImageIcon className="w-4 h-4 text-purple-400" />
+                  <span className="text-purple-300 max-w-[200px] truncate">{img.name}</span>
+                  {img.isProcessing && (
+                    <div className="w-3 h-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveImage(img.id)}
+                    className="ml-1 text-purple-400 hover:text-purple-300"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Attached Uploaded Files Display */}
+          {attachedUploadedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2 px-2">
+              {attachedUploadedFiles.map((file) => (
+                <div
+                  key={file.id}
+                  className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/30 rounded-lg px-3 py-2 text-sm"
+                >
+                  <FileText className="w-4 h-4 text-blue-400" />
+                  <span className="text-blue-300 max-w-[200px] truncate">{file.name}</span>
+                  <span className="text-blue-400 text-xs">({(file.size / 1024).toFixed(1)}KB)</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveUploadedFile(file.id)}
+                    className="ml-1 text-blue-400 hover:text-blue-300"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Hidden file inputs */}
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleImageUpload}
+            className="hidden"
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+
           <div className="relative flex items-center bg-[#2b2b2b] border border-gray-600 rounded-[24px] px-4 py-3">
             {/* Main input row: textarea + mode selector */}
             <div className="flex items-center w-full relative">
+              {/* Plus button for attachments at bottom-left */}
+              <div className="absolute left-0 bottom-2 z-10 attachment-menu-container flex flex-col gap-2">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
+                    className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                  
+                  {/* Attachment menu dropdown */}
+                  {showAttachmentMenu && (
+                    <div className="absolute bottom-full left-0 mb-2 bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-2 min-w-[160px] z-20">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAttachmentMenu(false)
+                          imageInputRef.current?.click()
+                        }}
+                        disabled={attachedImages.length >= 2 || attachedUploadedFiles.length > 0}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        <ImageIcon className="w-4 h-4" />
+                        <span>Attach Image</span>
+                        {attachedImages.length >= 2 && (
+                          <span className="ml-auto text-xs text-gray-500">(Max 2)</span>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAttachmentMenu(false)
+                          fileInputRef.current?.click()
+                        }}
+                        disabled={attachedImages.length > 0}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        <FileText className="w-4 h-4" />
+                        <span>Attach File</span>
+                        {attachedImages.length > 0 && (
+                          <span className="ml-auto text-xs text-gray-500">(Remove images)</span>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Microphone button for speech-to-text */}
+                <button
+                  type="button"
+                  onClick={handleMicrophoneClick}
+                  disabled={isTranscribing}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                    isRecording 
+                      ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse' 
+                      : isTranscribing
+                      ? 'bg-gray-600 cursor-wait'
+                      : 'bg-gray-700 hover:bg-gray-600 text-gray-400 hover:text-white'
+                  }`}
+                  title={isRecording ? "Stop recording" : isTranscribing ? "Transcribing..." : "Start voice input"}
+                >
+                  {isTranscribing ? (
+                    <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  ) : isRecording ? (
+                    <MicOff className="w-4 h-4" />
+                  ) : (
+                    <Mic className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+
               {/* Mode selector at bottom left inside input */}
           {/*<AiModeSelector
   selectedMode={bbbbbbbbbbbaiMode}
@@ -6612,8 +7081,8 @@ export function ChatPanel({
                     handleSendMessage(e)
                   }
                 }}
-                placeholder={isEditingRevertedMessage ? "Editing reverted message... Make changes and press Enter to send" : isLoading ? "PiPilot is working..." : "Plan, build and ship faster. Type @ to attach files."}
-                className={`flex-1 bg-transparent border-none outline-none text-white placeholder-gray-400 text-[15px] resize-none rounded-md px-2 py-2 leading-[1.5] min-h-[48px] max-h-[140px] ${
+                placeholder={isEditingRevertedMessage ? "Editing reverted message... Make changes and press Enter to send" : isLoading ? "PiPilot is working..." : "Type, speak, or attach. Use @ for files, + for images/files, 🎤 for voice."}
+                className={`flex-1 bg-transparent border-none outline-none text-white placeholder-gray-400 text-[15px] resize-none rounded-md py-2 leading-[1.5] min-h-[48px] max-h-[140px] ${
                   isEditingRevertedMessage ? 'border-yellow-500 ring-yellow-500 ring-2' : ''
                 }`}
                 disabled={isLoading}
@@ -6624,7 +7093,9 @@ export function ChatPanel({
                   maxHeight: '140px',
                   overflowY: 'hidden', // hide scrollbar until content exceeds maxHeight
                   resize: 'none',
-                  boxSizing: 'border-box'
+                  boxSizing: 'border-box',
+                  paddingLeft: '40px', // Space for Plus button
+                  paddingRight: '52px' // Space for Send button
                 }}
               />
               <button
