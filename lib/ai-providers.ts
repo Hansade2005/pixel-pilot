@@ -213,13 +213,16 @@ if (process.env.NODE_ENV === 'development') {
 // Model mapping with direct provider instances
 const modelProviders: Record<string, any> = {
   // Auto/Default Option - uses Grok Code Fast 1
-  'auto': xaiProvider ('grok-code-fast-1'), // Auto selection uses Grok Code Fast 1
+  'auto': xaiProvider('grok-code-fast-1'), // Auto selection uses Grok Code Fast 1
+  
+  // Codestral Models (OpenAI Compatible)
+  'codestral-latest': codestral('codestral-latest'),
   
   // a0.dev Models
   'a0-dev-llm': a0devProvider.languageModel('a0-dev-llm'),
   
   // Mistral Models - Default uses Codestral endpoint
-  'open-codestral-mamba': codestral('codestral-latest'), // Direct Codestral model selection
+  'open-codestral-mamba': mistralProvider('open-codestral-mamba'),
   'pixtral-12b-2409': mistralProvider('pixtral-12b-2409'),
   'mistral-small-2503': mistralProvider('mistral-small-2503'),
   'mistral-small-2506': mistralProvider('mistral-small-2506'),

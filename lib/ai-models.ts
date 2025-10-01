@@ -48,6 +48,14 @@ export const chatModels: Array<ChatModel> = [
     provider: 'mistral',
   },
 
+  // Codestral Models (OpenAI Compatible)
+  {
+    id: 'codestral-latest',
+    name: 'Codestral',
+    description: 'Mistral Codestral model via OpenAI-compatible endpoint',
+    provider: 'codestral',
+  },
+
   // a0.dev Models
   {
     id: 'a0-dev-llm',
