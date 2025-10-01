@@ -335,13 +335,13 @@ function processStreamMemorySimple(
   const semanticSummary = filesAffected.length > 0
     ? `UserMessage in last request: ${userMessage}
 
-Note: Files you affected are outlined below
+Note: Changes you made and files you modified  to compleett the request are listed below
 filesAffected: [
 ${filesAffected.map(f => `  "${f}"`).join(',\n')}
 ]`
     : `UserMessage in last request: ${userMessage}
 
-Note: No files were affected in this request`
+Note: No files were affected in the last request`
 
   const keyChanges = jsonOperations.map(op => op.changeSummary)
 
