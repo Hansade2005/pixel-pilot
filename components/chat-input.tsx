@@ -13,7 +13,7 @@ import {
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { toast } from "react-toastify"
+import { toast } from "sonner"
 import { useSubscription } from "@/hooks/use-subscription"
 
 interface ChatInputProps {
@@ -46,16 +46,67 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     setIsLoading(true)
 
     try {
-      console.log('🚀 ChatInput: Redirecting to workspace with prompt:', prompt)
+      console.log('🚀 ChatInput: Generating project details with Pixtral for prompt:', prompt)
       
-      // Clear the input and redirect to workspace with the prompt
-      // The workspace will auto-open the project creation modal
-      setPrompt("")
-      router.push(`/workspace?prompt=${encodeURIComponent(prompt)}`)
+      // Generate project name and description using Pixtral
+      const response = await fetch('/api/project-suggestions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: prompt,
+          userId: user.id,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to generate project suggestion')
+      }
+
+      const data = await response.json()
+
+      if (data.success && data.suggestion) {
+        console.log('🤖 Pixtral generated suggestion:', data.suggestion)
+        
+        // Create project immediately with generated details
+        const projectName = data.suggestion.name
+        const projectDescription = data.suggestion.description
+        const slug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+        
+        console.log('📝 Creating project with name:', projectName)
+        
+        // Client-side project creation
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        const workspace = await storageManager.createWorkspace({
+          name: projectName,
+          description: projectDescription,
+          userId: user.id,
+          isPublic: false,
+          isTemplate: false,
+          lastActivity: new Date().toISOString(),
+          deploymentStatus: 'not_deployed',
+          slug
+        })
+        
+        // Apply template files
+        const { TemplateService } = await import('@/lib/template-service')
+        await TemplateService.applyViteReactTemplate(workspace.id)
+        const files = await storageManager.getFiles(workspace.id)
+        
+        toast.success('Project created and saved!')
+        
+        // Clear the input and redirect to workspace with the new project
+        setPrompt("")
+        router.push(`/workspace?newProject=${workspace.id}&prompt=${encodeURIComponent(prompt)}`)
+      } else {
+        throw new Error('Failed to generate project suggestion')
+      }
 
     } catch (error) {
       console.error('❌ Error:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to navigate to workspace')
+      toast.error(error instanceof Error ? error.message : 'Failed to create project')
     } finally {
       setIsLoading(false)
     }

@@ -110,6 +110,7 @@ interface ChatPanelProps {
   aiMode?: AIMode
   onModeChange?: (mode: AIMode) => void
   onClearChat?: () => void
+  initialPrompt?: string
 }
 
 // Workflow Message Component for sophisticated workflow rendering
