@@ -212,8 +212,8 @@ if (process.env.NODE_ENV === 'development') {
 
 // Model mapping with direct provider instances
 const modelProviders: Record<string, any> = {
-  // Auto/Default Option - uses Codestral
-  'auto': codestral('codestral-latest'), // Auto selection uses Codestral endpoint
+  // Auto/Default Option - uses Grok Code Fast 1
+  'auto': xaiProvider('grok-code-fast-1'), // Auto selection uses Grok Code Fast 1
   
   // a0.dev Models
   'a0-dev-llm': a0devProvider.languageModel('a0-dev-llm'),

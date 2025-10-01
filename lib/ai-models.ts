@@ -1,4 +1,4 @@
-export const DEFAULT_CHAT_MODEL: string = 'auto';
+export const DEFAULT_CHAT_MODEL: string = 'grok-code-fast-1';
 
 export interface ChatModel {
   id: string;
@@ -14,14 +14,6 @@ export const chatModels: Array<ChatModel> = [
     name: 'Auto',
     description: 'Automatically uses the best model for code generation ',
     provider: 'auto',
-  },
-  
-  // a0.dev Models
-  {
-    id: 'a0-dev-llm',
-    name: 'Pixela',
-    description: 'Pixela model from PiPilot with strong code generation capabilities',
-    provider: 'a0dev',
   },
   
   // Mistral Models (Default - Code-focused)
@@ -54,6 +46,14 @@ export const chatModels: Array<ChatModel> = [
     name: 'Mistral Nemo',
     description: 'Versatile open Mistral model',
     provider: 'mistral',
+  },
+
+  // a0.dev Models
+  {
+    id: 'a0-dev-llm',
+    name: 'Pixela',
+    description: 'Pixela model from PiPilot with strong code generation capabilities',
+    provider: 'a0dev',
   },
 
   // OpenAI Models
