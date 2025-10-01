@@ -154,7 +154,17 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     const files = Array.from(e.target.files || [])
     if (files.length === 0) return
 
+    // Allowed file extensions
+    const allowedExtensions = ['json', 'js', 'ts', 'tsx', 'md', 'sql', 'cjs']
+
     for (const file of files) {
+      const extension = file.name.split('.').pop()?.toLowerCase()
+
+      if (!extension || !allowedExtensions.includes(extension)) {
+        toast.error(`File type not supported. Only ${allowedExtensions.join(', ')} files are allowed.`)
+        continue
+      }
+
       try {
         const content = await file.text()
         const attachedFile: AttachedFile = {
@@ -162,7 +172,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
           name: file.name,
           path: file.name,
           content,
-          fileType: file.type,
+          fileType: file.type || `text/${extension}`,
           type: 'file',
           size: file.size,
           isDirectory: false
@@ -468,7 +478,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   onClick={handleFileAttach}
                   disabled={attachedImages.length > 0 || isGenerating}
                   className="flex items-center space-x-2 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  title={attachedImages.length > 0 ? "File attachment disabled when images are attached" : "Attach files"}
+                  title={attachedImages.length > 0 ? "File attachment disabled when images are attached" : "Attach files (JSON, JS, TS, TSX, MD, SQL, CJS only)"}
                 >
                   <Paperclip className="w-4 h-4" />
                   <span className="text-sm">Attach</span>
@@ -501,6 +511,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
             <input
               ref={fileInputRef}
               type="file"
+              accept=".json,.js,.ts,.tsx,.md,.sql,.cjs,application/json,text/javascript,text/typescript,application/typescript,text/markdown,text/x-sql"
               onChange={handleFileSelect}
               className="hidden"
             />
