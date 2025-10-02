@@ -3678,14 +3678,6 @@ function preprocessMarkdownContent(content: string): string {
   // Add space after parentheses when followed by letters
   content = content.replace(/\)([A-Za-z])/g, ') $1')
 
-  // FIX: Handle common AI date formatting issues
-  // Add space between month names and day numbers (e.g., "October2" -> "October 2")
-  content = content.replace(/(January|February|March|April|May|June|July|August|September|October|November|December)(\d)/g, '$1 $2')
-  // Add space between month abbreviations and day numbers (e.g., "Dec2024" -> "Dec 2024")
-  content = content.replace(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(\d)/g, '$1 $2')
-  // Fix double spaces that might be created
-  content = content.replace(/  +/g, ' ')
-
   // Keep double newlines for proper paragraph separation, but limit to max 2
   content = content.replace(/\n{3,}/g, '\n\n')
 
