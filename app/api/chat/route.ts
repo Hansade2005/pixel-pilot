@@ -6160,19 +6160,158 @@ Use this context to provide accurate, file-aware responses to the user's request
               console.log(`[JSON-TOOL] Status signal sent: ${statusMessage} ${path}`)
             }
             
-            // Helper to send complete JSON tool block
-            const sendCompleteJsonToolBlock = (fullBlock: string, toolType: string, path: string, toolId: string) => {
+            // Helper to validate JSON tool block
+            const validateJsonToolBlock = (jsonContent: string): { isValid: boolean, errors: string[], parsedJson?: any } => {
+              const errors: string[] = []
+
+              try {
+                // Extract JSON from code block
+                const jsonMatch = jsonContent.match(/```json\s*\n([\s\S]*?)\n```/)
+                if (!jsonMatch) {
+                  errors.push('No valid JSON code block found')
+                  return { isValid: false, errors }
+                }
+
+                const jsonString = jsonMatch[1].trim()
+                if (!jsonString) {
+                  errors.push('Empty JSON content')
+                  return { isValid: false, errors }
+                }
+
+                // Parse JSON
+                const parsedJson = JSON.parse(jsonString)
+
+                // Validate required fields
+                if (!parsedJson.tool) {
+                  errors.push('Missing "tool" field')
+                } else if (!['write_file', 'delete_file', 'edit_file'].includes(parsedJson.tool)) {
+                  errors.push(`Invalid tool type: ${parsedJson.tool}. Must be write_file, delete_file, or edit_file`)
+                }
+
+                if (!parsedJson.path || typeof parsedJson.path !== 'string') {
+                  errors.push('Missing or invalid "path" field (must be string)')
+                }
+
+                // Tool-specific validations
+                if (parsedJson.tool === 'write_file') {
+                  if (!parsedJson.content && parsedJson.content !== '') {
+                    errors.push('write_file tool requires "content" field')
+                  }
+                } else if (parsedJson.tool === 'edit_file') {
+                  if (!parsedJson.search_replace) {
+                    errors.push('edit_file tool requires "search_replace" field')
+                  }
+                }
+                // delete_file only needs path, which we already validated
+
+                return {
+                  isValid: errors.length === 0,
+                  errors,
+                  parsedJson
+                }
+              } catch (parseError) {
+                errors.push(`JSON parsing error: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`)
+                return { isValid: false, errors }
+              }
+            }
+
+            // Helper to correct JSON tool block using AI
+            const correctJsonToolBlock = async (originalBlock: string, validationErrors: string[]): Promise<string> => {
+              console.log('[JSON-TOOL] Attempting to correct invalid block:', validationErrors)
+
+              try {
+                const correctionPrompt = `You are correcting a JSON tool command that has errors. The original block was:
+
+${originalBlock}
+
+Validation errors found:
+${validationErrors.map(error => `- ${error}`).join('\n')}
+
+Please provide a corrected JSON tool command that fixes these errors. The corrected block should be in the same format:
+
+\`\`\`json
+{
+  "tool": "write_file|delete_file|edit_file",
+  "path": "file/path.ext",
+  "content": "..." // for write_file
+  // or
+  "search_replace": {...} // for edit_file
+}
+\`\`\`
+
+Rules:
+- Use only valid tool types: write_file, delete_file, edit_file
+- Path must be a valid file path string
+- write_file requires "content" field
+- edit_file requires "search_replace" field with "old_string" and "new_string"
+- delete_file only requires "path"
+- JSON must be valid and properly formatted
+
+Provide only the corrected JSON code block, nothing else.`
+
+                const correctionResult = await generateText({
+                  model: model,
+                  messages: [
+                    { role: 'system', content: 'You are an expert at correcting JSON tool commands. Always provide valid, properly formatted JSON tool blocks.  ' },
+                    { role: 'user', content: correctionPrompt }
+                  ],
+                  temperature: 0.1,
+                })
+
+                const correctedBlock = correctionResult.text?.trim()
+                if (correctedBlock && correctedBlock.includes('```json')) {
+                  console.log('[JSON-TOOL] Successfully corrected JSON block')
+                  return correctedBlock
+                } else {
+                  console.warn('[JSON-TOOL] Correction failed, using original block')
+                  return originalBlock
+                }
+              } catch (error) {
+                console.error('[JSON-TOOL] Correction failed:', error)
+                return originalBlock
+              }
+            }
+
+            // Helper to send complete JSON tool block (with validation/correction)
+            const sendCompleteJsonToolBlock = async (fullBlock: string, toolType: string, path: string, toolId: string) => {
+              console.log('[JSON-TOOL] Validating JSON tool block before sending...')
+
+              // Validate the JSON tool block
+              const validation = validateJsonToolBlock(fullBlock)
+
+              let finalBlock = fullBlock
+              if (!validation.isValid) {
+                console.log('[JSON-TOOL] Block validation failed, attempting correction:', validation.errors)
+
+                // Attempt to correct the block
+                finalBlock = await correctJsonToolBlock(fullBlock, validation.errors)
+
+                // Validate the corrected block
+                const reValidation = validateJsonToolBlock(finalBlock)
+                if (!reValidation.isValid) {
+                  console.warn('[JSON-TOOL] Correction failed, proceeding with original block despite errors:', reValidation.errors)
+                  finalBlock = fullBlock // Fall back to original
+                } else {
+                  console.log('[JSON-TOOL] Correction successful!')
+                }
+              } else {
+                console.log('[JSON-TOOL] Block validation passed')
+              }
+
+              // Send the final block (validated and potentially corrected)
               controller.enqueue(`data: ${JSON.stringify({
                 type: 'json-tool-block',
                 status: 'complete',
                 toolType,
                 path,
                 toolId,
-                content: fullBlock,
+                content: finalBlock,
+                validationPassed: validation.isValid,
+                corrected: finalBlock !== fullBlock,
                 timestamp: Date.now()
               })}\n\n`)
-              
-              console.log(`[JSON-TOOL] Complete block sent: ${toolType} ${path} (${fullBlock.length} chars)`)
+
+              console.log(`[JSON-TOOL] Complete block sent: ${toolType} ${path} (${finalBlock.length} chars, validated: ${validation.isValid})`)
             }
             
             for await (const chunk of result.textStream) {
