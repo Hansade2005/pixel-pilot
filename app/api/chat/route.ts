@@ -6107,10 +6107,12 @@ Use this context to provide accurate, file-aware responses to the user's request
               window.addEventListener('xml-tool-executed', handleToolExecution as EventListener)
             }
             
-            // LINE-BY-LINE STREAMING BUFFER
+            // SMART LINE-BY-LINE STREAMING BUFFER
+            // Stream complete lines for code blocks and structured markdown
+            // Stream token-by-token for conversational text (better UX)
             let streamBuffer = ''
             let inCodeBlock = false
-            let isFirstChunk = true
+            let codeBlockLanguage = ''
             
             for await (const chunk of result.textStream) {
               // Accumulate response for memory
@@ -6119,31 +6121,41 @@ Use this context to provide accurate, file-aware responses to the user's request
               // Add chunk to buffer
               streamBuffer += chunk
               
-              // Check if we're entering/exiting code blocks
-              if (chunk.includes('```')) {
-                inCodeBlock = !inCodeBlock
+              // Detect code block boundaries
+              const codeBlockMatch = chunk.match(/```(\w*)/)
+              if (codeBlockMatch) {
+                if (!inCodeBlock) {
+                  // Entering code block
+                  inCodeBlock = true
+                  codeBlockLanguage = codeBlockMatch[1] || ''
+                } else {
+                  // Exiting code block
+                  inCodeBlock = false
+                  codeBlockLanguage = ''
+                }
               }
               
-              // Stream line-by-line for better code/markdown rendering
-              // But allow immediate output for first chunk to feel responsive
-              if (streamBuffer.includes('\n') || isFirstChunk) {
-                isFirstChunk = false
-                
-                // Split by newlines
+              // Decision: Line-by-line for code/structured content, token-by-token for chat
+              const shouldStreamByLine = inCodeBlock || 
+                                         streamBuffer.includes('\n') && (
+                                           /^#{1,6}\s/.test(streamBuffer.trim()) || // Headers
+                                           /^[\s]*[-*+]\s/.test(streamBuffer.trim()) || // Lists  
+                                           /^\d+\.\s/.test(streamBuffer.trim()) || // Numbered lists
+                                           /^>/.test(streamBuffer.trim()) || // Blockquotes
+                                           streamBuffer.includes('|') // Tables
+                                         )
+              
+              if (shouldStreamByLine && streamBuffer.includes('\n')) {
+                // LINE-BY-LINE MODE: For code blocks and structured markdown
                 const lines = streamBuffer.split('\n')
-                
-                // Keep last incomplete line in buffer (unless we're done)
                 streamBuffer = lines.pop() || ''
                 
-                // Send complete lines
                 for (const line of lines) {
-                  if (line || inCodeBlock) { // Keep empty lines in code blocks for spacing
+                  // Always send lines in code blocks (preserves spacing/indentation)
+                  // Send other lines if they have content or are part of structure
+                  if (inCodeBlock || line.trim() || lines.length === 1) {
                     const fullLine = line + '\n'
-                    
-                    // Detect content type for better frontend handling
                     const contentType = detectContentType(fullLine)
-                    
-                    // Pre-process for better frontend rendering
                     const processedLine = preprocessForFrontend(fullLine)
                     
                     controller.enqueue(`data: ${JSON.stringify({
@@ -6157,6 +6169,7 @@ Use this context to provide accurate, file-aware responses to the user's request
                       hasList: /^[\s]*[-*+]\s/.test(line.trim()),
                       hasNumbers: /^\d+\.\s/.test(line.trim()),
                       inCodeBlock: inCodeBlock,
+                      codeLanguage: inCodeBlock ? codeBlockLanguage : null,
                       renderHints: {
                         needsLineBreak: contentType === 'paragraph-break',
                         needsListFormatting: contentType.includes('list'),
@@ -6164,17 +6177,49 @@ Use this context to provide accurate, file-aware responses to the user's request
                         needsCopyButton: contentType.includes('code-block'),
                         isSQLCode: contentType === 'code-block-sql',
                         isCodeBlock: contentType.includes('code-block') || inCodeBlock,
-                        codeLanguage: contentType.startsWith('code-block-') 
-                          ? contentType.replace('code-block-', '') 
-                          : null
+                        codeLanguage: inCodeBlock ? codeBlockLanguage : (
+                          contentType.startsWith('code-block-') 
+                            ? contentType.replace('code-block-', '') 
+                            : null
+                        )
                       }
                     })}\n\n`)
                   }
                 }
+              } else if (!shouldStreamByLine && chunk.trim()) {
+                // TOKEN-BY-TOKEN MODE: For conversational text (feels more natural)
+                // Send the raw chunk immediately for responsive feel
+                const contentType = detectContentType(chunk)
+                const processedChunk = preprocessForFrontend(chunk)
+                
+                controller.enqueue(`data: ${JSON.stringify({
+                  type: 'text-delta',
+                  delta: chunk,
+                  processedDelta: processedChunk,
+                  format: 'markdown',
+                  contentType: contentType,
+                  hasLineBreaks: chunk.includes('\n'),
+                  hasHeaders: /^#{1,6}\s/.test(chunk.trim()),
+                  hasList: /^[\s]*[-*+]\s/.test(chunk.trim()),
+                  hasNumbers: /^\d+\.\s/.test(chunk.trim()),
+                  inCodeBlock: false,
+                  renderHints: {
+                    needsLineBreak: contentType === 'paragraph-break',
+                    needsListFormatting: contentType.includes('list'),
+                    needsHeaderSpacing: contentType === 'header',
+                    needsCopyButton: false,
+                    isSQLCode: false,
+                    isCodeBlock: false,
+                    codeLanguage: null
+                  }
+                })}\n\n`)
+                
+                // Clear buffer after token streaming
+                streamBuffer = ''
               }
             }
             
-            // Flush remaining buffer at the end (last incomplete line)
+            // Flush remaining buffer at the end
             if (streamBuffer.trim()) {
               const contentType = detectContentType(streamBuffer)
               const processedChunk = preprocessForFrontend(streamBuffer)
@@ -6190,6 +6235,7 @@ Use this context to provide accurate, file-aware responses to the user's request
                 hasList: /^[\s]*[-*+]\s/.test(streamBuffer.trim()),
                 hasNumbers: /^\d+\.\s/.test(streamBuffer.trim()),
                 inCodeBlock: inCodeBlock,
+                codeLanguage: inCodeBlock ? codeBlockLanguage : null,
                 renderHints: {
                   needsLineBreak: contentType === 'paragraph-break',
                   needsListFormatting: contentType.includes('list'),
@@ -6197,9 +6243,11 @@ Use this context to provide accurate, file-aware responses to the user's request
                   needsCopyButton: contentType.includes('code-block'),
                   isSQLCode: contentType === 'code-block-sql',
                   isCodeBlock: contentType.includes('code-block') || inCodeBlock,
-                  codeLanguage: contentType.startsWith('code-block-') 
-                    ? contentType.replace('code-block-', '') 
-                    : null
+                  codeLanguage: inCodeBlock ? codeBlockLanguage : (
+                    contentType.startsWith('code-block-') 
+                      ? contentType.replace('code-block-', '') 
+                      : null
+                  )
                 }
               })}\n\n`)
             }
