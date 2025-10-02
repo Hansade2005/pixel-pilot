@@ -6107,12 +6107,73 @@ Use this context to provide accurate, file-aware responses to the user's request
               window.addEventListener('xml-tool-executed', handleToolExecution as EventListener)
             }
             
-            // SMART LINE-BY-LINE STREAMING BUFFER
-            // Stream complete lines for code blocks and structured markdown
-            // Stream token-by-token for conversational text (better UX)
+            // ENHANCED STREAMING BUFFER WITH JSON TOOL BLOCK DETECTION
+            // - JSON tool blocks: Buffer complete block, send as single delta with immediate status
+            // - Other code blocks: Stream line-by-line for better rendering
+            // - Conversational text: Stream token-by-token for natural feel
             let streamBuffer = ''
             let inCodeBlock = false
             let codeBlockLanguage = ''
+            let inJsonToolBlock = false
+            let jsonToolBuffer = ''
+            let jsonToolType: 'write_file' | 'delete_file' | 'edit_file' | null = null
+            let jsonToolPath = ''
+            let jsonToolId = ''
+            
+            // Helper to detect if JSON block contains tool commands
+            const detectJsonToolCommand = (jsonContent: string): { isToolCommand: boolean, toolType: string | null, path: string } => {
+              try {
+                // Look for tool command patterns in the JSON
+                const toolMatch = jsonContent.match(/"tool"\s*:\s*"(write_file|delete_file|edit_file)"/)
+                const pathMatch = jsonContent.match(/"path"\s*:\s*"([^"]+)"/)
+                
+                if (toolMatch) {
+                  return {
+                    isToolCommand: true,
+                    toolType: toolMatch[1],
+                    path: pathMatch ? pathMatch[1] : ''
+                  }
+                }
+                
+                return { isToolCommand: false, toolType: null, path: '' }
+              } catch {
+                return { isToolCommand: false, toolType: null, path: '' }
+              }
+            }
+            
+            // Helper to send immediate tool status signal
+            const sendToolStatusSignal = (toolType: string, path: string, toolId: string) => {
+              const statusMessage = toolType === 'write_file' ? 'Creating...' : 
+                                   toolType === 'delete_file' ? 'Deleting...' : 
+                                   toolType === 'edit_file' ? 'Editing...' : 'Processing...'
+              
+              controller.enqueue(`data: ${JSON.stringify({
+                type: 'json-tool-status',
+                status: 'buffering',
+                toolType,
+                path,
+                toolId,
+                statusMessage,
+                timestamp: Date.now()
+              })}\n\n`)
+              
+              console.log(`[JSON-TOOL] Status signal sent: ${statusMessage} ${path}`)
+            }
+            
+            // Helper to send complete JSON tool block
+            const sendCompleteJsonToolBlock = (fullBlock: string, toolType: string, path: string, toolId: string) => {
+              controller.enqueue(`data: ${JSON.stringify({
+                type: 'json-tool-block',
+                status: 'complete',
+                toolType,
+                path,
+                toolId,
+                content: fullBlock,
+                timestamp: Date.now()
+              })}\n\n`)
+              
+              console.log(`[JSON-TOOL] Complete block sent: ${toolType} ${path} (${fullBlock.length} chars)`)
+            }
             
             for await (const chunk of result.textStream) {
               // Accumulate response for memory
@@ -6128,13 +6189,78 @@ Use this context to provide accurate, file-aware responses to the user's request
                   // Entering code block
                   inCodeBlock = true
                   codeBlockLanguage = codeBlockMatch[1] || ''
+                  
+                  // Check if this is a JSON tool block
+                  if (codeBlockLanguage.toLowerCase() === 'json') {
+                    // Look ahead in buffer to detect tool command
+                    const bufferPreview = streamBuffer
+                    const detection = detectJsonToolCommand(bufferPreview)
+                    
+                    if (detection.isToolCommand) {
+                      // This is a JSON tool block - enter special buffering mode
+                      inJsonToolBlock = true
+                      jsonToolType = detection.toolType as any
+                      jsonToolPath = detection.path
+                      jsonToolId = `tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+                      jsonToolBuffer = streamBuffer // Start buffering
+                      
+                      // Send immediate status signal to frontend
+                      sendToolStatusSignal(detection.toolType!, detection.path, jsonToolId)
+                      
+                      console.log(`[JSON-TOOL] Detected ${detection.toolType} for ${detection.path} - buffering started`)
+                      
+                      // Clear stream buffer - we're now in JSON tool buffer mode
+                      streamBuffer = ''
+                      continue
+                    }
+                  }
                 } else {
                   // Exiting code block
+                  if (inJsonToolBlock) {
+                    // Complete JSON tool block buffering
+                    jsonToolBuffer += chunk
+                    
+                    // Send the complete block as a single delta
+                    sendCompleteJsonToolBlock(jsonToolBuffer, jsonToolType!, jsonToolPath, jsonToolId)
+                    
+                    // Reset JSON tool state
+                    inJsonToolBlock = false
+                    jsonToolBuffer = ''
+                    jsonToolType = null
+                    jsonToolPath = ''
+                    jsonToolId = ''
+                    streamBuffer = ''
+                    
+                    // Reset code block state
+                    inCodeBlock = false
+                    codeBlockLanguage = ''
+                    continue
+                  }
+                  
                   inCodeBlock = false
                   codeBlockLanguage = ''
                 }
               }
               
+              // If we're in JSON tool buffering mode, just accumulate
+              if (inJsonToolBlock) {
+                jsonToolBuffer += chunk
+                
+                // Check if we can detect tool info from accumulated buffer
+                if (!jsonToolType || !jsonToolPath) {
+                  const detection = detectJsonToolCommand(jsonToolBuffer)
+                  if (detection.isToolCommand && detection.toolType && detection.path) {
+                    jsonToolType = detection.toolType as any
+                    jsonToolPath = detection.path
+                    
+                    // Update status with actual path if we didn't have it before
+                    sendToolStatusSignal(detection.toolType, detection.path, jsonToolId)
+                  }
+                }
+                continue // Skip normal streaming logic
+              }
+              
+              // Normal streaming logic for non-JSON-tool content
               // Decision: Line-by-line for code/structured content, token-by-token for chat
               const shouldStreamByLine = inCodeBlock || 
                                          streamBuffer.includes('\n') && (

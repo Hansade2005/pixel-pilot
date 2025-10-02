@@ -95,6 +95,16 @@ interface Message {
     // XML placeholders for inline rendering
     xmlPlaceholders?: Array<{ token: string; tool: XMLToolCall }>
 
+    // JSON tool status (for buffering indicators)
+    jsonToolStatus?: {
+      id: string
+      type: string
+      path: string
+      status: 'buffering' | 'complete'
+      statusMessage: string
+      timestamp: number
+    } | null
+
     // Workflow system properties
     workflowMode?: boolean
     workflowChunk?: any
@@ -5396,6 +5406,69 @@ export function ChatPanel({
                           }
                           : msg
                       ))
+                    }
+                    // Handle JSON tool status events (immediate status signal during buffering)
+                    else if (data.type === 'json-tool-status') {
+                      console.log('[JSON-TOOL] Status signal received:', data)
+
+                      // Create a temporary status indicator in the UI
+                      const statusIndicator: Message['metadata'] = {
+                        jsonToolStatus: {
+                          id: data.toolId,
+                          type: data.toolType,
+                          path: data.path,
+                          status: 'buffering' as const,
+                          statusMessage: data.statusMessage,
+                          timestamp: data.timestamp
+                        }
+                      }
+
+                      // Add to assistant content as a temporary placeholder
+                      const statusPlaceholder = `\n\n🔧 **${data.statusMessage}** \`${data.path}\`\n\n`
+                      assistantContent += statusPlaceholder
+
+                      // Update message with status indicator
+                      setMessages(prev => prev.map(msg =>
+                        msg.id === assistantMessageId
+                          ? {
+                            ...msg,
+                            content: assistantContent,
+                            metadata: {
+                              ...msg.metadata,
+                              ...statusIndicator
+                            }
+                          }
+                          : msg
+                      ))
+
+                      console.log(`[JSON-TOOL] Showing status: ${data.statusMessage} ${data.path}`)
+                    }
+                    // Handle JSON tool block completion (full block ready)
+                    else if (data.type === 'json-tool-block') {
+                      console.log('[JSON-TOOL] Complete block received:', data)
+
+                      // Remove the status placeholder from content
+                      const statusPlaceholderPattern = new RegExp(`🔧 \\*\\*.*?\\*\\* \`${data.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\`\\n\\n`, 'g')
+                      assistantContent = assistantContent.replace(statusPlaceholderPattern, '')
+
+                      // Add the complete JSON block to content
+                      assistantContent += data.content
+
+                      // Update message with complete block (handlers already exist for JSON parsing)
+                      setMessages(prev => prev.map(msg =>
+                        msg.id === assistantMessageId
+                          ? {
+                            ...msg,
+                            content: assistantContent,
+                            metadata: {
+                              ...msg.metadata,
+                              jsonToolStatus: null // Clear status indicator
+                            }
+                          }
+                          : msg
+                      ))
+
+                      console.log(`[JSON-TOOL] Block complete: ${data.toolType} ${data.path} (${data.content.length} chars)`)
                     }
                     // Handle tool-results event (from hybrid approach)
                     else if (data.type === 'tool-results' && data.toolCalls) {
