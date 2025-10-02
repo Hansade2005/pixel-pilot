@@ -3624,42 +3624,6 @@ const HighlightLoader = () => {
   return null
 }
 
-// Enhanced markdown preprocessing for better formatting and emoji support
-function preprocessMarkdownContent(content: string): string {
-  if (!content) return ''
-
-  // CRITICAL: Remove ANY trailing hashtags (##, ###, etc.) after text content
-  // This handles "Text ##", "Text ###", etc. anywhere in the content
-  content = content.replace(/\s+(#{1,6})\s*$/gm, '')
-  content = content.replace(/\s+(#{1,6})(\s|$)/g, ' ')
-
-  // Remove trailing hashtags from headings (e.g., "## Heading ##" -> "## Heading")
-  content = content.replace(/^(#{1,6})\s*(.+?)\s*(#{1,6})\s*$/gm, '$1 $2')
-
-  // REMOVED: These aggressive replacements were breaking valid content like "ShowcaseSpark--**your"
-  // They caused false positives, breaking text that contained dashes into fake list items
-
-  // Ensure proper spacing around code blocks
-  content = content.replace(/```(\w*)\n?([\s\S]*?)\n?```/gm, (match, language, code) => {
-    return `\n\n\`\`\`${language}\n${code.trim()}\n\`\`\`\n\n`
-  })
-
-  // REMOVED: These were adding excessive \n\n spacing causing large gaps between content
-
-  // Bold text in list items (common pattern: "Label: Description")
-  content = content.replace(/^([*+\-•]|\d+\.)\s+([^:\n]+):\s*/gm, '$1 **$2:** ')
-
-  // Clean up malformed bold markers (spaces inside the asterisks)
-  // Fix: "** text**" or "**text **" → "**text**"
-  content = content.replace(/\*\*\s+([^\*]+?)\s*\*\*/g, '**$1**')
-  content = content.replace(/\*\*\s*([^\*]+?)\s+\*\*/g, '**$1**')
-
-  // Keep double newlines for proper paragraph separation, but limit to max 2
-  content = content.replace(/\n{3,}/g, '\n\n')
-
-  return content.trim()
-}
-
 export function ChatPanel({
   project,
   isMobile = false,
@@ -6885,15 +6849,7 @@ export function ChatPanel({
                                           ),
                                         }}
                                       >
-                                        {(() => {
-                                          const processed = preprocessMarkdownContent(msg.content)
-                                          // Debug: Log the processed content to see what's being rendered
-                                          if (process.env.NODE_ENV === 'development') {
-                                            console.log('[Markdown Debug] Original:', msg.content.substring(0, 200))
-                                            console.log('[Markdown Debug] Processed:', processed.substring(0, 200))
-                                          }
-                                          return processed
-                                        })()}
+                                        {msg.content}
                                       </ReactMarkdown>
                                     </div>
                                   )
