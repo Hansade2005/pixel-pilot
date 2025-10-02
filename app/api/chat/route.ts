@@ -6107,41 +6107,101 @@ Use this context to provide accurate, file-aware responses to the user's request
               window.addEventListener('xml-tool-executed', handleToolExecution as EventListener)
             }
             
+            // LINE-BY-LINE STREAMING BUFFER
+            let streamBuffer = ''
+            let inCodeBlock = false
+            let isFirstChunk = true
+            
             for await (const chunk of result.textStream) {
               // Accumulate response for memory
               accumulatedResponse += chunk
               
-              // Send text delta with enhanced formatting info
-              if (chunk.trim()) {
-                // Detect content type for better frontend handling
-                const contentType = detectContentType(chunk)
-                
-                // Pre-process for better frontend rendering
-                const processedChunk = preprocessForFrontend(chunk)
-                
-                controller.enqueue(`data: ${JSON.stringify({
-                  type: 'text-delta',
-                  delta: chunk,
-                  processedDelta: processedChunk,
-                  format: 'markdown',
-                  contentType: contentType,
-                  hasLineBreaks: chunk.includes('\n'),
-                  hasHeaders: /^#{1,6}\s/.test(chunk.trim()),
-                  hasList: /^[\s]*[-*+]\s/.test(chunk.trim()),
-                  hasNumbers: /^\d+\.\s/.test(chunk.trim()),
-                  renderHints: {
-                    needsLineBreak: contentType === 'paragraph-break',
-                    needsListFormatting: contentType.includes('list'),
-                    needsHeaderSpacing: contentType === 'header',
-                    needsCopyButton: contentType.includes('code-block'),
-                    isSQLCode: contentType === 'code-block-sql',
-                    isCodeBlock: contentType.includes('code-block'),
-                    codeLanguage: contentType.startsWith('code-block-') 
-                      ? contentType.replace('code-block-', '') 
-                      : null
-                  }
-                })}\n\n`)
+              // Add chunk to buffer
+              streamBuffer += chunk
+              
+              // Check if we're entering/exiting code blocks
+              if (chunk.includes('```')) {
+                inCodeBlock = !inCodeBlock
               }
+              
+              // Stream line-by-line for better code/markdown rendering
+              // But allow immediate output for first chunk to feel responsive
+              if (streamBuffer.includes('\n') || isFirstChunk) {
+                isFirstChunk = false
+                
+                // Split by newlines
+                const lines = streamBuffer.split('\n')
+                
+                // Keep last incomplete line in buffer (unless we're done)
+                streamBuffer = lines.pop() || ''
+                
+                // Send complete lines
+                for (const line of lines) {
+                  if (line || inCodeBlock) { // Keep empty lines in code blocks for spacing
+                    const fullLine = line + '\n'
+                    
+                    // Detect content type for better frontend handling
+                    const contentType = detectContentType(fullLine)
+                    
+                    // Pre-process for better frontend rendering
+                    const processedLine = preprocessForFrontend(fullLine)
+                    
+                    controller.enqueue(`data: ${JSON.stringify({
+                      type: 'text-delta',
+                      delta: fullLine,
+                      processedDelta: processedLine,
+                      format: 'markdown',
+                      contentType: contentType,
+                      hasLineBreaks: true,
+                      hasHeaders: /^#{1,6}\s/.test(line.trim()),
+                      hasList: /^[\s]*[-*+]\s/.test(line.trim()),
+                      hasNumbers: /^\d+\.\s/.test(line.trim()),
+                      inCodeBlock: inCodeBlock,
+                      renderHints: {
+                        needsLineBreak: contentType === 'paragraph-break',
+                        needsListFormatting: contentType.includes('list'),
+                        needsHeaderSpacing: contentType === 'header',
+                        needsCopyButton: contentType.includes('code-block'),
+                        isSQLCode: contentType === 'code-block-sql',
+                        isCodeBlock: contentType.includes('code-block') || inCodeBlock,
+                        codeLanguage: contentType.startsWith('code-block-') 
+                          ? contentType.replace('code-block-', '') 
+                          : null
+                      }
+                    })}\n\n`)
+                  }
+                }
+              }
+            }
+            
+            // Flush remaining buffer at the end (last incomplete line)
+            if (streamBuffer.trim()) {
+              const contentType = detectContentType(streamBuffer)
+              const processedChunk = preprocessForFrontend(streamBuffer)
+              
+              controller.enqueue(`data: ${JSON.stringify({
+                type: 'text-delta',
+                delta: streamBuffer,
+                processedDelta: processedChunk,
+                format: 'markdown',
+                contentType: contentType,
+                hasLineBreaks: false,
+                hasHeaders: /^#{1,6}\s/.test(streamBuffer.trim()),
+                hasList: /^[\s]*[-*+]\s/.test(streamBuffer.trim()),
+                hasNumbers: /^\d+\.\s/.test(streamBuffer.trim()),
+                inCodeBlock: inCodeBlock,
+                renderHints: {
+                  needsLineBreak: contentType === 'paragraph-break',
+                  needsListFormatting: contentType.includes('list'),
+                  needsHeaderSpacing: contentType === 'header',
+                  needsCopyButton: contentType.includes('code-block'),
+                  isSQLCode: contentType === 'code-block-sql',
+                  isCodeBlock: contentType.includes('code-block') || inCodeBlock,
+                  codeLanguage: contentType.startsWith('code-block-') 
+                    ? contentType.replace('code-block-', '') 
+                    : null
+                }
+              })}\n\n`)
             }
             
             // Clean up event listeners

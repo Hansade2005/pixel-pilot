@@ -57,6 +57,11 @@ export class JsonToolParser {
     const tools: JsonToolCall[] = []
     let processedContent = content
 
+    // Quick check: skip if content doesn't contain JSON-like patterns
+    if (!content || !content.includes('{') || !content.includes('"tool"')) {
+      return { tools, processedContent }
+    }
+
     // Find JSON tool patterns in the content
     const toolMatches = this.findJsonToolBlocks(content)
 
@@ -75,7 +80,7 @@ export class JsonToolParser {
           processedContent = processedContent.replace(match.json, placeholder)
         }
       } catch (error) {
-        console.error('[JsonToolParser] Failed to parse JSON block:', error, match.json)
+        // Silently skip - most parsing errors are from incomplete streaming content
       }
     }
 
@@ -179,9 +184,15 @@ export class JsonToolParser {
    */
   private parseJsonBlock(jsonString: string, startIndex: number): Omit<JsonToolCall, 'id' | 'startTime'> | null {
     try {
+      // Skip parsing if the string is too short or doesn't look like JSON
+      if (!jsonString || jsonString.length < 10 || !jsonString.trim().startsWith('{')) {
+        return null
+      }
+
       const parsed = JSON.parse(jsonString)
       
-      if (!parsed.tool || !this.supportedTools.includes(parsed.tool)) {
+      // Must be an object with a tool property
+      if (!parsed || typeof parsed !== 'object' || !parsed.tool || !this.supportedTools.includes(parsed.tool)) {
         return null
       }
 
@@ -202,7 +213,10 @@ export class JsonToolParser {
       }
 
     } catch (error) {
-      console.error('[JsonToolParser] JSON parsing failed:', error)
+      // Only log errors for content that looks like JSON (starts with {)
+      if (jsonString.trim().startsWith('{')) {
+        console.error('[JsonToolParser] JSON parsing failed:', error)
+      }
       return null
     }
   }

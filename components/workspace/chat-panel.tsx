@@ -1801,39 +1801,56 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): 
 
 // Direct JSON tool detection - returns JsonToolCall[] directly (no XML conversion)
 function detectJsonTools(content: string): JsonToolCall[] {
-  console.log('[DEBUG] detectJsonTools called with content length:', content.length)
-  console.log('[DEBUG] Content preview:', content.substring(0, 200))
+  // Skip detection if content is too short or doesn't contain JSON markers
+  if (!content || content.length < 20 || !content.includes('{') || !content.includes('"tool"')) {
+    return []
+  }
 
-  // Use JSON parser for reliable tool detection
-  const parseResult = jsonToolParser.parseJsonTools(content)
-  console.log('[DEBUG] JSON parser detected', parseResult.tools.length, 'tools')
-
-  return parseResult.tools
+  try {
+    // Use JSON parser for reliable tool detection
+    const parseResult = jsonToolParser.parseJsonTools(content)
+    if (parseResult.tools.length > 0) {
+      console.log('[DEBUG] JSON parser detected', parseResult.tools.length, 'tools')
+    }
+    return parseResult.tools
+  } catch (error) {
+    // Silently handle parsing errors during streaming
+    return []
+  }
 }
 
 // Enhanced tool detection using JSON parser (more reliable than XML) - Legacy support
 function detectXMLTools(content: string): XMLToolCall[] {
-  console.log('[DEBUG] detectXMLTools called with content length:', content.length)
-  console.log('[DEBUG] Content preview:', content.substring(0, 200))
+  // Skip detection if content is too short or doesn't contain JSON markers
+  if (!content || content.length < 20 || !content.includes('{') || !content.includes('"tool"')) {
+    return []
+  }
 
-  // Use JSON parser for reliable tool detection
-  const parseResult = jsonToolParser.parseJsonTools(content)
+  try {
+    // Use JSON parser for reliable tool detection
+    const parseResult = jsonToolParser.parseJsonTools(content)
 
-  // Convert JsonToolCall to XMLToolCall format for backward compatibility
-  const detectedTools: XMLToolCall[] = parseResult.tools.map(tool => ({
-    id: tool.id,
-    name: tool.name || tool.tool,
-    command: tool.tool as 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file',
-    path: tool.path,
-    content: tool.content,
-    args: tool.args,
-    status: tool.status as 'detected' | 'processing' | 'executing' | 'completed' | 'failed',
-    startTime: tool.startTime
-  }))
+    // Convert JsonToolCall to XMLToolCall format for backward compatibility
+    const detectedTools: XMLToolCall[] = parseResult.tools.map(tool => ({
+      id: tool.id,
+      name: tool.name || tool.tool,
+      command: tool.tool as 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file',
+      path: tool.path,
+      content: tool.content,
+      args: tool.args,
+      status: tool.status as 'detected' | 'processing' | 'executing' | 'completed' | 'failed',
+      startTime: tool.startTime
+    }))
 
-  console.log('[DEBUG] JSON parser detected', detectedTools.length, 'tools')
+    if (detectedTools.length > 0) {
+      console.log('[DEBUG] JSON parser detected', detectedTools.length, 'tools')
+    }
 
-  return detectedTools
+    return detectedTools
+  } catch (error) {
+    // Silently handle parsing errors during streaming
+    return []
+  }
 }
 
 
