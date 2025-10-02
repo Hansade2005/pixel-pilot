@@ -1801,56 +1801,39 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): 
 
 // Direct JSON tool detection - returns JsonToolCall[] directly (no XML conversion)
 function detectJsonTools(content: string): JsonToolCall[] {
-  // Skip detection if content is too short or doesn't contain JSON markers
-  if (!content || content.length < 20 || !content.includes('{') || !content.includes('"tool"')) {
-    return []
-  }
+  console.log('[DEBUG] detectJsonTools called with content length:', content.length)
+  console.log('[DEBUG] Content preview:', content.substring(0, 200))
 
-  try {
-    // Use JSON parser for reliable tool detection
-    const parseResult = jsonToolParser.parseJsonTools(content)
-    if (parseResult.tools.length > 0) {
-      console.log('[DEBUG] JSON parser detected', parseResult.tools.length, 'tools')
-    }
-    return parseResult.tools
-  } catch (error) {
-    // Silently handle parsing errors during streaming
-    return []
-  }
+  // Use JSON parser for reliable tool detection
+  const parseResult = jsonToolParser.parseJsonTools(content)
+  console.log('[DEBUG] JSON parser detected', parseResult.tools.length, 'tools')
+
+  return parseResult.tools
 }
 
 // Enhanced tool detection using JSON parser (more reliable than XML) - Legacy support
 function detectXMLTools(content: string): XMLToolCall[] {
-  // Skip detection if content is too short or doesn't contain JSON markers
-  if (!content || content.length < 20 || !content.includes('{') || !content.includes('"tool"')) {
-    return []
-  }
+  console.log('[DEBUG] detectXMLTools called with content length:', content.length)
+  console.log('[DEBUG] Content preview:', content.substring(0, 200))
 
-  try {
-    // Use JSON parser for reliable tool detection
-    const parseResult = jsonToolParser.parseJsonTools(content)
+  // Use JSON parser for reliable tool detection
+  const parseResult = jsonToolParser.parseJsonTools(content)
 
-    // Convert JsonToolCall to XMLToolCall format for backward compatibility
-    const detectedTools: XMLToolCall[] = parseResult.tools.map(tool => ({
-      id: tool.id,
-      name: tool.name || tool.tool,
-      command: tool.tool as 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file',
-      path: tool.path,
-      content: tool.content,
-      args: tool.args,
-      status: tool.status as 'detected' | 'processing' | 'executing' | 'completed' | 'failed',
-      startTime: tool.startTime
-    }))
+  // Convert JsonToolCall to XMLToolCall format for backward compatibility
+  const detectedTools: XMLToolCall[] = parseResult.tools.map(tool => ({
+    id: tool.id,
+    name: tool.name || tool.tool,
+    command: tool.tool as 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file',
+    path: tool.path,
+    content: tool.content,
+    args: tool.args,
+    status: tool.status as 'detected' | 'processing' | 'executing' | 'completed' | 'failed',
+    startTime: tool.startTime
+  }))
 
-    if (detectedTools.length > 0) {
-      console.log('[DEBUG] JSON parser detected', detectedTools.length, 'tools')
-    }
+  console.log('[DEBUG] JSON parser detected', detectedTools.length, 'tools')
 
-    return detectedTools
-  } catch (error) {
-    // Silently handle parsing errors during streaming
-    return []
-  }
+  return detectedTools
 }
 
 
@@ -3639,6 +3622,42 @@ const HighlightLoader = () => {
   }, [])
 
   return null
+}
+
+// Enhanced markdown preprocessing for better formatting and emoji support
+function preprocessMarkdownContent(content: string): string {
+  if (!content) return ''
+
+  // CRITICAL: Remove ANY trailing hashtags (##, ###, etc.) after text content
+  // This handles "Text ##", "Text ###", etc. anywhere in the content
+  content = content.replace(/\s+(#{1,6})\s*$/gm, '')
+  content = content.replace(/\s+(#{1,6})(\s|$)/g, ' ')
+
+  // Remove trailing hashtags from headings (e.g., "## Heading ##" -> "## Heading")
+  content = content.replace(/^(#{1,6})\s*(.+?)\s*(#{1,6})\s*$/gm, '$1 $2')
+
+  // REMOVED: These aggressive replacements were breaking valid content like "ShowcaseSpark--**your"
+  // They caused false positives, breaking text that contained dashes into fake list items
+
+  // Ensure proper spacing around code blocks
+  content = content.replace(/```(\w*)\n?([\s\S]*?)\n?```/gm, (match, language, code) => {
+    return `\n\n\`\`\`${language}\n${code.trim()}\n\`\`\`\n\n`
+  })
+
+  // REMOVED: These were adding excessive \n\n spacing causing large gaps between content
+
+  // Bold text in list items (common pattern: "Label: Description")
+  content = content.replace(/^([*+\-•]|\d+\.)\s+([^:\n]+):\s*/gm, '$1 **$2:** ')
+
+  // Clean up malformed bold markers (spaces inside the asterisks)
+  // Fix: "** text**" or "**text **" → "**text**"
+  content = content.replace(/\*\*\s+([^\*]+?)\s*\*\*/g, '**$1**')
+  content = content.replace(/\*\*\s*([^\*]+?)\s+\*\*/g, '**$1**')
+
+  // Keep double newlines for proper paragraph separation, but limit to max 2
+  content = content.replace(/\n{3,}/g, '\n\n')
+
+  return content.trim()
 }
 
 export function ChatPanel({
@@ -6866,7 +6885,15 @@ export function ChatPanel({
                                           ),
                                         }}
                                       >
-                                        {msg.content}
+                                        {(() => {
+                                          const processed = preprocessMarkdownContent(msg.content)
+                                          // Debug: Log the processed content to see what's being rendered
+                                          if (process.env.NODE_ENV === 'development') {
+                                            console.log('[Markdown Debug] Original:', msg.content.substring(0, 200))
+                                            console.log('[Markdown Debug] Processed:', processed.substring(0, 200))
+                                          }
+                                          return processed
+                                        })()}
                                       </ReactMarkdown>
                                     </div>
                                   )
