@@ -285,3 +285,90 @@ body {
 .dark .hover\:bg-gray-800:hover {
   background-color: #1f2937;
 }
+
+/* ===== Chat Message Markdown Styling ===== */
+.chat-message-content {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+.chat-message-content * {
+  max-width: 100%;
+}
+
+/* Ensure proper spacing and formatting for markdown elements */
+.chat-message-content p {
+  margin-bottom: 1rem;
+}
+
+.chat-message-content p:last-child {
+  margin-bottom: 0;
+}
+
+.chat-message-content ul,
+.chat-message-content ol {
+  margin-bottom: 1rem;
+  padding-left: 0;
+}
+
+.chat-message-content li {
+  margin-bottom: 0.5rem;
+}
+
+.chat-message-content li:last-child {
+  margin-bottom: 0;
+}
+
+/* Better strong/bold text visibility */
+.chat-message-content strong {
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.01em;
+}
+
+/* Better code block styling */
+.chat-message-content code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+
+/* Ensure headings have proper spacing */
+.chat-message-content h1,
+.chat-message-content h2,
+.chat-message-content h3,
+.chat-message-content h4,
+.chat-message-content h5,
+.chat-message-content h6 {
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+/* Prose override for better readability */
+.prose.prose-sm {
+  font-size: 0.9375rem;
+  line-height: 1.9;
+}
+
+.prose.prose-sm p {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.prose.prose-sm ul,
+.prose.prose-sm ol {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+/* Better link styling */
+.chat-message-content a {
+  text-decoration: underline;
+  text-decoration-color: rgba(96, 165, 250, 0.5);
+  transition: all 0.2s ease;
+}
+
+.chat-message-content a:hover {
+  text-decoration-color: rgba(96, 165, 250, 1);
+}

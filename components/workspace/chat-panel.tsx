@@ -37,6 +37,7 @@ import { FileSearchResult } from "@/lib/file-lookup-service"
 import { useToast } from "@/hooks/use-toast"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import 'github-markdown-css/github-markdown.css'
 import type { Workspace as Project } from "@/lib/storage-manager"
 import { AuthModal } from "@/components/auth-modal"
 import { ChatDiagnostics } from "./chat-diagnostics"
@@ -80,7 +81,7 @@ interface Message {
       projectId: string
       success: boolean
     }>
-    
+
     // XML command execution results
     xmlCommands?: Array<{
       id: string
@@ -272,26 +273,81 @@ An error occurred during execution: ${eventData.error}`
   }
 }
 
+// Ensure proper spacing around markdown syntax and preserve spaces in code during streaming
+function normalizeMarkdownSpacing(existingContent: string, newDelta: string): string {
+  // Don't modify if we're inside a code block or inline code
+  const codeBlockCount = (existingContent.match(/```/g) || []).length
+  const isInCodeBlock = codeBlockCount % 2 !== 0
+  const hasUnclosedInlineCode = (existingContent.match(/`/g) || []).length % 2 !== 0
+  
+  // Preserve spaces in code contexts (SVG, code blocks, etc.)
+  if (isInCodeBlock || hasUnclosedInlineCode) {
+    return newDelta
+  }
+  
+  // Handle headings: If delta starts with hashtag and existing content doesn't end with newline or space
+  if (newDelta.match(/^#{1,6}\s/) && existingContent.length > 0) {
+    const lastChar = existingContent[existingContent.length - 1]
+    if (lastChar !== '\n' && lastChar !== ' ') {
+      return '\n\n' + newDelta
+    }
+  }
+  
+  // If existing content ends with hashtag(s) and delta starts with text (not space), add space
+  if (existingContent.match(/#{1,6}$/) && newDelta.length > 0 && !newDelta.match(/^\s/)) {
+    return ' ' + newDelta
+  }
+  
+  // Handle unordered list markers: -, *, +
+  // If delta starts with list marker and existing content doesn't end with newline
+  if (newDelta.match(/^[-*+]\s/) && existingContent.length > 0) {
+    const lastChar = existingContent[existingContent.length - 1]
+    if (lastChar !== '\n') {
+      return '\n' + newDelta
+    }
+  }
+  
+  // If existing content ends with list marker and delta starts with text (not space), add space
+  if (existingContent.match(/[-*+]$/) && newDelta.length > 0 && !newDelta.match(/^\s/)) {
+    return ' ' + newDelta
+  }
+  
+  // Handle ordered list markers: 1., 2., etc.
+  if (newDelta.match(/^\d+\.\s/) && existingContent.length > 0) {
+    const lastChar = existingContent[existingContent.length - 1]
+    if (lastChar !== '\n') {
+      return '\n' + newDelta
+    }
+  }
+  
+  // If existing content ends with numbered list marker (e.g., "1.") and delta starts with text, add space
+  if (existingContent.match(/\d+\.$/) && newDelta.length > 0 && !newDelta.match(/^\s/)) {
+    return ' ' + newDelta
+  }
+  
+  return newDelta
+}
+
 // Sanitize content to remove raw streaming data
 function sanitizeStreamingContent(content: string): string {
   if (!content) return content
 
   console.log('[SANITIZER] Processing content length:', content.length)
   console.log('[SANITIZER] Content preview:', content.substring(0, 300))
-  
+
   // Only sanitize if we detect actual raw SSE patterns that shouldn't be in final content
   // This should only catch content that is literally raw SSE data, not regular content
-  
+
   // Check if the entire content is just raw SSE data (starts with data: and has streaming patterns)
-  const isRawSSEData = content.trim().startsWith('data: {') && 
-                      content.includes('"type":') && 
-                      content.includes('"text-delta"')
-  
+  const isRawSSEData = content.trim().startsWith('data: {') &&
+    content.includes('"type":') &&
+    content.includes('"text-delta"')
+
   if (isRawSSEData) {
     console.warn('[SANITIZER] Detected raw SSE data, filtering out:', content.substring(0, 100))
     return ''
   }
-  
+
   // For legitimate content, clean up any stray SSE fragments and XML tool tags
   let sanitized = content
     // Remove isolated data: {JSON} patterns that shouldn't be in final content
@@ -316,10 +372,10 @@ function sanitizeStreamingContent(content: string): string {
     .replace(/\n\n\n+/g, '\n\n')
     // Remove leading/trailing whitespace
     .trim()
-  
+
   console.log('[SANITIZER] Final sanitized content length:', sanitized.length)
   console.log('[SANITIZER] Final content preview:', sanitized.substring(0, 300))
-  
+
   return sanitized
 }
 
@@ -329,17 +385,17 @@ const ExpandableUserMessage = ({ content, messageId, onRevert, showRestore = fal
   const [shouldTruncate, setShouldTruncate] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
   const CHAR_LIMIT = 140 // Character limit before truncation
-  
+
   useEffect(() => {
     // Check if content exceeds character limit
     setShouldTruncate(content.length > CHAR_LIMIT)
   }, [content])
-  
+
   const handleIconClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onRevert(messageId);
   };
-  
+
   const renderIconButton = () => {
     if (showRestore) {
       return (
@@ -352,7 +408,7 @@ const ExpandableUserMessage = ({ content, messageId, onRevert, showRestore = fal
         </button>
       );
     }
-    
+
     return (
       <button
         onClick={handleIconClick}
@@ -363,7 +419,7 @@ const ExpandableUserMessage = ({ content, messageId, onRevert, showRestore = fal
       </button>
     );
   };
-  
+
   if (!shouldTruncate) {
     return (
       <div className="relative w-full">
@@ -380,7 +436,7 @@ const ExpandableUserMessage = ({ content, messageId, onRevert, showRestore = fal
       </div>
     )
   }
-  
+
   return (
     <div className="relative w-full">
       <div className="bg-card text-card-foreground border rounded-xl overflow-hidden relative shadow-sm w-full flex flex-col">
@@ -409,7 +465,7 @@ const ExpandableUserMessage = ({ content, messageId, onRevert, showRestore = fal
             </div>
           )}
         </div>
-        
+
         {/* Expand/Collapse trigger */}
         <div
           className="flex items-center justify-center px-4 py-2 border-t hover:bg-muted transition-colors cursor-pointer"
@@ -424,7 +480,7 @@ const ExpandableUserMessage = ({ content, messageId, onRevert, showRestore = fal
             <ChevronDown className="w-3 h-3 text-muted-foreground" />
           )}
         </div>
-        
+
         <div className="px-4 pb-2 flex justify-end">
           {renderIconButton()}
         </div>
@@ -455,26 +511,26 @@ const XML_TOOL_PATTERNS = {
   pilotwrite: /<pilotwrite\s+path=(["'])([^"']+)\1[^>]*>([\s\S]*?)<\/pilotwrite>/gi,
   pilotedit: /<pilotedit\s+path=(["'])([^"']+)\1[^>]*>([\s\S]*?)<\/pilotedit>/gi,
   pilotdelete: /<pilotdelete\s+path=(["'])([^"']+)\1[^>]*\s*\/>/gi,
-  
+
   // Additional tool patterns (if used elsewhere)
   write_file: /<write_file\s+path="([^"]+)"(?:\s+content="([^"]*)")?>/g,
   edit_file: /<edit_file\s+path="([^"]+)"(?:\s+content="([^"]*)")?>/g,
   delete_file: /<delete_file\s+path="([^"]+)"\s*\/>/g,
   read_file: /<read_file\s+path="([^"]+)"\s*\/>/g,
   list_files: /<list_files\s*(?:\s+path="([^"]+)")?\s*\/>/g,
-  
+
   // Directory operations
   create_directory: /<create_directory\s+path="([^"]+)"\s*\/>/g,
   delete_directory: /<delete_directory\s+path="([^"]+)"\s*\/>/g,
-  
+
   // Search operations
   search_files: /<search_files\s+query="([^"]+)"(?:\s+path="([^"]+)")?\s*\/>/g,
   grep_search: /<grep_search\s+pattern="([^"]+)"(?:\s+path="([^"]+)")?\s*\/>/g,
-  
+
   // Web operations
   web_search: /<web_search\s+query="([^"]+)"(?:\s+count="([^"]+)")?\s*\/>/g,
   web_extract: /<web_extract\s+url="([^"]+)"(?:\s+selector="([^"]+)")?\s*\/>/g,
-  
+
   // Analysis operations
   analyze_code: /<analyze_code\s+path="([^"]+)"\s*\/>/g,
   check_syntax: /<check_syntax\s+path="([^"]+)"\s*\/>/g,
@@ -487,7 +543,7 @@ const XML_TOOL_CLOSING_PATTERNS = {
   pilotwrite: /<\/pilotwrite>/gi,
   pilotedit: /<\/pilotedit>/gi,
   pilotdelete: /<\/pilotdelete>/gi,
-  
+
   // Additional tool patterns (if used elsewhere)
   write_file: /<\/write_file>/g,
   edit_file: /<\/edit_file>/g,
@@ -506,13 +562,13 @@ const XML_TOOL_CLOSING_PATTERNS = {
 }
 
 // JSONToolPill component for displaying JSON tool commands as pills
-const JSONToolPill = ({ 
-  toolCall, 
+const JSONToolPill = ({
+  toolCall,
   status = 'completed',
   autoExecutor,
-  project 
-}: { 
-  toolCall: JsonToolCall, 
+  project
+}: {
+  toolCall: JsonToolCall,
   status?: 'executing' | 'completed' | 'failed',
   autoExecutor?: XMLToolAutoExecutor | null,
   project: Project
@@ -551,20 +607,20 @@ const JSONToolPill = ({
 
         // Execute file operation directly like specs route does
         let result: any
-        
+
         switch (toolCall.tool) {
           case 'write_file':
           case 'pilotwrite':
             if (!toolCall.content) {
               throw new Error('write_file requires content')
             }
-            
+
             // Check if file exists (same logic as specs route)
             const existingFile = await storageManager.getFile(projectId, toolCall.path)
-            
+
             if (existingFile) {
               // Update existing file
-              await storageManager.updateFile(projectId, toolCall.path, { 
+              await storageManager.updateFile(projectId, toolCall.path, {
                 content: toolCall.content,
                 updatedAt: new Date().toISOString()
               })
@@ -599,7 +655,7 @@ const JSONToolPill = ({
               if (!toolCall.content) {
                 throw new Error('edit_file requires content')
               }
-              await storageManager.updateFile(projectId, toolCall.path, { 
+              await storageManager.updateFile(projectId, toolCall.path, {
                 content: toolCall.content,
                 updatedAt: new Date().toISOString()
               })
@@ -616,15 +672,15 @@ const JSONToolPill = ({
           default:
             throw new Error(`Unsupported tool: ${toolCall.tool}`)
         }
-        
+
         console.log('[JSONToolPill] Tool executed successfully:', toolCall.path, result)
         setExecutionStatus('completed')
 
         // Dispatch events with proper projectId like specs route
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('json-tool-executed', {
-            detail: { 
-              toolCall: {...toolCall, status: 'completed', id: executionId}, 
+            detail: {
+              toolCall: { ...toolCall, status: 'completed', id: executionId },
               result,
               immediate: true,
               projectId: projectId
@@ -653,11 +709,11 @@ const JSONToolPill = ({
 
   const getToolIcon = (toolName: string) => {
     switch (toolName) {
-      case 'write_file': 
+      case 'write_file':
       case 'pilotwrite': return FileText
-      case 'edit_file': 
+      case 'edit_file':
       case 'pilotedit': return Edit3
-      case 'delete_file': 
+      case 'delete_file':
       case 'pilotdelete': return X
       default: return Wrench
     }
@@ -665,11 +721,11 @@ const JSONToolPill = ({
 
   const getToolAction = (toolName: string) => {
     switch (toolName) {
-      case 'write_file': 
+      case 'write_file':
       case 'pilotwrite': return 'Created'
-      case 'edit_file': 
+      case 'edit_file':
       case 'pilotedit': return 'Modified'
-      case 'delete_file': 
+      case 'delete_file':
       case 'pilotdelete': return 'Deleted'
       default: return 'Executed'
     }
@@ -677,11 +733,11 @@ const JSONToolPill = ({
 
   const getToolDisplayName = (toolName: string) => {
     switch (toolName) {
-      case 'write_file': 
+      case 'write_file':
       case 'pilotwrite': return 'File Created'
-      case 'edit_file': 
+      case 'edit_file':
       case 'pilotedit': return 'File Modified'
-      case 'delete_file': 
+      case 'delete_file':
       case 'pilotdelete': return 'File Deleted'
       default: return 'Tool Executed'
     }
@@ -696,26 +752,24 @@ const JSONToolPill = ({
     const [isExpanded, setIsExpanded] = useState(false)
     const fileExtension = toolCall.path ? (toolCall.path.split('.').pop() || 'text') : 'tsx'
     const hasContent = toolCall.content && toolCall.content.trim().length > 0
-    
+
     return (
       <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
         {/* Header - Clickable to toggle */}
         <div
-          className={`px-4 py-3 border-b ${hasContent ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors ${
-            isSuccess
+          className={`px-4 py-3 border-b ${hasContent ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors ${isSuccess
               ? 'bg-muted border-l-4 border-l-primary'
               : 'bg-red-900/20 border-l-4 border-l-red-500'
-          }`}
+            }`}
           onClick={hasContent ? () => setIsExpanded(!isExpanded) : undefined}
         >
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-full transition-colors ${
-              executionStatus === 'executing' 
+            <div className={`p-2 rounded-full transition-colors ${executionStatus === 'executing'
                 ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white animate-pulse'
-                : isSuccess 
-                ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' 
-                : 'bg-red-500 text-white'
-            }`}>
+                : isSuccess
+                  ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white'
+                  : 'bg-red-500 text-white'
+              }`}>
               <IconComponent className="w-4 h-4" />
             </div>
             <div className="flex-1">
@@ -743,7 +797,7 @@ const JSONToolPill = ({
             )}
           </div>
         </div>
-        
+
         {/* File Content - Collapsible with Syntax Highlighting */}
         {hasContent && toolCall.content && isExpanded && (
           <div className="p-4 bg-background border-t">
@@ -768,18 +822,16 @@ const JSONToolPill = ({
   // Simple pill for delete_file (no content to show)
   return (
     <div className="bg-background border rounded-lg shadow-sm mb-2 overflow-hidden">
-      <div className={`px-3 py-2 flex items-center gap-3 ${
-        isSuccess
+      <div className={`px-3 py-2 flex items-center gap-3 ${isSuccess
           ? 'bg-muted border-l-4 border-l-primary'
           : 'bg-red-900/20 border-l-4 border-l-red-500'
-      }`}>
-        <div className={`p-2 rounded-full transition-colors ${
-          executionStatus === 'executing' 
-            ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white animate-pulse'
-            : isSuccess 
-            ? 'bg-gradient-to-r from-red-500 to-red-600 text-white' 
-            : 'bg-red-500 text-white'
         }`}>
+        <div className={`p-2 rounded-full transition-colors ${executionStatus === 'executing'
+            ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white animate-pulse'
+            : isSuccess
+              ? 'bg-gradient-to-r from-red-500 to-red-600 text-white'
+              : 'bg-red-500 text-white'
+          }`}>
           <IconComponent className={`w-4 h-4`} />
         </div>
         <div className="flex-1">
@@ -844,36 +896,34 @@ const XMLToolPill = ({ toolCall, status = 'completed' }: { toolCall: XMLToolCall
   }
 
   const isSuccess = status !== 'failed'
-  const fileName = toolCall.path && toolCall.path !== 'Unknown' ? 
-    (toolCall.path.split('/').pop() || toolCall.path) : 
+  const fileName = toolCall.path && toolCall.path !== 'Unknown' ?
+    (toolCall.path.split('/').pop() || toolCall.path) :
     `${toolCall.name || 'tool'}.${toolCall.id.split('_').pop()}`
   const IconComponent = getToolIcon(toolCall.command || toolCall.name || 'unknown')
 
   // Special handling for pilotwrite and pilotedit with content
   if ((toolCall.command || toolCall.name) === 'pilotwrite' || (toolCall.command || toolCall.name) === 'pilotedit') {
     const [isExpanded, setIsExpanded] = useState(false)
-    const fileExtension = toolCall.path && toolCall.path !== 'Unknown' ? 
-      (toolCall.path.split('.').pop() || 'text') : 
+    const fileExtension = toolCall.path && toolCall.path !== 'Unknown' ?
+      (toolCall.path.split('.').pop() || 'text') :
       'tsx' // Default extension for unknown files
-    
+
     // Don't show expansion for placeholders with no content
     const hasContent = toolCall.content && toolCall.content.trim().length > 0
-    
+
     return (
       <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
         {/* Header - Clickable to toggle */}
         <div
-          className={`px-4 py-3 border-b ${hasContent ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors ${
-            isSuccess
+          className={`px-4 py-3 border-b ${hasContent ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors ${isSuccess
               ? 'bg-muted border-l-4 border-l-primary'
               : 'bg-red-900/20 border-l-4 border-l-red-500'
-          }`}
+            }`}
           onClick={hasContent ? () => setIsExpanded(!isExpanded) : undefined}
         >
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-full ${
-              isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
-            }`}>
+            <div className={`p-2 rounded-full ${isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
+              }`}>
               <IconComponent className="w-4 h-4" />
             </div>
             <div className="flex-1">
@@ -899,7 +949,7 @@ const XMLToolPill = ({ toolCall, status = 'completed' }: { toolCall: XMLToolCall
             )}
           </div>
         </div>
-        
+
         {/* File Content - Collapsible with Syntax Highlighting */}
         {hasContent && toolCall.content && isExpanded && (
           <div className="p-4 bg-background border-t">
@@ -924,14 +974,12 @@ const XMLToolPill = ({ toolCall, status = 'completed' }: { toolCall: XMLToolCall
   // Simple pill for pilotdelete (no content to show)
   return (
     <div className="bg-background border rounded-lg shadow-sm mb-2 overflow-hidden">
-      <div className={`px-3 py-2 flex items-center gap-3 ${
-        isSuccess
+      <div className={`px-3 py-2 flex items-center gap-3 ${isSuccess
           ? 'bg-muted border-l-4 border-l-primary'
           : 'bg-red-900/20 border-l-4 border-l-red-500'
-      }`}>
-        <div className={`p-2 rounded-full ${
-          isSuccess ? 'bg-gradient-to-r from-red-500 to-red-600 text-white' : 'bg-red-500 text-white'
         }`}>
+        <div className={`p-2 rounded-full ${isSuccess ? 'bg-gradient-to-r from-red-500 to-red-600 text-white' : 'bg-red-500 text-white'
+          }`}>
           <IconComponent className={`w-4 h-4`} />
         </div>
         <div className="flex-1">
@@ -963,41 +1011,41 @@ function validateXMLToolCall(toolCall: XMLToolCall): boolean {
   if (!toolCall.id || !toolCall.name) {
     return false
   }
-  
+
   // Ensure path is valid
-  if (!toolCall.path || 
-      toolCall.path === 'Unknown' || 
-      toolCall.path.includes('<') || 
-      toolCall.path.includes('>') ||
-      toolCall.path.trim().length === 0) {
+  if (!toolCall.path ||
+    toolCall.path === 'Unknown' ||
+    toolCall.path.includes('<') ||
+    toolCall.path.includes('>') ||
+    toolCall.path.trim().length === 0) {
     return false
   }
-  
+
   // Ensure command is valid
   const validCommands = ['pilotwrite', 'pilotedit', 'pilotdelete']
   if (toolCall.command && !validCommands.includes(toolCall.command)) {
     return false
   }
-  
+
   // Check for suspicious IDs that might indicate corruption
   if (toolCall.id.includes('.') && toolCall.id.split('.').length > 2) {
     return false
   }
-  
+
   return true
 }
 
 // Validate if content actually contains valid XML tool tags (not just keywords)
 function hasValidXMLTools(content: string): boolean {
   if (!content || typeof content !== 'string') return false
-  
+
   // More strict patterns that require proper XML syntax
   const strictXMLPatterns = [
     /<pilotwrite\s+[^>]*path=(["'])[^"']+\1[^>]*>[\s\S]*?<\/pilotwrite>/i,
     /<pilotedit\s+[^>]*path=(["'])[^"']+\1[^>]*>[\s\S]*?<\/pilotedit>/i,
     /<pilotdelete\s+[^>]*path=(["'])[^"']+\1[^>]*\s*\/?>/i
   ]
-  
+
   return strictXMLPatterns.some(pattern => pattern.test(content))
 }
 
@@ -1019,7 +1067,7 @@ function renderXMLToolsDirectly(content: string): React.ReactNode[] {
       pattern: /<pilotwrite\s+[^>]*path=(["'])([^"']+)\1[^>]*>([\s\S]*?)<\/pilotwrite>/gi
     },
     {
-      name: 'pilotedit', 
+      name: 'pilotedit',
       pattern: /<pilotedit\s+[^>]*path=(["'])([^"']+)\1[^>]*>([\s\S]*?)<\/pilotedit>/gi
     },
     {
@@ -1077,7 +1125,7 @@ function renderXMLToolsDirectly(content: string): React.ReactNode[] {
       const beforeContent = remainingContent.slice(currentPosition, matchStart)
       if (beforeContent.trim()) {
         components.push(
-          <div key={`content-${elementKey++}`} className="markdown-content">
+          <div key={`content-${elementKey++}`} className="markdown-content prose prose-sm max-w-none break-words text-gray-200">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {beforeContent}
             </ReactMarkdown>
@@ -1129,7 +1177,7 @@ function renderXMLToolsDirectly(content: string): React.ReactNode[] {
     const afterContent = remainingContent.slice(currentPosition)
     if (afterContent.trim()) {
       components.push(
-        <div key={`content-${elementKey++}`} className="markdown-content">
+        <div key={`content-${elementKey++}`} className="markdown-content prose prose-sm max-w-none break-words text-gray-200">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {afterContent}
           </ReactMarkdown>
@@ -1145,22 +1193,22 @@ function renderXMLToolsDirectly(content: string): React.ReactNode[] {
 function parseXMLToolsToComponents(content: string): { content: string; xmlTools: XMLToolCall[] } {
   const xmlTools: XMLToolCall[] = []
   let processedContent = content
-  
+
   // Validate input
   if (!content || typeof content !== 'string') {
     return { content: processedContent, xmlTools }
   }
-  
+
   // First, parse existing XML tool placeholders that are already in the content
   const existingPlaceholders = [...content.matchAll(/<!-- XMLTOOL_(pilot\w+)_(\d+)_([a-z0-9]+) -->/gi)]
   existingPlaceholders.forEach(match => {
     const [fullMatch, toolType, timestamp, randomId] = match
     const toolId = `${toolType}_${timestamp}_${randomId}`
-    
+
     // Type-safe command mapping
     const validCommands = ['pilotwrite', 'pilotedit', 'pilotdelete'] as const
     const command = validCommands.includes(toolType as any) ? toolType as typeof validCommands[number] : undefined
-    
+
     // Only add if it's a valid command
     if (command) {
       const xmlTool: XMLToolCall = {
@@ -1172,27 +1220,27 @@ function parseXMLToolsToComponents(content: string): { content: string; xmlTools
         args: { path: 'Unknown', content: '' },
         status: 'completed' // Assume these are completed since they're already placeholders
       }
-      
+
       xmlTools.push(xmlTool)
     }
   })
-  
+
   // Process pilotwrite tags (with opening and closing tags) - with validation
   const pilotwriteMatches = [...content.matchAll(/<pilotwrite\s+[^>]*path=(["'])([^"']+)\1[^>]*>([\s\S]*?)<\/pilotwrite>/gi)]
   pilotwriteMatches.forEach(match => {
     const [fullMatch, quote, path, xmlContent] = match
-    
+
     // Validate the path - ensure it's not empty and doesn't contain invalid characters
     if (!path || path.trim().length === 0 || path.includes('<') || path.includes('>')) {
       console.warn('[XML Parser] Invalid path detected in pilotwrite tag:', path)
       return
     }
-    
+
     // Generate unique ID using crypto if available, fallback to timestamp + random
-    const toolId = typeof crypto !== 'undefined' && crypto.randomUUID 
+    const toolId = typeof crypto !== 'undefined' && crypto.randomUUID
       ? `pilotwrite_${crypto.randomUUID()}`
       : `pilotwrite_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    
+
     const xmlTool: XMLToolCall = {
       id: toolId,
       name: 'pilotwrite',
@@ -1202,29 +1250,29 @@ function parseXMLToolsToComponents(content: string): { content: string; xmlTools
       args: { path: path.trim(), content: xmlContent || '' },
       status: 'detected'
     }
-    
+
     xmlTools.push(xmlTool)
-    
+
     // Replace the XML tag with a placeholder
     processedContent = processedContent.replace(fullMatch, `<!-- XMLTOOL_${toolId} -->`)
   })
-  
+
   // Process pilotedit tags (with opening and closing tags - unified pattern) - with validation
   const piloteditMatches = [...processedContent.matchAll(/<pilotedit\s+[^>]*path=(["'])([^"']+)\1[^>]*>([\s\S]*?)<\/pilotedit>/gi)]
   piloteditMatches.forEach(match => {
     const [fullMatch, quote, path, xmlContent] = match
-    
+
     // Validate the path - ensure it's not empty and doesn't contain invalid characters
     if (!path || path.trim().length === 0 || path.includes('<') || path.includes('>')) {
       console.warn('[XML Parser] Invalid path detected in pilotedit tag:', path)
       return
     }
-    
+
     // Generate unique ID using crypto if available
-    const toolId = typeof crypto !== 'undefined' && crypto.randomUUID 
+    const toolId = typeof crypto !== 'undefined' && crypto.randomUUID
       ? `pilotedit_${crypto.randomUUID()}`
       : `pilotedit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    
+
     const xmlTool: XMLToolCall = {
       id: toolId,
       name: 'pilotedit',
@@ -1234,13 +1282,13 @@ function parseXMLToolsToComponents(content: string): { content: string; xmlTools
       args: { path: path.trim(), content: xmlContent || '' },
       status: 'detected'
     }
-    
+
     xmlTools.push(xmlTool)
-    
+
     // Replace the XML tag with a placeholder
     processedContent = processedContent.replace(fullMatch, `<!-- XMLTOOL_${toolId} -->`)
   })
-  
+
   // Process pilotdelete tags (with both self-closing and regular patterns) - with validation
   const pilotdeleteMatches = [
     ...processedContent.matchAll(/<pilotdelete\s+[^>]*path=(["'])([^"']+)\1[^>]*\s*\/?>/gi),
@@ -1248,18 +1296,18 @@ function parseXMLToolsToComponents(content: string): { content: string; xmlTools
   ]
   pilotdeleteMatches.forEach(match => {
     const [fullMatch, quote, path, xmlContent] = match
-    
+
     // Validate the path - ensure it's not empty and doesn't contain invalid characters
     if (!path || path.trim().length === 0 || path.includes('<') || path.includes('>')) {
       console.warn('[XML Parser] Invalid path detected in pilotdelete tag:', path)
       return
     }
-    
+
     // Generate unique ID using crypto if available
-    const toolId = typeof crypto !== 'undefined' && crypto.randomUUID 
+    const toolId = typeof crypto !== 'undefined' && crypto.randomUUID
       ? `pilotdelete_${crypto.randomUUID()}`
       : `pilotdelete_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    
+
     const xmlTool: XMLToolCall = {
       id: toolId,
       name: 'pilotdelete',
@@ -1269,19 +1317,19 @@ function parseXMLToolsToComponents(content: string): { content: string; xmlTools
       args: { path: path.trim(), content: xmlContent || '' },
       status: 'detected'
     }
-    
+
     xmlTools.push(xmlTool)
-    
+
     // Replace the XML tag with a placeholder
     processedContent = processedContent.replace(fullMatch, `<!-- XMLTOOL_${toolId} -->`)
   })
-  
+
   // Deduplicate tools - remove duplicates based on command + path + content
   const deduplicatedTools = xmlTools.filter((tool, index, arr) => {
     const key = `${tool.command}_${tool.path}_${(tool.content || '').substring(0, 50)}`
     return arr.findIndex(t => `${t.command}_${t.path}_${(t.content || '').substring(0, 50)}` === key) === index
   })
-  
+
   return { content: processedContent, xmlTools: deduplicatedTools }
 }
 
@@ -1290,22 +1338,22 @@ function renderXMLToolsInContent(content: string, xmlTools: XMLToolCall[]): Reac
   if (!xmlTools || xmlTools.length === 0) {
     return []
   }
-  
+
   // Filter out invalid tools before rendering
   const validTools = xmlTools.filter(validateXMLToolCall)
-  
+
   if (validTools.length === 0) {
     return []
   }
-  
+
   const components: React.ReactNode[] = []
   let workingContent = content
-  
+
   // Split content by XML tool placeholders
   validTools.forEach((tool, index) => {
     const placeholder = `<!-- XMLTOOL_${tool.id} -->`
     const parts = workingContent.split(placeholder)
-    
+
     if (parts.length === 2) {
       // Add the content before the placeholder (if any)
       if (parts[0].trim()) {
@@ -1317,17 +1365,17 @@ function renderXMLToolsInContent(content: string, xmlTools: XMLToolCall[]): Reac
           </div>
         )
       }
-      
+
       // Add the XML tool pill
       components.push(
         <XMLToolPill key={tool.id} toolCall={tool} status="completed" />
       )
-      
+
       // Update working content to the remainder
       workingContent = parts[1]
     }
   })
-  
+
   // Add any remaining content after the last tool
   if (workingContent.trim()) {
     components.push(
@@ -1338,7 +1386,7 @@ function renderXMLToolsInContent(content: string, xmlTools: XMLToolCall[]): Reac
       </div>
     )
   }
-  
+
   return components
 }
 
@@ -1558,7 +1606,7 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): 
           action: 'edited',
           toolCallId: toolCall.id
         }
-        
+
       case 'pilotdelete':
         const { path: pilotDeletePath } = toolCall.args
 
@@ -1603,11 +1651,11 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): 
             toolCallId: toolCall.id
           }
         }
-        
+
       case 'write_file':
         const { path: writeFilePath, content: writeFileContent } = toolCall.args
         const writeFileExistingFile = await storageManager.getFile(projectId, writeFilePath)
-        
+
         if (writeFileExistingFile) {
           await storageManager.updateFile(projectId, writeFilePath, {
             content: writeFileContent || '',
@@ -1627,7 +1675,7 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): 
           })
           return { success: true, action: 'created', path: writeFilePath, file: newFile, message: `File created: ${writeFilePath}` }
         }
-        
+
       case 'edit_file':
         const { path: editFilePath, content: editFileContent } = toolCall.args
         const editFileToEdit = await storageManager.getFile(projectId, editFilePath)
@@ -1640,7 +1688,7 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): 
         } else {
           throw new Error(`File not found: ${editFilePath}`)
         }
-        
+
       case 'delete_file':
         const { path: deleteFilePath } = toolCall.args
         const deleteFileToDelete = await storageManager.getFile(projectId, deleteFilePath)
@@ -1650,32 +1698,32 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): 
         } else {
           throw new Error(`File not found: ${deleteFilePath}`)
         }
-        
+
       case 'read_file':
         const { path: readPath } = toolCall.args
         const fileToRead = await storageManager.getFile(projectId, readPath)
         if (fileToRead) {
-          return { 
-            success: true, 
-            path: readPath, 
+          return {
+            success: true,
+            path: readPath,
             content: fileToRead.content,
             size: fileToRead.size,
             type: fileToRead.type,
-            message: `File read: ${readPath}` 
+            message: `File read: ${readPath}`
           }
         } else {
           throw new Error(`File not found: ${readPath}`)
         }
-        
+
       case 'list_files':
         const { path: listPath } = toolCall.args
         const allFiles = await storageManager.getFiles(projectId)
         let filteredFiles = allFiles
-        
+
         if (listPath && listPath !== '/') {
           filteredFiles = allFiles.filter(f => f.path.startsWith(listPath))
         }
-        
+
         return {
           success: true,
           files: filteredFiles.map(f => ({
@@ -1689,15 +1737,15 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): 
           count: filteredFiles.length,
           message: `Found ${filteredFiles.length} files`
         }
-        
+
       case 'search_files':
         const { query, path: searchPath } = toolCall.args
         const searchFiles = await storageManager.getFiles(projectId)
-        const searchResults = searchFiles.filter(f => 
+        const searchResults = searchFiles.filter(f =>
           f.name.toLowerCase().includes(query.toLowerCase()) ||
           f.path.toLowerCase().includes(query.toLowerCase())
         )
-        
+
         return {
           success: true,
           results: searchResults.map(f => ({
@@ -1710,19 +1758,19 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): 
           query,
           message: `Found ${searchResults.length} files matching "${query}"`
         }
-        
+
       case 'grep_search':
         const { pattern, path: grepPath } = toolCall.args
         const grepFiles = await storageManager.getFiles(projectId)
         const grepResults = []
-        
+
         for (const file of grepFiles) {
           if (file.content && file.content.includes(pattern)) {
             const lines = file.content.split('\n')
             const matchingLines = lines
               .map((line, index) => ({ line, lineNumber: index + 1 }))
               .filter(({ line }) => line.includes(pattern))
-            
+
             if (matchingLines.length > 0) {
               grepResults.push({
                 path: file.path,
@@ -1733,7 +1781,7 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): 
             }
           }
         }
-        
+
         return {
           success: true,
           results: grepResults,
@@ -1759,7 +1807,7 @@ function detectJsonTools(content: string): JsonToolCall[] {
   // Use JSON parser for reliable tool detection
   const parseResult = jsonToolParser.parseJsonTools(content)
   console.log('[DEBUG] JSON parser detected', parseResult.tools.length, 'tools')
-  
+
   return parseResult.tools
 }
 
@@ -1770,7 +1818,7 @@ function detectXMLTools(content: string): XMLToolCall[] {
 
   // Use JSON parser for reliable tool detection
   const parseResult = jsonToolParser.parseJsonTools(content)
-  
+
   // Convert JsonToolCall to XMLToolCall format for backward compatibility
   const detectedTools: XMLToolCall[] = parseResult.tools.map(tool => ({
     id: tool.id,
@@ -1784,7 +1832,7 @@ function detectXMLTools(content: string): XMLToolCall[] {
   }))
 
   console.log('[DEBUG] JSON parser detected', detectedTools.length, 'tools')
-  
+
   return detectedTools
 }
 
@@ -1794,7 +1842,7 @@ function detectXMLTools(content: string): XMLToolCall[] {
 function isXMLToolComplete(content: string, toolName: string): boolean {
   const closingPattern = XML_TOOL_CLOSING_PATTERNS[toolName as keyof typeof XML_TOOL_CLOSING_PATTERNS]
   if (!closingPattern) return false
-  
+
   // Reset regex lastIndex
   closingPattern.lastIndex = 0
   return closingPattern.test(content)
@@ -1804,23 +1852,23 @@ function isXMLToolComplete(content: string, toolName: string): boolean {
 function extractXMLToolContent(content: string, toolName: string): string {
   const openingPattern = XML_TOOL_PATTERNS[toolName as keyof typeof XML_TOOL_PATTERNS]
   const closingPattern = XML_TOOL_CLOSING_PATTERNS[toolName as keyof typeof XML_TOOL_CLOSING_PATTERNS]
-  
+
   if (!openingPattern || !closingPattern) return ''
-  
+
   // Reset regex lastIndex
   openingPattern.lastIndex = 0
   closingPattern.lastIndex = 0
-  
+
   const openingMatch = openingPattern.exec(content)
   const closingMatch = closingPattern.exec(content)
-  
+
   if (openingMatch && closingMatch) {
     return content.slice(
       openingMatch.index + openingMatch[0].length,
       closingMatch.index
     ).trim()
   }
-  
+
   return ''
 }
 
@@ -1924,27 +1972,27 @@ function renderMessageContentWithPills(content: string, placeholders: Array<{ to
 // Clean content by removing XML tool tags
 function cleanXMLToolTags(content: string): string {
   let cleaned = content
-  
+
   // Remove all XML tool opening and closing tags
   Object.values(XML_TOOL_PATTERNS).forEach(pattern => {
     // Reset regex lastIndex
     pattern.lastIndex = 0
     cleaned = cleaned.replace(pattern, '')
   })
-  
+
   Object.values(XML_TOOL_CLOSING_PATTERNS).forEach(pattern => {
     // Reset regex lastIndex
     pattern.lastIndex = 0
     cleaned = cleaned.replace(pattern, '')
   })
-  
+
   // Also remove any remaining XML tool tags that might have been missed
   const xmlTagRegex = /<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory)[^>]*>[\s\S]*?<\/\1>/g
   cleaned = cleaned.replace(xmlTagRegex, '')
-  
+
   // Clean up extra whitespace and newlines
   cleaned = cleaned.replace(/\n\s*\n\s*\n/g, '\n\n')
-  
+
   return cleaned.trim()
 }
 
@@ -1961,7 +2009,7 @@ async function executeXMLCommandClientSide(xmlCommand: any, projectId: string) {
     status: 'executing',
     startTime: Date.now()
   }
-  
+
   return executeClientSideTool(toolCall, projectId)
 }
 
@@ -2008,63 +2056,61 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
   const isSuccess = toolCall.result?.success !== false
   const fileName = toolCall.result?.path?.split('/').pop() || toolCall.result?.path || 'file'
   const fileCount = toolCall.result?.count || (toolCall.result?.files?.length)
-  
+
   // Special handling for web search tools
   const searchQuery = toolCall.result?.query || 'web search'
-  const urlCount = Array.isArray(toolCall.result?.urls) ? toolCall.result.urls.length : 
-                   toolCall.result?.urls ? 1 : 0
+  const urlCount = Array.isArray(toolCall.result?.urls) ? toolCall.result.urls.length :
+    toolCall.result?.urls ? 1 : 0
 
   const IconComponent = getToolIcon(toolCall.name)
 
-  
+
   // Special handling for web_search tool
   if (toolCall.name === 'web_search') {
     const [isExpanded, setIsExpanded] = useState(false)
-    
+
     // Debug logging to see the actual structure
     console.log('[DEBUG] web_search tool result:', toolCall.result)
-    
+
     const webResultCount = toolCall.result?.metadata?.resultCount || toolCall.result?.results?.length || 0
     const webCleanResults = toolCall.result?.cleanResults || toolCall.result?.results || []
-    
+
     return (
       <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
         {/* Header - Clickable to toggle */}
         <div
-          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
-          isSuccess
-            ? 'bg-muted border-l-4 border-l-blue-500'
-            : 'bg-red-900/20 border-l-4 border-l-red-500'
-          }`}
+          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${isSuccess
+              ? 'bg-muted border-l-4 border-l-blue-500'
+              : 'bg-red-900/20 border-l-4 border-l-red-500'
+            }`}
           onClick={() => setIsExpanded(!isExpanded)}
         >
           <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-full ${
-            isSuccess ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white' : 'bg-red-500 text-white'
-          }`}>
-            <IconComponent className="w-4 h-4" />
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-foreground">Web Search</span>
+            <div className={`p-2 rounded-full ${isSuccess ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white' : 'bg-red-500 text-white'
+              }`}>
+              <IconComponent className="w-4 h-4" />
             </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <span>{webResultCount} results found</span>
-              <span>•</span>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-foreground">Web Search</span>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <span>{webResultCount} results found</span>
+                <span>•</span>
                 <span>{isSuccess ? 'Success' : 'Failed'}</span>
+              </div>
             </div>
-          </div>
             {/* Chevron indicator */}
             <div className="ml-2">
               {isExpanded ? (
                 <ChevronUp className="w-4 h-4 text-muted-foreground" />
               ) : (
                 <ChevronDown className="w-4 h-4 text-muted-foreground" />
-            )}
+              )}
+            </div>
           </div>
         </div>
-        </div>
-        
+
         {/* Search Results Content - Collapsible */}
         {isSuccess && isExpanded && (
           <div className="p-4 bg-background border-t">
@@ -2076,12 +2122,12 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
                   "{searchQuery}"
                 </p>
               </div>
-              
+
               {/* Results Content */}
               {webCleanResults ? (
                 <div className="prose prose-sm max-w-none">
                   <h3 className="text-base font-bold text-white mb-3">Search Results</h3>
-                  <ReactMarkdown 
+                  <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
                       h1: ({ children }) => (
@@ -2124,55 +2170,53 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
       </div>
     )
   }
-  
+
   // Special handling for web_extract tool
   if (toolCall.name === 'web_extract') {
     const [isExpanded, setIsExpanded] = useState(false)
-    
+
     // Debug logging to see the actual structure
     console.log('[DEBUG] web_extract tool result:', toolCall.result)
-    
+
     const extractCleanResults = toolCall.result?.cleanResults || toolCall.result?.results || []
     const extractUrlCount = toolCall.result?.metadata?.urlCount || toolCall.result?.metadata?.contentCount || toolCall.result?.urls?.length || 0
-    
+
     return (
       <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
         {/* Header - Clickable to toggle */}
         <div
-          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
-          isSuccess
-            ? 'bg-muted border-l-4 border-l-purple-500'
-            : 'bg-red-900/20 border-l-4 border-l-red-500'
-          }`}
+          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${isSuccess
+              ? 'bg-muted border-l-4 border-l-purple-500'
+              : 'bg-red-900/20 border-l-4 border-l-red-500'
+            }`}
           onClick={() => setIsExpanded(!isExpanded)}
         >
           <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-full ${
-            isSuccess ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white' : 'bg-red-500 text-white'
-          }`}>
-            <IconComponent className="w-4 h-4" />
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-foreground">Content Extraction</span>
+            <div className={`p-2 rounded-full ${isSuccess ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white' : 'bg-red-500 text-white'
+              }`}>
+              <IconComponent className="w-4 h-4" />
             </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-foreground">Content Extraction</span>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <span>{extractUrlCount} URL{extractUrlCount !== 1 ? 's' : ''} processed</span>
-              <span>•</span>
+                <span>•</span>
                 <span>{isSuccess ? 'Success' : 'Failed'}</span>
+              </div>
             </div>
-          </div>
             {/* Chevron indicator */}
             <div className="ml-2">
               {isExpanded ? (
                 <ChevronUp className="w-4 h-4 text-muted-foreground" />
               ) : (
                 <ChevronDown className="w-4 h-4 text-muted-foreground" />
-            )}
+              )}
+            </div>
           </div>
         </div>
-        </div>
-        
+
         {/* Extracted Content - Collapsible */}
         {isSuccess && isExpanded && (
           <div className="p-4 bg-background border-t">
@@ -2188,12 +2232,12 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
                   ))}
                 </div>
               </div>
-              
+
               {/* Results Content */}
               {extractCleanResults ? (
                 <div className="prose prose-sm max-w-none">
                   <h3 className="text-base font-bold text-white mb-3">Extracted Content</h3>
-                  <ReactMarkdown 
+                  <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
                       h1: ({ children }) => (
@@ -2246,17 +2290,15 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
       <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
         {/* Header - Clickable to toggle */}
         <div
-          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
-            isSuccess
+          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${isSuccess
               ? 'bg-muted border-l-4 border-l-primary'
               : 'bg-red-900/20 border-l-4 border-l-red-500'
-          }`}
+            }`}
           onClick={() => setIsExpanded(!isExpanded)}
         >
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-full ${
-              isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
-            }`}>
+            <div className={`p-2 rounded-full ${isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
+              }`}>
               <IconComponent className="w-4 h-4" />
             </div>
             <div className="flex-1">
@@ -2282,7 +2324,7 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
             </div>
           </div>
         </div>
-        
+
         {/* Files Table - Collapsible */}
         {isSuccess && isExpanded && (
           <div className="p-4 bg-background border-t">
@@ -2322,8 +2364,8 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
                             {file.isDirectory ? '-' : (file.size ? `${file.size} chars` : 'N/A')}
                           </td>
                           <td className="py-2 px-3 text-gray-300 text-xs">
-                            {file.updatedAt || file.createdAt ? 
-                              new Date(file.updatedAt || file.createdAt).toLocaleDateString() : 
+                            {file.updatedAt || file.createdAt ?
+                              new Date(file.updatedAt || file.createdAt).toLocaleDateString() :
                               'N/A'
                             }
                           </td>
@@ -2350,22 +2392,20 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
     const filePath = toolCall.result?.path || toolCall.args?.path || 'Unknown file'
     const fileContent = toolCall.result?.content || ''
     const fileExtension = filePath.split('.').pop() || 'text'
-    
+
     return (
       <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
         {/* Header - Clickable to toggle */}
         <div
-          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
-            isSuccess
+          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${isSuccess
               ? 'bg-muted border-l-4 border-l-primary'
               : 'bg-red-900/20 border-l-4 border-l-red-500'
-          }`}
+            }`}
           onClick={() => setIsExpanded(!isExpanded)}
         >
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-full ${
-              isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
-            }`}>
+            <div className={`p-2 rounded-full ${isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
+              }`}>
               <IconComponent className="w-4 h-4" />
             </div>
             <div className="flex-1">
@@ -2389,7 +2429,7 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
             </div>
           </div>
         </div>
-        
+
         {/* File Content - Collapsible with Syntax Highlighting */}
         {isSuccess && isExpanded && (
           <div className="p-4 bg-background border-t">
@@ -2421,22 +2461,20 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
   if (toolCall.name === 'recall_context') {
     const [isExpanded, setIsExpanded] = useState(false)
     const context = toolCall.result || {}
-    
+
     return (
       <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
         {/* Header - Clickable to toggle */}
         <div
-          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
-            isSuccess
+          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${isSuccess
               ? 'bg-muted border-l-4 border-l-primary'
               : 'bg-red-900/20 border-l-4 border-l-red-500'
-          }`}
+            }`}
           onClick={() => setIsExpanded(!isExpanded)}
         >
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-full ${
-              isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
-            }`}>
+            <div className={`p-2 rounded-full ${isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
+              }`}>
               <IconComponent className="w-4 h-4" />
             </div>
             <div className="flex-1">
@@ -2460,13 +2498,13 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
             </div>
           </div>
         </div>
-        
+
         {/* Context Content - Collapsible */}
         {isSuccess && isExpanded && (
           <div className="p-4 bg-background border-t">
             <div className="max-h-96 overflow-y-auto">
               <div className="prose prose-sm max-w-none">
-                <ReactMarkdown 
+                <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
                     h1: ({ children }) => (
@@ -2509,22 +2547,20 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
   if (toolCall.name === 'learn_patterns') {
     const [isExpanded, setIsExpanded] = useState(false)
     const patterns = toolCall.result || {}
-    
+
     return (
       <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
         {/* Header - Clickable to toggle */}
         <div
-          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
-            isSuccess
+          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${isSuccess
               ? 'bg-muted border-l-4 border-l-primary'
               : 'bg-red-900/20 border-l-4 border-l-red-500'
-          }`}
+            }`}
           onClick={() => setIsExpanded(!isExpanded)}
         >
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-full ${
-              isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
-            }`}>
+            <div className={`p-2 rounded-full ${isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
+              }`}>
               <IconComponent className="w-4 h-4" />
             </div>
             <div className="flex-1">
@@ -2548,13 +2584,13 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
             </div>
           </div>
         </div>
-        
+
         {/* Pattern Analysis - Collapsible */}
         {isSuccess && isExpanded && (
           <div className="p-4 bg-background border-t">
             <div className="max-h-96 overflow-y-auto">
               <div className="prose prose-sm max-w-none">
-                <ReactMarkdown 
+                <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
                     h1: ({ children }) => (
@@ -2600,10 +2636,10 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
     const filePath = analysis.filePath || 'Unknown file'
     const missingDeps = analysis.missingDependencies || []
     const addedDeps = analysis.addedDependencies || []
-    
+
     return (
       <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
-        <div 
+        <div
           className="px-3 py-2 flex items-center gap-3 cursor-pointer hover:bg-muted/50 transition-colors"
           onClick={() => setIsExpanded(!isExpanded)}
         >
@@ -2627,7 +2663,7 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
           </div>
           <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
         </div>
-        
+
         {isExpanded && (
           <div className="border-t bg-muted/30 p-3">
             <div className="space-y-2 text-sm">
@@ -2641,7 +2677,7 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
                   </ul>
                 </div>
               )}
-              
+
               {missingDeps.length > 0 && addedDeps.length === 0 && (
                 <div>
                   <div className="font-medium text-orange-600 dark:text-orange-400 mb-1">⚠️ Missing Dependencies:</div>
@@ -2652,7 +2688,7 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
                   </ul>
                 </div>
               )}
-              
+
               {analysis.suggestions?.length > 0 && (
                 <div>
                   <div className="font-medium text-blue-600 dark:text-blue-400 mb-1">🔧 Suggestions:</div>
@@ -2677,10 +2713,10 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
     const filePath = analysis.filePath || 'Unknown file'
     const issues = analysis.issues || []
     const imports = analysis.imports || []
-    
+
     return (
       <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
-        <div 
+        <div
           className="px-3 py-2 flex items-center gap-3 cursor-pointer hover:bg-muted/50 transition-colors"
           onClick={() => setIsExpanded(!isExpanded)}
         >
@@ -2704,7 +2740,7 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
           </div>
           <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
         </div>
-        
+
         {isExpanded && (
           <div className="border-t bg-muted/30 p-3">
             <div className="space-y-2 text-sm">
@@ -2724,7 +2760,7 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
                   ✅ All {imports.length} imports validated successfully
                 </div>
               )}
-              
+
               {analysis.summary && (
                 <div className="text-muted-foreground text-xs mt-2">
                   {analysis.summary}
@@ -2744,22 +2780,20 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
     const filePath = toolCall.result?.path || toolCall.args?.path || 'Unknown file'
     const fileContent = toolCall.result?.content || toolCall.args?.content || ''
     const fileExtension = filePath.split('.').pop() || 'text'
-    
+
     return (
       <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
         {/* Header - Clickable to toggle */}
         <div
-          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
-            isSuccess
+          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${isSuccess
               ? 'bg-muted border-l-4 border-l-primary'
               : 'bg-red-900/20 border-l-4 border-l-red-500'
-          }`}
+            }`}
           onClick={() => setIsExpanded(!isExpanded)}
         >
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-full ${
-              isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
-            }`}>
+            <div className={`p-2 rounded-full ${isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
+              }`}>
               <IconComponent className="w-4 h-4" />
             </div>
             <div className="flex-1">
@@ -2785,7 +2819,7 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
             </div>
           </div>
         </div>
-        
+
         {/* File Content - Collapsible with Syntax Highlighting */}
         {isSuccess && isExpanded && (
           <div className="p-4 bg-background border-t">
@@ -2825,17 +2859,15 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
       <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
         {/* Header - Clickable to toggle */}
         <div
-          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
-            isSuccess
+          className={`px-4 py-3 border-b cursor-pointer hover:bg-muted/50 transition-colors ${isSuccess
               ? 'bg-muted border-l-4 border-l-blue-500'
               : 'bg-red-900/20 border-l-4 border-l-red-500'
-          }`}
+            }`}
           onClick={() => setIsExpanded(!isExpanded)}
         >
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-full ${
-              isSuccess ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white' : 'bg-red-500 text-white'
-            }`}>
+            <div className={`p-2 rounded-full ${isSuccess ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white' : 'bg-red-500 text-white'
+              }`}>
               <Database className="w-4 h-4" />
             </div>
             <div className="flex-1">
@@ -2882,11 +2914,10 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
               {/* Execution Result */}
               <div>
                 <h3 className="text-sm font-medium text-foreground mb-2">Execution Result</h3>
-                <div className={`p-3 rounded-lg border ${
-                  isSuccess
+                <div className={`p-3 rounded-lg border ${isSuccess
                     ? 'bg-green-900/10 border-green-700 text-green-200'
                     : 'bg-red-900/20 border-red-700 text-red-200'
-                }`}>
+                  }`}>
                   <div className="flex items-center gap-2 mb-2">
                     {isSuccess ? (
                       <Check className="w-4 h-4 text-green-400" />
@@ -2928,14 +2959,12 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
   // Regular tool pill for other tools
   return (
     <div className="bg-background border rounded-lg shadow-sm mb-2 overflow-hidden">
-      <div className={`px-3 py-2 flex items-center gap-3 ${
-        isSuccess
+      <div className={`px-3 py-2 flex items-center gap-3 ${isSuccess
           ? 'bg-muted border-l-4 border-l-primary'
           : 'bg-red-900/20 border-l-4 border-l-red-500'
-      }`}>
-        <div className={`p-2 rounded-full ${
-          isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
         }`}>
+        <div className={`p-2 rounded-full ${isSuccess ? 'bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white' : 'bg-red-500 text-white'
+          }`}>
           <IconComponent className={`w-4 h-4`} />
         </div>
         <div className="flex-1">
@@ -2964,16 +2993,16 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
 }
 
 // XMLCommandPill component for displaying XML command status with real-time updates
-const XMLCommandPill = ({ 
-  command, 
+const XMLCommandPill = ({
+  command,
   status = 'pending',
   filePath = '',
-  error = null 
-}: { 
+  error = null
+}: {
   command: 'pilotwrite' | 'pilotedit' | 'pilotdelete'
   status?: 'pending' | 'executing' | 'completed' | 'failed'
   filePath?: string
-  error?: string | null 
+  error?: string | null
 }) => {
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -3070,12 +3099,12 @@ const XMLCommandPill = ({
                   <span>•</span>
                   <span className={
                     status === 'completed' ? 'text-green-400' :
-                    status === 'failed' ? 'text-red-400' :
-                    status === 'executing' ? 'text-blue-400' : 'text-yellow-400'
+                      status === 'failed' ? 'text-red-400' :
+                        status === 'executing' ? 'text-blue-400' : 'text-yellow-400'
                   }>
-                    {status === 'executing' ? 'In Progress' : 
-                     status === 'completed' ? 'Success' :
-                     status === 'failed' ? 'Error' : 'Queued'}
+                    {status === 'executing' ? 'In Progress' :
+                      status === 'completed' ? 'Success' :
+                        status === 'failed' ? 'Error' : 'Queued'}
                   </span>
                 </>
               )}
@@ -3091,7 +3120,7 @@ const XMLCommandPill = ({
           </div>
         </div>
       </div>
-      
+
       {/* Content - Collapsible */}
       {isExpanded && (
         <div className="p-4 bg-background border-t">
@@ -3105,22 +3134,21 @@ const XMLCommandPill = ({
                 </code>
               </div>
             )}
-            
+
             {/* Status Details */}
             <div>
               <h4 className="text-sm font-medium text-foreground mb-1">Status</h4>
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${
-                  status === 'completed' ? 'bg-green-500' :
-                  status === 'failed' ? 'bg-red-500' :
-                  status === 'executing' ? 'bg-blue-500' : 'bg-yellow-500'
-                }`} />
+                <div className={`w-2 h-2 rounded-full ${status === 'completed' ? 'bg-green-500' :
+                    status === 'failed' ? 'bg-red-500' :
+                      status === 'executing' ? 'bg-blue-500' : 'bg-yellow-500'
+                  }`} />
                 <span className="text-sm text-muted-foreground">
                   {getStatusLabel(command, status)}
                 </span>
               </div>
             </div>
-            
+
             {/* Error Details */}
             {error && status === 'failed' && (
               <div>
@@ -3130,14 +3158,14 @@ const XMLCommandPill = ({
                 </div>
               </div>
             )}
-            
+
             {/* Command Type Info */}
             <div>
               <h4 className="text-sm font-medium text-foreground mb-1">Operation</h4>
               <span className="text-sm text-muted-foreground">
                 {command === 'pilotwrite' ? 'File creation operation' :
-                 command === 'pilotedit' ? 'File modification operation' :
-                 command === 'pilotdelete' ? 'File deletion operation' : 'Unknown operation'}
+                  command === 'pilotedit' ? 'File modification operation' :
+                    command === 'pilotdelete' ? 'File deletion operation' : 'Unknown operation'}
               </span>
             </div>
           </div>
@@ -3153,7 +3181,7 @@ const ExpandableAISummary = ({ content }: { content: string }) => {
   const [shouldTruncate, setShouldTruncate] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
   const MAX_HEIGHT = 200 // Maximum height before truncation in pixels
-  
+
   useEffect(() => {
     if (contentRef.current) {
       const element = contentRef.current
@@ -3167,18 +3195,18 @@ const ExpandableAISummary = ({ content }: { content: string }) => {
       tempDiv.style.width = element.offsetWidth + 'px'
       tempDiv.innerHTML = element.innerHTML
       document.body.appendChild(tempDiv)
-      
+
       const fullHeight = tempDiv.scrollHeight
       document.body.removeChild(tempDiv)
-      
+
       setShouldTruncate(fullHeight > MAX_HEIGHT)
     }
   }, [content])
-  
+
   if (!shouldTruncate) {
     return (
       <div className="prose prose-sm max-w-none dark:prose-invert">
-        <ReactMarkdown 
+        <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
             h1: ({ children }) => (
@@ -3212,7 +3240,7 @@ const ExpandableAISummary = ({ content }: { content: string }) => {
       </div>
     )
   }
-  
+
   return (
     <div className="relative">
       <div className="rounded-lg overflow-hidden relative">
@@ -3220,15 +3248,14 @@ const ExpandableAISummary = ({ content }: { content: string }) => {
         {!isExpanded && (
           <div className="absolute top-0 left-0 right-0 h-3 bg-gradient-to-b from-gray-600 to-transparent pointer-events-none z-10" />
         )}
-        
-        <div 
+
+        <div
           ref={contentRef}
-          className={`transition-all duration-200 ${
-            isExpanded ? 'max-h-[600px] overflow-y-auto' : 'max-h-[200px] overflow-hidden'
-          }`}
+          className={`transition-all duration-200 ${isExpanded ? 'max-h-[600px] overflow-y-auto' : 'max-h-[200px] overflow-hidden'
+            }`}
         >
           <div className="prose prose-sm max-w-none">
-            <ReactMarkdown 
+            <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
                 h1: ({ children }) => (
@@ -3261,14 +3288,14 @@ const ExpandableAISummary = ({ content }: { content: string }) => {
             </ReactMarkdown>
           </div>
         </div>
-        
+
         {/* Bottom gradient indicator when collapsed */}
         {!isExpanded && (
           <div className="absolute bottom-10 left-0 right-0 h-6 bg-gradient-to-t from-[#2e2e2e] via-[#2e2e2e]/80 to-transparent pointer-events-none z-10" />
         )}
-        
+
         {/* Expand/Collapse trigger */}
-        <div 
+        <div
           className="flex items-center justify-center px-4 py-2 border-t border-gray-600 hover:bg-gray-600 transition-colors cursor-pointer"
           onClick={() => setIsExpanded(!isExpanded)}
         >
@@ -3304,10 +3331,10 @@ const FloatingScrollToBottom = ({
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
     setReducedMotion(mediaQuery.matches)
-    
+
     const handleChange = (e: MediaQueryListEvent) => setReducedMotion(e.matches)
     mediaQuery.addEventListener('change', handleChange)
-    
+
     return () => mediaQuery.removeEventListener('change', handleChange)
   }, [])
 
@@ -3407,7 +3434,7 @@ const FloatingScrollToBottom = ({
         {!reducedMotion && (
           <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-ping opacity-75" />
         )}
-        
+
         {/* Main chevron icon with responsive sizing */}
         <ChevronDown
           className={`
@@ -3420,14 +3447,14 @@ const FloatingScrollToBottom = ({
             willChange: 'transform',
           }}
         />
-        
+
         {/* Subtle glow effect */}
         <div className="absolute inset-0 rounded-full bg-gradient-to-t from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-        
+
         {/* Focus indicator for accessibility */}
         <div className="absolute inset-0 rounded-full border-2 border-transparent group-focus:border-blue-400 transition-colors duration-200" />
       </button>
-      
+
       {/* Tooltip for desktop - enhanced accessibility */}
       {!isMobile && (
         <div
@@ -3457,25 +3484,23 @@ const MultiStepSummary = ({ steps, hasErrors }: { steps: any[], hasErrors: boole
 
   return (
     <div className="bg-background border rounded-lg shadow-sm mb-3 overflow-hidden">
-      <div className={`px-4 py-3 ${
-        hasErrors
+      <div className={`px-4 py-3 ${hasErrors
           ? 'bg-amber-900/20 border-l-4 border-l-amber-500'
           : 'bg-blue-900/20 border-l-4 border-l-blue-500'
-      }`}>
-          <div className="flex items-center justify-between">
+        }`}>
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-medium text-white">
-              {hasErrors ? (
-                <AlertTriangle className="w-4 h-4 text-amber-400" />
-              ) : (
-                <Zap className="w-4 h-4 text-blue-400" />
-              )}
+            {hasErrors ? (
+              <AlertTriangle className="w-4 h-4 text-amber-400" />
+            ) : (
+              <Zap className="w-4 h-4 text-blue-400" />
+            )}
             <span>Tools executions</span>
-            </div>
-            <span className={`text-xs font-medium ${
-              hasErrors ? 'text-amber-400' : 'text-blue-400'
+          </div>
+          <span className={`text-xs font-medium ${hasErrors ? 'text-amber-400' : 'text-blue-400'
             }`}>
             {totalTools} tools
-            </span>
+          </span>
         </div>
       </div>
     </div>
@@ -3485,11 +3510,11 @@ const MultiStepSummary = ({ steps, hasErrors }: { steps: any[], hasErrors: boole
 // Loader for highlight.js and CSS, and auto-highlighting code blocks
 const HighlightLoader = () => {
   const loadedRef = useRef(false)
-  
+
   useEffect(() => {
     if (loadedRef.current) return
     loadedRef.current = true
-    
+
     // Load highlight.js script
     if (!(window as any).hljs) {
       const script = document.createElement('script')
@@ -3497,7 +3522,7 @@ const HighlightLoader = () => {
       script.async = true
       document.body.appendChild(script)
     }
-    
+
     // Load highlight.js CSS (github style)
     if (!document.getElementById('hljs-css')) {
       const link = document.createElement('link')
@@ -3506,7 +3531,7 @@ const HighlightLoader = () => {
       link.href = '/highlight/styles/github.min.css'
       document.head.appendChild(link)
     }
-    
+
     // Add custom CSS to prevent XML tool tags from being wrapped in code blocks
     if (!document.getElementById('xml-tool-css')) {
       const style = document.createElement('style')
@@ -3570,7 +3595,7 @@ const HighlightLoader = () => {
       `
       document.head.appendChild(style)
     }
-    
+
     // Highlight code blocks after each render, but exclude XML tool tags
     const highlight = () => {
       if ((window as any).hljs) {
@@ -3578,51 +3603,60 @@ const HighlightLoader = () => {
           // Check if this code block contains XML tool tags
           const content = block.textContent || ''
           const hasXMLTools = /<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory)/.test(content)
-          
+
           if (!hasXMLTools) {
-          (window as any).hljs.highlightElement(block)
+            (window as any).hljs.highlightElement(block)
           }
         })
       }
     }
-    
+
     // Initial highlight
     setTimeout(highlight, 300)
-    
+
     // Re-highlight on mutation
     const observer = new MutationObserver(() => setTimeout(highlight, 100))
     observer.observe(document.body, { childList: true, subtree: true })
-    
+
     return () => observer.disconnect()
   }, [])
-  
+
   return null
 }
 
 // Enhanced markdown preprocessing for better formatting and emoji support
 function preprocessMarkdownContent(content: string): string {
-  // Ensure proper spacing around headings
-  content = content.replace(/^(#{1,6})\s*(.+)$/gm, (match, hashes, text) => {
-    return `\n${hashes} ${text.trim()}\n`
-  })
-  
-  // Ensure proper spacing around lists
-  content = content.replace(/^(\*|\+|-|\d+\.)\s+(.+)$/gm, (match, marker, text) => {
-    return `${marker} ${text.trim()}`
-  })
-  
+  if (!content) return ''
+
+  // CRITICAL: Remove ANY trailing hashtags (##, ###, etc.) after text content
+  // This handles "Text ##", "Text ###", etc. anywhere in the content
+  content = content.replace(/\s+(#{1,6})\s*$/gm, '')
+  content = content.replace(/\s+(#{1,6})(\s|$)/g, ' ')
+
+  // Remove trailing hashtags from headings (e.g., "## Heading ##" -> "## Heading")
+  content = content.replace(/^(#{1,6})\s*(.+?)\s*(#{1,6})\s*$/gm, '$1 $2')
+
+  // REMOVED: These aggressive replacements were breaking valid content like "ShowcaseSpark--**your"
+  // They caused false positives, breaking text that contained dashes into fake list items
+
   // Ensure proper spacing around code blocks
-  content = content.replace(/^```(\w*)\n([\s\S]*?)\n```$/gm, (match, language, code) => {
-    return `\n\`\`\`${language}\n${code.trim()}\n\`\`\`\n`
+  content = content.replace(/```(\w*)\n?([\s\S]*?)\n?```/gm, (match, language, code) => {
+    return `\n\n\`\`\`${language}\n${code.trim()}\n\`\`\`\n\n`
   })
-  
-  // Ensure proper paragraph spacing
+
+  // REMOVED: These were adding excessive \n\n spacing causing large gaps between content
+
+  // Bold text in list items (common pattern: "Label: Description")
+  content = content.replace(/^([*+\-•]|\d+\.)\s+([^:\n]+):\s*/gm, '$1 **$2:** ')
+
+  // Clean up malformed bold markers (spaces inside the asterisks)
+  // Fix: "** text**" or "**text **" → "**text**"
+  content = content.replace(/\*\*\s+([^\*]+?)\s*\*\*/g, '**$1**')
+  content = content.replace(/\*\*\s*([^\*]+?)\s+\*\*/g, '**$1**')
+
+  // Keep double newlines for proper paragraph separation, but limit to max 2
   content = content.replace(/\n{3,}/g, '\n\n')
-  
-  // Enhance emoji spacing
-  content = content.replace(/([^\\s])([🎯📌▶◆💡🔍⭐️✅❌⚡️🚀🎉💪🤖🛠️📋🔧💻🎨📊🔒🌟💰🎪🎭🎨🎵🎮🎯🎲🎰🎳🎯🎪🎭🎨🎵🎮🎯🎲🎰🎳])/g, '$1 $2')
-  content = content.replace(/([🎯📌▶◆💡🔍⭐️✅❌⚡️🚀🎉💪🤖🛠️📋🔧💻🎨📊🔒🌟💰🎪🎭🎨🎵🎮🎯🎲🎰🎳🎯🎪🎭🎨🎵🎮🎯🎲🎰🎳])([^\\s])/g, '$1 $2')
-  
+
   return content.trim()
 }
 
@@ -3636,7 +3670,7 @@ export function ChatPanel({
   initialPrompt
 }: ChatPanelProps) {
   const { toast } = useToast()
-  
+
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -3673,7 +3707,7 @@ export function ChatPanel({
   const audioChunksRef = useRef<Blob[]>([])
 
   // Check if Web Speech API is supported
-  const isWebSpeechSupported = typeof window !== 'undefined' && 
+  const isWebSpeechSupported = typeof window !== 'undefined' &&
     ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)
 
   // Auth modal state
@@ -3720,7 +3754,7 @@ export function ChatPanel({
         setCurrentProjectId(project.id)
         // Clear restore state when project changes
         setRestoreMessageId(null)
-        
+
         // Initialize XML Auto Executor for new project
         const executor = new XMLToolAutoExecutor({
           projectId: project.id,
@@ -3736,7 +3770,7 @@ export function ChatPanel({
                   ...msg,
                   metadata: {
                     ...msg.metadata,
-                    xmlCommands: msg.metadata.xmlCommands.map(cmd => 
+                    xmlCommands: msg.metadata.xmlCommands.map(cmd =>
                       cmd.id === toolCall.id ? { ...cmd, status: 'completed', result } : cmd
                     )
                   }
@@ -3754,7 +3788,7 @@ export function ChatPanel({
                   ...msg,
                   metadata: {
                     ...msg.metadata,
-                    xmlCommands: msg.metadata.xmlCommands.map(cmd => 
+                    xmlCommands: msg.metadata.xmlCommands.map(cmd =>
                       cmd.id === toolCall.id ? { ...cmd, status: 'failed', error: error.message } : cmd
                     )
                   }
@@ -3765,7 +3799,7 @@ export function ChatPanel({
           }
         })
         setAutoExecutor(executor)
-        
+
         await loadChatHistory(project)
       }
     }
@@ -3781,7 +3815,7 @@ export function ChatPanel({
         setMessages([])
       }
     }
-    
+
     window.addEventListener('chat-cleared', handleChatCleared as EventListener)
     return () => window.removeEventListener('chat-cleared', handleChatCleared as EventListener)
   }, [project?.id])
@@ -3791,17 +3825,17 @@ export function ChatPanel({
     const autoSendInitialPrompt = async () => {
       if (initialPrompt && project && messages.length === 0 && !isLoading) {
         console.log(`[ChatPanel] Auto-sending initial prompt: "${initialPrompt}"`)
-        
+
         // Set the input message and trigger send
         setInputMessage(initialPrompt)
-        
+
         // Small delay to ensure state is updated
         setTimeout(() => {
           // Create a synthetic form event to trigger handleSendMessage
           const syntheticEvent = {
-            preventDefault: () => {},
+            preventDefault: () => { },
           } as React.FormEvent
-          
+
           handleSendMessage(syntheticEvent)
         }, 100)
       }
@@ -3814,23 +3848,23 @@ export function ChatPanel({
   const loadChatHistory = async (projectToLoad: Project | null = null) => {
     const targetProject = projectToLoad || project
     if (!targetProject) return
-    
+
     try {
       console.log(`[ChatPanel] Loading chat history for project: ${targetProject.name} (${targetProject.id})`)
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
-      
+
       // Get chat sessions for this specific project/user
       const chatSessions = await storageManager.getChatSessions(targetProject.userId)
-      const activeSession = chatSessions.find((session: any) => 
+      const activeSession = chatSessions.find((session: any) =>
         session.workspaceId === targetProject.id && session.isActive
       )
-      
+
       if (activeSession) {
         console.log(`[ChatPanel] Found active session for project ${targetProject.id}:`, activeSession.id)
         // Get messages for this session
         const sessionMessages = await storageManager.getMessages(activeSession.id)
-        
+
         // Convert to our Message format
         const formattedMessages: Message[] = sessionMessages.map((msg: any) => ({
           id: msg.id,
@@ -3839,36 +3873,36 @@ export function ChatPanel({
           createdAt: msg.createdAt,
           metadata: msg.metadata
         }))
-        
+
         // Clean up any potential partial or duplicate assistant messages
         // Keep only the last assistant message if there are multiple consecutive ones with similar timestamps
         const cleanedMessages = formattedMessages.filter((msg, index) => {
           if (msg.role !== 'assistant') return true
-          
+
           // Check if this is a partial message (very short content or "Thinking...")
-          const isPartialMessage = msg.content.length < 10 || 
-                                 msg.content === "Thinking..." || 
-                                 msg.content.startsWith("data:")
-          
+          const isPartialMessage = msg.content.length < 10 ||
+            msg.content === "Thinking..." ||
+            msg.content.startsWith("data:")
+
           if (isPartialMessage) {
             // Check if there's a complete assistant message after this one
-            const nextAssistantIndex = formattedMessages.findIndex((nextMsg, nextIndex) => 
-              nextIndex > index && 
-              nextMsg.role === 'assistant' && 
+            const nextAssistantIndex = formattedMessages.findIndex((nextMsg, nextIndex) =>
+              nextIndex > index &&
+              nextMsg.role === 'assistant' &&
               nextMsg.content.length > 10 &&
               !nextMsg.content.startsWith("data:")
             )
-            
+
             // If there's a complete message after this partial one, filter out the partial
             if (nextAssistantIndex !== -1) {
               console.log(`[ChatPanel] Filtering out partial assistant message: "${msg.content.substring(0, 50)}..."`)
               return false
             }
           }
-          
+
           return true
         })
-        
+
         console.log(`[ChatPanel] Loaded ${cleanedMessages.length} messages (filtered ${formattedMessages.length - cleanedMessages.length} partial messages) for project ${targetProject.id}`)
         setMessages(cleanedMessages)
         // Don't clear restoreMessageId here as it should persist across reloads
@@ -3902,18 +3936,18 @@ export function ChatPanel({
       console.warn('[ChatPanel] Cannot save message: no project selected')
       return
     }
-    
+
     try {
       console.log(`[ChatPanel] Saving message to project ${project.id}:`, message.role, message.content.substring(0, 50) + '...')
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
-      
+
       // Get or create chat session for this specific project
       let chatSessions = await storageManager.getChatSessions(project.userId)
-      let chatSession = chatSessions.find((session: any) => 
+      let chatSession = chatSessions.find((session: any) =>
         session.workspaceId === project.id && session.isActive
       )
-      
+
       if (!chatSession) {
         console.log(`[ChatPanel] Creating new chat session for project ${project.id}`)
         chatSession = await storageManager.createChatSession({
@@ -3927,16 +3961,16 @@ export function ChatPanel({
       } else {
         console.log(`[ChatPanel] Using existing chat session:`, chatSession.id)
       }
-      
+
       // Check if message with this ID already exists and delete it (to prevent duplicates)
       const existingMessages = await storageManager.getMessages(chatSession.id)
       const existingMessage = existingMessages.find((m: any) => m.id === message.id)
-      
+
       if (existingMessage) {
         console.log(`[ChatPanel] Deleting existing message with ID ${message.id} to prevent duplicates`)
         await storageManager.deleteMessage(chatSession.id, message.id)
       }
-      
+
       // Create the message (fresh or replacement)
       await storageManager.createMessage({
         chatSessionId: chatSession.id,
@@ -3945,12 +3979,12 @@ export function ChatPanel({
         metadata: message.metadata || {},
         tokensUsed: 0
       })
-      
+
       // Update session's last message time
       await storageManager.updateChatSession(chatSession.id, {
         lastMessageAt: new Date().toISOString()
       })
-      
+
       console.log(`[ChatPanel] Message saved successfully for project ${project.id}`)
     } catch (error) {
       console.error(`[ChatPanel] Error saving message for project ${project?.id}:`, error)
@@ -3964,21 +3998,21 @@ export function ChatPanel({
       externalOnClearChat()
       return
     }
-    
+
     // Otherwise use internal logic (desktop)
     if (!project) return
-    
+
     try {
       console.log(`[ChatPanel] Clearing chat for project ${project.id}`)
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
-      
+
       // Find and deactivate current session for this project
       const chatSessions = await storageManager.getChatSessions(project.userId)
-      const activeSession = chatSessions.find((session: any) => 
+      const activeSession = chatSessions.find((session: any) =>
         session.workspaceId === project.id && session.isActive
       )
-      
+
       if (activeSession) {
         // Deactivate the current session instead of deleting (preserves history)
         await storageManager.updateChatSession(activeSession.id, {
@@ -3987,10 +4021,10 @@ export function ChatPanel({
         })
         console.log(`[ChatPanel] Deactivated session ${activeSession.id} for project ${project.id}`)
       }
-      
+
       // Clear local messages
       setMessages([])
-      
+
       toast({
         title: "Chat Cleared",
         description: `Chat history cleared for ${project.name}. Start a new conversation!`,
@@ -4013,7 +4047,7 @@ export function ChatPanel({
       setAbortController(null)
       setIsLoading(false)
       setIsStreaming(false)
-      
+
       toast({
         title: "Generation Stopped",
         description: "AI response generation has been cancelled.",
@@ -4025,20 +4059,20 @@ export function ChatPanel({
   const detectAtCommand = (text: string, cursorPosition: number) => {
     const beforeCursor = text.substring(0, cursorPosition);
     const atIndex = beforeCursor.lastIndexOf('@');
-    
+
     if (atIndex === -1) return null;
-    
+
     // Check if @ is at start of line or preceded by whitespace
     const charBeforeAt = atIndex > 0 ? beforeCursor[atIndex - 1] : ' ';
     if (charBeforeAt !== ' ' && charBeforeAt !== '\n' && atIndex !== 0) {
       return null;
     }
-    
+
     // Find the end of the command (space, newline, or end of string)
     const afterAt = text.substring(atIndex + 1);
     const spaceIndex = afterAt.search(/[\s\n]/);
     const endIndex = spaceIndex === -1 ? text.length : atIndex + 1 + spaceIndex;
-    
+
     return {
       startIndex: atIndex,
       endIndex,
@@ -4056,24 +4090,24 @@ export function ChatPanel({
     div.style.width = textarea.clientWidth + 'px';
     div.style.whiteSpace = 'pre-wrap';
     div.style.wordWrap = 'break-word';
-    
+
     document.body.appendChild(div);
-    
+
     // Get text up to the @ symbol
     const textBeforeAt = textarea.value.substring(0, atIndex);
     div.textContent = textBeforeAt;
-    
+
     const rect = textarea.getBoundingClientRect();
     const lines = Math.floor(div.scrollHeight / parseFloat(window.getComputedStyle(div).lineHeight));
-    
+
     document.body.removeChild(div);
-    
+
     // Calculate position - Position ABOVE the textarea
     const dropdownHeight = 320; // Approximate dropdown height
     const viewportHeight = window.innerHeight;
     const spaceAbove = rect.top;
     const spaceBelow = viewportHeight - rect.bottom;
-    
+
     // Prefer positioning above, but fall back to below if not enough space
     let top: number;
     if (spaceAbove >= dropdownHeight + 16) {
@@ -4086,33 +4120,33 @@ export function ChatPanel({
       // Not enough space either way - position above anyway and let it scroll
       top = Math.max(16, rect.top - dropdownHeight - 8);
     }
-    
+
     const left = rect.left;
-    
+
     return { top, left };
   };
 
   const handleFileSelect = (file: FileSearchResult) => {
     if (!textareaRef.current) return;
-    
+
     const textarea = textareaRef.current;
     const cursorPos = textarea.selectionStart;
     const atCommand = detectAtCommand(inputMessage, cursorPos);
-    
+
     if (atCommand) {
       // Replace the @query with @filename
       const before = inputMessage.substring(0, atCommand.startIndex);
       const after = inputMessage.substring(atCommand.endIndex);
       const replacement = `@${file.name}`;
-      
+
       const newMessage = before + replacement + after;
       setInputMessage(newMessage);
-      
+
       // Add to attached files if not already present
       if (!attachedFiles.some(f => f.id === file.id)) {
         setAttachedFiles(prev => [...prev, file]);
       }
-      
+
       // Position cursor after the replacement
       setTimeout(() => {
         const newCursorPos = atCommand.startIndex + replacement.length;
@@ -4120,7 +4154,7 @@ export function ChatPanel({
         textarea.focus();
       }, 0);
     }
-    
+
     setShowFileDropdown(false);
     setFileQuery("");
     setAtCommandStartIndex(-1);
@@ -4128,7 +4162,7 @@ export function ChatPanel({
 
   const handleRemoveAttachedFile = (fileId: string) => {
     setAttachedFiles(prev => prev.filter(f => f.id !== fileId));
-    
+
     // Also remove the @filename from the input message
     const fileToRemove = attachedFiles.find(f => f.id === fileId);
     if (fileToRemove) {
@@ -4216,8 +4250,8 @@ export function ChatPanel({
           const data = await response.json();
 
           // Update image with description
-          setAttachedImages(prev => prev.map(img => 
-            img.id === imageId 
+          setAttachedImages(prev => prev.map(img =>
+            img.id === imageId
               ? { ...img, description: data.description, isProcessing: false }
               : img
           ));
@@ -4345,16 +4379,16 @@ export function ChatPanel({
       // @ts-ignore - Web Speech API types
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
-      
+
       // Enable continuous recognition for better accuracy
       recognition.continuous = true;
       recognition.interimResults = true; // Show results in real-time
       recognition.lang = 'en-US';
       recognition.maxAlternatives = 1;
-      
+
       let finalTranscript = '';
       let interimTranscript = '';
-      
+
       recognition.onstart = () => {
         setIsRecording(true);
         finalTranscript = '';
@@ -4364,28 +4398,28 @@ export function ChatPanel({
           description: "Speak now, click mic again to stop"
         });
       };
-      
+
       recognition.onresult = (event: any) => {
         interimTranscript = '';
-        
+
         // Process all results
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript;
-          
+
           if (event.results[i].isFinal) {
             finalTranscript += transcript + ' ';
           } else {
             interimTranscript += transcript;
           }
         }
-        
+
         // Update input with final transcript + interim (for real-time feedback)
         const currentInput = inputMessage || '';
         const newText = finalTranscript + interimTranscript;
-        
+
         if (newText.trim()) {
           setInputMessage(currentInput ? `${currentInput} ${newText.trim()}` : newText.trim());
-          
+
           // Auto-resize textarea
           if (textareaRef.current) {
             textareaRef.current.style.height = '90px';
@@ -4395,7 +4429,7 @@ export function ChatPanel({
           }
         }
       };
-      
+
       recognition.onerror = (event: any) => {
         console.error('Speech recognition error:', event.error);
         if (event.error === 'not-allowed' || event.error === 'permission-denied') {
@@ -4421,7 +4455,7 @@ export function ChatPanel({
         }
         setIsRecording(false);
       };
-      
+
       recognition.onend = () => {
         if (finalTranscript.trim()) {
           // Save the final transcript
@@ -4429,16 +4463,16 @@ export function ChatPanel({
             const combined = prev ? `${prev} ${finalTranscript.trim()}` : finalTranscript.trim();
             return combined;
           });
-          
+
           toast({
             title: "Speech recognized",
             description: "Your speech has been converted to text"
           });
         }
-        
+
         setIsRecording(false);
         recognitionRef.current = null;
-        
+
         // Ensure textarea height is correct after recognition ends
         if (textareaRef.current) {
           setTimeout(() => {
@@ -4451,7 +4485,7 @@ export function ChatPanel({
           }, 100);
         }
       };
-      
+
       recognitionRef.current = recognition;
       recognition.start();
     } catch (error) {
@@ -4480,7 +4514,7 @@ export function ChatPanel({
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
         await transcribeWithDeepgram(audioBlob);
-        
+
         // Stop all tracks to release microphone
         stream.getTracks().forEach(track => track.stop());
       };
@@ -4515,7 +4549,7 @@ export function ChatPanel({
       // Convert blob to base64
       const reader = new FileReader();
       reader.readAsDataURL(audioBlob);
-      
+
       reader.onloadend = async () => {
         const base64Audio = (reader.result as string).split(',')[1];
 
@@ -4537,7 +4571,7 @@ export function ChatPanel({
         if (data.success && data.text) {
           // Append transcribed text to input
           setInputMessage(prev => prev ? `${prev} ${data.text}` : data.text);
-          
+
           toast({
             title: "Transcription complete",
             description: "Your speech has been converted to text"
@@ -4600,7 +4634,7 @@ export function ChatPanel({
     if (isEditingRevertedMessage && revertMessageId) {
       // Find the message being edited
       const messageToEdit = messages.find(msg => msg.id === revertMessageId);
-      
+
       if (messageToEdit) {
         // Update the existing message
         const updatedMessage: Message = {
@@ -4611,14 +4645,14 @@ export function ChatPanel({
 
         // Update the messages state
         setMessages(prev => prev.map(msg => msg.id === revertMessageId ? updatedMessage : msg))
-        
+
         // Save updated message to IndexedDB
         await saveMessageToIndexedDB(updatedMessage)
-        
+
         // Reset edit mode
         setIsEditingRevertedMessage(false)
         setRevertMessageId(null)
-        
+
         // Create a new checkpoint for the updated message
         try {
           await new Promise(resolve => setTimeout(resolve, 50))
@@ -4627,7 +4661,7 @@ export function ChatPanel({
         } catch (error) {
           console.error('[Checkpoint] Error creating checkpoint for updated message:', error)
         }
-        
+
         // Clear input
         setInputMessage("")
         return
@@ -4636,7 +4670,7 @@ export function ChatPanel({
 
     // Prepare message content with attached files, images, and uploaded files
     let messageContent = inputMessage.trim();
-    
+
     // Check if images are still processing
     if (attachedImages.some(img => img.isProcessing)) {
       toast({
@@ -4646,38 +4680,38 @@ export function ChatPanel({
       });
       return;
     }
-    
+
     // Add image descriptions first
     if (attachedImages.length > 0) {
       const imageDescriptions = attachedImages
         .filter(img => img.description)
         .map(img => `\n\n--- Image: ${img.name} ---\n${img.description}\n--- End of Image ---`)
         .join('');
-      
+
       if (imageDescriptions) {
         messageContent = `${messageContent}\n\n=== ATTACHED IMAGES CONTEXT ===${imageDescriptions}\n=== END ATTACHED IMAGES ===`;
       }
     }
-    
+
     // Add uploaded file contents
     if (attachedUploadedFiles.length > 0) {
       const uploadedFileContexts = attachedUploadedFiles
         .map(file => `\n\n--- Uploaded File: ${file.name} ---\n${file.content}\n--- End of ${file.name} ---`)
         .join('');
-      
+
       if (uploadedFileContexts) {
         messageContent = `${messageContent}\n\n=== UPLOADED FILES CONTEXT ===${uploadedFileContexts}\n=== END UPLOADED FILES ===`;
       }
     }
-    
+
     // Add project files attached via @ command
     if (attachedFiles.length > 0) {
       const fileContexts: string[] = [];
-      
+
       try {
         const { storageManager } = await import('@/lib/storage-manager');
         await storageManager.init();
-        
+
         for (const attachedFile of attachedFiles) {
           try {
             const fileData = await storageManager.getFile(project.id, attachedFile.path);
@@ -4689,7 +4723,7 @@ export function ChatPanel({
             fileContexts.push(`\n\n--- Project File: ${attachedFile.path} ---\n[Error loading file content]\n--- End of ${attachedFile.name} ---`);
           }
         }
-        
+
         if (fileContexts.length > 0) {
           messageContent = `${messageContent}\n\n=== PROJECT FILES CONTEXT ===${fileContexts.join('')}\n=== END PROJECT FILES ===`;
         }
@@ -4724,7 +4758,7 @@ export function ChatPanel({
 
     // Save user message to IndexedDB
     await saveMessageToIndexedDB(userMessage)
-    
+
     // Create checkpoint for this message
     if (project) {
       try {
@@ -4769,18 +4803,18 @@ export function ChatPanel({
 
       // Check if this is a JSON response (tools mode) or streaming response
       const contentType = response.headers.get('content-type')
-      
+
       if (contentType && contentType.includes('application/json')) {
         // Enhanced server-side tools response
         const jsonResponse = await response.json()
-        
+
         // Debug: Log the complete response
         console.log('[DEBUG] Complete API response:', jsonResponse)
-        
+
         if (jsonResponse.error) {
           throw new Error(jsonResponse.error)
         }
-        
+
         // Check if there's a tool_results_summary that should be displayed as assistant message
         let finalMessageContent = jsonResponse.message || ''
 
@@ -4802,55 +4836,55 @@ export function ChatPanel({
         // CRITICAL: Prevent empty assistant messages from being rendered
         // Only create and display the message if there's actual content
         if (finalMessageContent && finalMessageContent.trim()) {
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
+          const assistantMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
             content: finalMessageContent,
-          createdAt: new Date().toISOString(),
-          metadata: {
-            toolCalls: jsonResponse.toolCalls || [],
-            success: jsonResponse.success,
-            hasToolCalls: jsonResponse.hasToolCalls,
-            hasToolErrors: jsonResponse.hasToolErrors,
-            stepCount: jsonResponse.stepCount,
-            steps: jsonResponse.steps,
-            serverSideExecution: true,
-            fileOperations: jsonResponse.fileOperations || [],
-            // Workflow mode properties
-            workflowMode: jsonResponse.workflowMode || false,
-            workflowChunk: jsonResponse.workflowChunk,
-            sessionId: jsonResponse.sessionId
+            createdAt: new Date().toISOString(),
+            metadata: {
+              toolCalls: jsonResponse.toolCalls || [],
+              success: jsonResponse.success,
+              hasToolCalls: jsonResponse.hasToolCalls,
+              hasToolErrors: jsonResponse.hasToolErrors,
+              stepCount: jsonResponse.stepCount,
+              steps: jsonResponse.steps,
+              serverSideExecution: true,
+              fileOperations: jsonResponse.fileOperations || [],
+              // Workflow mode properties
+              workflowMode: jsonResponse.workflowMode || false,
+              workflowChunk: jsonResponse.workflowChunk,
+              sessionId: jsonResponse.sessionId
+            }
           }
-        }
-        
-        setMessages(prev => [...prev, assistantMessage])
-        await saveMessageToIndexedDB(assistantMessage)
-          
+
+          setMessages(prev => [...prev, assistantMessage])
+          await saveMessageToIndexedDB(assistantMessage)
+
           console.log('[DEBUG] Added assistant message with content:', finalMessageContent.substring(0, 100) + '...')
         } else {
           console.log('[DEBUG] Skipped empty assistant message, content was empty or whitespace only')
         }
-        
+
         // Apply file operations to client-side IndexedDB for persistence
         if (jsonResponse.fileOperations && jsonResponse.fileOperations.length > 0) {
           console.log('[DEBUG] Processing file operations:', jsonResponse.fileOperations)
-          
+
           try {
             const { storageManager } = await import('@/lib/storage-manager')
             await storageManager.init()
-            
+
             let operationsApplied = 0
-            
+
             for (const fileOp of jsonResponse.fileOperations) {
               console.log('[DEBUG] Applying file operation:', fileOp)
-              
+
               if (fileOp.type === 'write_file' && fileOp.path) {
                 // Check if file exists
                 const existingFile = await storageManager.getFile(project.id, fileOp.path)
-                
+
                 if (existingFile) {
                   // Update existing file
-                  await storageManager.updateFile(project.id, fileOp.path, { 
+                  await storageManager.updateFile(project.id, fileOp.path, {
                     content: fileOp.content || '',
                     updatedAt: new Date().toISOString()
                   })
@@ -4872,7 +4906,7 @@ export function ChatPanel({
                 operationsApplied++
               } else if (fileOp.type === 'edit_file' && fileOp.path && fileOp.content) {
                 // Update existing file with new content
-                await storageManager.updateFile(project.id, fileOp.path, { 
+                await storageManager.updateFile(project.id, fileOp.path, {
                   content: fileOp.content,
                   updatedAt: new Date().toISOString()
                 })
@@ -4887,14 +4921,14 @@ export function ChatPanel({
                 console.warn('[DEBUG] Skipped invalid file operation:', fileOp)
               }
             }
-            
+
             console.log(`[DEBUG] Applied ${operationsApplied}/${jsonResponse.fileOperations.length} file operations to IndexedDB`)
-            
+
             if (operationsApplied > 0) {
               // Force refresh the file explorer
               setTimeout(() => {
-                window.dispatchEvent(new CustomEvent('files-changed', { 
-                  detail: { projectId: project.id, forceRefresh: true } 
+                window.dispatchEvent(new CustomEvent('files-changed', {
+                  detail: { projectId: project.id, forceRefresh: true }
                 }))
               }, 100)
             }
@@ -4909,23 +4943,23 @@ export function ChatPanel({
         } else {
           console.log('[DEBUG] No file operations to process')
         }
-        
+
         // Refresh file explorer after any file operations
         if (jsonResponse.hasToolCalls && typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('files-changed', { detail: { projectId: project.id } }))
         }
-        
+
         // Show success toast for completed operations
         if (jsonResponse.success && jsonResponse.hasToolCalls) {
           const toolCount = jsonResponse.toolCalls?.length || 0
           const stepCount = jsonResponse.stepCount || 1
-          
+
           toast({
             title: "Operations Completed",
             description: `Successfully executed ${toolCount} tool(s) in ${stepCount} step(s).`,
           })
         }
-        
+
         // Show warning toast if there were errors
         if (jsonResponse.hasToolErrors) {
           toast({
@@ -4934,19 +4968,19 @@ export function ChatPanel({
             variant: "destructive"
           })
         }
-        
-        } else {
+
+      } else {
         // Streaming response - handle AI SDK streaming format
         const reader = response.body?.getReader()
         const decoder = new TextDecoder()
         let assistantContent = ""
         let assistantMessageId = (Date.now() + 1).toString()
-        
+
         // Track tool calls during streaming
         let toolCalls: any[] = []
         let hasToolCalls = false
         let hasToolErrors = false
-        
+
         // Reset XML commands for new message
         setXmlCommands([])
 
@@ -4966,35 +5000,35 @@ export function ChatPanel({
         if (reader) {
           try {
             let buffer = ""
-            
+
             while (true) {
               const { done, value } = await reader.read()
               if (done) break
 
               const chunk = decoder.decode(value, { stream: true })
               buffer += chunk
-              
+
               // Process complete SSE events from buffer
               // Handle concatenated events like: data: {...}data: {...}
               let remainingBuffer = buffer
-              
+
               while (remainingBuffer.length > 0) {
                 // Look for 'data: ' pattern
                 const dataIndex = remainingBuffer.indexOf('data: ')
                 if (dataIndex === -1) break
-                
+
                 // Extract the data part after 'data: '
                 const dataStart = dataIndex + 6
                 let dataEnd = remainingBuffer.indexOf('data: ', dataStart)
-                
+
                 // If no next 'data: ' found, check for newline or end of buffer
                 if (dataEnd === -1) {
                   const newlineIndex = remainingBuffer.indexOf('\n', dataStart)
                   dataEnd = newlineIndex !== -1 ? newlineIndex : remainingBuffer.length
                 }
-                
+
                 const dataStr = remainingBuffer.slice(dataStart, dataEnd).trim()
-                
+
                 // Process this SSE event
                 if (dataStr) {
                   // Handle [DONE] marker
@@ -5003,22 +5037,24 @@ export function ChatPanel({
                     setIsStreaming(false)
                     break
                   }
-                  
+
                   try {
                     const data = JSON.parse(dataStr)
                     console.log('[STREAM] Received event type:', data.type, 'Full data:', data)
-                    
+
                     // Handle text-delta events for actual content
                     if (data.type === 'text-delta' && data.delta) {
-                      assistantContent += data.delta
+                      // Normalize markdown spacing and preserve spaces in code contexts
+                      const normalizedDelta = normalizeMarkdownSpacing(assistantContent, data.delta)
+                      assistantContent += normalizedDelta
                       hasReceivedContent = true
-                      
+
                       // Set streaming state when content starts flowing
                       if (!isStreaming) {
                         setIsStreaming(true)
                       }
-                      
-                      console.log('[STREAM] Adding delta:', data.delta)
+
+                      console.log('[STREAM] Adding delta:', data.delta, '-> normalized:', normalizedDelta)
                       console.log('[DEBUG] Full assistant content length:', assistantContent.length)
                       console.log('[DEBUG] Assistant content preview:', assistantContent.substring(0, 500))
 
@@ -5032,22 +5068,22 @@ export function ChatPanel({
                       // Replace XML blocks with placeholders for inline display
                       const { content: processedContent, placeholders } = extractAndReplaceXMLBlocks(assistantContent, detectedTools)
                       console.log('[DEBUG] Processed content with placeholders:', processedContent.substring(0, 500))
-                      
+
                       // Process newly detected tools
                       let updatedXmlCommands = [...xmlCommands]
                       let hasNewTools = false
-                      
+
                       for (const detectedTool of detectedTools) {
                         // Check if this tool is already being tracked
-                        const existingTool = updatedXmlCommands.find(cmd => 
-                          cmd.name === detectedTool.name && 
-                          cmd.args.path === detectedTool.args.path && 
+                        const existingTool = updatedXmlCommands.find(cmd =>
+                          cmd.name === detectedTool.name &&
+                          cmd.args.path === detectedTool.args.path &&
                           (cmd.status === 'detected' || cmd.status === 'processing' || cmd.status === 'executing')
                         )
-                        
+
                         if (!existingTool) {
                           console.log('[CLIENT-TOOL] Detected new tool:', detectedTool.name, detectedTool.args)
-                          
+
                           // Add to tracking
                           updatedXmlCommands.push({
                             id: detectedTool.id,
@@ -5062,28 +5098,28 @@ export function ChatPanel({
                           hasNewTools = true
                         }
                       }
-                      
+
                       // Update state and UI if new tools were detected
                       if (hasNewTools) {
                         setXmlCommands(updatedXmlCommands)
                         setMessages(prev => prev.map(msg =>
                           msg.id === assistantMessageId
-                            ? { 
-                                ...msg, 
-                                metadata: {
-                                  ...msg.metadata,
-                                  xmlCommands: updatedXmlCommands
-                                }
+                            ? {
+                              ...msg,
+                              metadata: {
+                                ...msg.metadata,
+                                xmlCommands: updatedXmlCommands
                               }
+                            }
                             : msg
                         ))
                       }
-                      
+
                       // Check for completed tools (have closing tags)
                       let hasCompletedTools = false
                       for (let i = 0; i < updatedXmlCommands.length; i++) {
                         const tool = updatedXmlCommands[i]
-                        
+
                         if (tool.status === 'detected' && isXMLToolComplete(assistantContent, tool.name)) {
                           console.log('[CLIENT-TOOL] Tool completed, extracting content:', tool.name)
                           console.log('[DEBUG] Tool details:', tool)
@@ -5091,7 +5127,7 @@ export function ChatPanel({
                           // Extract content between tags
                           const extractedContent = extractXMLToolContent(assistantContent, tool.name)
                           console.log('[DEBUG] Extracted content length:', extractedContent.length)
-                          
+
                           // Update tool with extracted content
                           updatedXmlCommands[i] = {
                             ...tool,
@@ -5105,22 +5141,22 @@ export function ChatPanel({
                           hasCompletedTools = true
                         }
                       }
-                      
+
                       // Update state and UI if tools were completed
                       if (hasCompletedTools) {
                         setXmlCommands(updatedXmlCommands)
                         setMessages(prev => prev.map(msg =>
                           msg.id === assistantMessageId
-                            ? { 
-                                ...msg, 
-                                metadata: {
-                                  ...msg.metadata,
-                                  xmlCommands: updatedXmlCommands
-                                }
+                            ? {
+                              ...msg,
+                              metadata: {
+                                ...msg.metadata,
+                                xmlCommands: updatedXmlCommands
                               }
+                            }
                             : msg
                         ))
-                        
+
                         // Execute completed tools
                         for (const tool of updatedXmlCommands) {
                           if (tool.status === 'processing') {
@@ -5131,86 +5167,86 @@ export function ChatPanel({
                               status: 'executing',
                               startTime: tool.startTime
                             }
-                            
+
                             executeClientSideTool(toolCall, project.id)
                               .then((result) => {
                                 console.log('[CLIENT-TOOL] Tool executed successfully:', result)
-                                
+
                                 // Update the tool with result
-                                setXmlCommands(prev => prev.map(cmd => 
-                                  cmd.id === tool.id 
+                                setXmlCommands(prev => prev.map(cmd =>
+                                  cmd.id === tool.id
                                     ? { ...cmd, status: 'completed', result }
                                     : cmd
                                 ))
-                                
+
                                 setMessages(prev => prev.map(msg =>
                                   msg.id === assistantMessageId
-                                    ? { 
-                                        ...msg, 
-                                        metadata: {
-                                          ...msg.metadata,
-                                          xmlCommands: updatedXmlCommands.map(cmd => 
-                                            cmd.id === tool.id 
-                                              ? { ...cmd, status: 'completed', result }
-                                              : cmd
-                                          )
-                                        }
+                                    ? {
+                                      ...msg,
+                                      metadata: {
+                                        ...msg.metadata,
+                                        xmlCommands: updatedXmlCommands.map(cmd =>
+                                          cmd.id === tool.id
+                                            ? { ...cmd, status: 'completed', result }
+                                            : cmd
+                                        )
                                       }
+                                    }
                                     : msg
                                 ))
                               })
                               .catch((error) => {
                                 console.error('[CLIENT-TOOL] Tool execution failed:', error)
-                                
+
                                 // Update the tool with error
-                                setXmlCommands(prev => prev.map(cmd => 
-                                  cmd.id === tool.id 
+                                setXmlCommands(prev => prev.map(cmd =>
+                                  cmd.id === tool.id
                                     ? { ...cmd, status: 'failed', error: error.message }
                                     : cmd
                                 ))
-                                
+
                                 setMessages(prev => prev.map(msg =>
                                   msg.id === assistantMessageId
-                                    ? { 
-                                        ...msg, 
-                                        metadata: {
-                                          ...msg.metadata,
-                                          xmlCommands: updatedXmlCommands.map(cmd => 
-                                            cmd.id === tool.id 
-                                              ? { ...cmd, status: 'failed', error: error.message }
-                                              : cmd
-                                          )
-                                        }
+                                    ? {
+                                      ...msg,
+                                      metadata: {
+                                        ...msg.metadata,
+                                        xmlCommands: updatedXmlCommands.map(cmd =>
+                                          cmd.id === tool.id
+                                            ? { ...cmd, status: 'failed', error: error.message }
+                                            : cmd
+                                        )
                                       }
+                                    }
                                     : msg
                                 ))
                               })
                           }
                         }
                       }
-                      
+
                       // Update the message content incrementally with processed content and placeholders
                       setMessages(prev => prev.map(msg =>
                         msg.id === assistantMessageId
-                          ? { 
-                              ...msg, 
-                              content: processedContent,
-                              metadata: {
-                                ...msg.metadata,
-                                xmlCommands: updatedXmlCommands,
-                                xmlPlaceholders: placeholders // Store placeholders for inline rendering
-                              }
+                          ? {
+                            ...msg,
+                            content: processedContent,
+                            metadata: {
+                              ...msg.metadata,
+                              xmlCommands: updatedXmlCommands,
+                              xmlPlaceholders: placeholders // Store placeholders for inline rendering
                             }
+                          }
                           : msg
                       ))
-                      
+
                       // Note: Don't save incrementally to avoid multiple partial messages in DB
                       // The final complete message will be saved after streaming is done
                     }
                     // Handle tool call events
                     else if (data.type === 'tool-call') {
                       console.log('[STREAM] Tool call:', data)
-                      
+
                       const toolCall = {
                         name: data.toolName,
                         input: data.input || {},
@@ -5218,118 +5254,118 @@ export function ChatPanel({
                         status: 'pending',
                         result: null
                       }
-                      
+
                       toolCalls.push(toolCall)
                       hasToolCalls = true
-                      
+
                       // Update message with tool call
                       setMessages(prev => prev.map(msg =>
                         msg.id === assistantMessageId
-                          ? { 
-                              ...msg,
-                              metadata: {
-                                ...msg.metadata,
-                                toolCalls,
-                                hasToolCalls,
-                                hasToolErrors
-                              }
+                          ? {
+                            ...msg,
+                            metadata: {
+                              ...msg.metadata,
+                              toolCalls,
+                              hasToolCalls,
+                              hasToolErrors
                             }
+                          }
                           : msg
                       ))
                     }
                     // Handle tool result events
                     else if (data.type === 'tool-result') {
                       console.log('[STREAM] Tool result:', data)
-                      
+
                       // Find and update the corresponding tool call
                       const toolCallIndex = toolCalls.findIndex(tc => tc.id === (data.toolCallId || data.id))
                       if (toolCallIndex !== -1) {
                         toolCalls[toolCallIndex].result = data.output || data.result
                         toolCalls[toolCallIndex].status = 'completed'
                       }
-                      
+
                       // Update message with tool result
                       setMessages(prev => prev.map(msg =>
                         msg.id === assistantMessageId
-                          ? { 
-                              ...msg,
-                              metadata: {
-                                ...msg.metadata,
-                                toolCalls: [...toolCalls],
-                                hasToolCalls,
-                                hasToolErrors
-                              }
+                          ? {
+                            ...msg,
+                            metadata: {
+                              ...msg.metadata,
+                              toolCalls: [...toolCalls],
+                              hasToolCalls,
+                              hasToolErrors
                             }
+                          }
                           : msg
                       ))
                     }
                     // Handle tool error events
                     else if (data.type === 'tool-error') {
                       console.log('[STREAM] Tool error:', data)
-                      
+
                       // Find and update the corresponding tool call
                       const toolCallIndex = toolCalls.findIndex(tc => tc.id === (data.toolCallId || data.id))
                       if (toolCallIndex !== -1) {
                         toolCalls[toolCallIndex].status = 'error'
                         toolCalls[toolCallIndex].error = data.errorText || data.error
                       }
-                      
+
                       hasToolErrors = true
-                      
+
                       // Update message with tool error
                       setMessages(prev => prev.map(msg =>
                         msg.id === assistantMessageId
-                          ? { 
-                              ...msg,
-                              metadata: {
-                                ...msg.metadata,
-                                toolCalls: [...toolCalls],
-                                hasToolCalls,
-                                hasToolErrors
-                              }
+                          ? {
+                            ...msg,
+                            metadata: {
+                              ...msg.metadata,
+                              toolCalls: [...toolCalls],
+                              hasToolCalls,
+                              hasToolErrors
                             }
+                          }
                           : msg
                       ))
                     }
                     // Handle XML command detection events
                     else if (data.type === 'xml-command-detected') {
                       console.log('[STREAM] XML command detected:', data)
-                      
+
                       // Add XML command to tracking
                       if (!xmlCommands) {
                         setXmlCommands([])
                       }
-                      
+
                       setXmlCommands(prev => [...prev, {
                         id: `xml-${Date.now()}-${Math.random()}`,
                         command: data.command,
                         path: data.path,
                         status: data.status || 'executing'
                       }])
-                      
+
                       // Update message with XML command
                       setMessages(prev => prev.map(msg =>
                         msg.id === assistantMessageId
-                          ? { 
-                              ...msg,
-                              metadata: {
-                                ...msg.metadata,
-                                toolCalls,
-                                hasToolCalls,
-                                hasToolErrors,
-                                xmlCommands: [...xmlCommands]
-                              }
+                          ? {
+                            ...msg,
+                            metadata: {
+                              ...msg.metadata,
+                              toolCalls,
+                              hasToolCalls,
+                              hasToolErrors,
+                              xmlCommands: [...xmlCommands]
                             }
+                          }
                           : msg
                       ))
                     }
                     // Handle XML command result events
                     else if (data.type === 'xml-command-result') {
                       console.log('[STREAM] XML command result:', data)
-                      
+
                       // Find and update the corresponding XML command
                       setXmlCommands(prev => {
-                        const commandIndex = prev.findIndex(cmd => 
+                        const commandIndex = prev.findIndex(cmd =>
                           cmd.command === data.command && cmd.path === data.path && cmd.status === 'executing'
                         )
                         if (commandIndex !== -1) {
@@ -5344,20 +5380,20 @@ export function ChatPanel({
                         }
                         return prev
                       })
-                      
+
                       // Update message with XML command result
                       setMessages(prev => prev.map(msg =>
                         msg.id === assistantMessageId
-                          ? { 
-                              ...msg,
-                              metadata: {
-                                ...msg.metadata,
-                                toolCalls,
-                                hasToolCalls,
-                                hasToolErrors,
-                                xmlCommands: xmlCommands ? [...xmlCommands] : []
-                              }
+                          ? {
+                            ...msg,
+                            metadata: {
+                              ...msg.metadata,
+                              toolCalls,
+                              hasToolCalls,
+                              hasToolErrors,
+                              xmlCommands: xmlCommands ? [...xmlCommands] : []
                             }
+                          }
                           : msg
                       ))
                     }
@@ -5365,7 +5401,7 @@ export function ChatPanel({
                     else if (data.type === 'tool-results' && data.toolCalls) {
                       console.log('[STREAM] Tool results batch received:', data.toolCalls)
                       console.log('[STREAM] Current toolCalls array before update:', toolCalls)
-                      
+
                       // Process all tool results from the batch
                       data.toolCalls.forEach((toolCall: any) => {
                         console.log('[STREAM] Processing individual tool call:', toolCall)
@@ -5375,31 +5411,31 @@ export function ChatPanel({
                           id: toolCall.id,
                           result: toolCall.result
                         }
-                        
+
                         toolCalls.push(processedToolCall)
                         hasToolCalls = true
-                        
+
                         if (toolCall.result?.success === false) {
                           hasToolErrors = true
                         }
                       })
-                      
+
                       console.log('[STREAM] Updated toolCalls array:', toolCalls)
-                      
+
                       // Check for failed tools that need client-side execution
                       const failedTools = data.toolCalls.filter((tc: any) => tc.result?.success === false)
                       if (failedTools.length > 0) {
                         console.log('[STREAM] Found failed tools, attempting client-side execution:', failedTools)
-                        
+
                         // Execute failed tools client-side
                         for (const failedTool of failedTools) {
                           try {
                             console.log('[CLIENT-SIDE] Executing tool:', failedTool.name, failedTool.args)
-                            
+
                             if (failedTool.name === 'read_file' && failedTool.args?.path) {
                               const { storageManager } = await import('@/lib/storage-manager')
                               await storageManager.init()
-                              
+
                               const file = await storageManager.getFile(project.id, failedTool.args.path)
                               if (file) {
                                 // Update the tool call with successful result
@@ -5417,7 +5453,7 @@ export function ChatPanel({
                                     }
                                   }
                                   console.log('[CLIENT-SIDE] Successfully executed read_file for:', failedTool.args.path)
-                                  
+
                                   // Update hasToolErrors if all errors are now resolved
                                   hasToolErrors = toolCalls.some(tc => tc.result?.success === false)
                                 }
@@ -5425,7 +5461,7 @@ export function ChatPanel({
                             } else if (failedTool.name === 'list_files') {
                               const { storageManager } = await import('@/lib/storage-manager')
                               await storageManager.init()
-                              
+
                               const files = await storageManager.getFiles(project.id)
                               const toolIndex = toolCalls.findIndex(tc => tc.id === failedTool.id)
                               if (toolIndex !== -1) {
@@ -5451,14 +5487,14 @@ export function ChatPanel({
                             } else if (failedTool.name === 'write_file' && failedTool.args?.path && failedTool.args?.content !== undefined) {
                               const { storageManager } = await import('@/lib/storage-manager')
                               await storageManager.init()
-                              
+
                               try {
                                 // Check if file exists
                                 const existingFile = await storageManager.getFile(project.id, failedTool.args.path)
-                                
+
                                 if (existingFile) {
                                   // Update existing file
-                                  await storageManager.updateFile(project.id, failedTool.args.path, { 
+                                  await storageManager.updateFile(project.id, failedTool.args.path, {
                                     content: failedTool.args.content,
                                     updatedAt: new Date().toISOString()
                                   })
@@ -5475,7 +5511,7 @@ export function ChatPanel({
                                     isDirectory: false
                                   })
                                 }
-                                
+
                                 const toolIndex = toolCalls.findIndex(tc => tc.id === failedTool.id)
                                 if (toolIndex !== -1) {
                                   toolCalls[toolIndex] = {
@@ -5489,11 +5525,11 @@ export function ChatPanel({
                                   }
                                   console.log('[CLIENT-SIDE] Successfully executed write_file for:', failedTool.args.path)
                                   hasToolErrors = toolCalls.some(tc => tc.result?.success === false)
-                                  
+
                                   // Trigger file refresh
                                   setTimeout(() => {
-                                    window.dispatchEvent(new CustomEvent('files-changed', { 
-                                      detail: { projectId: project.id, forceRefresh: true } 
+                                    window.dispatchEvent(new CustomEvent('files-changed', {
+                                      detail: { projectId: project.id, forceRefresh: true }
                                     }))
                                   }, 100)
                                 }
@@ -5506,7 +5542,7 @@ export function ChatPanel({
                           }
                         }
                       }
-                      
+
                       // Also store server-side execution metadata
                       const serverMetadata = {
                         toolCalls: [...toolCalls],
@@ -5515,29 +5551,29 @@ export function ChatPanel({
                         serverSideExecution: data.serverSideExecution || true,
                         fileOperations: data.fileOperations || []
                       }
-                      
+
                       console.log('[STREAM] Final server metadata:', serverMetadata)
-                      
+
                       // Apply file operations to client-side IndexedDB for persistence (same as specs)
                       if (data.fileOperations && data.fileOperations.length > 0) {
                         console.log('[DEBUG] Processing streaming file operations:', data.fileOperations)
-                        
+
                         try {
                           const { storageManager } = await import('@/lib/storage-manager')
                           await storageManager.init()
-                          
+
                           let operationsApplied = 0
-                          
+
                           for (const fileOp of data.fileOperations) {
                             console.log('[DEBUG] Applying streaming file operation:', fileOp)
-                            
+
                             if (fileOp.type === 'write_file' && fileOp.path) {
                               // Check if file exists
                               const existingFile = await storageManager.getFile(project.id, fileOp.path)
-                              
+
                               if (existingFile) {
                                 // Update existing file
-                                await storageManager.updateFile(project.id, fileOp.path, { 
+                                await storageManager.updateFile(project.id, fileOp.path, {
                                   content: fileOp.content || '',
                                   updatedAt: new Date().toISOString()
                                 })
@@ -5559,7 +5595,7 @@ export function ChatPanel({
                               operationsApplied++
                             } else if (fileOp.type === 'edit_file' && fileOp.path && fileOp.content) {
                               // Update existing file with new content
-                              await storageManager.updateFile(project.id, fileOp.path, { 
+                              await storageManager.updateFile(project.id, fileOp.path, {
                                 content: fileOp.content,
                                 updatedAt: new Date().toISOString()
                               })
@@ -5574,14 +5610,14 @@ export function ChatPanel({
                               console.warn('[DEBUG] Skipped invalid streaming file operation:', fileOp)
                             }
                           }
-                          
+
                           console.log(`[DEBUG] Applied ${operationsApplied}/${data.fileOperations.length} streaming file operations to IndexedDB`)
-                          
+
                           if (operationsApplied > 0) {
                             // Force refresh the file explorer
                             setTimeout(() => {
-                              window.dispatchEvent(new CustomEvent('files-changed', { 
-                                detail: { projectId: project.id, forceRefresh: true } 
+                              window.dispatchEvent(new CustomEvent('files-changed', {
+                                detail: { projectId: project.id, forceRefresh: true }
                               }))
                             }, 100)
                           }
@@ -5596,17 +5632,17 @@ export function ChatPanel({
                       } else {
                         console.log('[DEBUG] No streaming file operations to process')
                       }
-                      
+
                       // Update message with all tool results
                       setMessages(prev => prev.map(msg =>
                         msg.id === assistantMessageId
-                          ? { 
-                              ...msg,
-                              metadata: {
-                                ...msg.metadata,
-                                ...serverMetadata
-                              }
+                          ? {
+                            ...msg,
+                            metadata: {
+                              ...msg.metadata,
+                              ...serverMetadata
                             }
+                          }
                           : msg
                       ))
                     }
@@ -5620,16 +5656,16 @@ export function ChatPanel({
                     else {
                       console.log('[STREAM] Ignoring event type:', data.type)
                     }
-                    
+
                   } catch (parseError) {
                     console.warn('[STREAM] JSON parse error:', parseError, 'for data:', dataStr.substring(0, 100))
                   }
                 }
-                
+
                 // Move to next event
                 remainingBuffer = remainingBuffer.slice(dataEnd)
               }
-              
+
               // Keep any remaining incomplete data in buffer
               const lastDataIndex = remainingBuffer.lastIndexOf('data: ')
               if (lastDataIndex !== -1) {
@@ -5641,18 +5677,18 @@ export function ChatPanel({
           } catch (streamError) {
             console.error('Streaming error:', streamError)
             // Update message with error content
-            setMessages(prev => prev.map(msg => 
-              msg.id === assistantMessageId 
+            setMessages(prev => prev.map(msg =>
+              msg.id === assistantMessageId
                 ? { ...msg, content: "Sorry, there was an error during streaming. Please try again." }
                 : msg
             ))
           } finally {
             // Ensure we have some content, even if streaming failed
             if (!hasReceivedContent || !assistantContent.trim()) {
-              setMessages(prev => prev.map(msg => 
-                msg.id === assistantMessageId 
+              setMessages(prev => prev.map(msg =>
+                msg.id === assistantMessageId
                   ? { ...msg, content: "I'm sorry, I couldn't generate a response. Please try again." }
-                : msg
+                  : msg
               ))
             }
           }
@@ -5681,11 +5717,11 @@ export function ChatPanel({
         // Auto-execute detected XML tools after streaming completes (LEGACY SUPPORT)
         if (autoExecutor && assistantContent) {
           console.log('[AutoExecutor] Processing detected XML tools after stream completion')
-          
+
           const finalDetectedTools = detectXMLTools(assistantContent)
           if (finalDetectedTools.length > 0) {
             console.log('[AutoExecutor] Final detected XML tools:', finalDetectedTools.length)
-            
+
             // Process each detected tool and wait for completion
             for (const tool of finalDetectedTools) {
               try {
@@ -5693,7 +5729,7 @@ export function ChatPanel({
                 if (isXMLToolComplete(assistantContent, tool.name)) {
                   // Extract the actual content between tags
                   const extractedContent = extractXMLToolContent(assistantContent, tool.name)
-                  
+
                   // Convert to XMLToolCall format
                   const xmlToolCall = {
                     id: tool.id,
@@ -5708,14 +5744,14 @@ export function ChatPanel({
                     status: 'detected' as const,
                     startTime: tool.startTime || Date.now()
                   }
-                  
+
                   console.log('[AutoExecutor] Auto-executing tool:', xmlToolCall.command, xmlToolCall.path)
                   console.log('[AutoExecutor] Tool content length:', xmlToolCall.content.length)
-                  
+
                   // Execute the tool automatically and wait for completion
                   const result = await autoExecutor.executeXMLTool(xmlToolCall)
                   console.log('[AutoExecutor] Tool execution result:', result)
-                  
+
                 } else {
                   console.log('[AutoExecutor] Incomplete tool detected, skipping:', tool.name)
                 }
@@ -5745,17 +5781,17 @@ export function ChatPanel({
 
           await saveMessageToIndexedDB(finalAssistantMessage)
         }
-        }
+      }
 
     } catch (error) {
       console.error('Error sending message:', error)
-      
+
       // Handle abort error specifically
       if (error instanceof Error && error.name === 'AbortError') {
         // Message was aborted, don't show error toast
         return
       }
-      
+
       toast({
         title: "Error",
         description: `Failed to send message: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -5784,21 +5820,21 @@ export function ChatPanel({
   // Add delete message function
   const handleDeleteMessage = async (msgId: string, role: "user" | "assistant" | "system") => {
     if (!project) return
-    
+
     try {
       // Remove message from UI immediately for better UX
       setMessages(prev => prev.filter(msg => msg.id !== msgId))
-      
+
       // Delete message from IndexedDB
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
-      
+
       // Get chat session for this project
       const chatSessions = await storageManager.getChatSessions(project.userId)
-      const activeSession = chatSessions.find((session: any) => 
+      const activeSession = chatSessions.find((session: any) =>
         session.workspaceId === project.id && session.isActive
       )
-      
+
       if (activeSession) {
         // Delete the message from the database
         const success = await storageManager.deleteMessage(activeSession.id, msgId)
@@ -5808,7 +5844,7 @@ export function ChatPanel({
           console.warn(`[ChatPanel] Failed to delete message ${msgId} from database`)
         }
       }
-      
+
       toast({
         title: "Message Deleted",
         description: "The message has been removed from the chat history."
@@ -5820,7 +5856,7 @@ export function ChatPanel({
         description: "Failed to delete the message. Please try again.",
         variant: "destructive"
       })
-      
+
       // Reload messages on error to maintain consistency
       if (project) {
         await loadChatHistory(project)
@@ -5834,7 +5870,7 @@ export function ChatPanel({
   const [showRevertDialog, setShowRevertDialog] = useState(false)
   const [isRestoreAvailable, setIsRestoreAvailable] = useState(false)
   const [restoreMessageId, setRestoreMessageId] = useState<string | null>(null) // Track which message to show restore icon for
-  
+
   // Check for restore availability on component mount and periodically
   useEffect(() => {
     const checkRestoreAvailability = async () => {
@@ -5843,7 +5879,7 @@ export function ChatPanel({
           // Load pre-revert states from storage
           const { loadPreRevertStatesFromStorage, isRestoreAvailableForMessage } = await import('@/lib/checkpoint-utils')
           loadPreRevertStatesFromStorage(project.id)
-          
+
           // Check if any message has a restore available
           let hasRestore = false
           for (const msg of messages) {
@@ -5862,26 +5898,26 @@ export function ChatPanel({
         console.error('[Checkpoint] Error checking restore availability:', error)
       }
     }
-    
+
     checkRestoreAvailability()
-    
+
     // Check every 30 seconds
     const interval = setInterval(checkRestoreAvailability, 30000)
-    
+
     return () => clearInterval(interval)
   }, [project, messages, restoreMessageId])
-  
+
   // Revert to checkpoint function
   const handleRevertToCheckpoint = async (messageId: string) => {
     if (!project || isReverting) return
-    
+
     // If this message is showing the restore icon, perform restore instead
     if (restoreMessageId === messageId) {
       // Perform restore operation for this specific message
       await handleRestoreForMessage(messageId);
       return;
     }
-    
+
     // Show confirmation dialog for revert
     setRevertMessageId(messageId)
     setShowRevertDialog(true)
@@ -5890,11 +5926,11 @@ export function ChatPanel({
   // New function to handle restore for a specific message
   const handleRestoreForMessage = async (messageId: string) => {
     if (!project) return
-    
+
     try {
       // Check if restore is available for this specific message
       const { isRestoreAvailableForMessage, restorePreRevertState } = await import('@/lib/checkpoint-utils')
-      
+
       if (!isRestoreAvailableForMessage(project.id, messageId)) {
         toast({
           title: "Restore Unavailable",
@@ -5905,16 +5941,16 @@ export function ChatPanel({
         setRestoreMessageId(null)
         return
       }
-      
+
       // Get the chat session for this project
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
-      
+
       const chatSessions = await storageManager.getChatSessions(project.userId)
-      const activeSession = chatSessions.find((session: any) => 
+      const activeSession = chatSessions.find((session: any) =>
         session.workspaceId === project.id && session.isActive
       )
-      
+
       if (!activeSession) {
         toast({
           title: "Restore Failed",
@@ -5923,23 +5959,23 @@ export function ChatPanel({
         })
         return
       }
-      
+
       // Restore the pre-revert state for this specific message
       const success = await restorePreRevertState(project.id, activeSession.id, messageId)
-      
+
       if (success) {
         // Reload the chat history to reflect restored messages
         await loadChatHistory(project)
-        
+
         // Force refresh the file explorer
-        window.dispatchEvent(new CustomEvent('files-changed', { 
-          detail: { projectId: project.id, forceRefresh: true } 
+        window.dispatchEvent(new CustomEvent('files-changed', {
+          detail: { projectId: project.id, forceRefresh: true }
         }))
-        
+
         // Clear the restore message ID
         setRestoreMessageId(null)
         setIsRestoreAvailable(false)
-        
+
         toast({
           title: "Restored Successfully",
           description: "Files and messages have been restored to their previous state."
@@ -5948,29 +5984,29 @@ export function ChatPanel({
     } catch (error) {
       console.error('[Checkpoint] Error restoring for message:', error)
       toast({
-          title: "Restore Failed",
-          description: error instanceof Error ? error.message : "An unknown error occurred.",
-          variant: "destructive"
+        title: "Restore Failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred.",
+        variant: "destructive"
       })
     }
   }
-  
+
   // Restore last reverted checkpoint
   const handleRestoreLastCheckpoint = async () => {
     if (!project) return
-    
+
     try {
       // Check if restore is available (using the old global method for backward compatibility)
       // We'll need to implement a new approach for the global restore
       const { clearAllPreRevertStates } = await import('@/lib/checkpoint-utils')
-      
+
       // For now, we'll just show a message that this feature needs to be reimplemented
       toast({
         title: "Restore Update",
         description: "The global restore feature has been updated. Please use the restore icon on the specific message you want to restore.",
         variant: "default"
       })
-      
+
       // Clear the global restore state
       clearAllPreRevertStates(project.id)
       setIsRestoreAvailable(false)
@@ -5988,20 +6024,20 @@ export function ChatPanel({
   // Confirm revert function
   const confirmRevert = async () => {
     if (!project || !revertMessageId) return
-    
+
     setIsReverting(true)
     setShowRevertDialog(false)
-    
+
     try {
       // Get the chat session for this project
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
-      
+
       const chatSessions = await storageManager.getChatSessions(project.userId)
-      const activeSession = chatSessions.find((session: any) => 
+      const activeSession = chatSessions.find((session: any) =>
         session.workspaceId === project.id && session.isActive
       )
-      
+
       if (!activeSession) {
         toast({
           title: "Revert Failed",
@@ -6012,27 +6048,27 @@ export function ChatPanel({
         setRevertMessageId(null)
         return
       }
-      
+
       // Capture the current state before revert for potential restore
       const { capturePreRevertState } = await import('@/lib/checkpoint-utils')
       await capturePreRevertState(project.id, activeSession.id, revertMessageId)
-      
+
       // Update restore availability state
       setIsRestoreAvailable(true)
-      
+
       // Get all checkpoints for this workspace
       const { getCheckpoints } = await import('@/lib/checkpoint-utils')
       const checkpoints = await getCheckpoints(project.id)
-      
+
       // Find the checkpoint associated with this message
       let checkpoint = checkpoints.find(cp => cp.messageId === revertMessageId) || undefined
-      
+
       if (!checkpoint) {
         // Try to find checkpoint by timestamp if message ID doesn't match
         // This handles cases where message ID might not match due to timing issues
         const allMessages = await storageManager.getMessages(activeSession.id)
         const targetMessage = allMessages.find(msg => msg.id === revertMessageId)
-        
+
         if (targetMessage) {
           // Find checkpoint closest to message creation time
           const targetTime = new Date(targetMessage.createdAt).getTime()
@@ -6041,12 +6077,12 @@ export function ChatPanel({
             const timeDiff = Math.abs(checkpointTime - targetTime)
             return timeDiff <= 2000 // 2 seconds tolerance
           });
-          
+
           if (foundCheckpoint) {
             checkpoint = foundCheckpoint;
           }
         }
-        
+
         if (!checkpoint) {
           toast({
             title: "Revert Failed",
@@ -6058,15 +6094,15 @@ export function ChatPanel({
           return
         }
       }
-      
+
       // Get all messages in the session
       const allMessages = await storageManager.getMessages(activeSession.id)
-      
+
       // Try to find the message by ID first
       let revertMessageIndex = allMessages.findIndex(msg => msg.id === revertMessageId)
       let revertTimestamp = ''
       let revertMessage = null
-      
+
       if (revertMessageIndex !== -1) {
         // Found the message by ID
         revertMessage = allMessages[revertMessageIndex]
@@ -6080,12 +6116,12 @@ export function ChatPanel({
           content: msg.content.substring(0, 50) + '...',
           createdAt: msg.createdAt
         })))
-        
+
         // If we can't find by ID, try to find by checkpoint creation time
         // This handles cases where the message hasn't been saved to DB yet or there's a timing issue
         const checkpointTime = new Date(checkpoint.createdAt).getTime()
         console.log(`[Checkpoint] Looking for message near checkpoint time: ${checkpoint.createdAt} (${checkpointTime})`)
-        
+
         // Find the message closest to the checkpoint creation time
         revertMessageIndex = allMessages.findIndex(msg => {
           const msgTime = new Date(msg.createdAt).getTime()
@@ -6094,7 +6130,7 @@ export function ChatPanel({
           console.log(`[Checkpoint] Message ${msg.id} time diff: ${timeDiff}ms`)
           return timeDiff <= 2000
         })
-        
+
         if (revertMessageIndex !== -1) {
           // Found a message close to checkpoint time
           revertMessage = allMessages[revertMessageIndex]
@@ -6106,7 +6142,7 @@ export function ChatPanel({
           console.log(`[Checkpoint] Using checkpoint timestamp as fallback: ${revertTimestamp}`)
         }
       }
-      
+
       if (!revertTimestamp) {
         toast({
           title: "Revert Failed",
@@ -6117,12 +6153,12 @@ export function ChatPanel({
         setRevertMessageId(null)
         return
       }
-      
+
       // Delete messages that came after this timestamp
       const { deleteMessagesAfter } = await import('@/lib/checkpoint-utils')
       const deletedCount = await deleteMessagesAfter(activeSession.id, revertTimestamp)
       console.log(`[Checkpoint] Deleted ${deletedCount} messages after timestamp ${revertTimestamp}`)
-      
+
       // Update the messages state to remove messages after the revert point
       // First, we'll update the UI immediately for better UX
       setMessages(prevMessages => {
@@ -6134,33 +6170,33 @@ export function ChatPanel({
         // If we couldn't find by ID, we'll reload after the restore completes
         return prevMessages
       })
-      
+
       // Restore the checkpoint
       const { restoreCheckpoint } = await import('@/lib/checkpoint-utils')
       const success = await restoreCheckpoint(checkpoint.id)
-      
+
       if (success) {
         // Force refresh the file explorer
-        window.dispatchEvent(new CustomEvent('files-changed', { 
-          detail: { projectId: project.id, forceRefresh: true } 
+        window.dispatchEvent(new CustomEvent('files-changed', {
+          detail: { projectId: project.id, forceRefresh: true }
         }))
-        
+
         // Small delay to ensure UI updates properly
         await new Promise(resolve => setTimeout(resolve, 100))
-        
+
         // Reload messages to ensure consistency between UI and database
         // This also helps avoid "Node cannot be found" errors
         await loadChatHistory(project)
-        
+
         // Set this message to show restore icon
         setRestoreMessageId(revertMessageId)
-        
+
         // Populate the input area with the reverted message content for editing
         if (revertMessage) {
           setInputMessage(revertMessage.content);
           setIsEditingRevertedMessage(true); // Set edit mode
         }
-        
+
         toast({
           title: "Reverted Successfully",
           description: `Files and messages have been restored to this version. The message is now in edit mode.`
@@ -6190,7 +6226,7 @@ export function ChatPanel({
       setRevertMessageId(null)
     }
   }
-  
+
   const cancelRevert = () => {
     setShowRevertDialog(false)
     setRevertMessageId(null)
@@ -6202,15 +6238,15 @@ export function ChatPanel({
 
     const container = messagesContainerRef.current
     const { scrollTop, scrollHeight, clientHeight } = container
-    
+
     // Show button when user is not near the bottom (within 100px)
     const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
     const shouldShow = !isNearBottom && messages.length > 0
-    
+
     // For mobile - more aggressive showing logic
     const isMobileDevice = isMobile || window.innerWidth <= 768
     const forceShowMobile = isMobileDevice && messages.length > 2 && scrollHeight > clientHeight * 1.2
-    
+
     setShowScrollToBottom(shouldShow || forceShowMobile)
   }, [messages.length, isMobile])
 
@@ -6264,7 +6300,7 @@ export function ChatPanel({
     }
 
     container.addEventListener('scroll', handleScroll, { passive: true })
-    
+
     // Initial check
     checkScrollPosition()
 
@@ -6292,17 +6328,17 @@ export function ChatPanel({
       checkScrollPosition()
     }
   }, [messages.length, scrollToBottom, checkScrollPosition])
-  
+
   return (
     <div className="flex flex-col h-full">
-      
+
       {/* Revert Confirmation Dialog */}
       <AlertDialog open={showRevertDialog} onOpenChange={setShowRevertDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Revert to Previous Version?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will restore all files in your project to the state they were in when this message was sent. 
+              This will restore all files in your project to the state they were in when this message was sent.
               All changes made since then will be permanently lost.
               <br /><br />
               <strong className="text-foreground">This will also clear all messages that came after this point.</strong>
@@ -6310,7 +6346,7 @@ export function ChatPanel({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={cancelRevert}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={confirmRevert}
               className="bg-destructive hover:bg-destructive/90"
             >
@@ -6319,18 +6355,17 @@ export function ChatPanel({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      
+
       {/* Diagnostics Panel */}
       {showDiagnostics && !isMobile && (
         <div className="border-b border-border">
           <ChatDiagnostics project={project} />
         </div>
       )}
-      
+
       {/* Messages Container - Fixed height, scrollable */}
-      <div className={`flex-1 min-h-0 overflow-hidden bg-background relative ${
-        isMobile ? 'pb-52' : ''
-      }`}>
+      <div className={`flex-1 min-h-0 overflow-hidden bg-background relative ${isMobile ? 'pb-52' : ''
+        }`}>
         <div
           ref={messagesContainerRef}
           className="h-full overflow-y-auto overflow-x-hidden p-4"
@@ -6347,10 +6382,10 @@ export function ChatPanel({
               </div>
               <h3 className="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">Welcome to {project?.name}</h3>
               <p className="text-gray-600 dark:text-gray-400 max-w-md mb-8 leading-relaxed">
-                Start chatting to build, edit, and manage your project files. 
+                Start chatting to build, edit, and manage your project files.
                 I can help you create components, fix code, and understand your project structure.
               </p>
-             
+
             </div>
           ) : (
             <div className="space-y-3">
@@ -6372,10 +6407,10 @@ export function ChatPanel({
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Assistant message */}
                     {msg.role === 'assistant' && (
-                      <div className="mb-3">
+                      <div className="mb-3 markdown-body chat-message-content bg-transparent">
                         <div className="flex items-start">
                           <div className="flex-1 min-w-0">
                             {/* Workflow mode rendering */}
@@ -6393,7 +6428,7 @@ export function ChatPanel({
                                 hasErrors={msg.metadata.hasToolErrors || false}
                               />
                             )}
-                            
+
                             {/* Tool execution results - exclude tool_results_summary as it displays in assistant bubble */}
                             {msg.metadata?.toolCalls && msg.metadata.toolCalls.length > 0 && (
                               <div className="space-y-2 mb-4">
@@ -6405,7 +6440,7 @@ export function ChatPanel({
                                 }
                               </div>
                             )}
-                            
+
                             {/* XML Tool execution results */}
                             {msg.metadata?.xmlCommands && msg.metadata.xmlCommands.length > 0 && (
                               <div className="space-y-2 mb-4">
@@ -6424,9 +6459,9 @@ export function ChatPanel({
                                     startTime: xmlCommand.startTime,
                                     endTime: xmlCommand.endTime
                                   }
-                                  
+
                                   return (
-                                    <XMLToolPill 
+                                    <XMLToolPill
                                       key={toolCall.id}
                                       toolCall={toolCall}
                                     />
@@ -6434,27 +6469,29 @@ export function ChatPanel({
                                 })}
                               </div>
                             )}
-                            
+
                             {/* Message content */}
-                            <div className="bg-card text-card-foreground border rounded-xl shadow-sm overflow-hidden w-full">
+                            <div className="bg-card
+                            chat-message-content bg-transparent
+                            border rounded-xl shadow-sm overflow-hidden w-full">
                               <div className="p-4">
                                 {(() => {
                                   // First check for JSON tools (new format)
                                   const jsonTools = detectJsonTools(msg.content)
                                   if (jsonTools.length > 0) {
                                     console.log('[DEBUG] Rendering', jsonTools.length, 'JSON tools as pills')
-                                    
+
                                     // Direct rendering of JSON tools as pills
                                     const components: React.ReactNode[] = []
                                     let remainingContent = msg.content
                                     let elementKey = 0
-                                    
+
                                     // Remove JSON code blocks from content and replace with pills
                                     const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/gi
                                     let match
                                     let currentPosition = 0
                                     let usedTools = new Set<string>() // Track used tools to avoid duplicates
-                                    
+
                                     while ((match = codeBlockRegex.exec(msg.content)) !== null) {
                                       // Add content before the code block
                                       if (match.index > currentPosition) {
@@ -6469,29 +6506,29 @@ export function ChatPanel({
                                           )
                                         }
                                       }
-                                      
+
                                       // Find matching JSON tool for this code block
                                       const jsonContent = match[1]
                                       let matchingTool: JsonToolCall | undefined
-                                      
+
                                       try {
                                         const parsed = JSON.parse(jsonContent)
                                         if (parsed.tool) {
                                           // Find unused tool that matches
-                                          matchingTool = jsonTools.find(tool => 
-                                            !usedTools.has(tool.id) && 
-                                            tool.tool === parsed.tool && 
+                                          matchingTool = jsonTools.find(tool =>
+                                            !usedTools.has(tool.id) &&
+                                            tool.tool === parsed.tool &&
                                             tool.path === parsed.path
                                           )
-                                          
+
                                           // If no exact match, find by tool type only
                                           if (!matchingTool) {
-                                            matchingTool = jsonTools.find(tool => 
-                                              !usedTools.has(tool.id) && 
+                                            matchingTool = jsonTools.find(tool =>
+                                              !usedTools.has(tool.id) &&
                                               tool.tool === parsed.tool
                                             )
                                           }
-                                          
+
                                           // If still no match, create a synthetic tool call from the JSON
                                           if (!matchingTool && parsed.tool && (parsed.path || parsed.content)) {
                                             matchingTool = {
@@ -6513,7 +6550,7 @@ export function ChatPanel({
                                       } catch (error) {
                                         console.warn('[DEBUG] Failed to parse JSON in code block:', error, jsonContent)
                                       }
-                                      
+
                                       if (matchingTool) {
                                         usedTools.add(matchingTool.id)
                                         components.push(
@@ -6531,10 +6568,10 @@ export function ChatPanel({
                                           </div>
                                         )
                                       }
-                                      
+
                                       currentPosition = match.index + match[0].length
                                     }
-                                    
+
                                     // Add any unused tools as pills (for bare JSON not in code blocks)
                                     const unusedTools = jsonTools.filter(tool => !usedTools.has(tool.id))
                                     unusedTools.forEach(tool => {
@@ -6543,7 +6580,7 @@ export function ChatPanel({
                                       )
                                       console.log('[DEBUG] Rendered unused tool as pill:', tool.tool, tool.path)
                                     })
-                                    
+
                                     // Add any remaining content
                                     if (currentPosition < msg.content.length) {
                                       const afterContent = msg.content.slice(currentPosition)
@@ -6557,18 +6594,18 @@ export function ChatPanel({
                                         )
                                       }
                                     }
-                                    
+
                                     return (
                                       <div className="space-y-3">
                                         {components}
                                       </div>
                                     )
                                   }
-                                  
+
                                   // Check if content has valid XML tools (not just keywords) - Legacy support
                                   const hasXMLTools = hasValidXMLTools(msg.content)
                                   const hasExistingPlaceholders = /<!-- XMLTOOL_pilot\w+_\d+_[a-z0-9]+ -->/.test(msg.content)
-                                  
+
                                   if (hasXMLTools) {
                                     // Direct rendering of XML tools - only for valid XML syntax
                                     const renderedComponents = renderXMLToolsDirectly(msg.content)
@@ -6597,19 +6634,19 @@ export function ChatPanel({
                                     }
                                     // If no valid components were rendered, fall through to normal content
                                   }
-                                  
+
                                   // Otherwise, render normal markdown content
                                   return (
-                                    <div className="chat-message-content prose prose-sm max-w-none">
-                                      <ReactMarkdown 
+                                    <div className="markdown-body chat-message-content bg-transparent break-words" style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
+                                      <ReactMarkdown
                                         remarkPlugins={[remarkGfm]}
                                         components={{
-                                          code: ({node, className, children, ...props}: any) => {
+                                          code: ({ node, className, children, ...props }: any) => {
                                             const match = /language-(\w+)/.exec(className || '')
                                             const language = match ? match[1] : ''
                                             const isInline = !className
                                             const codeString = String(children).replace(/\n$/, '')
-                                            
+
                                             // Copy function for code blocks
                                             const handleCopy = async () => {
                                               try {
@@ -6628,9 +6665,9 @@ export function ChatPanel({
                                                 })
                                               }
                                             }
-                                            
+
                                             return isInline ? (
-                                              <code className="bg-gray-700/80 px-2 py-1 rounded-md text-sm font-mono border border-gray-600 text-green-300 backdrop-blur-sm" {...props}>
+                                              <code className="bg-gray-700/90 px-2 py-1 rounded-md text-sm font-mono border border-gray-500 text-green-300 backdrop-blur-sm whitespace-nowrap" {...props}>
                                                 {children}
                                               </code>
                                             ) : (
@@ -6655,7 +6692,7 @@ export function ChatPanel({
                                                       Copy
                                                     </button>
                                                   </div>
-                                                  
+
                                                   {/* Code content */}
                                                   <div className="relative">
                                                     <pre className="p-4 overflow-x-auto bg-gray-900/50 backdrop-blur-sm">
@@ -6668,81 +6705,131 @@ export function ChatPanel({
                                               </div>
                                             );
                                           },
-                                          
-                                          // Enhanced paragraph rendering with proper spacing
-                                          p: ({ children }) => {
-                                            const text = String(children).trim()
-                                            // Add proper spacing for paragraphs
-                                            return (
-                                              <p className="text-gray-100 leading-[1.7] text-sm mb-4 last:mb-0 font-normal tracking-wide">
-                                                {children}
-                                                {/* Auto-add period if missing for long paragraphs */}
-                                                {text.length > 50 && !text.match(/[.!?]$/) && text.split(' ').length > 8 && '.'}
-                                              </p>
-                                            )
-                                          },
-                                          
-                                          // Enhanced list rendering with better spacing
-                                          ul: ({ children }) => (
-                                            <ul className="list-disc list-outside space-y-2 text-gray-100 mb-4 pl-6">
-                                              {children}
-                                            </ul>
-                                          ),
-                                          
-                                          ol: ({ children }) => (
-                                            <ol className="list-decimal list-outside space-y-2 text-gray-100 mb-4 pl-6">
-                                              {children}
-                                            </ol>
-                                          ),
-                                          
-                                          // Enhanced list items with custom styling
-                                          li: ({ children }) => (
-                                            <li className="text-sm leading-relaxed mb-1">
-                                              <div className="flex items-start gap-2">
-                                                <div className="flex-1">{children}</div>
-                                              </div>
-                                            </li>
-                                          ),
-                                          
-                                          // Enhanced heading rendering with emojis and better spacing
-                                          h1: ({ children }) => (
-                                            <h1 className="text-xl font-bold mb-4 mt-6 text-white border-b border-gray-600 pb-2 flex items-center gap-2">
-                                              <span className="text-yellow-400">🎯</span>
-                                              {children}
-                                            </h1>
-                                          ),
-                                          
-                                          h2: ({ children }) => (
-                                            <h2 className="text-lg font-bold mb-3 mt-5 text-white flex items-center gap-2">
-                                              <span className="text-blue-400">📌</span>
-                                              {children}
-                                            </h2>
-                                          ),
-                                          
-                                          h3: ({ children }) => (
-                                            <h3 className="text-base font-semibold mb-2 mt-4 text-gray-200 flex items-center gap-2">
-                                              <span className="text-green-400">▶</span>
-                                              {children}
-                                            </h3>
-                                          ),
-                                          
-                                          h4: ({ children }) => (
-                                            <h4 className="text-sm font-semibold mb-2 mt-3 text-gray-300 flex items-center gap-2">
-                                              <span className="text-purple-400">◆</span>
-                                              {children}
-                                            </h4>
-                                          ),
-                                          
-                                          // Enhanced blockquote with better styling
+
+                          // Enhanced paragraph rendering with proper spacing and line breaks
+                          p: ({ children }) => {
+                            // Clean any stray hashtags from paragraphs
+                            const cleanChildren = typeof children === 'string' 
+                              ? children.replace(/\s*#{1,6}\s*$/g, '').replace(/\s*#{1,6}\s+/g, ' ')
+                              : children
+                            return (
+                              <p className="text-gray-100 leading-relaxed text-sm mb-2.5 font-normal break-words" style={{ whiteSpace: 'pre-wrap' }}>
+                                {cleanChildren}
+                              </p>
+                            )
+                          },
+
+                          // Clean list rendering with native bullets/numbers (following best practices)
+                          ul: ({ children }) => (
+                            <ul className="list-disc list-outside ml-4 text-gray-100 my-2" style={{ whiteSpace: 'pre-wrap' }}>
+                              {children}
+                            </ul>
+                          ),
+
+                          ol: ({ children }) => (
+                            <ol className="list-decimal list-outside ml-4 text-gray-100 my-2" style={{ whiteSpace: 'pre-wrap' }}>
+                              {children}
+                            </ol>
+                          ),
+
+                          // Simple list items with minimal styling matching paragraph style
+                          li: ({ children }) => {
+                            return (
+                              <li className="py-1 text-sm leading-relaxed text-gray-100 font-normal break-words" style={{ whiteSpace: 'pre-wrap' }}>
+                                {children}
+                              </li>
+                            )
+                          },
+
+                          // Clean heading rendering (following best practices)
+                          h1: ({ children }) => {
+                            // Clean hashtags from heading text
+                            const cleanText = typeof children === 'string' 
+                              ? children.replace(/^\s*#+\s*/, '').replace(/\s*#+\s*$/, '').trim()
+                              : children
+                            return (
+                              <h1 className="text-3xl font-semibold mt-6 mb-2 text-white first:mt-0">
+                                {cleanText}
+                              </h1>
+                            )
+                          },
+
+                          h2: ({ children }) => {
+                            const cleanText = typeof children === 'string' 
+                              ? children.replace(/^\s*#+\s*/, '').replace(/\s*#+\s*$/, '').trim()
+                              : children
+                            return (
+                              <h2 className="text-sm font-semibold mt-6 mb-2 text-white first:mt-0">
+                                {cleanText}
+                              </h2>
+                            )
+                          },
+
+                          h3: ({ children }) => {
+                            const cleanText = typeof children === 'string' 
+                              ? children.replace(/^\s*#+\s*/, '').replace(/\s*#+\s*$/, '').trim()
+                              : children
+                            return (
+                              <h3 className="text-xl font-semibold mt-6 mb-2 text-gray-100 first:mt-0">
+                                {cleanText}
+                              </h3>
+                            )
+                          },
+
+                          h4: ({ children }) => {
+                            const cleanText = typeof children === 'string' 
+                              ? children.replace(/^\s*#+\s*/, '').replace(/\s*#+\s*$/, '').trim()
+                              : children
+                            return (
+                              <h4 className="text-lg font-semibold mt-6 mb-2 text-gray-200 first:mt-0">
+                                {cleanText}
+                              </h4>
+                            )
+                          },
+
+                          h5: ({ children }) => {
+                            const cleanText = typeof children === 'string' 
+                              ? children.replace(/^\s*#+\s*/, '').replace(/\s*#+\s*$/, '').trim()
+                              : children
+                            return (
+                              <h5 className="text-base font-semibold mt-6 mb-2 text-gray-300 first:mt-0">
+                                {cleanText}
+                              </h5>
+                            )
+                          },
+
+                          h6: ({ children }) => {
+                            const cleanText = typeof children === 'string' 
+                              ? children.replace(/^\s*#+\s*/, '').replace(/\s*#+\s*$/, '').trim()
+                              : children
+                            return (
+                              <h6 className="text-sm font-semibold mt-6 mb-2 text-gray-400 first:mt-0">
+                                {cleanText}
+                              </h6>
+                            )
+                          },
+
+                          // Enhanced blockquote with better styling
                                           blockquote: ({ children }) => (
-                                            <blockquote className="border-l-4 border-blue-500 bg-gray-800/50 pl-4 pr-4 py-3 my-4 italic text-gray-300 rounded-r-lg backdrop-blur-sm">
-                                              <div className="flex items-start gap-2">
-                                                <span className="text-blue-400 text-lg">💡</span>
-                                                <div className="flex-1">{children}</div>
-                                              </div>
+                                            <blockquote className="border-l-4 border-blue-500 bg-gray-800/50 pl-5 pr-4 py-3.5 my-5 text-gray-300 rounded-r-lg backdrop-blur-sm">
+                                              {children}
                                             </blockquote>
                                           ),
-                                          
+
+                                          // Enhanced strong/bold text with better contrast - MUCH more prominent
+                                          strong: ({ children }) => (
+                                            <strong className="font-black text-white bg-gray-800/40 px-1 rounded">
+                                              {children}
+                                            </strong>
+                                          ),
+
+                                          // Enhanced emphasis/italic text
+                                          em: ({ children }) => (
+                                            <em className="italic text-gray-100">
+                                              {children}
+                                            </em>
+                                          ),
+
                                           // Enhanced table rendering
                                           table: ({ children }) => (
                                             <div className="my-4 overflow-x-auto rounded-lg border border-gray-600">
@@ -6751,43 +6838,43 @@ export function ChatPanel({
                                               </table>
                                             </div>
                                           ),
-                                          
+
                                           thead: ({ children }) => (
                                             <thead className="bg-gray-700">
                                               {children}
                                             </thead>
                                           ),
-                                          
+
                                           tbody: ({ children }) => (
                                             <tbody className="bg-gray-800/50">
                                               {children}
                                             </tbody>
                                           ),
-                                          
+
                                           th: ({ children }) => (
                                             <th className="px-4 py-2 text-left font-semibold text-gray-200 border-b border-gray-600">
                                               {children}
                                             </th>
                                           ),
-                                          
+
                                           td: ({ children }) => (
                                             <td className="px-4 py-2 text-gray-300 border-b border-gray-700">
                                               {children}
                                             </td>
                                           ),
-                                          
+
                                           // Enhanced link rendering
                                           a: ({ href, children }) => (
-                                            <a 
-                                              href={href} 
-                                              target="_blank" 
+                                            <a
+                                              href={href}
+                                              target="_blank"
                                               rel="noopener noreferrer"
                                               className="text-blue-400 hover:text-blue-300 underline decoration-blue-400/50 hover:decoration-blue-300 transition-colors duration-200"
                                             >
                                               {children}
                                             </a>
                                           ),
-                                          
+
                                           // Enhanced horizontal rule
                                           hr: () => (
                                             <div className="my-6 flex items-center">
@@ -6798,7 +6885,15 @@ export function ChatPanel({
                                           ),
                                         }}
                                       >
-                                        {preprocessMarkdownContent(msg.content)}
+                                        {(() => {
+                                          const processed = preprocessMarkdownContent(msg.content)
+                                          // Debug: Log the processed content to see what's being rendered
+                                          if (process.env.NODE_ENV === 'development') {
+                                            console.log('[Markdown Debug] Original:', msg.content.substring(0, 200))
+                                            console.log('[Markdown Debug] Processed:', processed.substring(0, 200))
+                                          }
+                                          return processed
+                                        })()}
                                       </ReactMarkdown>
                                     </div>
                                   )
@@ -6809,7 +6904,7 @@ export function ChatPanel({
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Action buttons */}
                     <div className="flex items-start mt-2">
                       <button
@@ -6818,9 +6913,9 @@ export function ChatPanel({
                         onClick={async () => {
                           // Retry the message by sending it again
                           if (!project || isLoading) return;
-                          
+
                           const messageContent = msg.content;
-                          
+
                           const userMessage: Message = {
                             id: Date.now().toString(),
                             role: "user",
@@ -6837,7 +6932,7 @@ export function ChatPanel({
 
                           // Save user message to IndexedDB
                           await saveMessageToIndexedDB(userMessage)
-                          
+
                           // Create checkpoint for this message
                           if (project) {
                             try {
@@ -6905,10 +7000,10 @@ export function ChatPanel({
                                 if (line.startsWith('data: ')) {
                                   try {
                                     const data = JSON.parse(line.slice(6))
-                                    
+
                                     if (data.type === 'content') {
                                       assistantMessage.content += data.content
-                                      setMessages(prev => prev.map(msg => 
+                                      setMessages(prev => prev.map(msg =>
                                         msg.id === assistantMessage.id ? { ...assistantMessage } : msg
                                       ))
                                     }
@@ -6924,12 +7019,12 @@ export function ChatPanel({
 
                           } catch (error) {
                             console.error('Error retrying message:', error)
-                            
+
                             if (error instanceof Error && error.name === 'AbortError') {
                               console.log('Retry request was aborted')
                               return
                             }
-                            
+
                             toast({
                               title: "Error",
                               description: `Failed to retry message: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -6962,7 +7057,7 @@ export function ChatPanel({
                   </div>
                 </div>
               ))}
-              
+
               {/* Show interactive thinking indicator when loading */}
               {isLoading && (
                 <div className="mb-6">
@@ -6974,7 +7069,7 @@ export function ChatPanel({
             </div>
           )}
         </div>
-        
+
         {/* Floating Scroll to Bottom Button */}
         <FloatingScrollToBottom
           isVisible={showScrollToBottom}
@@ -6982,14 +7077,13 @@ export function ChatPanel({
           isMobile={isMobile}
         />
       </div>
-      
+
       {/* Footer - Fixed on mobile, normal on desktop */}
-      <footer className={`border-t border-border flex-shrink-0 bg-background ${
-        isMobile 
-          ? 'fixed bottom-12 left-0 right-0 p-4 z-30 border-b' 
+      <footer className={`border-t border-border flex-shrink-0 bg-background ${isMobile
+          ? 'fixed bottom-12 left-0 right-0 p-4 z-30 border-b'
           : 'p-4'
-      }`}>
-        
+        }`}>
+
         <form onSubmit={handleSendMessage} className="space-y-3">
           {/* Attached Files Display (@ command) */}
           {attachedFiles.length > 0 && (
@@ -7082,7 +7176,7 @@ export function ChatPanel({
                   >
                     <Plus className="w-4 h-4" />
                   </button>
-                  
+
                   {/* Attachment menu dropdown */}
                   {showAttachmentMenu && (
                     <div className="absolute bottom-full left-0 mb-2 bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-2 min-w-[160px] z-20">
@@ -7125,13 +7219,12 @@ export function ChatPanel({
                   type="button"
                   onClick={handleMicrophoneClick}
                   disabled={isTranscribing}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                    isRecording 
-                      ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse' 
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isRecording
+                      ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse'
                       : isTranscribing
-                      ? 'bg-gray-600 cursor-wait'
-                      : 'bg-gray-700 hover:bg-gray-600 text-gray-400 hover:text-white'
-                  }`}
+                        ? 'bg-gray-600 cursor-wait'
+                        : 'bg-gray-700 hover:bg-gray-600 text-gray-400 hover:text-white'
+                    }`}
                   title={isRecording ? "Stop recording" : isTranscribing ? "Transcribing..." : "Start voice input"}
                 >
                   {isTranscribing ? (
@@ -7145,7 +7238,7 @@ export function ChatPanel({
               </div>
 
               {/* Mode selector at bottom left inside input */}
-          {/*<AiModeSelector
+              {/*<AiModeSelector
   selectedMode={bbbbbbbbbbbaiMode}
   onModeChange={onModeChange ?? (() => {})}
   compact
@@ -7159,15 +7252,15 @@ export function ChatPanel({
                   const newValue = e.target.value;
                   setInputMessage(newValue);
                   const textarea = e.target as HTMLTextAreaElement;
-                  
+
                   // Handle @ command detection
                   const cursorPos = textarea.selectionStart;
                   const atCommand = detectAtCommand(newValue, cursorPos);
-                  
+
                   if (atCommand) {
                     setFileQuery(atCommand.query);
                     setAtCommandStartIndex(atCommand.startIndex);
-                    
+
                     if (!showFileDropdown) {
                       const position = calculateDropdownPosition(textarea, atCommand.startIndex);
                       setDropdownPosition(position);
@@ -7178,7 +7271,7 @@ export function ChatPanel({
                       closeFileDropdown();
                     }
                   }
-                  
+
                   // Reset to baseline then expand up to the max
                   textarea.style.height = '90px';
                   const newHeight = Math.min(textarea.scrollHeight, 160)
@@ -7204,7 +7297,7 @@ export function ChatPanel({
                   const textarea = e.target as HTMLTextAreaElement;
                   const cursorPos = textarea.selectionStart;
                   const atCommand = detectAtCommand(inputMessage, cursorPos);
-                  
+
                   if (atCommand && !showFileDropdown) {
                     setFileQuery(atCommand.query);
                     setAtCommandStartIndex(atCommand.startIndex);
@@ -7228,16 +7321,15 @@ export function ChatPanel({
                       return; // Let the dropdown component handle these
                     }
                   }
-                  
+
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
                     handleSendMessage(e)
                   }
                 }}
                 placeholder={isEditingRevertedMessage ? "Editing reverted message... Make changes and press Enter to send" : isLoading ? "PiPilot is working..." : "Type, speak, or attach. Use @ for files, + for images/files, 🎤 for voice."}
-                className={`flex-1 bg-transparent border-none outline-none text-white placeholder-gray-400 text-[15px] resize-none rounded-md py-2 leading-[1.5] min-h-[90px] max-h-[160px] ${
-                  isEditingRevertedMessage ? 'border-yellow-500 ring-yellow-500 ring-2' : ''
-                }`}
+                className={`flex-1 bg-transparent border-none outline-none text-white placeholder-gray-400 text-[15px] resize-none rounded-md py-2 leading-[1.5] min-h-[90px] max-h-[160px] ${isEditingRevertedMessage ? 'border-yellow-500 ring-yellow-500 ring-2' : ''
+                  }`}
                 disabled={isLoading}
                 rows={1}
                 style={{
@@ -7300,7 +7392,7 @@ export function ChatPanel({
           // Auth modal handles navigation internally
         }}
       />
-      
+
     </div>
   )
 }
