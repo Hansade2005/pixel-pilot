@@ -3664,6 +3664,20 @@ function preprocessMarkdownContent(content: string): string {
   // Add space before ` if directly attached to non-space characters
   content = content.replace(/([^\s])`/g, '$1 `')
 
+  // FIX: Add spaces after common punctuation that AI often omits
+  // Add space after colons when followed by letters/numbers
+  content = content.replace(/:([A-Za-z0-9])/g, ': $1')
+  // Add space after commas when followed by letters or numbers
+  content = content.replace(/,([A-Za-z0-9])/g, ', $1')
+  // Add space after periods only when followed by capital letters (new sentences)
+  content = content.replace(/\.([A-Z])/g, '. $1')
+  // Fix incorrectly spaced decimal numbers (e.g., "5. 7" -> "5.7")
+  content = content.replace(/(\d)\. (\d)/g, '$1.$2')
+  // Add space after dashes when followed by letters
+  content = content.replace(/-([A-Za-z])/g, '- $1')
+  // Add space after parentheses when followed by letters
+  content = content.replace(/\)([A-Za-z])/g, ') $1')
+
   // Keep double newlines for proper paragraph separation, but limit to max 2
   content = content.replace(/\n{3,}/g, '\n\n')
 
