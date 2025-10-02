@@ -3665,6 +3665,28 @@ function preprocessMarkdownContent(content: string): string {
   content = content.replace(/([^\s])`/g, '$1 `')
 
   // FIX: Add spaces after common punctuation that AI often omits
+  // But skip content inside markdown formatting (bold, italic, code)
+  // First, temporarily replace markdown spans with placeholders
+  const markdownPlaceholders: string[] = []
+  let placeholderIndex = 0
+
+  // Replace **bold** spans with placeholders
+  content = content.replace(/\*\*([^*]+)\*\*/g, (match) => {
+    const placeholder = `__BOLD_PLACEHOLDER_${placeholderIndex}__`
+    markdownPlaceholders[placeholderIndex] = match
+    placeholderIndex++
+    return placeholder
+  })
+
+  // Replace `code` spans with placeholders
+  content = content.replace(/`([^`]+)`/g, (match) => {
+    const placeholder = `__CODE_PLACEHOLDER_${placeholderIndex}__`
+    markdownPlaceholders[placeholderIndex] = match
+    placeholderIndex++
+    return placeholder
+  })
+
+  // Now apply spacing rules to non-markdown content
   // Add space after colons when followed by letters/numbers
   content = content.replace(/:([A-Za-z0-9])/g, ': $1')
   // Add space after commas when followed by letters or numbers
@@ -3677,6 +3699,23 @@ function preprocessMarkdownContent(content: string): string {
   content = content.replace(/-([A-Za-z])/g, '- $1')
   // Add space after parentheses when followed by letters
   content = content.replace(/\)([A-Za-z])/g, ') $1')
+
+  // FIX: Handle common AI date formatting issues
+  // Add space between month names and day numbers (e.g., "October2" -> "October 2")
+  content = content.replace(/(January|February|March|April|May|June|July|August|September|October|November|December)(\d)/g, '$1 $2')
+  // Add space between month abbreviations and day numbers (e.g., "Dec2024" -> "Dec 2024")
+  content = content.replace(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(\d)/g, '$1 $2')
+
+  // Restore markdown spans
+  content = content.replace(/__BOLD_PLACEHOLDER_(\d+)__/g, (match, index) => {
+    return markdownPlaceholders[parseInt(index)] || match
+  })
+  content = content.replace(/__CODE_PLACEHOLDER_(\d+)__/g, (match, index) => {
+    return markdownPlaceholders[parseInt(index)] || match
+  })
+
+  // Fix double spaces that might be created
+  content = content.replace(/  +/g, ' ')
 
   // Keep double newlines for proper paragraph separation, but limit to max 2
   content = content.replace(/\n{3,}/g, '\n\n')
