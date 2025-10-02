@@ -3646,13 +3646,23 @@ function preprocessMarkdownContent(content: string): string {
 
   // REMOVED: These were adding excessive \n\n spacing causing large gaps between content
 
-  // Bold text in list items (common pattern: "Label: Description")
-  content = content.replace(/^([*+\-•]|\d+\.)\s+([^:\n]+):\s*/gm, '$1 **$2:** ')
+  // DISABLED: Bold text formatting in list items can break existing bold markdown
+  // Commenting out to prevent interference with AI-generated bold formatting
+  // content = content.replace(/^([*+\-•]|\d+\.)\s+([^:\n*]+):\s*/gm, '$1 **$2:** ')
 
-  // Clean up malformed bold markers (spaces inside the asterisks)
-  // Fix: "** text**" or "**text **" → "**text**"
-  content = content.replace(/\*\*\s+([^\*]+?)\s*\*\*/g, '**$1**')
-  content = content.replace(/\*\*\s*([^\*]+?)\s+\*\*/g, '**$1**')
+  // DISABLED: Cleaning up bold markers can break properly formatted markdown
+  // The AI model generates correct markdown, so we should not modify it
+  // Commenting out to preserve original bold formatting
+  // content = content.replace(/\*\*\s+([^\*]+?)\s*\*\*/g, '**$1**')
+  // content = content.replace(/\*\*\s*([^\*]+?)\s+\*\*/g, '**$1**')
+
+  // FIX: Ensure proper spacing around bold markers for ReactMarkdown parsing
+  // Add space before ** if directly attached to non-space characters
+  content = content.replace(/([^\s])\*\*/g, '$1 **')
+
+  // FIX: Ensure proper spacing around inline code markers for ReactMarkdown parsing
+  // Add space before ` if directly attached to non-space characters
+  content = content.replace(/([^\s])`/g, '$1 `')
 
   // Keep double newlines for proper paragraph separation, but limit to max 2
   content = content.replace(/\n{3,}/g, '\n\n')
