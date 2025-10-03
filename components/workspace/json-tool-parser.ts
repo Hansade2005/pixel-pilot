@@ -36,9 +36,17 @@ export interface JsonToolCall {
   endTime?: number
 }
 
+export interface ContentSegment {
+  type: 'text' | 'tool'
+  content?: string
+  tool?: JsonToolCall
+  index: number
+}
+
 export interface JsonParseResult {
   tools: JsonToolCall[]
   processedContent: string
+  segments: ContentSegment[] // Ordered segments for proper rendering
 }
 
 /**
@@ -58,31 +66,79 @@ export class JsonToolParser {
    */
   public parseJsonTools(content: string): JsonParseResult {
     const tools: JsonToolCall[] = []
+    const segments: ContentSegment[] = []
     let processedContent = content
 
     // Find JSON tool patterns in the content
     const toolMatches = this.findJsonToolBlocks(content)
 
+    // Sort matches by position to process in order
+    toolMatches.sort((a, b) => a.startIndex - b.startIndex)
+
+    // Build segments array tracking text and tool positions
+    let lastIndex = 0
+    let segmentIndex = 0
+
     for (const match of toolMatches) {
       try {
+        // Add text segment before this tool (if any)
+        if (match.startIndex > lastIndex) {
+          const textContent = content.substring(lastIndex, match.startIndex).trim()
+          if (textContent) {
+            segments.push({
+              type: 'text',
+              content: textContent,
+              index: segmentIndex++
+            })
+          }
+        }
+
+        // Parse and add tool segment
         const parsedTool = this.parseJsonBlock(match.json, match.startIndex)
         if (parsedTool) {
-          tools.push({
+          const toolWithId = {
             ...parsedTool,
             id: this.generateId(),
             startTime: Date.now()
+          }
+          
+          tools.push(toolWithId)
+          
+          segments.push({
+            type: 'tool',
+            tool: toolWithId,
+            index: segmentIndex++
           })
 
-          // Replace JSON block with placeholder in processed content
-          const placeholder = `[${parsedTool.tool.toUpperCase()}: ${parsedTool.path || parsedTool.args.path || 'unknown'}]`
-          processedContent = processedContent.replace(match.json, placeholder)
+          // Remove JSON block from processed content
+          processedContent = processedContent.replace(match.json, '')
         }
+
+        // Update last index to end of this JSON block
+        lastIndex = match.startIndex + match.json.length
       } catch (error) {
         console.error('[JsonToolParser] Failed to parse JSON block:', error, match.json)
       }
     }
 
-    return { tools, processedContent }
+    // Add remaining text after last tool (if any)
+    if (lastIndex < content.length) {
+      const textContent = content.substring(lastIndex).trim()
+      if (textContent) {
+        segments.push({
+          type: 'text',
+          content: textContent,
+          index: segmentIndex++
+        })
+      }
+    }
+
+    // Clean up excessive whitespace left after removing JSON blocks
+    processedContent = processedContent
+      .replace(/\n{3,}/g, '\n\n') // Max 2 consecutive newlines
+      .trim()
+
+    return { tools, processedContent, segments }
   }
 
   /**
