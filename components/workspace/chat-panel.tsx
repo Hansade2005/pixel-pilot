@@ -4561,7 +4561,7 @@ export function ChatPanel({
 
     // Reset textarea height to default during loading
     if (textareaRef.current) {
-      textareaRef.current.style.height = '64px'
+      textareaRef.current.style.height = '90px'
       textareaRef.current.style.overflowY = 'hidden'
     }
 
@@ -7027,7 +7027,7 @@ export function ChatPanel({
                   }
                   
                   // Reset to baseline then expand up to the max (90px)
-                  textarea.style.height = '64px';
+                  textarea.style.height = '90px';
                   const newHeight = Math.min(textarea.scrollHeight, 140)
                   textarea.style.height = newHeight + 'px';
                   // Only show a vertical scrollbar when content exceeds the max height
@@ -7041,7 +7041,7 @@ export function ChatPanel({
                 }}
                 onInput={(e) => {
                   const textarea = e.target as HTMLTextAreaElement;
-                  textarea.style.height = '54px';
+                  textarea.style.height = '90px';
                   const newHeight = Math.min(textarea.scrollHeight, 140)
                   textarea.style.height = newHeight + 'px';
                   textarea.style.overflowY = textarea.scrollHeight > 140 ? 'auto' : 'hidden'
@@ -7088,8 +7088,8 @@ export function ChatPanel({
                 disabled={isLoading}
                 rows={1}
                 style={{
-                  height: '77px',
-                  minHeight: '48px',
+                  height: '90px',
+                  minHeight: '80px',
                   maxHeight: '140px',
                   overflowY: 'hidden', // hide scrollbar until content exceeds maxHeight
                   resize: 'none',
