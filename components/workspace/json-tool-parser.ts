@@ -3,8 +3,6 @@
  * Replaces XML parsing with reliable JSON parsing similar to specs route
  */
 
-import { SchemaAwareJSONRepairEngine } from '../../schema-aware-json-repair-engine.js'
-
 export interface SearchReplaceBlock {
   search: string
   replace: string
@@ -51,7 +49,6 @@ export class JsonToolParser {
     'read_file', 'list_files', 'create_directory',
     'pilotwrite', 'pilotedit', 'pilotdelete'
   ]
-  private repairEngine = new SchemaAwareJSONRepairEngine()
 
   /**
    * Extract and parse JSON tool calls from content
@@ -67,15 +64,13 @@ export class JsonToolParser {
       try {
         const parsedTool = this.parseJsonBlock(match.json, match.startIndex)
         if (parsedTool) {
-          const toolId = this.generateId()
           tools.push({
             ...parsedTool,
-            id: toolId,
+            id: this.generateId(),
             startTime: Date.now()
           })
 
-          // Replace JSON block with simple text placeholder (for display only, not for parsing)
-          // Matches specs-own pattern: human-readable fallback text
+          // Replace JSON block with placeholder in processed content
           const placeholder = `[${parsedTool.tool.toUpperCase()}: ${parsedTool.path || parsedTool.args.path || 'unknown'}]`
           processedContent = processedContent.replace(match.json, placeholder)
         }
@@ -83,11 +78,6 @@ export class JsonToolParser {
         console.error('[JsonToolParser] Failed to parse JSON block:', error, match.json)
       }
     }
-
-    // Clean up excessive whitespace left after removing JSON blocks
-    processedContent = processedContent
-      .replace(/\n{3,}/g, '\n\n') // Max 2 consecutive newlines
-      .trim()
 
     return { tools, processedContent }
   }
@@ -122,11 +112,8 @@ export class JsonToolParser {
     while ((match = codeBlockPattern.exec(content)) !== null) {
       try {
         const jsonContent = match[1]
-        const repairResult = this.repairEngine.repair(jsonContent) as any
-        if (repairResult.data && repairResult.data.tool && this.supportedTools.includes(repairResult.data.tool)) {
-          if (repairResult.confidence < 1.0) {
-            console.log(`[JsonToolParser] Repaired malformed JSON in code block with ${repairResult.confidence} confidence`)
-          }
+        const parsed = JSON.parse(jsonContent)
+        if (parsed.tool && this.supportedTools.includes(parsed.tool)) {
           blocks.push({
             json: jsonContent,
             startIndex: match.index
@@ -192,16 +179,10 @@ export class JsonToolParser {
    */
   private parseJsonBlock(jsonString: string, startIndex: number): Omit<JsonToolCall, 'id' | 'startTime'> | null {
     try {
-      const repairResult = this.repairEngine.repair(jsonString) as any
-      const parsed = repairResult.data
-
-      if (!parsed || !parsed.tool || !this.supportedTools.includes(parsed.tool)) {
+      const parsed = JSON.parse(jsonString)
+      
+      if (!parsed.tool || !this.supportedTools.includes(parsed.tool)) {
         return null
-      }
-
-      // Log if repair was needed
-      if (repairResult.confidence < 1.0) {
-        console.log(`[JsonToolParser] Repaired malformed JSON tool call with ${repairResult.confidence} confidence: ${parsed.tool}`)
       }
 
       // Build standardized args object
