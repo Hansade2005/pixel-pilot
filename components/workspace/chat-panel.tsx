@@ -5103,14 +5103,11 @@ export function ChatPanel({
 
                     // Handle text-delta events for actual content
                     if (data.type === 'text-delta' && data.delta) {
-                      // Process delta through buffer to handle code blocks line-by-line
-                      // This preserves all whitespace and formatting exactly as received
-                      const readyToEmit = processStreamingDelta(streamBuffer, data.delta)
-                      
-                      // Only update display if we have content ready to emit
-                      if (readyToEmit) {
-                        // Add content directly - whitespace is preserved from source
-                        assistantContent += readyToEmit
+                      // Server-side processing: chunks are pre-buffered and whitespace-preserved
+                      // No client-side buffering needed when serverProcessed flag is present
+                      if (data.serverProcessed) {
+                        // Direct addition - server already handled buffering and whitespace
+                        assistantContent += data.delta
                         hasReceivedContent = true
 
                         // Set streaming state when content starts flowing
@@ -5118,14 +5115,33 @@ export function ChatPanel({
                           setIsStreaming(true)
                         }
 
-                        console.log('[STREAM] Adding buffered delta (whitespace preserved):', readyToEmit.substring(0, 100), '...')
-                        console.log('[DEBUG] Full assistant content length:', assistantContent.length)
-                        console.log('[DEBUG] Assistant content preview:', assistantContent.substring(0, 500))
+                        console.log('[CLIENT-STREAM] Received server-processed chunk (optimized):', data.delta.substring(0, 100), '...')
                       } else {
-                        // Content is buffered (inside code block), skip update this cycle
-                        console.log('[STREAM] Buffering partial code block...')
-                        continue
+                        // Fallback for legacy/non-server-processed chunks
+                        // Process delta through buffer to handle code blocks line-by-line
+                        const readyToEmit = processStreamingDelta(streamBuffer, data.delta)
+                        
+                        // Only update display if we have content ready to emit
+                        if (readyToEmit) {
+                          // Add content directly - whitespace is preserved from source
+                          assistantContent += readyToEmit
+                          hasReceivedContent = true
+
+                          // Set streaming state when content starts flowing
+                          if (!isStreaming) {
+                            setIsStreaming(true)
+                          }
+
+                          console.log('[CLIENT-STREAM] Client-side buffered delta:', readyToEmit.substring(0, 100), '...')
+                        } else {
+                          // Content is buffered (inside code block), skip update this cycle
+                          console.log('[CLIENT-STREAM] Buffering partial code block...')
+                          continue
+                        }
                       }
+                      
+                      console.log('[DEBUG] Full assistant content length:', assistantContent.length)
+                      console.log('[DEBUG] Assistant content preview:', assistantContent.substring(0, 500))
 
                       // Enhanced XML tool detection and processing with inline replacement
                       const detectedTools = detectXMLTools(assistantContent)
@@ -5815,12 +5831,13 @@ export function ChatPanel({
                 : msg
             ))
           } finally {
-            // Finalize stream buffer to emit any remaining content
+            // Finalize client-side stream buffer (only for non-server-processed streams)
+            // Server-side processing already handles buffer finalization
             const remainingContent = finalizeStreamBuffer(streamBuffer)
-            if (remainingContent) {
+            if (remainingContent && remainingContent.trim()) {
               // Add remaining content directly - whitespace preserved
               assistantContent += remainingContent
-              console.log('[STREAM] Finalized buffer with remaining content (whitespace preserved):', remainingContent.substring(0, 100))
+              console.log('[CLIENT-STREAM] Finalized client buffer with remaining content:', remainingContent.substring(0, 100))
               
               // Update display with final content
               const detectedTools = detectXMLTools(assistantContent)

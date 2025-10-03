@@ -5941,25 +5941,81 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
           return 'text'
         }
 
-        // Helper function to preprocess content for better frontend rendering
+        // Server-side stream buffer for whitespace preservation and performance
+        interface ServerStreamBuffer {
+          content: string
+          inCodeBlock: boolean
+          lastEmittedContent: string
+        }
+
+        const createServerStreamBuffer = (): ServerStreamBuffer => ({
+          content: '',
+          inCodeBlock: false,
+          lastEmittedContent: ''
+        })
+
+        // Process streaming delta on server side to reduce client load
+        const processServerStreamingDelta = (buffer: ServerStreamBuffer, newDelta: string): string => {
+          // Add new delta to buffer
+          buffer.content += newDelta
+          
+          // Check if we're entering or exiting a code block
+          const codeBlockMarkers = buffer.content.match(/```/g) || []
+          const wasInCodeBlock = buffer.inCodeBlock
+          buffer.inCodeBlock = codeBlockMarkers.length % 2 !== 0
+          
+          // If we're in a code block, buffer it
+          if (buffer.inCodeBlock) {
+            // Find the start of the current code block
+            const lastCodeBlockStart = buffer.content.lastIndexOf('```')
+            
+            // Extract everything up to the code block
+            const beforeCodeBlock = buffer.content.substring(0, lastCodeBlockStart)
+            
+            // If there's content before the code block that hasn't been emitted, emit it
+            if (beforeCodeBlock.length > buffer.lastEmittedContent.length) {
+              const toEmit = beforeCodeBlock.substring(buffer.lastEmittedContent.length)
+              buffer.lastEmittedContent = beforeCodeBlock
+              return toEmit
+            }
+            
+            // Don't emit partial code blocks
+            return ''
+          }
+          
+          // If we just exited a code block, emit the complete code block
+          if (wasInCodeBlock && !buffer.inCodeBlock) {
+            const toEmit = buffer.content.substring(buffer.lastEmittedContent.length)
+            buffer.lastEmittedContent = buffer.content
+            return toEmit
+          }
+          
+          // Not in a code block - emit line by line as they complete
+          const lines = buffer.content.split('\n')
+          const completeLines = lines.slice(0, -1) // All but the last (potentially incomplete) line
+          const completeContent = completeLines.join('\n') + (completeLines.length > 0 ? '\n' : '')
+          
+          if (completeContent.length > buffer.lastEmittedContent.length) {
+            const toEmit = completeContent.substring(buffer.lastEmittedContent.length)
+            buffer.lastEmittedContent = completeContent
+            return toEmit
+          }
+          
+          return ''
+        }
+
+        // Finalize server buffer and return remaining content
+        const finalizeServerStreamBuffer = (buffer: ServerStreamBuffer): string => {
+          const remaining = buffer.content.substring(buffer.lastEmittedContent.length)
+          buffer.lastEmittedContent = buffer.content
+          return remaining
+        }
+
+        // Helper function to preprocess content for better frontend rendering (DEPRECATED - whitespace preserved by buffer)
         const preprocessForFrontend = (chunk: string): string => {
-          let processed = chunk
-          
-          // Ensure proper spacing around headers
-          processed = processed.replace(/^(#{1,6}\s)/gm, '\n$1')
-          processed = processed.replace(/(#{1,6}\s.*$)/gm, '$1\n')
-          
-          // Ensure proper spacing around lists
-          processed = processed.replace(/^(\d+\.\s)/gm, '\n$1')
-          processed = processed.replace(/^([-*+]\s)/gm, '\n$1')
-          
-          // Add line breaks after sentences
-          processed = processed.replace(/([.!?])\s+([A-Z])/g, '$1\n\n$2')
-          
-          // Clean up multiple consecutive newlines
-          processed = processed.replace(/\n{3,}/g, '\n\n')
-          
-          return processed.trim()
+          // No longer preprocessing to preserve exact whitespace
+          // Server-side buffering handles formatting
+          return chunk
         }
 
         // Create a readable stream that handles both preprocessing results and JSON commands
@@ -6095,6 +6151,9 @@ Use this context to provide accurate, file-aware responses to the user's request
             let accumulatedResponse = ''
             const executedToolCalls: any[] = []
             
+            // Initialize server-side stream buffer for performance
+            const serverBuffer = createServerStreamBuffer()
+            
             // Listen for tool execution events during streaming
             const handleToolExecution = (event: CustomEvent) => {
               console.log('[MEMORY] Tool executed during streaming:', event.detail)
@@ -6117,34 +6176,30 @@ Use this context to provide accurate, file-aware responses to the user's request
               window.addEventListener('xml-tool-executed', handleToolExecution as EventListener)
             }
             
+            console.log('[SERVER-STREAM] Starting server-side buffered streaming for performance')
+            
             for await (const chunk of result.textStream) {
               // Accumulate response for memory
               accumulatedResponse += chunk
               
-              // Send text delta with enhanced formatting info
-              if (chunk.trim()) {
+              // Process chunk through server-side buffer (reduces client load)
+              const readyToEmit = processServerStreamingDelta(serverBuffer, chunk)
+              
+              // Only send content when it's ready (complete lines or code blocks)
+              if (readyToEmit) {
                 // Detect content type for better frontend handling
-                const contentType = detectContentType(chunk)
+                const contentType = detectContentType(readyToEmit)
                 
-                // Pre-process for better frontend rendering
-                const processedChunk = preprocessForFrontend(chunk)
-                
+                // Send pre-processed chunk to reduce client-side work
                 controller.enqueue(`data: ${JSON.stringify({
                   type: 'text-delta',
-                  delta: chunk,
-                  processedDelta: processedChunk,
+                  delta: readyToEmit,
                   format: 'markdown',
                   contentType: contentType,
-                  hasLineBreaks: chunk.includes('\n'),
-                  hasHeaders: /^#{1,6}\s/.test(chunk.trim()),
-                  hasList: /^[\s]*[-*+]\s/.test(chunk.trim()),
-                  hasNumbers: /^\d+\.\s/.test(chunk.trim()),
+                  serverProcessed: true,
+                  whitespacePreserved: true,
+                  hasLineBreaks: readyToEmit.includes('\n'),
                   renderHints: {
-                    needsLineBreak: contentType === 'paragraph-break',
-                    needsListFormatting: contentType.includes('list'),
-                    needsHeaderSpacing: contentType === 'header',
-                    needsCopyButton: contentType.includes('code-block'),
-                    isSQLCode: contentType === 'code-block-sql',
                     isCodeBlock: contentType.includes('code-block'),
                     codeLanguage: contentType.startsWith('code-block-') 
                       ? contentType.replace('code-block-', '') 
@@ -6152,6 +6207,25 @@ Use this context to provide accurate, file-aware responses to the user's request
                   }
                 })}\n\n`)
               }
+              // else: content is buffered (inside code block or incomplete line), skip this cycle
+            }
+            
+            // Finalize buffer and send any remaining content
+            const remainingContent = finalizeServerStreamBuffer(serverBuffer)
+            if (remainingContent) {
+              console.log('[SERVER-STREAM] Flushing remaining buffered content')
+              accumulatedResponse += remainingContent // Ensure it's in accumulated response
+              
+              const contentType = detectContentType(remainingContent)
+              controller.enqueue(`data: ${JSON.stringify({
+                type: 'text-delta',
+                delta: remainingContent,
+                format: 'markdown',
+                contentType: contentType,
+                serverProcessed: true,
+                whitespacePreserved: true,
+                isFinalChunk: true
+              })}\n\n`)
             }
             
             // Clean up event listeners
