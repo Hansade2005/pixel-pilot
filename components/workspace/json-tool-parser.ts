@@ -74,9 +74,9 @@ export class JsonToolParser {
             startTime: Date.now()
           })
 
-          // Replace JSON block with a special marker that will be replaced with pill component
-          // Using a unique marker that won't appear in regular content
-          const placeholder = `__JSONTOOL_PILL_${toolId}__`
+          // Replace JSON block with simple text placeholder (for display only, not for parsing)
+          // Matches specs-own pattern: human-readable fallback text
+          const placeholder = `[${parsedTool.tool.toUpperCase()}: ${parsedTool.path || parsedTool.args.path || 'unknown'}]`
           processedContent = processedContent.replace(match.json, placeholder)
         }
       } catch (error) {
