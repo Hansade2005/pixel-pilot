@@ -6653,28 +6653,46 @@ export function ChatPanel({
                                   // First check for JSON tools (new format)
                                   const parseResult = parseJsonToolsWithContent(msg.content)
                                   if (parseResult.tools.length > 0) {
-                                    console.log('[DEBUG] Rendering', parseResult.tools.length, 'JSON tools as pills')
+                                    console.log('[DEBUG] Rendering', parseResult.tools.length, 'JSON tools as pills inline')
 
-                                    // Render JSON tools as pills with processed content
+                                    // Create a map of tool IDs to tool objects for quick lookup
+                                    const toolsById = new Map(parseResult.tools.map(tool => [tool.id, tool]))
+
+                                    // Split content by pill markers and render inline
                                     const components: React.ReactNode[] = []
-
-                                    // Add processed content (JSON blocks replaced with placeholders)
-                                    if (parseResult.processedContent.trim()) {
-                                      components.push(
-                                        <div key="processed-content" className="markdown-content">
-                                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                            {parseResult.processedContent}
-                                          </ReactMarkdown>
-                                        </div>
-                                      )
-                                    }
-
-                                    // Add all JSON tools as pills
-                                    parseResult.tools.forEach((tool, index) => {
-                                      components.push(
-                                        project ? <JSONToolPill key={`json-tool-${index}`} toolCall={tool} status="completed" autoExecutor={autoExecutor} project={project} /> : null
-                                      )
-                                      console.log('[DEBUG] Rendered JSONToolPill for:', tool.tool, tool.path)
+                                    const parts = parseResult.processedContent.split(/(__JSONTOOL_PILL_[^_]+__)/)
+                                    
+                                    parts.forEach((part, index) => {
+                                      // Check if this part is a pill marker
+                                      const pillMatch = part.match(/__JSONTOOL_PILL_([^_]+)__/)
+                                      
+                                      if (pillMatch) {
+                                        // This is a pill marker - render the actual pill
+                                        const toolId = pillMatch[1]
+                                        const tool = toolsById.get(toolId)
+                                        
+                                        if (tool && project) {
+                                          components.push(
+                                            <JSONToolPill 
+                                              key={`json-tool-${toolId}`} 
+                                              toolCall={tool} 
+                                              status="completed" 
+                                              autoExecutor={autoExecutor} 
+                                              project={project} 
+                                            />
+                                          )
+                                          console.log('[DEBUG] Rendered inline JSONToolPill for:', tool.tool, tool.path)
+                                        }
+                                      } else if (part.trim()) {
+                                        // This is regular text content - render as markdown
+                                        components.push(
+                                          <div key={`content-${index}`} className="markdown-content">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                              {part}
+                                            </ReactMarkdown>
+                                          </div>
+                                        )
+                                      }
                                     })
 
                                     return (

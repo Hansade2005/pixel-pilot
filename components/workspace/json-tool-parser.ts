@@ -67,15 +67,17 @@ export class JsonToolParser {
       try {
         const parsedTool = this.parseJsonBlock(match.json, match.startIndex)
         if (parsedTool) {
+          const toolId = this.generateId()
           tools.push({
             ...parsedTool,
-            id: this.generateId(),
+            id: toolId,
             startTime: Date.now()
           })
 
-          // Remove JSON block from processed content (pills will be rendered separately)
-          // Also remove surrounding empty lines to clean up formatting
-          processedContent = processedContent.replace(match.json, '')
+          // Replace JSON block with a special marker that will be replaced with pill component
+          // Using a unique marker that won't appear in regular content
+          const placeholder = `__JSONTOOL_PILL_${toolId}__`
+          processedContent = processedContent.replace(match.json, placeholder)
         }
       } catch (error) {
         console.error('[JsonToolParser] Failed to parse JSON block:', error, match.json)
