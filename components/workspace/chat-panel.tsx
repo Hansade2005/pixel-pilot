@@ -57,7 +57,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { XMLToolAutoExecutor } from './xml-tool-auto-executor'
-import { jsonToolParser, JsonToolCall, ContentSegment, JsonParseResult } from './json-tool-parser'
+import { jsonToolParser, JsonToolCall } from './json-tool-parser'
 
 interface Message {
   id: string
@@ -1855,15 +1855,14 @@ function detectJsonTools(content: string): JsonToolCall[] {
   return parseResult.tools
 }
 
-// Get full JSON parse result including processed content and segments
-function parseJsonToolsWithContent(content: string): JsonParseResult {
+// Get full JSON parse result including processed content
+function parseJsonToolsWithContent(content: string): { tools: JsonToolCall[], processedContent: string } {
   console.log('[DEBUG] parseJsonToolsWithContent called with content length:', content.length)
   console.log('[DEBUG] Content preview:', content.substring(0, 200))
 
   // Use JSON parser for reliable tool detection and content processing
   const parseResult = jsonToolParser.parseJsonTools(content)
   console.log('[DEBUG] JSON parser detected', parseResult.tools.length, 'tools')
-  console.log('[DEBUG] JSON parser created', parseResult.segments?.length || 0, 'segments')
 
   return parseResult
 }
@@ -6654,45 +6653,12 @@ export function ChatPanel({
                                   // First check for JSON tools (new format)
                                   const parseResult = parseJsonToolsWithContent(msg.content)
                                   if (parseResult.tools.length > 0) {
-                                    console.log('[DEBUG] Rendering', parseResult.tools.length, 'JSON tools as pills in correct positions')
+                                    console.log('[DEBUG] Rendering', parseResult.tools.length, 'JSON tools as pills')
 
-                                    // Render segments in order (text and pills interspersed)
-                                    if (parseResult.segments && parseResult.segments.length > 0) {
-                                      console.log('[DEBUG] Using segment-based rendering for', parseResult.segments.length, 'segments')
-                                      
-                                      return (
-                                        <div className="space-y-3">
-                                          {parseResult.segments.map((segment: ContentSegment, idx: number) => {
-                                            if (segment.type === 'text' && segment.content) {
-                                              return (
-                                                <div key={`text-${idx}`} className="markdown-content">
-                                                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                                    {segment.content}
-                                                  </ReactMarkdown>
-                                                </div>
-                                              )
-                                            } else if (segment.type === 'tool' && segment.tool) {
-                                              return project ? (
-                                                <JSONToolPill 
-                                                  key={`tool-${idx}`} 
-                                                  toolCall={segment.tool} 
-                                                  status="completed" 
-                                                  autoExecutor={autoExecutor} 
-                                                  project={project} 
-                                                />
-                                              ) : null
-                                            }
-                                            return null
-                                          })}
-                                        </div>
-                                      )
-                                    }
-
-                                    // Fallback: old rendering (should not happen with new parser)
-                                    console.warn('[DEBUG] No segments found, using fallback rendering')
+                                    // Render JSON tools as pills with processed content
                                     const components: React.ReactNode[] = []
 
-                                    // Add processed content
+                                    // Add processed content (JSON blocks replaced with placeholders)
                                     if (parseResult.processedContent.trim()) {
                                       components.push(
                                         <div key="processed-content" className="markdown-content">
@@ -6708,6 +6674,7 @@ export function ChatPanel({
                                       components.push(
                                         project ? <JSONToolPill key={`json-tool-${index}`} toolCall={tool} status="completed" autoExecutor={autoExecutor} project={project} /> : null
                                       )
+                                      console.log('[DEBUG] Rendered JSONToolPill for:', tool.tool, tool.path)
                                     })
 
                                     return (
