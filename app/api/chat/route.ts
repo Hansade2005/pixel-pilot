@@ -6321,19 +6321,36 @@ Provide only the corrected JSON code block, nothing else.`
               // Add chunk to buffer
               streamBuffer += chunk
               
+              // 📊 LOG: Chunk received
+              console.log(`[JSON-TOOL-STREAM] Chunk received (${chunk.length} chars): "${chunk.substring(0, 50)}..."`)
+              console.log(`[JSON-TOOL-STREAM] Buffer state: inCodeBlock=${inCodeBlock}, inJsonToolBlock=${inJsonToolBlock}, bufferLength=${streamBuffer.length}`)
+              
               // Detect code block boundaries
               const codeBlockMatch = chunk.match(/```(\w*)/)
               if (codeBlockMatch) {
+                console.log(`[JSON-TOOL-STREAM] ✅ Code block marker detected: "${codeBlockMatch[0]}", language="${codeBlockMatch[1]}"`)
+                
                 if (!inCodeBlock) {
                   // Entering code block
                   inCodeBlock = true
                   codeBlockLanguage = codeBlockMatch[1] || ''
                   
+                  console.log(`[JSON-TOOL-STREAM] 📥 ENTERING code block, language: "${codeBlockLanguage}"`)
+                  
                   // Check if this is a JSON tool block
                   if (codeBlockLanguage.toLowerCase() === 'json') {
+                    console.log(`[JSON-TOOL-STREAM] 🔍 JSON code block detected - checking for tool command...`)
+                    
                     // Look ahead in buffer to detect tool command
                     const bufferPreview = streamBuffer
+                    console.log(`[JSON-TOOL-STREAM] Buffer preview (${bufferPreview.length} chars): "${bufferPreview.substring(0, 200)}..."`)
+                    
                     const detection = detectJsonToolCommand(bufferPreview)
+                    console.log(`[JSON-TOOL-STREAM] Detection result:`, {
+                      isToolCommand: detection.isToolCommand,
+                      toolType: detection.toolType,
+                      path: detection.path
+                    })
                     
                     if (detection.isToolCommand) {
                       // This is a JSON tool block - enter special buffering mode
@@ -6343,24 +6360,49 @@ Provide only the corrected JSON code block, nothing else.`
                       jsonToolId = `tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
                       jsonToolBuffer = streamBuffer // Start buffering
                       
-                      // Send immediate status signal to frontend
-                      sendToolStatusSignal(detection.toolType!, detection.path, jsonToolId)
+                      console.log(`[JSON-TOOL-STREAM] 🎯 JSON TOOL DETECTED! Entering buffering mode`)
+                      console.log(`[JSON-TOOL-STREAM] Tool details:`, {
+                        type: jsonToolType,
+                        path: jsonToolPath,
+                        id: jsonToolId,
+                        initialBufferSize: jsonToolBuffer.length
+                      })
                       
-                      console.log(`[JSON-TOOL] Detected ${detection.toolType} for ${detection.path} - buffering started`)
+                      // Send immediate status signal to frontend
+                      console.log(`[JSON-TOOL-STREAM] 📤 Sending immediate status signal to frontend...`)
+                      sendToolStatusSignal(detection.toolType!, detection.path, jsonToolId)
+                      console.log(`[JSON-TOOL-STREAM] ✅ Status signal sent successfully`)
                       
                       // Clear stream buffer - we're now in JSON tool buffer mode
                       streamBuffer = ''
+                      console.log(`[JSON-TOOL-STREAM] 🧹 Stream buffer cleared, now buffering in jsonToolBuffer`)
                       continue
+                    } else {
+                      console.log(`[JSON-TOOL-STREAM] ❌ Not a tool command JSON block - using normal streaming`)
                     }
                   }
                 } else {
                   // Exiting code block
+                  console.log(`[JSON-TOOL-STREAM] 📤 EXITING code block`)
+                  
                   if (inJsonToolBlock) {
+                    console.log(`[JSON-TOOL-STREAM] 🎉 JSON TOOL BLOCK COMPLETE! Preparing to send...`)
+                    
                     // Complete JSON tool block buffering
                     jsonToolBuffer += chunk
                     
+                    console.log(`[JSON-TOOL-STREAM] Final buffer details:`, {
+                      toolType: jsonToolType,
+                      toolPath: jsonToolPath,
+                      toolId: jsonToolId,
+                      bufferLength: jsonToolBuffer.length,
+                      preview: jsonToolBuffer.substring(0, 200) + '...'
+                    })
+                    
                     // Send the complete block as a single delta
-                    sendCompleteJsonToolBlock(jsonToolBuffer, jsonToolType!, jsonToolPath, jsonToolId)
+                    console.log(`[JSON-TOOL-STREAM] 📤 Calling sendCompleteJsonToolBlock (with validation)...`)
+                    await sendCompleteJsonToolBlock(jsonToolBuffer, jsonToolType!, jsonToolPath, jsonToolId)
+                    console.log(`[JSON-TOOL-STREAM] ✅ Complete block sent to frontend`)
                     
                     // Reset JSON tool state
                     inJsonToolBlock = false
@@ -6370,6 +6412,8 @@ Provide only the corrected JSON code block, nothing else.`
                     jsonToolId = ''
                     streamBuffer = ''
                     
+                    console.log(`[JSON-TOOL-STREAM] 🧹 JSON tool state reset, ready for next block`)
+                    
                     // Reset code block state
                     inCodeBlock = false
                     codeBlockLanguage = ''
@@ -6378,24 +6422,36 @@ Provide only the corrected JSON code block, nothing else.`
                   
                   inCodeBlock = false
                   codeBlockLanguage = ''
+                  console.log(`[JSON-TOOL-STREAM] Code block exited (non-tool block)`)
                 }
               }
               
               // If we're in JSON tool buffering mode, just accumulate
               if (inJsonToolBlock) {
                 jsonToolBuffer += chunk
+                console.log(`[JSON-TOOL-STREAM] 📝 Buffering chunk (${chunk.length} chars), total buffer: ${jsonToolBuffer.length} chars`)
                 
                 // Check if we can detect tool info from accumulated buffer
                 if (!jsonToolType || !jsonToolPath) {
+                  console.log(`[JSON-TOOL-STREAM] 🔍 Tool info incomplete, re-checking buffer...`)
                   const detection = detectJsonToolCommand(jsonToolBuffer)
+                  console.log(`[JSON-TOOL-STREAM] Re-detection result:`, detection)
+                  
                   if (detection.isToolCommand && detection.toolType && detection.path) {
                     jsonToolType = detection.toolType as any
                     jsonToolPath = detection.path
                     
+                    console.log(`[JSON-TOOL-STREAM] ✅ Tool info updated from buffer:`, {
+                      type: jsonToolType,
+                      path: jsonToolPath
+                    })
+                    
                     // Update status with actual path if we didn't have it before
+                    console.log(`[JSON-TOOL-STREAM] 📤 Sending updated status signal...`)
                     sendToolStatusSignal(detection.toolType, detection.path, jsonToolId)
                   }
                 }
+                console.log(`[JSON-TOOL-STREAM] ⏭️ Skipping normal streaming (buffering mode active)`)
                 continue // Skip normal streaming logic
               }
               
