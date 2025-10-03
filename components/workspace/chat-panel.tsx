@@ -57,6 +57,21 @@ import {
 } from "@/components/ui/alert-dialog"
 import { XMLToolAutoExecutor } from './xml-tool-auto-executor'
 import { jsonToolParser, JsonToolCall } from './json-tool-parser'
+import { SchemaAwareJSONRepairEngine } from '@/schema-aware-json-repair-engine.js'
+
+// Create schema-aware repair engine instance for JSON parsing
+const schemaAwareRepairEngine = new SchemaAwareJSONRepairEngine()
+
+// Type definition for repair engine result
+interface RepairResult {
+  data: any | null
+  fixes: string[]
+  confidence: number
+  warnings: string[]
+  processingTime?: number
+  engine?: string
+  version?: string
+}
 
 interface Message {
   id: string
@@ -6322,7 +6337,25 @@ export function ChatPanel({
                                       let matchingTool: JsonToolCall | undefined
                                       
                                       try {
-                                        const parsed = JSON.parse(jsonContent)
+                                        // Try standard JSON.parse first, then use schema-aware repair if it fails
+                                        let parsed: any
+                                        try {
+                                          parsed = JSON.parse(jsonContent)
+                                        } catch (parseError) {
+                                          console.log('[DEBUG] Standard JSON.parse failed, using schema-aware repair engine...')
+                                          const repairResult = schemaAwareRepairEngine.repair(jsonContent) as RepairResult
+                                          if (repairResult.data && repairResult.confidence > 0.5) {
+                                            parsed = repairResult.data
+                                            console.log('[DEBUG] Successfully repaired JSON with confidence:', repairResult.confidence)
+                                            if (repairResult.fixes && repairResult.fixes.length > 0) {
+                                              console.log('[DEBUG] Applied fixes:', repairResult.fixes)
+                                            }
+                                          } else {
+                                            console.warn('[DEBUG] Schema-aware repair failed or low confidence:', repairResult.confidence)
+                                            throw new Error('Failed to repair JSON')
+                                          }
+                                        }
+                                        
                                         if (parsed.tool) {
                                           // Find unused tool that matches
                                           matchingTool = jsonTools.find(tool => 

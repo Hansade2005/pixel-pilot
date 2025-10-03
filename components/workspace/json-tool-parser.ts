@@ -3,6 +3,19 @@
  * Replaces XML parsing with reliable JSON parsing similar to specs route
  */
 
+import { SchemaAwareJSONRepairEngine } from '../../schema-aware-json-repair-engine.js'
+
+// Type definition for repair engine result
+interface RepairResult {
+  data: any | null
+  fixes: string[]
+  confidence: number
+  warnings: string[]
+  processingTime?: number
+  engine?: string
+  version?: string
+}
+
 export interface SearchReplaceBlock {
   search: string
   replace: string
@@ -49,6 +62,7 @@ export class JsonToolParser {
     'read_file', 'list_files', 'create_directory',
     'pilotwrite', 'pilotedit', 'pilotdelete'
   ]
+  private repairEngine = new SchemaAwareJSONRepairEngine()
 
   /**
    * Extract and parse JSON tool calls from content
@@ -175,13 +189,34 @@ export class JsonToolParser {
   }
 
   /**
-   * Parse individual JSON block
+   * Parse individual JSON block using schema-aware repair engine
    */
   private parseJsonBlock(jsonString: string, startIndex: number): Omit<JsonToolCall, 'id' | 'startTime'> | null {
     try {
-      const parsed = JSON.parse(jsonString)
+      // First try standard JSON.parse
+      let parsed: any
+      
+      try {
+        parsed = JSON.parse(jsonString)
+      } catch (parseError) {
+        // If standard parsing fails, use schema-aware repair engine
+        console.log('[JsonToolParser] Standard parse failed, trying schema-aware repair...')
+        const repairResult = this.repairEngine.repair(jsonString) as RepairResult
+        
+        if (repairResult.data && repairResult.confidence > 0.5) {
+          parsed = repairResult.data
+          console.log('[JsonToolParser] Successfully repaired JSON with confidence:', repairResult.confidence)
+          if (repairResult.fixes.length > 0) {
+            console.log('[JsonToolParser] Applied fixes:', repairResult.fixes)
+          }
+        } else {
+          console.error('[JsonToolParser] Schema-aware repair failed or low confidence:', repairResult.confidence)
+          return null
+        }
+      }
       
       if (!parsed.tool || !this.supportedTools.includes(parsed.tool)) {
+        console.warn('[JsonToolParser] Invalid or unsupported tool:', parsed.tool)
         return null
       }
 
@@ -197,12 +232,18 @@ export class JsonToolParser {
         operation: parsed.operation,
         search: parsed.search,
         replace: parsed.replace,
+        searchReplaceBlocks: parsed.searchReplaceBlocks,
+        replaceAll: parsed.replaceAll,
+        occurrenceIndex: parsed.occurrenceIndex,
+        validateAfter: parsed.validateAfter,
+        dryRun: parsed.dryRun,
+        rollbackOnFailure: parsed.rollbackOnFailure,
         args,
         status: 'detected' as const
       }
 
     } catch (error) {
-      console.error('[JsonToolParser] JSON parsing failed:', error)
+      console.error('[JsonToolParser] JSON parsing completely failed:', error)
       return null
     }
   }
