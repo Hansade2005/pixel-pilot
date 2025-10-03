@@ -3,6 +3,8 @@
  * Replaces XML parsing with reliable JSON parsing similar to specs route
  */
 
+import { SchemaAwareJSONRepairEngine } from '../../schema-aware-json-repair-engine.js'
+
 export interface SearchReplaceBlock {
   search: string
   replace: string
@@ -49,6 +51,7 @@ export class JsonToolParser {
     'read_file', 'list_files', 'create_directory',
     'pilotwrite', 'pilotedit', 'pilotdelete'
   ]
+  private repairEngine = new SchemaAwareJSONRepairEngine()
 
   /**
    * Extract and parse JSON tool calls from content
@@ -112,8 +115,11 @@ export class JsonToolParser {
     while ((match = codeBlockPattern.exec(content)) !== null) {
       try {
         const jsonContent = match[1]
-        const parsed = JSON.parse(jsonContent)
-        if (parsed.tool && this.supportedTools.includes(parsed.tool)) {
+        const repairResult = this.repairEngine.repair(jsonContent) as any
+        if (repairResult.data && repairResult.data.tool && this.supportedTools.includes(repairResult.data.tool)) {
+          if (repairResult.confidence < 1.0) {
+            console.log(`[JsonToolParser] Repaired malformed JSON in code block with ${repairResult.confidence} confidence`)
+          }
           blocks.push({
             json: jsonContent,
             startIndex: match.index
@@ -179,10 +185,16 @@ export class JsonToolParser {
    */
   private parseJsonBlock(jsonString: string, startIndex: number): Omit<JsonToolCall, 'id' | 'startTime'> | null {
     try {
-      const parsed = JSON.parse(jsonString)
-      
-      if (!parsed.tool || !this.supportedTools.includes(parsed.tool)) {
+      const repairResult = this.repairEngine.repair(jsonString) as any
+      const parsed = repairResult.data
+
+      if (!parsed || !parsed.tool || !this.supportedTools.includes(parsed.tool)) {
         return null
+      }
+
+      // Log if repair was needed
+      if (repairResult.confidence < 1.0) {
+        console.log(`[JsonToolParser] Repaired malformed JSON tool call with ${repairResult.confidence} confidence: ${parsed.tool}`)
       }
 
       // Build standardized args object

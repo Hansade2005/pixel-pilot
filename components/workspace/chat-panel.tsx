@@ -283,58 +283,92 @@ An error occurred during execution: ${eventData.error}`
   }
 }
 
-// Ensure proper spacing around markdown syntax and preserve spaces in code during streaming
+// Buffer and stream complete code blocks line-by-line to preserve whitespace
+interface StreamBuffer {
+  content: string
+  inCodeBlock: boolean
+  codeBlockBuffer: string
+  lastEmittedContent: string
+}
+
+function createStreamBuffer(): StreamBuffer {
+  return {
+    content: '',
+    inCodeBlock: false,
+    codeBlockBuffer: '',
+    lastEmittedContent: ''
+  }
+}
+
+// Process streaming delta and return content ready for display
+function processStreamingDelta(buffer: StreamBuffer, newDelta: string): string {
+  // Add new delta to buffer
+  buffer.content += newDelta
+  
+  // Check if we're entering or exiting a code block
+  const codeBlockMarkers = buffer.content.match(/```/g) || []
+  const wasInCodeBlock = buffer.inCodeBlock
+  buffer.inCodeBlock = codeBlockMarkers.length % 2 !== 0
+  
+  // If we're in a code block, buffer it
+  if (buffer.inCodeBlock) {
+    // Find the start of the current code block
+    const lastCodeBlockStart = buffer.content.lastIndexOf('```')
+    
+    // Extract everything up to the code block
+    const beforeCodeBlock = buffer.content.substring(0, lastCodeBlockStart)
+    
+    // If there's content before the code block that hasn't been emitted, emit it
+    if (beforeCodeBlock.length > buffer.lastEmittedContent.length) {
+      const toEmit = beforeCodeBlock.substring(buffer.lastEmittedContent.length)
+      buffer.lastEmittedContent = beforeCodeBlock
+      return toEmit
+    }
+    
+    // Don't emit partial code blocks
+    return ''
+  }
+  
+  // If we just exited a code block, emit the complete code block
+  if (wasInCodeBlock && !buffer.inCodeBlock) {
+    // Find the last complete code block
+    const lastCodeBlockStart = buffer.content.lastIndexOf('```', buffer.content.lastIndexOf('```') - 1)
+    const lastCodeBlockEnd = buffer.content.lastIndexOf('```')
+    
+    if (lastCodeBlockStart !== -1 && lastCodeBlockEnd !== -1 && lastCodeBlockEnd > lastCodeBlockStart) {
+      const completeCodeBlock = buffer.content.substring(lastCodeBlockStart, lastCodeBlockEnd + 3)
+      const toEmit = buffer.content.substring(buffer.lastEmittedContent.length)
+      buffer.lastEmittedContent = buffer.content
+      return toEmit
+    }
+  }
+  
+  // Not in a code block - emit line by line as they complete
+  const lines = buffer.content.split('\n')
+  const completeLines = lines.slice(0, -1) // All but the last (potentially incomplete) line
+  const completeContent = completeLines.join('\n') + (completeLines.length > 0 ? '\n' : '')
+  
+  if (completeContent.length > buffer.lastEmittedContent.length) {
+    const toEmit = completeContent.substring(buffer.lastEmittedContent.length)
+    buffer.lastEmittedContent = completeContent
+    return toEmit
+  }
+  
+  return ''
+}
+
+// Finalize buffer and return any remaining content
+function finalizeStreamBuffer(buffer: StreamBuffer): string {
+  const remaining = buffer.content.substring(buffer.lastEmittedContent.length)
+  buffer.lastEmittedContent = buffer.content
+  return remaining
+}
+
+// Preserve all whitespace - no normalization to prevent markdown corruption
+// Since we're streaming line-by-line, all formatting is preserved from the source
 function normalizeMarkdownSpacing(existingContent: string, newDelta: string): string {
-  // Don't modify if we're inside a code block or inline code
-  const codeBlockCount = (existingContent.match(/```/g) || []).length
-  const isInCodeBlock = codeBlockCount % 2 !== 0
-  const hasUnclosedInlineCode = (existingContent.match(/`/g) || []).length % 2 !== 0
-  
-  // Preserve spaces in code contexts (SVG, code blocks, etc.)
-  if (isInCodeBlock || hasUnclosedInlineCode) {
-    return newDelta
-  }
-  
-  // Handle headings: If delta starts with hashtag and existing content doesn't end with newline or space
-  if (newDelta.match(/^#{1,6}\s/) && existingContent.length > 0) {
-    const lastChar = existingContent[existingContent.length - 1]
-    if (lastChar !== '\n' && lastChar !== ' ') {
-      return '\n\n' + newDelta
-    }
-  }
-  
-  // If existing content ends with hashtag(s) and delta starts with text (not space), add space
-  if (existingContent.match(/#{1,6}$/) && newDelta.length > 0 && !newDelta.match(/^\s/)) {
-    return ' ' + newDelta
-  }
-  
-  // Handle unordered list markers: -, *, +
-  // If delta starts with list marker and existing content doesn't end with newline
-  if (newDelta.match(/^[-*+]\s/) && existingContent.length > 0) {
-    const lastChar = existingContent[existingContent.length - 1]
-    if (lastChar !== '\n') {
-      return '\n' + newDelta
-    }
-  }
-  
-  // If existing content ends with list marker and delta starts with text (not space), add space
-  if (existingContent.match(/[-*+]$/) && newDelta.length > 0 && !newDelta.match(/^\s/)) {
-    return ' ' + newDelta
-  }
-  
-  // Handle ordered list markers: 1., 2., etc.
-  if (newDelta.match(/^\d+\.\s/) && existingContent.length > 0) {
-    const lastChar = existingContent[existingContent.length - 1]
-    if (lastChar !== '\n') {
-      return '\n' + newDelta
-    }
-  }
-  
-  // If existing content ends with numbered list marker (e.g., "1.") and delta starts with text, add space
-  if (existingContent.match(/\d+\.$/) && newDelta.length > 0 && !newDelta.match(/^\s/)) {
-    return ' ' + newDelta
-  }
-  
+  // DISABLED: No longer modifying content to preserve exact whitespace from stream
+  // The line-by-line buffering strategy already ensures proper formatting
   return newDelta
 }
 
@@ -1819,6 +1853,18 @@ function detectJsonTools(content: string): JsonToolCall[] {
   console.log('[DEBUG] JSON parser detected', parseResult.tools.length, 'tools')
 
   return parseResult.tools
+}
+
+// Get full JSON parse result including processed content
+function parseJsonToolsWithContent(content: string): { tools: JsonToolCall[], processedContent: string } {
+  console.log('[DEBUG] parseJsonToolsWithContent called with content length:', content.length)
+  console.log('[DEBUG] Content preview:', content.substring(0, 200))
+
+  // Use JSON parser for reliable tool detection and content processing
+  const parseResult = jsonToolParser.parseJsonTools(content)
+  console.log('[DEBUG] JSON parser detected', parseResult.tools.length, 'tools')
+
+  return parseResult
 }
 
 // Enhanced tool detection using JSON parser (more reliable than XML) - Legacy support
@@ -5006,6 +5052,9 @@ export function ChatPanel({
 
         // Track if we've received any content
         let hasReceivedContent = false
+        
+        // Initialize stream buffer for code block handling
+        let streamBuffer = createStreamBuffer()
 
         if (reader) {
           try {
@@ -5054,19 +5103,29 @@ export function ChatPanel({
 
                     // Handle text-delta events for actual content
                     if (data.type === 'text-delta' && data.delta) {
-                      // Normalize markdown spacing and preserve spaces in code contexts
-                      const normalizedDelta = normalizeMarkdownSpacing(assistantContent, data.delta)
-                      assistantContent += normalizedDelta
-                      hasReceivedContent = true
+                      // Process delta through buffer to handle code blocks line-by-line
+                      // This preserves all whitespace and formatting exactly as received
+                      const readyToEmit = processStreamingDelta(streamBuffer, data.delta)
+                      
+                      // Only update display if we have content ready to emit
+                      if (readyToEmit) {
+                        // Add content directly - whitespace is preserved from source
+                        assistantContent += readyToEmit
+                        hasReceivedContent = true
 
-                      // Set streaming state when content starts flowing
-                      if (!isStreaming) {
-                        setIsStreaming(true)
+                        // Set streaming state when content starts flowing
+                        if (!isStreaming) {
+                          setIsStreaming(true)
+                        }
+
+                        console.log('[STREAM] Adding buffered delta (whitespace preserved):', readyToEmit.substring(0, 100), '...')
+                        console.log('[DEBUG] Full assistant content length:', assistantContent.length)
+                        console.log('[DEBUG] Assistant content preview:', assistantContent.substring(0, 500))
+                      } else {
+                        // Content is buffered (inside code block), skip update this cycle
+                        console.log('[STREAM] Buffering partial code block...')
+                        continue
                       }
-
-                      console.log('[STREAM] Adding delta:', data.delta, '-> normalized:', normalizedDelta)
-                      console.log('[DEBUG] Full assistant content length:', assistantContent.length)
-                      console.log('[DEBUG] Assistant content preview:', assistantContent.substring(0, 500))
 
                       // Enhanced XML tool detection and processing with inline replacement
                       const detectedTools = detectXMLTools(assistantContent)
@@ -5756,6 +5815,31 @@ export function ChatPanel({
                 : msg
             ))
           } finally {
+            // Finalize stream buffer to emit any remaining content
+            const remainingContent = finalizeStreamBuffer(streamBuffer)
+            if (remainingContent) {
+              // Add remaining content directly - whitespace preserved
+              assistantContent += remainingContent
+              console.log('[STREAM] Finalized buffer with remaining content (whitespace preserved):', remainingContent.substring(0, 100))
+              
+              // Update display with final content
+              const detectedTools = detectXMLTools(assistantContent)
+              const { content: processedContent, placeholders } = extractAndReplaceXMLBlocks(assistantContent, detectedTools)
+              
+              setMessages(prev => prev.map(msg =>
+                msg.id === assistantMessageId
+                  ? {
+                    ...msg,
+                    content: processedContent,
+                    metadata: {
+                      ...msg.metadata,
+                      xmlPlaceholders: placeholders
+                    }
+                  }
+                  : msg
+              ))
+            }
+            
             // Ensure we have some content, even if streaming failed
             if (!hasReceivedContent || !assistantContent.trim()) {
               setMessages(prev => prev.map(msg =>
@@ -6550,123 +6634,31 @@ export function ChatPanel({
                               <div className="p-4">
                                 {(() => {
                                   // First check for JSON tools (new format)
-                                  const jsonTools = detectJsonTools(msg.content)
-                                  if (jsonTools.length > 0) {
-                                    console.log('[DEBUG] Rendering', jsonTools.length, 'JSON tools as pills')
+                                  const parseResult = parseJsonToolsWithContent(msg.content)
+                                  if (parseResult.tools.length > 0) {
+                                    console.log('[DEBUG] Rendering', parseResult.tools.length, 'JSON tools as pills')
 
-                                    // Direct rendering of JSON tools as pills
+                                    // Render JSON tools as pills with processed content
                                     const components: React.ReactNode[] = []
-                                    let remainingContent = msg.content
-                                    let elementKey = 0
 
-                                    // Remove JSON code blocks from content and replace with pills
-                                    const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/gi
-                                    let match
-                                    let currentPosition = 0
-                                    let usedTools = new Set<string>() // Track used tools to avoid duplicates
-
-                                    while ((match = codeBlockRegex.exec(msg.content)) !== null) {
-                                      // Add content before the code block
-                                      if (match.index > currentPosition) {
-                                        const beforeContent = msg.content.slice(currentPosition, match.index)
-                                        if (beforeContent.trim()) {
-                                          components.push(
-                                            <div key={`content-${elementKey++}`} className="markdown-content">
-                                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                                {beforeContent}
-                                              </ReactMarkdown>
-                                            </div>
-                                          )
-                                        }
-                                      }
-
-                                      // Find matching JSON tool for this code block
-                                      const jsonContent = match[1]
-                                      let matchingTool: JsonToolCall | undefined
-
-                                      try {
-                                        const parsed = JSON.parse(jsonContent)
-                                        if (parsed.tool) {
-                                          // Find unused tool that matches
-                                          matchingTool = jsonTools.find(tool =>
-                                            !usedTools.has(tool.id) &&
-                                            tool.tool === parsed.tool &&
-                                            tool.path === parsed.path
-                                          )
-
-                                          // If no exact match, find by tool type only
-                                          if (!matchingTool) {
-                                            matchingTool = jsonTools.find(tool =>
-                                              !usedTools.has(tool.id) &&
-                                              tool.tool === parsed.tool
-                                            )
-                                          }
-
-                                          // If still no match, create a synthetic tool call from the JSON
-                                          if (!matchingTool && parsed.tool && (parsed.path || parsed.content)) {
-                                            matchingTool = {
-                                              id: `synthetic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                                              tool: parsed.tool,
-                                              name: parsed.tool,
-                                              path: parsed.path || '',
-                                              content: parsed.content || '',
-                                              args: parsed,
-                                              status: 'completed',
-                                              startTime: Date.now(),
-                                              search: parsed.search,
-                                              replace: parsed.replace,
-                                              operation: parsed.operation
-                                            }
-                                            console.log('[DEBUG] Created synthetic tool for code block:', matchingTool)
-                                          }
-                                        }
-                                      } catch (error) {
-                                        console.warn('[DEBUG] Failed to parse JSON in code block:', error, jsonContent)
-                                      }
-
-                                      if (matchingTool) {
-                                        usedTools.add(matchingTool.id)
-                                        components.push(
-                                          project ? <JSONToolPill key={`json-tool-${elementKey++}`} toolCall={matchingTool} status="completed" autoExecutor={autoExecutor} project={project} /> : null
-                                        )
-                                        console.log('[DEBUG] Rendered JSONToolPill for:', matchingTool.tool, matchingTool.path)
-                                      } else {
-                                        console.warn('[DEBUG] No matching tool found for JSON block:', jsonContent)
-                                        // Render the code block as regular markdown if no tool match
-                                        components.push(
-                                          <div key={`code-${elementKey++}`} className="markdown-content">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                              {`\`\`\`json\n${jsonContent}\n\`\`\``}
-                                            </ReactMarkdown>
-                                          </div>
-                                        )
-                                      }
-
-                                      currentPosition = match.index + match[0].length
-                                    }
-
-                                    // Add any unused tools as pills (for bare JSON not in code blocks)
-                                    const unusedTools = jsonTools.filter(tool => !usedTools.has(tool.id))
-                                    unusedTools.forEach(tool => {
+                                    // Add processed content (JSON blocks replaced with placeholders)
+                                    if (parseResult.processedContent.trim()) {
                                       components.push(
-                                        project ? <JSONToolPill key={`unused-tool-${elementKey++}`} toolCall={tool} status="completed" autoExecutor={autoExecutor} project={project} /> : null
+                                        <div key="processed-content" className="markdown-content">
+                                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                            {parseResult.processedContent}
+                                          </ReactMarkdown>
+                                        </div>
                                       )
-                                      console.log('[DEBUG] Rendered unused tool as pill:', tool.tool, tool.path)
-                                    })
-
-                                    // Add any remaining content
-                                    if (currentPosition < msg.content.length) {
-                                      const afterContent = msg.content.slice(currentPosition)
-                                      if (afterContent.trim()) {
-                                        components.push(
-                                          <div key={`content-${elementKey++}`} className="markdown-content">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                              {afterContent}
-                                            </ReactMarkdown>
-                                          </div>
-                                        )
-                                      }
                                     }
+
+                                    // Add all JSON tools as pills
+                                    parseResult.tools.forEach((tool, index) => {
+                                      components.push(
+                                        project ? <JSONToolPill key={`json-tool-${index}`} toolCall={tool} status="completed" autoExecutor={autoExecutor} project={project} /> : null
+                                      )
+                                      console.log('[DEBUG] Rendered JSONToolPill for:', tool.tool, tool.path)
+                                    })
 
                                     return (
                                       <div className="space-y-3">

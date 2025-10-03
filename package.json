@@ -61,6 +61,7 @@
     "@types/socket.io": "^3.0.2",
     "@vercel/sdk": "^1.10.4",
     "ai": "^5.0.23",
+    "ai-json-fixer": "^0.2.0",
     "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

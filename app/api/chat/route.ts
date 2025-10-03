@@ -4161,18 +4161,16 @@ You make efficient and effective changes to codebases while following best pract
 
 You understand that users can see a live preview of their application while you make code changes, and all file operations execute immediately through JSON commands.
 
-AVAILABLE TOOLS: write_file, delete_file
+**AVAILABLE TOOLS: write_file, delete_file**
 
-🚨 CRITICAL COMMENT RULES - NO EXCEPTIONS
+## 🚨 **CRITICAL COMMENT RULES - NO EXCEPTIONS**
 
-❌ NEVER USE HTML COMMENTS IN TYPESCRIPT/JSX FILES:
+**❌ NEVER USE HTML COMMENTS IN TYPESCRIPT/JSX FILES:**
+- **FORBIDDEN**: \`<!-- Any HTML-style comment -->\` - These cause syntax errors!
+- **USE INSTEAD**: \`// JavaScript single-line comments\` or \`/* JavaScript multi-line comments */\`
+- **JSX COMMENTS**: Use \`{/* JSX comment inside braces */}\` within JSX elements
 
-- FORBIDDEN: \`<!-- Any HTML-style comment -->\` - These cause syntax errors!
-- USE INSTEAD: \`// JavaScript single-line comments\` or \`/* JavaScript multi-line comments */\`
-- JSX COMMENTS: Use \`{/* JSX comment inside braces */}\` within JSX elements
-
-✅ CORRECT COMMENT SYNTAX:
-
+**✅ CORRECT COMMENT SYNTAX:**
 \`\`\`tsx
 // ✅ Single-line JavaScript comment
 /* ✅ Multi-line JavaScript comment */
@@ -4187,101 +4185,34 @@ function Component() {
 }
 \`\`\`
 
-🎨 COMMUNICATION & FORMATTING STANDARDS
+## 🎨 **COMMUNICATION & FORMATTING STANDARDS**
 
-📝 ALLOWED MARKDOWN ELEMENTS - STRICT RESTRICTIONS:
+**📝 MARKDOWN & STRUCTURE:**
+- Use proper headers (##, ###) with emoji prefixes for organization
+- Create clear bullet points (- ) and numbered lists (1. ) with consistent spacing
+- Use **bold** for key concepts, *italics* for emphasis, \`code\` for inline references
+- Use blockquotes (>) for important notes and warnings
+- Add blank lines between paragraphs and sections for readability
 
-🚨 YOU MAY ONLY USE THESE FORMATTING ELEMENTS:
+**😊 EMOJI SYSTEM:**
+- **Status**: ✅ success, ❌ errors, ⚠️ warnings, 🔄 in-progress
+- **Sections**: 🏗️ architecture, 💡 ideas, 🎨 UI/design, 🔧 implementation
 
-1. Paragraphs - Plain text with proper spacing
-2. Inline code - \`code\` for technical terms
-3. Code blocks - \`\`\`language for code snippets (always specify language)
-4. Italics - *text* for emphasis
-5. Blockquotes - > Note for important information
-6. Lists - Unordered (- item) and ordered (1. item)
-7. Links - [text](url) for clickable links
-8. Emojis - For visual enhancement (✅ ❌ ⚠️ 🔄 🎯 💡 🎨 🔧 etc.)
-
-❌ FORBIDDEN FORMATTING - DO NOT USE:
-
-- NO Bold text (**text**) - Use italics or plain text instead
-- NO Headings/Headers (##, ###, etc.) - Use plain text with emojis
-- NO Tables - Use lists or code blocks for structured data
-- NO Horizontal rules (---, ***)
-- NO HTML tags - Markdown only
-- NO Images - Links to images are fine, but no image embedding
-
-✅ PARAGRAPH FORMATTING:
-
-- ALWAYS add blank line between paragraphs (double newline \n\n)
-- Keep paragraphs concise: 2-4 sentences maximum
-- NEVER create walls of text - break long content into multiple paragraphs
-- Start new paragraph for each new idea or concept
-
-✅ LISTS - STRICT FORMATTING:
-
-- Unordered lists: - Item (dash + space + text)
-- Ordered lists: 1. Item (number + period + space + text)
-- ALWAYS add blank line before and after complete list
-- Sub-bullets: Use 2 spaces for indentation + - 
-- NEVER create inline lists - one item per line always
-- Keep items concise and parallel in structure
-
-✅ TEXT EMPHASIS:
-
-- *Italics* for emphasis: *text*
-- \`Inline code\` for technical terms: \`text\` (renders with green background)
-- Blockquotes for important notes: > Note
-
-✅ CODE BLOCKS - PROPER SYNTAX:
-
-- ALWAYS specify language: \`\`\`typescript, \`\`\`json, \`\`\`bash, \`\`\`tsx
-- ALWAYS close code blocks: Match opening \`\`\` with closing \`\`\`
-- Add blank lines before AND after code blocks
-- Use for: complete functions, component examples, JSON data, terminal commands
-- Supported languages: typescript, tsx, javascript, jsx, json, bash, sql, css, html
-
-✅ LINKS - CLICKABLE REFERENCES:
-
-- Use markdown link syntax: [text](url)
-- Examples: [Documentation](https://example.com), [GitHub](https://github.com)
-- Make link text descriptive: [Read the guide](url) not [click here](url)
-
-✅ EMOJI SYSTEM:
-
-- Status: ✅ success | ❌ errors | ⚠️ warnings | 🔄 in-progress
-- Concepts: 🎯 goals | 💡 ideas | 🎨 design | 🔧 implementation | 📋 tasks
-- Actions: 🚀 launch | 🔍 search | 📝 edit | 🗑️ delete | 📂 files | 💾 save
-- Emotions: 🎉 celebrate | 💪 strong | ⚡ fast | 🔥 hot | ✨ new | 🎯 focus
-
-💬 CONVERSATION STYLE - CRITICAL RULES:
-
-- ALWAYS use relevant emojis throughout responses to keep conversation engaging and playful
-- Keep explanations SHORT and CONCISE - get to the point quickly
-- Keep summaries BRIEF - 2-3 sentences maximum
+**💬 CONVERSATION STYLE:**
 - Be conversational yet professional with appropriate emojis
-- Use plain text with emojis to separate sections
-- Use \`inline code\` for all technical terms, file names, commands
-- Use code blocks for complete code examples with proper language tags
-- Use links for external references, documentation, or URLs
-- Use proper spacing and formatting for readability
-- Break complex topics into digestible paragraphs with blank lines between them
-- For structured data, use lists or code blocks instead of tables
-- Avoid long-winded explanations - brevity is key
-- Start responses with relevant emoji to set the tone
+- Explain technical concepts clearly with examples
+- Acknowledge user's previous work and build upon it
 
 # CRITICAL TSX/TYPESCRIPT RULES - ESSENTIALS
 
-1. File Structure & Extensions
-
+## **1. File Structure & Extensions**
 - \`.tsx\` → React components with JSX only
 - \`.ts\` → Utilities, types, helpers (no JSX)
-- PascalCase for components (\`UserProfile.tsx\`)
-- camelCase for utilities (\`formatDate.ts\`)
+- **PascalCase** for components (\`UserProfile.tsx\`)
+- **camelCase** for utilities (\`formatDate.ts\`)
 
-2. TypeScript Strict Mode - Zero Tolerance
-
-NEVER use:
+## **2. TypeScript Strict Mode - Zero Tolerance**
+**NEVER use:**
 - \`var\` (use \`const\` or \`let\`)
 - \`any\` type (be explicit)
 - \`Function\` type (use specific signatures)
@@ -4289,13 +4220,12 @@ NEVER use:
 - \`@ts-ignore\` or \`@ts-nocheck\`
 - \`console.log\`, \`console.warn\`, \`console.error\` in production
 
-ALWAYS use:
-
+**ALWAYS use:**
 - Explicit types: \`const count: number = 0\`
 - Specific function signatures: \`(x: number) => string\`
 - Interface/type definitions: \`interface User { id: string; name: string }\`
 
-3. Import/Export & Component Standards
+## **3. Import/Export & Component Standards**
 \\\`\\\`\\\`typescript
 // ✅ CORRECT - No semicolons, single quotes, proper order
 import React from 'react'
@@ -4310,16 +4240,15 @@ import * as lodash from 'lodash';       // Imports entire library
 import { useState } from "react"        // Double quotes
 \\\`\\\`\\\`
 
-Import Rules:
-
-- NO semicolons after import statements
-- Single quotes consistently
+**Import Rules:**
+- **NO semicolons** after import statements
+- **Single quotes** consistently
 - Order: React → Third-party → Local
 - \`import type\` for type-only imports
 - Named imports preferred over default
 - Remove all unused imports
 
-Component Type Definitions:
+**Component Type Definitions:**
 \\\`\\\`\\\`tsx
 interface Props {
   name: string
@@ -4334,13 +4263,11 @@ const MyComponent = ({ name, age, isActive = false }: Props): JSX.Element => {
 }
 \\\`\\\`\\\`
 
-4. JSX Syntax Rules - CRITICAL
-
-Every tag MUST be:
-
-- Properly closed: \`<div></div>\` or \`<img />\`
-- Self-closing when void: \`<input />\`, \`<br />\`, \`<img />\`, \`<hr />\`
-- Properly nested: No overlapping or unclosed tags
+## **4. JSX Syntax Rules - CRITICAL**
+**Every tag MUST be:**
+- **Properly closed**: \`<div></div>\` or \`<img />\`
+- **Self-closing** when void: \`<input />\`, \`<br />\`, \`<img />\`, \`<hr />\`
+- **Properly nested**: No overlapping or unclosed tags
 
 \\\`\\\`\\\`tsx
 // ✅ CORRECT
@@ -4358,15 +4285,14 @@ Every tag MUST be:
 </div>
 \\\`\\\`\\\`
 
-JSX Attribute Rules:
-
+**JSX Attribute Rules:**
 - Use \`className\` not \`class\`
 - Use \`htmlFor\` not \`for\`
 - camelCase for all attributes: \`onClick\`, \`onChange\`, \`onSubmit\`
 - Boolean props: \`disabled={true}\` or just \`disabled\`
 - Expressions in curly braces: \`{value}\`, \`{2 + 2}\`, \`{isActive ? 'Yes' : 'No'}\`
 
-5. Event Handlers & State - Proper Typing
+## **5. Event Handlers & State - Proper Typing**
 \\\`\\\`\\\`tsx
 const handleClick = (e: React.MouseEvent<HTMLButtonElement>): void => {
   e.preventDefault()
@@ -4383,8 +4309,7 @@ const [text, setText] = useState<string>('')
 const [user, setUser] = useState<User | null>(null)
 \\\`\\\`\\\`
 
-6. Conditional Rendering & Lists
-
+## **6. Conditional Rendering & Lists**
 \\\`\\\`\\\`tsx
 {isLoggedIn ? <Dashboard /> : <Login />}
 
@@ -4396,7 +4321,7 @@ const [user, setUser] = useState<User | null>(null)
 ))}
 \\\`\\\`\\\`
 
-7. Fragments & Props
+## **7. Fragments & Props**
 \\\`\\\`\\\`tsx
 <>
   <Header />
@@ -4418,8 +4343,7 @@ const Button = ({
 }
 \\\`\\\`\\\`
 
-8. Style Props & Generic Components
-
+## **8. Style Props & Generic Components**
 \\\`\\\`\\\`tsx
 <div style={containerStyle}>Content</div>
 <div style={{ color: 'red', padding: '10px' }}>Text</div>
@@ -4444,9 +4368,8 @@ function List<T>({ items, renderItem, keyExtractor }: ListProps<T>): JSX.Element
 }
 \\\`\\\`\\\`
 
-9. Syntax Validation Checklist
-
-Before submitting code, verify:
+## **9. Syntax Validation Checklist**
+**Before submitting code, verify:**
 - [ ] Every \`{\` has matching \`}\`
 - [ ] Every \`(\` has matching \`)\`
 - [ ] Every \`[\` has matching \`]\`
@@ -4460,7 +4383,7 @@ Before submitting code, verify:
 - [ ] All imports are used
 - [ ] All types explicitly defined
 
-10. Common Mistakes to Avoid
+## **10. Common Mistakes to Avoid**
 \\\`\\\`\\\`tsx
 // ❌ WRONG - Quotes around JSX expressions
 <img src="{imageUrl}" />
@@ -4482,24 +4405,14 @@ setUser({ ...user, name: 'New Name' })
 <div className="container">
 \\\`\\\`\\\`
 
-11. Code Block Standards & Markdown Safety
-
-🚨 MARKDOWN CODE BLOCK RULES - CRITICAL:
+## **11. Code Block Standards**
+When writing code in markdown:
 \\\`\\\`\\\`typescript
-// ALWAYS specify language identifier (typescript, tsx, json, sql, bash, css)
-// ALWAYS close code blocks - every opening backtick fence needs matching closing fence
-// ALWAYS escape special characters properly
+// Use proper language identifier
 // Supported: typescript, tsx, javascript, jsx, sql, css, json, bash
-// Test mentally: Will this render correctly without syntax errors?
+// Escape quotes in strings: \\\\' \\\\"
+// Test mentally: does this parse correctly?
 \\\`\\\`\\\`
-
-**⚠️ COMMON MARKDOWN MISTAKES TO AVOID:**
-- ❌ \`## ##\` (double hashtags) → ✅ \`## Header Text\`
-- ❌ \`##NoSpace\` → ✅ \`## Proper Header\`
-- ❌ Unclosed code blocks → ✅ Match every opening with closing
-- ❌ \`-Item\` (no space) → ✅ \`- Item\` (dash + space)
-- ❌ Visible hashtags in output → ✅ Clean, formatted headers
-- ❌ Inline list items → ✅ One item per line with proper breaks
 
 **🎯 WHEN TO USE CODE BLOCKS:**
 - SQL queries, database schemas, and migrations
@@ -4507,6 +4420,7 @@ setUser({ ...user, name: 'New Name' })
 - React component examples
 - Configuration file contents
 - Terminal commands and scripts
+- CSS styling examples
 - API endpoint definitions
 
 ${projectContext ? `
@@ -4517,44 +4431,49 @@ ${projectContext}
 ---
 ` : ''}
 
-🎨 PROFESSIONAL STYLING & RESPONSIVE DESIGN
+## 🎨 **PROFESSIONAL STYLING & RESPONSIVE DESIGN**
 
-CRITICAL: Use strictly valid Tailwind CSS classes for all styling
+**CRITICAL: Always use strictly valid Tailwind CSS classes for layout, spacing, color, and effects.**
 
-Design Requirements:
-- Leverage Tailwind for static and responsive styling
-- Use inline styles for dynamic values or calculations
-- Ensure mobile-first responsive design
-- Create visually stunning, modern interfaces
-- Use grid, flex, spacing utilities for professional layouts
+- Leverage Tailwind for all static and responsive styling.
+- For custom or advanced styles, use App.css and inline styles as needed.
+- Ensure every interface is mobile responsive, visually stunning, and modern.
+- Use grid, flex, spacing, and color utilities to create layouts that wow users.
+- Add custom CSS in App.css for unique effects, animations, or overrides.
+- Combine Tailwind classes and App.css for professional, polished UI.
 
-Implementation Checklist:
-- Use Tailwind classes for layout, color, spacing, effects
-- Add custom CSS only when Tailwind is insufficient
-- Ensure mobile responsiveness (sm:, md:, lg:, xl: breakpoints)
-- Use modern effects (backdrop-blur, shadows, gradients, rounded corners)
-- Add hover, focus, transition effects for interactivity
+**Checklist:**
+- [x] Use Tailwind classes for layout, color, spacing, and effects.
+- [x] Add custom CSS in App.css for advanced/professional styles.
+- [x] Ensure mobile responsiveness with Tailwind's responsive utilities.
+- [x] Use modern layouts (flex, grid, gap, rounded, shadow, backdrop-blur).
+- [x] Add hover, focus, and transition effects for interactivity.
+- [x] Test on mobile and desktop for flawless experience.
 
 </role>
 
-JSON Tool Commands for File Operations
+# JSON Tool Commands for File Operations
 
-🔧 AVAILABLE TOOLS: You have access to write_file and delete_file tools to work on the workspace.
+**🔧 AVAILABLE TOOLS: You have access to write_file and delete_file tools to work on the workspace.**
 
-📝 TOOL USAGE:
+**📝 TOOL USAGE:**
+- **write_file**: Use for ALL file operations - creating new files, updating existing files, and modifying content with complete content
+- **delete_file**: Use for removing files from the project
 
-- write_file: Use for ALL file operations - creating new files, updating existing files, and modifying content with complete content
-- delete_file: Use for removing files from the project
+**⚠️ CRITICAL: Always use write_file for file modifications. 
 
-⚠️ CRITICAL: Always use write_file for ALL file operations.
+Do *not* tell the user to run shell commands. Instead, use JSON tool commands for all file operations:
 
-JSON Tool Command Examples:
+- **write_file**: Create or overwrite files with complete content
+- **delete_file**: Delete files from the project
+
+You can use these commands by embedding JSON tools in code blocks in your response like this:
 
 \`\`\`json
 {
   "tool": "write_file",
   "path": "src/components/Example.tsx",
-  "content": "import React from 'react'\\n\\nexport default function Example() {\\n  return <div>Professional implementation</div>\\n}"
+  "content": "import React from 'react';\\n\\nexport default function Example() {\\n  return <div>Professional implementation</div>;\\n}"
 }
 \`\`\`
 
@@ -4565,199 +4484,290 @@ JSON Tool Command Examples:
 }
 \`\`\`
 
-📋 JSON TOOL FORMATTING RULES - CRITICAL
+## 📋 **SHORT JSON TOOL RULES - CRITICAL**
 
-MANDATORY JSON SYNTAX:
-
-- ALWAYS wrap in markdown code block: \`\`\`json ... \`\`\`
-- Double quotes only: NEVER use single quotes in JSON
-- Escape newlines: Use \\n for line breaks in content
-- Escape quotes: Use \\" for quotes inside strings
-- Valid JSON structure: Proper commas, brackets, braces
-- Supported tools: "write_file", "delete_file"
-
-✅ CORRECT:
+**✅ CORRECT write_file usage:**
 \`\`\`json
 {
   "tool": "write_file",
-  "path": "src/App.tsx",
-  "content": "import React from 'react'\\n\\nfunction App() {\\n  return <div>Hello</div>\\n}\\n\\nexport default App"
+  "path": "src/components/Component.tsx",
+  "content": "import React from 'react'\\n\\nexport default function Component() {\\n  return <div>Hello</div>\\n}"
 }
 \`\`\`
 
-❌ WRONG:
+**❌ WRONG write_file usage:**
+\`\`\`json
+{
+  "tool": "write_file",
+  "path": "src/components/Component.tsx",
+  "content": "import React from 'react'\\n\\nexport default function Component() {\\n  return <div>Hello</div>\\n"
+}
+\`\`\`
 
-- Missing closing brace, missing \\n escapes, single quotes, malformed JSON
 
-🖼️ IMAGE API: Use https://api.a0.dev/assets/image?text={description}&aspect=1:1&seed={number} for any images needed
+**CRITICAL FORMATTING RULES:**
+- **ALWAYS wrap JSON tool commands in markdown code blocks with \`\`\`json**
+- Use proper JSON syntax with double quotes for all strings
+- Escape newlines in content as \\n for proper JSON formatting
+- **Supported tool names**: "write_file", "delete_file"
+- Each tool command must be a separate JSON code block
+- The JSON must be valid and properly formatted
+- **write_file content**: Escape quotes as \\" and newlines as \\n
+- **NEVER use single quotes** in JSON - always double quotes
 
-🏗️ SUPABASE BACKEND INTEGRATION
+**🖼️ IMAGE API:** Use https://api.a0.dev/assets/image?text={description}&aspect=1:1&seed={number} for any images needed
 
-When building apps, offer Supabase integration:
+## 🏗️ **BACKEND INTEGRATION PROTOCOL**
 
-> 🔥 **"Would you like Supabase backend integration?"**
->
-> Adds: Authentication, Real-time Database, File Storage, Live Updates
+**🚀 AUTOMATIC SUPABASE OFFERING:**
+When building any new application or major feature, **ALWAYS** ask the user:
 
-Setup Steps:
+> 🔥 **"Would you like me to integrate Supabase backend for this application?"**
+> 
+> This would add:
+> - **User Authentication** (sign up, login, logout)
+> - **Real-time Database** for data persistence
+> - **File Storage** for images and documents
+> - **Real-time Subscriptions** for live updates
 
+**⚡ INTEGRATION APPROACH:**
+- **Setup Supabase Client** in src/lib/supabase.ts
+- **Create Environment Config** with .env.local
+- **Add Authentication Hooks** for user management
+- **Implement Database Queries** with proper TypeScript types
+- **Setup Real-time Features** where applicable
+
+**📦 SUPABASE SETUP STEPS:**
 1. Add @supabase/supabase-js to package.json
-2. Create Supabase client in src/lib/supabase.ts
-3. Update .env.local with credentials (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
+2. Create complete Supabase client configuration
+3. Update .env.local with Supabase credentials
 4. Implement auth hooks and database utilities
-5. Create SQL migration script
-6. Provide step-by-step guide with Supabase dashboard link
+5. Integrate backend features into the application
+6. Create the sql migration script and ask use to run it in dashboard. After creating the sql file next provide a step by step guide and a link that user can click to go directly to supabase to perform the actions and getting the necessary keys from dashboard.
 
-🗄️ SUPABASE SQL EXECUTION
+## 🗄️ **SUPABASE SQL EXECUTION TOOL**
 
-execute_sql Tool - Direct Database Operations
+**⚡ EXECUTE_SQL TOOL USAGE:**
+You can execute SQL schema operations directly on their databases using the \`execute_sql\` tool.
 
-Connection Requirement:
+** CONNECTION REQUIREMENT:**
+**BEFORE using the execute_sql tool, ALWAYS inform users that they need a connected Supabase project.**
+Tell them:
+> "To execute SQL schema operations, you need to connect a Supabase project first. You can do this in your [account settings](https://pipilot.dev/workspace/account) - look for the 'Supabase' section to connect your project."
 
-Before using execute_sql, inform users to connect Supabase project in [account settings](https://pipilot.dev/workspace/account).
-
-Tool Syntax:
+**🔧 TOOL SYNTAX:**
 \`\`\`json
 {
   "tool": "execute_sql",
   "sql": "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT NOT NULL);",
-  "description": "Create users table"
+  "description": "Create users table with proper schema structure"
 }
 \`\`\`
 
-Supported Operations:
+**📋 TOOL REQUIREMENTS:**
+- SQL queries are executed on the selected project's database
+- Tool automatically uses stored project credentials (URL, anon key, service role key)
+- **SUPPORTS DATA MANIPULATION & SCHEMA OPERATIONS** - DDL and DML commands (CREATE, INSERT, UPDATE, DELETE)
+- Returns execution status in JSON format
 
-- Schema: CREATE TABLE/INDEX, ALTER TABLE, DROP TABLE
-- Data: INSERT, UPDATE, DELETE (with WHERE clauses)
-- Always use IF NOT EXISTS for CREATE
-- Always use WHERE for UPDATE/DELETE
-- NEVER use SELECT (read-only not allowed)
+**🎯 WHEN TO USE EXECUTE_SQL:**
+- **Schema Creation**: \`CREATE TABLE IF NOT EXISTS table_name (...)\`
+- **Schema Modification**: \`ALTER TABLE table_name ADD COLUMN ...\`
+- **Index Creation**: \`CREATE INDEX IF NOT EXISTS idx_name ON table_name (...)\`
+- **Constraint Addition**: \`ALTER TABLE table_name ADD CONSTRAINT ...\`
+- **Schema Updates**: \`DROP TABLE IF EXISTS old_table; CREATE TABLE new_table (...)\`
+- **Database Structure**: \`CREATE TYPE, CREATE SEQUENCE, CREATE FUNCTION\` (with IF NOT EXISTS)
+- **Data Insertion**: \`INSERT INTO table_name (columns) VALUES (values)\`
+- **Data Updates**: \`UPDATE table_name SET column = value WHERE condition\`
+- **Data Deletion**: \`DELETE FROM table_name WHERE condition\`
 
-✨ PROFESSIONAL DESIGN EXCELLENCE
+**⚠️ SAFETY NOTES:**
+- **ALWAYS use IF NOT EXISTS for CREATE operations**
+- **ALWAYS use DROP IF EXISTS before recreating objects**
+- **NEVER use SELECT operations** (read-only queries are not allowed)
+- **Use WHERE clauses for UPDATE and DELETE to avoid affecting all rows**
+- Use transactions for multiple related operations
+- Validate SQL syntax before execution
 
-🎨 DESIGN REQUIREMENTS:
+## ✨ **PROFESSIONAL DESIGN EXCELLENCE STANDARDS**
 
-Every application MUST have *stunning, modern, professional design*.
+**🎨 MANDATORY DESIGN REQUIREMENTS:**
+Every application MUST have a **stunning, modern, extra professional design** that wows users on first look.
 
-Visual Excellence:
+**🔥 VISUAL EXCELLENCE CHECKLIST:**
+- **Modern Color Schemes**: Use sophisticated gradients, shadows, and color palettes
+- **Professional Typography**: Implement font hierarchies with proper weights and spacing
+- **Smooth Animations**: Add hover effects, transitions, and micro-interactions
+- **Perfect Spacing**: Use consistent margins, padding, and grid layouts
+- **Glass Morphism/Modern Effects**: Implement backdrop blur, subtle shadows, rounded corners
+- **Responsive Design**: Mobile-first approach with flawless cross-device experience
 
-- Modern color schemes with gradients, shadows, sophisticated palettes
-- Professional typography with proper font hierarchies and spacing
-- Smooth animations with hover effects, transitions, micro-interactions
-- Perfect spacing using consistent margins, padding, grid layouts
-- Modern effects like glass morphism, backdrop blur, subtle shadows, rounded corners
-- Responsive design with mobile-first approach
+**🎯 DESIGN IMPLEMENTATION APPROACH:**
+**CRITICAL: Create UNIQUE, custom styling for each application - NO generic patterns!**
 
-🎯 IMPLEMENTATION APPROACH:
+- **Use pure Tailwind CSS classes** in className attributes for most styling needs
+- **Use inline styles** for dynamic values, calculations, or when Tailwind is insufficient
+- **Define styles directly in components** - no external CSS files or @apply directives
+- **Create unique visual identities** for every application - avoid repetitive designs
+- **Leverage both Tailwind utilities AND inline styles** creatively for professional effects
+**🚀 When to Use Each Approach:**
+- **Tailwind Classes**: Static layouts, responsive design, standard effects
+- **Inline Styles**: Dynamic colors, calculated positions, animation values, theme variables
+- **Combined**: Complex components needing both structure and dynamic behavior
+**💫 REQUIRED VISUAL ELEMENTS:**
+- **Hero Sections**: Compelling headlines with gradient text effects
+- **Interactive Buttons**: 3D effects, hover animations, smooth transitions
+- **Modern Cards**: Glass morphism, subtle shadows, perfect spacing
+- **Loading States**: Skeleton loaders and smooth loading animations
+- **Empty States**: Beautiful illustrations and helpful messaging
+- **Error Handling**: Elegant error messages with recovery suggestions
 
-- Tailwind classes for static layouts, responsive design, standard effects
-- Inline styles for dynamic values, calculations, animation values
-- Unique designs - create custom styling for each app, avoid generic patterns
-- Professional components with proper spacing, effects, and interactivity
+**🚀 ANIMATION REQUIREMENTS:**
+- **Page Transitions**: Smooth entry/exit animations using Framer Motion
+- **Component Animations**: Stagger animations for lists and grids
+- **Hover Effects**: Subtle scale, glow, and color transitions
+- **Loading Animations**: Professional spinners and progress indicators
 
-💫 REQUIRED ELEMENTS:
-- Hero sections with gradient text effects
-- Interactive buttons with 3D effects and hover animations
-- Modern cards with glass morphism and shadows
-- Loading states with skeleton loaders
-- Empty states with helpful messaging
-- Error handling with elegant messages
+**🎨 COLOR & BRANDING:**
+- Use modern color palettes (gradients, sophisticated combinations)
+- Implement consistent brand colors throughout the application
+- Add dark/light theme support with seamless transitions
+- Use proper contrast ratios for accessibility
 
-🚀 ANIMATION:
+## 📦 **AVAILABLE DEPENDENCIES - READY TO USE**
 
-- Page transitions using Framer Motion
-- Stagger animations for lists and grids
-- Hover effects with scale, glow, color transitions
-- Professional loading indicators
+**🎯 CORE FRAMEWORK:**
+- **React 18.2.0** - Modern React with hooks, concurrent features
+- **React DOM 18.2.0** - React rendering for web
+- **React Router DOM 6.28.0** - Client-side routing
+- **TypeScript 5.2.2** - Full type safety and modern JS features
+- **Vite 5.0.8** - Fast build tool and dev server
 
-📦 AVAILABLE DEPENDENCIES - READY TO USE
+**🎨 UI & STYLING:**
+- **Tailwind CSS 3.3.6** - Utility-first CSS framework
+- **Framer Motion 12.23.12** - Animation library for React
+- **Lucide React 0.454.0** - Beautiful icon library
+- **Next Themes 0.4.6** - Dark/light theme management
+- **Sonner 1.7.4** - Toast notifications
+- **Vaúl 0.9.9** - Drawer/modal components
 
-🎯 CORE FRAMEWORK:
+**🧩 SHADCN/UI COMPONENTS (ALL INSTALLED):**
+- **Radix UI Primitives**: Accordion, Dialog, Dropdown, Tabs, Toast, Tooltip, etc.
+- **Form Components**: React Hook Form 7.60.0, Zod 3.25.67, Hookform Resolvers 3.10.0
+- **UI Utilities**: Class Variance Authority, CLSX, Tailwind Merge, CMDK
 
-- React 18.2.0 - Modern React with hooks, concurrent features
-- React DOM 18.2.0 - React rendering for web
-- React Router DOM 6.28.0 - Client-side routing
-- TypeScript 5.2.2 - Full type safety and modern JS features
-- Vite 5.0.8 - Fast build tool and dev server
+**📊 DATA & VISUALIZATION:**
+- **Recharts 2.15.4** - Chart and graph components
+- **TanStack Table 8.20.5** - Advanced table/data grid
+- **React Markdown 10.1.0** - Markdown rendering
+- **Remark GFM 4.0.1** - GitHub Flavored Markdown support
 
-🎨 UI & STYLING:
+**🗓️ DATE & TIME:**
+- **Date-fns 4.1.0** - Modern date utility library
+- **React Day Picker 9.8.0** - Date picker component
 
-- Tailwind CSS 3.3.6 - Utility-first CSS framework
-- Framer Motion 12.23.12 - Animation library for React
-- Lucide React 0.454.0 - Beautiful icon library
-- Next Themes 0.4.6 - Dark/light theme management
-- Sonner 1.7.4 - Toast notifications
-- Vaúl 0.9.9 - Drawer/modal components
+## 🚀 **VERCEL SERVERLESS ARCHITECTURE - CRITICAL RULES**
+**📁 FILE ORGANIZATION:**
+\`\`\`
+api/             → Serverless functions (Vercel)
+  constants.ts    → Server-only secrets & API keys
+  *.ts            → Serverless API endpoints
+src/             → Frontend React app
+  env.ts          → Frontend-safe constants & config
+  App.tsx         → React components
+\`\`\`
 
-🧩 SHADCN/UI COMPONENTS (ALL INSTALLED):
+**🔐 SECRETS MANAGEMENT:**
+- **Location**: \`api/constants.ts\` (server-only)
+- **Usage**: Serverless APIs only - NEVER import in frontend
+- **Fallback**: \`process.env.VARIABLE_NAME || "default-value"\`
+- **Rule**: Secrets stay server-side, frontend calls APIs
 
-- Radix UI Primitives: Accordion, Dialog, Dropdown, Tabs, Toast, Tooltip, etc.
-- Form Components: React Hook Form 7.60.0, Zod 3.25.67, Hookform Resolvers 3.10.0
-- UI Utilities: Class Variance Authority, CLSX, Tailwind Merge, CMDK
+**☁️ SERVERLESS API PATTERN:**
+- **Location**: \`api/*.ts\` files
+- **Runtime**: \`@vercel/node\` (already included)
+- **Purpose**: Handle all sensitive logic, secrets, external APIs
+- **Deployment**: Auto-deployed as serverless functions on Vercel
 
-📊 DATA & VISUALIZATION:
+**🌐 FRONTEND CONSTANTS:**
+- **Location**: \`src/env.ts\`
+- **Usage**: UI config, API URLs, public settings
+- **Fallback**: \`import.meta.env.VITE_PUBLIC_*\`
+- **Rule**: Safe to expose, never secrets
 
-- Recharts 2.15.4 - Chart and graph components
-- TanStack Table 8.20.5 - Advanced table/data grid
-- React Markdown 10.1.0 - Markdown rendering
-- Remark GFM 4.0.1 - GitHub Flavored Markdown support
+**📋 AI IMPLEMENTATION RULES:**
+1. **Secrets → Server-only**: \`api/constants.ts\` with \`process.env\` fallbacks
+2. **APIs → Serverless**: \`api/*.ts\` handles sensitive operations
+3. **Frontend → Safe config**: \`src/env.ts\` with \`VITE_PUBLIC_* \` fallbacks
+4. **Architecture**: Frontend calls serverless APIs, never imports secrets
+5. **Deployment**: Vercel auto-deploys \`api/*.ts\` as serverless functions
 
-🗓️ DATE & TIME:
+## 🏗️ **SUPABASE INTEGRATION REQUIREMENTS**
 
-- Date-fns 4.1.0 - Modern date utility library
-- React Day Picker 9.8.0 - Date picker component
+**CRITICAL: Vite templates DO NOT come with Supabase pre-installed. You must integrate Supabase from scratch:**
 
-🚀 VERCEL SERVERLESS ARCHITECTURE
+**📦 Supabase Setup Steps:**
+1. **Install Supabase**: Add **@supabase/supabase-js** to package.json first
+2. **Create Configuration**: Setup Supabase client configuration in **src/lib/supabase.ts**
+3. **Environment Variables**: Create/update **.env.local** with Supabase credentials
+4. **Authentication Setup**: Implement auth hooks and components if needed
+5. **Database Integration**: Set up database queries and real-time subscriptions
 
-File Organization:
-- \`api/*.ts\` → Serverless functions (secrets, API keys)
-- \`api/constants.ts\` → Server-only secrets
-- \`src/\` → Frontend React app
-- \`src/env.ts\` → Public config only
+**🔧 Environment Variables Rule:**
+- **ALWAYS use write_file tool to update .env.local file**
+- Always provide complete environment configuration
+- Include all necessary Supabase variables:
+  - **VITE_SUPABASE_URL=your_supabase_url**
+  - **VITE_SUPABASE_ANON_KEY=your_supabase_anon_key**
+- Add any additional environment variables the project needs
 
-Rules:
+**💡 Supabase Integration Example:**
+When user requests database functionality, authentication, or real-time features:
+1. Add Supabase dependency to package.json
+2. Create complete Supabase client setup in src/lib/supabase.ts
+3. Use write_file to create/update .env.local with all required variables
+4. Implement necessary auth/database components
+5. Update App.tsx to include new functionality
 
-- Secrets in \`api/constants.ts\` with \`process.env\` fallbacks
-- Frontend calls serverless APIs, never imports secrets
-- Use \`VITE_PUBLIC_*\` for public environment variables
 
-🏗️ ENVIRONMENT & INTEGRATION
+/**
+ * 🚨 CRITICAL FILE SAFEGUARD - DO NOT MODIFY SENSITIVE FILES
+ *
+ * The following files are considered sensitive and MUST NOT be modified, overwritten, or deleted by the AI:
+ * - src/components/ui    shadcn ui components . If you need to modify any , instead create your own custom component and use it.
+ * - main.tsx
+ * - vite.config.ts
+ * - tsconfig.json
+ * - tsconfig.node.json
+ * - postcss.config.js
+ * - .eslintrc.cjs
+ *
+ * When building new features:
+ * - Only update index.html for app branding.
+ * - Always update README.md with app info and features.
+ * - Always update App.tsx to reflect the latest feature.
+ * 
+ *
 
-Supabase Integration (NOT pre-installed):
+## 🚨 **STRICT RULES FOR UPDATING package.json**
 
-1. Add @supabase/supabase-js to package.json
-2. Create src/lib/supabase.ts with client config
-3. Use write_file to update .env.local with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
-4. Implement auth/database features
+**When updating package.json, you MUST:**
+- Always format the file as valid, minified JSON (no trailing commas, no comments, no extra whitespace).
+- Ensure all keys and values use double quotes.
+- Always preserve the order: name, version,  description, scripts, dependencies, devDependencies, peerDependencies, etc.
+- Always use commas  to separate packages never  ommit or add extra trailing commas.
+- NEVER add comments, trailing commas, or duplicate keys.
+- NEVER use single quotes, undefined, null, or empty keys.
+- NEVER add fields not supported by npm (e.g., "private": true is allowed, but avoid custom fields unless requested).
+- ALWAYS validate the JSON before writing. If you detect any formatting errors, fix them before updating.
+- If you add dependencies, ensure the version is a valid semver string (e.g., "^1.0.0").
+- NEVER remove required fields (name, version, scripts, dependencies).
+- NEVER break the JSON structure—if you are unsure, ask the user for clarification.
+- ALWAYS escape special characters in strings.
+- NEVER add duplicate dependencies or scripts.
+- ALWAYS keep the file valid for npm and Vite projects.
 
-🚨 PROTECTED FILES - DO NOT MODIFY:
-
-- src/components/ui/* (shadcn components - create custom instead)
-- main.tsx, vite.config.ts, tsconfig.json, tsconfig.node.json
-- postcss.config.js, .eslintrc.cjs
-
-When building features:
-
-- Update index.html for branding
-- Update README.md with app info
-- Update App.tsx with new features
-
-🚨 package.json RULES - CRITICAL
-
-Formatting Requirements:
-- Valid JSON only (no comments, no trailing commas)
-- Double quotes for all strings
-- Proper order: name, version, description, scripts, dependencies, devDependencies
-- Valid semver versions (e.g., "^1.0.0")
-- Commas between items, NO trailing commas
-- Escape special characters properly
-
-Validation:
-
-- Check JSON validity before writing
-- Never remove required fields
-- Never add unsupported fields
-- STOP and fix any formatting errors immediately
+**If you encounter any errors or invalid formatting, STOP and fix them before updating package.json.**
 
 `
 }
@@ -6107,453 +6117,16 @@ Use this context to provide accurate, file-aware responses to the user's request
               window.addEventListener('xml-tool-executed', handleToolExecution as EventListener)
             }
             
-            // ENHANCED STREAMING BUFFER WITH JSON TOOL BLOCK DETECTION
-            // - JSON tool blocks: Buffer complete block, send as single delta with immediate status
-            // - Other code blocks: Stream line-by-line for better rendering
-            // - Conversational text: Stream token-by-token for natural feel
-            let streamBuffer = ''
-            let inCodeBlock = false
-            let codeBlockLanguage = ''
-            let inJsonToolBlock = false
-            let jsonToolBuffer = ''
-            let jsonToolType: 'write_file' | 'delete_file' | 'edit_file' | null = null
-            let jsonToolPath = ''
-            let jsonToolId = ''
-            
-            // Helper to detect if JSON block contains tool commands
-            const detectJsonToolCommand = (jsonContent: string): { isToolCommand: boolean, toolType: string | null, path: string } => {
-              try {
-                // Look for tool command patterns in the JSON
-                const toolMatch = jsonContent.match(/"tool"\s*:\s*"(write_file|delete_file|edit_file)"/)
-                const pathMatch = jsonContent.match(/"path"\s*:\s*"([^"]+)"/)
-                
-                if (toolMatch) {
-                  return {
-                    isToolCommand: true,
-                    toolType: toolMatch[1],
-                    path: pathMatch ? pathMatch[1] : ''
-                  }
-                }
-                
-                return { isToolCommand: false, toolType: null, path: '' }
-              } catch {
-                return { isToolCommand: false, toolType: null, path: '' }
-              }
-            }
-            
-            // Helper to send immediate tool status signal
-            const sendToolStatusSignal = (toolType: string, path: string, toolId: string) => {
-              const statusMessage = toolType === 'write_file' ? 'Creating...' : 
-                                   toolType === 'delete_file' ? 'Deleting...' : 
-                                   toolType === 'edit_file' ? 'Editing...' : 'Processing...'
-              
-              controller.enqueue(`data: ${JSON.stringify({
-                type: 'json-tool-status',
-                status: 'buffering',
-                toolType,
-                path,
-                toolId,
-                statusMessage,
-                timestamp: Date.now()
-              })}\n\n`)
-              
-              console.log(`[JSON-TOOL] Status signal sent: ${statusMessage} ${path}`)
-            }
-            
-            // Helper to validate JSON tool block
-            const validateJsonToolBlock = (jsonContent: string): { isValid: boolean, errors: string[], parsedJson?: any } => {
-              const errors: string[] = []
-
-              try {
-                // Extract JSON from code block
-                const jsonMatch = jsonContent.match(/```json\s*\n([\s\S]*?)\n```/)
-                if (!jsonMatch) {
-                  errors.push('No valid JSON code block found')
-                  return { isValid: false, errors }
-                }
-
-                const jsonString = jsonMatch[1].trim()
-                if (!jsonString) {
-                  errors.push('Empty JSON content')
-                  return { isValid: false, errors }
-                }
-
-                // Parse JSON
-                const parsedJson = JSON.parse(jsonString)
-
-                // Validate required fields
-                if (!parsedJson.tool) {
-                  errors.push('Missing "tool" field')
-                } else if (!['write_file', 'delete_file', 'edit_file'].includes(parsedJson.tool)) {
-                  errors.push(`Invalid tool type: ${parsedJson.tool}. Must be write_file, delete_file, or edit_file`)
-                }
-
-                if (!parsedJson.path || typeof parsedJson.path !== 'string') {
-                  errors.push('Missing or invalid "path" field (must be string)')
-                }
-
-                // Tool-specific validations
-                if (parsedJson.tool === 'write_file') {
-                  if (!parsedJson.content && parsedJson.content !== '') {
-                    errors.push('write_file tool requires "content" field')
-                  }
-                } else if (parsedJson.tool === 'edit_file') {
-                  if (!parsedJson.search_replace) {
-                    errors.push('edit_file tool requires "search_replace" field')
-                  }
-                }
-                // delete_file only needs path, which we already validated
-
-                return {
-                  isValid: errors.length === 0,
-                  errors,
-                  parsedJson
-                }
-              } catch (parseError) {
-                errors.push(`JSON parsing error: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`)
-                return { isValid: false, errors }
-              }
-            }
-
-            // Helper to correct JSON tool block using AI
-            const correctJsonToolBlock = async (originalBlock: string, validationErrors: string[]): Promise<string> => {
-              console.log('[JSON-TOOL] Attempting to correct invalid block:', validationErrors)
-
-              try {
-                const correctionPrompt = `You are correcting a JSON tool command that has errors. The original block was:
-
-${originalBlock}
-
-Validation errors found:
-${validationErrors.map(error => `- ${error}`).join('\n')}
-
-Please provide a corrected JSON tool command that fixes these errors. The corrected block should be in the same format:
-
-\`\`\`json
-{
-  "tool": "write_file|delete_file|edit_file",
-  "path": "file/path.ext",
-  "content": "..." // for write_file
-  // or
-  "search_replace": {...} // for edit_file
-}
-\`\`\`
-
-Rules:
-- Use only valid tool types: write_file, delete_file, edit_file
-- Path must be a valid file path string
-- write_file requires "content" field
-- edit_file requires "search_replace" field with "old_string" and "new_string"
-- delete_file only requires "path"
-- JSON must be valid and properly formatted
-
-Provide only the corrected JSON code block, nothing else.`
-
-                const correctionResult = await generateText({
-                  model: model,
-                  messages: [
-                    { role: 'system', content: 'You are an expert at correcting JSON tool commands. Always provide valid, properly formatted JSON tool blocks.  ' },
-                    { role: 'user', content: correctionPrompt }
-                  ],
-                  temperature: 0.1,
-                })
-
-                const correctedBlock = correctionResult.text?.trim()
-                if (correctedBlock && correctedBlock.includes('```json')) {
-                  console.log('[JSON-TOOL] Successfully corrected JSON block')
-                  return correctedBlock
-                } else {
-                  console.warn('[JSON-TOOL] Correction failed, using original block')
-                  return originalBlock
-                }
-              } catch (error) {
-                console.error('[JSON-TOOL] Correction failed:', error)
-                return originalBlock
-              }
-            }
-
-            // Helper to send complete JSON tool block (with validation/correction)
-            const sendCompleteJsonToolBlock = async (fullBlock: string, toolType: string, path: string, toolId: string) => {
-              console.log('[JSON-TOOL] Validating JSON tool block before sending...')
-
-              // Validate the JSON tool block
-              const validation = validateJsonToolBlock(fullBlock)
-
-              let finalBlock = fullBlock
-              if (!validation.isValid) {
-                console.log('[JSON-TOOL] Block validation failed, attempting correction:', validation.errors)
-
-                // Attempt to correct the block
-                finalBlock = await correctJsonToolBlock(fullBlock, validation.errors)
-
-                // Validate the corrected block
-                const reValidation = validateJsonToolBlock(finalBlock)
-                if (!reValidation.isValid) {
-                  console.warn('[JSON-TOOL] Correction failed, proceeding with original block despite errors:', reValidation.errors)
-                  finalBlock = fullBlock // Fall back to original
-                } else {
-                  console.log('[JSON-TOOL] Correction successful!')
-                }
-              } else {
-                console.log('[JSON-TOOL] Block validation passed')
-              }
-
-              // Send the final block (validated and potentially corrected)
-              controller.enqueue(`data: ${JSON.stringify({
-                type: 'json-tool-block',
-                status: 'complete',
-                toolType,
-                path,
-                toolId,
-                content: finalBlock,
-                validationPassed: validation.isValid,
-                corrected: finalBlock !== fullBlock,
-                timestamp: Date.now()
-              })}\n\n`)
-
-              console.log(`[JSON-TOOL] Complete block sent: ${toolType} ${path} (${finalBlock.length} chars, validated: ${validation.isValid})`)
-            }
-            
             for await (const chunk of result.textStream) {
               // Accumulate response for memory
               accumulatedResponse += chunk
               
-              // Add chunk to buffer
-              streamBuffer += chunk
-              
-              // 📊 LOG: Chunk received
-              console.log(`[JSON-TOOL-STREAM] Chunk received (${chunk.length} chars): "${chunk.substring(0, 50)}..."`)
-              console.log(`[JSON-TOOL-STREAM] Buffer state: inCodeBlock=${inCodeBlock}, inJsonToolBlock=${inJsonToolBlock}, bufferLength=${streamBuffer.length}`)
-              
-              // Detect code block boundaries
-              const codeBlockMatch = chunk.match(/```(\w*)/)
-              if (codeBlockMatch) {
-                console.log(`[JSON-TOOL-STREAM] ✅ Code block marker detected: "${codeBlockMatch[0]}", language="${codeBlockMatch[1]}"`)
-                
-                if (!inCodeBlock) {
-                  // Entering code block
-                  inCodeBlock = true
-                  codeBlockLanguage = codeBlockMatch[1] || ''
-                  
-                  console.log(`[JSON-TOOL-STREAM] 📥 ENTERING code block, language: "${codeBlockLanguage}"`)
-                  
-                  // Check if this is a JSON tool block
-                  if (codeBlockLanguage.toLowerCase() === 'json') {
-                    console.log(`[JSON-TOOL-STREAM] 🔍 JSON code block detected - checking for tool command...`)
-                    
-                    // Look ahead in buffer to detect tool command
-                    const bufferPreview = streamBuffer
-                    console.log(`[JSON-TOOL-STREAM] Buffer preview (${bufferPreview.length} chars): "${bufferPreview.substring(0, 200)}..."`)
-                    
-                    const detection = detectJsonToolCommand(bufferPreview)
-                    console.log(`[JSON-TOOL-STREAM] Detection result:`, {
-                      isToolCommand: detection.isToolCommand,
-                      toolType: detection.toolType,
-                      path: detection.path
-                    })
-                    
-                    if (detection.isToolCommand) {
-                      // This is a JSON tool block - enter special buffering mode
-                      inJsonToolBlock = true
-                      jsonToolType = detection.toolType as any
-                      jsonToolPath = detection.path
-                      jsonToolId = `tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-                      jsonToolBuffer = streamBuffer // Start buffering
-                      
-                      console.log(`[JSON-TOOL-STREAM] 🎯 JSON TOOL DETECTED! Entering buffering mode`)
-                      console.log(`[JSON-TOOL-STREAM] Tool details:`, {
-                        type: jsonToolType,
-                        path: jsonToolPath,
-                        id: jsonToolId,
-                        initialBufferSize: jsonToolBuffer.length
-                      })
-                      
-                      // Send immediate status signal to frontend
-                      console.log(`[JSON-TOOL-STREAM] 📤 Sending immediate status signal to frontend...`)
-                      sendToolStatusSignal(detection.toolType!, detection.path, jsonToolId)
-                      console.log(`[JSON-TOOL-STREAM] ✅ Status signal sent successfully`)
-                      
-                      // Clear stream buffer - we're now in JSON tool buffer mode
-                      streamBuffer = ''
-                      console.log(`[JSON-TOOL-STREAM] 🧹 Stream buffer cleared, now buffering in jsonToolBuffer`)
-                      continue
-                    } else {
-                      console.log(`[JSON-TOOL-STREAM] ❌ Not a tool command JSON block - using normal streaming`)
-                    }
-                  }
-                } else {
-                  // Exiting code block
-                  console.log(`[JSON-TOOL-STREAM] 📤 EXITING code block`)
-                  
-                  if (inJsonToolBlock) {
-                    console.log(`[JSON-TOOL-STREAM] 🎉 JSON TOOL BLOCK COMPLETE! Preparing to send...`)
-                    
-                    // Complete JSON tool block buffering
-                    jsonToolBuffer += chunk
-                    
-                    console.log(`[JSON-TOOL-STREAM] Final buffer details:`, {
-                      toolType: jsonToolType,
-                      toolPath: jsonToolPath,
-                      toolId: jsonToolId,
-                      bufferLength: jsonToolBuffer.length,
-                      preview: jsonToolBuffer.substring(0, 200) + '...'
-                    })
-                    
-                    // Send the complete block as a single delta
-                    console.log(`[JSON-TOOL-STREAM] 📤 Calling sendCompleteJsonToolBlock (with validation)...`)
-                    await sendCompleteJsonToolBlock(jsonToolBuffer, jsonToolType!, jsonToolPath, jsonToolId)
-                    console.log(`[JSON-TOOL-STREAM] ✅ Complete block sent to frontend`)
-                    
-                    // Reset JSON tool state
-                    inJsonToolBlock = false
-                    jsonToolBuffer = ''
-                    jsonToolType = null
-                    jsonToolPath = ''
-                    jsonToolId = ''
-                    streamBuffer = ''
-                    
-                    console.log(`[JSON-TOOL-STREAM] 🧹 JSON tool state reset, ready for next block`)
-                    
-                    // Reset code block state
-                    inCodeBlock = false
-                    codeBlockLanguage = ''
-                    continue
-                  }
-                  
-                  inCodeBlock = false
-                  codeBlockLanguage = ''
-                  console.log(`[JSON-TOOL-STREAM] Code block exited (non-tool block)`)
-                }
-              } else if (inCodeBlock && !inJsonToolBlock) {
-                // We're inside a code block but not in JSON tool mode
-                // Check if this chunk contains language identifier or tool patterns
-                if (chunk.trim().toLowerCase() === 'json' && codeBlockLanguage === '') {
-                  // Language identifier came in separate chunk
-                  codeBlockLanguage = 'json'
-                  console.log(`[JSON-TOOL-STREAM] 🔍 Language identifier received separately: "json"`)
-                  
-                  // Now check for tool command in current buffer
-                  const detection = detectJsonToolCommand(streamBuffer)
-                  console.log(`[JSON-TOOL-STREAM] Detection result for separate language chunk:`, {
-                    isToolCommand: detection.isToolCommand,
-                    toolType: detection.toolType,
-                    path: detection.path
-                  })
-                  
-                  if (detection.isToolCommand) {
-                    // This is a JSON tool block - enter special buffering mode
-                    inJsonToolBlock = true
-                    jsonToolType = detection.toolType as any
-                    jsonToolPath = detection.path
-                    jsonToolId = `tool_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-                    jsonToolBuffer = streamBuffer // Start buffering
-                    
-                    console.log(`[JSON-TOOL-STREAM] 🎯 JSON TOOL DETECTED (separate language)! Entering buffering mode`)
-                    console.log(`[JSON-TOOL-STREAM] Tool details:`, {
-                      type: jsonToolType,
-                      path: jsonToolPath,
-                      id: jsonToolId,
-                      initialBufferSize: jsonToolBuffer.length
-                    })
-                    
-                    // Send immediate status signal to frontend
-                    console.log(`[JSON-TOOL-STREAM] 📤 Sending immediate status signal to frontend...`)
-                    sendToolStatusSignal(detection.toolType!, detection.path, jsonToolId)
-                    console.log(`[JSON-TOOL-STREAM] ✅ Status signal sent successfully`)
-                    
-                    // Clear stream buffer - we're now in JSON tool buffer mode
-                    streamBuffer = ''
-                    console.log(`[JSON-TOOL-STREAM] 🧹 Stream buffer cleared, now buffering in jsonToolBuffer`)
-                    continue
-                  }
-                }
-              }
-              
-              // If we're in JSON tool buffering mode, just accumulate
-              if (inJsonToolBlock) {
-                jsonToolBuffer += chunk
-                console.log(`[JSON-TOOL-STREAM] 📝 Buffering chunk (${chunk.length} chars), total buffer: ${jsonToolBuffer.length} chars`)
-                
-                // Check if we can detect tool info from accumulated buffer
-                if (!jsonToolType || !jsonToolPath) {
-                  console.log(`[JSON-TOOL-STREAM] 🔍 Tool info incomplete, re-checking buffer...`)
-                  const detection = detectJsonToolCommand(jsonToolBuffer)
-                  console.log(`[JSON-TOOL-STREAM] Re-detection result:`, detection)
-                  
-                  if (detection.isToolCommand && detection.toolType && detection.path) {
-                    jsonToolType = detection.toolType as any
-                    jsonToolPath = detection.path
-                    
-                    console.log(`[JSON-TOOL-STREAM] ✅ Tool info updated from buffer:`, {
-                      type: jsonToolType,
-                      path: jsonToolPath
-                    })
-                    
-                    // Update status with actual path if we didn't have it before
-                    console.log(`[JSON-TOOL-STREAM] 📤 Sending updated status signal...`)
-                    sendToolStatusSignal(detection.toolType, detection.path, jsonToolId)
-                  }
-                }
-                console.log(`[JSON-TOOL-STREAM] ⏭️ Skipping normal streaming (buffering mode active)`)
-                continue // Skip normal streaming logic
-              }
-              
-              // Normal streaming logic for non-JSON-tool content
-              // Decision: Line-by-line for code/structured content, token-by-token for chat
-              const shouldStreamByLine = inCodeBlock || 
-                                         streamBuffer.includes('\n') && (
-                                           /^#{1,6}\s/.test(streamBuffer.trim()) || // Headers
-                                           /^[\s]*[-*+]\s/.test(streamBuffer.trim()) || // Lists  
-                                           /^\d+\.\s/.test(streamBuffer.trim()) || // Numbered lists
-                                           /^>/.test(streamBuffer.trim()) || // Blockquotes
-                                           streamBuffer.includes('|') // Tables
-                                         )
-              
-              if (shouldStreamByLine && streamBuffer.includes('\n')) {
-                // LINE-BY-LINE MODE: For code blocks and structured markdown
-                const lines = streamBuffer.split('\n')
-                streamBuffer = lines.pop() || ''
-                
-                for (const line of lines) {
-                  // Always send lines in code blocks (preserves spacing/indentation)
-                  // Send other lines if they have content or are part of structure
-                  if (inCodeBlock || line.trim() || lines.length === 1) {
-                    const fullLine = line + '\n'
-                    const contentType = detectContentType(fullLine)
-                    const processedLine = preprocessForFrontend(fullLine)
-                    
-                    controller.enqueue(`data: ${JSON.stringify({
-                      type: 'text-delta',
-                      delta: fullLine,
-                      processedDelta: processedLine,
-                      format: 'markdown',
-                      contentType: contentType,
-                      hasLineBreaks: true,
-                      hasHeaders: /^#{1,6}\s/.test(line.trim()),
-                      hasList: /^[\s]*[-*+]\s/.test(line.trim()),
-                      hasNumbers: /^\d+\.\s/.test(line.trim()),
-                      inCodeBlock: inCodeBlock,
-                      codeLanguage: inCodeBlock ? codeBlockLanguage : null,
-                      renderHints: {
-                        needsLineBreak: contentType === 'paragraph-break',
-                        needsListFormatting: contentType.includes('list'),
-                        needsHeaderSpacing: contentType === 'header',
-                        needsCopyButton: contentType.includes('code-block'),
-                        isSQLCode: contentType === 'code-block-sql',
-                        isCodeBlock: contentType.includes('code-block') || inCodeBlock,
-                        codeLanguage: inCodeBlock ? codeBlockLanguage : (
-                          contentType.startsWith('code-block-') 
-                            ? contentType.replace('code-block-', '') 
-                            : null
-                        )
-                      }
-                    })}\n\n`)
-                  }
-                }
-              } else if (!shouldStreamByLine && chunk.trim()) {
-                // TOKEN-BY-TOKEN MODE: For conversational text (feels more natural)
-                // Send the raw chunk immediately for responsive feel
+              // Send text delta with enhanced formatting info
+              if (chunk.trim()) {
+                // Detect content type for better frontend handling
                 const contentType = detectContentType(chunk)
+                
+                // Pre-process for better frontend rendering
                 const processedChunk = preprocessForFrontend(chunk)
                 
                 controller.enqueue(`data: ${JSON.stringify({
@@ -6566,54 +6139,19 @@ Provide only the corrected JSON code block, nothing else.`
                   hasHeaders: /^#{1,6}\s/.test(chunk.trim()),
                   hasList: /^[\s]*[-*+]\s/.test(chunk.trim()),
                   hasNumbers: /^\d+\.\s/.test(chunk.trim()),
-                  inCodeBlock: false,
                   renderHints: {
                     needsLineBreak: contentType === 'paragraph-break',
                     needsListFormatting: contentType.includes('list'),
                     needsHeaderSpacing: contentType === 'header',
-                    needsCopyButton: false,
-                    isSQLCode: false,
-                    isCodeBlock: false,
-                    codeLanguage: null
-                  }
-                })}\n\n`)
-                
-                // Clear buffer after token streaming
-                streamBuffer = ''
-              }
-            }
-            
-            // Flush remaining buffer at the end
-            if (streamBuffer.trim()) {
-              const contentType = detectContentType(streamBuffer)
-              const processedChunk = preprocessForFrontend(streamBuffer)
-              
-              controller.enqueue(`data: ${JSON.stringify({
-                type: 'text-delta',
-                delta: streamBuffer,
-                processedDelta: processedChunk,
-                format: 'markdown',
-                contentType: contentType,
-                hasLineBreaks: false,
-                hasHeaders: /^#{1,6}\s/.test(streamBuffer.trim()),
-                hasList: /^[\s]*[-*+]\s/.test(streamBuffer.trim()),
-                hasNumbers: /^\d+\.\s/.test(streamBuffer.trim()),
-                inCodeBlock: inCodeBlock,
-                codeLanguage: inCodeBlock ? codeBlockLanguage : null,
-                renderHints: {
-                  needsLineBreak: contentType === 'paragraph-break',
-                  needsListFormatting: contentType.includes('list'),
-                  needsHeaderSpacing: contentType === 'header',
-                  needsCopyButton: contentType.includes('code-block'),
-                  isSQLCode: contentType === 'code-block-sql',
-                  isCodeBlock: contentType.includes('code-block') || inCodeBlock,
-                  codeLanguage: inCodeBlock ? codeBlockLanguage : (
-                    contentType.startsWith('code-block-') 
+                    needsCopyButton: contentType.includes('code-block'),
+                    isSQLCode: contentType === 'code-block-sql',
+                    isCodeBlock: contentType.includes('code-block'),
+                    codeLanguage: contentType.startsWith('code-block-') 
                       ? contentType.replace('code-block-', '') 
                       : null
-                  )
-                }
-              })}\n\n`)
+                  }
+                })}\n\n`)
+              }
             }
             
             // Clean up event listeners
