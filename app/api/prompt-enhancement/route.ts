@@ -27,12 +27,11 @@ export async function POST(request: Request) {
 
     console.log('✨ Enhancing prompt using Pixtral:', prompt)
 
-    // Get Pixtral model for prompt enhancement
-    const pixtralModel = getModel('pixtral-large-latest')
-
-    // Enhance the prompt using Pixtral
-    const result = await generateText({
-      model: pixtralModel,
+   const codestralModel = getModel('codestral-latest')
+   
+       // Generate prompt suggestions using Codestral
+       const result = await generateText({
+         model: codestralModel,
       prompt: `You are an AI prompt enhancement expert. Your task is to take a user's basic prompt for building a web application and enhance it to be more detailed, specific, and actionable.
 
 User's original prompt: "${prompt}"
