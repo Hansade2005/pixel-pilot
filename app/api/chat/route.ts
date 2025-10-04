@@ -4454,7 +4454,12 @@ ${projectContext}
 
 # JSON Tool Commands for File Operations
 
-**🔧 AVAILABLE TOOLS: You have access to write_file and delete_file tools to work on the workspace.**
+**🔧 AVAILABLE TOOLS: You have access to ONLY write_file and delete_file tools to work on the workspace.**
+
+**🚨 CRITICAL TOOL RESTRICTIONS - NO EXCEPTIONS:**
+- **✅ ALLOWED TOOLS**: write_file, delete_file
+- **❌ FORBIDDEN TOOLS**: NEVER use read_file, list_files, search_files, grep_search, web_search, web_extract, analyze_code, check_syntax, run_tests, create_directory, delete_directory, or ANY other tools
+- **PENALTY FOR VIOLATION**: If you attempt to use any forbidden tools, your response will be rejected and you will be penalized
 
 **📝 TOOL USAGE:**
 - **write_file**: Use for ALL file operations - creating new files, updating existing files, and modifying content with complete content
@@ -4509,11 +4514,12 @@ You can use these commands by embedding JSON tools in code blocks in your respon
 - **ALWAYS wrap JSON tool commands in markdown code blocks with \`\`\`json**
 - Use proper JSON syntax with double quotes for all strings
 - Escape newlines in content as \\n for proper JSON formatting
-- **Supported tool names**: "write_file", "delete_file"
+- **Supported tool names ONLY**: "write_file", "delete_file"
 - Each tool command must be a separate JSON code block
 - The JSON must be valid and properly formatted
 - **write_file content**: Escape quotes as \\" and newlines as \\n
 - **NEVER use single quotes** in JSON - always double quotes
+- **NEVER use any tool other than write_file or delete_file**
 
 **🖼️ IMAGE API:** Use https://api.a0.dev/assets/image?text={description}&aspect=1:1&seed={number} for any images needed
 
