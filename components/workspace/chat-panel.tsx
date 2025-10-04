@@ -3614,33 +3614,6 @@ const HighlightLoader = () => {
   return null
 }
 
-// Enhanced markdown preprocessing for better formatting and emoji support
-function preprocessMarkdownContent(content: string): string {
-  // Ensure proper spacing around headings
-  content = content.replace(/^(#{1,6})\s*(.+)$/gm, (match, hashes, text) => {
-    return `\n${hashes} ${text.trim()}\n`
-  })
-  
-  // Ensure proper spacing around lists
-  content = content.replace(/^(\*|\+|-|\d+\.)\s+(.+)$/gm, (match, marker, text) => {
-    return `${marker} ${text.trim()}`
-  })
-  
-  // Ensure proper spacing around code blocks
-  content = content.replace(/^```(\w*)\n([\s\S]*?)\n```$/gm, (match, language, code) => {
-    return `\n\`\`\`${language}\n${code.trim()}\n\`\`\`\n`
-  })
-  
-  // Ensure proper paragraph spacing
-  content = content.replace(/\n{3,}/g, '\n\n')
-  
-  // Enhance emoji spacing
-  content = content.replace(/([^\\s])([🎯📌▶◆💡🔍⭐️✅❌⚡️🚀🎉💪🤖🛠️📋🔧💻🎨📊🔒🌟💰🎪🎭🎨🎵🎮🎯🎲🎰🎳🎯🎪🎭🎨🎵🎮🎯🎲🎰🎳])/g, '$1 $2')
-  content = content.replace(/([🎯📌▶◆💡🔍⭐️✅❌⚡️🚀🎉💪🤖🛠️📋🔧💻🎨📊🔒🌟💰🎪🎭🎨🎵🎮🎯🎲🎰🎳🎯🎪🎭🎨🎵🎮🎯🎲🎰🎳])([^\\s])/g, '$1 $2')
-  
-  return content.trim()
-}
-
 export function ChatPanel({
   project,
   isMobile = false,
@@ -6678,7 +6651,7 @@ export function ChatPanel({
                                           ),
                                         }}
                                       >
-                                        {preprocessMarkdownContent(msg.content)}
+                                        {msg.content}
                                       </ReactMarkdown>
                                     </div>
                                   )
