@@ -33,6 +33,7 @@ export interface TemplateProject {
   thumbnailUrl: string
   files: Omit<File, 'id' | 'workspaceId' | 'createdAt' | 'updatedAt'>[]
   additionalPackages?: { [key: string]: string }
+  createdAt?: Date
 }
 
 export class TemplateManager {
@@ -48,11 +49,12 @@ export class TemplateManager {
       thumbnailUrl: 'https://api.a0.dev/assets/image?text=Cryptocurrency Trading Dashboard with real-time charts, trading interface, price graphs, buy sell buttons, market data, professional design&aspect=1:1&seed=123',
       files: cryptoTradingDashboardFiles,
       additionalPackages: {
-        
-        "d3": "^7.8.5",                  
-        "@visx/visx": "^3.3.0",           
-        "socket.io-client": "^4.7.5",    
-      }
+
+        "d3": "^7.8.5",
+        "@visx/visx": "^3.3.0",
+        "socket.io-client": "^4.7.5",
+      },
+      createdAt: new Date('2024-01-15')
     },
     {
       id: 'characterforge-imagix',
@@ -64,11 +66,12 @@ export class TemplateManager {
       remixes: 7421,
       thumbnailUrl: 'https://api.a0.dev/assets/image?text=AI character creation platform, 3D character models, customization tools, fantasy art generator, character builder interface, magical effects&aspect=1:1&seed=456',
       files: characterForgeImagixFiles,
+      createdAt: new Date('2024-02-20')
     },
     {
       id: 'forklift-navigator',
       title: 'Forklift Navigator',
-      category: 'Prototype',
+      category: 'Internal Tools',
       description: 'Dashboard de Controle for logistics',
       author: 'Hans Ade',
       authorAvatar: '/hans.png',
@@ -76,17 +79,18 @@ export class TemplateManager {
       thumbnailUrl: 'https://api.a0.dev/assets/image?text=Logistics dashboard, forklift navigation system, warehouse management, inventory control, route optimization, real-time tracking, industrial design&aspect=1:1&seed=456',
       files: forkliftNavigatorFiles,
       additionalPackages: {
-       
-        "leaflet": "^1.9.4",             
-        "react-leaflet": "^4.2.1",        
-        "socket.io-client": "^4.7.5",     
-        "react-flow": "^11.10.1",        
-      }
+
+        "leaflet": "^1.9.4",
+        "react-leaflet": "^4.2.1",
+        "socket.io-client": "^4.7.5",
+        "react-flow": "^11.10.1",
+      },
+      createdAt: new Date('2024-03-10')
     },
     {
       id: 'market-mosaic-online',
       title: 'Market Mosaic Online',
-      category: 'Consumer App',
+      category: 'B2B App',
       description: 'Complex dashboard with analytics',
       author: 'Hans Ade',
       authorAvatar: '/hans.png',
@@ -94,11 +98,12 @@ export class TemplateManager {
       thumbnailUrl: 'https://api.a0.dev/assets/image?text=Market analytics dashboard, data visualization, charts and graphs, financial reports, market trends, business intelligence, modern UI&aspect=1:1&seed=789',
       files: marketMosaicOnlineFiles,
       additionalPackages: {
-       
-        "d3": "^7.8.5",                 
-        "@visx/visx": "^3.3.0",           
-        "react-pdf": "^8.0.2",            
-      }
+
+        "d3": "^7.8.5",
+        "@visx/visx": "^3.3.0",
+        "react-pdf": "^8.0.2",
+      },
+      createdAt: new Date('2024-04-05')
     },
     {
       id: 'psk-services',

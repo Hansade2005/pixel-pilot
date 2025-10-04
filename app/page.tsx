@@ -31,6 +31,8 @@ export default function LandingPage() {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [templates, setTemplates] = useState<any[]>([])
+  const [sortBy, setSortBy] = useState<string>('popular')
+  const [filterBy, setFilterBy] = useState<string>('all')
 
   useEffect(() => {
     checkUser()
@@ -73,6 +75,58 @@ export default function LandingPage() {
   const handleAuthSuccess = () => {
     setShowAuthModal(false)
     checkUser()
+  }
+
+  // Function to filter and sort templates
+  const getFilteredAndSortedTemplates = () => {
+    let filtered = templates
+
+    // Apply category filter
+    if (filterBy !== 'all') {
+      filtered = filtered.filter(template => {
+        const category = template.category?.toLowerCase()
+        switch (filterBy) {
+          case 'discover':
+            return category?.includes('consumer') || category?.includes('website') || category?.includes('personal')
+          case 'internal':
+            return category?.includes('internal') || category?.includes('tools') || category?.includes('prototype')
+          case 'website':
+            return category?.includes('website')
+          case 'personal':
+            return category?.includes('personal') || category?.includes('consumer')
+          case 'consumer':
+            return category?.includes('consumer')
+          case 'b2b':
+            return category?.includes('b2b') || category?.includes('saas')
+          case 'prototype':
+            return category?.includes('prototype')
+          default:
+            return category === filterBy.toLowerCase()
+        }
+      })
+    }
+
+    // Apply sorting
+    const sorted = [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case 'popular':
+          return (b.remixes || 0) - (a.remixes || 0)
+        case 'recent':
+          // Use createdAt if available, otherwise fall back to current date for sorting stability
+          const aDate = a.createdAt ? new Date(a.createdAt).getTime() : Date.now() - (a.remixes || 0) * 1000
+          const bDate = b.createdAt ? new Date(b.createdAt).getTime() : Date.now() - (b.remixes || 0) * 1000
+          return bDate - aDate
+        case 'trending':
+          // For trending, sort by combination of recency and popularity
+          const aScore = (a.remixes || 0) * 0.7 + (new Date(a.createdAt || Date.now()).getTime() / (1000 * 60 * 60 * 24)) * 0.3
+          const bScore = (b.remixes || 0) * 0.7 + (new Date(b.createdAt || Date.now()).getTime() / (1000 * 60 * 60 * 24)) * 0.3
+          return bScore - aScore
+        default:
+          return 0
+      }
+    })
+
+    return sorted
   }
 
   return (
@@ -128,24 +182,33 @@ export default function LandingPage() {
             <div className="flex flex-wrap items-center gap-4">
               {/* Popular Dropdown */}
               <div className="relative group">
-                <Button variant="outline" className="border-gray-600 text-white hover:bg-gray-700">
-                  Popular
+                <Button variant="outline" className={`border-gray-600 text-white hover:bg-gray-700 ${sortBy === 'popular' ? 'bg-purple-600 border-purple-600' : ''}`}>
+                  {sortBy === 'popular' ? 'Popular' : sortBy === 'recent' ? 'Recent' : 'Trending'}
                   <ChevronDown className="w-4 h-4 ml-2" />
                 </Button>
                 {/* Dropdown Menu */}
                 <div className="absolute top-full left-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
                   <div className="py-2">
-                    <button className="w-full text-left px-4 py-2 text-white hover:bg-gray-700 transition-colors">
+                    <button
+                      className={`w-full text-left px-4 py-2 transition-colors ${sortBy === 'popular' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
+                      onClick={() => setSortBy('popular')}
+                    >
                       Popular
                     </button>
-                    <button className="w-full text-left px-4 py-2 text-white hover:bg-gray-700 transition-colors">
+                    <button
+                      className={`w-full text-left px-4 py-2 transition-colors ${sortBy === 'recent' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
+                      onClick={() => setSortBy('recent')}
+                    >
                       Recent
                     </button>
-                    <button className="w-full text-left px-4 py-2 text-white hover:bg-gray-700 transition-colors">
+                    <button
+                      className={`w-full text-left px-4 py-2 transition-colors ${sortBy === 'trending' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
+                      onClick={() => setSortBy('trending')}
+                    >
                       Trending
                     </button>
                     <div className="border-t border-gray-700 my-1"></div>
-                    <Link href="/community" className="block w-full text-left px-4 py-2 text-white hover:bg-gray-700 transition-colors">
+                    <Link href="/showcase" className="block w-full text-left px-4 py-2 text-white hover:bg-gray-700 transition-colors">
                       View All
                     </Link>
                   </div>
@@ -154,25 +217,68 @@ export default function LandingPage() {
               
               {/* Filter Buttons */}
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" className="border-gray-600 text-white hover:bg-gray-700">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`border-gray-600 text-white hover:bg-gray-700 ${filterBy === 'all' ? 'bg-purple-600 border-purple-600' : ''}`}
+                  onClick={() => setFilterBy('all')}
+                >
+                  View All
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`border-gray-600 text-white hover:bg-gray-700 ${filterBy === 'discover' ? 'bg-purple-600 border-purple-600' : ''}`}
+                  onClick={() => setFilterBy('discover')}
+                >
                   Discover
                 </Button>
-                <Button variant="outline" size="sm" className="border-gray-600 text-white hover:bg-gray-700">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`border-gray-600 text-white hover:bg-gray-700 ${filterBy === 'internal' ? 'bg-purple-600 border-purple-600' : ''}`}
+                  onClick={() => setFilterBy('internal')}
+                >
                   Internal Tools
                 </Button>
-                <Button variant="outline" size="sm" className="border-gray-600 text-white hover:bg-gray-700">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`border-gray-600 text-white hover:bg-gray-700 ${filterBy === 'website' ? 'bg-purple-600 border-purple-600' : ''}`}
+                  onClick={() => setFilterBy('website')}
+                >
                   Website
                 </Button>
-                <Button variant="outline" size="sm" className="border-gray-600 text-white hover:bg-gray-700">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`border-gray-600 text-white hover:bg-gray-700 ${filterBy === 'personal' ? 'bg-purple-600 border-purple-600' : ''}`}
+                  onClick={() => setFilterBy('personal')}
+                >
                   Personal
                 </Button>
-                <Button variant="outline" size="sm" className="border-gray-600 text-white hover:bg-gray-700">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`border-gray-600 text-white hover:bg-gray-700 ${filterBy === 'consumer' ? 'bg-purple-600 border-purple-600' : ''}`}
+                  onClick={() => setFilterBy('consumer')}
+                >
                   Consumer App
                 </Button>
-                <Button variant="outline" size="sm" className="border-gray-600 text-white hover:bg-gray-700">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`border-gray-600 text-white hover:bg-gray-700 ${filterBy === 'b2b' ? 'bg-purple-600 border-purple-600' : ''}`}
+                  onClick={() => setFilterBy('b2b')}
+                >
                   B2B App
                 </Button>
-                <Button variant="outline" size="sm" className="border-gray-600 text-white hover:bg-gray-700">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`border-gray-600 text-white hover:bg-gray-700 ${filterBy === 'prototype' ? 'bg-purple-600 border-purple-600' : ''}`}
+                  onClick={() => setFilterBy('prototype')}
+                >
                   Prototype
                 </Button>
               </div>
@@ -181,7 +287,7 @@ export default function LandingPage() {
 
           {/* Community Projects Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {templates.map((template, index) => (
+            {getFilteredAndSortedTemplates().map((template, index) => (
               <Card
                 key={index}
                 className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-all duration-300 hover:scale-105 group"
