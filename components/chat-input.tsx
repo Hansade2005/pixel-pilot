@@ -12,7 +12,8 @@ import {
   Crown,
   Mic,
   MicOff,
-  Square
+  Square,
+  Sparkles
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -34,6 +35,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   const [isLoading, setIsLoading] = useState(false)
   const [suggestions, setSuggestions] = useState<PromptSuggestion[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isEnhancing, setIsEnhancing] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -84,6 +86,34 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         { display: "Blog with dark mode", prompt: "Create a blog website with dark mode" },
         { display: "Business website", prompt: "Build a business website with contact forms" }
       ])
+    }
+  }
+
+  // Prompt enhancement using Pixtral AI
+  const handlePromptEnhancement = async () => {
+    if (!prompt.trim() || isEnhancing || isGenerating) return
+
+    setIsEnhancing(true)
+    try {
+      const response = await fetch('/api/prompt-enhancement', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt: prompt.trim() }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.enhancedPrompt) {
+          setPrompt(data.enhancedPrompt)
+          inputRef.current?.focus()
+        }
+      }
+    } catch (error) {
+      console.error('Failed to enhance prompt:', error)
+    } finally {
+      setIsEnhancing(false)
     }
   }
 
@@ -518,18 +548,37 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                 </button>
               </div>
 
-              {/* Right Side - Send Button */}
-              <button 
-                type="submit" 
-                disabled={!prompt.trim() || isGenerating}
-                className="w-8 h-8 rounded-full bg-gray-700/50 hover:bg-gray-600/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-gray-400 hover:text-white transition-colors"
-              >
-                {isGenerating ? (
-                  <Square className="w-4 h-4" />
-                ) : (
-                  <ArrowUp className="w-4 h-4" />
-                )}
-              </button>
+              {/* Right Side - Enhance and Send Buttons */}
+              <div className="flex items-center space-x-3">
+                <button 
+                  type="button"
+                  onClick={handlePromptEnhancement}
+                  disabled={!prompt.trim() || isEnhancing || isGenerating}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isEnhancing
+                      ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
+                      : 'bg-gray-700/50 hover:bg-gradient-to-r hover:from-purple-600/80 hover:to-blue-600/80 text-gray-400 hover:text-white'
+                  }`}
+                  title="Enhance prompt with AI"
+                >
+                  {isEnhancing ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4" />
+                  )}
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={!prompt.trim() || isGenerating}
+                  className="w-8 h-8 rounded-full bg-gray-700/50 hover:bg-gray-600/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                >
+                  {isGenerating ? (
+                    <Square className="w-4 h-4" />
+                  ) : (
+                    <ArrowUp className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
             </div>
           </form>
         </div>
