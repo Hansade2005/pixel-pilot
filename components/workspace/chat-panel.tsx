@@ -1,6 +1,19 @@
 "use client"
 
 import React, { useState, useRef, useEffect, useCallback } from "react"
+
+// Simple debounce utility to prevent excessive function calls
+function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
+
 import {
   MessageSquare,
   Trash2,
@@ -3639,6 +3652,42 @@ export function ChatPanel({
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null) // Ref for messages container
 
+  // Debounced file dropdown handler to prevent lag during typing
+  const debouncedFileDropdownHandler = useCallback(
+    debounce((newValue: string, cursorPos: number, textarea: HTMLTextAreaElement) => {
+      const atCommand = detectAtCommand(newValue, cursorPos);
+
+      if (atCommand) {
+        setFileQuery(atCommand.query);
+        setAtCommandStartIndex(atCommand.startIndex);
+
+        if (!showFileDropdown) {
+          const position = calculateDropdownPosition(textarea, atCommand.startIndex);
+          setDropdownPosition(position);
+          setShowFileDropdown(true);
+        }
+      } else {
+        if (showFileDropdown) {
+          closeFileDropdown();
+        }
+      }
+    }, 150), // 150ms debounce
+    [] // No dependencies needed since we access state inside the function
+  );
+
+  // Debounced textarea height adjustment to prevent lag during typing
+  const debouncedHeightAdjustment = useCallback(
+    debounce((textarea: HTMLTextAreaElement) => {
+      // Reset to baseline then expand up to the max (90px)
+      textarea.style.height = '90px';
+      const newHeight = Math.min(textarea.scrollHeight, 140)
+      textarea.style.height = newHeight + 'px';
+      // Only show a vertical scrollbar when content exceeds the max height
+      textarea.style.overflowY = textarea.scrollHeight > 140 ? 'auto' : 'hidden'
+    }, 50), // 50ms debounce for height adjustments
+    []
+  );
+
   // File attachment state
   const [attachedFiles, setAttachedFiles] = useState<FileSearchResult[]>([])
   const [showFileDropdown, setShowFileDropdown] = useState(false)
@@ -7013,31 +7062,12 @@ export function ChatPanel({
                   setInputMessage(newValue);
                   const textarea = e.target as HTMLTextAreaElement;
                   
-                  // Handle @ command detection
-                  const cursorPos = textarea.selectionStart;
-                  const atCommand = detectAtCommand(newValue, cursorPos);
+                  // Debounced file dropdown handling to prevent lag
+                  debouncedFileDropdownHandler(newValue, textarea.selectionStart, textarea);
                   
-                  if (atCommand) {
-                    setFileQuery(atCommand.query);
-                    setAtCommandStartIndex(atCommand.startIndex);
-                    
-                    if (!showFileDropdown) {
-                      const position = calculateDropdownPosition(textarea, atCommand.startIndex);
-                      setDropdownPosition(position);
-                      setShowFileDropdown(true);
-                    }
-                  } else {
-                    if (showFileDropdown) {
-                      closeFileDropdown();
-                    }
-                  }
+                  // Debounced height adjustment to prevent lag
+                  debouncedHeightAdjustment(textarea);
                   
-                  // Reset to baseline then expand up to the max (90px)
-                  textarea.style.height = '90px';
-                  const newHeight = Math.min(textarea.scrollHeight, 140)
-                  textarea.style.height = newHeight + 'px';
-                  // Only show a vertical scrollbar when content exceeds the max height
-                  textarea.style.overflowY = textarea.scrollHeight > 140 ? 'auto' : 'hidden'
                   if (isEditingRevertedMessage) {
                     const revertedMessage = messages.find(m => m.id === revertMessageId)?.content || '';
                     if (e.target.value !== revertedMessage) {
@@ -7046,11 +7076,8 @@ export function ChatPanel({
                   }
                 }}
                 onInput={(e) => {
-                  const textarea = e.target as HTMLTextAreaElement;
-                  textarea.style.height = '90px';
-                  const newHeight = Math.min(textarea.scrollHeight, 140)
-                  textarea.style.height = newHeight + 'px';
-                  textarea.style.overflowY = textarea.scrollHeight > 140 ? 'auto' : 'hidden'
+                  // Height adjustment is now handled by debounced function in onChange
+                  // This handler is kept for any future input-specific logic
                 }}
                 onClick={(e) => {
                   // Handle cursor position changes for @ command detection
