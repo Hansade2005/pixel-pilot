@@ -124,29 +124,36 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
       const recognition = new SpeechRecognition()
       
-      // Enable continuous recognition for better accuracy
+      // Enhanced settings for real-time typing
       recognition.continuous = true
-      recognition.interimResults = true // Show results in real-time
+      recognition.interimResults = true // Enable instant real-time results
       recognition.lang = 'en-US'
       recognition.maxAlternatives = 1
       
-      let finalTranscript = ''
-      let interimTranscript = ''
+      // Store the initial prompt value when starting
+      const initialPrompt = prompt
+      let lastFinalTranscript = ''
+      let silenceTimer: NodeJS.Timeout | null = null
       
       recognition.onstart = () => {
         setIsRecording(true)
-        finalTranscript = ''
-        interimTranscript = ''
-        toast.success("Listening...", {
-          description: "Speak now, click mic again to stop"
+        lastFinalTranscript = ''
+        toast.success("🎤 Listening...", {
+          description: "Speak now. I'll stop automatically when you're done."
         })
       }
       
       recognition.onresult = (event: any) => {
-        interimTranscript = ''
+        // Clear any existing silence timer
+        if (silenceTimer) {
+          clearTimeout(silenceTimer)
+        }
         
-        // Process all results
-        for (let i = event.resultIndex; i < event.results.length; i++) {
+        let interimTranscript = ''
+        let finalTranscript = ''
+        
+        // Process all results for instant typing effect
+        for (let i = 0; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript
           
           if (event.results[i].isFinal) {
@@ -156,27 +163,52 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
           }
         }
         
-        // Update input with final transcript + interim (for real-time feedback)
-        const currentInput = prompt || ''
-        const newText = finalTranscript + interimTranscript
+        // Combine final and interim for instant real-time typing
+        const combinedText = (finalTranscript || lastFinalTranscript) + interimTranscript
         
-        if (newText.trim()) {
-          setPrompt(currentInput ? `${currentInput} ${newText.trim()}` : newText.trim())
+        // Update final transcript tracker
+        if (finalTranscript) {
+          lastFinalTranscript = finalTranscript
         }
+        
+        // Instantly update the input field with real-time text
+        if (combinedText.trim()) {
+          const updatedPrompt = initialPrompt 
+            ? `${initialPrompt} ${combinedText.trim()}` 
+            : combinedText.trim()
+          setPrompt(updatedPrompt)
+        }
+        
+        // Auto-stop detection: Set timer to stop after 2 seconds of silence
+        silenceTimer = setTimeout(() => {
+          if (recognition && recognitionRef.current) {
+            recognition.stop()
+            toast.info("Recording stopped", {
+              description: "Stopped due to silence detected"
+            })
+          }
+        }, 2000) // 2 seconds of silence triggers auto-stop
       }
       
       recognition.onerror = (event: any) => {
         console.error('Speech recognition error:', event.error)
+        
+        // Clear silence timer on error
+        if (silenceTimer) {
+          clearTimeout(silenceTimer)
+        }
+        
         if (event.error === 'not-allowed' || event.error === 'permission-denied') {
-          toast.error("Microphone access denied", {
+          toast.error("❌ Microphone access denied", {
             description: "Please allow microphone access to use voice input"
           })
         } else if (event.error === 'no-speech') {
-          toast.error("No speech detected", {
-            description: "Please try speaking again"
+          toast.warning("⚠️ No speech detected", {
+            description: "Please try speaking louder or closer to the microphone"
           })
         } else if (event.error === 'aborted') {
-          // User stopped, don't show error
+          // User manually stopped, don't show error
+          console.log('Recognition aborted by user')
         } else {
           toast.error("Recognition error", {
             description: `Error: ${event.error}. Please try again.`
@@ -186,14 +218,14 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       }
       
       recognition.onend = () => {
-        if (finalTranscript.trim()) {
-          // Save the final transcript
-          setPrompt(prev => {
-            const combined = prev ? `${prev} ${finalTranscript.trim()}` : finalTranscript.trim()
-            return combined
-          })
-          
-          toast.success("Speech recognized", {
+        // Clear any pending silence timer
+        if (silenceTimer) {
+          clearTimeout(silenceTimer)
+        }
+        
+        // Only show success if we actually captured text
+        if (lastFinalTranscript.trim()) {
+          toast.success("✅ Speech recognized successfully", {
             description: "Your speech has been converted to text"
           })
         }
