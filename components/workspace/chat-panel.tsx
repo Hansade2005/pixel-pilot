@@ -4634,18 +4634,29 @@ export function ChatPanel({
     }
   };
 
-  // Prompt enhancement using Pixtral AI
+  // Prompt enhancement using Pixtral AI with conversation context
   const handlePromptEnhancement = async () => {
     if (!inputMessage.trim() || isEnhancing || isLoading) return
 
     setIsEnhancing(true)
     try {
-      const response = await fetch('/api/prompt-enhancement', {
+      // Get the last 6 messages (up to 3 user-assistant pairs) for context
+      const recentMessages = messages.slice(-6)
+
+      const response = await fetch('/api/chat-prompt-enhancement', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt: inputMessage.trim() }),
+        body: JSON.stringify({
+          prompt: inputMessage.trim(),
+          messages: recentMessages.map(msg => ({
+            id: msg.id,
+            role: msg.role,
+            content: msg.content,
+            createdAt: msg.createdAt,
+          }))
+        }),
       })
 
       if (response.ok) {
