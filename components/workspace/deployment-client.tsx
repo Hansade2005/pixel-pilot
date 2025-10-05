@@ -1122,9 +1122,14 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
 
           // Provide specific error messages based on status code
           if (repoResponse.status === 422) {
+            const isAlreadyExists = errorData.error?.toLowerCase().includes('already exist') || 
+                                   errorData.error?.toLowerCase().includes('name already exists')
+            
             toast({
               title: "Repository Creation Failed",
-              description: errorData.error || "Repository name may already exist or is invalid. Try using a different name.",
+              description: isAlreadyExists 
+                ? "Repository already exists. Try switching to 'Push to existing repository' mode instead."
+                : (errorData.error || "Repository name may already exist or is invalid. Try using a different name."),
               variant: "destructive"
             })
           } else if (repoResponse.status === 401) {
@@ -1198,44 +1203,8 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
 
       setDeploymentState(prev => ({ ...prev, currentStep: 'deploying' }))
 
-      // Update project with GitHub repo URL
-      await storageManager.updateWorkspace(selectedProject.id, {
-        githubRepoUrl: repoData.url,
-        githubRepoName: repoData.name || githubForm.repoName,
-        deploymentStatus: 'in_progress',
-        lastActivity: new Date().toISOString(),
-      })
-
-      // Refresh projects list to include updated workspace
-      const updatedProjects = await storageManager.getWorkspaces(currentUserId)
-      const projectsWithDisplay: ProjectDisplay[] = updatedProjects.map(project => ({
-        ...project,
-        url: project.vercelDeploymentUrl || project.netlifyDeploymentUrl || project.githubRepoUrl,
-        platform: (project.vercelDeploymentUrl ? 'vercel' : project.netlifyDeploymentUrl ? 'netlify' : 'github') as 'vercel' | 'netlify' | 'github',
-        lastDeployment: undefined,
-        environmentVariables: []
-      }))
-      setProjects(projectsWithDisplay)
-
-      // Get all files from the workspace for deployment
-      await storageManager.init()
+      // Load project files
       const projectFiles = await storageManager.getFiles(selectedProject.id)
-
-      if (projectFiles.length === 0) {
-        toast({
-          title: "No Files Found",
-          description: "No files found in the workspace to deploy",
-          variant: "destructive"
-        })
-        setDeploymentState(prev => ({ ...prev, isDeploying: false }))
-        return
-      }
-
-      // Check plan limits for GitHub deployment (repository creation)
-      const planCheck = await checkPlanLimits('', 'deploy', 'github')
-      if (!planCheck.canPerform) {
-        throw new Error(planCheck.reason || 'Deployment not allowed with your current plan.')
-      }
 
       // Deploy code to the repository
       const deployResponse = await fetch('/api/deploy/github', {
@@ -1247,8 +1216,8 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
           repoName: githubForm.deploymentMode === 'new' ? githubForm.repoName : repoName,
           repoDescription: githubForm.deploymentMode === 'new' ? githubForm.repoDescription : '',
           files: projectFiles,
-          mode: githubForm.deploymentMode === 'push' ? 'push' : 'create',
-          existingRepo: githubForm.deploymentMode === 'push' ? repoData.fullName : undefined,
+          mode: githubForm.deploymentMode === 'new' ? 'create' : 'push',
+          existingRepo: githubForm.deploymentMode === 'existing' ? repoData.fullName : undefined,
           commitMessage: githubForm.commitMessage || 'Update project files',
         })
       })
@@ -1260,8 +1229,10 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
 
       const deployData = await deployResponse.json()
 
-      // Update project with deployment status
+      // Update project with GitHub repo URL and deployment status AFTER successful deployment
       await storageManager.updateWorkspace(selectedProject.id, {
+        githubRepoUrl: repoData.url,
+        githubRepoName: repoData.name || githubForm.repoName,
         deploymentStatus: 'deployed',
         lastActivity: new Date().toISOString(),
       })
