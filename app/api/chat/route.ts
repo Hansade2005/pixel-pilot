@@ -4812,6 +4812,8 @@ export async function POST(req: Request) {
     global.currentUserId = user.id
 
     // Get memory context to prevent duplicates and provide AI awareness
+    // DISABLED: Memory functionality temporarily disabled for future use
+    /*
     const currentUserMessage = messages[messages.length - 1]?.content || ''
     const memoryContext = getStreamContextForRequest(projectId, currentUserMessage)
     
@@ -4824,6 +4826,7 @@ export async function POST(req: Request) {
       relevantMemoriesCount: memoryContext.relevantMemories.length,
       suggestedApproach: memoryContext.suggestedApproach
     })
+    */
 
     // Validate model access based on subscription plan
     const selectedModelId = modelId || DEFAULT_CHAT_MODEL
@@ -5902,7 +5905,9 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
           })
         } else {
           // Add JSON command instructions for cases without preprocessing using focused prompt
-          const streamingPrompt = getStreamingSystemPrompt(projectContext, memoryContext)
+          // DISABLED: Memory functionality temporarily disabled for future use
+          // const streamingPrompt = getStreamingSystemPrompt(projectContext, memoryContext)
+          const streamingPrompt = getStreamingSystemPrompt(projectContext)
           
           enhancedMessages.push({
             role: 'system' as const,
@@ -6249,6 +6254,8 @@ Use this context to provide accurate, file-aware responses to the user's request
               console.log('[MEMORY] Executed tool calls:', executedToolCalls.length)
               
               // Store memory asynchronously (don't block response)
+              // DISABLED: Memory functionality temporarily disabled for future use
+              /*
               storeStreamMemory(
                 projectId,
                 user?.id || 'anonymous',
@@ -6265,6 +6272,7 @@ Use this context to provide accurate, file-aware responses to the user's request
               }).catch((error) => {
                 console.error('[MEMORY] Failed to store stream memory:', error)
               })
+              */
               
             } catch (memoryError) {
               console.error('[MEMORY] Memory processing error:', memoryError)
