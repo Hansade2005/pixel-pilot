@@ -4172,11 +4172,22 @@ export function ChatPanel({
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    // Check max 2 images limit
-    if (attachedImages.length + files.length > 2) {
+    // Check total attachment limit (images + files)
+    const totalAttachments = attachedImages.length + attachedUploadedFiles.length;
+    if (totalAttachments >= 2) {
       toast({
-        title: "Maximum images reached",
-        description: "You can attach a maximum of 2 images",
+        title: "Maximum attachments reached",
+        description: "You can attach a maximum of 2 items (images and/or files)",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check if adding these images would exceed the limit
+    if (totalAttachments + files.length > 2) {
+      toast({
+        title: "Too many attachments",
+        description: `You can only add ${2 - totalAttachments} more attachment(s)`,
         variant: "destructive"
       });
       return;
@@ -4288,21 +4299,22 @@ export function ChatPanel({
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    // Check if images are attached
-    if (attachedImages.length > 0) {
+    // Check total attachment limit (images + files)
+    const totalAttachments = attachedImages.length + attachedUploadedFiles.length;
+    if (totalAttachments >= 2) {
       toast({
-        title: "Cannot attach files",
-        description: "Remove attached images first before attaching files",
+        title: "Maximum attachments reached",
+        description: "You can attach a maximum of 2 items (images and/or files)",
         variant: "destructive"
       });
       return;
     }
 
-    // Check max 10 files limit
-    if (attachedUploadedFiles.length + files.length > 10) {
+    // Check if adding these files would exceed the limit
+    if (totalAttachments + files.length > 2) {
       toast({
-        title: "Maximum files reached",
-        description: "You can attach a maximum of 10 files",
+        title: "Too many attachments",
+        description: `You can only add ${2 - totalAttachments} more attachment(s)`,
         variant: "destructive"
       });
       return;
@@ -7003,13 +7015,13 @@ export function ChatPanel({
                           setShowAttachmentMenu(false)
                           imageInputRef.current?.click()
                         }}
-                        disabled={attachedImages.length >= 2 || attachedUploadedFiles.length > 0}
+                        disabled={(attachedImages.length + attachedUploadedFiles.length) >= 2}
                         className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
                         <ImageIcon className="w-4 h-4" />
                         <span>Attach Image</span>
-                        {attachedImages.length >= 2 && (
-                          <span className="ml-auto text-xs text-gray-500">(Max 2)</span>
+                        {(attachedImages.length + attachedUploadedFiles.length) >= 2 && (
+                          <span className="ml-auto text-xs text-gray-500">(Max 2 total)</span>
                         )}
                       </button>
                       <button
@@ -7018,13 +7030,13 @@ export function ChatPanel({
                           setShowAttachmentMenu(false)
                           fileInputRef.current?.click()
                         }}
-                        disabled={attachedImages.length > 0}
+                        disabled={(attachedImages.length + attachedUploadedFiles.length) >= 2}
                         className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
                         <FileText className="w-4 h-4" />
                         <span>Attach File</span>
-                        {attachedImages.length > 0 && (
-                          <span className="ml-auto text-xs text-gray-500">(Remove images)</span>
+                        {(attachedImages.length + attachedUploadedFiles.length) >= 2 && (
+                          <span className="ml-auto text-xs text-gray-500">(Max 2 total)</span>
                         )}
                       </button>
                     </div>
@@ -7135,11 +7147,12 @@ export function ChatPanel({
                     if (item.type.indexOf('image') !== -1) {
                       e.preventDefault(); // Prevent default paste behavior
                       
-                      // Check max 2 images limit
-                      if (attachedImages.length >= 2) {
+                      // Check total attachment limit (images + files)
+                      const totalAttachments = attachedImages.length + attachedUploadedFiles.length;
+                      if (totalAttachments >= 2) {
                         toast({
-                          title: "Maximum images reached",
-                          description: "You can attach a maximum of 2 images",
+                          title: "Maximum attachments reached",
+                          description: "You can attach a maximum of 2 items (images and/or files)",
                           variant: "destructive"
                         });
                         return;
@@ -7226,7 +7239,7 @@ export function ChatPanel({
                     }
                   }
                 }}
-                placeholder={isEditingRevertedMessage ? "Editing reverted message... Make changes and press Enter to send" : isLoading ? "PiPilot is working..." : "Type, speak, or attach. Use @ for files, + for images/files, paste images directly, 🎤 for voice."}
+                placeholder={isEditingRevertedMessage ? "Editing reverted message... Make changes and press Enter to send" : isLoading ? "PiPilot is working..." : "Type, speak, or attach. Use @ for files, + for images/files (max 2 total), paste images directly, 🎤 for voice."}
                 className={`flex-1 bg-transparent border-none outline-none text-white placeholder-gray-400 text-[15px] resize-none rounded-md py-2 leading-[1.5] min-h-[48px] max-h-[140px] ${
                   isEditingRevertedMessage ? 'border-yellow-500 ring-yellow-500 ring-2' : ''
                 }`}
