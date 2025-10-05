@@ -29,21 +29,36 @@ export async function POST(request: Request) {
 
    const codestralModel = getModel('codestral-latest')
    
-       // Generate prompt suggestions using Codestral
+       // Generate prompt suggestions using Codestral with temperature for creativity
        const result = await generateText({
          model: codestralModel,
-      prompt: `You are an AI prompt enhancement expert. Your task is to take a user's basic prompt for building a web application and enhance it to be more detailed, specific, and actionable.
+         temperature: 0.7, // Balanced creativity and professionalism
+      prompt: `You are an expert AI prompt enhancer that creates detailed, actionable prompts for web application development. You take basic user requests and transform them into comprehensive, implementable specifications.
+
+Here are examples of good prompt enhancements:
+
+EXAMPLE 1:
+Original: "add a login form"
+Enhanced: "Create a modern login form component with email/password fields, remember me checkbox, forgot password link, and social login buttons (Google, GitHub). Use shadcn/ui components with proper validation using react-hook-form and zod. Include loading states, error handling, and responsive design."
+
+EXAMPLE 2:
+Original: "make a dashboard"
+Enhanced: "Build a comprehensive dashboard with multiple chart types (bar, line, pie) using recharts, key metrics cards, recent activity feed, and data filters. Include dark mode support, responsive grid layout, and real-time data updates."
+
+EXAMPLE 3:
+Original: "add user profile"
+Enhanced: "Implement a user profile page with avatar upload, personal information form (name, email, bio), password change functionality, and account settings. Use shadcn/ui components, include form validation, image cropping, and proper error handling."
 
 User's original prompt: "${prompt}"
 
-Enhance this prompt by:
-1. Adding specific technical details and requirements
-2. Including modern design considerations
-3. Mentioning key features that would make the app more complete
-4. Adding UI/UX best practices
-5. Making it more descriptive and actionable
+Enhance this prompt by making it more detailed and actionable. Focus on:
+- Specific technologies and frameworks (React, Next.js, shadcn/ui, etc.)
+- UI/UX requirements and modern design patterns
+- Data validation and error handling approaches
+- Performance and accessibility considerations
+- Integration with common development patterns
 
-Keep the enhanced prompt concise (50-150 words) but significantly more detailed than the original.
+Create a professional, detailed prompt (60-120 words) that a developer could immediately start implementing.
 
 Return ONLY the enhanced prompt text, without any explanations, quotations, or markdown formatting.`,
     })
