@@ -42,7 +42,8 @@ import {
   Plus,
   Image as ImageIcon,
   Mic,
-  MicOff
+  MicOff,
+  Sparkles
 } from "lucide-react"
 import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown"
 import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
@@ -3709,6 +3710,9 @@ export function ChatPanel({
   const audioChunksRef = useRef<Blob[]>([])
   const recognitionRef = useRef<any>(null)
 
+  // Prompt enhancement state
+  const [isEnhancing, setIsEnhancing] = useState(false)
+
   // Auth modal state
   const [showAuthModal, setShowAuthModal] = useState(false)
 
@@ -4627,6 +4631,34 @@ export function ChatPanel({
       } else {
         startDeepgramRecording();
       }
+    }
+  };
+
+  // Prompt enhancement using Pixtral AI
+  const handlePromptEnhancement = async () => {
+    if (!inputMessage.trim() || isEnhancing || isLoading) return
+
+    setIsEnhancing(true)
+    try {
+      const response = await fetch('/api/prompt-enhancement', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt: inputMessage.trim() }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.enhancedPrompt) {
+          setInputMessage(data.enhancedPrompt)
+          textareaRef.current?.focus()
+        }
+      }
+    } catch (error) {
+      console.error('Failed to enhance prompt:', error)
+    } finally {
+      setIsEnhancing(false)
     }
   };
 
@@ -7401,9 +7433,29 @@ export function ChatPanel({
                   resize: 'none',
                   boxSizing: 'border-box',
                   paddingLeft: '40px', // Space for Plus button
-                  paddingRight: '52px' // Space for Send button
+                  paddingRight: '108px' // Space for Enhancement (right-16) and Send (right-3) buttons
                 }}
               />
+              
+              {/* Prompt Enhancement Button */}
+              <button
+                type="button"
+                onClick={handlePromptEnhancement}
+                disabled={!inputMessage.trim() || isEnhancing || isLoading}
+                className={`absolute right-16 top-1/2 transform -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isEnhancing
+                    ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
+                    : 'bg-gray-700/50 hover:bg-gradient-to-r hover:from-purple-600/80 hover:to-blue-600/80 text-gray-400 hover:text-white'
+                }`}
+                title="Enhance prompt with AI"
+              >
+                {isEnhancing ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+              </button>
+              
               <button
                 type={isLoading ? "button" : "submit"}
                 disabled={!inputMessage.trim() && !isLoading}
