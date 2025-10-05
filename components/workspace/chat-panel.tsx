@@ -7123,7 +7123,110 @@ export function ChatPanel({
                     handleSendMessage(e)
                   }
                 }}
-                placeholder={isEditingRevertedMessage ? "Editing reverted message... Make changes and press Enter to send" : isLoading ? "PiPilot is working..." : "Type, speak, or attach. Use @ for files, + for images/files, 🎤 for voice."}
+                onPaste={async (e) => {
+                  // Handle image pasting
+                  const items = e.clipboardData?.items;
+                  if (!items) return;
+
+                  for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
+                    
+                    // Check if the pasted item is an image
+                    if (item.type.indexOf('image') !== -1) {
+                      e.preventDefault(); // Prevent default paste behavior
+                      
+                      // Check max 2 images limit
+                      if (attachedImages.length >= 2) {
+                        toast({
+                          title: "Maximum images reached",
+                          description: "You can attach a maximum of 2 images",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
+
+                      const file = item.getAsFile();
+                      if (!file) continue;
+
+                      // Validate file size (max 10MB)
+                      if (file.size > 10 * 1024 * 1024) {
+                        toast({
+                          title: "File too large",
+                          description: "Pasted image is too large. Maximum size is 10MB",
+                          variant: "destructive"
+                        });
+                        continue;
+                      }
+
+                      // Convert to base64
+                      const reader = new FileReader();
+                      reader.onload = async (event) => {
+                        const base64 = event.target?.result as string;
+                        const imageId = `pasted_img_${Date.now()}_${i}`;
+
+                        // Add image to state with processing flag
+                        setAttachedImages(prev => [...prev, {
+                          id: imageId,
+                          name: `Pasted Image ${attachedImages.length + 1}`,
+                          base64: base64,
+                          isProcessing: true
+                        }]);
+
+                        // Send to Pixtral for description
+                        try {
+                          const response = await fetch('/api/describe-image', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                              image: base64,
+                              prompt: "Describe this image in detail, including layout, colors, text, UI elements, and any other relevant information that would help recreate or understand this design."
+                            }),
+                          });
+
+                          if (!response.ok) {
+                            throw new Error('Failed to describe image');
+                          }
+
+                          const data = await response.json();
+
+                          // Update image with description
+                          setAttachedImages(prev => prev.map(img => 
+                            img.id === imageId 
+                              ? { ...img, description: data.description, isProcessing: false }
+                              : img
+                          ));
+
+                          toast({
+                            title: "Image pasted and processed",
+                            description: "Image attached successfully"
+                          });
+                        } catch (error) {
+                          console.error('Error describing pasted image:', error);
+                          toast({
+                            title: "Processing failed",
+                            description: "Failed to process pasted image",
+                            variant: "destructive"
+                          });
+                          // Remove failed image
+                          setAttachedImages(prev => prev.filter(img => img.id !== imageId));
+                        }
+                      };
+
+                      reader.onerror = () => {
+                        toast({
+                          title: "Read error",
+                          description: "Failed to read pasted image",
+                          variant: "destructive"
+                        });
+                      };
+
+                      reader.readAsDataURL(file);
+                    }
+                  }
+                }}
+                placeholder={isEditingRevertedMessage ? "Editing reverted message... Make changes and press Enter to send" : isLoading ? "PiPilot is working..." : "Type, speak, or attach. Use @ for files, + for images/files, paste images directly, 🎤 for voice."}
                 className={`flex-1 bg-transparent border-none outline-none text-white placeholder-gray-400 text-[15px] resize-none rounded-md py-2 leading-[1.5] min-h-[48px] max-h-[140px] ${
                   isEditingRevertedMessage ? 'border-yellow-500 ring-yellow-500 ring-2' : ''
                 }`}
