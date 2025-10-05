@@ -7433,44 +7433,48 @@ export function ChatPanel({
                   resize: 'none',
                   boxSizing: 'border-box',
                   paddingLeft: '40px', // Space for Plus button
-                  paddingRight: '108px' // Space for Enhancement (right-16) and Send (right-3) buttons
+                  paddingRight: '52px' // Space for Send button container
                 }}
               />
               
-              {/* Prompt Enhancement Button */}
-              <button
-                type="button"
-                onClick={handlePromptEnhancement}
-                disabled={!inputMessage.trim() || isEnhancing || isLoading}
-                className={`absolute right-16 top-1/2 transform -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                  isEnhancing
-                    ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
-                    : 'bg-gray-700/50 hover:bg-gradient-to-r hover:from-purple-600/80 hover:to-blue-600/80 text-gray-400 hover:text-white'
-                }`}
-                title="Enhance prompt with AI"
-              >
-                {isEnhancing ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4" />
-                )}
-              </button>
-              
-              <button
-                type={isLoading ? "button" : "submit"}
-                disabled={!inputMessage.trim() && !isLoading}
-                onClick={isLoading ? handleStopGeneration : undefined}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 w-10 h-10 rounded-full bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white hover:from-[#00a844] hover:to-[#45a049] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center shadow-lg"
-              >
-                {isLoading ? (
-                  <div className="relative w-4 h-4 flex items-center justify-center">
-                    <div className="absolute inset-0 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <div className="w-2 h-2 bg-red-500 hover:bg-red-600 cursor-pointer transition-colors" style={{ borderRadius: '2px' }} />
-                  </div>
-                ) : (
-                  <ArrowUp className="w-4 h-4" />
-                )}
-              </button>
+              {/* Send and Enhancement buttons container */}
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex flex-col gap-2">
+                {/* Send Button */}
+                <button
+                  type={isLoading ? "button" : "submit"}
+                  disabled={!inputMessage.trim() && !isLoading}
+                  onClick={isLoading ? handleStopGeneration : undefined}
+                  className="w-10 h-10 rounded-full bg-gradient-to-r from-[#00c853] to-[#4caf50] text-white hover:from-[#00a844] hover:to-[#45a049] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center shadow-lg"
+                >
+                  {isLoading ? (
+                    <div className="relative w-4 h-4 flex items-center justify-center">
+                      <div className="absolute inset-0 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <div className="w-2 h-2 bg-red-500 hover:bg-red-600 cursor-pointer transition-colors" style={{ borderRadius: '2px' }} />
+                    </div>
+                  ) : (
+                    <ArrowUp className="w-4 h-4" />
+                  )}
+                </button>
+                
+                {/* Prompt Enhancement Button */}
+                <button
+                  type="button"
+                  onClick={handlePromptEnhancement}
+                  disabled={!inputMessage.trim() || isEnhancing || isLoading}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isEnhancing
+                      ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
+                      : 'bg-gray-700/50 hover:bg-gradient-to-r hover:from-purple-600/80 hover:to-blue-600/80 text-gray-400 hover:text-white'
+                  }`}
+                  title="Enhance prompt with AI"
+                >
+                  {isEnhancing ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
             </div>
           </div>
           {/* Model selector and loading indicator */}
