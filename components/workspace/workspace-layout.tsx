@@ -76,9 +76,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const { triggerBackup, getSyncStatus } = useCloudSync(user?.id || null)
   
   // Auto cloud backup for file operations
-  const { triggerAutoBackup } = useAutoCloudBackup({
-    debounceMs: 3000, // Wait 3 seconds after file save
-    silent: true // Don't show backup notifications for saves (to avoid spam)
+  const { triggerAutoBackup, triggerInstantBackup } = useAutoCloudBackup({
+    debounceMs: 1000, // Reduced to 1 second for faster file backups
+    silent: true, // Don't show backup notifications for saves (to avoid spam)
+    instantForCritical: true // Enable instant backup for critical operations
   })
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newProjectName, setNewProjectName] = useState("")
@@ -494,8 +495,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         setJustCreatedProject(true)
         
         // Trigger backup after project creation
-        if (triggerBackup) {
-          await triggerBackup()
+        if (triggerInstantBackup) {
+          await triggerInstantBackup('Project created')
         }
         
         // Reset the flag after a short delay
@@ -712,8 +713,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                   setJustCreatedProject(true)
                   
                   // Trigger backup after project creation
-                  if (triggerBackup) {
-                    await triggerBackup()
+                  if (triggerInstantBackup) {
+                    await triggerInstantBackup('Project created')
                   }
                   
                   // Reset the flag after a short delay
@@ -809,8 +810,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     setJustCreatedProject(true)
                     
                     // Trigger backup after project creation
-                    if (triggerBackup) {
-                      await triggerBackup()
+                    if (triggerInstantBackup) {
+                      await triggerInstantBackup('Project created')
                     }
                     
                     // Reset the flag after a short delay
@@ -1004,8 +1005,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                             })
                           }
                           
-                          // Trigger auto cloud backup after file save
-                          triggerAutoBackup(`Saved file: ${file.name}`)
+                          // Trigger instant cloud backup after file save
+                          triggerInstantBackup(`Saved file: ${file.name}`)
                           
                           // Force file explorer refresh to show updated content
                           setFileExplorerKey(prev => prev + 1)
@@ -1169,8 +1170,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           setJustCreatedProject(true)
                           
                           // Trigger backup after project creation
-                          if (triggerBackup) {
-                            await triggerBackup()
+                          if (triggerInstantBackup) {
+                            await triggerInstantBackup('Project created')
                           }
                           
                           // Reset the flag after a short delay
@@ -1215,7 +1216,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     collapsed={false}
                     onToggleCollapse={() => {}}
                     isMobile={true}
-                    onTriggerBackup={triggerBackup}
+                    onTriggerBackup={triggerInstantBackup}
                   />
                 </SheetContent>
               </Sheet>
@@ -1337,8 +1338,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       onSave={(file, content) => {
                         console.log("File saved:", file.name, content.length, "characters")
                         
-                        // Trigger auto cloud backup after file save
-                        triggerAutoBackup(`Saved file: ${file.name}`)
+                        // Trigger instant cloud backup after file save
+                        triggerInstantBackup(`Saved file: ${file.name}`)
                         
                         setFileExplorerKey(prev => prev + 1)
                       }}

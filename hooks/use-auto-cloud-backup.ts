@@ -8,10 +8,11 @@ import { useToast } from "@/hooks/use-toast"
 interface AutoBackupOptions {
   debounceMs?: number // Delay before backup to avoid rapid successive backups
   silent?: boolean // Don't show toast notifications
+  instantForCritical?: boolean // Enable instant backup for critical operations
 }
 
 export function useAutoCloudBackup(options: AutoBackupOptions = {}) {
-  const { debounceMs = 2000, silent = false } = options
+  const { debounceMs = 2000, silent = false, instantForCritical = false } = options
   const { toast } = useToast()
   
   // Use refs to store timeout and prevent multiple simultaneous backups
@@ -85,8 +86,15 @@ export function useAutoCloudBackup(options: AutoBackupOptions = {}) {
   /**
    * Trigger an automatic cloud backup with debouncing
    */
-  const triggerAutoBackup = useCallback((reason?: string) => {
-    console.log(`Auto-backup triggered: ${reason || 'File operation'}`)
+  const triggerAutoBackup = useCallback((reason?: string, isCritical: boolean = false) => {
+    console.log(`Auto-backup triggered: ${reason || 'File operation'}${isCritical ? ' (CRITICAL - instant)' : ''}`)
+    
+    // For critical operations, backup immediately if instant mode is enabled
+    if (isCritical && instantForCritical) {
+      console.log('Critical operation detected, performing instant backup...')
+      performBackup()
+      return
+    }
     
     // Clear any existing timeout
     if (timeoutRef.current) {
@@ -98,13 +106,28 @@ export function useAutoCloudBackup(options: AutoBackupOptions = {}) {
       await performBackup()
       timeoutRef.current = null
     }, debounceMs)
-  }, [debounceMs, performBackup])
+  }, [debounceMs, performBackup, instantForCritical])
 
   /**
    * Force immediate backup (bypassing debounce)
    */
   const forceBackup = useCallback(async (reason?: string): Promise<boolean> => {
     console.log(`Forcing immediate backup: ${reason || 'Forced operation'}`)
+    
+    // Clear any pending debounced backup
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+
+    return await performBackup()
+  }, [performBackup])
+
+  /**
+   * Trigger instant backup for critical operations (no delay)
+   */
+  const triggerInstantBackup = useCallback(async (reason?: string): Promise<boolean> => {
+    console.log(`Instant backup triggered: ${reason || 'Critical operation'}`)
     
     // Clear any pending debounced backup
     if (timeoutRef.current) {
@@ -129,6 +152,7 @@ export function useAutoCloudBackup(options: AutoBackupOptions = {}) {
   return {
     triggerAutoBackup,
     forceBackup,
+    triggerInstantBackup,
     cancelPendingBackup,
     isBackupInProgress: () => backupInProgressRef.current
   }

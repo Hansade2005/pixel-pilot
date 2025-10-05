@@ -1378,7 +1378,7 @@ function renderXMLToolsInContent(content: string, xmlTools: XMLToolCall[]): Reac
 }
 
 // Client-side tool execution functions
-async function executeClientSideTool(toolCall: XMLToolCall, projectId: string, triggerAutoBackup: (message: string) => void): Promise<any> {
+async function executeClientSideTool(toolCall: XMLToolCall, projectId: string, triggerInstantBackup: (message: string) => void): Promise<any> {
   const { storageManager } = await import('@/lib/storage-manager')
   await storageManager.init()
 
@@ -1414,7 +1414,7 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string, t
         if (writeExistingFile) {
           // Update existing file
           await storageManager.updateFile(projectId, pilotWritePath, { content: pilotWriteContent })
-          triggerAutoBackup(`Pilot wrote to file: ${pilotWritePath}`)
+          triggerInstantBackup(`Pilot wrote to file: ${pilotWritePath}`)
           return {
             success: true,
             message: `✅ File ${pilotWritePath} updated successfully.`,
@@ -1586,7 +1586,7 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string, t
 
         // Update the file
         await storageManager.updateFile(projectId, pilotEditPath, { content: modifiedContent })
-        triggerAutoBackup(`Pilot edited file: ${pilotEditPath}`)
+        triggerInstantBackup(`Pilot edited file: ${pilotEditPath}`)
 
         return {
           success: true,
@@ -1650,7 +1650,7 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string, t
             content: writeFileContent || '',
             updatedAt: new Date().toISOString()
           })
-          triggerAutoBackup(`Wrote to file: ${writeFilePath}`)
+          triggerInstantBackup(`Wrote to file: ${writeFilePath}`)
           return { success: true, action: 'updated', path: writeFilePath, message: `File updated: ${writeFilePath}` }
         } else {
           const newFile = await storageManager.createFile({
@@ -1663,7 +1663,7 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string, t
             size: (writeFileContent || '').length,
             isDirectory: false
           })
-          triggerAutoBackup(`Created file: ${writeFilePath}`)
+          triggerInstantBackup(`Created file: ${writeFilePath}`)
           return { success: true, action: 'created', path: writeFilePath, file: newFile, message: `File created: ${writeFilePath}` }
         }
         
@@ -1675,7 +1675,7 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string, t
             content: editFileContent || '',
             updatedAt: new Date().toISOString()
           })
-          triggerAutoBackup(`Edited file: ${editFilePath}`)
+          triggerInstantBackup(`Edited file: ${editFilePath}`)
           return { success: true, action: 'edited', path: editFilePath, message: `File edited: ${editFilePath}` }
         } else {
           throw new Error(`File not found: ${editFilePath}`)
@@ -3632,9 +3632,10 @@ export function ChatPanel({
   initialPrompt
 }: ChatPanelProps) {
   const { toast } = useToast()
-  const { triggerAutoBackup } = useAutoCloudBackup({
-    debounceMs: 2000, // Longer debounce for AI operations
-    silent: false // Show notifications for AI changes
+  const { triggerAutoBackup, triggerInstantBackup } = useAutoCloudBackup({
+    debounceMs: 0, // No debounce for instant AI operations
+    silent: false, // Show notifications for AI changes
+    instantForCritical: true // Enable instant backup for all AI operations
   })
   
   const [messages, setMessages] = useState<Message[]>([])
@@ -4738,7 +4739,7 @@ export function ChatPanel({
                     updatedAt: new Date().toISOString()
                   })
                   console.log(`[DEBUG] Updated existing file: ${fileOp.path}`)
-                  triggerAutoBackup(`AI updated file: ${fileOp.path}`)
+                  triggerInstantBackup(`AI updated file: ${fileOp.path}`)
                 } else {
                   // Create new file
                   const newFile = await storageManager.createFile({
@@ -4752,7 +4753,7 @@ export function ChatPanel({
                     isDirectory: false
                   })
                   console.log(`[DEBUG] Created new file: ${fileOp.path}`, newFile)
-                  triggerAutoBackup(`AI created file: ${fileOp.path}`)
+                  triggerInstantBackup(`AI created file: ${fileOp.path}`)
                 }
                 operationsApplied++
               } else if (fileOp.type === 'edit_file' && fileOp.path && fileOp.content) {
@@ -4762,13 +4763,13 @@ export function ChatPanel({
                   updatedAt: new Date().toISOString()
                 })
                 console.log(`[DEBUG] Edited file: ${fileOp.path}`)
-                triggerAutoBackup(`AI edited file: ${fileOp.path}`)
+                triggerInstantBackup(`AI edited file: ${fileOp.path}`)
                 operationsApplied++
               } else if (fileOp.type === 'delete_file' && fileOp.path) {
                 // Delete file
                 await storageManager.deleteFile(project.id, fileOp.path)
                 console.log(`[DEBUG] Deleted file: ${fileOp.path}`)
-                triggerAutoBackup(`AI deleted file: ${fileOp.path}`)
+                triggerInstantBackup(`AI deleted file: ${fileOp.path}`)
                 operationsApplied++
               } else {
                 console.warn('[DEBUG] Skipped invalid file operation:', fileOp)
@@ -5019,7 +5020,7 @@ export function ChatPanel({
                               startTime: tool.startTime
                             }
                             
-                            executeClientSideTool(toolCall, project.id, triggerAutoBackup)
+                            executeClientSideTool(toolCall, project.id, triggerInstantBackup)
                               .then((result) => {
                                 console.log('[CLIENT-TOOL] Tool executed successfully:', result)
                                 
@@ -5349,7 +5350,7 @@ export function ChatPanel({
                                     content: failedTool.args.content,
                                     updatedAt: new Date().toISOString()
                                   })
-                                  triggerAutoBackup(`Fallback updated file: ${failedTool.args.path}`)
+                                  triggerInstantBackup(`Fallback updated file: ${failedTool.args.path}`)
                                 } else {
                                   // Create new file
                                   await storageManager.createFile({
@@ -5362,7 +5363,7 @@ export function ChatPanel({
                                     size: failedTool.args.content.length,
                                     isDirectory: false
                                   })
-                                  triggerAutoBackup(`Fallback created file: ${failedTool.args.path}`)
+                                  triggerInstantBackup(`Fallback created file: ${failedTool.args.path}`)
                                 }
                                 
                                 const toolIndex = toolCalls.findIndex(tc => tc.id === failedTool.id)
@@ -5431,7 +5432,7 @@ export function ChatPanel({
                                   updatedAt: new Date().toISOString()
                                 })
                                 console.log(`[DEBUG] Updated existing file: ${fileOp.path}`)
-                                triggerAutoBackup(`Streaming updated file: ${fileOp.path}`)
+                                triggerInstantBackup(`Streaming updated file: ${fileOp.path}`)
                               } else {
                                 // Create new file
                                 const newFile = await storageManager.createFile({
