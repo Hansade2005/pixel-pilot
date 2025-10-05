@@ -19,6 +19,13 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { useSubscription } from "@/hooks/use-subscription"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 interface ChatInputProps {
   onAuthRequired: () => void
@@ -46,6 +53,9 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   const recognitionRef = useRef<any>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
+
+  // Template selection state
+  const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs'>('vite-react')
 
   // Subscription status hook
   const { subscription, loading: subscriptionLoading } = useSubscription()
@@ -385,6 +395,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         body: JSON.stringify({
           prompt: prompt,
           userId: user.id,
+          template: selectedTemplate,
         }),
       })
 
@@ -418,9 +429,13 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
           slug
         })
         
-        // Apply template files
+        // Apply template files based on selection
         const { TemplateService } = await import('@/lib/template-service')
-        await TemplateService.applyViteReactTemplate(workspace.id)
+        if (selectedTemplate === 'nextjs') {
+          await TemplateService.applyNextJSTemplate(workspace.id)
+        } else {
+          await TemplateService.applyViteReactTemplate(workspace.id)
+        }
         const files = await storageManager.getFiles(workspace.id)
         
         toast.success('Project created and saved!')
@@ -540,7 +555,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
             {/* Bottom Bar with Buttons */}
             <div className="flex items-center justify-between pt-2 border-t border-gray-700/50">
-              {/* Left Side - Mic */}
+              {/* Left Side - Mic and Template Selector */}
               <div className="flex items-center space-x-3">
                 <button 
                   type="button"
@@ -563,6 +578,31 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                     <Mic className="w-4 h-4" />
                   )}
                 </button>
+
+                {/* Template Selector */}
+                <Select
+                  value={selectedTemplate}
+                  onValueChange={(value: 'vite-react' | 'nextjs') => setSelectedTemplate(value)}
+                  disabled={isGenerating}
+                >
+                  <SelectTrigger className="w-[140px] h-8 bg-gray-700/50 border-gray-600/50 text-gray-300 text-sm">
+                    <SelectValue placeholder="Template" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-700">
+                    <SelectItem value="vite-react" className="text-gray-300 focus:bg-gray-700 focus:text-white">
+                      <div className="flex items-center gap-2">
+                        <Zap className="w-3 h-3 text-purple-400" />
+                        <span>Vite (Default)</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="nextjs" className="text-gray-300 focus:bg-gray-700 focus:text-white">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">▲</span>
+                        <span>Next.js</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Right Side - Enhance and Send Buttons */}

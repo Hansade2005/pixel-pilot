@@ -999,6 +999,11 @@ async function buildOptimizedProjectContext(projectId: string, storageManager: a
       return true
     })
 
+    // Detect project type (Vite or Next.js)
+    const hasNextConfig = files.some((f: any) => f.path === 'next.config.js' || f.path === 'next.config.mjs')
+    const hasViteConfig = files.some((f: any) => f.path === 'vite.config.ts' || f.path === 'vite.config.js')
+    const projectType = hasNextConfig ? 'nextjs' : hasViteConfig ? 'vite-react' : 'unknown'
+
     // Build file tree structure
     const fileTree: string[] = []
     const directories = new Set<string>()
@@ -1045,25 +1050,46 @@ async function buildOptimizedProjectContext(projectId: string, storageManager: a
       })
     })
 
-    // Files that should include full content
-    const fullContentFiles = [
+    // Files that should include full content (template-specific)
+    const fullContentFiles = projectType === 'nextjs' ? [
       'package.json',
-      'app/page.tsx',
-      'app/layout.tsx',
+      'src/app/page.tsx',
+      'src/app/layout.tsx',
+      'next.config.js',
+      'next.config.mjs',
+      'tailwind.config.js',
+      'tsconfig.json'
+    ] : [
+      'package.json',
       'src/App.tsx',
       'src/main.tsx',
       'App.tsx',
       'main.tsx',
       'index.tsx',
-      'next.config.mjs',
-      'tailwind.config.js',
       'vite.config.ts',
+      'tailwind.config.js',
       'tsconfig.json'
     ]
 
     // Build the context
     let context = `# Current Time
 ${currentTime}
+
+# Project Type
+${projectType === 'nextjs' ? '**Next.js** - Full-stack React framework with App Router' : projectType === 'vite-react' ? '**Vite + React** - Fast build tool with React' : 'Unknown'}
+
+${projectType === 'nextjs' ? `## Next.js Project Structure
+- **src/app/** - App Router pages and layouts
+- **src/components/** - React components  
+- **src/lib/** - Utilities and helpers
+- **public/** - Static assets
+- **API Routes:** Create in src/app/api/[name]/route.ts` : 
+`## Vite Project Structure
+- **src/** - Source code directory
+- **src/components/** - React components
+- **src/lib/** - Utilities and helpers
+- **public/** - Static assets
+- **api/** - Serverless functions (Vercel)`}
 
 # Current Project Structure
 ${fileTree.join('\n')}
@@ -4150,7 +4176,9 @@ Remember: This is the INFORMATION GATHERING phase. Your job is to understand and
 }
 
 
-function getStreamingSystemPrompt(projectContext?: string, memoryContext?: any): string {
+function getStreamingSystemPrompt(projectContext?: string, memoryContext?: any, template?: 'vite-react' | 'nextjs'): string {
+  // Determine if this is a Next.js project
+  const isNextJS = template === 'nextjs'
 
   return `<role>
 You are PIXEL FORGE, an AI development assistant that creates and modifies web applications in real-time. You assist users by chatting with them and making changes to their code through JSON tool commands that execute immediately during our conversation.
@@ -4643,12 +4671,25 @@ Every application MUST have a **stunning, modern, extra professional design** th
 
 ## 📦 **AVAILABLE DEPENDENCIES - READY TO USE**
 
-**🎯 CORE FRAMEWORK:**
+${isNextJS ? `**🎯 CORE FRAMEWORK (Next.js):**
+- **Next.js 14.0.4** - Full-stack React framework with App Router
+- **React 18.2.0** - Modern React with hooks, concurrent features
+- **React DOM 18.2.0** - React rendering for web
+- **TypeScript 5.2.2** - Full type safety and modern JS features
+
+**⚡ NEXT.JS SPECIFIC FEATURES:**
+- **App Router** - File-system based routing in \`src/app/\` directory
+- **Server Components** - Default server-side rendering for optimal performance
+- **API Routes** - Built-in API routes in \`src/app/api/\` directory
+- **Image Optimization** - Built-in \`next/image\` component for optimized images
+- **Font Optimization** - Built-in \`next/font\` for optimized font loading
+- **Metadata API** - Built-in SEO optimization with metadata exports` : 
+`**🎯 CORE FRAMEWORK (Vite + React):**
 - **React 18.2.0** - Modern React with hooks, concurrent features
 - **React DOM 18.2.0** - React rendering for web
 - **React Router DOM 6.28.0** - Client-side routing
 - **TypeScript 5.2.2** - Full type safety and modern JS features
-- **Vite 5.0.8** - Fast build tool and dev server
+- **Vite 5.0.8** - Fast build tool and dev server`}
 
 **🎨 UI & STYLING:**
 - **Tailwind CSS 3.3.6** - Utility-first CSS framework
@@ -4673,8 +4714,30 @@ Every application MUST have a **stunning, modern, extra professional design** th
 - **Date-fns 4.1.0** - Modern date utility library
 - **React Day Picker 9.8.0** - Date picker component
 
-## 🚀 **VERCEL SERVERLESS ARCHITECTURE - CRITICAL RULES**
-**📁 FILE ORGANIZATION:**
+## 🚀 **${isNextJS ? 'NEXT.JS' : 'VERCEL SERVERLESS'} ARCHITECTURE - CRITICAL RULES**
+
+${isNextJS ? `**📁 NEXT.JS FILE ORGANIZATION:**
+\`\`\`
+src/
+  app/           → App Router (pages and layouts)
+    page.tsx     → Home page
+    layout.tsx   → Root layout
+    api/         → API routes (serverless functions)
+      route.ts   → API endpoint handlers
+  components/    → React components
+  lib/          → Utilities and helpers
+  hooks/        → Custom React hooks
+public/         → Static assets
+\`\`\`
+
+**🔐 NEXT.JS SPECIFIC RULES:**
+- **Server Components by default** - Use 'use client' directive only when needed
+- **API Routes**: Create in \`src/app/api/[name]/route.ts\` with GET, POST, PUT, DELETE exports
+- **Layouts**: Use \`layout.tsx\` for shared UI across routes
+- **Loading States**: Use \`loading.tsx\` for loading UI
+- **Error Handling**: Use \`error.tsx\` for error boundaries
+- **Environment Variables**: Prefix with \`NEXT_PUBLIC_\` for client-side access` :
+`**📁 FILE ORGANIZATION:**
 \`\`\`
 api/             → Serverless functions (Vercel)
   constants.ts    → Server-only secrets & API keys
@@ -4682,7 +4745,7 @@ api/             → Serverless functions (Vercel)
 src/             → Frontend React app
   env.ts          → Frontend-safe constants & config
   App.tsx         → React components
-\`\`\`
+\`\`\``}
 
 **🔐 SECRETS MANAGEMENT:**
 - **Location**: \`api/constants.ts\` (server-only)
@@ -4742,17 +4805,25 @@ When user requests database functionality, authentication, or real-time features
  *
  * The following files are considered sensitive and MUST NOT be modified, overwritten, or deleted by the AI:
  * - src/components/ui    shadcn ui components . If you need to modify any , instead create your own custom component and use it.
- * - main.tsx
+ ${isNextJS ? `* - src/app/layout.tsx (Root layout - modify with extreme caution)
+ * - next.config.js
+ * - tsconfig.json
+ * - postcss.config.js
+ * - .eslintrc.cjs` : 
+ `* - main.tsx
  * - vite.config.ts
  * - tsconfig.json
  * - tsconfig.node.json
  * - postcss.config.js
- * - .eslintrc.cjs
+ * - .eslintrc.cjs`}
  *
  * When building new features:
- * - Only update index.html for app branding.
+ ${isNextJS ? `* - Create new pages in src/app/ directory with page.tsx files
+ * - Always update README.md with app info and features
+ * - Update src/app/page.tsx (home page) to reflect latest features` :
+ `* - Only update index.html for app branding.
  * - Always update README.md with app info and features.
- * - Always update App.tsx to reflect the latest feature.
+ * - Always update App.tsx to reflect the latest feature.`}
  * 
  *
 
@@ -4984,9 +5055,16 @@ export async function POST(req: Request) {
 
     // ENHANCED: Build comprehensive project context with file contents
     let projectContext = ''
+    let detectedTemplate: 'vite-react' | 'nextjs' | undefined
     try {
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
+      
+      // Detect template type from project files
+      const files = await storageManager.getFiles(projectId)
+      const hasNextConfig = files.some((f: any) => f.path === 'next.config.js' || f.path === 'next.config.mjs')
+      const hasViteConfig = files.some((f: any) => f.path === 'vite.config.ts' || f.path === 'vite.config.js')
+      detectedTemplate = hasNextConfig ? 'nextjs' : hasViteConfig ? 'vite-react' : undefined
       
     if (body.project) {
       const project = body.project
@@ -4995,8 +5073,7 @@ Project description: ${project.description || 'No description'}
 
 ${await buildOptimizedProjectContext(projectId, storageManager)}`
     } else {
-      projectContext = `\n\nCurrent project: Vite React Project
-Project description: Vite + React + TypeScript project with Tailwind CSS
+      projectContext = `\n\n${detectedTemplate === 'nextjs' ? 'Current project: Next.js Project\nProject description: Next.js + React + TypeScript project with App Router' : 'Current project: Vite React Project\nProject description: Vite + React + TypeScript project with Tailwind CSS'}
 
 ${await buildOptimizedProjectContext(projectId, storageManager)}`
       }
@@ -5907,7 +5984,7 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
           // Add JSON command instructions for cases without preprocessing using focused prompt
           // DISABLED: Memory functionality temporarily disabled for future use
           // const streamingPrompt = getStreamingSystemPrompt(projectContext, memoryContext)
-          const streamingPrompt = getStreamingSystemPrompt(projectContext)
+          const streamingPrompt = getStreamingSystemPrompt(projectContext, undefined, detectedTemplate)
           
           enhancedMessages.push({
             role: 'system' as const,
