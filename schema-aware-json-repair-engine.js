@@ -315,293 +315,82 @@ export class SchemaAwareJSONRepairEngine extends AIJSONRepairEngine {
    * This is the main method that should be used for AI tool parsing
    */
   parseToolCall(input) {
-    try {
-      // Clean the input
-      const cleaned = this.cleanInput(input);
-
-      // Try different parsing strategies
-      let result = this.tryStandardJson(cleaned);
-      if (result) return result;
-
-      result = this.tryCodeBlockExtraction(cleaned);
-      if (result) return result;
-
-      result = this.tryPatternMatching(cleaned);
-      if (result) return result;
-
-      result = this.trySchemaAwareRepair(cleaned);
-      if (result) return result;
-
-      return null;
-    } catch (error) {
-      console.error('SchemaAwareJSONRepairEngine parseToolCall error:', error);
+    if (!input || typeof input !== 'string') {
       return null;
     }
-  }
 
-  /**
-   * Clean and normalize input
-   */
-  cleanInput(input) {
-    if (typeof input !== 'string') return input;
+    // Clean input - remove markdown fences and normalize whitespace
+    let cleanInput = input.trim();
+    cleanInput = cleanInput.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
 
-    return input
-      // Remove markdown code fences
-      .replace(/```(?:json)?\s*/g, '')
-      .replace(/```\s*$/g, '')
-      // Normalize whitespace
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-
-  /**
-   * Try standard JSON parsing first
-   */
-  tryStandardJson(input) {
+    // Strategy 1: Try standard JSON parsing (fastest, highest confidence)
     try {
-      const parsed = JSON.parse(input);
+      const parsed = JSON.parse(cleanInput);
       if (this.isValidToolCall(parsed)) {
         return {
           tool: parsed.tool,
           path: parsed.path,
           content: parsed.content,
-          args: parsed,
+          args: this.buildArgsFromParsed(parsed),
           confidence: 1.0,
           method: 'standard_json'
         };
       }
-    } catch (e) {
-      // Continue to next method
+    } catch (error) {
+      // Continue to next strategy
     }
-    return null;
-  }
 
-  /**
-   * Extract JSON from code blocks
-   */
-  tryCodeBlockExtraction(input) {
-    const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/g;
-    const matches = [...input.matchAll(codeBlockRegex)];
-
-    for (const match of matches) {
+    // Strategy 2: Extract from code blocks
+    const codeBlockMatch = input.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+    if (codeBlockMatch) {
       try {
-        const jsonContent = match[1];
-        const parsed = JSON.parse(jsonContent);
+        const parsed = JSON.parse(codeBlockMatch[1]);
         if (this.isValidToolCall(parsed)) {
           return {
             tool: parsed.tool,
             path: parsed.path,
             content: parsed.content,
-            args: parsed,
+            args: this.buildArgsFromParsed(parsed),
             confidence: 0.9,
             method: 'code_block'
           };
         }
-      } catch (e) {
-        // Try repairing this specific block
-        const repairResult = this.repair(jsonContent);
-        if (repairResult.data && this.isValidToolCall(repairResult.data)) {
-          return {
-            tool: repairResult.data.tool,
-            path: repairResult.data.path,
-            content: repairResult.data.content,
-            args: repairResult.data,
-            confidence: 0.7,
-            method: 'repaired_code_block'
-          };
-        }
+      } catch (error) {
+        // Continue to next strategy
       }
     }
-    return null;
-  }
 
-  /**
-   * Pattern matching for malformed JSON
-   */
-  tryPatternMatching(input) {
-    // Extract key components using regex
-    const toolMatch = input.match(/"tool"\s*:\s*"([^"]+)"/);
-    const pathMatch = input.match(/"path"\s*:\s*"([^"]+)"/);
-
-    if (!toolMatch || !this.isSupportedTool(toolMatch[1])) {
-      return null;
+    // Strategy 3: Pattern matching for malformed JSON
+    const patternResult = this.tryPatternMatching(cleanInput);
+    if (patternResult) {
+      return {
+        ...patternResult,
+        confidence: 0.6,
+        method: 'pattern_matching'
+      };
     }
 
-    // Extract content - this is the tricky part
-    const contentMatch = this.extractContentBlock(input);
-
-    const result = {
-      tool: toolMatch[1],
-      path: pathMatch ? pathMatch[1] : null,
-      content: contentMatch ? contentMatch.content : null,
-      args: {},
-      confidence: 0.6,
-      method: 'pattern_matching'
-    };
-
-    // Build args object
-    result.args = this.buildArgsFromPatterns(input, result);
-
-    return result;
-  }
-
-  /**
-   * Extract content block from malformed JSON
-   */
-  extractContentBlock(input) {
-    // Find content field
-    const contentStart = input.indexOf('"content"');
-    if (contentStart === -1) return null;
-
-    // Find the colon after "content"
-    const colonIndex = input.indexOf(':', contentStart);
-    if (colonIndex === -1) return null;
-
-    // Skip whitespace
-    let valueStart = colonIndex + 1;
-    while (valueStart < input.length && /\s/.test(input[valueStart])) {
-      valueStart++;
-    }
-
-    // Check if it's a string or object
-    if (input[valueStart] === '"') {
-      // String content
-      return this.extractStringContent(input, valueStart);
-    } else if (input[valueStart] === '{') {
-      // Object content (like package.json)
-      return this.extractObjectContent(input, valueStart);
+    // Strategy 4: Schema-aware repair (last resort)
+    const repairResult = this.repair(cleanInput);
+    if (repairResult.data && repairResult.confidence > 0.3 && this.isValidToolCall(repairResult.data)) {
+      return {
+        tool: repairResult.data.tool,
+        path: repairResult.data.path,
+        content: repairResult.data.content,
+        args: this.buildArgsFromParsed(repairResult.data),
+        confidence: repairResult.confidence * 0.8, // Slightly lower confidence for repaired data
+        method: 'schema_aware_repair'
+      };
     }
 
     return null;
   }
 
-  /**
-   * Extract string content
-   */
-  extractStringContent(input, startIndex) {
-    let inString = false;
-    let escaped = false;
-    let content = '';
 
-    for (let i = startIndex; i < input.length; i++) {
-      const char = input[i];
 
-      if (escaped) {
-        content += char;
-        escaped = false;
-        continue;
-      }
 
-      if (char === '\\') {
-        escaped = true;
-        continue;
-      }
 
-      if (char === '"') {
-        if (inString) {
-          // End of string
-          return { content, endIndex: i };
-        } else {
-          inString = true;
-        }
-      } else if (inString) {
-        content += char;
-      }
-    }
 
-    return inString ? { content, endIndex: input.length } : null;
-  }
-
-  /**
-   * Extract object content (handles nested JSON)
-   */
-  extractObjectContent(input, startIndex) {
-    let braceCount = 0;
-    let inString = false;
-    let escaped = false;
-    let content = '';
-
-    for (let i = startIndex; i < input.length; i++) {
-      const char = input[i];
-
-      if (escaped) {
-        content += char;
-        escaped = false;
-        continue;
-      }
-
-      if (char === '\\') {
-        escaped = true;
-        continue;
-      }
-
-      if (char === '"') {
-        inString = !inString;
-      }
-
-      if (!inString) {
-        if (char === '{') {
-          braceCount++;
-        } else if (char === '}') {
-          braceCount--;
-          if (braceCount === 0) {
-            // End of object
-            content += char;
-            return { content, endIndex: i };
-          }
-        }
-      }
-
-      if (braceCount > 0) {
-        content += char;
-      }
-    }
-
-    return braceCount > 0 ? { content, endIndex: input.length } : null;
-  }
-
-  /**
-   * Build args object from pattern matching
-   */
-  buildArgsFromPatterns(input, baseResult) {
-    const args = { ...baseResult };
-
-    // Extract other fields
-    const fieldPatterns = {
-      search: /"search"\s*:\s*"([^"]*)"/,
-      replace: /"replace"\s*:\s*"([^"]*)"/,
-      operation: /"operation"\s*:\s*"([^"]*)"/,
-      replaceAll: /"replaceAll"\s*:\s*(true|false)/,
-      occurrenceIndex: /"occurrenceIndex"\s*:\s*(\d+)/,
-      dryRun: /"dryRun"\s*:\s*(true|false)/,
-      rollbackOnFailure: /"rollbackOnFailure"\s*:\s*(true|false)/
-    };
-
-    for (const [field, pattern] of Object.entries(fieldPatterns)) {
-      const match = input.match(pattern);
-      if (match) {
-        if (['replaceAll', 'dryRun', 'rollbackOnFailure'].includes(field)) {
-          args[field] = match[1] === 'true';
-        } else if (field === 'occurrenceIndex') {
-          args[field] = parseInt(match[1]);
-        } else {
-          args[field] = match[1];
-        }
-      }
-    }
-
-    return args;
-  }
-
-  /**
-   * Check if parsed object is a valid tool call
-   */
-  isValidToolCall(obj) {
-    return obj &&
-           typeof obj === 'object' &&
-           obj.tool &&
-           this.isSupportedTool(obj.tool);
-  }
 
   /**
    * Check if tool is supported
