@@ -1355,12 +1355,12 @@ export default function TodoApp() {
               ) : preview.url ? (
                 <div className="w-full h-full relative">
                   {previewViewMode === 'mobile' ? (
-                    <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
-                      <div className="w-80 h-[600px] border-8 border-gray-300 dark:border-gray-600 rounded-[2rem] shadow-2xl bg-white overflow-hidden">
+                    <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 p-4">
+                      <div className={`w-80 border-8 border-gray-300 dark:border-gray-600 rounded-[2rem] shadow-2xl bg-white overflow-hidden flex flex-col ${isConsoleOpen ? 'h-[calc(100%-12rem)]' : 'h-full max-h-[600px]'}`}>
                         <iframe
                           id="preview-iframe"
                           src={preview.url}
-                          className="w-full h-full rounded-[1.5rem] border-none"
+                          className="w-full flex-1 rounded-[1.5rem] border-none"
                           sandbox="allow-scripts allow-same-origin allow-forms allow-downloads allow-popups"
                           ref={(iframe) => {
                             if (iframe) {
