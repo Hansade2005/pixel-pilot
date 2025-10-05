@@ -309,7 +309,501 @@ export class SchemaAwareJSONRepairEngine extends AIJSONRepairEngine {
         return `inferred-${property}`;
     }
   }
-}
 
-// Export a default instance
-export const schemaAwareEngine = new SchemaAwareJSONRepairEngine();
+  /**
+   * Enhanced parsing method that handles various malformed JSON formats
+   * This is the main method that should be used for AI tool parsing
+   */
+  parseToolCall(input) {
+    try {
+      // Clean the input
+      const cleaned = this.cleanInput(input);
+
+      // Try different parsing strategies
+      let result = this.tryStandardJson(cleaned);
+      if (result) return result;
+
+      result = this.tryCodeBlockExtraction(cleaned);
+      if (result) return result;
+
+      result = this.tryPatternMatching(cleaned);
+      if (result) return result;
+
+      result = this.trySchemaAwareRepair(cleaned);
+      if (result) return result;
+
+      return null;
+    } catch (error) {
+      console.error('SchemaAwareJSONRepairEngine parseToolCall error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Clean and normalize input
+   */
+  cleanInput(input) {
+    if (typeof input !== 'string') return input;
+
+    return input
+      // Remove markdown code fences
+      .replace(/```(?:json)?\s*/g, '')
+      .replace(/```\s*$/g, '')
+      // Normalize whitespace
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /**
+   * Try standard JSON parsing first
+   */
+  tryStandardJson(input) {
+    try {
+      const parsed = JSON.parse(input);
+      if (this.isValidToolCall(parsed)) {
+        return {
+          tool: parsed.tool,
+          path: parsed.path,
+          content: parsed.content,
+          args: parsed,
+          confidence: 1.0,
+          method: 'standard_json'
+        };
+      }
+    } catch (e) {
+      // Continue to next method
+    }
+    return null;
+  }
+
+  /**
+   * Extract JSON from code blocks
+   */
+  tryCodeBlockExtraction(input) {
+    const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/g;
+    const matches = [...input.matchAll(codeBlockRegex)];
+
+    for (const match of matches) {
+      try {
+        const jsonContent = match[1];
+        const parsed = JSON.parse(jsonContent);
+        if (this.isValidToolCall(parsed)) {
+          return {
+            tool: parsed.tool,
+            path: parsed.path,
+            content: parsed.content,
+            args: parsed,
+            confidence: 0.9,
+            method: 'code_block'
+          };
+        }
+      } catch (e) {
+        // Try repairing this specific block
+        const repairResult = this.repair(jsonContent);
+        if (repairResult.data && this.isValidToolCall(repairResult.data)) {
+          return {
+            tool: repairResult.data.tool,
+            path: repairResult.data.path,
+            content: repairResult.data.content,
+            args: repairResult.data,
+            confidence: 0.7,
+            method: 'repaired_code_block'
+          };
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Pattern matching for malformed JSON
+   */
+  tryPatternMatching(input) {
+    // Extract key components using regex
+    const toolMatch = input.match(/"tool"\s*:\s*"([^"]+)"/);
+    const pathMatch = input.match(/"path"\s*:\s*"([^"]+)"/);
+
+    if (!toolMatch || !this.isSupportedTool(toolMatch[1])) {
+      return null;
+    }
+
+    // Extract content - this is the tricky part
+    const contentMatch = this.extractContentBlock(input);
+
+    const result = {
+      tool: toolMatch[1],
+      path: pathMatch ? pathMatch[1] : null,
+      content: contentMatch ? contentMatch.content : null,
+      args: {},
+      confidence: 0.6,
+      method: 'pattern_matching'
+    };
+
+    // Build args object
+    result.args = this.buildArgsFromPatterns(input, result);
+
+    return result;
+  }
+
+  /**
+   * Extract content block from malformed JSON
+   */
+  extractContentBlock(input) {
+    // Find content field
+    const contentStart = input.indexOf('"content"');
+    if (contentStart === -1) return null;
+
+    // Find the colon after "content"
+    const colonIndex = input.indexOf(':', contentStart);
+    if (colonIndex === -1) return null;
+
+    // Skip whitespace
+    let valueStart = colonIndex + 1;
+    while (valueStart < input.length && /\s/.test(input[valueStart])) {
+      valueStart++;
+    }
+
+    // Check if it's a string or object
+    if (input[valueStart] === '"') {
+      // String content
+      return this.extractStringContent(input, valueStart);
+    } else if (input[valueStart] === '{') {
+      // Object content (like package.json)
+      return this.extractObjectContent(input, valueStart);
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract string content
+   */
+  extractStringContent(input, startIndex) {
+    let inString = false;
+    let escaped = false;
+    let content = '';
+
+    for (let i = startIndex; i < input.length; i++) {
+      const char = input[i];
+
+      if (escaped) {
+        content += char;
+        escaped = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char === '"') {
+        if (inString) {
+          // End of string
+          return { content, endIndex: i };
+        } else {
+          inString = true;
+        }
+      } else if (inString) {
+        content += char;
+      }
+    }
+
+    return inString ? { content, endIndex: input.length } : null;
+  }
+
+  /**
+   * Extract object content (handles nested JSON)
+   */
+  extractObjectContent(input, startIndex) {
+    let braceCount = 0;
+    let inString = false;
+    let escaped = false;
+    let content = '';
+
+    for (let i = startIndex; i < input.length; i++) {
+      const char = input[i];
+
+      if (escaped) {
+        content += char;
+        escaped = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = !inString;
+      }
+
+      if (!inString) {
+        if (char === '{') {
+          braceCount++;
+        } else if (char === '}') {
+          braceCount--;
+          if (braceCount === 0) {
+            // End of object
+            content += char;
+            return { content, endIndex: i };
+          }
+        }
+      }
+
+      if (braceCount > 0) {
+        content += char;
+      }
+    }
+
+    return braceCount > 0 ? { content, endIndex: input.length } : null;
+  }
+
+  /**
+   * Build args object from pattern matching
+   */
+  buildArgsFromPatterns(input, baseResult) {
+    const args = { ...baseResult };
+
+    // Extract other fields
+    const fieldPatterns = {
+      search: /"search"\s*:\s*"([^"]*)"/,
+      replace: /"replace"\s*:\s*"([^"]*)"/,
+      operation: /"operation"\s*:\s*"([^"]*)"/,
+      replaceAll: /"replaceAll"\s*:\s*(true|false)/,
+      occurrenceIndex: /"occurrenceIndex"\s*:\s*(\d+)/,
+      dryRun: /"dryRun"\s*:\s*(true|false)/,
+      rollbackOnFailure: /"rollbackOnFailure"\s*:\s*(true|false)/
+    };
+
+    for (const [field, pattern] of Object.entries(fieldPatterns)) {
+      const match = input.match(pattern);
+      if (match) {
+        if (['replaceAll', 'dryRun', 'rollbackOnFailure'].includes(field)) {
+          args[field] = match[1] === 'true';
+        } else if (field === 'occurrenceIndex') {
+          args[field] = parseInt(match[1]);
+        } else {
+          args[field] = match[1];
+        }
+      }
+    }
+
+    return args;
+  }
+
+  /**
+   * Check if parsed object is a valid tool call
+   */
+  isValidToolCall(obj) {
+    return obj &&
+           typeof obj === 'object' &&
+           obj.tool &&
+           this.isSupportedTool(obj.tool);
+  }
+
+  /**
+   * Check if tool is supported
+   */
+  isSupportedTool(toolName) {
+    const supportedTools = [
+      'write_file', 'edit_file', 'delete_file',
+      'read_file', 'list_files', 'create_directory',
+      'pilotwrite', 'pilotedit', 'pilotdelete'
+    ];
+    return supportedTools.includes(toolName);
+  }
+
+  /**
+   * Parse AI-generated tool calls with robust malformed JSON handling
+   * Returns structured tool call data with confidence scoring
+   */
+  parseToolCall(input) {
+    if (!input || typeof input !== 'string') {
+      return null;
+    }
+
+    // Clean input - remove markdown fences and normalize whitespace
+    let cleanInput = input.trim();
+    cleanInput = cleanInput.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+
+    // Strategy 1: Try standard JSON parsing (fastest, highest confidence)
+    try {
+      const parsed = JSON.parse(cleanInput);
+      if (this.isValidToolCall(parsed)) {
+        return {
+          tool: parsed.tool,
+          path: parsed.path,
+          content: parsed.content,
+          args: this.buildArgsFromParsed(parsed),
+          confidence: 1.0,
+          method: 'standard_json'
+        };
+      }
+    } catch (error) {
+      // Continue to next strategy
+    }
+
+    // Strategy 2: Extract from code blocks
+    const codeBlockMatch = input.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+    if (codeBlockMatch) {
+      try {
+        const parsed = JSON.parse(codeBlockMatch[1]);
+        if (this.isValidToolCall(parsed)) {
+          return {
+            tool: parsed.tool,
+            path: parsed.path,
+            content: parsed.content,
+            args: this.buildArgsFromParsed(parsed),
+            confidence: 0.9,
+            method: 'code_block'
+          };
+        }
+      } catch (error) {
+        // Continue to next strategy
+      }
+    }
+
+    // Strategy 3: Pattern matching for malformed JSON
+    const patternResult = this.tryPatternMatching(cleanInput);
+    if (patternResult) {
+      return {
+        ...patternResult,
+        confidence: 0.6,
+        method: 'pattern_matching'
+      };
+    }
+
+    // Strategy 4: Schema-aware repair (last resort)
+    const repairResult = this.repair(cleanInput);
+    if (repairResult.data && repairResult.confidence > 0.3 && this.isValidToolCall(repairResult.data)) {
+      return {
+        tool: repairResult.data.tool,
+        path: repairResult.data.path,
+        content: repairResult.data.content,
+        args: this.buildArgsFromParsed(repairResult.data),
+        confidence: repairResult.confidence * 0.8, // Slightly lower confidence for repaired data
+        method: 'schema_aware_repair'
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract content block from nested JSON structures
+   */
+  extractContentBlock(input) {
+    // Look for content field with nested object
+    const contentMatch = input.match(/"content"\s*:\s*(\{[\s\S]*\}(?:\s*\n?\s*\})*)/);
+    if (contentMatch) {
+      try {
+        return JSON.parse(contentMatch[1]);
+      } catch (error) {
+        // Try to fix common issues
+        let contentStr = contentMatch[1];
+        contentStr = contentStr.replace(/,(\s*[}\]])/g, '$1'); // Remove trailing commas
+        try {
+          return JSON.parse(contentStr);
+        } catch (error2) {
+          return contentStr; // Return as string if parsing fails
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Try pattern matching for severely malformed JSON
+   */
+  tryPatternMatching(input) {
+    const patterns = {
+      tool: /"tool"\s*:\s*"([^"]+)"/,
+      path: /"path"\s*:\s*"([^"]+)"/,
+      content: /"content"\s*:\s*(\{[\s\S]*?\}(?:\s*\n?\s*\})*)/
+    };
+
+    const toolMatch = input.match(patterns.tool);
+    if (!toolMatch || !this.isSupportedTool(toolMatch[1])) {
+      return null;
+    }
+
+    const result = {
+      tool: toolMatch[1],
+      path: null,
+      content: null,
+      args: {}
+    };
+
+    // Extract path
+    const pathMatch = input.match(patterns.path);
+    if (pathMatch) {
+      result.path = pathMatch[1];
+    }
+
+    // Extract content (try as JSON object first, then as string)
+    const contentMatch = input.match(patterns.content);
+    if (contentMatch) {
+      result.content = this.extractContentBlock(input) || contentMatch[1];
+    }
+
+    // Build args from additional patterns
+    result.args = this.buildArgsFromPatterns(input);
+
+    return result.tool && result.path ? result : null;
+  }
+
+  /**
+   * Build args object from pattern-matched input
+   */
+  buildArgsFromPatterns(input) {
+    const args = {};
+    const argPatterns = {
+      operation: /"operation"\s*:\s*"([^"]+)"/,
+      search: /"search"\s*:\s*"([^"]+)"/,
+      replace: /"replace"\s*:\s*"([^"]+)"/,
+      replaceAll: /"replaceAll"\s*:\s*(true|false)/,
+      occurrenceIndex: /"occurrenceIndex"\s*:\s*(\d+)/,
+      validateAfter: /"validateAfter"\s*:\s*"([^"]+)"/,
+      dryRun: /"dryRun"\s*:\s*(true|false)/,
+      rollbackOnFailure: /"rollbackOnFailure"\s*:\s*(true|false)/
+    };
+
+    for (const [key, pattern] of Object.entries(argPatterns)) {
+      const match = input.match(pattern);
+      if (match) {
+        if (key.includes('Index')) {
+          args[key] = parseInt(match[1]);
+        } else if (key.includes('All') || key.includes('Run') || key.includes('Failure')) {
+          args[key] = match[1] === 'true';
+        } else {
+          args[key] = match[1];
+        }
+      }
+    }
+
+    return args;
+  }
+
+  /**
+   * Build args object from successfully parsed JSON
+   */
+  buildArgsFromParsed(parsed) {
+    const args = { ...parsed };
+    delete args.tool;
+    delete args.path;
+    delete args.content;
+    return args;
+  }
+
+  /**
+   * Validate if parsed object is a valid tool call
+   */
+  isValidToolCall(obj) {
+    return obj &&
+           typeof obj === 'object' &&
+           obj.tool &&
+           this.isSupportedTool(obj.tool);
+  }
+}

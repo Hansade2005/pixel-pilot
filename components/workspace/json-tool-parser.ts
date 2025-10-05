@@ -71,12 +71,12 @@ export class JsonToolParser {
     const tools: JsonToolCall[] = []
     let processedContent = content
 
-    // Find JSON tool patterns in the content
-    const toolMatches = this.findJsonToolBlocks(content)
+    // Find JSON tool patterns in the content using enhanced parsing
+    const toolMatches = this.findJsonToolBlocksEnhanced(content)
 
     for (const match of toolMatches) {
       try {
-        const parsedTool = this.parseJsonBlock(match.json, match.startIndex)
+        const parsedTool = this.parseJsonBlockEnhanced(match.json, match.startIndex)
         if (parsedTool) {
           tools.push({
             ...parsedTool,
@@ -94,6 +94,110 @@ export class JsonToolParser {
     }
 
     return { tools, processedContent }
+  }
+
+  /**
+   * Enhanced JSON tool block finding with better malformed JSON support
+   */
+  private findJsonToolBlocksEnhanced(content: string): Array<{ json: string; startIndex: number }> {
+    const blocks: Array<{ json: string; startIndex: number }> = []
+
+    // First try the enhanced parsing method from the schema-aware engine
+    const enhancedResult = (this.repairEngine as any).parseToolCall(content)
+    if (enhancedResult) {
+      // If enhanced parsing found a tool call, extract the JSON portion
+      const jsonMatch = content.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        blocks.push({
+          json: jsonMatch[0],
+          startIndex: jsonMatch.index || 0
+        })
+        return blocks // Return early if enhanced parsing worked
+      }
+    }
+
+    // Fall back to original method for multiple tool calls or when enhanced parsing doesn't find anything
+    // Pattern to find JSON objects with "tool" property
+    const jsonToolPattern = /\{\s*["\']tool["\']\s*:\s*["\']([^"\']+)["\']\s*[,}][\s\S]*?\}/g
+
+    let match
+    while ((match = jsonToolPattern.exec(content)) !== null) {
+      const toolName = match[1]
+      if (this.supportedTools.includes(toolName)) {
+        // Try to extract the complete JSON object
+        const completeJson = this.extractCompleteJson(content, match.index)
+        if (completeJson) {
+          blocks.push({
+            json: completeJson,
+            startIndex: match.index
+          })
+        }
+      }
+    }
+
+    // Also look for code blocks containing JSON
+    const codeBlockPattern = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/g
+    while ((match = codeBlockPattern.exec(content)) !== null) {
+      try {
+        const jsonContent = match[1]
+        const parsed = JSON.parse(jsonContent)
+        if (parsed.tool && this.supportedTools.includes(parsed.tool)) {
+          blocks.push({
+            json: jsonContent,
+            startIndex: match.index
+          })
+        }
+      } catch (error) {
+        // Try enhanced parsing on the code block content
+        const enhancedResult = (this.repairEngine as any).parseToolCall(match[1])
+        if (enhancedResult) {
+          blocks.push({
+            json: match[1],
+            startIndex: match.index
+          })
+        }
+        // Ignore malformed JSON in code blocks if enhanced parsing also fails
+      }
+    }
+
+    return blocks
+  }
+
+  /**
+   * Enhanced JSON block parsing using the schema-aware engine
+   */
+  private parseJsonBlockEnhanced(jsonString: string, startIndex: number): Omit<JsonToolCall, 'id' | 'startTime'> | null {
+    try {
+      // First try the enhanced parsing method
+      const enhancedResult = (this.repairEngine as any).parseToolCall(jsonString)
+      if (enhancedResult) {
+        // Convert enhanced result to JsonToolCall format
+        return {
+          tool: enhancedResult.tool,
+          name: enhancedResult.tool,
+          path: enhancedResult.path,
+          content: enhancedResult.content,
+          operation: enhancedResult.args.operation,
+          search: enhancedResult.args.search,
+          replace: enhancedResult.args.replace,
+          searchReplaceBlocks: enhancedResult.args.searchReplaceBlocks,
+          replaceAll: enhancedResult.args.replaceAll,
+          occurrenceIndex: enhancedResult.args.occurrenceIndex,
+          validateAfter: enhancedResult.args.validateAfter,
+          dryRun: enhancedResult.args.dryRun,
+          rollbackOnFailure: enhancedResult.args.rollbackOnFailure,
+          args: enhancedResult.args,
+          status: 'detected' as const
+        }
+      }
+
+      // Fall back to original parsing method
+      return this.parseJsonBlock(jsonString, startIndex)
+
+    } catch (error) {
+      console.error('[JsonToolParser] Enhanced parsing completely failed:', error)
+      return null
+    }
   }
 
   /**
