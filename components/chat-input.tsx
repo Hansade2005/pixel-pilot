@@ -13,8 +13,7 @@ import {
   Mic,
   MicOff,
   Square,
-  Sparkles,
-  FileText
+  Sparkles
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -48,13 +47,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
 
-  // Attachment state
-  const [attachedImages, setAttachedImages] = useState<Array<{ id: string; name: string; base64: string; description?: string; isProcessing?: boolean }>>([])
-  const [attachedUploadedFiles, setAttachedUploadedFiles] = useState<Array<{ id: string; name: string; content: string; size: number }>>([])
-  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
-  const imageInputRef = useRef<HTMLInputElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
   // Subscription status hook
   const { subscription, loading: subscriptionLoading } = useSubscription()
 
@@ -66,23 +58,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   useEffect(() => {
     fetchPromptSuggestions()
   }, [])
-
-  // Close attachment menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (showAttachmentMenu) {
-        const target = e.target as HTMLElement;
-        if (!target.closest('.attachment-menu-container')) {
-          setShowAttachmentMenu(false);
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showAttachmentMenu]);
 
   const fetchPromptSuggestions = async () => {
     try {
@@ -141,182 +116,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       setIsEnhancing(false)
     }
   }
-
-  // Image attachment handlers
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    // Check max 2 images limit
-    if (attachedImages.length + files.length > 2) {
-      toast("Maximum images reached", {
-        description: "You can attach a maximum of 2 images"
-      });
-      return;
-    }
-
-    // Process each image
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        toast("Invalid file type", {
-          description: `${file.name} is not a valid image file`
-        });
-        continue;
-      }
-
-      // Validate file size (max 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        toast("File too large", {
-          description: `${file.name} is too large. Maximum size is 10MB`
-        });
-        continue;
-      }
-
-      // Convert to base64
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const base64 = event.target?.result as string;
-        const imageId = `img_${Date.now()}_${i}`;
-
-        // Add image to state with processing flag
-        setAttachedImages(prev => [...prev, {
-          id: imageId,
-          name: file.name,
-          base64: base64,
-          isProcessing: true
-        }]);
-
-        // Send to Pixtral for description
-        try {
-          const response = await fetch('/api/describe-image', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              image: base64,
-              prompt: "Describe this image in detail, including layout, colors, text, UI elements, and any other relevant information that would help recreate or understand this design."
-            }),
-          });
-
-          if (!response.ok) {
-            throw new Error('Failed to describe image');
-          }
-
-          const data = await response.json();
-
-          // Update image with description
-          setAttachedImages(prev => prev.map(img => 
-            img.id === imageId 
-              ? { ...img, description: data.description, isProcessing: false }
-              : img
-          ));
-
-          toast("Image processed", {
-            description: `${file.name} processed successfully`
-          });
-        } catch (error) {
-          console.error('Error describing image:', error);
-          toast("Processing failed", {
-            description: `Failed to process ${file.name}`
-          });
-          // Remove failed image
-          setAttachedImages(prev => prev.filter(img => img.id !== imageId));
-        }
-      };
-
-      reader.onerror = () => {
-        toast("Read error", {
-          description: `Failed to read ${file.name}`
-        });
-      };
-
-      reader.readAsDataURL(file);
-    }
-
-    // Reset input
-    if (imageInputRef.current) {
-      imageInputRef.current.value = '';
-    }
-  };
-
-  const handleRemoveImage = (imageId: string) => {
-    setAttachedImages(prev => prev.filter(img => img.id !== imageId));
-  };
-
-  // File upload attachment handlers
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    // Check if images are attached
-    if (attachedImages.length > 0) {
-      toast("Cannot attach files", {
-        description: "Remove attached images first before attaching files"
-      });
-      return;
-    }
-
-    // Check max 10 files limit
-    if (attachedUploadedFiles.length + files.length > 10) {
-      toast("Maximum files reached", {
-        description: "You can attach a maximum of 10 files"
-      });
-      return;
-    }
-
-    // Process each file
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        toast("File too large", {
-          description: `${file.name} is too large. Maximum size is 5MB`
-        });
-        continue;
-      }
-
-      // Read file content
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const content = event.target?.result as string;
-        const fileId = `file_${Date.now()}_${i}`;
-
-        // Add file to state
-        setAttachedUploadedFiles(prev => [...prev, {
-          id: fileId,
-          name: file.name,
-          content: content,
-          size: file.size
-        }]);
-
-        toast("File attached", {
-          description: `${file.name} attached successfully`
-        });
-      };
-
-      reader.onerror = () => {
-        toast("Read error", {
-          description: `Failed to read ${file.name}`
-        });
-      };
-
-      reader.readAsText(file);
-    }
-
-    // Reset input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const handleRemoveUploadedFile = (fileId: string) => {
-    setAttachedUploadedFiles(prev => prev.filter(file => file.id !== fileId));
-  };
 
   // Speech-to-text handlers using Web Speech API (with Deepgram fallback)
   const startWebSpeechRecognition = () => {
@@ -741,23 +540,8 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
             {/* Bottom Bar with Buttons */}
             <div className="flex items-center justify-between pt-2 border-t border-gray-700/50">
-              {/* Left Side - Plus, Attach, and Mic */}
+              {/* Left Side - Mic */}
               <div className="flex items-center space-x-3">
-                <button 
-                  type="button"
-                  onClick={() => toast("Coming Soon!", { description: "File attachments will be available soon." })}
-                  className="w-8 h-8 rounded-full bg-gray-700/50 hover:bg-gray-600/50 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => toast("Coming Soon!", { description: "Image attachments will be available soon." })}
-                  className="flex items-center space-x-2 text-gray-400 hover:text-white transition-colors"
-                >
-                  <ImageIcon className="w-4 h-4" />
-                  <span className="text-sm">Attach</span>
-                </button>
                 <button 
                   type="button"
                   onClick={handleMicrophoneClick}
@@ -833,23 +617,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
           ))}
         </div>
       )}
-      
-      {/* Hidden file inputs */}
-      <input
-        ref={imageInputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        onChange={handleImageUpload}
-        className="hidden"
-      />
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        onChange={handleFileUpload}
-        className="hidden"
-      />
     </div>
   )
 }
