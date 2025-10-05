@@ -3707,6 +3707,7 @@ export function ChatPanel({
   const [isTranscribing, setIsTranscribing] = useState(false)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
+  const recognitionRef = useRef<any>(null)
 
   // Auth modal state
   const [showAuthModal, setShowAuthModal] = useState(false)
@@ -4375,8 +4376,145 @@ export function ChatPanel({
     setAttachedUploadedFiles(prev => prev.filter(f => f.id !== fileId));
   };
 
-  // Speech-to-text handlers
-  const startRecording = async () => {
+  // Speech-to-text handlers using Web Speech API (with Deepgram fallback)
+  const startWebSpeechRecognition = () => {
+    try {
+      // @ts-ignore - Web Speech API types
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+      const recognition = new SpeechRecognition()
+
+      // Enhanced settings for real-time typing
+      recognition.continuous = true
+      recognition.interimResults = true // Enable instant real-time results
+      recognition.lang = 'en-US'
+      recognition.maxAlternatives = 1
+
+      // Store the initial input value when starting
+      const initialInput = inputMessage
+      let lastFinalTranscript = ''
+      let silenceTimer: NodeJS.Timeout | null = null
+
+      recognition.onstart = () => {
+        setIsRecording(true)
+        lastFinalTranscript = ''
+        toast({
+          title: "🎤 Listening...",
+          description: "Speak now. I'll stop automatically when you're done."
+        })
+      }
+
+      recognition.onresult = (event: any) => {
+        // Clear any existing silence timer
+        if (silenceTimer) {
+          clearTimeout(silenceTimer)
+        }
+
+        let interimTranscript = ''
+        let finalTranscript = ''
+
+        // Process all results for instant typing effect
+        for (let i = 0; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript
+
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' '
+          } else {
+            interimTranscript += transcript
+          }
+        }
+
+        // Combine final and interim for instant real-time typing
+        const combinedText = (finalTranscript || lastFinalTranscript) + interimTranscript
+
+        // Update final transcript tracker
+        if (finalTranscript) {
+          lastFinalTranscript = finalTranscript
+        }
+
+        // Instantly update the input field with real-time text
+        if (combinedText.trim()) {
+          const updatedInput = initialInput
+            ? `${initialInput} ${combinedText.trim()}`
+            : combinedText.trim()
+          setInputMessage(updatedInput)
+        }
+
+        // Auto-stop detection: Set timer to stop after 2 seconds of silence
+        silenceTimer = setTimeout(() => {
+          if (recognition && recognitionRef.current) {
+            recognition.stop()
+            toast({
+              title: "Recording stopped",
+              description: "Stopped due to silence detected"
+            })
+          }
+        }, 2000) // 2 seconds of silence triggers auto-stop
+      }
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error)
+
+        // Clear silence timer on error
+        if (silenceTimer) {
+          clearTimeout(silenceTimer)
+        }
+
+        if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+          toast({
+            title: "❌ Microphone access denied",
+            description: "Please allow microphone access to use voice input",
+            variant: "destructive"
+          })
+        } else if (event.error === 'no-speech') {
+          toast({
+            title: "⚠️ No speech detected",
+            description: "Please try speaking louder or closer to the microphone",
+            variant: "destructive"
+          })
+        } else if (event.error === 'aborted') {
+          // User manually stopped, don't show error
+          console.log('Recognition aborted by user')
+        } else {
+          toast({
+            title: "Recognition error",
+            description: `Error: ${event.error}. Please try again.`,
+            variant: "destructive"
+          })
+        }
+        setIsRecording(false)
+      }
+
+      recognition.onend = () => {
+        // Clear any pending silence timer
+        if (silenceTimer) {
+          clearTimeout(silenceTimer)
+        }
+
+        // Only show success if we actually captured text
+        if (lastFinalTranscript.trim()) {
+          toast({
+            title: "✅ Speech recognized successfully",
+            description: "Your speech has been converted to text"
+          })
+        }
+
+        setIsRecording(false)
+        recognitionRef.current = null
+      }
+
+      recognitionRef.current = recognition
+      recognition.start()
+    } catch (error) {
+      console.error('Error starting Web Speech Recognition:', error)
+      toast({
+        title: "Speech recognition not available",
+        description: "Your browser doesn't support speech recognition",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const startDeepgramRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -4392,7 +4530,7 @@ export function ChatPanel({
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
         await transcribeAudio(audioBlob);
-        
+
         // Stop all tracks to release microphone
         stream.getTracks().forEach(track => track.stop());
       };
@@ -4414,7 +4552,7 @@ export function ChatPanel({
     }
   };
 
-  const stopRecording = () => {
+  const stopDeepgramRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
@@ -4427,7 +4565,7 @@ export function ChatPanel({
       // Convert blob to base64
       const reader = new FileReader();
       reader.readAsDataURL(audioBlob);
-      
+
       reader.onloadend = async () => {
         const base64Audio = (reader.result as string).split(',')[1];
 
@@ -4449,7 +4587,7 @@ export function ChatPanel({
         if (data.success && data.text) {
           // Append transcribed text to input
           setInputMessage(prev => prev ? `${prev} ${data.text}` : data.text);
-          
+
           toast({
             title: "Transcription complete",
             description: "Your speech has been converted to text"
@@ -4476,9 +4614,19 @@ export function ChatPanel({
 
   const handleMicrophoneClick = () => {
     if (isRecording) {
-      stopRecording();
+      // Stop current recording
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      } else if (mediaRecorderRef.current) {
+        stopDeepgramRecording();
+      }
     } else {
-      startRecording();
+      // Check if Web Speech API is available, otherwise fallback to Deepgram
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        startWebSpeechRecognition();
+      } else {
+        startDeepgramRecording();
+      }
     }
   };
 
