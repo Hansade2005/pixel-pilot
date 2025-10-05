@@ -48,6 +48,7 @@ import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown
 import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
 import { FileSearchResult } from "@/lib/file-lookup-service"
 import { useToast } from "@/hooks/use-toast"
+import { useAutoCloudBackup } from "@/hooks/use-auto-cloud-backup"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Workspace as Project } from "@/lib/storage-manager"
@@ -538,12 +539,14 @@ const JSONToolPill = ({
   toolCall, 
   status = 'completed',
   autoExecutor,
-  project 
+  project,
+  triggerAutoBackup
 }: { 
   toolCall: JsonToolCall, 
   status?: 'executing' | 'completed' | 'failed',
   autoExecutor?: XMLToolAutoExecutor | null,
-  project: Project
+  project: Project,
+  triggerAutoBackup: (message: string) => void
 }) => {
   const [executionStatus, setExecutionStatus] = useState<'executing' | 'completed' | 'failed'>(status)
   const [hasExecuted, setHasExecuted] = useState(false)
@@ -597,6 +600,7 @@ const JSONToolPill = ({
                 updatedAt: new Date().toISOString()
               })
               result = { message: `File ${toolCall.path} updated successfully`, action: 'updated' }
+              triggerAutoBackup(`Tool updated file: ${toolCall.path}`)
             } else {
               // Create new file (exact same logic as specs route)
               const newFile = await storageManager.createFile({
@@ -610,6 +614,7 @@ const JSONToolPill = ({
                 isDirectory: false
               })
               result = { message: `File ${toolCall.path} created successfully`, action: 'created' }
+              triggerAutoBackup(`Tool created file: ${toolCall.path}`)
             }
             break
 
@@ -632,6 +637,7 @@ const JSONToolPill = ({
                 updatedAt: new Date().toISOString()
               })
               result = { message: `File ${toolCall.path} edited successfully`, action: 'edited' }
+              triggerAutoBackup(`Tool edited file: ${toolCall.path}`)
             }
             break
 
@@ -639,6 +645,7 @@ const JSONToolPill = ({
           case 'pilotdelete':
             await storageManager.deleteFile(projectId, toolCall.path)
             result = { message: `File ${toolCall.path} deleted successfully`, action: 'deleted' }
+            triggerAutoBackup(`Tool deleted file: ${toolCall.path}`)
             break
 
           default:
@@ -1371,7 +1378,7 @@ function renderXMLToolsInContent(content: string, xmlTools: XMLToolCall[]): Reac
 }
 
 // Client-side tool execution functions
-async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): Promise<any> {
+async function executeClientSideTool(toolCall: XMLToolCall, projectId: string, triggerAutoBackup: (message: string) => void): Promise<any> {
   const { storageManager } = await import('@/lib/storage-manager')
   await storageManager.init()
 
@@ -1407,6 +1414,7 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): 
         if (writeExistingFile) {
           // Update existing file
           await storageManager.updateFile(projectId, pilotWritePath, { content: pilotWriteContent })
+          triggerAutoBackup(`Pilot wrote to file: ${pilotWritePath}`)
           return {
             success: true,
             message: `✅ File ${pilotWritePath} updated successfully.`,
@@ -1578,6 +1586,7 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): 
 
         // Update the file
         await storageManager.updateFile(projectId, pilotEditPath, { content: modifiedContent })
+        triggerAutoBackup(`Pilot edited file: ${pilotEditPath}`)
 
         return {
           success: true,
@@ -1641,6 +1650,7 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): 
             content: writeFileContent || '',
             updatedAt: new Date().toISOString()
           })
+          triggerAutoBackup(`Wrote to file: ${writeFilePath}`)
           return { success: true, action: 'updated', path: writeFilePath, message: `File updated: ${writeFilePath}` }
         } else {
           const newFile = await storageManager.createFile({
@@ -1653,6 +1663,7 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): 
             size: (writeFileContent || '').length,
             isDirectory: false
           })
+          triggerAutoBackup(`Created file: ${writeFilePath}`)
           return { success: true, action: 'created', path: writeFilePath, file: newFile, message: `File created: ${writeFilePath}` }
         }
         
@@ -1664,6 +1675,7 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string): 
             content: editFileContent || '',
             updatedAt: new Date().toISOString()
           })
+          triggerAutoBackup(`Edited file: ${editFilePath}`)
           return { success: true, action: 'edited', path: editFilePath, message: `File edited: ${editFilePath}` }
         } else {
           throw new Error(`File not found: ${editFilePath}`)
@@ -1974,23 +1986,6 @@ function cleanXMLToolTags(content: string): string {
   cleaned = cleaned.replace(/\n\s*\n\s*\n/g, '\n\n')
   
   return cleaned.trim()
-}
-
-// Legacy function for backward compatibility
-async function executeXMLCommandClientSide(xmlCommand: any, projectId: string) {
-  // Convert legacy format to new format
-  const toolCall: XMLToolCall = {
-    id: xmlCommand.id || `legacy-${Date.now()}`,
-    name: xmlCommand.command,
-    args: {
-      path: xmlCommand.path,
-      content: xmlCommand.content
-    },
-    status: 'executing',
-    startTime: Date.now()
-  }
-  
-  return executeClientSideTool(toolCall, projectId)
 }
 
 // ToolPill component for displaying server-side tool results
@@ -3637,6 +3632,10 @@ export function ChatPanel({
   initialPrompt
 }: ChatPanelProps) {
   const { toast } = useToast()
+  const { triggerAutoBackup } = useAutoCloudBackup({
+    debounceMs: 2000, // Longer debounce for AI operations
+    silent: false // Show notifications for AI changes
+  })
   
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState("")
@@ -4739,6 +4738,7 @@ export function ChatPanel({
                     updatedAt: new Date().toISOString()
                   })
                   console.log(`[DEBUG] Updated existing file: ${fileOp.path}`)
+                  triggerAutoBackup(`AI updated file: ${fileOp.path}`)
                 } else {
                   // Create new file
                   const newFile = await storageManager.createFile({
@@ -4752,6 +4752,7 @@ export function ChatPanel({
                     isDirectory: false
                   })
                   console.log(`[DEBUG] Created new file: ${fileOp.path}`, newFile)
+                  triggerAutoBackup(`AI created file: ${fileOp.path}`)
                 }
                 operationsApplied++
               } else if (fileOp.type === 'edit_file' && fileOp.path && fileOp.content) {
@@ -4761,11 +4762,13 @@ export function ChatPanel({
                   updatedAt: new Date().toISOString()
                 })
                 console.log(`[DEBUG] Edited file: ${fileOp.path}`)
+                triggerAutoBackup(`AI edited file: ${fileOp.path}`)
                 operationsApplied++
               } else if (fileOp.type === 'delete_file' && fileOp.path) {
                 // Delete file
                 await storageManager.deleteFile(project.id, fileOp.path)
                 console.log(`[DEBUG] Deleted file: ${fileOp.path}`)
+                triggerAutoBackup(`AI deleted file: ${fileOp.path}`)
                 operationsApplied++
               } else {
                 console.warn('[DEBUG] Skipped invalid file operation:', fileOp)
@@ -5016,7 +5019,7 @@ export function ChatPanel({
                               startTime: tool.startTime
                             }
                             
-                            executeClientSideTool(toolCall, project.id)
+                            executeClientSideTool(toolCall, project.id, triggerAutoBackup)
                               .then((result) => {
                                 console.log('[CLIENT-TOOL] Tool executed successfully:', result)
                                 
@@ -5346,6 +5349,7 @@ export function ChatPanel({
                                     content: failedTool.args.content,
                                     updatedAt: new Date().toISOString()
                                   })
+                                  triggerAutoBackup(`Fallback updated file: ${failedTool.args.path}`)
                                 } else {
                                   // Create new file
                                   await storageManager.createFile({
@@ -5358,6 +5362,7 @@ export function ChatPanel({
                                     size: failedTool.args.content.length,
                                     isDirectory: false
                                   })
+                                  triggerAutoBackup(`Fallback created file: ${failedTool.args.path}`)
                                 }
                                 
                                 const toolIndex = toolCalls.findIndex(tc => tc.id === failedTool.id)
@@ -5426,6 +5431,7 @@ export function ChatPanel({
                                   updatedAt: new Date().toISOString()
                                 })
                                 console.log(`[DEBUG] Updated existing file: ${fileOp.path}`)
+                                triggerAutoBackup(`Streaming updated file: ${fileOp.path}`)
                               } else {
                                 // Create new file
                                 const newFile = await storageManager.createFile({
@@ -5439,6 +5445,7 @@ export function ChatPanel({
                                   isDirectory: false
                                 })
                                 console.log(`[DEBUG] Created new file: ${fileOp.path}`, newFile)
+                                triggerAutoBackup(`Streaming created file: ${fileOp.path}`)
                               }
                               operationsApplied++
                             } else if (fileOp.type === 'edit_file' && fileOp.path && fileOp.content) {
@@ -5448,6 +5455,7 @@ export function ChatPanel({
                                 updatedAt: new Date().toISOString()
                               })
                               console.log(`[DEBUG] Edited file: ${fileOp.path}`)
+                              triggerAutoBackup(`Streaming edited file: ${fileOp.path}`)
                               operationsApplied++
                             } else if (fileOp.type === 'delete_file' && fileOp.path) {
                               // Delete file
@@ -6419,7 +6427,7 @@ export function ChatPanel({
                                       if (matchingTool) {
                                         usedTools.add(matchingTool.id)
                                         components.push(
-                                          project ? <JSONToolPill key={`json-tool-${elementKey++}`} toolCall={matchingTool} status="completed" autoExecutor={autoExecutor} project={project} /> : null
+                                          project ? <JSONToolPill key={`json-tool-${elementKey++}`} toolCall={matchingTool} status="completed" autoExecutor={autoExecutor} project={project} triggerAutoBackup={triggerAutoBackup} /> : null
                                         )
                                         console.log('[DEBUG] Rendered JSONToolPill for:', matchingTool.tool, matchingTool.path)
                                       } else {
@@ -6441,7 +6449,7 @@ export function ChatPanel({
                                     const unusedTools = jsonTools.filter(tool => !usedTools.has(tool.id))
                                     unusedTools.forEach(tool => {
                                       components.push(
-                                        project ? <JSONToolPill key={`unused-tool-${elementKey++}`} toolCall={tool} status="completed" autoExecutor={autoExecutor} project={project} /> : null
+                                        project ? <JSONToolPill key={`unused-tool-${elementKey++}`} toolCall={tool} status="completed" autoExecutor={autoExecutor} project={project} triggerAutoBackup={triggerAutoBackup} /> : null
                                       )
                                       console.log('[DEBUG] Rendered unused tool as pill:', tool.tool, tool.path)
                                     })

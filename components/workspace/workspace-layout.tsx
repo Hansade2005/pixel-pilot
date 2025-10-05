@@ -725,6 +725,37 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 console.error('Error refreshing projects after creation:', error)
               }
             }}
+            onProjectDeleted={async (deletedProjectId) => {
+              // Refresh projects when one is deleted
+              try {
+                await storageManager.init()
+                const workspaces = await storageManager.getWorkspaces(user.id)
+                setClientProjects(workspaces || [])
+                console.log('WorkspaceLayout: Refreshed projects after deletion:', workspaces?.length || 0)
+                
+                // If the deleted project was selected, navigate away from it
+                if (selectedProject?.id === deletedProjectId) {
+                  const params = new URLSearchParams(searchParams.toString())
+                  params.delete('projectId')
+                  router.push(`/workspace?${params.toString()}`)
+                  setSelectedProject(null)
+                  setSelectedFile(null)
+                }
+              } catch (error) {
+                console.error('Error refreshing projects after deletion:', error)
+              }
+            }}
+            onProjectUpdated={async () => {
+              // Refresh projects when one is updated (renamed, pinned, etc.)
+              try {
+                await storageManager.init()
+                const workspaces = await storageManager.getWorkspaces(user.id)
+                setClientProjects(workspaces || [])
+                console.log('WorkspaceLayout: Refreshed projects after update:', workspaces?.length || 0)
+              } catch (error) {
+                console.error('Error refreshing projects after update:', error)
+              }
+            }}
             collapsed={sidebarCollapsed}
             onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
             onTriggerBackup={triggerBackup}
@@ -1147,6 +1178,38 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                         }
                       } catch (error) {
                         console.error('Error refreshing projects after creation:', error)
+                      }
+                    }}
+                    onProjectDeleted={async (deletedProjectId) => {
+                      // Refresh projects when one is deleted
+                      try {
+                        await storageManager.init()
+                        const workspaces = await storageManager.getWorkspaces(user.id)
+                        setClientProjects(workspaces || [])
+                        console.log('WorkspaceLayout: Refreshed projects after deletion:', workspaces?.length || 0)
+                        
+                        // If the deleted project was selected, navigate away from it
+                        if (selectedProject?.id === deletedProjectId) {
+                          const params = new URLSearchParams(searchParams.toString())
+                          params.delete('projectId')
+                          router.push(`/workspace?${params.toString()}`)
+                          setSelectedProject(null)
+                          setSelectedFile(null)
+                          setSidebarOpen(false)
+                        }
+                      } catch (error) {
+                        console.error('Error refreshing projects after deletion:', error)
+                      }
+                    }}
+                    onProjectUpdated={async () => {
+                      // Refresh projects when one is updated (renamed, pinned, etc.)
+                      try {
+                        await storageManager.init()
+                        const workspaces = await storageManager.getWorkspaces(user.id)
+                        setClientProjects(workspaces || [])
+                        console.log('WorkspaceLayout: Refreshed projects after update:', workspaces?.length || 0)
+                      } catch (error) {
+                        console.error('Error refreshing projects after update:', error)
                       }
                     }}
                     collapsed={false}

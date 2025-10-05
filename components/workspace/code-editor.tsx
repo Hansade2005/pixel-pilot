@@ -7,6 +7,7 @@ import { Editor } from "@monaco-editor/react"
 import { Button } from "@/components/ui/button"
 import { FileText, Save, Settings, Maximize2, Sparkles, Send, X } from "lucide-react"
 import { useTheme } from "next-themes"
+import { useAutoCloudBackup } from "@/hooks/use-auto-cloud-backup"
 import type { File } from "@/lib/storage-manager"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -301,6 +302,10 @@ interface CodeEditorProps {
 
 export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps) {
   const { theme } = useTheme()
+  const { triggerAutoBackup } = useAutoCloudBackup({
+    debounceMs: 1000, // Shorter debounce for code editor saves
+    silent: true // Don't show notifications for every save
+  })
   const editorRef = useRef<any>(null)
   const [content, setContent] = useState("")
   const [isSaving, setIsSaving] = useState(false)
@@ -527,6 +532,9 @@ export function CodeEditor({ file, onSave, projectFiles = [] }: CodeEditorProps)
       
       console.log('File saved successfully to IndexedDB:', file.path)
       setHasChanges(false)
+      
+      // Trigger auto cloud backup after successful save
+      triggerAutoBackup(`Auto-saved file: ${file.name}`)
       
       if (onSave) {
         onSave(file, content)

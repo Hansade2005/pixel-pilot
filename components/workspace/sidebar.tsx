@@ -73,6 +73,8 @@ interface SidebarProps {
   selectedProject: Project | null
   onSelectProject: (project: Project) => void
   onProjectCreated?: (newProject: Project) => Promise<void>
+  onProjectDeleted?: (deletedProjectId: string) => Promise<void>
+  onProjectUpdated?: () => Promise<void>
   collapsed: boolean
   onToggleCollapse: () => void
   isMobile?: boolean
@@ -85,6 +87,8 @@ export function Sidebar({
   selectedProject,
   onSelectProject,
   onProjectCreated,
+  onProjectDeleted,
+  onProjectUpdated,
   collapsed,
   onToggleCollapse,
   isMobile = false,
@@ -154,13 +158,15 @@ export function Sidebar({
         isPinned: !project.isPinned
       })
       
-      // Trigger backup before reload to save the updated state
+      // Trigger backup before updating UI to save the updated state
       if (onTriggerBackup) {
         await onTriggerBackup()
       }
       
-      // Refresh projects
-      window.location.reload()
+      // Call the callback to update the parent component's state
+      if (onProjectUpdated) {
+        await onProjectUpdated()
+      }
     } catch (error) {
       console.error('Error toggling pin status:', error)
     }
@@ -189,13 +195,16 @@ export function Sidebar({
         }
       }
       
-      // Trigger backup before reload to save the updated state
+      // Trigger backup before updating UI to save the updated state
       if (onTriggerBackup) {
         await onTriggerBackup()
       }
       
-      // Refresh page to update project list
-      window.location.reload()
+      // Call the callback to update the parent component's state
+      if (onProjectDeleted) {
+        await onProjectDeleted(projectId)
+      }
+      
       setDeleteProjectId(null)
     } catch (error) {
       console.error('Error deleting project:', error)
@@ -220,12 +229,15 @@ export function Sidebar({
       setRenameProject(null)
       setRenameValue("")
       
-      // Trigger backup before reload to save the updated state
+      // Trigger backup before updating UI to save the updated state
       if (onTriggerBackup) {
         await onTriggerBackup()
       }
       
-      window.location.reload()
+      // Call the callback to update the parent component's state
+      if (onProjectUpdated) {
+        await onProjectUpdated()
+      }
     } catch (error) {
       console.error('Error renaming project:', error)
     }
@@ -276,12 +288,13 @@ export function Sidebar({
         await onProjectCreated(newProject)
       }
       
-      // Trigger backup before reload to save the updated state
+      // Trigger backup after project creation
       if (onTriggerBackup) {
         await onTriggerBackup()
       }
       
-      window.location.reload()
+      setCloneProject(null)
+      setCloneName("")
     } catch (error) {
       console.error('Error cloning project:', error)
     }
