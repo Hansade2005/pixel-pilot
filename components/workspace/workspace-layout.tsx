@@ -264,9 +264,20 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           params.delete('newProject')
           params.set('projectId', projectId)
           
-          // Extract and set initial chat prompt if provided
+          // Retrieve the FULL prompt from sessionStorage (not truncated)
+          // This ensures the complete prompt is sent to the chat panel
+          if (typeof window !== 'undefined') {
+            const storedPrompt = sessionStorage.getItem(`initial-prompt-${projectId}`)
+            if (storedPrompt) {
+              setInitialChatPrompt(storedPrompt)
+              // Clean up sessionStorage after retrieving
+              sessionStorage.removeItem(`initial-prompt-${projectId}`)
+            }
+          }
+          
+          // Legacy: Also check URL param for backward compatibility
           const promptParam = searchParams.get('prompt')
-          if (promptParam) {
+          if (promptParam && !sessionStorage.getItem(`initial-prompt-${projectId}`)) {
             setInitialChatPrompt(decodeURIComponent(promptParam))
             params.delete('prompt') // Remove prompt from URL after extracting
           }

@@ -440,14 +440,16 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         
         toast.success('Project created and saved!')
         
-        // Truncate prompt to first 20 characters to avoid URL too long errors
-        const truncatedPrompt = prompt.length > 20 
-          ? prompt.substring(0, 20).trim() + '...'
-          : prompt.trim()
+        // Store the FULL prompt in sessionStorage to avoid URL length limitations
+        // This ensures the complete prompt is sent to the chat panel, not truncated
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem(`initial-prompt-${workspace.id}`, prompt.trim())
+        }
         
         // Clear the input and redirect to workspace with the new project
+        // No need to pass prompt in URL anymore - it's in sessionStorage
         setPrompt("")
-        router.push(`/workspace?newProject=${workspace.id}&prompt=${encodeURIComponent(truncatedPrompt)}`)
+        router.push(`/workspace?newProject=${workspace.id}`)
       } else {
         throw new Error('Failed to generate project suggestion')
       }
