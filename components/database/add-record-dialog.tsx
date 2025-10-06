@@ -273,7 +273,7 @@ export function AddRecordDialog({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ data: recordData }),
+          body: JSON.stringify({ data_json: recordData }),
         }
       );
 

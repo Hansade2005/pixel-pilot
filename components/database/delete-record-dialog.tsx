@@ -42,11 +42,10 @@ export function DeleteRecordDialog({
 
     try {
       const response = await fetch(
-        `/api/database/${databaseId}/tables/${table.id}/records`,
+        `/api/database/${databaseId}/tables/${table.id}/records?recordId=${record.id}`,
         {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ recordId: record.id }),
         }
       );
 

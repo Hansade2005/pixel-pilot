@@ -275,13 +275,12 @@ export function EditRecordDialog({
       });
 
       const response = await fetch(
-        `/api/database/${databaseId}/tables/${table.id}/records`,
+        `/api/database/${databaseId}/tables/${table.id}/records?recordId=${record.id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            recordId: record.id,
-            data: recordData,
+            data_json: recordData,
           }),
         }
       );
