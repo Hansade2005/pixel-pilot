@@ -254,11 +254,13 @@ export async function POST(
     }
 
     // Transform record: flatten data_json into top-level properties
+    // Exclude 'id' from data_json to avoid overriding the database primary key
+    const { id: _, ...dataWithoutId } = record.data_json || {};
     const transformedRecord = {
       id: record.id,
       created_at: record.created_at,
       updated_at: record.updated_at,
-      ...(record.data_json || {}),
+      ...dataWithoutId,
     };
 
     return NextResponse.json({
@@ -337,12 +339,16 @@ export async function GET(
     }
 
     // Transform records: flatten data_json into top-level properties
-    const transformedRecords = (records || []).map((record: any) => ({
-      id: record.id,
-      created_at: record.created_at,
-      updated_at: record.updated_at,
-      ...(record.data_json || {}), // Spread data_json fields to top level
-    }));
+    // Exclude 'id' from data_json to avoid overriding the database primary key
+    const transformedRecords = (records || []).map((record: any) => {
+      const { id: _, ...dataWithoutId } = record.data_json || {};
+      return {
+        id: record.id,
+        created_at: record.created_at,
+        updated_at: record.updated_at,
+        ...dataWithoutId, // Spread data_json fields except id
+      };
+    });
 
     return NextResponse.json({
       success: true,
@@ -594,11 +600,13 @@ export async function PUT(
     }
 
     // Transform record: flatten data_json into top-level properties
+    // Exclude 'id' from data_json to avoid overriding the database primary key
+    const { id: _, ...dataWithoutId } = record.data_json || {};
     const transformedRecord = {
       id: record.id,
       created_at: record.created_at,
       updated_at: record.updated_at,
-      ...(record.data_json || {}),
+      ...dataWithoutId,
     };
 
     return NextResponse.json({
