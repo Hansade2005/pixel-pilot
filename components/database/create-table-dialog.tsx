@@ -98,7 +98,7 @@ export function CreateTableDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: tableName.trim(),
-          schema,
+          schema_json: schema,
         }),
       });
 

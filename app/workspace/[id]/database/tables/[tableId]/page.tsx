@@ -10,6 +10,7 @@ import { DataGrid } from "@/components/database/data-grid";
 import { AddRecordDialog } from "@/components/database/add-record-dialog";
 import { EditRecordDialog } from "@/components/database/edit-record-dialog";
 import { DeleteRecordDialog } from "@/components/database/delete-record-dialog";
+import { getWorkspaceDatabaseId } from "@/lib/get-current-workspace";
 import type { Table } from "@/lib/supabase";
 
 interface RecordData {
@@ -26,20 +27,42 @@ export default function TableRecordsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [editingRecord, setEditingRecord] = useState<RecordData | null>(null);
   const [deletingRecord, setDeletingRecord] = useState<RecordData | null>(null);
+  const [databaseId, setDatabaseId] = useState<string | null>(null);
 
-  const databaseId = params.id as string;
+  const workspaceId = params.id as string;
   const tableId = params.tableId as string;
 
   useEffect(() => {
-    loadData();
-  }, [databaseId, tableId]);
+    initializeData();
+  }, [workspaceId, tableId]);
 
-  async function loadData() {
+  async function initializeData() {
     try {
       setLoading(true);
 
+      // First, get the database ID from the workspace
+      const dbId = await getWorkspaceDatabaseId(workspaceId);
+      
+      if (!dbId) {
+        toast.error("No database found for this workspace");
+        router.push(`/workspace/${workspaceId}/database`);
+        return;
+      }
+
+      setDatabaseId(dbId.toString());
+      await loadData(dbId.toString());
+    } catch (error: any) {
+      console.error("Error initializing data:", error);
+      toast.error(error.message || "Failed to initialize");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadData(dbId: string) {
+    try {
       // Get table details
-      const tableResponse = await fetch(`/api/database/${databaseId}/tables/${tableId}`);
+      const tableResponse = await fetch(`/api/database/${dbId}/tables/${tableId}`);
       const tableData = await tableResponse.json();
 
       if (!tableResponse.ok) {
@@ -49,19 +72,17 @@ export default function TableRecordsPage() {
       setTable(tableData.table);
 
       // Get records
-      await loadRecords();
+      await loadRecords(dbId);
     } catch (error: any) {
       console.error("Error loading data:", error);
       toast.error(error.message || "Failed to load data");
-    } finally {
-      setLoading(false);
     }
   }
 
-  async function loadRecords() {
+  async function loadRecords(dbId: string) {
     try {
       const response = await fetch(
-        `/api/database/${databaseId}/tables/${tableId}/records`
+        `/api/database/${dbId}/tables/${tableId}/records`
       );
       const data = await response.json();
 
@@ -77,11 +98,18 @@ export default function TableRecordsPage() {
   }
 
   async function handleRefresh() {
+    if (!databaseId) return;
     setRefreshing(true);
-    await loadRecords();
+    await loadRecords(databaseId);
     setRefreshing(false);
     toast.success("Records refreshed");
   }
+
+  const handleRecordsRefresh = async () => {
+    if (databaseId) {
+      await loadRecords(databaseId);
+    }
+  };
 
   if (loading) {
     return (
@@ -139,8 +167,8 @@ export default function TableRecordsPage() {
           </Button>
           <AddRecordDialog
             table={table}
-            databaseId={databaseId}
-            onSuccess={loadRecords}
+            databaseId={databaseId || ""}
+            onSuccess={handleRecordsRefresh}
           >
             <Button>
               <Plus className="mr-2 h-4 w-4" />
@@ -159,7 +187,7 @@ export default function TableRecordsPage() {
             loading={refreshing}
             onEdit={setEditingRecord}
             onDelete={setDeletingRecord}
-            onRefresh={loadRecords}
+            onRefresh={handleRecordsRefresh}
           />
         </CardContent>
       </Card>
@@ -168,12 +196,12 @@ export default function TableRecordsPage() {
       {editingRecord && (
         <EditRecordDialog
           table={table}
-          databaseId={databaseId}
+          databaseId={databaseId || ""}
           record={editingRecord}
           open={!!editingRecord}
           onOpenChange={(open) => !open && setEditingRecord(null)}
           onSuccess={() => {
-            loadRecords();
+            handleRecordsRefresh();
             setEditingRecord(null);
           }}
         />
@@ -183,12 +211,12 @@ export default function TableRecordsPage() {
       {deletingRecord && (
         <DeleteRecordDialog
           table={table}
-          databaseId={databaseId}
+          databaseId={databaseId || ""}
           record={deletingRecord}
           open={!!deletingRecord}
           onOpenChange={(open) => !open && setDeletingRecord(null)}
           onSuccess={() => {
-            loadRecords();
+            handleRecordsRefresh();
             setDeletingRecord(null);
           }}
         />
