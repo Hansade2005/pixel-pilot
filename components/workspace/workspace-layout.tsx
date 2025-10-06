@@ -249,7 +249,29 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     if (projectId && clientProjects.length > 0 && !isLoadingProjects) {
       const project = clientProjects.find(p => p.id === projectId)
       if (project) {
-        console.log('WorkspaceLayout: Setting project from URL params:', project.name)
+        console.log('WorkspaceLayout: Setting project from URL params:', project.name, 'Project ID:', project.id)
+        
+        // CRITICAL FIX: Verify this is a new project from chat-input and load its files explicitly
+        const isNewProjectFromChatInput = searchParams.get('newProject') === projectId
+        if (isNewProjectFromChatInput) {
+          console.log('🆕 New project from chat-input detected, loading files explicitly for:', projectId)
+          
+          // Load files explicitly for this new project to prevent contamination
+          import('@/lib/storage-manager').then(({ storageManager }) => {
+            storageManager.init().then(() => {
+              storageManager.getFiles(projectId).then(files => {
+                console.log(`✅ Loaded ${files.length} files for new project ${projectId}:`, files.map(f => f.path))
+                
+                // Verify files belong to correct workspace
+                const incorrectFiles = files.filter(f => f.workspaceId !== projectId)
+                if (incorrectFiles.length > 0) {
+                  console.error(`🚨 CONTAMINATION DETECTED: ${incorrectFiles.length} files belong to wrong workspace!`, incorrectFiles)
+                }
+              })
+            })
+          })
+        }
+        
         setSelectedProject(project)
 
         // Force file explorer refresh when selecting any project
@@ -437,11 +459,29 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     const loadProjectFiles = async () => {
       if (selectedProject && typeof window !== 'undefined') {
         try {
-          console.log('WorkspaceLayout: Loading files for project:', selectedProject.name)
+          console.log('WorkspaceLayout: Loading files for project:', selectedProject.name, 'ID:', selectedProject.id)
           await storageManager.init()
           const files = await storageManager.getFiles(selectedProject.id)
-          console.log('WorkspaceLayout: Loaded', files?.length || 0, 'files for project')
-          setProjectFiles(files || [])
+          console.log('WorkspaceLayout: Loaded', files?.length || 0, 'files for project', selectedProject.id)
+          
+          // CRITICAL FIX: Verify all files belong to the correct workspace
+          const incorrectFiles = files.filter(f => f.workspaceId !== selectedProject.id)
+          if (incorrectFiles.length > 0) {
+            console.error(`🚨 FILE CONTAMINATION DETECTED: ${incorrectFiles.length} files belong to different workspaces!`)
+            console.error('Contaminated files:', incorrectFiles.map(f => ({ 
+              path: f.path, 
+              belongsTo: f.workspaceId, 
+              shouldBe: selectedProject.id 
+            })))
+            
+            // Filter out contaminated files
+            const cleanFiles = files.filter(f => f.workspaceId === selectedProject.id)
+            console.log(`✅ Filtered to ${cleanFiles.length} correct files`)
+            setProjectFiles(cleanFiles)
+          } else {
+            console.log(`✅ All ${files.length} files verified to belong to workspace ${selectedProject.id}`)
+            setProjectFiles(files || [])
+          }
         } catch (error) {
           console.error('WorkspaceLayout: Error loading project files:', error)
           setProjectFiles([])

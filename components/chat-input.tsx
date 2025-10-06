@@ -436,7 +436,18 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         } else {
           await TemplateService.applyViteReactTemplate(workspace.id)
         }
+        
+        // CRITICAL FIX: Wait for IndexedDB transactions to complete
+        // This prevents file contamination from other projects
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Verify files were created correctly for this specific workspace
         const files = await storageManager.getFiles(workspace.id)
+        console.log(`✅ Verified ${files.length} files created for workspace ${workspace.id}`)
+        
+        if (files.length === 0) {
+          throw new Error('Template files were not created properly. Please try again.')
+        }
         
         toast.success('Project created and saved!')
         
@@ -444,6 +455,11 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         // This ensures the complete prompt is sent to the chat panel, not truncated
         if (typeof window !== 'undefined') {
           sessionStorage.setItem(`initial-prompt-${workspace.id}`, prompt.trim())
+          
+          // CRITICAL FIX: Clear any cached project/file state to prevent contamination
+          // This ensures the workspace loads with a clean slate
+          sessionStorage.removeItem('lastSelectedProject')
+          sessionStorage.removeItem('cachedFiles')
         }
         
         // Clear the input and redirect to workspace with the new project
