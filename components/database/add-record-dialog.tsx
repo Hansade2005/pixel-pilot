@@ -249,10 +249,23 @@ export function AddRecordDialog({
       schema.columns.forEach((column) => {
         let value = formData[column.name];
 
-        // Use default value if not provided
+        // Skip fields with PostgreSQL function defaults (like gen_random_uuid(), NOW())
+        // These should be handled by the database
+        const isFunctionDefault = column.defaultValue && 
+          (column.defaultValue.includes('(') || 
+           column.defaultValue.toUpperCase() === 'NOW()' ||
+           column.defaultValue.toUpperCase() === 'CURRENT_TIMESTAMP');
+
+        // Use default value if not provided (but not function defaults)
         if (value === undefined || value === "") {
-          if (column.defaultValue) {
+          if (isFunctionDefault) {
+            // Don't include this field - let the database generate it
+            return;
+          } else if (column.defaultValue) {
             value = column.defaultValue;
+          } else {
+            // Skip fields with no value and no default
+            return;
           }
         }
 

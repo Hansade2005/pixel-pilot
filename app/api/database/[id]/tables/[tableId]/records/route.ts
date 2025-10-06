@@ -49,15 +49,38 @@ export async function POST(
       );
     }
 
-    // Validate data against schema (basic validation)
+    // Process default values and validate against schema
     const schema = table.schema_json;
+    const processedData = { ...data_json };
+    
     if (schema && schema.columns) {
       for (const column of schema.columns) {
-        if (column.required && !data_json[column.name]) {
-          return NextResponse.json(
-            { error: `Required field '${column.name}' is missing` },
-            { status: 400 }
-          );
+        // Check if field is missing
+        if (!processedData.hasOwnProperty(column.name) || processedData[column.name] === undefined || processedData[column.name] === '') {
+          // Handle default values
+          if (column.defaultValue) {
+            const defaultVal = column.defaultValue;
+            
+            // Generate UUID for gen_random_uuid()
+            if (defaultVal === 'gen_random_uuid()' || defaultVal.toLowerCase().includes('uuid')) {
+              processedData[column.name] = crypto.randomUUID();
+            }
+            // Generate timestamp for NOW() or CURRENT_TIMESTAMP
+            else if (defaultVal === 'NOW()' || defaultVal === 'CURRENT_TIMESTAMP' || defaultVal.toLowerCase().includes('now')) {
+              processedData[column.name] = new Date().toISOString();
+            }
+            // Use literal default value
+            else {
+              processedData[column.name] = defaultVal;
+            }
+          }
+          // Check if field is required
+          else if (column.required) {
+            return NextResponse.json(
+              { error: `Required field '${column.name}' is missing` },
+              { status: 400 }
+            );
+          }
         }
       }
     }
@@ -67,7 +90,7 @@ export async function POST(
       .from('records')
       .insert({
         table_id: params.tableId,
-        data_json
+        data_json: processedData
       })
       .select()
       .single();
@@ -80,9 +103,17 @@ export async function POST(
       );
     }
 
+    // Transform record: flatten data_json into top-level properties
+    const transformedRecord = {
+      id: record.id,
+      created_at: record.created_at,
+      updated_at: record.updated_at,
+      ...(record.data_json || {}),
+    };
+
     return NextResponse.json({
       success: true,
-      record,
+      record: transformedRecord,
       message: 'Record created successfully'
     });
 
@@ -152,9 +183,17 @@ export async function GET(
       );
     }
 
+    // Transform records: flatten data_json into top-level properties
+    const transformedRecords = (records || []).map((record: any) => ({
+      id: record.id,
+      created_at: record.created_at,
+      updated_at: record.updated_at,
+      ...(record.data_json || {}), // Spread data_json fields to top level
+    }));
+
     return NextResponse.json({
       success: true,
-      records: records || [],
+      records: transformedRecords,
       total: count || 0,
       limit,
       offset
@@ -241,9 +280,17 @@ export async function PUT(
       );
     }
 
+    // Transform record: flatten data_json into top-level properties
+    const transformedRecord = {
+      id: record.id,
+      created_at: record.created_at,
+      updated_at: record.updated_at,
+      ...(record.data_json || {}),
+    };
+
     return NextResponse.json({
       success: true,
-      record,
+      record: transformedRecord,
       message: 'Record updated successfully'
     });
 
