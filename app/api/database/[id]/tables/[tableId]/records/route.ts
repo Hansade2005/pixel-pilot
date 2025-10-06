@@ -52,6 +52,7 @@ export async function POST(
     // Process default values and validate against schema
     const schema = table.schema_json;
     const processedData = { ...data_json };
+    const tableIdInt = parseInt(params.tableId, 10); // Parse once at top level
     
     if (schema && schema.columns) {
       // First pass: Handle defaults and check required fields
@@ -161,7 +162,7 @@ export async function POST(
         const { data: existingRecords, error: queryError } = await supabase
           .from('records')
           .select('id, data_json')
-          .eq('table_id', params.tableId);
+          .eq('table_id', tableIdInt);
 
         if (queryError) {
           console.error('Error checking uniqueness:', queryError);
@@ -192,10 +193,11 @@ export async function POST(
     }
 
     // Insert record
+    // Note: table_id is integer type
     const { data: record, error: recordError } = await supabase
       .from('records')
       .insert({
-        table_id: params.tableId,
+        table_id: tableIdInt,
         data_json: processedData
       })
       .select()
@@ -275,10 +277,13 @@ export async function GET(
     }
 
     // Get records with pagination
+    // Note: table_id is integer, not UUID
+    const tableIdInt = parseInt(params.tableId, 10);
+    
     const { data: records, error: recordsError, count } = await supabase
       .from('records')
       .select('*', { count: 'exact' })
-      .eq('table_id', params.tableId)
+      .eq('table_id', tableIdInt)
       .range(offset, offset + limit - 1)
       .order('created_at', { ascending: false });
 
@@ -373,6 +378,7 @@ export async function PUT(
     // Validate and process data
     const schema = table.schema_json;
     const processedData = { ...data_json };
+    const tableIdInt = parseInt(params.tableId, 10); // Parse once at top level
 
     if (schema && schema.columns) {
       // Validate data types and constraints
@@ -457,7 +463,7 @@ export async function PUT(
         const { data: existingRecords, error: queryError } = await supabase
           .from('records')
           .select('id, data_json')
-          .eq('table_id', params.tableId)
+          .eq('table_id', tableIdInt)
           .neq('id', recordId); // Exclude current record
 
         if (queryError) {
@@ -479,11 +485,12 @@ export async function PUT(
     }
 
     // Update record
+    // Note: table_id is integer, records.id is UUID
     const { data: record, error: updateError } = await supabase
       .from('records')
       .update({ data_json: processedData })
       .eq('id', recordId)
-      .eq('table_id', params.tableId)
+      .eq('table_id', tableIdInt)
       .select()
       .single();
 
@@ -586,27 +593,42 @@ export async function DELETE(
     }
 
     // Verify record exists
+    // Note: records.id is UUID (text), table_id is integer
+    const tableIdInt = parseInt(params.tableId, 10);
+    
     const { data: existingRecord, error: recordCheckError } = await supabase
       .from('records')
-      .select('id')
+      .select('id, table_id')
       .eq('id', recordId)
-      .eq('table_id', params.tableId)
+      .eq('table_id', tableIdInt)
       .single();
 
     if (recordCheckError || !existingRecord) {
-      console.error('DELETE failed: Record not found', recordCheckError);
+      console.error('DELETE failed: Record not found', {
+        error: recordCheckError,
+        recordId,
+        tableId: params.tableId,
+        tableIdInt,
+        message: recordCheckError?.message,
+        code: recordCheckError?.code,
+      });
       return NextResponse.json(
         { error: 'Record not found' },
         { status: 404 }
       );
     }
 
+    console.log('DELETE: Record found, proceeding with deletion', {
+      recordId: existingRecord.id,
+      tableId: existingRecord.table_id,
+    });
+
     // Delete record
     const { error: deleteError } = await supabase
       .from('records')
       .delete()
       .eq('id', recordId)
-      .eq('table_id', params.tableId);
+      .eq('table_id', tableIdInt);
 
     if (deleteError) {
       console.error('DELETE failed: Database error', {
