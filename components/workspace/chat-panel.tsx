@@ -3706,6 +3706,9 @@ export function ChatPanel({
   const [urlInput, setUrlInput] = useState("")
   const imageInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Auto-send tracking ref to prevent double-send
+  const hasAutoSentRef = useRef(false)
 
   // Speech-to-text state
   const [isRecording, setIsRecording] = useState(false)
@@ -3743,12 +3746,17 @@ export function ChatPanel({
         setCurrentProjectId(null)
         // Clear restore state when project changes
         setRestoreMessageId(null)
+        // Reset auto-send flag when project changes
+        hasAutoSentRef.current = false
         return
       }
 
       // If this is a different project, clear messages and load new chat history
       if (project.id !== currentProjectId) {
         console.log(`[ChatPanel] Project changed from ${currentProjectId} to ${project.id}, loading chat history...`)
+        
+        // Reset auto-send flag for new project
+        hasAutoSentRef.current = false
         
         // ✅ CRITICAL: Clean up contaminated files BEFORE loading chat or auto-sending
         // This runs when project first loads, BEFORE any messages are sent
@@ -3899,8 +3907,17 @@ export function ChatPanel({
   // Auto-send initial prompt when provided and no messages exist
   React.useEffect(() => {
     const autoSendInitialPrompt = async () => {
+      // Prevent double auto-send
+      if (hasAutoSentRef.current) {
+        console.log(`[ChatPanel] Auto-send already executed, skipping...`)
+        return
+      }
+      
       if (initialPrompt && project && messages.length === 0 && !isLoading) {
         console.log(`[ChatPanel] Auto-sending initial prompt: "${initialPrompt}"`)
+        
+        // Mark as auto-sent to prevent double execution
+        hasAutoSentRef.current = true
         
         // Check for URL attachment from homepage
         const initialUrl = typeof window !== 'undefined' 
@@ -3969,12 +3986,13 @@ export function ChatPanel({
           }
         }
         
-        // Set the input message (original prompt only, not the context)
-        setInputMessage(initialPrompt)
+        // DON'T set input message - we're auto-sending with pre-processed message
+        // This prevents double-sending issue
         
         // Small delay to ensure state is updated
         setTimeout(() => {
           // Send message with context directly (bypass state)
+          // Pass the messageWithContext as pre-processed message
           handleSendMessage(undefined, messageWithContext)
         }, 100)
       }
