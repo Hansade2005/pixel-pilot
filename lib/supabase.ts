@@ -51,7 +51,20 @@ export interface Column {
   references?: {
     table: string;
     column: string;
+    onDelete?: 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
+    onUpdate?: 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
   };
+  // Check constraints
+  min?: number;          // For numbers/strings (length)
+  max?: number;          // For numbers/strings (length)
+  minLength?: number;    // For strings
+  maxLength?: number;    // For strings
+  pattern?: string;      // Regex pattern
+  enum?: string[];       // Allowed values
+  // Computed field
+  computed?: string;     // Expression for computed fields
+  // Indexing
+  indexed?: boolean;     // Create index on this column
 }
 
 export interface Record {
