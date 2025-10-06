@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Loader2, RefreshCw, Plus } from "lucide-react";
+import { ArrowLeft, Loader2, RefreshCw, Plus, Database, Table as TableIcon } from "lucide-react";
 import { toast } from "sonner";
 import { DataGrid } from "@/components/database/data-grid";
 import { AddRecordDialog } from "@/components/database/add-record-dialog";
@@ -119,12 +119,8 @@ export default function TableRecordsPage() {
         <div className="absolute inset-0 lovable-gradient" />
         <div className="absolute inset-0 noise-texture" />
         <Navigation />
-        <div className="relative z-10 pt-16 pb-24">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl py-8">
-            <div className="flex items-center justify-center min-h-[400px]">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          </div>
+        <div className="relative z-10 flex items-center justify-center min-h-screen pt-16">
+          <Loader2 className="h-8 w-8 animate-spin text-white" />
         </div>
         <Footer />
       </div>
@@ -138,7 +134,7 @@ export default function TableRecordsPage() {
         <div className="absolute inset-0 noise-texture" />
         <Navigation />
         <div className="relative z-10 pt-16 pb-24">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl py-8">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <Card className="bg-gray-800 border-gray-700">
               <CardHeader>
                 <CardTitle className="text-white">Table Not Found</CardTitle>
@@ -161,92 +157,138 @@ export default function TableRecordsPage() {
       <Navigation />
       <div className="relative z-10 pt-16 pb-24">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.push(`/workspace/${workspaceId}/database`)}
-            className="text-gray-400 hover:text-white hover:bg-gray-800"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-white">{table.name}</h1>
-            <p className="text-gray-400">
-              {records.length} record{records.length !== 1 ? "s" : ""} •{" "}
-              {(table.schema_json as any).columns?.length || 0} columns
-            </p>
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => router.push(`/workspace/${params.workspaceId || params.id}/database`)}
+                className="text-white hover:bg-gray-800"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div>
+                <h1 className="text-3xl font-bold text-white">{table.name}</h1>
+                <p className="text-gray-400">
+                  {records.length} record{records.length !== 1 ? "s" : ""} •{" "}
+                  {(table.schema_json as any).columns?.length || 0} columns
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="border-gray-700 text-white hover:bg-gray-800"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
+              <AddRecordDialog
+                table={table}
+                databaseId={databaseId || ""}
+                onSuccess={handleRecordsRefresh}
+              >
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Record
+                </Button>
+              </AddRecordDialog>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={refreshing}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-          <AddRecordDialog
-            table={table}
-            databaseId={databaseId || ""}
-            onSuccess={handleRecordsRefresh}
-          >
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Record
-            </Button>
-          </AddRecordDialog>
-        </div>
-      </div>
+          {/* Stats Cards */}
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card className="bg-gray-800 border-gray-700">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-white">Records</CardTitle>
+                <Database className="h-4 w-4 text-gray-400" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-white">{records.length}</div>
+                <p className="text-xs text-gray-400">
+                  {records.length === 1 ? 'record' : 'records'} in table
+                </p>
+              </CardContent>
+            </Card>
 
-      {/* Data Grid */}
-      <Card className="bg-gray-800 border-gray-700">
-        <CardContent className="p-6">
-          <DataGrid
-            table={table}
-            records={records}
-            loading={refreshing}
-            onEdit={setEditingRecord}
-            onDelete={setDeletingRecord}
-            onRefresh={handleRecordsRefresh}
-          />
-        </CardContent>
-      </Card>
+            <Card className="bg-gray-800 border-gray-700">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-white">Columns</CardTitle>
+                <TableIcon className="h-4 w-4 text-gray-400" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-white">
+                  {(table.schema_json as any).columns?.length || 0}
+                </div>
+                <p className="text-xs text-gray-400">
+                  table columns
+                </p>
+              </CardContent>
+            </Card>
 
-      {/* Edit Dialog */}
-      {editingRecord && (
-        <EditRecordDialog
-          table={table}
-          databaseId={databaseId || ""}
-          record={editingRecord}
-          open={!!editingRecord}
-          onOpenChange={(open) => !open && setEditingRecord(null)}
-          onSuccess={() => {
-            handleRecordsRefresh();
-            setEditingRecord(null);
-          }}
-        />
-      )}
+            <Card className="bg-gray-800 border-gray-700">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-white">Table ID</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm font-medium text-white">
+                  {table.id}
+                </div>
+                <p className="text-xs text-gray-400">
+                  unique identifier
+                </p>
+              </CardContent>
+            </Card>
+          </div>
 
-      {/* Delete Dialog */}
-      {deletingRecord && (
-        <DeleteRecordDialog
-          table={table}
-          databaseId={databaseId || ""}
-          record={deletingRecord}
-          open={!!deletingRecord}
-          onOpenChange={(open) => !open && setDeletingRecord(null)}
-          onSuccess={() => {
-            handleRecordsRefresh();
-            setDeletingRecord(null);
-          }}
-        />
-      )}
+          {/* Data Grid */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardContent className="p-6">
+              <DataGrid
+                table={table}
+                records={records}
+                loading={refreshing}
+                onEdit={setEditingRecord}
+                onDelete={setDeletingRecord}
+                onRefresh={handleRecordsRefresh}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Edit Dialog */}
+          {editingRecord && (
+            <EditRecordDialog
+              table={table}
+              databaseId={databaseId || ""}
+              record={editingRecord}
+              open={!!editingRecord}
+              onOpenChange={(open) => !open && setEditingRecord(null)}
+              onSuccess={() => {
+                handleRecordsRefresh();
+                setEditingRecord(null);
+              }}
+            />
+          )}
+
+          {/* Delete Dialog */}
+          {deletingRecord && (
+            <DeleteRecordDialog
+              table={table}
+              databaseId={databaseId || ""}
+              record={deletingRecord}
+              open={!!deletingRecord}
+              onOpenChange={(open) => !open && setDeletingRecord(null)}
+              onSuccess={() => {
+                handleRecordsRefresh();
+                setDeletingRecord(null);
+              }}
+            />
+          )}
         </div>
       </div>
       <Footer />
