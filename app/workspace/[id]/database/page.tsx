@@ -14,6 +14,8 @@ import { EditTableDialog } from '@/components/database/edit-table-dialog';
 import { DeleteTableDialog } from '@/components/database/delete-table-dialog';
 import { AISchemaGenerator } from '@/components/database/ai-schema-generator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Navigation } from '@/components/navigation';
+import { Footer } from '@/components/footer';
 import type { Table } from '@/lib/supabase';
 
 interface DatabaseData {
@@ -104,6 +106,18 @@ export default function DatabasePage() {
 
       const data = await response.json();
 
+      if (!response.ok) {
+        // Handle HTTP errors
+        if (response.status === 401) {
+          toast.error('Authentication required. Please log in again.');
+        } else if (response.status === 400) {
+          toast.error(data.error || 'Invalid request');
+        } else {
+          toast.error(data.error || `Failed to create database (Error ${response.status})`);
+        }
+        return;
+      }
+
       if (data.success) {
         toast.success('Database created successfully!');
         
@@ -117,7 +131,7 @@ export default function DatabasePage() {
       }
     } catch (error) {
       console.error('Error creating database:', error);
-      toast.error('Failed to create database');
+      toast.error(error instanceof Error ? error.message : 'Failed to create database. Please try again.');
     } finally {
       setCreating(false);
     }
@@ -125,139 +139,166 @@ export default function DatabasePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen relative overflow-hidden">
+        <div className="absolute inset-0 lovable-gradient" />
+        <div className="absolute inset-0 noise-texture" />
+        <Navigation />
+        <div className="relative z-10 flex items-center justify-center min-h-screen pt-16">
+          <Loader2 className="h-8 w-8 animate-spin text-white" />
+        </div>
+        <Footer />
       </div>
     );
   }
 
   if (!workspace) {
     return (
-      <div className="container py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-destructive" />
-              Workspace Not Found
-            </CardTitle>
-            <CardDescription>
-              Unable to load workspace. Please try refreshing the page.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      <div className="min-h-screen relative overflow-hidden">
+        <div className="absolute inset-0 lovable-gradient" />
+        <div className="absolute inset-0 noise-texture" />
+        <Navigation />
+        <div className="relative z-10 pt-16 pb-24">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <Card className="bg-gray-800 border-gray-700">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-white">
+                  <AlertCircle className="h-5 w-5 text-destructive" />
+                  Workspace Not Found
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  Unable to load workspace. Please try refreshing the page.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </div>
+        </div>
+        <Footer />
       </div>
     );
   }
 
   if (!database) {
     return (
-      <div className="container max-w-4xl py-8">
-        <Card>
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-              <Database className="h-8 w-8 text-primary" />
-            </div>
-            <CardTitle className="text-2xl">Create Database</CardTitle>
-            <CardDescription>
-              Set up a database for <strong>{workspace.name}</strong>
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-lg border p-4 space-y-2">
-              <h3 className="font-medium">What you'll get:</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="flex items-start gap-2">
-                  <span className="text-primary">✓</span>
-                  <span>A fully functional database with authentication</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-primary">✓</span>
-                  <span>Auto-generated users table for login/signup</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-primary">✓</span>
-                  <span>Visual table builder with AI assistance</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-primary">✓</span>
-                  <span>REST API endpoints for your app</span>
-                </li>
-              </ul>
-            </div>
+      <div className="min-h-screen relative overflow-hidden">
+        <div className="absolute inset-0 lovable-gradient" />
+        <div className="absolute inset-0 noise-texture" />
+        <Navigation />
+        <div className="relative z-10 pt-16 pb-24">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl py-8">
+            <Card className="bg-gray-800 border-gray-700">
+              <CardHeader className="text-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-500/10">
+                  <Database className="h-8 w-8 text-blue-400" />
+                </div>
+                <CardTitle className="text-2xl text-white">Create Database</CardTitle>
+                <CardDescription className="text-gray-400">
+                  Set up a database for <strong className="text-white">{workspace.name}</strong>
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-lg border border-gray-700 bg-gray-900/50 p-4 space-y-2">
+                  <h3 className="font-medium text-white">What you'll get:</h3>
+                  <ul className="space-y-2 text-sm text-gray-400">
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-400">✓</span>
+                      <span>A fully functional database with authentication</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-400">✓</span>
+                      <span>Auto-generated users table for login/signup</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-400">✓</span>
+                      <span>Visual table builder with AI assistance</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-400">✓</span>
+                      <span>REST API endpoints for your app</span>
+                    </li>
+                  </ul>
+                </div>
 
-            <Button 
-              onClick={createDatabase} 
-              disabled={creating}
-              className="w-full"
-              size="lg"
-            >
-              {creating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating Database...
-                </>
-              ) : (
-                <>
-                  <Database className="mr-2 h-4 w-4" />
-                  Create Database
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
+                <Button 
+                  onClick={createDatabase} 
+                  disabled={creating}
+                  className="w-full"
+                  size="lg"
+                >
+                  {creating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating Database...
+                    </>
+                  ) : (
+                    <>
+                      <Database className="mr-2 h-4 w-4" />
+                      Create Database
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+        <Footer />
       </div>
     );
   }
 
   return (
-    <div className="container max-w-6xl py-8 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold mb-2">{database.name}</h1>
-        <p className="text-muted-foreground">
-          Manage tables and records for {workspace.name}
-        </p>
-      </div>
+    <div className="min-h-screen relative overflow-hidden">
+      <div className="absolute inset-0 lovable-gradient" />
+      <div className="absolute inset-0 noise-texture" />
+      <Navigation />
+      <div className="relative z-10 pt-16 pb-24">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-8 space-y-6">
+          {/* Header */}
+          <div>
+            <h1 className="text-3xl font-bold mb-2 text-white">{database.name}</h1>
+            <p className="text-gray-400">
+              Manage tables and records for {workspace.name}
+            </p>
+          </div>
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
+        <Card className="bg-gray-800 border-gray-700">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tables</CardTitle>
-            <TableIcon className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-white">Tables</CardTitle>
+            <TableIcon className="h-4 w-4 text-gray-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{tables.length}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-2xl font-bold text-white">{tables.length}</div>
+            <p className="text-xs text-gray-400">
               {tables.length === 1 ? 'table' : 'tables'} created
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gray-800 border-gray-700">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Records</CardTitle>
-            <Database className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-white">Total Records</CardTitle>
+            <Database className="h-4 w-4 text-gray-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold text-white">
               {tables.reduce((sum, table) => sum + table.recordCount, 0)}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-gray-400">
               across all tables
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gray-800 border-gray-700">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Created</CardTitle>
+            <CardTitle className="text-sm font-medium text-white">Created</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-sm font-medium">
+            <div className="text-sm font-medium text-white">
               {new Date(database.created_at).toLocaleDateString()}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-gray-400">
               {new Date(database.created_at).toLocaleTimeString()}
             </p>
           </CardContent>
@@ -268,14 +309,14 @@ export default function DatabasePage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold">Tables</h2>
-            <p className="text-muted-foreground">
+            <h2 className="text-2xl font-bold text-white">Tables</h2>
+            <p className="text-gray-400">
               Manage your database tables and schemas
             </p>
           </div>
           <div className="flex gap-2">
             <Link href={`/workspace/${params.id}/database/sql`}>
-              <Button variant="outline" className="flex items-center gap-2">
+              <Button variant="outline" className="flex items-center gap-2 border-gray-700 text-white hover:bg-gray-800">
                 <Code className="h-4 w-4" />
                 SQL Panel
               </Button>
@@ -283,7 +324,7 @@ export default function DatabasePage() {
             <Button
               variant="outline"
               onClick={() => setShowAISchemaGenerator(true)}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 border-gray-700 text-white hover:bg-gray-800"
             >
               <Sparkles className="h-4 w-4" />
               Generate with AI
@@ -296,10 +337,10 @@ export default function DatabasePage() {
         </div>
 
         {tables.length === 0 ? (
-          <Card>
+          <Card className="bg-gray-800 border-gray-700">
             <CardContent className="text-center py-12">
-              <TableIcon className="mx-auto h-12 w-12 mb-4 opacity-20" />
-              <p className="text-muted-foreground mb-4">
+              <TableIcon className="mx-auto h-12 w-12 mb-4 opacity-20 text-gray-600" />
+              <p className="text-gray-400 mb-4">
                 No tables yet. Create your first table to get started.
               </p>
               <CreateTableDialog
@@ -409,6 +450,9 @@ export default function DatabasePage() {
           />
         </DialogContent>
       </Dialog>
+        </div>
+      </div>
+      <Footer />
     </div>
   );
 }
