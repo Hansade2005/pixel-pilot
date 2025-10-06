@@ -185,9 +185,51 @@ export async function POST(
       // Fourth pass: Validate foreign key references
       for (const column of schema.columns) {
         if (column.references && processedData[column.name]) {
-          // TODO: Check if referenced record exists
-          // This requires querying the referenced table
-          // For now, we'll skip this to avoid circular dependencies
+          const referencedValue = processedData[column.name];
+          const { table: refTableName, column: refColumnName } = column.references;
+
+          // Find the referenced table in the same database
+          const { data: refTable, error: refTableError } = await supabase
+            .from('tables')
+            .select('id, schema_json')
+            .eq('database_id', params.id)
+            .eq('name', refTableName)
+            .single();
+
+          if (refTableError || !refTable) {
+            return NextResponse.json(
+              { error: `Referenced table '${refTableName}' not found` },
+              { status: 400 }
+            );
+          }
+
+          const refTableIdInt = refTable.id;
+
+          // Check if the referenced record exists
+          const { data: refRecords, error: refQueryError } = await supabase
+            .from('records')
+            .select('id, data_json')
+            .eq('table_id', refTableIdInt);
+
+          if (refQueryError) {
+            console.error('Error checking foreign key reference:', refQueryError);
+            return NextResponse.json(
+              { error: `Failed to validate foreign key reference for '${column.name}'` },
+              { status: 500 }
+            );
+          }
+
+          // Check if any record has the referenced value
+          const refRecordExists = refRecords?.some((record: any) => 
+            record.data_json && record.data_json[refColumnName] === referencedValue
+          );
+
+          if (!refRecordExists) {
+            return NextResponse.json(
+              { error: `Referenced record with ${refColumnName} '${referencedValue}' not found in table '${refTableName}'` },
+              { status: 400 }
+            );
+          }
         }
       }
     }
@@ -482,6 +524,56 @@ export async function PUT(
           );
         }
       }
+
+      // Validate foreign key references
+      for (const column of schema.columns) {
+        if (column.references && processedData[column.name]) {
+          const referencedValue = processedData[column.name];
+          const { table: refTableName, column: refColumnName } = column.references;
+
+          // Find the referenced table
+          const { data: refTable, error: refTableError } = await supabase
+            .from('tables')
+            .select('id, schema_json')
+            .eq('database_id', params.id)
+            .eq('name', refTableName)
+            .single();
+
+          if (refTableError || !refTable) {
+            return NextResponse.json(
+              { error: `Referenced table '${refTableName}' not found` },
+              { status: 400 }
+            );
+          }
+
+          const refTableIdInt = refTable.id;
+
+          // Check if the referenced record exists
+          const { data: refRecords, error: refQueryError } = await supabase
+            .from('records')
+            .select('id, data_json')
+            .eq('table_id', refTableIdInt);
+
+          if (refQueryError) {
+            console.error('Error checking foreign key reference:', refQueryError);
+            return NextResponse.json(
+              { error: `Failed to validate foreign key reference for '${column.name}'` },
+              { status: 500 }
+            );
+          }
+
+          const refRecordExists = refRecords?.some((record: any) => 
+            record.data_json && record.data_json[refColumnName] === referencedValue
+          );
+
+          if (!refRecordExists) {
+            return NextResponse.json(
+              { error: `Referenced record with ${refColumnName} '${referencedValue}' not found in table '${refTableName}'` },
+              { status: 400 }
+            );
+          }
+        }
+      }
     }
 
     // Update record
@@ -596,10 +688,11 @@ export async function DELETE(
     // Note: records.id is UUID (text), table_id is integer
     const tableIdInt = parseInt(params.tableId, 10);
     
+    // IMPORTANT: Explicitly cast id to text to handle UUID strings
     const { data: existingRecord, error: recordCheckError } = await supabase
       .from('records')
       .select('id, table_id')
-      .eq('id', recordId)
+      .eq('id', recordId.toString()) // Ensure string type
       .eq('table_id', tableIdInt)
       .single();
 
@@ -622,6 +715,100 @@ export async function DELETE(
       recordId: existingRecord.id,
       tableId: existingRecord.table_id,
     });
+
+    // Check for foreign key constraints and handle CASCADE/RESTRICT
+    const schema = table.schema_json;
+    
+    // Get the record data to check which values are being deleted
+    const { data: recordToDelete, error: fetchError } = await supabase
+      .from('records')
+      .select('data_json')
+      .eq('id', recordId)
+      .single();
+
+    if (fetchError || !recordToDelete) {
+      console.error('DELETE failed: Could not fetch record data', fetchError);
+      return NextResponse.json(
+        { error: 'Failed to fetch record data' },
+        { status: 500 }
+      );
+    }
+
+    // Find all tables in the same database that might reference this table
+    const { data: allTables, error: tablesError } = await supabase
+      .from('tables')
+      .select('id, name, schema_json')
+      .eq('database_id', params.id);
+
+    if (tablesError) {
+      console.error('DELETE failed: Could not fetch tables', tablesError);
+    } else {
+      // Check each table for foreign key references to this table
+      for (const otherTable of allTables || []) {
+        const otherSchema = otherTable.schema_json;
+        if (!otherSchema || !otherSchema.columns) continue;
+
+        for (const column of otherSchema.columns) {
+          if (column.references && column.references.table === table.name) {
+            const refColumnName = column.references.column;
+            const referencedValue = recordToDelete.data_json[refColumnName];
+
+            if (!referencedValue) continue;
+
+            // Find records that reference this record
+            const otherTableIdInt = otherTable.id;
+            const { data: referencingRecords, error: refQueryError } = await supabase
+              .from('records')
+              .select('id, data_json')
+              .eq('table_id', otherTableIdInt);
+
+            if (refQueryError) {
+              console.error('DELETE failed: Could not check references', refQueryError);
+              continue;
+            }
+
+            const affectedRecords = referencingRecords?.filter((rec: any) => 
+              rec.data_json && rec.data_json[column.name] === referencedValue
+            );
+
+            if (affectedRecords && affectedRecords.length > 0) {
+              const onDelete = column.references.onDelete || 'RESTRICT';
+
+              if (onDelete === 'RESTRICT') {
+                // Prevent deletion
+                return NextResponse.json(
+                  { error: `Cannot delete record: ${affectedRecords.length} record(s) in table '${otherTable.name}' reference this record` },
+                  { status: 409 }
+                );
+              } else if (onDelete === 'CASCADE') {
+                // Delete referencing records
+                for (const refRecord of affectedRecords) {
+                  await supabase
+                    .from('records')
+                    .delete()
+                    .eq('id', refRecord.id)
+                    .eq('table_id', otherTableIdInt);
+                }
+                console.log(`DELETE: Cascaded deletion of ${affectedRecords.length} records in ${otherTable.name}`);
+              } else if (onDelete === 'SET NULL') {
+                // Set foreign key to null
+                for (const refRecord of affectedRecords) {
+                  const updatedData = { ...refRecord.data_json };
+                  updatedData[column.name] = null;
+                  
+                  await supabase
+                    .from('records')
+                    .update({ data_json: updatedData })
+                    .eq('id', refRecord.id)
+                    .eq('table_id', otherTableIdInt);
+                }
+                console.log(`DELETE: Set ${column.name} to NULL in ${affectedRecords.length} records in ${otherTable.name}`);
+              }
+            }
+          }
+        }
+      }
+    }
 
     // Delete record
     const { error: deleteError } = await supabase
