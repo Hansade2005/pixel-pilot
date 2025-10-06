@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { checkAdminAccess, ADMIN_MENU_ITEMS, hasAdminPermission, ADMIN_PERMISSIONS } from "@/lib/admin-utils"
+import { checkAdminAccess, checkSuperAdminAccess, ADMIN_MENU_ITEMS, hasAdminPermission, ADMIN_PERMISSIONS } from "@/lib/admin-utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -238,7 +238,7 @@ export default function AdminPanel() {
       <div className="container mx-auto px-4 py-8">
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-          {ADMIN_MENU_ITEMS.map((item) => (
+          {ADMIN_MENU_ITEMS.filter(item => hasAdminPermission(user, item.permission)).map((item) => (
             <Card
               key={item.id}
               className="cursor-pointer hover:shadow-md transition-shadow"
@@ -251,6 +251,8 @@ export default function AdminPanel() {
                   router.push('/admin/analytics')
                 } else if (item.id === 'system') {
                   router.push('/admin/system')
+                } else if (item.id === 'super-admin') {
+                  router.push('/admin/super-admin')
                 }
               }}
             >
