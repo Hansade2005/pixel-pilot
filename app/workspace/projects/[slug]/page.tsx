@@ -25,7 +25,8 @@ import {
   FileText,
   GitBranch,
   Clock,
-  Plus
+  Plus,
+  Database
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { storageManager, type Workspace as Project, type Deployment, type EnvironmentVariable } from "@/lib/storage-manager"
@@ -461,6 +462,15 @@ export default function ProjectPage() {
                 Deploy Project
               </Button>
 
+              <Button
+                onClick={() => router.push(`/workspace/${project.id}/database`)}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                <Database className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Database</span>
+                <span className="sm:hidden">DB</span>
+              </Button>
+
               {project.vercelDeploymentUrl && (
                 <Button
                   variant="outline"
@@ -567,6 +577,36 @@ export default function ProjectPage() {
                       No repository connected
                     </div>
                   )}
+                </CardContent>
+              </Card>
+
+              {/* Database */}
+              <Card className="bg-gray-800 border-gray-700 hover:border-purple-500 transition-colors cursor-pointer" onClick={() => router.push(`/workspace/${project.id}/database`)}>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between text-white">
+                    <div className="flex items-center space-x-2">
+                      <Database className="h-5 w-5 text-purple-400" />
+                      <span>Database</span>
+                    </div>
+                    <Badge variant="outline" className="border-purple-500 text-purple-400">
+                      Manage
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription className="text-gray-400">
+                    Create and manage databases for this project
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      router.push(`/workspace/${project.id}/database`)
+                    }}
+                    className="w-full bg-purple-600 hover:bg-purple-700"
+                  >
+                    <Database className="h-4 w-4 mr-2" />
+                    Open Database Manager
+                  </Button>
                 </CardContent>
               </Card>
 

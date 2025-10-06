@@ -858,6 +858,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               }}
               onSettings={() => window.open('/workspace/management', '_blank')}
               onDeploy={() => router.push(`/workspace/deployment?project=${selectedProject?.id}`)}
+              onDatabase={() => {
+                if (selectedProject) {
+                  router.push(`/workspace/${selectedProject.id}/database`)
+                }
+              }}
               user={user}
               openDialog={openProjectHeaderDialog}
               initialName={projectHeaderInitialName}

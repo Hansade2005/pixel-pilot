@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Play, GitBranch, Share, Settings, Plus, Rocket, Upload } from "lucide-react"
+import { Play, GitBranch, Share, Settings, Plus, Rocket, Upload, Database } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import React, { useState, useEffect } from 'react'
@@ -28,6 +28,7 @@ interface ProjectHeaderProps {
   onShare?: (shareUrl?: string) => void
   onSettings?: () => void
   onDeploy?: () => void
+  onDatabase?: () => void
   selectedModel?: string
   onModelChange?: (modelId: string) => void
   userPlan?: string
@@ -45,6 +46,7 @@ export function ProjectHeader({
   onShare,
   onSettings,
   onDeploy,
+  onDatabase,
   selectedModel,
   onModelChange,
   userPlan,
@@ -426,6 +428,27 @@ export function ProjectHeader({
             </Tooltip>
           </TooltipProvider>
         )}
+        
+        {/* Database Button - Mobile shows icon only */}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="outline"
+                size="sm" 
+                onClick={onDatabase}
+                disabled={!project}
+                className="h-8 w-8 p-0 sm:w-auto sm:px-3 bg-purple-600/10 border-purple-500 hover:bg-purple-600/20"
+              >
+                <Database className="h-4 w-4 text-purple-400" />
+                <span className="hidden sm:inline ml-2 text-purple-400">Database</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Manage Database</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         
         <TooltipProvider>
           <Tooltip>
