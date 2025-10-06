@@ -449,6 +449,24 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
           throw new Error('Template files were not created properly. Please try again.')
         }
         
+        // ✅ CRITICAL: Create initial checkpoint RIGHT AFTER template application
+        // This captures the CLEAN template state before any contamination can occur
+        try {
+          const { createCheckpoint } = await import('@/lib/checkpoint-utils')
+          // Create a dummy message ID for the initial template checkpoint
+          const initialCheckpointMessageId = `template-init-${workspace.id}`
+          await createCheckpoint(workspace.id, initialCheckpointMessageId)
+          console.log(`✅ Created initial template checkpoint for workspace ${workspace.id}`)
+          
+          // Store the checkpoint message ID so we can reference it later
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem(`initial-checkpoint-${workspace.id}`, initialCheckpointMessageId)
+          }
+        } catch (checkpointError) {
+          console.error('Failed to create initial checkpoint:', checkpointError)
+          // Don't fail the project creation if checkpoint fails
+        }
+        
         toast.success('Project created and saved!')
         
         // Store the FULL prompt in sessionStorage to avoid URL length limitations

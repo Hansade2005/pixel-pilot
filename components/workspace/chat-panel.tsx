@@ -4817,6 +4817,79 @@ export function ChatPanel({
       try {
         // Small delay to ensure message is saved before creating checkpoint
         await new Promise(resolve => setTimeout(resolve, 50))
+        
+        // ✅ CRITICAL FIX: Restore from initial template checkpoint if contamination detected
+        // This ensures we start with ONLY the correct template files
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        
+        // Check if this is the FIRST message for a new project (from chat-input)
+        const allMessages = await storageManager.getMessages(project.id)
+        const isFirstMessage = allMessages.length === 1 // Only the user message we just saved
+        
+        if (isFirstMessage) {
+          console.log('🧹 ChatPanel: First message detected - checking for contamination and restoring from initial checkpoint if needed')
+          
+          // Check if there's an initial template checkpoint
+          const initialCheckpointMessageId = typeof window !== 'undefined' 
+            ? sessionStorage.getItem(`initial-checkpoint-${project.id}`)
+            : null
+          
+          if (initialCheckpointMessageId) {
+            console.log(`✅ Found initial template checkpoint: ${initialCheckpointMessageId}`)
+            
+            // Get the initial checkpoint
+            const checkpoints = await storageManager.getCheckpoints(project.id)
+            const initialCheckpoint = checkpoints.find(cp => cp.messageId === initialCheckpointMessageId)
+            
+            if (initialCheckpoint) {
+              // Get all current files
+              const currentFiles = await storageManager.getFiles(project.id)
+              console.log(`📂 Current files: ${currentFiles.length}`)
+              console.log(`📦 Checkpoint files: ${initialCheckpoint.files.length}`)
+              
+              // Check for contamination: files that aren't in the checkpoint
+              const checkpointPaths = new Set(initialCheckpoint.files.map(f => f.path))
+              const contaminatedFiles = currentFiles.filter(f => !checkpointPaths.has(f.path))
+              
+              // Also check for files with wrong workspaceId
+              const wrongWorkspaceFiles = currentFiles.filter(f => f.workspaceId !== project.id)
+              
+              if (contaminatedFiles.length > 0 || wrongWorkspaceFiles.length > 0) {
+                console.warn(`🚨 CONTAMINATION DETECTED!`)
+                console.warn(`  - ${contaminatedFiles.length} files not in initial checkpoint`)
+                console.warn(`  - ${wrongWorkspaceFiles.length} files with wrong workspaceId`)
+                console.warn('🔄 Restoring from initial template checkpoint...')
+                
+                // Restore from the initial checkpoint
+                const { restoreCheckpoint } = await import('@/lib/checkpoint-utils')
+                const restoreSuccess = await restoreCheckpoint(initialCheckpoint.id)
+                
+                if (restoreSuccess) {
+                  console.log('✅ Successfully restored from initial template checkpoint')
+                  
+                  // Verify restoration
+                  const restoredFiles = await storageManager.getFiles(project.id)
+                  console.log(`✅ After restore: ${restoredFiles.length} files (should match ${initialCheckpoint.files.length})`)
+                  
+                  // Dispatch event to refresh file explorer
+                  window.dispatchEvent(new CustomEvent('files-changed', { 
+                    detail: { projectId: project.id } 
+                  }))
+                } else {
+                  console.error('❌ Failed to restore from initial checkpoint')
+                }
+              } else {
+                console.log(`✅ No contamination detected - ${currentFiles.length} files match initial template checkpoint`)
+              }
+            } else {
+              console.warn('⚠️ Initial checkpoint not found in database')
+            }
+          } else {
+            console.log('ℹ️ No initial checkpoint reference found - skipping contamination check')
+          }
+        }
+        
         await createCheckpoint(project.id, userMessage.id)
         console.log(`[Checkpoint] Created checkpoint for message ${userMessage.id}`)
       } catch (error) {
