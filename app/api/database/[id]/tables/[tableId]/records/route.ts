@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSupabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/server';
 
 /**
  * POST /api/database/[id]/tables/[tableId]/records
@@ -19,19 +19,19 @@ export async function POST(
       );
     }
 
-    const supabase = getServerSupabase();
+    const supabase = await createClient();
 
     // Get current user session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    const { data: { user }, error: sessionError } = await supabase.auth.getUser();
     
-    if (sessionError || !session) {
+    if (sessionError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized - Please log in' },
         { status: 401 }
       );
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
 
     // Verify table ownership
     const { data: table, error: tableError } = await supabase
@@ -108,19 +108,19 @@ export async function GET(
     const limit = parseInt(searchParams.get('limit') || '100');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    const supabase = getServerSupabase();
+    const supabase = await createClient();
 
     // Get current user session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    const { data: { user }, error: sessionError } = await supabase.auth.getUser();
     
-    if (sessionError || !session) {
+    if (sessionError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized - Please log in' },
         { status: 401 }
       );
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
 
     // Verify table ownership
     const { data: table } = await supabase
@@ -196,19 +196,19 @@ export async function PUT(
       );
     }
 
-    const supabase = getServerSupabase();
+    const supabase = await createClient();
 
     // Get current user session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    const { data: { user }, error: sessionError } = await supabase.auth.getUser();
     
-    if (sessionError || !session) {
+    if (sessionError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized - Please log in' },
         { status: 401 }
       );
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
 
     // Verify ownership
     const { data: table } = await supabase
@@ -275,20 +275,18 @@ export async function DELETE(
       );
     }
 
-    const supabase = getServerSupabase();
-
+   const supabase = await createClient();
     // Get current user session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
-    if (sessionError || !session) {
+    const { data: { user }, error: sessionError } = await supabase.auth.getUser();
+
+    if (sessionError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized - Please log in' },
         { status: 401 }
       );
     }
 
-    const userId = session.user.id;
-
+     const userId = user.id;
     // Verify ownership
     const { data: table } = await supabase
       .from('tables')

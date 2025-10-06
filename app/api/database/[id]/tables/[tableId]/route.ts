@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSupabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 import { validateTableSchema } from "@/lib/validate-schema";
 
 export async function GET(
@@ -7,14 +7,14 @@ export async function GET(
   { params }: { params: { id: string; tableId: string } }
 ) {
   try {
-    const supabase = getServerSupabase();
+    const supabase = await createClient();
     const { id: databaseId, tableId } = params;
 
     // Get current user
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -30,7 +30,7 @@ export async function GET(
       return NextResponse.json({ error: "Table not found" }, { status: 404 });
     }
 
-    if ((table.databases as any).user_id !== session.user.id) {
+    if ((table.databases as any).user_id !== user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -49,7 +49,7 @@ export async function PUT(
   { params }: { params: { id: string; tableId: string } }
 ) {
   try {
-    const supabase = getServerSupabase();
+    const supabase = await createClient();
     const { id: databaseId, tableId } = params;
     const body = await request.json();
     const { name, schema } = body;
@@ -62,9 +62,9 @@ export async function PUT(
 
     // Get current user
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -80,7 +80,7 @@ export async function PUT(
       return NextResponse.json({ error: "Table not found" }, { status: 404 });
     }
 
-    if ((existingTable.databases as any).user_id !== session.user.id) {
+    if ((existingTable.databases as any).user_id !== user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -136,14 +136,14 @@ export async function DELETE(
   { params }: { params: { id: string; tableId: string } }
 ) {
   try {
-    const supabase = getServerSupabase();
+    const supabase = await createClient();
     const { id: databaseId, tableId } = params;
 
     // Get current user
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -159,7 +159,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Table not found" }, { status: 404 });
     }
 
-    if ((existingTable.databases as any).user_id !== session.user.id) {
+    if ((existingTable.databases as any).user_id !== user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

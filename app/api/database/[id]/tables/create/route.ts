@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSupabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/server';
 
 /**
  * POST /api/database/[id]/tables/create
@@ -20,19 +20,19 @@ export async function POST(
       );
     }
 
-    const supabase = getServerSupabase();
+    const supabase = await createClient();
 
     // Get current user session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    const { data: { user }, error: sessionError } = await supabase.auth.getUser();
     
-    if (sessionError || !session) {
+    if (sessionError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized - Please log in' },
         { status: 401 }
       );
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
 
     // Verify database ownership
     const { data: database, error: dbError } = await supabase
@@ -116,19 +116,19 @@ export async function GET(
 ) {
   try {
     const databaseId = params.id;
-    const supabase = getServerSupabase();
+    const supabase = await createClient();
 
     // Get current user session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    const { data: { user }, error: sessionError } = await supabase.auth.getUser();
     
-    if (sessionError || !session) {
+    if (sessionError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized - Please log in' },
         { status: 401 }
       );
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
 
     // Verify database ownership
     const { data: database } = await supabase

@@ -5,6 +5,8 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentWorkspace, setWorkspaceDatabase } from '@/lib/get-current-workspace';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Database, Plus, AlertCircle, Loader2, Table as TableIcon, Sparkles, Code } from 'lucide-react';
 import { toast } from 'sonner';
@@ -36,6 +38,7 @@ export default function DatabasePage() {
   const [tables, setTables] = useState<TableWithCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [databaseName, setDatabaseName] = useState('');
   const [editingTable, setEditingTable] = useState<TableWithCount | null>(null);
   const [deletingTable, setDeletingTable] = useState<TableWithCount | null>(null);
   const [showAISchemaGenerator, setShowAISchemaGenerator] = useState(false);
@@ -55,6 +58,11 @@ export default function DatabasePage() {
         return;
       }
       setWorkspace(ws);
+      
+      // Set default database name
+      if (!databaseName) {
+        setDatabaseName(`${ws.name}_db`);
+      }
 
       // Check if database exists
       if (ws.databaseId) {
@@ -91,6 +99,18 @@ export default function DatabasePage() {
 
   async function createDatabase() {
     if (!workspace) return;
+    
+    // Validate database name
+    if (!databaseName || databaseName.trim().length === 0) {
+      toast.error('Please enter a database name');
+      return;
+    }
+    
+    // Validate database name format (alphanumeric, underscores, hyphens)
+    if (!/^[a-zA-Z0-9_-]+$/.test(databaseName.trim())) {
+      toast.error('Database name can only contain letters, numbers, underscores, and hyphens');
+      return;
+    }
 
     try {
       setCreating(true);
@@ -100,7 +120,7 @@ export default function DatabasePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId: workspace.id,
-          name: `${workspace.name}_db`
+          name: databaseName.trim()
         })
       });
 
@@ -196,6 +216,26 @@ export default function DatabasePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="databaseName" className="text-white">
+                      Database Name
+                    </Label>
+                    <Input
+                      id="databaseName"
+                      type="text"
+                      placeholder="my_app_db"
+                      value={databaseName}
+                      onChange={(e) => setDatabaseName(e.target.value)}
+                      className="bg-gray-900/50 border-gray-700 text-white placeholder:text-gray-500"
+                      disabled={creating}
+                    />
+                    <p className="text-xs text-gray-500">
+                      Use letters, numbers, underscores, and hyphens only
+                    </p>
+                  </div>
+                </div>
+
                 <div className="rounded-lg border border-gray-700 bg-gray-900/50 p-4 space-y-2">
                   <h3 className="font-medium text-white">What you'll get:</h3>
                   <ul className="space-y-2 text-sm text-gray-400">
