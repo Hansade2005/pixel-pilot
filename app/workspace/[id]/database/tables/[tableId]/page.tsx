@@ -11,6 +11,8 @@ import { AddRecordDialog } from "@/components/database/add-record-dialog";
 import { EditRecordDialog } from "@/components/database/edit-record-dialog";
 import { DeleteRecordDialog } from "@/components/database/delete-record-dialog";
 import { getWorkspaceDatabaseId } from "@/lib/get-current-workspace";
+import { Navigation } from "@/components/navigation";
+import { Footer } from "@/components/footer";
 import type { Table } from "@/lib/supabase";
 
 interface RecordData {
@@ -113,42 +115,66 @@ export default function TableRecordsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen relative overflow-hidden">
+        <div className="absolute inset-0 lovable-gradient" />
+        <div className="absolute inset-0 noise-texture" />
+        <Navigation />
+        <div className="relative z-10 pt-16 pb-24">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl py-8">
+            <div className="flex items-center justify-center min-h-[400px]">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          </div>
+        </div>
+        <Footer />
       </div>
     );
   }
 
   if (!table) {
     return (
-      <div className="container py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Table Not Found</CardTitle>
-            <CardDescription>
-              Unable to load table details. Please try again.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      <div className="min-h-screen relative overflow-hidden">
+        <div className="absolute inset-0 lovable-gradient" />
+        <div className="absolute inset-0 noise-texture" />
+        <Navigation />
+        <div className="relative z-10 pt-16 pb-24">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl py-8">
+            <Card className="bg-gray-800 border-gray-700">
+              <CardHeader>
+                <CardTitle className="text-white">Table Not Found</CardTitle>
+                <CardDescription className="text-gray-400">
+                  Unable to load table details. Please try again.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </div>
+        </div>
+        <Footer />
       </div>
     );
   }
 
   return (
-    <div className="container max-w-7xl py-8 space-y-6">
+    <div className="min-h-screen relative overflow-hidden">
+      <div className="absolute inset-0 lovable-gradient" />
+      <div className="absolute inset-0 noise-texture" />
+      <Navigation />
+      <div className="relative z-10 pt-16 pb-24">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-8 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => router.push(`/workspace/${params.workspaceId || params.id}/database`)}
+            onClick={() => router.push(`/workspace/${workspaceId}/database`)}
+            className="text-gray-400 hover:text-white hover:bg-gray-800"
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">{table.name}</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-3xl font-bold text-white">{table.name}</h1>
+            <p className="text-gray-400">
               {records.length} record{records.length !== 1 ? "s" : ""} •{" "}
               {(table.schema_json as any).columns?.length || 0} columns
             </p>
@@ -179,7 +205,7 @@ export default function TableRecordsPage() {
       </div>
 
       {/* Data Grid */}
-      <Card>
+      <Card className="bg-gray-800 border-gray-700">
         <CardContent className="p-6">
           <DataGrid
             table={table}
@@ -221,6 +247,9 @@ export default function TableRecordsPage() {
           }}
         />
       )}
+        </div>
+      </div>
+      <Footer />
     </div>
   );
 }
