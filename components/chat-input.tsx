@@ -57,6 +57,9 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   // Template selection state
   const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs'>('vite-react')
 
+  // URL attachment state
+  const [attachedUrl, setAttachedUrl] = useState("")
+
   // Subscription status hook
   const { subscription, loading: subscriptionLoading } = useSubscription()
 
@@ -474,6 +477,12 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         if (typeof window !== 'undefined') {
           sessionStorage.setItem(`initial-prompt-${workspace.id}`, prompt.trim())
           
+          // 🌐 Store URL attachment if present
+          if (attachedUrl.trim()) {
+            console.log('🌐 Storing URL attachment for workspace:', attachedUrl)
+            sessionStorage.setItem(`initial-url-${workspace.id}`, attachedUrl.trim())
+          }
+          
           // CRITICAL FIX: Clear any cached project/file state to prevent contamination
           // This ensures the workspace loads with a clean slate
           sessionStorage.removeItem('lastSelectedProject')
@@ -483,6 +492,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         // Clear the input and redirect to workspace with the new project
         // No need to pass prompt in URL anymore - it's in sessionStorage
         setPrompt("")
+        setAttachedUrl("") // Clear URL attachment
         router.push(`/workspace?newProject=${workspace.id}`)
       } else {
         throw new Error('Failed to generate project suggestion')
@@ -587,6 +597,35 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                 className="w-full bg-transparent outline-none text-lg text-white placeholder-gray-400 py-3 px-4"
                 disabled={isGenerating}
               />
+            </div>
+
+            {/* URL Attachment Field */}
+            <div className="relative">
+              <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+                <input
+                  type="url"
+                  placeholder="Optional: Paste website URL to clone (e.g., https://example.com)"
+                  value={attachedUrl}
+                  onChange={(e) => setAttachedUrl(e.target.value)}
+                  className="flex-1 bg-transparent outline-none text-sm text-gray-300 placeholder-gray-500"
+                  disabled={isGenerating}
+                />
+                {attachedUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setAttachedUrl("")}
+                    className="text-gray-400 hover:text-white transition-colors"
+                    title="Clear URL"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Bottom Bar with Buttons */}

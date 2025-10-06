@@ -43,7 +43,8 @@ import {
   Image as ImageIcon,
   Mic,
   MicOff,
-  Sparkles
+  Sparkles,
+  Link as LinkIcon
 } from "lucide-react"
 import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown"
 import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
@@ -3699,7 +3700,10 @@ export function ChatPanel({
   // Image and file upload attachment state
   const [attachedImages, setAttachedImages] = useState<Array<{ id: string; name: string; base64: string; description?: string; isProcessing?: boolean }>>([])
   const [attachedUploadedFiles, setAttachedUploadedFiles] = useState<Array<{ id: string; name: string; content: string; size: number }>>([])
+  const [attachedUrls, setAttachedUrls] = useState<Array<{ id: string; url: string; title?: string; content?: string; isProcessing?: boolean }>>([])
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
+  const [showUrlDialog, setShowUrlDialog] = useState(false)
+  const [urlInput, setUrlInput] = useState("")
   const imageInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -3898,10 +3902,72 @@ export function ChatPanel({
       if (initialPrompt && project && messages.length === 0 && !isLoading) {
         console.log(`[ChatPanel] Auto-sending initial prompt: "${initialPrompt}"`)
         
+        // Check for URL attachment from homepage
+        const initialUrl = typeof window !== 'undefined' 
+          ? sessionStorage.getItem(`initial-url-${project.id}`)
+          : null
+
+        if (initialUrl) {
+          console.log(`🌐 [ChatPanel] Found URL attachment from homepage: ${initialUrl}`)
+          
+          // Fetch URL content before sending message
+          try {
+            const urlId = `url_${Date.now()}`;
+            
+            // Add URL to state with processing flag
+            setAttachedUrls([{
+              id: urlId,
+              url: initialUrl,
+              isProcessing: true
+            }]);
+
+            const response = await fetch('/api/redesign', {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ url: initialUrl }),
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              
+              console.log('✅ URL content fetched for auto-send:', {
+                title: data.title,
+                contentLength: data.content?.length,
+                tokens: data.tokens
+              });
+
+              // Update URL with content
+              setAttachedUrls([{
+                id: urlId,
+                url: initialUrl,
+                title: data.title,
+                content: data.content,
+                isProcessing: false
+              }]);
+
+              toast({
+                title: "Website loaded",
+                description: `${data.title || initialUrl} fetched successfully`
+              });
+            } else {
+              console.error('❌ Failed to fetch URL for auto-send');
+              setAttachedUrls([]);
+            }
+
+            // Clean up session storage
+            sessionStorage.removeItem(`initial-url-${project.id}`);
+          } catch (error) {
+            console.error('❌ Error fetching URL for auto-send:', error);
+            setAttachedUrls([]);
+          }
+        }
+        
         // Set the input message and trigger send
         setInputMessage(initialPrompt)
         
-        // Small delay to ensure state is updated
+        // Small delay to ensure state is updated (increased for URL fetch)
         setTimeout(() => {
           // Create a synthetic form event to trigger handleSendMessage
           const syntheticEvent = {
@@ -3909,7 +3975,7 @@ export function ChatPanel({
           } as React.FormEvent
           
           handleSendMessage(syntheticEvent)
-        }, 100)
+        }, initialUrl ? 2000 : 100) // Wait longer if URL was attached
       }
     }
 
@@ -4376,6 +4442,104 @@ export function ChatPanel({
     setAttachedImages(prev => prev.filter(img => img.id !== imageId));
   };
 
+  // URL attachment handlers
+  const handleUrlAttachment = async () => {
+    if (!urlInput.trim()) {
+      toast({
+        title: "URL required",
+        description: "Please enter a valid URL",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate URL format
+    try {
+      new URL(urlInput.trim());
+    } catch {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a valid URL starting with http:// or https://",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check total attachment limit
+    const totalAttachments = attachedImages.length + attachedUploadedFiles.length + attachedUrls.length;
+    if (totalAttachments >= 2) {
+      toast({
+        title: "Maximum attachments reached",
+        description: "You can attach a maximum of 2 items total",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const urlId = `url_${Date.now()}`;
+    const url = urlInput.trim();
+
+    // Add URL to state with processing flag
+    setAttachedUrls(prev => [...prev, {
+      id: urlId,
+      url: url,
+      isProcessing: true
+    }]);
+
+    setShowUrlDialog(false);
+    setUrlInput("");
+
+    // Fetch URL content from Jina AI
+    try {
+      console.log('🌐 Fetching URL content:', url);
+      
+      const response = await fetch('/api/redesign', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch URL content');
+      }
+
+      const data = await response.json();
+
+      console.log('✅ URL content fetched:', {
+        title: data.title,
+        contentLength: data.content?.length,
+        tokens: data.tokens
+      });
+
+      // Update URL with content
+      setAttachedUrls(prev => prev.map(item => 
+        item.id === urlId 
+          ? { ...item, title: data.title, content: data.content, isProcessing: false }
+          : item
+      ));
+
+      toast({
+        title: "URL processed",
+        description: `${data.title || url} fetched successfully (${data.tokens} tokens)`
+      });
+    } catch (error) {
+      console.error('❌ Error fetching URL:', error);
+      toast({
+        title: "Processing failed",
+        description: `Failed to fetch content from ${url}`,
+        variant: "destructive"
+      });
+      // Remove failed URL
+      setAttachedUrls(prev => prev.filter(item => item.id !== urlId));
+    }
+  };
+
+  const handleRemoveUrl = (urlId: string) => {
+    setAttachedUrls(prev => prev.filter(item => item.id !== urlId));
+  };
+
   // File upload attachment handlers
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -4798,7 +4962,7 @@ export function ChatPanel({
       }
     }
 
-    // Prepare message content with attached files, images, and uploaded files
+    // Prepare message content with attached files, images, uploaded files, and URLs
     let messageContent = inputMessage.trim();
     
     // Check if images are still processing
@@ -4806,6 +4970,16 @@ export function ChatPanel({
       toast({
         title: "Images processing",
         description: "Please wait for images to finish processing",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check if URLs are still processing
+    if (attachedUrls.some(url => url.isProcessing)) {
+      toast({
+        title: "URLs processing",
+        description: "Please wait for URLs to finish processing",
         variant: "destructive"
       });
       return;
@@ -4820,6 +4994,18 @@ export function ChatPanel({
       
       if (imageDescriptions) {
         messageContent = `${messageContent}\n\n=== ATTACHED IMAGES CONTEXT ===${imageDescriptions}\n=== END ATTACHED IMAGES ===`;
+      }
+    }
+
+    // Add URL contents
+    if (attachedUrls.length > 0) {
+      const urlContents = attachedUrls
+        .filter(url => url.content)
+        .map(url => `\n\n--- Website: ${url.title || url.url} ---\nURL: ${url.url}\n\nContent:\n${url.content}\n--- End of Website ---`)
+        .join('');
+      
+      if (urlContents) {
+        messageContent = `${messageContent}\n\n=== ATTACHED WEBSITES CONTEXT ===${urlContents}\n=== END ATTACHED WEBSITES ===`;
       }
     }
     
@@ -4874,6 +5060,7 @@ export function ChatPanel({
     setAttachedFiles([]) // Clear attached files after sending
     setAttachedImages([]) // Clear attached images after sending
     setAttachedUploadedFiles([]) // Clear uploaded files after sending
+    setAttachedUrls([]) // Clear attached URLs after sending
     setIsLoading(true)
 
     // Reset textarea height to default during loading
@@ -7258,6 +7445,31 @@ export function ChatPanel({
             </div>
           )}
 
+          {/* Attached URLs Display */}
+          {attachedUrls.length > 0 && (
+            <div className="flex flex-wrap gap-2 px-2">
+              {attachedUrls.map((urlItem) => (
+                <div
+                  key={urlItem.id}
+                  className="flex items-center gap-2 bg-green-500/10 border border-green-500/30 rounded-lg px-3 py-2 text-sm"
+                >
+                  <LinkIcon className="w-4 h-4 text-green-400" />
+                  <span className="text-green-300 max-w-[200px] truncate">{urlItem.title || urlItem.url}</span>
+                  {urlItem.isProcessing && (
+                    <div className="w-3 h-3 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveUrl(urlItem.id)}
+                    className="ml-1 text-green-400 hover:text-green-300"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Hidden file inputs */}
           <input
             ref={imageInputRef}
@@ -7298,12 +7510,12 @@ export function ChatPanel({
                           setShowAttachmentMenu(false)
                           imageInputRef.current?.click()
                         }}
-                        disabled={(attachedImages.length + attachedUploadedFiles.length) >= 2}
+                        disabled={(attachedImages.length + attachedUploadedFiles.length + attachedUrls.length) >= 2}
                         className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
                         <ImageIcon className="w-4 h-4" />
                         <span>Attach Image</span>
-                        {(attachedImages.length + attachedUploadedFiles.length) >= 2 && (
+                        {(attachedImages.length + attachedUploadedFiles.length + attachedUrls.length) >= 2 && (
                           <span className="ml-auto text-xs text-gray-500">(Max 2 total)</span>
                         )}
                       </button>
@@ -7313,12 +7525,27 @@ export function ChatPanel({
                           setShowAttachmentMenu(false)
                           fileInputRef.current?.click()
                         }}
-                        disabled={(attachedImages.length + attachedUploadedFiles.length) >= 2}
+                        disabled={(attachedImages.length + attachedUploadedFiles.length + attachedUrls.length) >= 2}
                         className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
                         <FileText className="w-4 h-4" />
                         <span>Attach File</span>
-                        {(attachedImages.length + attachedUploadedFiles.length) >= 2 && (
+                        {(attachedImages.length + attachedUploadedFiles.length + attachedUrls.length) >= 2 && (
+                          <span className="ml-auto text-xs text-gray-500">(Max 2 total)</span>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAttachmentMenu(false)
+                          setShowUrlDialog(true)
+                        }}
+                        disabled={(attachedImages.length + attachedUploadedFiles.length + attachedUrls.length) >= 2}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        <LinkIcon className="w-4 h-4" />
+                        <span>Attach URL</span>
+                        {(attachedImages.length + attachedUploadedFiles.length + attachedUrls.length) >= 2 && (
                           <span className="ml-auto text-xs text-gray-500">(Max 2 total)</span>
                         )}
                       </button>
@@ -7612,6 +7839,46 @@ export function ChatPanel({
           // Auth modal handles navigation internally
         }}
       />
+
+      {/* URL Attachment Dialog */}
+      <AlertDialog open={showUrlDialog} onOpenChange={setShowUrlDialog}>
+        <AlertDialogContent className="bg-gray-900 border-gray-700">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Attach Website URL</AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-400">
+              Enter a website URL to fetch its content. The AI will analyze the website structure and content.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <input
+              type="url"
+              placeholder="https://example.com"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  handleUrlAttachment()
+                }
+              }}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+              autoFocus
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-gray-700 text-gray-300 hover:bg-gray-600">
+              Cancel
+            </AlertDialogCancel>
+            <button
+              onClick={handleUrlAttachment}
+              disabled={!urlInput.trim()}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Attach URL
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       
     </div>
   )
