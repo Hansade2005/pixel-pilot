@@ -371,11 +371,19 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           setFileExplorerKey(prev => prev + 1)
         }, 100)
 
-            // Update URL to use projectId instead of newProject
+            // ✅ CRITICAL FIX: DO NOT change URL parameters for new projects!
+            // Changing from newProject to projectId triggers a page reload which runs auto-restore
+            // Keep BOTH parameters to prevent contamination
             const params = new URLSearchParams(searchParams.toString())
-            params.delete('newProject')
-            params.set('projectId', newProjectId)
-            router.replace(`/workspace?${params.toString()}`)
+            // DO NOT DELETE: params.delete('newProject') - THIS CAUSES CONTAMINATION!
+            // Only add projectId if not already present
+            if (!params.get('projectId')) {
+              params.set('projectId', newProjectId)
+              console.log('✅ Added projectId to URL while keeping newProject parameter')
+              router.replace(`/workspace?${params.toString()}`)
+            } else {
+              console.log('✅ URL already has projectId, not changing URL to prevent reload')
+            }
           }
         } catch (error) {
           console.error('Error reloading projects:', error)
