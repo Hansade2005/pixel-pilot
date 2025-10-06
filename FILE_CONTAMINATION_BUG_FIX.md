@@ -468,10 +468,21 @@ Contaminated files: [
 ## Summary
 
 **Problem**: Files from other projects appearing in newly created projects from chat-input  
-**Root Cause**: Race condition + lack of verification + no workspace ID validation  
-**Solution**: Wait for transactions + verify files + clear cache + filter by workspace ID  
-**Impact**: ✅ Bug eliminated, slight performance cost (150ms), better reliability  
-**Status**: ✅ **FIXED & TESTED**
+**Initial Diagnosis**: Race condition + lack of verification + no workspace ID validation  
+**Initial Solution**: Wait for transactions + verify files + clear cache + filter by workspace ID  
+**Initial Status**: ⚠️ **ATTEMPTED BUT DID NOT FIX THE ISSUE**
+
+---
+
+## 🚨 CRITICAL UPDATE
+
+**The real root cause was discovered:** The **auto-restore system** was clearing all data and restoring old backups when loading newly created projects!
+
+**See:** [AUTO_RESTORE_BUG_FIX.md](./AUTO_RESTORE_BUG_FIX.md) for the complete fix.
+
+**Real Root Cause**: Auto-restore didn't detect `newProject` parameter and ran `storageManager.clearAll()`, deleting new projects  
+**Real Solution**: Skip auto-restore for newly created projects + set `justCreatedProject` flag  
+**Real Status**: ✅ **FIXED & VERIFIED**
 
 ---
 

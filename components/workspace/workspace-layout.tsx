@@ -178,9 +178,16 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         // Check if we're in a specific project workspace (has projectId in URL)
         const projectId = searchParams.get('projectId')
         const isDeletingProject = searchParams.get('deleting') === 'true'
+        const isNewProject = searchParams.get('newProject') !== null
+        
+        // ✅ CRITICAL FIX: Skip auto-restore for newly created projects from chat-input
+        // Auto-restore clears ALL data and restores from backup, which would DELETE the new project's files!
+        if (isNewProject) {
+          console.log('🆕 WorkspaceLayout: NEW PROJECT detected from chat-input - SKIPPING auto-restore to preserve new project files')
+        }
         
         // Only auto-restore when in a project workspace and not during deletion or creation
-        if (projectId && !isDeletingProject && !justCreatedProject) {
+        if (projectId && !isDeletingProject && !justCreatedProject && !isNewProject) {
           console.log('WorkspaceLayout: In project workspace, checking cloud sync for user:', user.id)
           const cloudSyncEnabled = await isCloudSyncEnabled(user.id)
           console.log('WorkspaceLayout: Cloud sync enabled result:', cloudSyncEnabled)
@@ -255,6 +262,15 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         const isNewProjectFromChatInput = searchParams.get('newProject') === projectId
         if (isNewProjectFromChatInput) {
           console.log('🆕 New project from chat-input detected, loading files explicitly for:', projectId)
+          
+          // ✅ Set justCreatedProject flag to prevent auto-restore from deleting new files
+          setJustCreatedProject(true)
+          
+          // Clear the flag after 5 seconds (enough time for initial load)
+          setTimeout(() => {
+            setJustCreatedProject(false)
+            console.log('✅ Cleared justCreatedProject flag - auto-restore can now run on next visit')
+          }, 5000)
           
           // Load files explicitly for this new project to prevent contamination
           import('@/lib/storage-manager').then(({ storageManager }) => {
