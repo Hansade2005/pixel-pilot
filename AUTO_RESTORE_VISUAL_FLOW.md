@@ -48,22 +48,26 @@
 │ 7. restoreBackupFromCloud() EXECUTES                            │
 │    Step 1: storageManager.clearAll()                            │
 │            ↓                                                     │
-│            🚨 DELETES ALL WORKSPACES ❌                          │
-│            🚨 DELETES ALL FILES (including new project!) ❌      │
+│            🚨 DELETES ALL FILES FROM ALL WORKSPACES ❌           │
 │            🚨 DELETES ALL CHAT SESSIONS ❌                       │
+│            (But workspace structure remains)                    │
 │                                                                  │
 │    Step 2: Import backup data from cloud                        │
 │            ↓                                                     │
-│            Restores OLD projects from backup                    │
+│            Restores OLD project files from backup               │
 │            (New project NOT in backup - just created!)          │
+│            ↓                                                     │
+│            🚨 Files from backup + New project files = MERGED!   │
 └─────────────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│ 8. RESULT: FILE CONTAMINATION ❌                                │
-│    - New project abc-123: DELETED ❌                            │
-│    - Old backup projects: RESTORED                              │
-│    - User sees files from OLD projects in NEW project slot ❌   │
-│    - Sometimes old files overwrite new ones (package.json) ❌   │
+│ 8. RESULT: FILE CONTAMINATION & OVERWRITES ❌                   │
+│    - New project abc-123: Still exists (workspace preserved)    │
+│    - Files: MIXED from new template + old backup ❌             │
+│    - package.json: OVERWRITTEN by backup version ❌             │
+│    - tsconfig.json: OVERWRITTEN by backup version ❌            │
+│    - Extra files: From old backup projects ❌                   │
+│    Result: User sees WRONG dependencies, MIXED files! ❌        │
 └─────────────────────────────────────────────────────────────────┘
 ```
 

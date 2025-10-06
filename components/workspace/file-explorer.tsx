@@ -160,12 +160,12 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
   }
 
   useEffect(() => {
-    console.log('FileExplorer: Project changed:', project?.id, project?.name)
+    console.log('🔄 FileExplorer: Project prop changed:', project?.id, project?.name)
     if (project) {
-      console.log('FileExplorer: Fetching files for project:', project.id, '- component key changed, forcing refresh')
+      console.log('🔄 FileExplorer: Fetching files for project:', project.id, '- useEffect triggered by project prop change')
       fetchFiles()
     } else {
-      console.log('FileExplorer: No project selected, clearing files')
+      console.log('🔄 FileExplorer: No project selected, clearing files')
       setFiles([])
     }
   }, [project])
@@ -202,8 +202,10 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
     const handleFilesChanged = (e: CustomEvent) => {
       const detail = e.detail as { projectId: string };
       if (detail.projectId === project.id) {
-        console.log('File explorer: Detected files changed event, refreshing files');
+        console.log('🔔 File explorer: Detected "files-changed" event for project:', project.id, '- triggering refresh at', new Date().toISOString());
         fetchFiles();
+      } else {
+        console.log('🔕 File explorer: Ignoring "files-changed" event for different project:', detail.projectId, '(current project:', project.id, ')');
       }
     };
     
@@ -218,7 +220,7 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
     }
 
     try {
-      console.log(`FileExplorer: Fetching files for project: ${project.id} (${project.name}) from IndexedDB`);
+      console.log(`📂 FileExplorer: Fetching files for project: ${project.id} (${project.name}) from IndexedDB - Timestamp: ${new Date().toISOString()}`);
 
       // Import and initialize storage manager
       const { storageManager } = await import('@/lib/storage-manager');
@@ -226,18 +228,26 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
 
       // Get files directly from IndexedDB
       const projectFiles = await storageManager.getFiles(project.id);
-      console.log(`FileExplorer: Found ${projectFiles.length} files for project: ${project.id}`);
+      console.log(`✅ FileExplorer: Found ${projectFiles.length} files for project: ${project.id}`);
+
+      // Verify all files belong to correct workspace
+      const incorrectFiles = projectFiles.filter(f => f.workspaceId !== project.id);
+      if (incorrectFiles.length > 0) {
+        console.error(`🚨 CONTAMINATION DETECTED in FileExplorer: ${incorrectFiles.length} files belong to wrong workspace!`, incorrectFiles.map(f => ({ name: f.name, path: f.path, actualWorkspaceId: f.workspaceId, expectedWorkspaceId: project.id })));
+      } else {
+        console.log(`✅ All ${projectFiles.length} files verified to belong to workspace: ${project.id}`);
+      }
 
       if (projectFiles.length === 0) {
-        console.log('FileExplorer: No files found for project, this might indicate template application failed')
+        console.log('⚠️ FileExplorer: No files found for project, this might indicate template application failed')
       } else {
-        console.log('FileExplorer: First few files:', projectFiles.slice(0, 3).map(f => f.name))
+        console.log('📄 FileExplorer: Sample files:', projectFiles.slice(0, 5).map(f => ({ name: f.name, path: f.path, workspaceId: f.workspaceId })))
       }
 
       setFiles(projectFiles);
       // If no files, show empty state in UI (handled by render logic)
     } catch (error) {
-      console.error('FileExplorer: Error fetching files:', error);
+      console.error('❌ FileExplorer: Error fetching files:', error);
     }
   }
 

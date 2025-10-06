@@ -296,11 +296,14 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           setFileExplorerKey(prev => prev + 1)
         }, 100)
 
-        // Update URL to use projectId if it was newProject
+        // Update URL to ADD projectId alongside newProject (KEEP BOTH for protection)
+        // DO NOT delete newProject parameter - it's needed to prevent auto-restore contamination!
         if (searchParams.get('newProject') && !searchParams.get('projectId')) {
           const params = new URLSearchParams(searchParams.toString())
-          params.delete('newProject')
+          // ✅ CRITICAL FIX: Keep newProject parameter AND add projectId
+          // This ensures auto-restore is skipped during the initial load period
           params.set('projectId', projectId)
+          // DO NOT DELETE: params.delete('newProject') - this would cause contamination!
           
           // Retrieve the FULL prompt from sessionStorage (not truncated)
           // This ensures the complete prompt is sent to the chat panel
@@ -771,10 +774,14 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                   setSelectedProject(newProject)
                   setSelectedFile(null)
                   
-                  // Update URL to reflect the new project
+                  // Update URL to reflect the new project with BOTH projectId AND newProject params
+                  // The newProject param signals to skip auto-restore (prevents file contamination)
                   const params = new URLSearchParams(searchParams.toString())
                   params.set('projectId', newProject.id)
+                  params.set('newProject', newProject.id) // ✅ CRITICAL: This prevents auto-restore from running
                   router.push(`/workspace?${params.toString()}`)
+                  
+                  console.log('✅ WorkspaceLayout: Navigating to NEW project with newProject flag:', newProject.id)
                   
                   // Prevent auto-restore for newly created project
                   setJustCreatedProject(true)
@@ -868,10 +875,14 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     setSelectedProject(newProject)
                     setSelectedFile(null)
                     
-                    // Update URL to reflect the new project
+                    // Update URL to reflect the new project with BOTH projectId AND newProject params
+                    // The newProject param signals to skip auto-restore (prevents file contamination)
                     const params = new URLSearchParams(searchParams.toString())
                     params.set('projectId', newProject.id)
+                    params.set('newProject', newProject.id) // ✅ CRITICAL: This prevents auto-restore from running
                     router.push(`/workspace?${params.toString()}`)
+                    
+                    console.log('✅ WorkspaceLayout: Navigating to NEW project with newProject flag:', newProject.id)
                     
                     // Prevent auto-restore for newly created project
                     setJustCreatedProject(true)
@@ -1229,9 +1240,14 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           setSelectedFile(null)
                           setSidebarOpen(false)
                           
+                          // Update URL with BOTH projectId AND newProject params
+                          // The newProject param signals to skip auto-restore (prevents file contamination)
                           const params = new URLSearchParams(searchParams.toString())
                           params.set('projectId', newProject.id)
+                          params.set('newProject', newProject.id) // ✅ CRITICAL: This prevents auto-restore from running
                           router.push(`/workspace?${params.toString()}`)
+                          
+                          console.log('✅ WorkspaceLayout: Navigating to NEW project with newProject flag:', newProject.id)
                           
                           // Prevent auto-restore for newly created project
                           setJustCreatedProject(true)

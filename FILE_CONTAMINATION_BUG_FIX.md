@@ -3,6 +3,32 @@
 ## Critical Issue
 When creating projects from the **chat input**, files from OTHER projects were appearing in the NEW project, and sometimes **overwriting** the new project's files (like package.json). This **ONLY** happened with chat-input creation, NOT when using the + button in workspace.
 
+### ⚠️ IMPORTANT CLARIFICATION
+
+**What Actually Happened:**
+- New project files were NOT deleted entirely
+- Instead, they were **MERGED** with auto-restored backup files
+- Common files (package.json, tsconfig.json) were **OVERWRITTEN** by backup versions
+- Result: A hybrid project with mixed files from multiple sources
+
+**Example:**
+```
+New Project Files (correct):
+  ✅ package.json (Next.js 14.0.4)
+  ✅ src/app/layout.tsx
+
+Auto-Restore Backup Files:
+  ⚠️ package.json (Next.js 13.0.0) ← Overwrites new one!
+  ⚠️ src/components/OldComponent.tsx ← Contaminates new project
+
+Final Result:
+  ❌ package.json (Next.js 13.0.0) ← WRONG VERSION!
+  ✅ src/app/layout.tsx ← Preserved
+  ❌ src/components/OldComponent.tsx ← Should not exist!
+```
+
+**See [AUTO_RESTORE_BUG_FIX.md](./AUTO_RESTORE_BUG_FIX.md) for the complete fix.**
+
 ---
 
 ## Root Cause Analysis

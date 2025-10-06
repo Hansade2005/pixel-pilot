@@ -10,6 +10,7 @@ The file contamination issue was NOT caused by race conditions in chat-input.tsx
 User creates NEW project from chat-input
    ↓
 New project files are created in IndexedDB ✅
+(e.g., Next.js template: package.json, src/app/layout.tsx, etc.)
    ↓
 User redirects to /workspace?newProject=abc-123
    ↓
@@ -19,11 +20,18 @@ workspace-layout.tsx loads
    ↓
 🚨 restoreBackupFromCloud() is called
    ↓
-🚨 storageManager.clearAll() - DELETES ALL DATA INCLUDING NEW PROJECT! ❌
+🚨 storageManager.clearAll() - DELETES ALL DATA! ❌
    ↓
 🚨 Restores OLD backup data from cloud
    ↓
-Result: New project DELETED, old backup files appear instead! ❌
+🚨 New project files + Old backup files = MERGED TOGETHER ❌
+   ↓
+🚨 Common files (package.json, tsconfig.json) = OVERWRITTEN by backup ❌
+   ↓
+Result: NEW project has MIXED files from multiple sources! ❌
+- New template files (some preserved)
+- Old backup files (contamination)
+- Common files OVERWRITTEN (wrong package.json, wrong dependencies!)
 ```
 
 ---
@@ -52,10 +60,137 @@ export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
 
 **Why This Causes Contamination:**
 
-1. **Clears ALL projects** - Not just the one being restored
+1. **Clears ALL data** - Deletes all files from all projects
 2. **No project-specific restoration** - Restores entire backup, not individual projects
-3. **No new project detection** - Doesn't know if a project was just created
-4. **Immediate execution** - Runs as soon as workspace loads
+3. **Files get merged** - New project files + backup files = mixed together
+4. **Common files overwritten** - package.json, tsconfig.json, etc. replaced by backup versions
+5. **No new project detection** - Doesn't know if a project was just created
+6. **Immediate execution** - Runs as soon as workspace loads
+
+**Example Contamination Scenario:**
+
+```
+NEW Project (just created):
+  ├─ package.json (Next.js 14.0.4, React 18.2.0) ✅ CORRECT
+  ├─ src/app/layout.tsx ✅ NEW
+  ├─ src/app/page.tsx ✅ NEW
+  └─ tsconfig.json ✅ CORRECT
+
+AUTO-RESTORE runs → clearAll() → restore backup
+
+BACKUP from cloud (old project):
+  ├─ package.json (Next.js 13.0.0, React 17.0.0) ⚠️ OLD
+  ├─ src/components/OldComponent.tsx ⚠️ FROM DIFFERENT PROJECT
+  ├─ src/lib/old-utils.ts ⚠️ FROM DIFFERENT PROJECT
+  └─ tsconfig.json ⚠️ OLD
+
+RESULT (merged/contaminated):
+  ├─ package.json (Next.js 13.0.0, React 17.0.0) ❌ OVERWRITTEN!
+  ├─ src/app/layout.tsx ✅ NEW (preserved)
+  ├─ src/app/page.tsx ✅ NEW (preserved)
+  ├─ src/components/OldComponent.tsx ❌ CONTAMINATION!
+  ├─ src/lib/old-utils.ts ❌ CONTAMINATION!
+  └─ tsconfig.json ❌ OVERWRITTEN!
+
+User experience:
+  - "Why is my package.json showing old dependencies?" ❌
+  - "Where did these extra files come from?" ❌
+  - "My new Next.js 14 project is using React 17?" ❌
+```
+
+---
+
+## Real-World Example: What Users Experienced
+
+### Scenario: Creating a New Next.js Project
+
+**Step 1: User creates project from chat-input**
+```
+Prompt: "Create a Next.js blog application"
+Template: Next.js 14.0.4
+Expected files created:
+  ✅ package.json (Next 14.0.4, React 18.2.0, TypeScript 5.2.2)
+  ✅ src/app/layout.tsx (App Router)
+  ✅ src/app/page.tsx
+  ✅ tsconfig.json (strict mode)
+  ✅ tailwind.config.ts
+  ✅ Total: 45 files
+```
+
+**Step 2: Auto-restore runs (BUG)**
+```
+User's last backup from cloud (from a different project 2 days ago):
+  - Old React project (Next.js 13.0.0)
+  - Different dependencies
+  - Old configuration files
+```
+
+**Step 3: Result (FILE CONTAMINATION)**
+```
+What the user sees in their "NEW" project:
+
+📦 package.json ❌ OVERWRITTEN
+  {
+    "dependencies": {
+      "next": "13.0.0",        ← ❌ WRONG! Should be 14.0.4
+      "react": "17.0.0",       ← ❌ WRONG! Should be 18.2.0
+      "old-library": "1.0.0"   ← ❌ FROM OLD PROJECT!
+    }
+  }
+
+📁 src/app/
+  ├─ layout.tsx ✅ CORRECT (from new template)
+  ├─ page.tsx ✅ CORRECT (from new template)
+  └─ OLD_COMPONENT.tsx ❌ CONTAMINATION (from backup!)
+
+📁 src/components/
+  ├─ Header.tsx ❌ FROM OLD PROJECT
+  ├─ Footer.tsx ❌ FROM OLD PROJECT
+  └─ OldFeature.tsx ❌ FROM OLD PROJECT
+
+⚙️ tsconfig.json ❌ OVERWRITTEN
+  {
+    "compilerOptions": {
+      "strict": false,  ← ❌ WRONG! New template uses strict: true
+      "target": "es5"   ← ❌ OLD CONFIG!
+    }
+  }
+
+User's confusion:
+  😕 "Why does my new Next.js 14 project have Next.js 13 in package.json?"
+  😕 "Where did these Header/Footer components come from?"
+  😕 "Why is npm install failing? (version conflicts)"
+  😕 "I created a NEW project, why does it have old files?"
+```
+
+### Why This Happens
+
+**The Merge Process:**
+
+1. **New project files written to IndexedDB**
+   - Workspace ID: `abc-123`
+   - 45 files with correct versions
+
+2. **Auto-restore runs: `clearAll()`**
+   - Deletes ALL files from ALL workspaces
+   - BUT: Workspace structures remain (abc-123 still exists as empty workspace)
+
+3. **Auto-restore runs: Import backup data**
+   - Restores files from backup
+   - Backup has workspace ID `xyz-789` (different old project)
+   - Files get written to IndexedDB
+
+4. **File loading: `getFiles(abc-123)`**
+   - Query: Get all files where `workspaceId = abc-123`
+   - Returns: SOME new files that survived + SOME backup files that got assigned to abc-123
+   - Result: MIXED FILES!
+
+5. **Common files overwritten**
+   - package.json exists in BOTH new template AND backup
+   - Backup's version wins (last write)
+   - User gets WRONG package.json
+
+---
 
 ### The Bug in `workspace-layout.tsx`
 
