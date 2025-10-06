@@ -3907,20 +3907,14 @@ export function ChatPanel({
           ? sessionStorage.getItem(`initial-url-${project.id}`)
           : null
 
+        let messageWithContext = initialPrompt;
+
         if (initialUrl) {
           console.log(`🌐 [ChatPanel] Found URL attachment from homepage: ${initialUrl}`)
+          console.log(`🔄 [ChatPanel] Fetching URL content BEFORE auto-send...`)
           
-          // Fetch URL content before sending message
+          // Fetch URL content and append to message BEFORE sending
           try {
-            const urlId = `url_${Date.now()}`;
-            
-            // Add URL to state with processing flag
-            setAttachedUrls([{
-              id: urlId,
-              url: initialUrl,
-              isProcessing: true
-            }]);
-
             const response = await fetch('/api/redesign', {
               method: 'PUT',
               headers: {
@@ -3933,49 +3927,56 @@ export function ChatPanel({
               const data = await response.json();
               
               console.log('✅ URL content fetched for auto-send:', {
-                title: data.title,
-                contentLength: data.content?.length,
-                tokens: data.tokens
+                url: initialUrl,
+                markdownLength: data.markdown?.length || 0,
+                preview: data.markdown?.substring(0, 100)
               });
 
-              // Update URL with content
-              setAttachedUrls([{
-                id: urlId,
-                url: initialUrl,
-                title: data.title,
-                content: data.content,
-                isProcessing: false
-              }]);
+              // Append URL markdown to message (like image descriptions)
+              if (data.markdown) {
+                const urlAttachment = `\n\n=== ATTACHED WEBSITE CONTEXT ===\n\n--- Website: ${initialUrl} ---\nContent:\n${data.markdown}\n--- End of Website ---\n\n=== END ATTACHED WEBSITE ===`;
+                messageWithContext = `${initialPrompt}${urlAttachment}`;
+                
+                console.log('✅ URL content appended to message:', {
+                  originalLength: initialPrompt.length,
+                  finalLength: messageWithContext.length,
+                  addedLength: urlAttachment.length
+                });
+              }
 
               toast({
                 title: "Website loaded",
-                description: `${data.title || initialUrl} fetched successfully`
+                description: `Content from ${initialUrl} fetched successfully`
               });
             } else {
               console.error('❌ Failed to fetch URL for auto-send');
-              setAttachedUrls([]);
+              toast({
+                title: "Failed to load website",
+                description: "Could not fetch website content",
+                variant: "destructive"
+              });
             }
 
             // Clean up session storage
             sessionStorage.removeItem(`initial-url-${project.id}`);
           } catch (error) {
             console.error('❌ Error fetching URL for auto-send:', error);
-            setAttachedUrls([]);
+            toast({
+              title: "Error loading website",
+              description: "An error occurred while fetching website content",
+              variant: "destructive"
+            });
           }
         }
         
-        // Set the input message and trigger send
+        // Set the input message (original prompt only, not the context)
         setInputMessage(initialPrompt)
         
-        // Small delay to ensure state is updated (increased for URL fetch)
+        // Small delay to ensure state is updated
         setTimeout(() => {
-          // Create a synthetic form event to trigger handleSendMessage
-          const syntheticEvent = {
-            preventDefault: () => {},
-          } as React.FormEvent
-          
-          handleSendMessage(syntheticEvent)
-        }, initialUrl ? 2000 : 100) // Wait longer if URL was attached
+          // Send message with context directly (bypass state)
+          handleSendMessage(undefined, messageWithContext)
+        }, 100)
       }
     }
 
@@ -4508,21 +4509,21 @@ export function ChatPanel({
       const data = await response.json();
 
       console.log('✅ URL content fetched:', {
-        title: data.title,
-        contentLength: data.content?.length,
-        tokens: data.tokens
+        url: url,
+        markdownLength: data.markdown?.length || 0,
+        preview: data.markdown?.substring(0, 100)
       });
 
-      // Update URL with content
+      // Update URL with content (markdown field)
       setAttachedUrls(prev => prev.map(item => 
         item.id === urlId 
-          ? { ...item, title: data.title, content: data.content, isProcessing: false }
+          ? { ...item, title: url, content: data.markdown, isProcessing: false }
           : item
       ));
 
       toast({
         title: "URL processed",
-        description: `${data.title || url} fetched successfully (${data.tokens} tokens)`
+        description: `Content from ${url} fetched successfully (${data.markdown?.length || 0} chars)`
       });
     } catch (error) {
       console.error('❌ Error fetching URL:', error);
@@ -4914,9 +4915,13 @@ export function ChatPanel({
     }
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!inputMessage.trim() || isLoading) return
+  const handleSendMessage = async (e?: React.FormEvent, preProcessedMessage?: string) => {
+    e?.preventDefault()
+    
+    // Use pre-processed message if provided (for auto-send with URL), otherwise use input
+    const baseMessage = preProcessedMessage || inputMessage.trim();
+    
+    if (!baseMessage || isLoading) return
 
     // If no project is selected, show auth modal
     if (!project) {
@@ -4963,7 +4968,8 @@ export function ChatPanel({
     }
 
     // Prepare message content with attached files, images, uploaded files, and URLs
-    let messageContent = inputMessage.trim();
+    // If pre-processed message is provided, use it directly (URL already appended)
+    let messageContent = preProcessedMessage || inputMessage.trim();
     
     // Check if images are still processing
     if (attachedImages.some(img => img.isProcessing)) {
@@ -4985,27 +4991,30 @@ export function ChatPanel({
       return;
     }
     
-    // Add image descriptions first
-    if (attachedImages.length > 0) {
-      const imageDescriptions = attachedImages
-        .filter(img => img.description)
-        .map(img => `\n\n--- Image: ${img.name} ---\n${img.description}\n--- End of Image ---`)
-        .join('');
-      
-      if (imageDescriptions) {
-        messageContent = `${messageContent}\n\n=== ATTACHED IMAGES CONTEXT ===${imageDescriptions}\n=== END ATTACHED IMAGES ===`;
+    // Only process attachments if not using pre-processed message (URL already appended in auto-send)
+    if (!preProcessedMessage) {
+      // Add image descriptions first
+      if (attachedImages.length > 0) {
+        const imageDescriptions = attachedImages
+          .filter(img => img.description)
+          .map(img => `\n\n--- Image: ${img.name} ---\n${img.description}\n--- End of Image ---`)
+          .join('');
+        
+        if (imageDescriptions) {
+          messageContent = `${messageContent}\n\n=== ATTACHED IMAGES CONTEXT ===${imageDescriptions}\n=== END ATTACHED IMAGES ===`;
+        }
       }
-    }
 
-    // Add URL contents
-    if (attachedUrls.length > 0) {
-      const urlContents = attachedUrls
-        .filter(url => url.content)
-        .map(url => `\n\n--- Website: ${url.title || url.url} ---\nURL: ${url.url}\n\nContent:\n${url.content}\n--- End of Website ---`)
-        .join('');
-      
-      if (urlContents) {
-        messageContent = `${messageContent}\n\n=== ATTACHED WEBSITES CONTEXT ===${urlContents}\n=== END ATTACHED WEBSITES ===`;
+      // Add URL contents
+      if (attachedUrls.length > 0) {
+        const urlContents = attachedUrls
+          .filter(url => url.content)
+          .map(url => `\n\n--- Website: ${url.title || url.url} ---\nURL: ${url.url}\n\nContent:\n${url.content}\n--- End of Website ---`)
+          .join('');
+        
+        if (urlContents) {
+          messageContent = `${messageContent}\n\n=== ATTACHED WEBSITES CONTEXT ===${urlContents}\n=== END ATTACHED WEBSITES ===`;
+        }
       }
     }
     

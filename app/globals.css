@@ -173,6 +173,29 @@ body {
   }
 }
 
+/* NEW Badge Blinking Animation */
+@keyframes new-badge-blink {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.5), 0 0 20px rgba(147, 51, 234, 0.3);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.8), 0 0 30px rgba(147, 51, 234, 0.6);
+  }
+}
+
+@keyframes new-badge-shine {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
 .logo-glow {
   animation: logo-glow 3s ease-in-out infinite;
 }
@@ -183,6 +206,15 @@ body {
 
 .sparkle-rotate {
   animation: sparkle-rotate 6s linear infinite;
+}
+
+.new-badge-blink {
+  animation: new-badge-blink 1.5s ease-in-out infinite;
+}
+
+.new-badge-shine {
+  background-size: 200% auto;
+  animation: new-badge-shine 3s linear infinite;
 }
 
 /* Enhanced hover effects for logo */

@@ -601,13 +601,21 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
             {/* URL Attachment Field */}
             <div className="relative">
-              <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700/50">
-                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {/* Blinking NEW Badge */}
+              <div className="absolute -top-2 left-2 z-10">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 text-white shadow-lg new-badge-blink new-badge-shine">
+                  <Sparkles className="w-2.5 h-2.5 sparkle-rotate" />
+                  NEW
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700/50 hover:border-blue-500/50 transition-colors">
+                <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                 </svg>
                 <input
                   type="url"
-                  placeholder="Optional: Paste website URL to clone (e.g., https://example.com)"
+                  placeholder="🌐 Clone any website - paste URL here (e.g., https://bbc.com)"
                   value={attachedUrl}
                   onChange={(e) => setAttachedUrl(e.target.value)}
                   className="flex-1 bg-transparent outline-none text-sm text-gray-300 placeholder-gray-500"
