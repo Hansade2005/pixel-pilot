@@ -3900,74 +3900,12 @@ export function ChatPanel({
   React.useEffect(() => {
     const autoSendInitialPrompt = async () => {
       if (initialPrompt && project && messages.length === 0 && !isLoading) {
-        console.log(`[ChatPanel] Auto-sending initial prompt: "${initialPrompt}"`)
+        console.log(`[ChatPanel] Auto-sending initial prompt (already includes URL content if attached)`)
         
-        // Check for URL attachment from homepage
-        const initialUrl = typeof window !== 'undefined' 
-          ? sessionStorage.getItem(`initial-url-${project.id}`)
-          : null
-
-        if (initialUrl) {
-          console.log(`🌐 [ChatPanel] Found URL attachment from homepage: ${initialUrl}`)
-          
-          // Fetch URL content before sending message
-          try {
-            const urlId = `url_${Date.now()}`;
-            
-            // Add URL to state with processing flag
-            setAttachedUrls([{
-              id: urlId,
-              url: initialUrl,
-              isProcessing: true
-            }]);
-
-            const response = await fetch('/api/redesign', {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ url: initialUrl }),
-            });
-
-            if (response.ok) {
-              const data = await response.json();
-              
-              console.log('✅ URL content fetched for auto-send:', {
-                title: data.title,
-                contentLength: data.content?.length,
-                tokens: data.tokens
-              });
-
-              // Update URL with content
-              setAttachedUrls([{
-                id: urlId,
-                url: initialUrl,
-                title: data.title,
-                content: data.content,
-                isProcessing: false
-              }]);
-
-              toast({
-                title: "Website loaded",
-                description: `${data.title || initialUrl} fetched successfully`
-              });
-            } else {
-              console.error('❌ Failed to fetch URL for auto-send');
-              setAttachedUrls([]);
-            }
-
-            // Clean up session storage
-            sessionStorage.removeItem(`initial-url-${project.id}`);
-          } catch (error) {
-            console.error('❌ Error fetching URL for auto-send:', error);
-            setAttachedUrls([]);
-          }
-        }
-        
-        // Set the input message and trigger send
+        // Set the input message (already includes URL content from chat-input)
         setInputMessage(initialPrompt)
         
-        // Small delay to ensure state is updated (increased for URL fetch)
+        // Small delay to ensure state is updated
         setTimeout(() => {
           // Create a synthetic form event to trigger handleSendMessage
           const syntheticEvent = {
@@ -3975,7 +3913,7 @@ export function ChatPanel({
           } as React.FormEvent
           
           handleSendMessage(syntheticEvent)
-        }, initialUrl ? 2000 : 100) // Wait longer if URL was attached
+        }, 100)
       }
     }
 
@@ -4508,21 +4446,21 @@ export function ChatPanel({
       const data = await response.json();
 
       console.log('✅ URL content fetched:', {
-        title: data.title,
-        contentLength: data.content?.length,
-        tokens: data.tokens
+        url: url,
+        contentLength: data.markdown?.length,
+        hasContent: !!data.markdown
       });
 
-      // Update URL with content
+      // Update URL with content (API returns markdown field)
       setAttachedUrls(prev => prev.map(item => 
         item.id === urlId 
-          ? { ...item, title: data.title, content: data.content, isProcessing: false }
+          ? { ...item, title: url, content: data.markdown, isProcessing: false }
           : item
       ));
 
       toast({
         title: "URL processed",
-        description: `${data.title || url} fetched successfully (${data.tokens} tokens)`
+        description: `Website content fetched successfully (${data.markdown?.length || 0} characters)`
       });
     } catch (error) {
       console.error('❌ Error fetching URL:', error);

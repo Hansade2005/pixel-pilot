@@ -472,16 +472,50 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         
         toast.success('Project created and saved!')
         
-        // Store the FULL prompt in sessionStorage to avoid URL length limitations
-        // This ensures the complete prompt is sent to the chat panel, not truncated
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem(`initial-prompt-${workspace.id}`, prompt.trim())
+        // 🌐 CRITICAL FIX: Fetch URL content BEFORE storing prompt
+        // This ensures the full prompt with website context is ready for auto-send
+        let fullPrompt = prompt.trim()
+        
+        if (attachedUrl.trim()) {
+          console.log('🌐 Fetching URL content before storing prompt:', attachedUrl)
+          toast.loading('Fetching website content...', { id: 'url-fetch' })
           
-          // 🌐 Store URL attachment if present
-          if (attachedUrl.trim()) {
-            console.log('🌐 Storing URL attachment for workspace:', attachedUrl)
-            sessionStorage.setItem(`initial-url-${workspace.id}`, attachedUrl.trim())
+          try {
+            const response = await fetch('/api/redesign', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url: attachedUrl.trim() })
+            })
+            
+            if (response.ok) {
+              const data = await response.json()
+              
+              if (data.ok && data.markdown) {
+                console.log('✅ URL content fetched:', {
+                  url: attachedUrl,
+                  contentLength: data.markdown.length
+                })
+                
+                // Append URL content to prompt
+                fullPrompt = `${fullPrompt}\n\n=== WEBSITE CONTEXT ===\nURL: ${attachedUrl}\n\n${data.markdown}\n=== END WEBSITE CONTEXT ===`
+                
+                toast.success('Website content loaded!', { id: 'url-fetch' })
+              } else {
+                toast.error('Failed to fetch website content', { id: 'url-fetch' })
+              }
+            } else {
+              toast.error('Failed to fetch website content', { id: 'url-fetch' })
+            }
+          } catch (error) {
+            console.error('❌ Error fetching URL:', error)
+            toast.error('Error loading website content', { id: 'url-fetch' })
           }
+        }
+        
+        // Store the FULL prompt (with URL content if attached) in sessionStorage
+        // This ensures the complete prompt is sent to the chat panel
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem(`initial-prompt-${workspace.id}`, fullPrompt)
           
           // CRITICAL FIX: Clear any cached project/file state to prevent contamination
           // This ensures the workspace loads with a clean slate
