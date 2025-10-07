@@ -152,10 +152,6 @@ export async function POST(
       supabaseAdmin
     );
 
-    // Use proxy URL to mask storage location
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pipilot.dev';
-    const proxyUrl = `${appUrl}/api/v1/databases/${params.id}/storage/files/${uploadedFile.id}/proxy`;
-
     return NextResponse.json({
       success: true,
       file: {
@@ -164,7 +160,7 @@ export async function POST(
         original_name: uploadedFile.original_name,
         size_bytes: uploadedFile.size_bytes,
         mime_type: uploadedFile.mime_type,
-        url: proxyUrl,
+        url: uploadedFile.public_url || uploadedFile.url,
         is_public: uploadedFile.is_public,
         created_at: uploadedFile.created_at,
       },

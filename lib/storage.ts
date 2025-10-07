@@ -172,7 +172,16 @@ export async function uploadFile(
       throw new Error('Failed to upload file');
     }
 
-    // Create file record in database first (to get file ID)
+    // Get public URL if public
+    let publicUrl = null;
+    if (options.isPublic) {
+      const { data: urlData } = supabaseAdmin.storage
+        .from(STORAGE_CONFIG.MASTER_BUCKET_NAME)
+        .getPublicUrl(filePath);
+      publicUrl = urlData.publicUrl;
+    }
+
+    // Create file record in database
     const { data: fileRecord, error: dbError } = await supabaseAdmin
       .from('storage_files')
       .insert({
@@ -185,6 +194,7 @@ export async function uploadFile(
         is_public: options.isPublic || false,
         metadata: {
           ...options.metadata,
+          public_url: publicUrl,
           uploaded_at: new Date().toISOString(),
         },
       })
@@ -201,15 +211,9 @@ export async function uploadFile(
       throw new Error('Failed to create file record');
     }
 
-    // Generate proxy URL (hides Supabase URLs)
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pipilot.dev';
-    const proxyUrl = options.isPublic 
-      ? `${baseUrl}/api/public/files/${fileRecord.id}/proxy`
-      : `${baseUrl}/api/database/${databaseId}/storage/files/${fileRecord.id}/proxy`;
-
     return {
       ...fileRecord,
-      url: proxyUrl, // Proxy URL that masks Supabase
+      public_url: publicUrl,
     };
   } catch (error) {
     console.error('Error in uploadFile:', error);
@@ -222,10 +226,10 @@ export async function uploadFile(
  * @param fileId - The file ID
  * @param expiresIn - Expiration time in seconds (default: 7 days for database storage)
  */
-export async function getFileUrl(fileId: string, expiresIn: number = 604800, useProxy: boolean = true) {
+export async function getFileUrl(fileId: string, expiresIn: number = 604800) { // 7 days default (604800 seconds)
   const { data: file, error } = await supabaseAdmin
     .from('storage_files')
-    .select('*, storage_buckets!inner(database_id)')
+    .select('*')
     .eq('id', fileId)
     .single();
 
@@ -233,20 +237,6 @@ export async function getFileUrl(fileId: string, expiresIn: number = 604800, use
     throw new Error('File not found');
   }
 
-  // If proxy is enabled, return proxy URLs that hide Supabase URLs
-  if (useProxy) {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pipilot.dev';
-    
-    if (file.is_public) {
-      // Public files: Use public API proxy (no authentication required)
-      return `${baseUrl}/api/public/files/${fileId}/proxy`;
-    } else {
-      // Private files: Use authenticated proxy
-      return `${baseUrl}/api/database/${file.storage_buckets.database_id}/storage/files/${fileId}/proxy`;
-    }
-  }
-
-  // Legacy: Direct Supabase URLs (only used when proxy is disabled)
   if (file.is_public) {
     // Public files: permanent URL that never expires
     const { data } = supabaseAdmin.storage
