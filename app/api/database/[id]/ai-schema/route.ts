@@ -55,10 +55,10 @@ export async function POST(
       )
     }
 
-    // Verify database ownership via workspace
+    // Verify database ownership
     const { data: database, error: dbError } = await supabase
       .from('databases')
-      .select('id, name, workspace_id, workspaces!inner(user_id)')
+      .select('id, name, project_id, user_id')
       .eq('id', databaseId)
       .single()
 
@@ -69,8 +69,8 @@ export async function POST(
       )
     }
 
-    // @ts-ignore - Supabase join typing
-    if (database.workspaces.user_id !== user.id) {
+    // Check if user owns this database
+    if (database.user_id !== user.id) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
