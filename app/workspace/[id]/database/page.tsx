@@ -8,14 +8,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Database, Plus, AlertCircle, Loader2, Table as TableIcon, Sparkles } from 'lucide-react';
+import { Database, Plus, AlertCircle, Loader2, Table as TableIcon, Sparkles, Key, Book } from 'lucide-react';
 import { toast } from 'sonner';
 import { CreateTableDialog } from '@/components/database/create-table-dialog';
 import { TableDetailsView } from '@/components/database/table-details-view';
 import { EditTableDialog } from '@/components/database/edit-table-dialog';
 import { DeleteTableDialog } from '@/components/database/delete-table-dialog';
 import { AISchemaGenerator } from '@/components/database/ai-schema-generator';
+import ApiKeysManager from '@/components/database/api-keys-manager';
+import { ApiDocsGenerator } from '@/components/database/api-docs-generator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Navigation } from '@/components/navigation';
 import { Footer } from '@/components/footer';
 import type { Table } from '@/lib/supabase';
@@ -42,6 +45,8 @@ export default function DatabasePage() {
   const [editingTable, setEditingTable] = useState<TableWithCount | null>(null);
   const [deletingTable, setDeletingTable] = useState<TableWithCount | null>(null);
   const [showAISchemaGenerator, setShowAISchemaGenerator] = useState(false);
+  const [showApiDocsGenerator, setShowApiDocsGenerator] = useState(false);
+  const [activeTab, setActiveTab] = useState('tables');
 
   useEffect(() => {
     loadData();
@@ -377,30 +382,51 @@ export default function DatabasePage() {
         </Card>
       </div>
 
-      {/* Tables List */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-white">Tables</h2>
-            <p className="text-gray-400">
-              Manage your database tables and schemas
-            </p>
+      {/* Tabs for Tables and API Keys */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="bg-gray-800 border-gray-700">
+          <TabsTrigger value="tables" className="data-[state=active]:bg-gray-700">
+            <TableIcon className="h-4 w-4 mr-2" />
+            Tables
+          </TabsTrigger>
+          <TabsTrigger value="api-keys" className="data-[state=active]:bg-gray-700">
+            <Key className="h-4 w-4 mr-2" />
+            API Keys
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Tables Tab */}
+        <TabsContent value="tables" className="space-y-4 mt-0">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-white">Tables</h2>
+              <p className="text-gray-400">
+                Manage your database tables and schemas
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowApiDocsGenerator(true)}
+                className="flex items-center gap-2 border-gray-700 text-white hover:bg-gray-800"
+              >
+                <Book className="h-4 w-4" />
+                API Docs
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowAISchemaGenerator(true)}
+                className="flex items-center gap-2 border-gray-700 text-white hover:bg-gray-800"
+              >
+                <Sparkles className="h-4 w-4" />
+                Generate with AI
+              </Button>
+              <CreateTableDialog
+                databaseId={database.id.toString()}
+                onSuccess={() => loadDatabase(database.id)}
+              />
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowAISchemaGenerator(true)}
-              className="flex items-center gap-2 border-gray-700 text-white hover:bg-gray-800"
-            >
-              <Sparkles className="h-4 w-4" />
-              Generate with AI
-            </Button>
-            <CreateTableDialog
-              databaseId={database.id.toString()}
-              onSuccess={() => loadDatabase(database.id)}
-            />
-          </div>
-        </div>
 
         {tables.length === 0 ? (
           <Card className="bg-gray-800 border-gray-700">
@@ -432,7 +458,13 @@ export default function DatabasePage() {
             ))}
           </div>
         )}
-      </div>
+        </TabsContent>
+
+        {/* API Keys Tab */}
+        <TabsContent value="api-keys" className="mt-0">
+          <ApiKeysManager databaseId={database.id.toString()} />
+        </TabsContent>
+      </Tabs>
 
       {/* Edit Table Dialog */}
       {editingTable && (
@@ -461,6 +493,18 @@ export default function DatabasePage() {
           }}
         />
       )}
+
+      {/* API Docs Generator Dialog */}
+      <ApiDocsGenerator
+        databaseId={database.id.toString()}
+        tables={tables.map(t => ({
+          id: t.id.toString(),
+          name: t.name,
+          schema: t.schema_json
+        }))}
+        open={showApiDocsGenerator}
+        onOpenChange={setShowApiDocsGenerator}
+      />
 
       {/* AI Schema Generator Dialog */}
       <Dialog open={showAISchemaGenerator} onOpenChange={setShowAISchemaGenerator}>
