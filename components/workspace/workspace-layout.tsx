@@ -15,7 +15,7 @@ import { CodePreviewPanel } from "./code-preview-panel"
 import { ProjectHeader } from "./project-header"
 import { FileExplorer } from "./file-explorer"
 import { CodeEditor } from "./code-editor"
-import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone } from "lucide-react"
+import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone, Database } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -1329,9 +1329,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               </div>
             </div>
             
-            {/* Model Selector with label */}
-            <div className="flex-1 max-w-60 mx-4 flex items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground">Model:</span>
+            {/* Model Selector without label for mobile space optimization */}
+            <div className="flex-1 max-w-48 mx-2 flex items-center">
               <ModelSelector
                 selectedModel={selectedModel}
                 onModelChange={setSelectedModel}
@@ -1342,16 +1341,29 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               />
             </div>
             
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => {
+                  if (selectedProject) {
+                    router.push(`/workspace/${selectedProject.id}/database`)
+                  }
+                }}
+                disabled={!selectedProject}
+                title="Database"
+              >
+                <Database className="h-4 w-4" />
+              </Button>
              
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 px-3"
+                className="h-8 px-2"
                 onClick={() => setIsCreateDialogOpen(true)}
               >
-                <Plus className="h-4 w-4 mr-2" />
-                New
+                <Plus className="h-4 w-4" />
               </Button>
              
               <Button
@@ -1360,6 +1372,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 className="h-8 w-8 p-0"
                 onClick={() => router.push(`/workspace/deployment?project=${selectedProject?.id}`)}
                 disabled={!selectedProject}
+                title="Deploy"
               >
                 <Rocket className="h-4 w-4" />
               </Button>
@@ -1368,6 +1381,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 size="sm"
                 className="h-8 w-8 p-0"
                 onClick={() => window.open('/workspace/management', '_blank')}
+                title="Settings"
               >
                 <Settings className="h-4 w-4" />
               </Button>

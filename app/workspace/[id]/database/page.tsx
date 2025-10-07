@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Database, Plus, AlertCircle, Loader2, Table as TableIcon, Sparkles, Key, Book } from 'lucide-react';
+import { Database, Plus, AlertCircle, Loader2, Table as TableIcon, Sparkles, Key, Book, HardDrive } from 'lucide-react';
 import { toast } from 'sonner';
 import { CreateTableDialog } from '@/components/database/create-table-dialog';
 import { TableDetailsView } from '@/components/database/table-details-view';
@@ -16,6 +16,7 @@ import { EditTableDialog } from '@/components/database/edit-table-dialog';
 import { DeleteTableDialog } from '@/components/database/delete-table-dialog';
 import { AISchemaGenerator } from '@/components/database/ai-schema-generator';
 import ApiKeysManager from '@/components/database/api-keys-manager';
+import StorageManager from '@/components/database/storage-manager';
 import { ApiDocsGenerator } from '@/components/database/api-docs-generator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -382,12 +383,16 @@ export default function DatabasePage() {
         </Card>
       </div>
 
-      {/* Tabs for Tables and API Keys */}
+      {/* Tabs for Tables, Storage, and API Keys */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="bg-gray-800 border-gray-700">
           <TabsTrigger value="tables" className="data-[state=active]:bg-gray-700">
             <TableIcon className="h-4 w-4 mr-2" />
             Tables
+          </TabsTrigger>
+          <TabsTrigger value="storage" className="data-[state=active]:bg-gray-700">
+            <HardDrive className="h-4 w-4 mr-2" />
+            Storage
           </TabsTrigger>
           <TabsTrigger value="api-keys" className="data-[state=active]:bg-gray-700">
             <Key className="h-4 w-4 mr-2" />
@@ -458,6 +463,11 @@ export default function DatabasePage() {
             ))}
           </div>
         )}
+        </TabsContent>
+
+        {/* Storage Tab */}
+        <TabsContent value="storage" className="mt-0">
+          <StorageManager databaseId={database.id.toString()} />
         </TabsContent>
 
         {/* API Keys Tab */}
