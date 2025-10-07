@@ -972,6 +972,7 @@ curl -X GET "https://pipilot.dev/api/v1/databases/${databaseId}/tables/${selecte
     );
   }
 
+  return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-gray-800 border-gray-700 max-w-5xl max-h-[90vh] flex flex-col h-full">
         <DialogHeader>
@@ -1086,5 +1087,5 @@ curl -X GET "https://pipilot.dev/api/v1/databases/${databaseId}/tables/${selecte
           </div>
         </div>
       </DialogContent>
-    </Dialog>
+    </Dialog>)
 }

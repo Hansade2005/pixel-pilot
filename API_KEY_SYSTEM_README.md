@@ -144,7 +144,6 @@ const response = await fetch(
 const data = await response.json();
 console.log(data.records); // Array of records
 ```
-
 #### **Create a Record:**
 
 ```javascript
