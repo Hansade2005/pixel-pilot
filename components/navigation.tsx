@@ -22,7 +22,8 @@ import {
   Image as ImageIcon,
   Bell,
   ChevronDown,
-  Zap
+  Zap,
+  Database
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
@@ -203,6 +204,12 @@ export function Navigation() {
                            Projects
                          </DropdownMenuItem>
                        </Link>
+                       <Link href="/database">
+                         <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
+                           <Database className="w-4 h-4 mr-2" />
+                           Database
+                         </DropdownMenuItem>
+                       </Link>
                        <Link href="/workspace/deployment">
                          <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
                            <Rocket className="w-4 h-4 mr-2" />
@@ -255,7 +262,7 @@ export function Navigation() {
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
           <div className="md:hidden">
-            <div className="px-2 pt-2 pb-3 space-y-1 bg-gray-800/50 backdrop-blur-sm rounded-lg mt-2 border border-gray-700/50">
+            <div className="px-2 pt-2 pb-3 space-y-1 bg-gray-800/50 backdrop-blur-sm rounded-lg mt-2 border border-gray-700/50 max-h-[calc(100vh-80px)] overflow-y-auto">
               {/* Mobile Navigation Links */}
               <Link
                 href="/community"
@@ -396,6 +403,14 @@ export function Navigation() {
                              >
                                <Settings className="w-4 h-4 inline mr-2" />
                                Projects
+                             </Link>
+                             <Link
+                               href="/database"
+                               className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
+                               onClick={closeMobileMenu}
+                             >
+                               <Database className="w-4 h-4 inline mr-2" />
+                               Database
                              </Link>
                              <Link
                                href="/workspace/deployment"

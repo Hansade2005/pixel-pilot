@@ -604,44 +604,24 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
       {/* File Preview Dialog */}
       {previewFile && (
         <Dialog open={!!previewFile} onOpenChange={() => setPreviewFile(null)}>
-          <DialogContent className="bg-gray-800 border-gray-700 max-w-5xl max-h-[90vh]">
+          <DialogContent className="bg-gray-800 border-gray-700 max-w-5xl max-h-[90vh] flex flex-col">
             <DialogHeader>
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
                 <div className="flex-1 min-w-0">
                   <DialogTitle className="text-white truncate">{previewFile.original_name}</DialogTitle>
-                  <DialogDescription className="text-gray-400">
+                  <DialogDescription className="text-gray-400 text-xs sm:text-sm">
                     {formatBytes(previewFile.size_bytes)} • {previewFile.mime_type}
                   </DialogDescription>
                 </div>
-                <div className="flex gap-2 flex-shrink-0">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleCopyUrl(previewFile.id)}
-                    className="border-gray-700 text-white hover:bg-gray-700"
-                  >
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copy URL
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDownload(previewFile.id, previewFile.original_name)}
-                    className="border-gray-700 text-white hover:bg-gray-700"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download
-                  </Button>
-                </div>
               </div>
             </DialogHeader>
-            <div className="max-h-[calc(90vh-180px)] overflow-auto">
+            <div className="flex-1 min-h-0 overflow-auto">
               {isImage(previewFile.mime_type) ? (
-                <div className="flex items-center justify-center bg-gray-900 rounded-lg p-4">
+                <div className="flex items-center justify-center bg-gray-900 rounded-lg p-2 sm:p-4 h-full">
                   <img
                     src={previewFile.url}
                     alt={previewFile.original_name}
-                    className="max-w-full max-h-[calc(90vh-220px)] object-contain rounded"
+                    className="max-w-full max-h-full object-contain rounded"
                     onError={(e) => {
                       const parent = e.currentTarget.parentElement;
                       if (parent) {
@@ -656,7 +636,7 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
                   />
                 </div>
               ) : isPDF(previewFile.mime_type) ? (
-                <div className="w-full h-[calc(90vh-220px)] bg-gray-900 rounded-lg overflow-hidden">
+                <div className="w-full h-full bg-gray-900 rounded-lg overflow-hidden">
                   <iframe
                     src={previewFile.url}
                     className="w-full h-full border-0"
@@ -698,12 +678,34 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
                 </div>
               )}
             </div>
-            <DialogFooter className="text-xs text-gray-500">
-              {previewFile.is_public ? (
-                <p className="text-green-600">✓ This URL never expires - safe to store in database</p>
-              ) : (
-                <p className="text-orange-600">⚠️ Private file URLs expire after 7 days for security</p>
-              )}
+            <DialogFooter className="flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+              <div className="flex-1 text-xs text-gray-500">
+                {previewFile.is_public ? (
+                  <p className="text-green-600">✓ This URL never expires - safe to store in database</p>
+                ) : (
+                  <p className="text-orange-600">⚠️ Private file URLs expire after 7 days for security</p>
+                )}
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleCopyUrl(previewFile.id)}
+                  className="border-gray-700 text-white hover:bg-gray-700 flex-1 sm:flex-none"
+                >
+                  <Copy className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Copy URL</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDownload(previewFile.id, previewFile.original_name)}
+                  className="border-gray-700 text-white hover:bg-gray-700 flex-1 sm:flex-none"
+                >
+                  <Download className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Download</span>
+                </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>
