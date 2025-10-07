@@ -346,35 +346,26 @@ export function DataGrid({
     try {
       const recordIds = selectedRows.map(row => row.original.id);
       
-      // Delete each record (you can optimize this with a bulk API endpoint)
-      let successCount = 0;
-      let failCount = 0;
-
-      for (const id of recordIds) {
-        try {
-          const response = await fetch(
-            `/api/database/${table.database_id}/tables/${table.id}/records/${id}`,
-            { method: 'DELETE' }
-          );
-          
-          if (response.ok) {
-            successCount++;
-          } else {
-            failCount++;
-          }
-        } catch (error) {
-          failCount++;
+      // Use bulk delete API endpoint for better performance
+      const response = await fetch(
+        `/api/database/${table.database_id}/tables/${table.id}/records/bulk`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ recordIds }),
         }
-      }
+      );
 
-      if (successCount > 0) {
-        toast.success(`Deleted ${successCount} record(s)`);
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success(data.message || `Deleted ${data.deletedCount} record(s)`);
         setRowSelection({});
         onRefresh?.();
-      }
-      
-      if (failCount > 0) {
-        toast.error(`Failed to delete ${failCount} record(s)`);
+      } else {
+        toast.error(data.error || 'Failed to delete records');
       }
     } catch (error) {
       console.error('Bulk delete error:', error);
@@ -584,6 +575,29 @@ export function DataGrid({
           </Button>
         </div>
       </div>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedRows.length} Record{selectedRows.length !== 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the selected{' '}
+              {selectedRows.length} record{selectedRows.length !== 1 ? 's' : ''} from the table.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isBulkDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              disabled={isBulkDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isBulkDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

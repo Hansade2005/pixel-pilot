@@ -135,7 +135,7 @@ const response = await fetch(
   'https://pipilot.dev/api/v1/databases/123/tables/456/records',
   {
     headers: {
-      'Authorization': 'Bearer sk_live_your_actual_key_here',
+      'Authorization': 'Bearer YOUR_API_KEY_HERE',
       'Content-Type': 'application/json'
     }
   }
