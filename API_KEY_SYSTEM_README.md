@@ -125,7 +125,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 4. Give it a name (e.g., "Production App")
 5. Copy the key immediately - **it will only be shown once!**
 
-Example key: `sk_live_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2`
+Example key: `pk_live_example_key_1234567890abcdef1234567890abcdef`
 
 ### **Step 4: Use the API Key in Your App**
 
