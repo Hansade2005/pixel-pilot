@@ -1,0 +1,17 @@
+# robots.txt for pipilot.dev
+# Allow all major search engines to crawl the site
+User-agent: *
+Allow: /
+
+# Disallow sensitive or unnecessary files/folders
+Disallow: /admin/
+Disallow: /api/
+Disallow: /private/
+Disallow: /node_modules/
+Disallow: /assets/temp/
+
+# Sitemap location
+Sitemap: https://pipilot.dev/sitemap.xml
+
+# Crawl-delay (optional, only for certain bots like Bing)
+Crawl-delay: 10

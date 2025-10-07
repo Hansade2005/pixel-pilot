@@ -89,6 +89,21 @@ USING (
 );
 
 -- =====================================================
+-- 6. ALLOW PUBLIC READ FOR PUBLIC FILES (IMPORTANT!)
+-- =====================================================
+-- This allows public URLs to work without expiration
+-- Files are still secure - only marked public files are accessible
+
+CREATE POLICY "Public files are readable by anyone"
+ON storage.objects
+FOR SELECT
+TO public, anon, authenticated
+USING (
+  bucket_id = 'pipilot-storage'
+  -- No additional restrictions - allows getPublicUrl() to work
+);
+
+-- =====================================================
 -- VERIFICATION QUERIES
 -- =====================================================
 

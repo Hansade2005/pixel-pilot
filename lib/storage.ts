@@ -223,8 +223,10 @@ export async function uploadFile(
 
 /**
  * Get file download URL (signed URL for private files)
+ * @param fileId - The file ID
+ * @param expiresIn - Expiration time in seconds (default: 7 days for database storage)
  */
-export async function getFileUrl(fileId: string, expiresIn: number = 3600) {
+export async function getFileUrl(fileId: string, expiresIn: number = 604800) { // 7 days default (604800 seconds)
   const { data: file, error } = await supabaseAdmin
     .from('storage_files')
     .select('*')
@@ -236,11 +238,13 @@ export async function getFileUrl(fileId: string, expiresIn: number = 3600) {
   }
 
   if (file.is_public) {
+    // Public files: permanent URL that never expires
     const { data } = supabaseAdmin.storage
       .from(STORAGE_CONFIG.MASTER_BUCKET_NAME)
       .getPublicUrl(file.path);
     return data.publicUrl;
   } else {
+    // Private files: signed URL with 7-day expiration (suitable for storing in database)
     const { data, error: signError } = await supabaseAdmin.storage
       .from(STORAGE_CONFIG.MASTER_BUCKET_NAME)
       .createSignedUrl(file.path, expiresIn);

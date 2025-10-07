@@ -38,6 +38,9 @@ import {
   Loader2,
   HardDrive,
   X,
+  ExternalLink,
+  Copy,
+  Eye,
 } from 'lucide-react';
 
 interface StorageFile {
@@ -82,6 +85,7 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
   const [isPublic, setIsPublic] = useState(true);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [previewFile, setPreviewFile] = useState<StorageFile | null>(null);
+  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchStorageData();
@@ -172,6 +176,74 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
     }
   };
 
+  const handleDownload = async (fileId: string, fileName: string) => {
+    setDownloadingFileId(fileId);
+    try {
+      // Get fresh signed URL from API
+      const response = await fetch(`/api/database/${databaseId}/storage/files/${fileId}`);
+      if (!response.ok) throw new Error('Failed to get download URL');
+
+      const data = await response.json();
+      
+      // Download the file
+      const link = document.createElement('a');
+      link.href = data.file.url;
+      link.download = fileName;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success('Download started');
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('Failed to download file');
+    } finally {
+      setDownloadingFileId(null);
+    }
+  };
+
+  const handleCopyUrl = async (fileId: string) => {
+    try {
+      // Get fresh signed URL from API
+      const response = await fetch(`/api/database/${databaseId}/storage/files/${fileId}`);
+      if (!response.ok) throw new Error('Failed to get file URL');
+
+      const data = await response.json();
+      
+      // Copy to clipboard
+      await navigator.clipboard.writeText(data.file.url);
+      
+      // Show appropriate message based on file type
+      if (data.file.is_public) {
+        toast.success('Public URL copied!', {
+          description: '✓ This URL never expires - perfect for storing in database',
+        });
+      } else {
+        toast.success('Private URL copied!', {
+          description: '⚠️ Note: This URL expires in 7 days',
+        });
+      }
+    } catch (error) {
+      console.error('Copy URL error:', error);
+      toast.error('Failed to copy URL');
+    }
+  };
+
+  const handleOpenInNewTab = async (fileId: string) => {
+    try {
+      // Get fresh signed URL from API
+      const response = await fetch(`/api/database/${databaseId}/storage/files/${fileId}`);
+      if (!response.ok) throw new Error('Failed to get file URL');
+
+      const data = await response.json();
+      window.open(data.file.url, '_blank');
+    } catch (error) {
+      console.error('Open file error:', error);
+      toast.error('Failed to open file');
+    }
+  };
+
   const formatBytes = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -189,6 +261,8 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
   };
 
   const isImage = (mimeType: string) => mimeType.startsWith('image/');
+  const isPDF = (mimeType: string) => mimeType === 'application/pdf';
+  const isPreviewable = (mimeType: string) => isImage(mimeType) || isPDF(mimeType);
 
   const filteredFiles = files.filter(file =>
     file.original_name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -308,18 +382,47 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
             <Card key={file.id} className="bg-gray-800 border-gray-700 overflow-hidden">
               {/* File Preview */}
               <div 
-                className="h-48 bg-gray-900 flex items-center justify-center cursor-pointer hover:bg-gray-850 transition-colors"
-                onClick={() => setPreviewFile(file)}
+                className="h-48 bg-gray-900 flex items-center justify-center cursor-pointer hover:bg-gray-850 transition-colors relative group"
+                onClick={() => isPreviewable(file.mime_type) && setPreviewFile(file)}
               >
                 {isImage(file.mime_type) ? (
-                  <img
-                    src={file.url}
-                    alt={file.original_name}
-                    className="w-full h-full object-cover"
-                  />
+                  <>
+                    <img
+                      src={file.url}
+                      alt={file.original_name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // If image fails to load, show icon
+                        e.currentTarget.style.display = 'none';
+                        const parent = e.currentTarget.parentElement;
+                        if (parent) {
+                          const icon = document.createElement('div');
+                          icon.className = 'text-gray-500 flex flex-col items-center gap-2';
+                          icon.innerHTML = '<div>🖼️</div><span class="text-xs">Image unavailable</span>';
+                          parent.appendChild(icon);
+                        }
+                      }}
+                    />
+                    {isPreviewable(file.mime_type) && (
+                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        <Eye className="h-8 w-8 text-white" />
+                      </div>
+                    )}
+                  </>
+                ) : isPDF(file.mime_type) ? (
+                  <>
+                    <div className="text-gray-500 flex flex-col items-center gap-2">
+                      <FileText className="h-12 w-12" />
+                      <span className="text-xs">PDF Document</span>
+                    </div>
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                      <Eye className="h-8 w-8 text-white" />
+                    </div>
+                  </>
                 ) : (
-                  <div className="text-gray-500">
+                  <div className="text-gray-500 flex flex-col items-center gap-2">
                     {getFileIcon(file.mime_type)}
+                    <span className="text-xs capitalize">{file.mime_type.split('/')[0]}</span>
                   </div>
                 )}
               </div>
@@ -328,7 +431,7 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
               <CardContent className="p-4 space-y-3">
                 <div>
                   <div className="flex items-start justify-between gap-2">
-                    <h4 className="text-white font-medium text-sm truncate flex-1">
+                    <h4 className="text-white font-medium text-sm truncate flex-1" title={file.original_name}>
                       {file.original_name}
                     </h4>
                     <Badge
@@ -348,16 +451,40 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
                     variant="outline"
                     size="sm"
                     className="flex-1 border-gray-700 text-white hover:bg-gray-700"
-                    onClick={() => window.open(file.url, '_blank')}
+                    onClick={() => handleDownload(file.id, file.original_name)}
+                    disabled={downloadingFileId === file.id}
                   >
-                    <Download className="h-3 w-3 mr-1" />
+                    {downloadingFileId === file.id ? (
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    ) : (
+                      <Download className="h-3 w-3 mr-1" />
+                    )}
                     Download
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCopyUrl(file.id)}
+                    className="border-gray-700 text-white hover:bg-gray-700"
+                    title="Copy URL"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleOpenInNewTab(file.id)}
+                    className="border-gray-700 text-white hover:bg-gray-700"
+                    title="Open in new tab"
+                  >
+                    <ExternalLink className="h-3 w-3" />
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setDeleteConfirm(file.id)}
                     className="border-red-900 text-red-400 hover:bg-red-950"
+                    title="Delete"
                   >
                     <Trash2 className="h-3 w-3" />
                   </Button>
@@ -370,7 +497,7 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
 
       {/* Upload Dialog */}
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-        <DialogContent className="bg-gray-800 border-gray-700">
+        <DialogContent className="bg-gray-800 border-gray-700 max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-white">Upload File</DialogTitle>
             <DialogDescription className="text-gray-400">
@@ -378,17 +505,49 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                id="is-public"
-                checked={isPublic}
-                onChange={(e) => setIsPublic(e.target.checked)}
-                className="rounded border-gray-700"
-              />
-              <label htmlFor="is-public" className="text-white text-sm">
-                Make file publicly accessible
-              </label>
+            {/* Public/Private Toggle */}
+            <div className="space-y-3 p-4 rounded-lg border border-gray-700 bg-gray-900">
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  id="is-public"
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                  className="mt-1 rounded border-gray-700"
+                />
+                <div className="flex-1">
+                  <label htmlFor="is-public" className="text-white text-sm font-medium cursor-pointer">
+                    Make file publicly accessible (Recommended)
+                  </label>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {isPublic ? (
+                      <>
+                        <span className="text-green-400">✓ URL will never expire</span> - Perfect for avatars, images, and files stored in database records
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-orange-400">⚠️ URL expires in 7 days</span> - Only use for sensitive/temporary files
+                      </>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Usage Guidelines */}
+            <div className="text-xs space-y-2 text-gray-400">
+              <p className="font-medium text-gray-300">Choose Public for:</p>
+              <ul className="list-disc list-inside space-y-1 ml-2">
+                <li>Profile pictures & avatars</li>
+                <li>Product images & logos</li>
+                <li>Any URL stored in database</li>
+              </ul>
+              <p className="font-medium text-gray-300 mt-3">Choose Private for:</p>
+              <ul className="list-disc list-inside space-y-1 ml-2">
+                <li>Sensitive documents</li>
+                <li>Temporary files</li>
+                <li>Files with restricted access</li>
+              </ul>
             </div>
           </div>
           <DialogFooter>
@@ -445,34 +604,107 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
       {/* File Preview Dialog */}
       {previewFile && (
         <Dialog open={!!previewFile} onOpenChange={() => setPreviewFile(null)}>
-          <DialogContent className="bg-gray-800 border-gray-700 max-w-4xl">
+          <DialogContent className="bg-gray-800 border-gray-700 max-w-5xl max-h-[90vh]">
             <DialogHeader>
-              <DialogTitle className="text-white">{previewFile.original_name}</DialogTitle>
-              <DialogDescription className="text-gray-400">
-                {formatBytes(previewFile.size_bytes)} • {previewFile.mime_type}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="max-h-[70vh] overflow-auto">
-              {isImage(previewFile.mime_type) ? (
-                <img
-                  src={previewFile.url}
-                  alt={previewFile.original_name}
-                  className="w-full h-auto rounded-lg"
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                  {getFileIcon(previewFile.mime_type)}
-                  <p className="mt-4">Preview not available for this file type</p>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <DialogTitle className="text-white truncate">{previewFile.original_name}</DialogTitle>
+                  <DialogDescription className="text-gray-400">
+                    {formatBytes(previewFile.size_bytes)} • {previewFile.mime_type}
+                  </DialogDescription>
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
                   <Button
-                    className="mt-4"
-                    onClick={() => window.open(previewFile.url, '_blank')}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCopyUrl(previewFile.id)}
+                    className="border-gray-700 text-white hover:bg-gray-700"
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy URL
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownload(previewFile.id, previewFile.original_name)}
+                    className="border-gray-700 text-white hover:bg-gray-700"
                   >
                     <Download className="h-4 w-4 mr-2" />
-                    Download File
+                    Download
                   </Button>
+                </div>
+              </div>
+            </DialogHeader>
+            <div className="max-h-[calc(90vh-180px)] overflow-auto">
+              {isImage(previewFile.mime_type) ? (
+                <div className="flex items-center justify-center bg-gray-900 rounded-lg p-4">
+                  <img
+                    src={previewFile.url}
+                    alt={previewFile.original_name}
+                    className="max-w-full max-h-[calc(90vh-220px)] object-contain rounded"
+                    onError={(e) => {
+                      const parent = e.currentTarget.parentElement;
+                      if (parent) {
+                        parent.innerHTML = `
+                          <div class="text-gray-400 text-center py-12">
+                            <p class="mb-4">Failed to load image</p>
+                            <p class="text-sm">The signed URL may have expired. Try downloading the file.</p>
+                          </div>
+                        `;
+                      }
+                    }}
+                  />
+                </div>
+              ) : isPDF(previewFile.mime_type) ? (
+                <div className="w-full h-[calc(90vh-220px)] bg-gray-900 rounded-lg overflow-hidden">
+                  <iframe
+                    src={previewFile.url}
+                    className="w-full h-full border-0"
+                    title={previewFile.original_name}
+                    onError={() => {
+                      toast.error('Failed to load PDF preview', {
+                        description: 'The file may be too large or the URL expired. Try downloading instead.',
+                      });
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-400 bg-gray-900 rounded-lg">
+                  <div className="text-6xl mb-4">
+                    {getFileIcon(previewFile.mime_type)}
+                  </div>
+                  <p className="text-lg mb-2">Preview not available</p>
+                  <p className="text-sm text-gray-500 mb-6">
+                    This file type cannot be previewed in the browser
+                  </p>
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => handleDownload(previewFile.id, previewFile.original_name)}
+                      className="border-gray-700 text-white hover:bg-gray-700"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download File
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleOpenInNewTab(previewFile.id)}
+                      className="border-gray-700 text-white hover:bg-gray-700"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Open in New Tab
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
+            <DialogFooter className="text-xs text-gray-500">
+              {previewFile.is_public ? (
+                <p className="text-green-600">✓ This URL never expires - safe to store in database</p>
+              ) : (
+                <p className="text-orange-600">⚠️ Private file URLs expire after 7 days for security</p>
+              )}
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
