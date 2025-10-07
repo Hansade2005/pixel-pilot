@@ -972,9 +972,8 @@ curl -X GET "https://pipilot.dev/api/v1/databases/${databaseId}/tables/${selecte
     );
   }
 
-  return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-gray-800 border-gray-700 max-w-5xl max-h-[90vh]">
+      <DialogContent className="bg-gray-800 border-gray-700 max-w-5xl max-h-[90vh] flex flex-col h-full">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
             <Book className="h-5 w-5 text-blue-400" />
@@ -985,9 +984,9 @@ curl -X GET "https://pipilot.dev/api/v1/databases/${databaseId}/tables/${selecte
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="flex-1 overflow-auto p-4 space-y-4">
           {/* Configuration */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-300">
                 Framework / Language
@@ -1026,7 +1025,7 @@ curl -X GET "https://pipilot.dev/api/v1/databases/${databaseId}/tables/${selecte
           </div>
 
           {/* Info Cards */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Card className="bg-gray-900/50 border-gray-700">
               <CardContent className="p-3">
                 <div className="text-xs text-gray-400 mb-1">Database ID</div>
@@ -1061,32 +1060,31 @@ curl -X GET "https://pipilot.dev/api/v1/databases/${databaseId}/tables/${selecte
               </pre>
             </div>
           </ScrollArea>
+        </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-between pt-4 border-t border-gray-700">
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="border-green-700 text-green-400">
-                <CheckCircle2 className="h-3 w-3 mr-1" />
-                Ready to use
-              </Badge>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => copyToClipboard(generateFullDocumentation())}
-                className="border-gray-700 text-white hover:bg-gray-700"
-              >
-                <Copy className="h-4 w-4 mr-2" />
-                Copy All
-              </Button>
-              <Button onClick={downloadDocs}>
-                <Download className="h-4 w-4 mr-2" />
-                Download
-              </Button>
-            </div>
+        {/* Actions */}
+        <div className="border-t border-gray-700 p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="border-green-700 text-green-400">
+              <CheckCircle2 className="h-3 w-3 mr-1" />
+              Ready to use
+            </Badge>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => copyToClipboard(generateFullDocumentation())}
+              className="border-gray-700 text-white hover:bg-gray-700"
+            >
+              <Copy className="h-4 w-4 mr-2" />
+              Copy All
+            </Button>
+            <Button onClick={downloadDocs}>
+              <Download className="h-4 w-4 mr-2" />
+              Download
+            </Button>
           </div>
         </div>
       </DialogContent>
     </Dialog>
-  );
 }

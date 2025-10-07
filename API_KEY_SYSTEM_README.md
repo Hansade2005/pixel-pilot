@@ -178,7 +178,7 @@ const response = await fetch(
   {
     method: 'PUT',
     headers: {
-      'Authorization': 'Bearer sk_live_your_actual_key_here',
+      'Authorization': 'Bearer your_actual_key_here',
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
