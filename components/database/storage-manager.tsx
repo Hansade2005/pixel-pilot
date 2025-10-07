@@ -179,20 +179,17 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
   const handleDownload = async (fileId: string, fileName: string) => {
     setDownloadingFileId(fileId);
     try {
-      // Get fresh signed URL from API
-      const response = await fetch(`/api/database/${databaseId}/storage/files/${fileId}`);
-      if (!response.ok) throw new Error('Failed to get download URL');
+      // Use the proxy endpoint for reliable downloads
+      const proxyUrl = `/api/database/${databaseId}/storage/files/${fileId}/proxy`;
 
-      const data = await response.json();
-      
-      // Download the file
+      // Create a temporary link to trigger download
       const link = document.createElement('a');
-      link.href = data.file.url;
+      link.href = proxyUrl;
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       toast.success('Download started');
     } catch (error) {
       console.error('Download error:', error);
@@ -200,9 +197,7 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
     } finally {
       setDownloadingFileId(null);
     }
-  };
-
-  const handleCopyUrl = async (fileId: string) => {
+  };  const handleCopyUrl = async (fileId: string) => {
     try {
       // Get fresh signed URL from API
       const response = await fetch(`/api/database/${databaseId}/storage/files/${fileId}`);
