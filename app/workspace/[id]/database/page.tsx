@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Database, Plus, AlertCircle, Loader2, Table as TableIcon, Sparkles, Code } from 'lucide-react';
+import { Database, Plus, AlertCircle, Loader2, Table as TableIcon, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { CreateTableDialog } from '@/components/database/create-table-dialog';
 import { TableDetailsView } from '@/components/database/table-details-view';
@@ -387,12 +387,6 @@ export default function DatabasePage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Link href={`/workspace/${params.id}/database/sql`}>
-              <Button variant="outline" className="flex items-center gap-2 border-gray-700 text-white hover:bg-gray-800">
-                <Code className="h-4 w-4" />
-                SQL Panel
-              </Button>
-            </Link>
             <Button
               variant="outline"
               onClick={() => setShowAISchemaGenerator(true)}
