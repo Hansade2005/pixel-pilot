@@ -65,6 +65,7 @@ export function AISchemaGenerator({
     setGeneratedSchema(null)
 
     try {
+      console.log('[AI Schema] Generating schema for database:', databaseId)
       const response = await fetch(`/api/database/${databaseId}/ai-schema`, {
         method: 'POST',
         headers: {
@@ -75,12 +76,16 @@ export function AISchemaGenerator({
         })
       })
 
+      console.log('[AI Schema] Response status:', response.status)
+      
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to generate schema')
+        console.error('[AI Schema] Error response:', errorData)
+        throw new Error(errorData.error || errorData.details || 'Failed to generate schema')
       }
 
       const data = await response.json()
+      console.log('[AI Schema] Success:', data)
       const schema = data.schema
 
       setGeneratedSchema(schema)
@@ -92,6 +97,7 @@ export function AISchemaGenerator({
       })
 
     } catch (err) {
+      console.error('Schema generation error:', err)
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate schema'
       setError(errorMessage)
       toast({

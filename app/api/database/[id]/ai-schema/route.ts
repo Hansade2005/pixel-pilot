@@ -19,14 +19,10 @@ const ColumnSchema = z.object({
 })
 
 const TableSchemaOutput = z.object({
-  tableName: z.string().min(1),
-  columns: z.array(ColumnSchema).min(1),
-  indexes: z.array(z.string()).default([]),
-  explanation: z.string(),
-  relationships: z.array(z.object({
-    type: z.enum(['one-to-one', 'one-to-many', 'many-to-many']),
-    description: z.string()
-  })).optional()
+  tableName: z.string().min(1).describe('The name of the table in snake_case (singular)'),
+  columns: z.array(ColumnSchema).min(1).describe('Array of column definitions'),
+  indexes: z.array(z.string()).default([]).describe('Array of column names to index'),
+  explanation: z.string().describe('Detailed explanation of the table schema and design decisions')
 })
 
 export async function POST(
@@ -90,19 +86,21 @@ export async function POST(
 
     const systemPrompt = `You are a PostgreSQL database schema expert specializing in Supabase/PostgreSQL databases.
 
-Your task is to generate a complete, production-ready table schema based on the user's description.
+Your task is to generate a complete, production-ready table schema for a SINGLE TABLE based on the user's description.
 
 **CRITICAL RULES:**
-1. Always include an 'id' column as UUID with default gen_random_uuid()
-2. Always include 'created_at' timestamp with default NOW()
-3. Always include 'updated_at' timestamp with default NOW()
-4. Use snake_case for all column names and table names
-5. Choose appropriate data types for each field
-6. Add foreign keys for relationships (references)
-7. Mark required fields appropriately
-8. Suggest useful indexes for performance
-9. Keep table names singular (e.g., 'user' not 'users')
-10. Ensure column names are descriptive and clear
+1. Generate ONLY ONE table schema (not multiple tables)
+2. Always include an 'id' column as UUID with default gen_random_uuid()
+3. Always include 'created_at' timestamp with default NOW()
+4. Always include 'updated_at' timestamp with default NOW()
+5. Use snake_case for all column names and table names
+6. Choose appropriate data types for each field
+7. Add foreign keys for relationships (references)
+8. Mark required fields appropriately
+9. Suggest useful indexes for performance (return column names as strings in indexes array)
+10. Keep table names singular (e.g., 'user' not 'users')
+11. Ensure column names are descriptive and clear
+12. MUST include an 'explanation' field describing your schema decisions
 
 **AVAILABLE TYPES:**
 - text: For strings, descriptions, names
@@ -137,13 +135,19 @@ Suggest indexes for:
 - Think about query patterns
 - Consider scalability`
 
-    const userPrompt = `Generate a table schema for: "${description}"${refinementPrompt ? `\n\nRefinement: ${refinementPrompt}` : ''}
+    const userPrompt = `Generate a SINGLE table schema for: "${description}"${refinementPrompt ? `\n\nRefinement: ${refinementPrompt}` : ''}
 
 ${existingTableNames.length > 0 ? `\nExisting tables in this database: ${existingTableNames.join(', ')}` : ''}
 
 Database: ${database.name} (PostgreSQL/Supabase)
 
-Generate a complete schema following all the rules. Be creative but practical.`
+IMPORTANT: Generate ONLY ONE table. Do not wrap it in a "tables" array. Return the schema directly with:
+- tableName: string (the table name)
+- columns: array (list of column definitions)
+- indexes: array of strings (column names to index)
+- explanation: string (why you designed it this way)
+
+Be creative but practical.`
 
     console.log('[AI Schema] Generating schema with Codestral...')
     const startTime = Date.now()
