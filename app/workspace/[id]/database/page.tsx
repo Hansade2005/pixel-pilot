@@ -332,14 +332,14 @@ export default function DatabasePage() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-8 space-y-6">
           {/* Header */}
           <div>
-            <h1 className="text-3xl font-bold mb-2 text-white">{database.name}</h1>
-            <p className="text-gray-400">
+            <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-white break-words">{database.name}</h1>
+            <p className="text-gray-400 text-sm sm:text-base">
               Manage tables and records for {workspace.name}
             </p>
           </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3">
         <Card className="bg-gray-800 border-gray-700">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-white">Tables</CardTitle>
@@ -385,46 +385,48 @@ export default function DatabasePage() {
 
       {/* Tabs for Tables, Storage, and API Keys */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="bg-gray-800 border-gray-700">
+        <TabsList className="bg-gray-800 border-gray-700 grid grid-cols-3 w-full sm:w-auto">
           <TabsTrigger value="tables" className="data-[state=active]:bg-gray-700">
-            <TableIcon className="h-4 w-4 mr-2" />
-            Tables
+            <TableIcon className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Tables</span>
           </TabsTrigger>
           <TabsTrigger value="storage" className="data-[state=active]:bg-gray-700">
-            <HardDrive className="h-4 w-4 mr-2" />
-            Storage
+            <HardDrive className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Storage</span>
           </TabsTrigger>
           <TabsTrigger value="api-keys" className="data-[state=active]:bg-gray-700">
-            <Key className="h-4 w-4 mr-2" />
-            API Keys
+            <Key className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">API Keys</span>
           </TabsTrigger>
         </TabsList>
 
         {/* Tables Tab */}
         <TabsContent value="tables" className="space-y-4 mt-0">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-2xl font-bold text-white">Tables</h2>
-              <p className="text-gray-400">
+              <p className="text-gray-400 text-sm sm:text-base">
                 Manage your database tables and schemas
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 onClick={() => setShowApiDocsGenerator(true)}
                 className="flex items-center gap-2 border-gray-700 text-white hover:bg-gray-800"
+                size="sm"
               >
                 <Book className="h-4 w-4" />
-                API Docs
+                <span className="hidden sm:inline">API Docs</span>
               </Button>
               <Button
                 variant="outline"
                 onClick={() => setShowAISchemaGenerator(true)}
                 className="flex items-center gap-2 border-gray-700 text-white hover:bg-gray-800"
+                size="sm"
               >
                 <Sparkles className="h-4 w-4" />
-                Generate with AI
+                <span className="hidden sm:inline">Generate with AI</span>
               </Button>
               <CreateTableDialog
                 databaseId={database.id.toString()}

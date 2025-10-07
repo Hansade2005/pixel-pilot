@@ -72,23 +72,23 @@ export function TableDetailsView({
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900 flex-shrink-0">
               <TableIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
-            <div>
-              <CardTitle className="text-xl">{table.name}</CardTitle>
-              <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
+            <div className="min-w-0 flex-1">
+              <CardTitle className="text-xl truncate">{table.name}</CardTitle>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1 whitespace-nowrap">
                   <Hash className="h-3 w-3" />
                   {schema.columns.length} columns
                 </span>
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1 whitespace-nowrap">
                   <Database className="h-3 w-3" />
                   {table.recordCount ?? 0} records
                 </span>
-                <span className="flex items-center gap-1">
+                <span className="hidden sm:flex items-center gap-1 whitespace-nowrap">
                   <Calendar className="h-3 w-3" />
                   {formatDate(table.created_at)}
                 </span>
@@ -97,23 +97,23 @@ export function TableDetailsView({
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {onEdit && (
               <Button variant="outline" size="sm" onClick={onEdit}>
-                <Edit className="h-4 w-4 mr-1" />
-                Edit
+                <Edit className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Edit</span>
               </Button>
             )}
             <Button variant="default" size="sm" onClick={handleViewRecords}>
-              <Database className="h-4 w-4 mr-1" />
-              View Records
+              <Database className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">View Records</span>
             </Button>
             {onDelete && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={onDelete}
-                className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
