@@ -8,7 +8,7 @@ import {
   logApiUsage,
   updateApiKeyLastUsed,
 } from '@/lib/api-keys';
-import { uploadFile, getDatabaseBucket } from '@/lib/storage';
+import { getDatabaseBucket } from '@/lib/storage';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -79,18 +79,20 @@ async function authenticateApiKey(request: Request, databaseId: string) {
 }
 
 /**
- * POST /api/v1/databases/[id]/storage/upload
- * Public API: Upload file to storage
+ * GET /api/v1/databases/[id]/storage/files/[fileId]/proxy
+ * Public API: Proxy file access (masks Supabase storage URLs)
+ * 
+ * This endpoint streams files from Supabase storage through your domain,
+ * hiding the actual storage location from users.
  */
-export async function POST(
+export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string; fileId: string } }
 ) {
   const auth = await authenticateApiKey(request, params.id);
   if (auth.error) return auth.error;
 
   try {
-    // Get bucket
     const bucket = await getDatabaseBucket(parseInt(params.id));
     
     if (!bucket) {
@@ -100,86 +102,72 @@ export async function POST(
       );
     }
 
-    // Parse form data
-    const formData = await request.formData();
-    const file = formData.get('file') as File;
-    const isPublic = formData.get('is_public') === 'true';
-    const metadataStr = formData.get('metadata') as string;
-    
-    if (!file) {
+    // Get file metadata from database
+    const { data: file, error: fileError } = await supabaseAdmin
+      .from('storage_files')
+      .select('*')
+      .eq('id', params.fileId)
+      .eq('database_id', parseInt(params.id))
+      .single();
+
+    if (fileError || !file) {
       return NextResponse.json(
-        { error: 'No file provided' },
-        { status: 400 }
+        { error: 'File not found' },
+        { status: 404 }
       );
     }
 
-    // Parse metadata
-    let metadata = {};
-    if (metadataStr) {
-      try {
-        metadata = JSON.parse(metadataStr);
-      } catch (error) {
-        return NextResponse.json(
-          { error: 'Invalid metadata JSON' },
-          { status: 400 }
-        );
-      }
+    // Get actual file from Supabase storage
+    const { data: fileData, error: downloadError } = await supabaseAdmin
+      .storage
+      .from(bucket.name)
+      .download(file.storage_path);
+
+    if (downloadError || !fileData) {
+      console.error('Storage download error:', downloadError);
+      return NextResponse.json(
+        { error: 'Failed to download file from storage' },
+        { status: 500 }
+      );
     }
 
-    // Upload file
-    const uploadedFile = await uploadFile(
-      bucket.id,
-      parseInt(params.id),
-      file,
-      {
-        isPublic,
-        metadata: {
-          ...metadata,
-          via_api: true,
-          api_key_id: auth.apiKeyRecord!.id,
-        },
-      }
-    );
+    // Convert blob to buffer for streaming
+    const arrayBuffer = await fileData.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
 
     // Log API usage
     const responseTime = Date.now() - auth.startTime!;
     logApiUsage(
       auth.apiKeyRecord!.id,
-      `/api/v1/databases/${params.id}/storage/upload`,
-      'POST',
+      `/api/v1/databases/${params.id}/storage/files/${params.fileId}/proxy`,
+      'GET',
       200,
       responseTime,
       supabaseAdmin
     );
 
-    // Use proxy URL to mask storage location
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pipilot.dev';
-    const proxyUrl = `${appUrl}/api/v1/databases/${params.id}/storage/files/${uploadedFile.id}/proxy`;
-
-    return NextResponse.json({
-      success: true,
-      file: {
-        id: uploadedFile.id,
-        name: uploadedFile.name,
-        original_name: uploadedFile.original_name,
-        size_bytes: uploadedFile.size_bytes,
-        mime_type: uploadedFile.mime_type,
-        url: proxyUrl,
-        is_public: uploadedFile.is_public,
-        created_at: uploadedFile.created_at,
+    // Return file with proper headers
+    return new NextResponse(buffer, {
+      status: 200,
+      headers: {
+        'Content-Type': file.mime_type || 'application/octet-stream',
+        'Content-Length': buffer.length.toString(),
+        'Content-Disposition': `inline; filename="${file.original_name}"`,
+        'Cache-Control': 'public, max-age=31536000, immutable', // Cache for 1 year
+        'X-File-ID': file.id,
+        'X-File-Name': file.original_name,
       },
-      message: 'File uploaded successfully',
     });
   } catch (error: any) {
-    console.error('Public upload error:', error);
+    console.error('Public proxy error:', error);
     
     // Log failed API usage
     if (auth.startTime) {
       const responseTime = Date.now() - auth.startTime;
       logApiUsage(
         auth.apiKeyRecord!.id,
-        `/api/v1/databases/${params.id}/storage/upload`,
-        'POST',
+        `/api/v1/databases/${params.id}/storage/files/${params.fileId}/proxy`,
+        'GET',
         500,
         responseTime,
         supabaseAdmin
@@ -187,15 +175,8 @@ export async function POST(
     }
 
     return NextResponse.json(
-      { error: error.message || 'Failed to upload file' },
+      { error: error.message || 'Failed to proxy file' },
       { status: 500 }
     );
   }
 }
-
-export const config = {
-  api: {
-    bodyParser: false,
-    responseLimit: false,
-  },
-};

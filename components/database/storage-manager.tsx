@@ -189,7 +189,6 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
       const link = document.createElement('a');
       link.href = data.file.url;
       link.download = fileName;
-      link.target = '_blank';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
