@@ -219,32 +219,32 @@ export function AISchemaGenerator({
 
       {/* Generated Schema Display */}
       {generatedSchema && (
-        <Card>
+        <Card className="bg-gray-800 border-gray-700">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Database className="h-5 w-5 text-green-600" />
+            <CardTitle className="flex items-center gap-2 text-white">
+              <Database className="h-5 w-5 text-green-400" />
               Generated Schema: {generatedSchema.tableName}
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-gray-400">
               {generatedSchema.explanation}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Columns List */}
             <div className="space-y-3">
-              <h4 className="font-medium text-sm text-gray-700">Columns ({generatedSchema.columns.length})</h4>
+              <h4 className="font-medium text-sm text-white">Columns ({generatedSchema.columns.length})</h4>
               <div className="space-y-2">
                 {generatedSchema.columns.map((column, index) => (
                   <div
                     key={index}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
+                    className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg border border-gray-700"
                   >
                     <div className="flex items-center gap-3">
                       <span className="text-lg">{getTypeIcon(column.type)}</span>
                       <div>
-                        <div className="font-medium">{column.name}</div>
+                        <div className="font-medium text-white">{column.name}</div>
                         {column.description && (
-                          <div className="text-sm text-gray-600">{column.description}</div>
+                          <div className="text-sm text-gray-400">{column.description}</div>
                         )}
                       </div>
                     </div>
@@ -261,13 +261,13 @@ export function AISchemaGenerator({
                       )}
 
                       {column.unique && (
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge variant="secondary" className="text-xs bg-gray-700 text-white border-gray-600">
                           Unique
                         </Badge>
                       )}
 
                       {column.references && (
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-xs border-gray-600 text-gray-300">
                           FK → {column.references.table}.{column.references.column}
                         </Badge>
                       )}
@@ -280,10 +280,10 @@ export function AISchemaGenerator({
             {/* Indexes */}
             {generatedSchema.indexes.length > 0 && (
               <div className="space-y-2">
-                <h4 className="font-medium text-sm text-gray-700">Suggested Indexes</h4>
+                <h4 className="font-medium text-sm text-white">Suggested Indexes</h4>
                 <div className="flex flex-wrap gap-2">
                   {generatedSchema.indexes.map((index, idx) => (
-                    <Badge key={idx} variant="outline" className="text-xs">
+                    <Badge key={idx} variant="outline" className="text-xs border-gray-600 text-gray-300">
                       {index}
                     </Badge>
                   ))}
@@ -292,7 +292,7 @@ export function AISchemaGenerator({
             )}
 
             {/* Action Buttons */}
-            <div className="flex gap-2 pt-4 border-t">
+            <div className="flex gap-2 pt-4 border-t border-gray-700">
               <Button
                 onClick={handleCreateTable}
                 className="flex items-center gap-2"
@@ -326,13 +326,13 @@ export function AISchemaGenerator({
 
       {/* Empty State */}
       {!generatedSchema && !isGenerating && !error && (
-        <Card className="border-dashed">
+        <Card className="border-dashed border-gray-700 bg-gray-800/50">
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Sparkles className="h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+            <h3 className="text-lg font-medium text-white mb-2">
               Ready to generate your first schema
             </h3>
-            <p className="text-gray-600 max-w-md">
+            <p className="text-gray-400 max-w-md">
               Describe your table in plain English above, and AI will create a complete database schema with columns, types, and relationships.
             </p>
           </CardContent>

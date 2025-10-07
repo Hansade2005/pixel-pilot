@@ -479,20 +479,25 @@ export default function DatabasePage() {
                 // Convert AI schema to table creation format
                 const tableData = {
                   name: schema.tableName,
-                  schema: schema.columns.reduce((acc, col) => {
-                    acc[col.name] = {
+                  schema_json: {
+                    columns: schema.columns.map(col => ({
+                      name: col.name,
                       type: col.type,
-                      required: col.required,
-                      defaultValue: col.defaultValue,
-                      unique: col.unique,
-                      description: col.description
-                    };
-                    return acc;
-                  }, {} as any)
+                      required: col.required || false,
+                      defaultValue: col.defaultValue || null,
+                      unique: col.unique || false,
+                      primary_key: col.name === 'id',
+                      description: col.description || '',
+                      references: col.references || null
+                    })),
+                    indexes: schema.indexes || []
+                  }
                 };
 
-                // Create the table
-                const response = await fetch(`/api/database/${database.id}/tables`, {
+                console.log('[Create Table] Sending request:', tableData);
+
+                // Create the table using the correct endpoint
+                const response = await fetch(`/api/database/${database.id}/tables/create`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json'
@@ -500,10 +505,16 @@ export default function DatabasePage() {
                   body: JSON.stringify(tableData)
                 });
 
+                console.log('[Create Table] Response status:', response.status);
+
                 if (!response.ok) {
                   const errorData = await response.json();
+                  console.error('[Create Table] Error response:', errorData);
                   throw new Error(errorData.error || 'Failed to create table');
                 }
+
+                const result = await response.json();
+                console.log('[Create Table] Success:', result);
 
                 toast.success(`Table "${schema.tableName}" created successfully!`);
                 setShowAISchemaGenerator(false);
