@@ -34,7 +34,29 @@ import {
   Edit,
   Trash2,
   Search,
+  Download,
+  Trash,
+  X,
+  FileJson,
+  FileText,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 import type { Table as TableType, TableSchema, Column } from "@/lib/supabase";
 
 interface Record {
@@ -63,6 +85,8 @@ export function DataGrid({
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   const schema = table.schema_json as TableSchema;
 
@@ -251,8 +275,170 @@ export function DataGrid({
 
   const selectedRows = reactTable.getFilteredSelectedRowModel().rows;
 
+  // Export selected records to CSV
+  const exportToCSV = () => {
+    const rowsToExport = selectedRows.length > 0 ? selectedRows : reactTable.getFilteredRowModel().rows;
+    
+    if (rowsToExport.length === 0) {
+      toast.error("No records to export");
+      return;
+    }
+
+    const headers = schema.columns.map(col => col.name);
+    const csvRows = [
+      headers.join(','),
+      ...rowsToExport.map(row => 
+        headers.map(header => {
+          const value = row.original[header];
+          // Escape quotes and wrap in quotes if contains comma
+          const stringValue = value === null || value === undefined ? '' : String(value);
+          return stringValue.includes(',') ? `"${stringValue.replace(/"/g, '""')}"` : stringValue;
+        }).join(',')
+      )
+    ];
+
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${table.name}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success(`Exported ${rowsToExport.length} record(s) to CSV`);
+  };
+
+  // Export selected records to JSON
+  const exportToJSON = () => {
+    const rowsToExport = selectedRows.length > 0 ? selectedRows : reactTable.getFilteredRowModel().rows;
+    
+    if (rowsToExport.length === 0) {
+      toast.error("No records to export");
+      return;
+    }
+
+    const data = rowsToExport.map(row => row.original);
+    const jsonContent = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonContent], { type: 'application/json' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${table.name}_${new Date().toISOString().split('T')[0]}.json`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success(`Exported ${rowsToExport.length} record(s) to JSON`);
+  };
+
+  // Bulk delete selected records
+  const handleBulkDelete = async () => {
+    if (selectedRows.length === 0) return;
+
+    setIsBulkDeleting(true);
+    
+    try {
+      const recordIds = selectedRows.map(row => row.original.id);
+      
+      // Delete each record (you can optimize this with a bulk API endpoint)
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const id of recordIds) {
+        try {
+          const response = await fetch(
+            `/api/database/${table.database_id}/tables/${table.id}/records/${id}`,
+            { method: 'DELETE' }
+          );
+          
+          if (response.ok) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+        } catch (error) {
+          failCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`Deleted ${successCount} record(s)`);
+        setRowSelection({});
+        onRefresh?.();
+      }
+      
+      if (failCount > 0) {
+        toast.error(`Failed to delete ${failCount} record(s)`);
+      }
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      toast.error('Failed to delete records');
+    } finally {
+      setIsBulkDeleting(false);
+      setShowBulkDeleteDialog(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
+      {/* Bulk Actions Bar - Shows when rows are selected */}
+      {selectedRows.length > 0 && (
+        <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setRowSelection({})}
+              className="h-8 px-2"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-medium">
+              {selectedRows.length} record{selectedRows.length !== 1 ? 's' : ''} selected
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {/* Export Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={exportToCSV}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportToJSON}>
+                  <FileJson className="h-4 w-4 mr-2" />
+                  Export as JSON
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Bulk Delete */}
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowBulkDeleteDialog(true)}
+              className="h-8"
+            >
+              <Trash className="h-4 w-4 mr-2" />
+              Delete Selected
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="flex items-center justify-between">
         {/* Search */}
@@ -266,12 +452,26 @@ export function DataGrid({
           />
         </div>
 
-        {/* Selection info */}
-        {selectedRows.length > 0 && (
-          <div className="text-sm text-muted-foreground">
-            {selectedRows.length} of {reactTable.getFilteredRowModel().rows.length}{" "}
-            row(s) selected
-          </div>
+        {/* Export All Button - Shows when no rows are selected */}
+        {selectedRows.length === 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-2" />
+                Export All
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={exportToCSV}>
+                <FileText className="h-4 w-4 mr-2" />
+                Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportToJSON}>
+                <FileJson className="h-4 w-4 mr-2" />
+                Export as JSON
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
 
         {/* Record count */}
