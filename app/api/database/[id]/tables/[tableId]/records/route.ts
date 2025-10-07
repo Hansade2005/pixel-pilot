@@ -88,6 +88,9 @@ export async function POST(
 
       // Second pass: Validate data types and constraints
       for (const column of schema.columns) {
+        // Skip validation for 'id' field as it's the database primary key
+        if (column.name === 'id') continue;
+
         const value = processedData[column.name];
         if (value === null || value === undefined) continue;
 
@@ -155,6 +158,9 @@ export async function POST(
       // Third pass: Check unique constraints (prevent duplicates)
       const uniqueColumns = schema.columns.filter((col: any) => col.unique || col.primary_key);
       for (const column of uniqueColumns) {
+        // Skip 'id' field as it's the database primary key
+        if (column.name === 'id') continue;
+
         const value = processedData[column.name];
         if (value === null || value === undefined) continue;
 
@@ -184,6 +190,9 @@ export async function POST(
 
       // Fourth pass: Validate foreign key references
       for (const column of schema.columns) {
+        // Skip 'id' field as it's the database primary key
+        if (column.name === 'id') continue;
+
         if (column.references && processedData[column.name]) {
           const referencedValue = processedData[column.name];
           const { table: refTableName, column: refColumnName } = column.references;
@@ -431,6 +440,9 @@ export async function PUT(
     if (schema && schema.columns) {
       // Validate data types and constraints
       for (const column of schema.columns) {
+        // Skip validation for 'id' field as it's the database primary key
+        if (column.name === 'id') continue;
+
         const value = processedData[column.name];
         if (value === null || value === undefined) {
           // Check if required field is being removed
@@ -505,6 +517,9 @@ export async function PUT(
       // Check unique constraints (excluding the current record)
       const uniqueColumns = schema.columns.filter((col: any) => col.unique || col.primary_key);
       for (const column of uniqueColumns) {
+        // Skip 'id' field as it's the database primary key
+        if (column.name === 'id') continue;
+
         const value = processedData[column.name];
         if (value === null || value === undefined) continue;
 
@@ -533,6 +548,9 @@ export async function PUT(
 
       // Validate foreign key references
       for (const column of schema.columns) {
+        // Skip 'id' field as it's the database primary key
+        if (column.name === 'id') continue;
+
         if (column.references && processedData[column.name]) {
           const referencedValue = processedData[column.name];
           const { table: refTableName, column: refColumnName } = column.references;

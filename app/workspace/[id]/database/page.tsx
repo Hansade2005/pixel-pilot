@@ -47,10 +47,21 @@ export default function DatabasePage() {
     loadData();
   }, [params.id]);
 
+  // Auto-refresh data every 5 seconds
+  useEffect(() => {
+    if (!database) return; // Only start auto-refresh after database is loaded
+
+    const interval = setInterval(() => {
+      silentRefresh();
+    }, 5000); // 5 seconds
+
+    return () => clearInterval(interval); // Cleanup on unmount
+  }, [database]);
+
   async function loadData() {
     try {
       setLoading(true);
-      
+
       // Get current workspace
       const ws = await getCurrentWorkspace();
       if (!ws) {
@@ -58,7 +69,7 @@ export default function DatabasePage() {
         return;
       }
       setWorkspace(ws);
-      
+
       // Set default database name
       if (!databaseName) {
         setDatabaseName(`${ws.name}_db`);
@@ -76,7 +87,24 @@ export default function DatabasePage() {
     }
   }
 
-  async function loadDatabase(databaseId: number) {
+  // Silent refresh function for auto-updates (no loading states or success messages)
+  async function silentRefresh() {
+    try {
+      if (!workspace?.databaseId) return;
+
+      // Get current workspace (silently)
+      const ws = await getCurrentWorkspace();
+      if (!ws || !ws.databaseId) return;
+
+      // Load database data silently
+      await loadDatabase(ws.databaseId, true); // true = silent mode
+    } catch (error) {
+      // Only log errors, don't show toasts for silent refresh
+      console.error('Silent refresh error:', error);
+    }
+  }
+
+  async function loadDatabase(databaseId: number, silent = false) {
     try {
       const response = await fetch(`/api/database/${databaseId}`);
       const data = await response.json();
@@ -90,10 +118,14 @@ export default function DatabasePage() {
         }));
         setTables(transformedTables);
       } else {
-        console.error('Failed to load database:', data.error);
+        if (!silent) {
+          console.error('Failed to load database:', data.error);
+        }
       }
     } catch (error) {
-      console.error('Error fetching database:', error);
+      if (!silent) {
+        console.error('Error fetching database:', error);
+      }
     }
   }
 

@@ -38,6 +38,17 @@ export default function TableRecordsPage() {
     initializeData();
   }, [workspaceId, tableId]);
 
+  // Auto-refresh records every 5 seconds
+  useEffect(() => {
+    if (!table || !databaseId) return; // Only start auto-refresh after table is loaded
+
+    const interval = setInterval(() => {
+      silentRefresh();
+    }, 5000); // 5 seconds
+
+    return () => clearInterval(interval); // Cleanup on unmount
+  }, [table, databaseId]);
+
   async function initializeData() {
     try {
       setLoading(true);
@@ -81,7 +92,7 @@ export default function TableRecordsPage() {
     }
   }
 
-  async function loadRecords(dbId: string) {
+  async function loadRecords(dbId: string, silent = false) {
     try {
       const response = await fetch(
         `/api/database/${dbId}/tables/${tableId}/records`
@@ -91,11 +102,22 @@ export default function TableRecordsPage() {
       if (response.ok) {
         setRecords(data.records || []);
       } else {
-        throw new Error(data.error || "Failed to load records");
+        if (!silent) {
+          throw new Error(data.error || "Failed to load records");
+        }
       }
     } catch (error: any) {
-      console.error("Error loading records:", error);
-      toast.error("Failed to load records");
+      if (!silent) {
+        console.error("Error loading records:", error);
+        toast.error("Failed to load records");
+      }
+    }
+  }
+
+  // Silent refresh function for auto-updates (no loading states or success messages)
+  async function silentRefresh() {
+    if (databaseId) {
+      await loadRecords(databaseId, true); // true = silent mode
     }
   }
 
