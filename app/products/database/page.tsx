@@ -27,13 +27,12 @@ import {
 import Link from "next/link"
 
 export default function DatabaseProductPage() {
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
 
   const features = [
     {
       icon: Database,
       title: "PostgreSQL Databases",
-      description: "Create unlimited databases with 500MB storage each. Powered by Supabase's reliable infrastructure."
+      description: "Create 1 database per project with 500MB storage. Powered by Supabase's reliable infrastructure."
     },
     {
       icon: Sparkles,
@@ -72,66 +71,7 @@ export default function DatabaseProductPage() {
     }
   ]
 
-  const pricingTiers = [
-    {
-      name: "Free",
-      price: 0,
-      description: "Perfect for learning and testing",
-      features: [
-        "Unlimited Databases",
-        "500MB storage per database",
-        "500MB file storage per database",
-        "Unlimited API requests",
-        "10 API keys per database",
-        "AI Schema Generation",
-        "Auto-generated REST APIs",
-        "API Documentation Generator",
-        "Row Level Security",
-        "Community Support"
-      ],
-      cta: "Get Started Free",
-      highlighted: false
-    },
-    {
-      name: "Pro",
-      price: billingCycle === 'monthly' ? 25 : 20,
-      originalPrice: billingCycle === 'yearly' ? 25 : null,
-      description: "For production applications",
-      features: [
-        "Everything in Free, plus:",
-        "5GB storage per database",
-        "5GB file storage per database",
-        "Unlimited API keys",
-        "Custom domains",
-        "Advanced rate limiting controls",
-        "Priority email support",
-        "Database backups (30 days)",
-        "Real-time database subscriptions",
-        "Advanced analytics"
-      ],
-      cta: "Upgrade to Pro",
-      highlighted: true
-    },
-    {
-      name: "Enterprise",
-      price: "Custom",
-      description: "For large-scale applications",
-      features: [
-        "Everything in Pro, plus:",
-        "Custom storage limits",
-        "Dedicated support (24/7)",
-        "Custom SLA",
-        "Advanced security features",
-        "Single Sign-On (SSO)",
-        "Audit logs",
-        "Custom integrations",
-        "On-premise deployment options",
-        "White-label solutions"
-      ],
-      cta: "Contact Sales",
-      highlighted: false
-    }
-  ]
+
 
   const codeExamples = [
     {
@@ -326,101 +266,70 @@ requests.post(
           </div>
         </section>
 
-        {/* Pricing Section */}
+        {/* Free Tier Section */}
         <section className="py-20 px-4 bg-gray-900/50">
-          <div className="container mx-auto max-w-6xl">
-            <div className="text-center mb-12">
+          <div className="container mx-auto max-w-4xl text-center">
+            <div className="mb-8">
+              <Badge className="mb-4 bg-green-500/20 text-green-300 border-green-500/30 text-lg px-4 py-2">
+                🎉 Completely Free
+              </Badge>
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-                Simple, transparent pricing
+                Start building today, no credit card required
               </h2>
-              <p className="text-gray-400 mb-8">Start free, scale as you grow</p>
-
-              {/* Billing Toggle */}
-              <div className="inline-flex items-center gap-4 p-1 bg-gray-800 rounded-lg border border-gray-700">
-                <button
-                  onClick={() => setBillingCycle('monthly')}
-                  className={`px-6 py-2 rounded-md text-sm font-medium transition-colors ${
-                    billingCycle === 'monthly'
-                      ? 'bg-purple-600 text-white'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  Monthly
-                </button>
-                <button
-                  onClick={() => setBillingCycle('yearly')}
-                  className={`px-6 py-2 rounded-md text-sm font-medium transition-colors ${
-                    billingCycle === 'yearly'
-                      ? 'bg-purple-600 text-white'
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  Yearly
-                  <Badge className="ml-2 bg-green-500/20 text-green-300 border-green-500/30">
-                    Save 20%
-                  </Badge>
-                </button>
-              </div>
+              <p className="text-gray-400 mb-8 text-lg">
+                Everything you need to build your application is included in our free tier.
+                <br />
+                Pro features coming soon for power users.
+              </p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8">
-              {pricingTiers.map((tier, index) => (
-                <Card
-                  key={index}
-                  className={`bg-gray-800 border-2 ${
-                    tier.highlighted
-                      ? 'border-purple-500 shadow-2xl shadow-purple-500/20 scale-105'
-                      : 'border-gray-700'
-                  }`}
-                >
-                  <CardHeader>
-                    {tier.highlighted && (
-                      <Badge className="mb-2 w-fit bg-purple-500/20 text-purple-300 border-purple-500/30">
-                        Most Popular
-                      </Badge>
-                    )}
-                    <CardTitle className="text-white text-2xl">{tier.name}</CardTitle>
-                    <div className="mt-4">
-                      {typeof tier.price === 'number' ? (
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-4xl font-bold text-white">${tier.price}</span>
-                          <span className="text-gray-400">/{billingCycle === 'monthly' ? 'mo' : 'yr'}</span>
-                          {tier.originalPrice && (
-                            <span className="text-sm text-gray-500 line-through">${tier.originalPrice}/mo</span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-4xl font-bold text-white">{tier.price}</span>
-                      )}
-                    </div>
-                    <CardDescription className="text-gray-400 mt-2">
-                      {tier.description}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-3 mb-6">
-                      {tier.features.map((feature, fIndex) => (
-                        <li key={fIndex} className="flex items-start gap-2 text-gray-300">
-                          <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                          <span className="text-sm">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Link href={tier.name === 'Enterprise' ? '/enterprise' : '/auth/signup'}>
-                      <Button
-                        className={`w-full ${
-                          tier.highlighted
-                            ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                            : 'bg-gray-700 hover:bg-gray-600 text-white'
-                        }`}
-                      >
-                        {tier.cta}
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <Card className="bg-gray-800/50 border-2 border-green-500/30 max-w-2xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-white text-2xl flex items-center justify-center gap-2">
+                  <Check className="h-6 w-6 text-green-500" />
+                  Free Forever
+                </CardTitle>
+                <CardDescription className="text-gray-400 text-center">
+                  All features included at no cost
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3 text-left">
+                  <li className="flex items-start gap-3 text-gray-300">
+                    <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span>1 database per project (500MB each)</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-gray-300">
+                    <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span>500MB file storage per database</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-gray-300">
+                    <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span>Unlimited API requests</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-gray-300">
+                    <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span>AI schema generation</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-gray-300">
+                    <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span>Auto-generated REST APIs</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-gray-300">
+                    <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span>Row Level Security</span>
+                  </li>
+                </ul>
+                <div className="mt-8">
+                  <Link href="/auth/signup">
+                    <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white w-full">
+                      Get Started Free
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </section>
 
