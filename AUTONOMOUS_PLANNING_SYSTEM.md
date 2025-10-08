@@ -1,8 +1,8 @@
-# Autonomous Planning System for AI App Builder
+# Autonomous Planning System for PiPilot
 
 ## Overview
 
-The Autonomous Planning System is a sophisticated AI-driven framework that enables the AI App Builder to automatically plan and execute complex application development tasks without requiring step-by-step user guidance. This system transforms simple user requests like "create an ecommerce store" into comprehensive, executable development plans.
+The Autonomous Planning System is a sophisticated AI-driven framework that enables the PiPilot to automatically plan and execute complex application development tasks without requiring step-by-step user guidance. This system transforms simple user requests like "create an ecommerce store" into comprehensive, executable development plans.
 
 ## System Architecture
 

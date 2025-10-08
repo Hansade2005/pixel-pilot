@@ -29,7 +29,7 @@
 
 ### Target State
 - **Multi-product platform:**
-  - AI App Builder (existing)
+  - PiPilot (existing)
   - **Database as a Service (NEW)** - Standalone product
   - Storage as a Service (integrated)
   - Authentication as a Service (future)
@@ -60,7 +60,7 @@
 
 #### Competitive Advantages
 - **AI-First**: Natural language database operations
-- **Integrated**: Works seamlessly with AI App Builder
+- **Integrated**: Works seamlessly with PiPilot
 - **Developer-Friendly**: Superior DX with modern APIs
 - **Affordable**: Generous free tier, transparent pricing
 
@@ -179,7 +179,7 @@ table: database_usage {
 Desktop Navigation:
 - Community
 - Products → [Dropdown]
-  - AI App Builder
+  - PiPilot
   - Database (NEW)
   - Storage
 - Plans → /pricing
@@ -189,7 +189,7 @@ Desktop Navigation:
 Mobile Navigation:
 - Home
 - Products
-  - AI App Builder
+  - PiPilot
   - Database (NEW)
   - Storage
 - Pricing
@@ -481,7 +481,7 @@ const posts = await ai.query({
 
 #### 1. Product Showcase
 ```
-- "AI App Builder" card with animated preview
+- "PiPilot" card with animated preview
 - "Database as a Service" card (NEW)
 - "Storage & CDN" card
 - Each links to product pages
@@ -853,7 +853,7 @@ yourplatform db:backup
 
 ### Differentiation Strategy
 - **AI-First:** Natural language database operations (unique)
-- **Integrated:** Seamlessly works with AI App Builder
+- **Integrated:** Seamlessly works with PiPilot
 - **Simple Pricing:** No hidden costs, predictable billing
 - **Superior DX:** Better documentation, faster onboarding
 

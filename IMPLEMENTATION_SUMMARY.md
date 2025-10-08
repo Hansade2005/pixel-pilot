@@ -1,7 +1,7 @@
 # Complete Feature Implementation Summary
 
 ## Overview
-This document summarizes all the features implemented for the PiPilot AI app builder, including image/file attachments and speech-to-text input.
+This document summarizes all the features implemented for the PiPilot PiPilot, including image/file attachments and speech-to-text input.
 
 ## ✅ Features Implemented
 

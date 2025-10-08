@@ -1,6 +1,6 @@
 # Tavily Web Search Integration
 
-This document explains how to use the Tavily web search and extraction tools that have been integrated into the AI App Builder.
+This document explains how to use the Tavily web search and extraction tools that have been integrated into the PiPilot.
 
 ## Overview
 

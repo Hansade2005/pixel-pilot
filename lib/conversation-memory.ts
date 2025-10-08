@@ -1,4 +1,4 @@
-// Conversation memory service for AI App Builder
+// Conversation memory service for PiPilot
 // This service provides a way to store and retrieve conversation history
 
 export interface ConversationMessage {

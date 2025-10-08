@@ -18,7 +18,7 @@
    - Fill in the details:
 
 ```
-Application name: AI App Builder
+Application name: PiPilot
 Homepage URL: https://dev.pixelways.co
 Authorization callback URL: https://lzuknbfbvpuscpammwzg.supabase.co/auth/v1/callback
 ```

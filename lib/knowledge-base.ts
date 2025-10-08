@@ -1,4 +1,4 @@
-// Knowledge base service for AI App Builder
+// Knowledge base service for PiPilot
 // This service provides a way to store and retrieve design guidelines, best practices, and other knowledge
 
 export interface KnowledgeItem {

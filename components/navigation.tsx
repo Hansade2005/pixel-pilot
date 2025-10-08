@@ -116,7 +116,7 @@ export function Navigation() {
                   <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
                     <Zap className="w-4 h-4 mr-2" />
                     <div>
-                      <div className="font-medium">AI App Builder</div>
+                      <div className="font-medium">PiPilot</div>
                       <div className="text-xs text-gray-400">Build apps with chat</div>
                     </div>
                   </DropdownMenuItem>
@@ -302,7 +302,7 @@ export function Navigation() {
                 >
                   <Zap className="w-4 h-4" />
                   <div>
-                    <div className="font-medium">AI App Builder</div>
+                    <div className="font-medium">PiPilot</div>
                     <div className="text-xs text-gray-400">Build apps with chat</div>
                   </div>
                 </Link>

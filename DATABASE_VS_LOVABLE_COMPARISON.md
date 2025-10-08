@@ -107,7 +107,7 @@ No need to configure Clerk, Auth0, or Supabase Auth separately!
     └── [Export Database] [Delete Database]
 ```
 
-### 3. Integration with Your AI App Builder
+### 3. Integration with Your PiPilot
 
 **Workflow:**
 ```
@@ -288,7 +288,7 @@ User: Clicks "Create"
 1. **"Lovable Cloud on Steroids"**
    - Everything Lovable offers + full database control
 
-2. **"The Supabase Dashboard, Built Into Your AI App Builder"**
+2. **"The Supabase Dashboard, Built Into Your PiPilot"**
    - No juggling multiple platforms
 
 3. **"Ship Fullstack Apps Without Writing Backend Code"**

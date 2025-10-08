@@ -27,7 +27,7 @@ Created a comprehensive 400+ line roadmap document covering:
 
 ✅ Added "Products" dropdown menu to main navigation:
 - Desktop dropdown with hover effects
-- **AI App Builder** - Links to home page
+- **PiPilot** - Links to home page
 - **Database** (NEW) - Links to `/products/database`
 - Mobile-friendly version with expandable section
 - Beautiful UI with icons and descriptions
@@ -40,7 +40,7 @@ Community | Plans | Business | Blog | Docs | Showcase
 **After:**
 ```
 Products ▼ | Community | Plans | Business | Blog | Docs | Showcase
-├── AI App Builder (Build apps with chat)
+├── PiPilot (Build apps with chat)
 └── Database (PostgreSQL as a service) ✨ NEW
 ```
 

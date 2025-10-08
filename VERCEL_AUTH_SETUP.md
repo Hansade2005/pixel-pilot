@@ -2,7 +2,7 @@
 
 ## 🔧 Vercel API Token Configuration
 
-Unlike GitHub, Vercel uses **API tokens** instead of OAuth for authentication. This guide explains how to set up Vercel authentication in your AI App Builder.
+Unlike GitHub, Vercel uses **API tokens** instead of OAuth for authentication. This guide explains how to set up Vercel authentication in your PiPilot.
 
 ## 🚀 How Vercel Authentication Works
 
@@ -34,7 +34,7 @@ Users need to create a Vercel API token:
 
 2. **Create New Token**
    - Click "Create Token"
-   - Name: "AI App Builder"
+   - Name: "PiPilot"
    - Expiration: Choose appropriate duration
    - Scope: Full Account (for deployment access)
 

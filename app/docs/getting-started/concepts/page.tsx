@@ -35,7 +35,7 @@ export default function CoreConceptsPage() {
                 <Badge className="mb-4">Getting Started</Badge>
                 <h1 className="text-4xl font-bold mb-4">Core Concepts</h1>
                 <p className="text-xl text-muted-foreground">
-                  Understand the fundamental building blocks of AI App Builder and how they work together to power your applications.
+                  Understand the fundamental building blocks of PiPilot and how they work together to power your applications.
                 </p>
               </div>
 

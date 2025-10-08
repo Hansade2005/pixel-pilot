@@ -7,7 +7,7 @@
 ### **Application Description for Netlify:**
 
 ```
-Application Name: AI App Builder
+Application Name: PiPilot
 Description: AI-powered web application builder that helps users create, deploy, and manage web applications. The app provides an intuitive interface for building modern web applications with AI assistance, offering features like real-time code editing, instant deployment to Netlify, and comprehensive project management. Users can build React, Vue, and other modern web applications with AI-generated code and deploy them seamlessly to Netlify with automatic SSL, CDN, and continuous deployment.
 
 Homepage URL: https://dev.pixelways.co
@@ -83,8 +83,8 @@ Token used for all Netlify API operations
    - Fill in the details:
 
 ```
-Token Name: AI App Builder
-Description: For deploying applications built with AI App Builder
+Token Name: PiPilot
+Description: For deploying applications built with PiPilot
 Expiration: Choose appropriate duration (recommend 1 year)
 ```
 

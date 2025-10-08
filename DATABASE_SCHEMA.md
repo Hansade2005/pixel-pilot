@@ -2,7 +2,7 @@
 
 ## 🗄️ **Complete Database Structure**
 
-This document describes the complete database schema for the AI App Builder platform, including all tables, relationships, and policies.
+This document describes the complete database schema for the PiPilot platform, including all tables, relationships, and policies.
 
 ## 📋 **Migration Scripts Order**
 

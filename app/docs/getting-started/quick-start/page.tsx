@@ -36,7 +36,7 @@ export default function QuickStartPage() {
                 <Badge className="mb-4">Getting Started</Badge>
                 <h1 className="text-4xl font-bold mb-4">Quick Start Guide</h1>
                 <p className="text-xl text-muted-foreground">
-                  Get up and running with AI App Builder in under 5 minutes. Build your first AI-powered application with our intuitive platform.
+                  Get up and running with PiPilot in under 5 minutes. Build your first AI-powered application with our intuitive platform.
                 </p>
               </div>
 
@@ -77,7 +77,7 @@ export default function QuickStartPage() {
                   Create Your Account
                 </h2>
                 <p className="text-muted-foreground">
-                  Sign up for a free account to get started with AI App Builder.
+                  Sign up for a free account to get started with PiPilot.
                 </p>
                 <Card className="bg-muted/50">
                   <CardContent className="pt-6">
@@ -156,7 +156,7 @@ export default function QuickStartPage() {
                   Install the SDK
                 </h2>
                 <p className="text-muted-foreground">
-                  Add the AI App Builder SDK to your project.
+                  Add the PiPilot SDK to your project.
                 </p>
                 <Tabs defaultValue="npm" className="w-full">
                   <TabsList className="grid w-full max-w-md grid-cols-3">
@@ -306,7 +306,7 @@ print("User created:", response.data)`}
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <p className="text-muted-foreground">
-                    You've successfully set up your first AI App Builder project. Here's what to explore next:
+                    You've successfully set up your first PiPilot project. Here's what to explore next:
                   </p>
                   <div className="grid gap-3">
                     <Link href="/docs/getting-started/concepts">

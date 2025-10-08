@@ -1,7 +1,7 @@
-# AI App Builder Platform - Project Summary
+# PiPilot Platform - Project Summary
 
 ## 🎯 **Project Overview**
-A full-stack AI App Builder platform built with Next.js 14, TypeScript, and App Router. The platform allows users to build applications through AI chat, with instant previews via E2B sandboxes, deployment to GitHub + Vercel, and automatic Vite React template cloning for every new project.
+A full-stack PiPilot platform built with Next.js 14, TypeScript, and App Router. The platform allows users to build applications through AI chat, with instant previews via E2B sandboxes, deployment to GitHub + Vercel, and automatic Vite React template cloning for every new project.
 
 ## 🏗️ **Architecture & Tech Stack**
 
@@ -546,7 +546,7 @@ NEXT_PUBLIC_SITE_URL=https://dev.pixelways.co
 
 ## 🎉 **Project Status: PRODUCTION READY WITH TEMPLATE SYSTEM**
 
-The AI App Builder platform is **fully functional** and ready for production use. All major features have been implemented and tested, including the new Vite React template system:
+The PiPilot platform is **fully functional** and ready for production use. All major features have been implemented and tested, including the new Vite React template system:
 
 - ✅ **AI-Powered Development** with real-time code generation
 - ✅ **Instant Live Previews** with E2B sandboxes

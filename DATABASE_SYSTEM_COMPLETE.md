@@ -2,7 +2,7 @@
 
 ## ✅ What We've Built
 
-A complete **Lovable Cloud-style** database system integrated into your AI app builder. Users can now create fully functional databases with authentication, manage tables and records, all without writing a single line of backend code.
+A complete **Lovable Cloud-style** database system integrated into your PiPilot. Users can now create fully functional databases with authentication, manage tables and records, all without writing a single line of backend code.
 
 ---
 

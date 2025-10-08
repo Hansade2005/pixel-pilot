@@ -1,6 +1,6 @@
 # SQL Execution API Setup Guide
 
-This guide explains how to set up and use the SQL execution functionality in your AI App Builder.
+This guide explains how to set up and use the SQL execution functionality in your PiPilot.
 
 ## Overview
 
