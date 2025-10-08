@@ -1125,11 +1125,18 @@ Unable to load project structure. Use list_files tool to explore the project.`
 // SMART CONTEXT PROVIDER: Use Mistral Pixtral to select relevant files and produce a src patch
 async function buildSmartContextForA0(projectId: string, userMessage: string, storageManager: any) {
   try {
+    // Known shadcn/ui components to exclude (include custom components in src/components/ui/)
+    const shadcnComponents = new Set(['button', 'input', 'textarea', 'select', 'checkbox', 'radio-group', 'switch', 'label', 'form', 'card', 'dialog', 'sheet', 'alert-dialog', 'popover', 'tooltip', 'dropdown-menu', 'context-menu', 'hover-card', 'menubar', 'navigation-menu', 'scroll-area', 'separator', 'skeleton', 'slider', 'tabs', 'toast', 'toggle', 'badge', 'avatar', 'calendar', 'command', 'table', 'accordion', 'alert', 'aspect-ratio', 'breadcrumb', 'carousel', 'chart', 'collapsible', 'drawer', 'progress', 'resizable', 'sidebar'])
+
     // Load files and limit candidate set
     const allFiles = await storageManager.getFiles(projectId)
-    // Prioritize src/ files and recently modified files
+    // Prioritize src/ files and recently modified files, exclude known shadcn/ui components
     const candidateFiles = allFiles
-      .filter((f: any) => f.path.startsWith('src/') || f.path.endsWith('.ts') || f.path.endsWith('.tsx') || f.path.endsWith('.js') || f.path.endsWith('.jsx'))
+      .filter((f: any) => {
+        const isSrcFile = f.path.startsWith('src/') || f.path.endsWith('.ts') || f.path.endsWith('.tsx') || f.path.endsWith('.js') || f.path.endsWith('.jsx')
+        const isShadcnComponent = f.path.startsWith('src/components/ui/') && shadcnComponents.has(f.path.split('/').pop()?.replace(/\.(tsx|ts|jsx|js)$/, '') || '')
+        return isSrcFile && !isShadcnComponent
+      })
       .slice(-200) // cap candidates
 
     // Read small previews for the model to analyze
@@ -4195,10 +4202,8 @@ When gathering context, identify:
 
 **🛠️ AVAILABLE TOOLS:**
 - read_file: Read file contents for analysis
-- list_files: Explore project structure and file organization
 - web_search: Search for external information when needed
 - web_extract: Extract content from web resources
-- analyze_dependencies: Understand project dependencies and imports
 
 **🚫 RESTRICTIONS:**
 - Do NOT attempt to write, edit, or delete files
