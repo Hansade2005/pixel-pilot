@@ -4246,6 +4246,33 @@ You understand that users can see a live preview of their application while you 
 **AVAILABLE TOOLS: write_file, delete_file, read_file**
 ## 🚨 **CRITICAL** Use read_file to verify changes you made, but never use any other tools.
 
+## 🔄 **MULTI-STEP TOOL EXECUTION GUIDELINES** (Powered by maxToolRoundtrips)
+
+**You have the ability to call tools multiple times in sequence. Use this wisely!**
+
+**✅ WHEN TO USE MULTIPLE TOOL ROUNDS:**
+- **Information Gathering**: Read multiple files to understand codebase structure
+- **Verification**: After making changes, read files back to confirm success
+- **Iterative Development**: Create file → Read to verify → Fix if needed
+- **Analysis Tasks**: List files → Read relevant ones → Provide insights
+
+**📋 TOOL USAGE BEST PRACTICES:**
+1. **Before calling a tool**: Check if you already have that information from previous calls
+2. **Don't repeat yourself**: Never call the same tool twice with identical arguments
+3. **Explain your process**: Briefly tell users what you're about to do and why
+4. **Handle errors gracefully**: If a tool fails, explain the error instead of retrying blindly
+5. **Think before acting**: Plan your tool calls to minimize roundtrips (max 5 allowed)
+
+**🎯 EFFICIENT TOOL PATTERNS:**
+- **Parallel reading**: When you need multiple files, mention them all at once
+- **Progressive refinement**: Read → Analyze → Act → Verify
+- **Context building**: Start broad (list_files) → Get specific (read_file)
+
+**❌ AVOID:**
+- Calling the same tool repeatedly with no new information
+- Reading files you don't need
+- Making changes without reading the current state first
+
 ## 🚨 **CRITICAL COMMENT RULES - NO EXCEPTIONS**
 
 **❌ NEVER USE HTML COMMENTS IN TYPESCRIPT/JSX FILES:**
@@ -5977,13 +6004,19 @@ Use read_file tool to access any file content when needed.`
               const enhancedMessagesWithContext = [smartContextMessage, ...enhancedMessages];
               
               // Standard AI SDK streaming for all other providers
-              result = await streamText({
+              result = streamText({
                 model: model,
                 messages: enhancedMessagesWithContext,
                 temperature: 0.3,
                 abortSignal: abortController.signal,
                 tools: tools, // Use full tool set now that preprocessing is disabled
-                toolChoice: 'auto'
+                toolChoice: 'auto',
+               stopWhen: stepCountIs(7), // ⭐ CRITICAL: Enable multi-step tool execution like VS Code Copilot (AI SDK 4.0)
+                // This allows the AI to:
+                // 1. Call tools
+                // 2. See tool results
+                // 3. Generate text response based on results
+                // 4. Repeat if more tools needed (up to 6 steps total = 5 roundtrips + 1)
               });
             }
             
