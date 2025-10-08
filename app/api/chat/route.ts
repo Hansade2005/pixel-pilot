@@ -5652,6 +5652,8 @@ Please respond to the user's request above, taking into account the project cont
       }
 
       try {
+        // DISABLED: Preprocessing phase no longer needed - streaming handles tool execution
+        /*
         // INTELLIGENT READ-WRITE SEPARATION: Use generateText for read-only tools, streamText for write operations
         
         // Step 1: Create read-only tools for preprocessing phase
@@ -5716,63 +5718,25 @@ Please respond to the user's request above, taking into account the project cont
           toolCallsRaw: JSON.stringify(preprocessingResults?.toolCalls, null, 2),
           toolResultsRaw: JSON.stringify(preprocessingResults?.toolResults, null, 2)
         })
+        */
 
-        // Step 3: Now use streamText with JSON command system for all responses
+        // DISABLED: Preprocessing variables no longer used
+        const hasToolCalls = false
+        const preprocessingResults = null
         console.log('[STREAMING] Starting JSON-enhanced streaming response')
         
-        // Create enhanced messages with preprocessing context
+        // Create enhanced messages with system prompt
         let enhancedMessages = [...finalMessages]
         
-        if (hasToolCalls && preprocessingResults) {
-          // Add preprocessing context to the conversation
-          const preprocessingContext = `## Preprocessing Results
-
-${preprocessingResults.text || 'Information gathered successfully.'}
-
-## Available Information
-${preprocessingResults.toolResults?.map((result: any, index: number) => {
-  const toolCall = preprocessingResults.toolCalls?.[index]
-  return `- ${toolCall?.toolName}: ${JSON.stringify(result, null, 2)}`
-}).join('\n') || 'No additional context available.'}
-
----
-
-Now respond to the user's request. If you need to create, edit, or delete files, use JSON tool commands in code blocks:
-
-\`\`\`json
-{
-  "tool": "write_file",
-  "path": "file/path.ext", 
-  "content": "file content here"
-}
-\`\`\`
-
-
-
-\`\`\`json
-{
-  "tool": "delete_file",
-  "path": "file/path.ext"
-}
-\`\`\`
-
-Provide a comprehensive response addressing: "${currentUserMessage?.content || ''}"`
-          
-          enhancedMessages.push({
-            role: 'user' as const,
-            content: preprocessingContext
-          })
-        } else {
-          // Add JSON command instructions for cases without preprocessing using focused prompt
-          // DISABLED: Memory functionality temporarily disabled for future use
-          // const streamingPrompt = getStreamingSystemPrompt(projectContext, memoryContext)
-          const streamingPrompt = getStreamingSystemPrompt(projectContext, undefined, detectedTemplate)
-          
-          enhancedMessages.push({
-            role: 'system' as const,
-            content: streamingPrompt
-          })
-        }
+        // Add JSON command instructions using focused prompt
+        // DISABLED: Memory functionality temporarily disabled for future use
+        // const streamingPrompt = getStreamingSystemPrompt(projectContext, memoryContext)
+        const streamingPrompt = getStreamingSystemPrompt(projectContext, undefined, detectedTemplate)
+        
+        enhancedMessages.push({
+          role: 'system' as const,
+          content: streamingPrompt
+        })
 
         // Helper function to detect content type for better frontend handling
         const detectContentType = (chunk: string): string => {
@@ -5889,9 +5853,11 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
           return chunk
         }
 
-        // Create a readable stream that handles both preprocessing results and JSON commands
+        // Create a readable stream that handles JSON commands
         const stream = new ReadableStream({
           async start(controller) {
+            // DISABLED: Preprocessing results no longer sent since preprocessing is disabled
+            /*
             // First, send preprocessing tool results if available
             if (hasToolCalls && preprocessingResults) {
               const processedToolCalls = preprocessingResults.toolCalls?.map((toolCall: any, index: number) => {
@@ -5924,6 +5890,7 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
               
               controller.enqueue(`data: ${JSON.stringify(toolData)}\n\n`)
             }
+            */
             
             // Start streaming the main response with JSON command support
             let result;
@@ -6015,7 +5982,7 @@ Use read_file tool to access any file content when needed.`
                 messages: enhancedMessagesWithContext,
                 temperature: 0.3,
                 abortSignal: abortController.signal,
-                tools: filteredReadOnlyTools,
+                tools: tools, // Use full tool set now that preprocessing is disabled
                 toolChoice: 'auto'
               });
             }
@@ -6086,33 +6053,37 @@ Use read_file tool to access any file content when needed.`
 
             // After text streaming completes, send buffered tool results as streaming chunks
             try {
-              if (result.toolCalls && typeof result.toolCalls.then === 'function') {
-                const toolCalls = await result.toolCalls
-                console.log('[STREAM] Sending buffered tool results as streaming chunk:', toolCalls?.length || 0)
+              if (result.toolResults && typeof result.toolResults.then === 'function') {
+                const toolResults = await result.toolResults
+                console.log('[STREAM] Raw toolResults from AI SDK:', JSON.stringify(toolResults, null, 2))
+                console.log('[STREAM] Sending buffered tool results as streaming chunk:', toolResults?.length || 0)
 
-                if (toolCalls && toolCalls.length > 0) {
+                if (toolResults && toolResults.length > 0) {
                   // Send complete tool results as a streaming chunk (like generateText sends full JSON)
                   controller.enqueue(`data: ${JSON.stringify({
                     type: 'tool-results',
-                    toolCalls: toolCalls.map((toolCall: any) => ({
-                      id: toolCall.id || `tool_${Date.now()}`,
-                      name: toolCall.name || 'unknown',
-                      args: toolCall.args || {},
-                      result: toolCall.result || null
-                    })),
+                    toolCalls: toolResults.map((toolResult: any) => {
+                      console.log('[STREAM] Processing toolResult:', JSON.stringify(toolResult, null, 2))
+                      return {
+                        id: toolResult.toolCallId,
+                        name: toolResult.toolName,
+                        args: toolResult.input || {},
+                        result: toolResult.output || null
+                      }
+                    }),
                     hasToolCalls: true,
                     serverExecuted: true,
                     streamingCompleted: false // Still part of streaming, not final
                   })}\n\n`)
 
                   // Track for memory
-                  toolCalls.forEach((toolCall: any) => {
+                  toolResults.forEach((toolResult: any) => {
                     executedToolCalls.push({
-                      toolCallId: toolCall.id || `tool_${Date.now()}`,
-                      toolName: toolCall.name || 'unknown',
-                      args: toolCall.args || {},
+                      toolCallId: toolResult.toolCallId,
+                      toolName: toolResult.toolName || 'unknown',
+                      args: toolResult.input || {},
                       timestamp: new Date().toISOString(),
-                      result: toolCall.result || null
+                      result: toolResult.output || null
                     })
                   })
                 }
