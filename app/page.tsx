@@ -21,6 +21,7 @@ import { ChatInput } from "@/components/chat-input"
 import { AuthModal } from "@/components/auth-modal"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
+import { AnimatedCodeDemo } from "@/components/animated-code-demo"
 import { createClient } from "@/lib/supabase/client"
 import { TemplateManager } from "@/lib/template-manager"
 import { toast } from "sonner"
@@ -161,6 +162,11 @@ export default function LandingPage() {
         {/* Chat Input Section */}
         <div className="w-full max-w-4xl mx-auto">
           <ChatInput onAuthRequired={handleAuthRequired} />
+        </div>
+
+        {/* Animated Code Demo Section */}
+        <div className="mt-24 mb-12 w-full">
+          <AnimatedCodeDemo />
         </div>
       </main>
 

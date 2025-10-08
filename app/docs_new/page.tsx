@@ -25,7 +25,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
-export default function DocsPage() {
+export default function NewDocsPage() {
   const [searchQuery, setSearchQuery] = useState("")
 
   const docCategories = [
@@ -281,7 +281,7 @@ export default function DocsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Link href="https://status.pipilot.dev" target="_blank">
+                  <Link href="https://status.yourplatform.com" target="_blank">
                     <Button variant="outline" className="w-full border-gray-700 text-white hover:bg-gray-700">
                       View Status
                       <ArrowRight className="ml-2 h-4 w-4" />

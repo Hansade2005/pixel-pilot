@@ -103,23 +103,50 @@ export function Navigation() {
 
           {/* Center - Navigation Links (Desktop) */}
           <div className="hidden md:flex items-center space-x-8">
+            {/* Products Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="text-white hover:text-gray-300 transition-colors flex items-center gap-1">
+                  Products
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56 bg-gray-800 border-gray-700">
+                <Link href="/">
+                  <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
+                    <Zap className="w-4 h-4 mr-2" />
+                    <div>
+                      <div className="font-medium">AI App Builder</div>
+                      <div className="text-xs text-gray-400">Build apps with chat</div>
+                    </div>
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/products/database">
+                  <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
+                    <Database className="w-4 h-4 mr-2" />
+                    <div>
+                      <div className="font-medium">Database</div>
+                      <div className="text-xs text-gray-400">PostgreSQL as a service</div>
+                    </div>
+                  </DropdownMenuItem>
+                </Link>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
             <Link href="/community" className="text-white hover:text-gray-300 transition-colors">
               Community
+            </Link>
+            <Link href="/playground" className="text-white hover:text-gray-300 transition-colors">
+              Playground
+            </Link>
+            <Link href="/schema" className="text-white hover:text-gray-300 transition-colors">
+              Schema
             </Link>
             <Link href="/pricing" className="text-white hover:text-gray-300 transition-colors">
               Plans
             </Link>
-            <Link href="/enterprise" className="text-white hover:text-gray-300 transition-colors">
-              Business
-            </Link>
-            <Link href="/blog" className="text-white hover:text-gray-300 transition-colors">
-              Blog
-            </Link>
             <Link href="/docs" className="text-white hover:text-gray-300 transition-colors">
               Docs
-            </Link>
-            <Link href="/showcase" className="text-white hover:text-gray-300 transition-colors">
-              Showcase
             </Link>
           </div>
 
@@ -264,6 +291,34 @@ export function Navigation() {
           <div className="md:hidden">
             <div className="px-2 pt-2 pb-3 space-y-1 bg-gray-800/50 backdrop-blur-sm rounded-lg mt-2 border border-gray-700/50 max-h-[calc(100vh-80px)] overflow-y-auto">
               {/* Mobile Navigation Links */}
+              <div className="border-b border-gray-700 pb-2 mb-2">
+                <div className="px-3 py-2 text-gray-400 text-xs uppercase tracking-wider">
+                  Products
+                </div>
+                <Link
+                  href="/"
+                  className="flex items-center gap-3 px-3 py-2 text-white hover:text-gray-300 transition-colors"
+                  onClick={closeMobileMenu}
+                >
+                  <Zap className="w-4 h-4" />
+                  <div>
+                    <div className="font-medium">AI App Builder</div>
+                    <div className="text-xs text-gray-400">Build apps with chat</div>
+                  </div>
+                </Link>
+                <Link
+                  href="/products/database"
+                  className="flex items-center gap-3 px-3 py-2 text-white hover:text-gray-300 transition-colors"
+                  onClick={closeMobileMenu}
+                >
+                  <Database className="w-4 h-4" />
+                  <div>
+                    <div className="font-medium">Database</div>
+                    <div className="text-xs text-gray-400">PostgreSQL as a service</div>
+                  </div>
+                </Link>
+              </div>
+              
               <Link
                 href="/community"
                 className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
