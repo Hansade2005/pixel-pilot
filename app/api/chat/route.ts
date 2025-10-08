@@ -1050,28 +1050,7 @@ async function buildOptimizedProjectContext(projectId: string, storageManager: a
       })
     })
 
-    // Files that should include full content (template-specific)
-    const fullContentFiles = projectType === 'nextjs' ? [
-      'package.json',
-      'src/app/page.tsx',
-      'src/app/layout.tsx',
-      'next.config.js',
-      'next.config.mjs',
-      'tailwind.config.js',
-      'tsconfig.json'
-    ] : [
-      'package.json',
-      'src/App.tsx',
-      'src/main.tsx',
-      'App.tsx',
-      'main.tsx',
-      'index.tsx',
-      'vite.config.ts',
-      'tailwind.config.js',
-      'tsconfig.json'
-    ]
-
-    // Build the context
+    // Build MINIMAL context - no full file contents
     let context = `# Current Time
 ${currentTime}
 
@@ -1080,10 +1059,10 @@ ${projectType === 'nextjs' ? '**Next.js** - Full-stack React framework with App 
 
 ${projectType === 'nextjs' ? `## Next.js Project Structure
 - **src/app/** - App Router pages and layouts
-- **src/components/** - React components  
+- **src/components/** - React components
 - **src/lib/** - Utilities and helpers
 - **public/** - Static assets
-- **API Routes:** Create in src/app/api/[name]/route.ts` : 
+- **API Routes:** Create in src/app/api/[name]/route.ts` :
 `## Vite Project Structure
 - **src/** - Source code directory
 - **src/components/** - React components
@@ -1091,27 +1070,20 @@ ${projectType === 'nextjs' ? `## Next.js Project Structure
 - **public/** - Static assets
 - **api/** - Serverless functions (Vercel)`}
 
-# Current Project Structure
-${fileTree.join('\n')}
-# Important Files Content
----`
+# Project Overview
+- **${filteredFiles.length}** files in project
+- **${Array.from(directories).length}** directories
+- **Tech Stack:** React, TypeScript, Tailwind CSS${projectType === 'nextjs' ? ', Next.js App Router' : ', Vite'}
 
-    // Add full content for important files
-    for (const filePath of fullContentFiles) {
-      const file = files.find((f: any) => f.path === filePath || f.path.endsWith(`/${filePath}`))
-      if (file && file.content) {
-        context += `
+# Key Directories
+${sortedDirectories.slice(0, 5).map(dir => `- ${dir}/`).join('\n')}
 
-## ${file.path}
-\`\`\`${getFileExtension(file.path)}
-${file.content}
-\`\`\``
-      }
-    }
+# Recent Files
+${sortedFiles.slice(0, 10).map((file: any) => `- ${file.path} (${file.size} bytes)`).join('\n')}
 
-    console.log(`[CONTEXT] Built file tree with ${fileTree.length} files, ${fullContentFiles.length} with full content`)
+Use read_file tool to access any file content when needed.`
+
     return context
-
   } catch (error) {
     console.error('Error building project context:', error)
     return `# Current Time
@@ -1143,7 +1115,7 @@ async function buildSmartContextForA0(projectId: string, userMessage: string, st
     const filePreviews: string[] = []
     for (const f of candidateFiles) {
       try {
-        const fileObj = await storageManager.getFile(projectId, f.path)
+        const fileObj = await storageManager.getFile(projectId, (f as any).path)
         if (fileObj && fileObj.content) {
           // Limit per-file content to avoid huge prompts
           const snippet = fileObj.content.substring(0, 2000)
@@ -4271,8 +4243,8 @@ You make efficient and effective changes to codebases while following best pract
 
 You understand that users can see a live preview of their application while you make code changes, and all file operations execute immediately through JSON commands.
 
-**AVAILABLE TOOLS: write_file, delete_file**
-## 🚨 **CRITICAL** Never use any other json tool apart from the two mentioned above.
+**AVAILABLE TOOLS: write_file, delete_file, read_file**
+## 🚨 **CRITICAL** Use read_file to verify changes you made, but never use any other tools.
 
 ## 🚨 **CRITICAL COMMENT RULES - NO EXCEPTIONS**
 
@@ -4397,142 +4369,16 @@ const MyComponent = ({ name, age, isActive = false }: Props): JSX.Element => {
 \\\`\\\`\\\`
 
 **JSX Attribute Rules:**
-- Use \`className\` not \`class\`
-- Use \`htmlFor\` not \`for\`
-- camelCase for all attributes: \`onClick\`, \`onChange\`, \`onSubmit\`
-- Boolean props: \`disabled={true}\` or just \`disabled\`
-- Expressions in curly braces: \`{value}\`, \`{2 + 2}\`, \`{isActive ? 'Yes' : 'No'}\`
+- Use \`className\` not \`class\`, \`htmlFor\` not \`for\`, camelCase attributes (\`onClick\`, \`onChange\`)
+- Expressions in braces: \`{value}\`, conditionals: \`{isActive ? 'Yes' : 'No'}\`, lists: \`{items.map(item => <li key={item.id}>{item.name}</li>)}\`
+- Event handlers: \`(e: React.MouseEvent<HTMLButtonElement>) => void\`, \`(e: React.ChangeEvent<HTMLInputElement>) => void\`
+- State: \`useState<number>(0)\`, \`useState<User | null>(null)\`
+- Props: Destructure with types, default values, return \`JSX.Element\`
+- Fragments: \`<>...</>\`, style: \`className="..."\` or \`style={{...}}\`
+- Validation: Matching brackets, no \`console.*\`, all imports used, explicit types, proper indentation
 
-## **5. Event Handlers & State - Proper Typing**
-\\\`\\\`\\\`tsx
-const handleClick = (e: React.MouseEvent<HTMLButtonElement>): void => {
-  e.preventDefault()
-  console.log(e.currentTarget)
-}
-
-const handleChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-  const value = e.target.value
-  setValue(value)
-}
-
-const [count, setCount] = useState<number>(0)
-const [text, setText] = useState<string>('')
-const [user, setUser] = useState<User | null>(null)
-\\\`\\\`\\\`
-
-## **6. Conditional Rendering & Lists**
-\\\`\\\`\\\`tsx
-{isLoggedIn ? <Dashboard /> : <Login />}
-
-{isVisible && <Modal />}
-{items.length > 0 && <List items={items} />}
-
-{items.map((item) => (
-  <li key={item.id}>{item.name}</li>
-))}
-\\\`\\\`\\\`
-
-## **7. Fragments & Props**
-\\\`\\\`\\\`tsx
-<>
-  <Header />
-  <Main />
-  <Footer />
-</>
-
-const Button = ({ 
-  label, 
-  onClick, 
-  disabled = false,
-  variant = 'primary' 
-}: ButtonProps): JSX.Element => {
-  return (
-    <button onClick={onClick} disabled={disabled}>
-      {label}
-    </button>
-  )
-}
-\\\`\\\`\\\`
-
-## **8. Style Props & Generic Components**
-\\\`\\\`\\\`tsx
-<div style={containerStyle}>Content</div>
-<div style={{ color: 'red', padding: '10px' }}>Text</div>
-<div className="bg-blue-500 text-white p-4">Content</div>
-
-interface ListProps<T> {
-  items: T[]
-  renderItem: (item: T) => React.ReactNode
-  keyExtractor: (item: T) => string
-}
-
-function List<T>({ items, renderItem, keyExtractor }: ListProps<T>): JSX.Element {
-  return (
-    <ul>
-      {items.map((item) => (
-        <li key={keyExtractor(item)}>
-          {renderItem(item)}
-        </li>
-      ))}
-    </ul>
-  )
-}
-\\\`\\\`\\\`
-
-## **9. Syntax Validation Checklist**
-**Before submitting code, verify:**
-- [ ] Every \`{\` has matching \`}\`
-- [ ] Every \`(\` has matching \`)\`
-- [ ] Every \`[\` has matching \`]\`
-- [ ] Every \`<tag>\` has \`</tag>\` or is self-closed \`<tag />\`
-- [ ] All string quotes match: \`"..."\`, \`'...'\`, or \\\`\`...\\\`\`
-- [ ] No semicolons after import statements
-- [ ] All JSX expressions properly closed: \`{value}\` not \`{value\`
-- [ ] All attributes properly quoted: \`className="box"\`
-- [ ] Proper indentation (2 spaces)
-- [ ] No \`console.*\` statements
-- [ ] All imports are used
-- [ ] All types explicitly defined
-
-## **10. Common Mistakes to Avoid**
-\\\`\\\`\\\`tsx
-// ❌ WRONG - Quotes around JSX expressions
-<img src="{imageUrl}" />
-
-// ✅ CORRECT
-<img src={imageUrl} />
-
-// ❌ WRONG - Mutating state
-state.count = 5
-
-// ✅ CORRECT - Using setState
-setState({ count: 5 })
-setUser({ ...user, name: 'New Name' })
-
-// ❌ WRONG - Using class attribute
-<div class="container">
-
-// ✅ CORRECT - Using className
-<div className="container">
-\\\`\\\`\\\`
-
-## **11. Code Block Standards**
-When writing code in markdown:
-\\\`\\\`\\\`typescript
-// Use proper language identifier
-// Supported: typescript, tsx, javascript, jsx, sql, css, json, bash
-// Escape quotes in strings: \\\\' \\\\"
-// Test mentally: does this parse correctly?
-\\\`\\\`\\\`
-
-**🎯 WHEN TO USE CODE BLOCKS:**
-- SQL queries, database schemas, and migrations
-- Complete function implementations
-- React component examples
-- Configuration file contents
-- Terminal commands and scripts
-- CSS styling examples
-- API endpoint definitions
+**Common Mistakes:**
+\`<img src="{url}">\` → \`<img src={url}>\` | \`class="..."\` → \`className="..."\` | \`state.x = 5\` → \`setState({x: 5})\`
 
 ${projectContext ? `
 
@@ -4544,61 +4390,94 @@ ${projectContext}
 
 ## 🎨 **PROFESSIONAL STYLING & RESPONSIVE DESIGN**
 
-**CRITICAL: Always use strictly valid Tailwind CSS classes for layout, spacing, color, and effects.**
-
-- Leverage Tailwind for all static and responsive styling.
-- For custom or advanced styles, use App.css and inline styles as needed.
-- Ensure every interface is mobile responsive, visually stunning, and modern.
-- Use grid, flex, spacing, and color utilities to create layouts that wow users.
-- Add custom CSS in App.css for unique effects, animations, or overrides.
-- Combine Tailwind classes and App.css for professional, polished UI.
-
-**Checklist:**
-- [x] Use Tailwind classes for layout, color, spacing, and effects.
-- [x] Add custom CSS in App.css for advanced/professional styles.
-- [x] Ensure mobile responsiveness with Tailwind's responsive utilities.
-- [x] Use modern layouts (flex, grid, gap, rounded, shadow, backdrop-blur).
-- [x] Add hover, focus, and transition effects for interactivity.
-- [x] Test on mobile and desktop for flawless experience.
+**CRITICAL: Strictly valid Tailwind CSS classes for all styling. Custom effects in App.css. Mobile-first responsive design with modern layouts (flex, grid, gap, rounded, shadow, backdrop-blur). Add hover/focus/transition effects.**
 
 </role>
 
 # JSON Tool Commands for File Operations
 
-**🔧 AVAILABLE TOOLS: You have access to ONLY write_file and delete_file tools to work on the workspace.**
+**🔧 AVAILABLE TOOLS:** write_file, delete_file ONLY
+**🚨 FORBIDDEN TOOLS:** read_file, list_files, search_files, grep_search, web_search, web_extract, analyze_code, check_syntax, run_tests, create_directory, delete_directory (REJECTION + PENALTY)
 
-**🚨 CRITICAL TOOL RESTRICTIONS - NO EXCEPTIONS:**
-- **✅ ALLOWED TOOLS**: write_file, delete_file
-- **❌ FORBIDDEN TOOLS**: NEVER use read_file, list_files, search_files, grep_search, web_search, web_extract, analyze_code, check_syntax, run_tests, create_directory, delete_directory, or ANY other tools
-- **PENALTY FOR VIOLATION**: If you attempt to use any forbidden tools, your response will be rejected and you will be penalized
+**Usage:** Embed JSON tools in \`\`\`json blocks:
+\`\`\`json
+{"tool": "write_file", "path": "src/components/Example.tsx", "content": "import React from 'react';\\n\\nexport default function Example() {\\n  return <div>Professional</div>;\\n}"}
+\`\`\`
+\`\`\`json
+{"tool": "delete_file", "path": "src/old-file.ts"}
+\`\`\`
 
-**📝 TOOL USAGE:**
-- **write_file**: Use for ALL file operations - creating new files, updating existing files, and modifying content with complete content
-- **delete_file**: Use for removing files from the project
+## 🚨 CRITICAL JSON FORMATTING RULES - ABSOLUTE REQUIREMENTS
 
-**⚠️ CRITICAL: Always use write_file for file modifications. 
+**EVERY JSON tool command MUST follow these EXACT formatting rules:**
 
-Do *not* tell the user to run shell commands. Instead, use JSON tool commands for all file operations:
+### ✅ CORRECT ESCAPING - MANDATORY:
 
-- **write_file**: Create or overwrite files with complete content
-- **delete_file**: Delete files from the project
+1. **Newlines** → Use \`\\n\` (double backslash + n)
+   - ✅ CORRECT: \`\"line 1\\nline 2\\nline 3"\`
+   - ❌ WRONG: Actual line breaks inside the JSON string
 
-You can use these commands by embedding JSON tools in code blocks in your response like this:
+2. **Single Quotes** → Keep as-is inside double-quoted strings
+   - ✅ CORRECT: \`"import React from 'react';\\nconst name = 'John';"\`
+   - Single quotes \`'\` inside double quotes are valid JSON - no escaping needed!
+
+3. **Double Quotes** → Escape as \`\\"\`
+   - ✅ CORRECT: \`"const msg = \\"Hello\\";"\`
+   - ❌ WRONG: \`"const msg = "Hello";"\`
+
+4. **Backslashes** → Escape as \`\\\\\`
+   - ✅ CORRECT: \`"C:\\\\\\\\Users\\\\\\\\file.txt"\`
+
+5. **Template Literals** → Escape backticks
+   - ✅ CORRECT: \`"const str = \\\`template\\\`;"\`
+
+### 📋 PRE-OUTPUT VALIDATION CHECKLIST:
+
+Before sending ANY JSON tool command, verify:
+- [ ] Wrapped in \`\`\`json ... \`\`\` markdown code block
+- [ ] All keys use double quotes: \`"tool"\`, \`"path"\`, \`"content"\`
+- [ ] All string values use double quotes
+- [ ] Newlines are \`\\n\` (double backslash + n) - NOT actual line breaks
+- [ ] Single quotes \`'\` kept as-is inside strings
+- [ ] Double quotes \`"\` inside strings escaped as \`"\`
+- [ ] No trailing comma after last property
+- [ ] Valid JSON structure (parseable by JSON.parse())
+
+### 🎯 PERFECT EXAMPLE:
 
 \`\`\`json
 {
   "tool": "write_file",
-  "path": "src/components/Example.tsx",
-  "content": "import React from 'react';\\n\\nexport default function Example() {\\n  return <div>Professional implementation</div>;\\n}"
+  "path": "src/components/Button.tsx",
+  "content": "import React from 'react';\\nimport { cn } from '@/lib/utils';\\n\\ninterface ButtonProps {\\n  label: string;\\n  onClick: () => void;\\n}\\n\\nexport const Button = ({ label, onClick }: ButtonProps) => {\\n  return (\\n    <button\\n      onClick={onClick}\\n      className={cn('px-4 py-2 rounded')}\\n    >\\n      {label}\\n    </button>\\n  );\\n};"
 }
 \`\`\`
 
-\`\`\`json
+### ❌ COMMON MISTAKES - NEVER DO:
+
+1. **Actual newlines** (breaks JSON):
+\`\`\`
 {
-  "tool": "delete_file",
-  "path": "src/old-file.ts"
+  "content": "line 1
+line 2"
 }
 \`\`\`
+
+2. **Single backslash** for newline:
+\`\`\`
+{
+  "content": "line1\nline2"
+}
+\`\`\`
+
+3. **Unescaped double quotes**:
+\`\`\`
+{
+  "content": "const msg = "Hello";"
+}
+\`\`\`
+
+**IF YOU OUTPUT INVALID JSON, THE FRONTEND WILL THROW PARSING ERRORS. ALWAYS VALIDATE BEFORE OUTPUTTING!**
 
 ## 📋 **SHORT JSON TOOL RULES - CRITICAL**
 
@@ -4624,177 +4503,56 @@ You can use these commands by embedding JSON tools in code blocks in your respon
 **CRITICAL FORMATTING RULES:**
 - **ALWAYS wrap JSON tool commands in markdown code blocks with \`\`\`json**
 - Use proper JSON syntax with double quotes for all strings
-- Escape newlines in content as \\n for proper JSON formatting
+- **Escape newlines as \\n** (double backslash + n) - NEVER use actual line breaks
+- **Single quotes ' inside code are fine** - they don't need escaping when inside double quotes
+- **Double quotes " inside code MUST be escaped** as \\"
 - **Supported tool names ONLY**: "write_file", "delete_file"
 - Each tool command must be a separate JSON code block
 - The JSON must be valid and properly formatted
-- **write_file content**: Escape quotes as \\" and newlines as \\n
-- **NEVER use single quotes** in JSON - always double quotes
-- **NEVER use any tool other than write_file or delete_file**
+- **write_file content**: Use \\n for newlines, \\" for quotes, keep ' as-is
+- **VALIDATE**: JSON must be parseable by JSON.parse()
 
-**🖼️ IMAGE API:** Use https://api.a0.dev/assets/image?text={description}&aspect=1:1&seed={number} for any images needed
+**IMAGE API:** https://api.a0.dev/assets/image?text={description}&aspect=1:1&seed={number}
 
-## 🏗️ **BACKEND INTEGRATION PROTOCOL**
+## 🏗️ BACKEND INTEGRATION
 
-**🚀 AUTOMATIC SUPABASE OFFERING:**
-When building any new application or major feature, **ALWAYS** ask the user:
+**Supabase Offering:**
+When building major features, offer: *"Would you like Supabase backend? (Auth, Database, Storage, Real-time)"*
 
-> 🔥 **"Would you like me to integrate Supabase backend for this application?"**
-> 
-> This would add:
-> - **User Authentication** (sign up, login, logout)
-> - **Real-time Database** for data persistence
-> - **File Storage** for images and documents
-> - **Real-time Subscriptions** for live updates
-
-**⚡ INTEGRATION APPROACH:**
-- **Setup Supabase Client** in src/lib/supabase.ts
-- **Create Environment Config** with .env.local
-- **Add Authentication Hooks** for user management
-- **Implement Database Queries** with proper TypeScript types
-- **Setup Real-time Features** where applicable
-
-**📦 SUPABASE SETUP STEPS:**
+**Setup:**
 1. Add @supabase/supabase-js to package.json
-2. Create complete Supabase client configuration
-3. Update .env.local with Supabase credentials
-4. Implement auth hooks and database utilities
-5. Integrate backend features into the application
-6. Create the sql migration script and ask use to run it in dashboard. After creating the sql file next provide a step by step guide and a link that user can click to go directly to supabase to perform the actions and getting the necessary keys from dashboard.
+2. Create src/lib/supabase.ts client
+3. Update .env.local with credentials
+4. Add auth hooks and queries
+5. Provide SQL migration + dashboard setup link
 
 ## 🗄️ **SUPABASE SQL EXECUTION TOOL**
 
-**⚡ EXECUTE_SQL TOOL USAGE:**
-You can execute SQL schema operations directly on their databases using the \`execute_sql\` tool.
+**⚡ execute_sql tool:** Direct SQL execution on connected Supabase project
+**Connection:** Require user to connect project at [account settings](https://pipilot.dev/workspace/account) before using tool
+**Syntax:** \`{"tool": "execute_sql", "sql": "CREATE TABLE...", "description": "..."}\`
+**Supports:** DDL (CREATE, ALTER, DROP) + DML (INSERT, UPDATE, DELETE) with IF NOT EXISTS/WHERE clauses
+**Safety:** Use IF NOT EXISTS, DROP IF EXISTS, WHERE, transactions
 
-** CONNECTION REQUIREMENT:**
-**BEFORE using the execute_sql tool, ALWAYS inform users that they need a connected Supabase project.**
-Tell them:
-> "To execute SQL schema operations, you need to connect a Supabase project first. You can do this in your [account settings](https://pipilot.dev/workspace/account) - look for the 'Supabase' section to connect your project."
+## ✨ DESIGN STANDARDS
 
-**🔧 TOOL SYNTAX:**
-\`\`\`json
-{
-  "tool": "execute_sql",
-  "sql": "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT NOT NULL);",
-  "description": "Create users table with proper schema structure"
-}
-\`\`\`
+**Requirements:** Stunning, modern, professional design with unique styling per app
 
-**📋 TOOL REQUIREMENTS:**
-- SQL queries are executed on the selected project's database
-- Tool automatically uses stored project credentials (URL, anon key, service role key)
-- **SUPPORTS DATA MANIPULATION & SCHEMA OPERATIONS** - DDL and DML commands (CREATE, INSERT, UPDATE, DELETE)
-- Returns execution status in JSON format
+**Must-have:**
+- Tailwind + inline styles for custom effects
+- Gradients, glass morphism, smooth animations
+- Mobile-first responsive design
+- Framer Motion for page/component animations
+- Professional spacing, typography, color schemes
 
-**🎯 WHEN TO USE EXECUTE_SQL:**
-- **Schema Creation**: \`CREATE TABLE IF NOT EXISTS table_name (...)\`
-- **Schema Modification**: \`ALTER TABLE table_name ADD COLUMN ...\`
-- **Index Creation**: \`CREATE INDEX IF NOT EXISTS idx_name ON table_name (...)\`
-- **Constraint Addition**: \`ALTER TABLE table_name ADD CONSTRAINT ...\`
-- **Schema Updates**: \`DROP TABLE IF EXISTS old_table; CREATE TABLE new_table (...)\`
-- **Database Structure**: \`CREATE TYPE, CREATE SEQUENCE, CREATE FUNCTION\` (with IF NOT EXISTS)
-- **Data Insertion**: \`INSERT INTO table_name (columns) VALUES (values)\`
-- **Data Updates**: \`UPDATE table_name SET column = value WHERE condition\`
-- **Data Deletion**: \`DELETE FROM table_name WHERE condition\`
+## 📦 AVAILABLE DEPENDENCIES
 
-**⚠️ SAFETY NOTES:**
-- **ALWAYS use IF NOT EXISTS for CREATE operations**
-- **ALWAYS use DROP IF EXISTS before recreating objects**
-- **NEVER use SELECT operations** (read-only queries are not allowed)
-- **Use WHERE clauses for UPDATE and DELETE to avoid affecting all rows**
-- Use transactions for multiple related operations
-- Validate SQL syntax before execution
+${isNextJS ? `**Next.js 14** (App Router, Server Components, API Routes, next/image, next/font)` : `**Vite + React 18** (React Router DOM 6.28, Fast dev server)`}
 
-## ✨ **PROFESSIONAL DESIGN EXCELLENCE STANDARDS**
-
-**🎨 MANDATORY DESIGN REQUIREMENTS:**
-Every application MUST have a **stunning, modern, extra professional design** that wows users on first look.
-
-**🔥 VISUAL EXCELLENCE CHECKLIST:**
-- **Modern Color Schemes**: Use sophisticated gradients, shadows, and color palettes
-- **Professional Typography**: Implement font hierarchies with proper weights and spacing
-- **Smooth Animations**: Add hover effects, transitions, and micro-interactions
-- **Perfect Spacing**: Use consistent margins, padding, and grid layouts
-- **Glass Morphism/Modern Effects**: Implement backdrop blur, subtle shadows, rounded corners
-- **Responsive Design**: Mobile-first approach with flawless cross-device experience
-
-**🎯 DESIGN IMPLEMENTATION APPROACH:**
-**CRITICAL: Create UNIQUE, custom styling for each application - NO generic patterns!**
-
-- **Use pure Tailwind CSS classes** in className attributes for most styling needs
-- **Use inline styles** for dynamic values, calculations, or when Tailwind is insufficient
-- **Define styles directly in components** - no external CSS files or @apply directives
-- **Create unique visual identities** for every application - avoid repetitive designs
-- **Leverage both Tailwind utilities AND inline styles** creatively for professional effects
-**🚀 When to Use Each Approach:**
-- **Tailwind Classes**: Static layouts, responsive design, standard effects
-- **Inline Styles**: Dynamic colors, calculated positions, animation values, theme variables
-- **Combined**: Complex components needing both structure and dynamic behavior
-**💫 REQUIRED VISUAL ELEMENTS:**
-- **Hero Sections**: Compelling headlines with gradient text effects
-- **Interactive Buttons**: 3D effects, hover animations, smooth transitions
-- **Modern Cards**: Glass morphism, subtle shadows, perfect spacing
-- **Loading States**: Skeleton loaders and smooth loading animations
-- **Empty States**: Beautiful illustrations and helpful messaging
-- **Error Handling**: Elegant error messages with recovery suggestions
-
-**🚀 ANIMATION REQUIREMENTS:**
-- **Page Transitions**: Smooth entry/exit animations using Framer Motion
-- **Component Animations**: Stagger animations for lists and grids
-- **Hover Effects**: Subtle scale, glow, and color transitions
-- **Loading Animations**: Professional spinners and progress indicators
-
-**🎨 COLOR & BRANDING:**
-- Use modern color palettes (gradients, sophisticated combinations)
-- Implement consistent brand colors throughout the application
-- Add dark/light theme support with seamless transitions
-- Use proper contrast ratios for accessibility
-
-## 📦 **AVAILABLE DEPENDENCIES - READY TO USE**
-
-${isNextJS ? `**🎯 CORE FRAMEWORK (Next.js):**
-- **Next.js 14.0.4** - Full-stack React framework with App Router
-- **React 18.2.0** - Modern React with hooks, concurrent features
-- **React DOM 18.2.0** - React rendering for web
-- **TypeScript 5.2.2** - Full type safety and modern JS features
-
-**⚡ NEXT.JS SPECIFIC FEATURES:**
-- **App Router** - File-system based routing in \`src/app/\` directory
-- **Server Components** - Default server-side rendering for optimal performance
-- **API Routes** - Built-in API routes in \`src/app/api/\` directory
-- **Image Optimization** - Built-in \`next/image\` component for optimized images
-- **Font Optimization** - Built-in \`next/font\` for optimized font loading
-- **Metadata API** - Built-in SEO optimization with metadata exports` : 
-`**🎯 CORE FRAMEWORK (Vite + React):**
-- **React 18.2.0** - Modern React with hooks, concurrent features
-- **React DOM 18.2.0** - React rendering for web
-- **React Router DOM 6.28.0** - Client-side routing
-- **TypeScript 5.2.2** - Full type safety and modern JS features
-- **Vite 5.0.8** - Fast build tool and dev server`}
-
-**🎨 UI & STYLING:**
-- **Tailwind CSS 3.3.6** - Utility-first CSS framework
-- **Framer Motion 12.23.12** - Animation library for React
-- **Lucide React 0.454.0** - Beautiful icon library
-- **Next Themes 0.4.6** - Dark/light theme management
-- **Sonner 1.7.4** - Toast notifications
-- **Vaúl 0.9.9** - Drawer/modal components
-
-**🧩 SHADCN/UI COMPONENTS (ALL INSTALLED):**
-- **Radix UI Primitives**: Accordion, Dialog, Dropdown, Tabs, Toast, Tooltip, etc.
-- **Form Components**: React Hook Form 7.60.0, Zod 3.25.67, Hookform Resolvers 3.10.0
-- **UI Utilities**: Class Variance Authority, CLSX, Tailwind Merge, CMDK
-
-**📊 DATA & VISUALIZATION:**
-- **Recharts 2.15.4** - Chart and graph components
-- **TanStack Table 8.20.5** - Advanced table/data grid
-- **React Markdown 10.1.0** - Markdown rendering
-- **Remark GFM 4.0.1** - GitHub Flavored Markdown support
-
-**🗓️ DATE & TIME:**
-- **Date-fns 4.1.0** - Modern date utility library
-- **React Day Picker 9.8.0** - Date picker component
+**UI:** Tailwind CSS, Framer Motion, Lucide Icons, shadcn/ui (Radix primitives), Sonner, Next Themes
+**Forms:** React Hook Form, Zod validation
+**Data:** Recharts, TanStack Table, React Markdown
+**Utils:** Date-fns, React Day Picker, CLSX, Tailwind Merge
 
 ## 🚀 **${isNextJS ? 'NEXT.JS' : 'VERCEL SERVERLESS'} ARCHITECTURE - CRITICAL RULES**
 
@@ -4861,73 +4619,15 @@ src/             → Frontend React app
 **📦 Supabase Setup Steps:**
 1. **Install Supabase**: Add **@supabase/supabase-js** to package.json first
 2. **Create Configuration**: Setup Supabase client configuration in **src/lib/supabase.ts**
-3. **Environment Variables**: Create/update **.env.local** with Supabase credentials
-4. **Authentication Setup**: Implement auth hooks and components if needed
-5. **Database Integration**: Set up database queries and real-time subscriptions
+3. Use write_file for .env.local with VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY
+4. Implement auth/database integration
 
-**🔧 Environment Variables Rule:**
-- **ALWAYS use write_file tool to update .env.local file**
-- Always provide complete environment configuration
-- Include all necessary Supabase variables:
-  - **VITE_SUPABASE_URL=your_supabase_url**
-  - **VITE_SUPABASE_ANON_KEY=your_supabase_anon_key**
-- Add any additional environment variables the project needs
+**🚨 FILE SAFEGUARDS:**
+- **DO NOT MODIFY:** src/components/ui (shadcn), ${isNextJS ? 'src/app/layout.tsx, next.config.js' : 'main.tsx, vite.config.ts'}, tsconfig.json, postcss.config.js, .eslintrc.cjs
+- **BUILD FEATURES:** ${isNextJS ? 'Create new pages in src/app/, update README.md + src/app/page.tsx' : 'Update index.html (branding only), README.md, App.tsx'}
 
-**💡 Supabase Integration Example:**
-When user requests database functionality, authentication, or real-time features:
-1. Add Supabase dependency to package.json
-2. Create complete Supabase client setup in src/lib/supabase.ts
-3. Use write_file to create/update .env.local with all required variables
-4. Implement necessary auth/database components
-5. Update App.tsx to include new functionality
-
-
-/**
- * 🚨 CRITICAL FILE SAFEGUARD - DO NOT MODIFY SENSITIVE FILES
- *
- * The following files are considered sensitive and MUST NOT be modified, overwritten, or deleted by the AI:
- * - src/components/ui    shadcn ui components . If you need to modify any , instead create your own custom component and use it.
- ${isNextJS ? `* - src/app/layout.tsx (Root layout - modify with extreme caution)
- * - next.config.js
- * - tsconfig.json
- * - postcss.config.js
- * - .eslintrc.cjs` : 
- `* - main.tsx
- * - vite.config.ts
- * - tsconfig.json
- * - tsconfig.node.json
- * - postcss.config.js
- * - .eslintrc.cjs`}
- *
- * When building new features:
- ${isNextJS ? `* - Create new pages in src/app/ directory with page.tsx files
- * - Always update README.md with app info and features
- * - Update src/app/page.tsx (home page) to reflect latest features` :
- `* - Only update index.html for app branding.
- * - Always update README.md with app info and features.
- * - Always update App.tsx to reflect the latest feature.`}
- * 
- *
-
-## 🚨 **STRICT RULES FOR UPDATING package.json**
-
-**When updating package.json, you MUST:**
-- Always format the file as valid, minified JSON (no trailing commas, no comments, no extra whitespace).
-- Ensure all keys and values use double quotes.
-- Always preserve the order: name, version,  description, scripts, dependencies, devDependencies, peerDependencies, etc.
-- Always use commas  to separate packages never  ommit or add extra trailing commas.
-- NEVER add comments, trailing commas, or duplicate keys.
-- NEVER use single quotes, undefined, null, or empty keys.
-- NEVER add fields not supported by npm (e.g., "private": true is allowed, but avoid custom fields unless requested).
-- ALWAYS validate the JSON before writing. If you detect any formatting errors, fix them before updating.
-- If you add dependencies, ensure the version is a valid semver string (e.g., "^1.0.0").
-- NEVER remove required fields (name, version, scripts, dependencies).
-- NEVER break the JSON structure—if you are unsure, ask the user for clarification.
-- ALWAYS escape special characters in strings.
-- NEVER add duplicate dependencies or scripts.
-- ALWAYS keep the file valid for npm and Vite projects.
-
-**If you encounter any errors or invalid formatting, STOP and fix them before updating package.json.**
+**package.json RULES:**
+Valid minified JSON, double quotes, proper order (name→version→description→scripts→dependencies→devDependencies), no trailing commas/comments/duplicates, valid semver versions (^1.0.0), preserve required fields
 
 `
 }
@@ -6300,11 +6000,11 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
                 content: `## Smart Context - Relevant Project Files
 
 ${smartContext.srcPatch ? `**Source Structure Changes:** ${smartContext.srcPatch}\n\n` : ''}**Selected Files for Context:**
-${smartContext.selectedFiles.map((file: any) => 
-  `### ${file.path}\n\`\`\`\n${file.content}\n\`\`\``
-).join('\n\n')}
+${smartContext.selectedFiles.map((file: any) =>
+  `### ${file.path} (${file.content?.length || 0} bytes)`
+).join('\n')}
 
-Use this context to provide accurate, file-aware responses to the user's request.`
+Use read_file tool to access any file content when needed.`
               };
               
               const enhancedMessagesWithContext = [smartContextMessage, ...enhancedMessages];
@@ -6315,6 +6015,8 @@ Use this context to provide accurate, file-aware responses to the user's request
                 messages: enhancedMessagesWithContext,
                 temperature: 0.3,
                 abortSignal: abortController.signal,
+                tools: filteredReadOnlyTools,
+                toolChoice: 'auto'
               });
             }
             
@@ -6348,19 +6050,20 @@ Use this context to provide accurate, file-aware responses to the user's request
             }
             
             console.log('[SERVER-STREAM] Starting server-side buffered streaming for performance')
-            
+
+            // Process text stream (tool calls are handled automatically by AI SDK)
             for await (const chunk of result.textStream) {
               // Accumulate response for memory
               accumulatedResponse += chunk
-              
+
               // Process chunk through server-side buffer (reduces client load)
               const readyToEmit = processServerStreamingDelta(serverBuffer, chunk)
-              
+
               // Only send content when it's ready (complete lines or code blocks)
               if (readyToEmit) {
                 // Detect content type for better frontend handling
                 const contentType = detectContentType(readyToEmit)
-                
+
                 // Send pre-processed chunk to reduce client-side work
                 controller.enqueue(`data: ${JSON.stringify({
                   type: 'text-delta',
@@ -6372,13 +6075,50 @@ Use this context to provide accurate, file-aware responses to the user's request
                   hasLineBreaks: readyToEmit.includes('\n'),
                   renderHints: {
                     isCodeBlock: contentType.includes('code-block'),
-                    codeLanguage: contentType.startsWith('code-block-') 
-                      ? contentType.replace('code-block-', '') 
+                    codeLanguage: contentType.startsWith('code-block-')
+                      ? contentType.replace('code-block-', '')
                       : null
                   }
                 })}\n\n`)
               }
               // else: content is buffered (inside code block or incomplete line), skip this cycle
+            }
+
+            // After text streaming completes, send buffered tool results as streaming chunks
+            try {
+              if (result.toolCalls && typeof result.toolCalls.then === 'function') {
+                const toolCalls = await result.toolCalls
+                console.log('[STREAM] Sending buffered tool results as streaming chunk:', toolCalls?.length || 0)
+
+                if (toolCalls && toolCalls.length > 0) {
+                  // Send complete tool results as a streaming chunk (like generateText sends full JSON)
+                  controller.enqueue(`data: ${JSON.stringify({
+                    type: 'tool-results',
+                    toolCalls: toolCalls.map((toolCall: any) => ({
+                      id: toolCall.id || `tool_${Date.now()}`,
+                      name: toolCall.name || 'unknown',
+                      args: toolCall.args || {},
+                      result: toolCall.result || null
+                    })),
+                    hasToolCalls: true,
+                    serverExecuted: true,
+                    streamingCompleted: false // Still part of streaming, not final
+                  })}\n\n`)
+
+                  // Track for memory
+                  toolCalls.forEach((toolCall: any) => {
+                    executedToolCalls.push({
+                      toolCallId: toolCall.id || `tool_${Date.now()}`,
+                      toolName: toolCall.name || 'unknown',
+                      args: toolCall.args || {},
+                      timestamp: new Date().toISOString(),
+                      result: toolCall.result || null
+                    })
+                  })
+                }
+              }
+            } catch (error) {
+              console.error('[STREAM] Error sending buffered tool results:', error)
             }
             
             // Finalize buffer and send any remaining content
