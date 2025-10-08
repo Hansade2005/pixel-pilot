@@ -27,6 +27,53 @@ export default function DocPage() {
   const [loading, setLoading] = useState(true)
   const [readingProgress, setReadingProgress] = useState(0)
 
+  // Parse content into structured sections
+  const parseContentIntoSections = (content: string) => {
+    const sections = []
+    const lines = content.split('\n')
+
+    let currentSection = null
+    let sectionContent = []
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim()
+
+      // Check if line is a heading (starts with multiple uppercase letters or contains specific patterns)
+      if (line.match(/^[A-Z][A-Z\s]{10,}/) || line.includes('PiPilot\'s') || line.includes('The ') && line.includes(' provides') || line.includes(' represents')) {
+        // Save previous section if exists
+        if (currentSection && sectionContent.length > 0) {
+          sections.push({
+            heading: currentSection,
+            body: sectionContent.join(' '),
+            key_points: [],
+            technical_highlights: [],
+            benefits: []
+          })
+        }
+
+        // Start new section
+        currentSection = line
+        sectionContent = []
+      } else if (line && currentSection) {
+        sectionContent.push(line)
+      }
+    }
+
+    // Add final section
+    if (currentSection && sectionContent.length > 0) {
+      sections.push({
+        heading: currentSection,
+        body: sectionContent.join(' '),
+        key_points: [],
+        technical_highlights: [],
+        benefits: []
+      })
+    }
+
+    // Render sections
+    return sections.map((section, index) => renderContentSection(section, index))
+  }
+
   useEffect(() => {
     const loadDocData = async () => {
       try {
@@ -133,6 +180,63 @@ export default function DocPage() {
                       <span className="text-green-300">{benefit.trim()}</span>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {section.case_study && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-white mb-3">Case Study</h3>
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-6">
+                  <h4 className="text-blue-300 font-medium mb-2">{section.case_study.title}</h4>
+                  <p className="text-gray-300 mb-4">{section.case_study.scenario}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <h5 className="text-red-300 mb-1">Traditional Approach</h5>
+                      <p className="text-gray-400">{section.case_study.traditional_approach}</p>
+                    </div>
+                    <div>
+                      <h5 className="text-green-300 mb-1">PiPilot Approach</h5>
+                      <p className="text-gray-400">{section.case_study.pilot_approach}</p>
+                    </div>
+                  </div>
+                  <p className="text-green-300 mt-4 font-medium">{section.case_study.results}</p>
+                </div>
+              </div>
+            )}
+
+            {section.implementation_framework && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-white mb-3">Implementation Framework</h3>
+                <div className="space-y-3">
+                  {Object.entries(section.implementation_framework).map(([phase, description]: [string, any], phaseIndex: number) => (
+                    <div key={phaseIndex} className="flex gap-3">
+                      <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30 flex-shrink-0">
+                        {phase.replace('_', ' ')}
+                      </Badge>
+                      <span className="text-gray-300">{description}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {section.code_comparison && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-white mb-3">Code Comparison</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                    <h4 className="text-red-300 font-medium mb-2">Traditional</h4>
+                    <pre className="text-xs text-gray-300 overflow-x-auto">
+                      <code>{section.code_comparison.traditional}</code>
+                    </pre>
+                  </div>
+                  <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+                    <h4 className="text-green-300 font-medium mb-2">PiPilot</h4>
+                    <pre className="text-xs text-gray-300 overflow-x-auto">
+                      <code>{section.code_comparison.pixel_pilot}</code>
+                    </pre>
+                  </div>
                 </div>
               </div>
             )}
@@ -269,19 +373,21 @@ export default function DocPage() {
 
           {/* Article Content */}
           <div className="max-w-4xl">
-            {/* Main Content */}
+            {/* Introduction Section */}
             <div className="mb-12">
               <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-2xl p-8 border border-purple-500/20">
-                <h2 className="text-2xl font-bold text-white mb-6">Overview</h2>
+                <h2 className="text-2xl font-bold text-white mb-6">Introduction</h2>
                 <div className="prose prose-invert max-w-none">
                   <p className="text-gray-300 leading-relaxed text-lg mb-6">
                     {docData.overview}
                   </p>
-                  <div className="text-gray-300 leading-relaxed text-lg whitespace-pre-line">
-                    {docData.content}
-                  </div>
                 </div>
               </div>
+            </div>
+
+            {/* Main Content Sections */}
+            <div className="mb-12">
+              {parseContentIntoSections(docData.content)}
             </div>
 
             {/* Keywords Section */}
