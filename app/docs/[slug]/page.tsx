@@ -29,48 +29,18 @@ export default function DocPage() {
 
   // Parse content into structured sections
   const parseContentIntoSections = (content: string) => {
-    const sections = []
-    const lines = content.split('\n')
-
-    let currentSection = null
-    let sectionContent = []
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim()
-
-      // Check if line is a heading (starts with multiple uppercase letters or contains specific patterns)
-      if (line.match(/^[A-Z][A-Z\s]{10,}/) || line.includes('PiPilot\'s') || line.includes('The ') && line.includes(' provides') || line.includes(' represents')) {
-        // Save previous section if exists
-        if (currentSection && sectionContent.length > 0) {
-          sections.push({
-            heading: currentSection,
-            body: sectionContent.join(' '),
-            key_points: [],
-            technical_highlights: [],
-            benefits: []
-          })
-        }
-
-        // Start new section
-        currentSection = line
-        sectionContent = []
-      } else if (line && currentSection) {
-        sectionContent.push(line)
-      }
-    }
-
-    // Add final section
-    if (currentSection && sectionContent.length > 0) {
-      sections.push({
-        heading: currentSection,
-        body: sectionContent.join(' '),
+    // For now, create a single section with the full content
+    // This can be enhanced later to parse the content intelligently
+    const sections = [
+      {
+        heading: "Overview",
+        body: content,
         key_points: [],
         technical_highlights: [],
         benefits: []
-      })
-    }
+      }
+    ]
 
-    // Render sections
     return sections.map((section, index) => renderContentSection(section, index))
   }
 
