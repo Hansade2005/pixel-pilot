@@ -1,16 +1,16 @@
 # Troubleshooting Guide
 
-## Comprehensive Problem-Solving Guide for Pixel Pilot
+## Comprehensive Problem-Solving Guide for PiPilot
 
 **Date:** September 7, 2025  
 **Author:** Anye Happiness Ade  
 **Version:** 1.0.0
 
-This troubleshooting guide provides solutions to common issues and problems you might encounter while using Pixel Pilot. Follow the systematic approach outlined in each section to resolve issues quickly.
+This troubleshooting guide provides solutions to common issues and problems you might encounter while using PiPilot. Follow the systematic approach outlined in each section to resolve issues quickly.
 
 ## Getting Started Issues
 
-### Problem: Cannot Access Pixel Pilot
+### Problem: Cannot Access PiPilot
 **Symptoms**: Website doesn't load, connection timeout, or access denied
 
 **Solutions**:
@@ -20,7 +20,7 @@ This troubleshooting guide provides solutions to common issues and problems you 
    # Test internet connection
    ping google.com
 
-   # Test Pixel Pilot specifically
+   # Test PiPilot specifically
    ping dev.pixelways.co
    ```
 
@@ -41,7 +41,7 @@ This troubleshooting guide provides solutions to common issues and problems you 
 4. **Firewall/Antivirus**
    - Temporarily disable firewall
    - Check antivirus software settings
-   - Add Pixel Pilot to allowed sites
+   - Add PiPilot to allowed sites
 
 ### Problem: GitHub OAuth Not Working
 **Symptoms**: Cannot log in with GitHub, OAuth errors, authorization failures
@@ -196,7 +196,7 @@ This troubleshooting guide provides solutions to common issues and problems you 
 5. **Sandbox Cleanup**
    ```bash
    # Force cleanup of existing sandboxes
-   # Use the cleanup button in Pixel Pilot interface
+   # Use the cleanup button in PiPilot interface
    ```
 
 ### Problem: Preview Shows Blank Page

@@ -8,16 +8,16 @@ const stripe = new Stripe(stripeSecretKey, {
   apiVersion: '2024-12-18.acacia',
 })
 
-// Product definition for Pixel Pilot Pro
+// Product definition for PiPilot Pro
 const productConfig = {
-  name: 'Pixel Pilot Enterprisee',
+  name: 'PiPilot Enterprisee',
   description: 'Professional AI development for serious developers',
   monthlyPrice: 99, // $29/month
   yearlyPrice: 379, // $279/year (20% savings)
 }
 
 async function createStripeProducts() {
-  console.log('🚀 Creating Pixel Pilot Pro product and prices...\n')
+  console.log('🚀 Creating PiPilot Pro product and prices...\n')
   console.log(`🔑 Using Stripe key: ${stripeSecretKey.substring(0, 20)}...\n`)
 
   try {

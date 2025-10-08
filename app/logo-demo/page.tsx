@@ -6,7 +6,7 @@ export default function LogoDemoPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-8">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-4xl font-bold text-white mb-8 text-center">Pixel Pilot Logo Demo</h1>
+        <h1 className="text-4xl font-bold text-white mb-8 text-center">PiPilot Logo Demo</h1>
         
         {/* Icon Variants */}
         <div className="mb-12">
@@ -112,7 +112,7 @@ export default function LogoDemoPage() {
               <h3 className="text-lg font-semibold text-white mb-4">Hero Section</h3>
               <div className="text-center">
                 <Logo variant="full" size="lg" className="mx-auto mb-4" />
-                <h2 className="text-2xl font-bold text-white mb-2">Welcome to Pixel Pilot</h2>
+                <h2 className="text-2xl font-bold text-white mb-2">Welcome to PiPilot</h2>
                 <p className="text-gray-300">AI-Powered App Development</p>
               </div>
             </div>

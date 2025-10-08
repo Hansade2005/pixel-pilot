@@ -40,10 +40,10 @@ export default function RefundPolicyPage() {
             <section>
               <h2 className="text-2xl font-semibold text-white mb-4">1. Overview</h2>
               <p className="text-gray-300 leading-relaxed mb-4">
-                At Pixel Pilot, Inc., we want you to be completely satisfied with our AI-powered web application development platform. This Refund Policy outlines the circumstances under which we provide refunds for our subscription services.
+                At PiPilot, Inc., we want you to be completely satisfied with our AI-powered web application development platform. This Refund Policy outlines the circumstances under which we provide refunds for our subscription services.
               </p>
               <p className="text-gray-300 leading-relaxed">
-                All refund requests are evaluated on a case-by-case basis and granted at the sole discretion of Pixel Pilot, Inc.
+                All refund requests are evaluated on a case-by-case basis and granted at the sole discretion of PiPilot, Inc.
               </p>
             </section>
 
@@ -174,7 +174,7 @@ export default function RefundPolicyPage() {
             <section>
               <h2 className="text-2xl font-semibold text-white mb-4">11. Changes to This Policy</h2>
               <p className="text-gray-300 leading-relaxed mb-4">
-                Pixel Pilot reserves the right to modify this Refund Policy at any time. Changes will be effective immediately upon posting on our website.
+                PiPilot reserves the right to modify this Refund Policy at any time. Changes will be effective immediately upon posting on our website.
               </p>
               <p className="text-gray-300 leading-relaxed">
                 We will notify users of significant changes via email or through our service notifications.

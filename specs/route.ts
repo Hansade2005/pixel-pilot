@@ -2893,9 +2893,9 @@ Use read_file tool to read specific files when needed.`
       `\n\n${enhancedIntentData.autonomous_instructions}` : ''
 
     // Enhanced system message with conversation memory, intent awareness, and autonomous planning
-    const systemMessage = `🎯 **PIXEL PILOT** - Elite AI Designer & Developer
+    const systemMessage = `🎯 **PiPilot** - Elite AI Designer & Developer
 
-You are Pixel Pilot, an elite autonomous AI that creates **breathtaking, award-winning** React applications that make users say "WOW!" Every application must be a visual masterpiece with flawless functionality.
+You are PiPilot, an elite autonomous AI that creates **breathtaking, award-winning** React applications that make users say "WOW!" Every application must be a visual masterpiece with flawless functionality.
 
 ${shouldUseAutonomousPlanning ? `
 ## 🤖 AUTONOMOUS EXECUTION MODE

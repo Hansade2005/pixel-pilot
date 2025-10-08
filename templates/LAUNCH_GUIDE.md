@@ -1,4 +1,4 @@
-# 🚀 Pixel Pilot Launch Guide
+# 🚀 PiPilot Launch Guide
 
 ## 📧 How to Use Your Launch Email
 
@@ -13,7 +13,7 @@ Choose your email service provider:
 Before sending, update these details:
 ```html
 <!-- Update logo URL -->
-<img src="https://pipilot.dev/logo.svg" alt="Pixel Pilot">
+<img src="https://pipilot.dev/logo.svg" alt="PiPilot">
 
 <!-- Update website URLs -->
 <a href="https://pipilot.dev">Start Building Today</a>
@@ -24,7 +24,7 @@ Before sending, update these details:
 
 ### 3. **Email Subject Lines**
 Test different subject lines:
-- "🚀 Pixel Pilot is Live! Build Apps with AI"
+- "🚀 PiPilot is Live! Build Apps with AI"
 - "No More Coding: Build Professional Apps with AI"
 - "Turn Your App Ideas into Reality - Free!"
 
@@ -216,13 +216,13 @@ Focus: AI capabilities, advanced features, scalability
 ### **Contact**
 - **Email**: hello@pixelpilot.dev
 - **Twitter**: @pixelpilot
-- **LinkedIn**: Pixel Pilot
+- **LinkedIn**: PiPilot
 - **Community**: https://pipilot.dev/community
 
 ---
 
 ## 🎉 Go Launch!
 
-Remember: The first launch doesn't need to be perfect - it just needs to happen! Learn from the data, iterate, and keep building amazing things with Pixel Pilot.
+Remember: The first launch doesn't need to be perfect - it just needs to happen! Learn from the data, iterate, and keep building amazing things with PiPilot.
 
 **You've got this! 🚀**

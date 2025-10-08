@@ -33,7 +33,7 @@ export default function LaunchedPage() {
               Launched Projects
             </h1>
             <p className="text-xl text-white/80 max-w-3xl mx-auto">
-              Discover amazing apps and websites built by the Pixel Pilot community.
+              Discover amazing apps and websites built by the PiPilot community.
             </p>
           </div>
 
@@ -199,7 +199,7 @@ export default function LaunchedPage() {
           <div className="bg-gray-800/50 rounded-xl p-8 backdrop-blur-sm text-center">
             <h2 className="text-3xl font-bold text-white mb-4">Ready to Launch?</h2>
             <p className="text-gray-300 mb-6 max-w-2xl mx-auto">
-              Build your next amazing project with Pixel Pilot and join our community of creators.
+              Build your next amazing project with PiPilot and join our community of creators.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white">

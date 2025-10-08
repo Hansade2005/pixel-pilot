@@ -6,9 +6,9 @@ Since our API key is expired, here's how to manually create your products in Str
 
 Go to [Stripe Dashboard](https://dashboard.stripe.com/) → **Products** → **Create product**
 
-### **Product 1: Pixel Pilot Pro**
+### **Product 1: PiPilot Pro**
 ```
-Product name: Pixel Pilot Pro
+Product name: PiPilot Pro
 Description: Perfect for individual developers and small teams
 ```
 
@@ -16,9 +16,9 @@ Description: Perfect for individual developers and small teams
 - **Monthly**: $15.00 USD/month → Copy `Price ID`
 - **Yearly**: $180.00 USD/year → Copy `Price ID`
 
-### **Product 2: Pixel Pilot Teams**
+### **Product 2: PiPilot Teams**
 ```
-Product name: Pixel Pilot Teams
+Product name: PiPilot Teams
 Description: Advanced collaboration tools for growing teams
 ```
 
@@ -26,9 +26,9 @@ Description: Advanced collaboration tools for growing teams
 - **Monthly**: $30.00 USD/month → Copy `Price ID`
 - **Yearly**: $360.00 USD/year → Copy `Price ID`
 
-### **Product 3: Pixel Pilot Enterprise**
+### **Product 3: PiPilot Enterprise**
 ```
-Product name: Pixel Pilot Enterprise
+Product name: PiPilot Enterprise
 Description: Complete solution for large organizations
 ```
 

@@ -32,122 +32,124 @@ export default function DocsPage() {
     {
       id: "getting-started",
       title: "Getting Started",
-      description: "Learn the basics and get up and running in minutes",
+      description: "Learn the basics and create your first database",
       icon: Zap,
       color: "purple",
       articles: [
         { title: "Quick Start Guide", href: "/docs/getting-started/quick-start", time: "5 min" },
         { title: "Core Concepts", href: "/docs/getting-started/concepts", time: "10 min" },
-        { title: "Installation", href: "/docs/getting-started/installation", time: "5 min" },
-        { title: "First Project", href: "/docs/getting-started/first-project", time: "15 min" }
+        { title: "Create Your First Database", href: "#", time: "5 min" },
+        { title: "Using AI Schema Generator", href: "#", time: "10 min" }
       ]
     },
     {
       id: "database",
-      title: "Database",
-      description: "Complete guide to working with PostgreSQL databases",
+      title: "Database Tables",
+      description: "Create and manage PostgreSQL database tables",
       icon: Database,
       color: "blue",
       articles: [
-        { title: "Table Management", href: "/docs/database/tables", time: "10 min" },
-        { title: "Queries & Filters", href: "/docs/database/queries", time: "15 min" },
-        { title: "Insert & Update", href: "/docs/database/mutations", time: "10 min" },
-        { title: "Relationships & Joins", href: "/docs/database/relationships", time: "20 min" },
-        { title: "Full-Text Search", href: "/docs/database/search", time: "15 min" },
-        { title: "Real-time Subscriptions", href: "/docs/database/realtime", time: "15 min" }
+        { title: "Creating Tables", href: "#", time: "10 min" },
+        { title: "AI Schema Generation", href: "#", time: "10 min" },
+        { title: "Data Types (Text, Number, UUID, JSON, etc.)", href: "#", time: "15 min" },
+        { title: "Adding & Editing Records", href: "#", time: "10 min" },
+        { title: "Table Schema Management", href: "#", time: "15 min" },
+        { title: "Row Level Security", href: "#", time: "20 min" }
+      ]
+    },
+    {
+      id: "api-keys",
+      title: "API Keys & Authentication",
+      description: "Secure access for external applications",
+      icon: Lock,
+      color: "orange",
+      articles: [
+        { title: "Creating API Keys", href: "#", time: "5 min" },
+        { title: "Using API Keys in Your App", href: "#", time: "10 min" },
+        { title: "Rate Limiting (1000 req/hour)", href: "#", time: "10 min" },
+        { title: "API Key Security Best Practices", href: "#", time: "15 min" },
+        { title: "Revoking & Managing Keys", href: "#", time: "5 min" }
+      ]
+    },
+    {
+      id: "rest-api",
+      title: "REST API",
+      description: "Auto-generated CRUD endpoints for your tables",
+      icon: Code,
+      color: "pink",
+      articles: [
+        { title: "API Documentation Generator", href: "#", time: "10 min" },
+        { title: "GET - List Records", href: "#", time: "10 min" },
+        { title: "POST - Create Records", href: "#", time: "10 min" },
+        { title: "PUT - Update Records", href: "#", time: "10 min" },
+        { title: "DELETE - Remove Records", href: "#", time: "10 min" },
+        { title: "Error Handling", href: "#", time: "10 min" }
       ]
     },
     {
       id: "storage",
-      title: "Storage",
-      description: "File upload, management, and CDN delivery",
+      title: "File Storage",
+      description: "Upload and manage files (500MB per database)",
       icon: Cloud,
       color: "green",
       articles: [
-        { title: "File Upload", href: "/docs/storage/upload", time: "10 min" },
-        { title: "File Management", href: "/docs/storage/management", time: "10 min" },
-        { title: "Access Control", href: "/docs/storage/access-control", time: "15 min" },
-        { title: "Image Optimization", href: "/docs/storage/image-optimization", time: "10 min" },
-        { title: "CDN Configuration", href: "/docs/storage/cdn", time: "10 min" }
+        { title: "Uploading Files", href: "#", time: "10 min" },
+        { title: "Supported File Types (Images, PDFs, Videos)", href: "#", time: "5 min" },
+        { title: "Public vs Private Files", href: "#", time: "10 min" },
+        { title: "Signed URLs for Private Files", href: "#", time: "15 min" },
+        { title: "Storage Limits & Usage Tracking", href: "#", time: "10 min" }
       ]
     },
     {
-      id: "authentication",
-      title: "Authentication",
-      description: "User authentication and authorization",
-      icon: Lock,
-      color: "orange",
+      id: "integration",
+      title: "Framework Integration",
+      description: "Use PiPilot with popular frameworks",
+      icon: Terminal,
+      color: "indigo",
       articles: [
-        { title: "User Signup & Login", href: "/docs/auth/user-management", time: "10 min" },
-        { title: "Social Authentication", href: "/docs/auth/social", time: "15 min" },
-        { title: "Password Reset", href: "/docs/auth/password-reset", time: "10 min" },
-        { title: "Row Level Security", href: "/docs/auth/rls", time: "20 min" },
-        { title: "JWT Tokens", href: "/docs/auth/jwt", time: "15 min" }
-      ]
-    },
-    {
-      id: "api",
-      title: "API Reference",
-      description: "Complete REST and GraphQL API documentation",
-      icon: Code,
-      color: "pink",
-      articles: [
-        { title: "REST API", href: "/docs/api/rest", time: "15 min" },
-        { title: "GraphQL API", href: "/docs/api/graphql", time: "20 min" },
-        { title: "Real-time API", href: "/docs/api/realtime", time: "15 min" },
-        { title: "Error Handling", href: "/docs/api/errors", time: "10 min" },
-        { title: "Rate Limiting", href: "/docs/api/rate-limits", time: "10 min" }
-      ]
-    },
-    {
-      id: "deployment",
-      title: "Deployment",
-      description: "Deploy your applications to production",
-      icon: Rocket,
-      color: "yellow",
-      articles: [
-        { title: "Deploy to Vercel", href: "/docs/deployment/vercel", time: "10 min" },
-        { title: "Deploy to Netlify", href: "/docs/deployment/netlify", time: "10 min" },
-        { title: "Environment Variables", href: "/docs/deployment/env-variables", time: "10 min" },
-        { title: "Custom Domains", href: "/docs/deployment/domains", time: "10 min" },
-        { title: "SSL Certificates", href: "/docs/deployment/ssl", time: "10 min" }
+        { title: "Next.js Integration", href: "#", time: "15 min" },
+        { title: "React + Vite Integration", href: "#", time: "15 min" },
+        { title: "Vue.js Integration", href: "#", time: "15 min" },
+        { title: "Node.js Integration", href: "#", time: "15 min" },
+        { title: "Python Integration", href: "#", time: "15 min" },
+        { title: "React Native & Mobile Apps", href: "#", time: "20 min" }
       ]
     },
     {
       id: "guides",
-      title: "Guides & Tutorials",
-      description: "Step-by-step guides for common use cases",
+      title: "Step-by-Step Guides",
+      description: "Build real-world applications",
       icon: FileText,
-      color: "indigo",
+      color: "yellow",
       articles: [
-        { title: "Build a Blog", href: "/docs/guides/blog", time: "30 min" },
-        { title: "E-commerce Store", href: "/docs/guides/ecommerce", time: "45 min" },
-        { title: "Real-time Chat App", href: "/docs/guides/chat", time: "40 min" },
-        { title: "Social Network", href: "/docs/guides/social", time: "60 min" },
-        { title: "SaaS Dashboard", href: "/docs/guides/saas", time: "50 min" }
+        { title: "Build a Todo App", href: "#", time: "20 min" },
+        { title: "User Authentication System", href: "#", time: "30 min" },
+        { title: "Image Gallery with File Upload", href: "#", time: "25 min" },
+        { title: "Blog with Database Tables", href: "#", time: "35 min" },
+        { title: "Deploy to Vercel/Netlify", href: "#", time: "15 min" }
       ]
     },
     {
-      id: "sdk",
-      title: "SDK References",
-      description: "Language-specific SDK documentation",
-      icon: Terminal,
+      id: "reference",
+      title: "API Reference",
+      description: "Complete API documentation",
+      icon: Server,
       color: "red",
       articles: [
-        { title: "JavaScript SDK", href: "/docs/sdk/javascript", time: "20 min" },
-        { title: "TypeScript SDK", href: "/docs/sdk/typescript", time: "20 min" },
-        { title: "Python SDK", href: "/docs/sdk/python", time: "20 min" },
-        { title: "Go SDK", href: "/docs/sdk/go", time: "20 min" },
-        { title: "CLI Tool", href: "/docs/sdk/cli", time: "15 min" }
+        { title: "Database API Endpoints", href: "#", time: "10 min" },
+        { title: "Storage API Endpoints", href: "#", time: "10 min" },
+        { title: "Authentication Headers", href: "#", time: "5 min" },
+        { title: "Response Formats", href: "#", time: "5 min" },
+        { title: "Status Codes & Errors", href: "#", time: "10 min" }
       ]
     }
   ]
 
   const quickLinks = [
     { title: "Quick Start", href: "/docs/getting-started/quick-start", icon: Zap },
-    { title: "API Reference", href: "/docs/api/rest", icon: Code },
-    { title: "Database Guide", href: "/docs/database/tables", icon: Database },
-    { title: "Deploy to Production", href: "/docs/deployment/vercel", icon: Rocket }
+    { title: "Create API Keys", href: "#", icon: Lock },
+    { title: "AI Schema Generator", href: "#", icon: Layers },
+    { title: "File Storage Guide", href: "#", icon: Cloud }
   ]
 
   const colorClasses = {

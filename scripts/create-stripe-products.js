@@ -11,19 +11,19 @@ const stripe = new Stripe(stripeSecretKey, {
 // Product definitions
 const products = [
   {
-    name: 'Pixel Pilot Pro',
+    name: 'PiPilot Pro',
     description: 'Perfect for individual developers and small teams',
     monthlyPrice: 15, // $15/month
     yearlyPrice: 180, // $180/year (20% savings)
   },
   {
-    name: 'Pixel Pilot Teams',
+    name: 'PiPilot Teams',
     description: 'Advanced collaboration tools for growing teams',
     monthlyPrice: 30, // $30/month
     yearlyPrice: 360, // $360/year (20% savings)
   },
   {
-    name: 'Pixel Pilot Enterprise',
+    name: 'PiPilot Enterprise',
     description: 'Complete solution for large organizations',
     monthlyPrice: 60, // $60/month
     yearlyPrice: 720, // $720/year (20% savings)
@@ -43,7 +43,7 @@ async function createProductsAndPrices() {
         description: product.description,
         metadata: {
           app: 'pixel-pilot',
-          plan_type: product.name.toLowerCase().replace('pixel pilot ', '').replace(' ', '-')
+          plan_type: product.name.toLowerCase().replace('PiPilot ', '').replace(' ', '-')
         }
       })
 
@@ -94,7 +94,7 @@ async function createProductsAndPrices() {
 
     // Output the price IDs in a format ready for .env
     products.forEach(product => {
-      const planName = product.name.toLowerCase().replace('pixel pilot ', '').replace(' ', '_').toUpperCase()
+      const planName = product.name.toLowerCase().replace('PiPilot ', '').replace(' ', '_').toUpperCase()
       console.log(`NEXT_PUBLIC_STRIPE_PRICE_${planName}_MONTHLY=${product.monthlyPriceId}`)
       console.log(`NEXT_PUBLIC_STRIPE_PRICE_${planName}_YEARLY=${product.yearlyPriceId}`)
     })

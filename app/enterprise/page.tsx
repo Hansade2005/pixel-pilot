@@ -512,7 +512,7 @@ export default function EnterprisePage() {
               <h2 className="text-4xl font-bold text-white mb-4">Ready to Get Started?</h2>
               <p className="text-xl text-gray-300 max-w-3xl mx-auto">
                 Join the hundreds of enterprise teams already scaling their development with AI.
-                Schedule a personalized demo and see how Pixel Pilot can transform your workflow.
+                Schedule a personalized demo and see how PiPilot can transform your workflow.
               </p>
             </div>
 

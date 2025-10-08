@@ -142,7 +142,7 @@ body {
   -webkit-backdrop-filter: blur(12px);
 }
 
-/* Pixel Pilot Logo Animations */
+/* PiPilot Logo Animations */
 @keyframes logo-glow {
   0%, 100% {
     box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);

@@ -107,7 +107,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
             {isSignUp ? "Create Account" : "Welcome Back"}
           </CardTitle>
           <CardDescription className="text-gray-400">
-            {isSignUp ? "Join Pixel Pilot and start creating" : "Sign in to your Pixel Pilot account"}
+            {isSignUp ? "Join PiPilot and start creating" : "Sign in to your PiPilot account"}
           </CardDescription>
         </CardHeader>
         

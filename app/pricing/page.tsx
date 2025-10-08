@@ -89,7 +89,7 @@ export default function PricingPage() {
         window.history.replaceState({}, '', url.toString())
 
         // You could show a success toast here
-        alert(`Welcome to Pixel Pilot ${result.plan}! Your subscription is now active.`)
+        alert(`Welcome to PiPilot ${result.plan}! Your subscription is now active.`)
       } else {
         console.error('Payment verification failed')
         alert('There was an issue verifying your payment. Please contact support.')
@@ -137,12 +137,12 @@ export default function PricingPage() {
 
   const faqData = [
     {
-      question: "What is Pixel Pilot and how does it work?",
-      answer: "Pixel Pilot is an AI-powered development platform that helps you build web applications faster. Simply describe what you want to build, and our AI generates the code, handles the setup, and deploys your project automatically."
+      question: "What is PiPilot and how does it work?",
+      answer: "PiPilot is an AI-powered development platform that helps you build web applications faster. Simply describe what you want to build, and our AI generates the code, handles the setup, and deploys your project automatically."
     },
     {
       question: "What does the free plan include?",
-      answer: "The free plan includes GitHub repository creation with 2 pushes per month, deployment to Netlify only (5 deployments per month), basic project templates, and community support. It's perfect for trying out Pixel Pilot and building small projects."
+      answer: "The free plan includes GitHub repository creation with 2 pushes per month, deployment to Netlify only (5 deployments per month), basic project templates, and community support. It's perfect for trying out PiPilot and building small projects."
     },
     {
       question: "What deployment platforms are available?",
@@ -150,7 +150,7 @@ export default function PricingPage() {
     },
     {
       question: "What AI models are available?",
-      answer: "Pixel Pilot supports leading AI models including OpenAI GPT, Claude, Gemini, and xAI. Pro users get unlimited access to all premium models, while free users have basic access with reasonable limits."
+      answer: "PiPilot supports leading AI models including OpenAI GPT, Claude, Gemini, and xAI. Pro users get unlimited access to all premium models, while free users have basic access with reasonable limits."
     },
     {
       question: "What are the deployment limits?",
@@ -158,7 +158,7 @@ export default function PricingPage() {
     },
     {
       question: "What does 'GitHub repository pushes' mean?",
-      answer: "GitHub repository pushes refer to creating or updating repositories on GitHub through Pixel Pilot. This includes initial repository creation and subsequent code pushes. Free users are limited to 2 pushes per month to encourage upgrading to Pro for unlimited development."
+      answer: "GitHub repository pushes refer to creating or updating repositories on GitHub through PiPilot. This includes initial repository creation and subsequent code pushes. Free users are limited to 2 pushes per month to encourage upgrading to Pro for unlimited development."
     },
     {
       question: "Who owns the projects and code?",
@@ -166,7 +166,7 @@ export default function PricingPage() {
     },
     {
       question: "How much does it cost to use?",
-      answer: "Pixel Pilot offers a free tier with limited deployment access. The Pro plan is $29/month ($279/year) with unlimited prompts and full deployment access - saving 20% with annual billing. Enterprise plans are coming soon."
+      answer: "PiPilot offers a free tier with limited deployment access. The Pro plan is $29/month ($279/year) with unlimited prompts and full deployment access - saving 20% with annual billing. Enterprise plans are coming soon."
     },
     {
       question: "Can I upgrade or downgrade my plan?",
@@ -174,7 +174,7 @@ export default function PricingPage() {
     },
     {
       question: "Where can I find out more?",
-      answer: "You can learn more about Pixel Pilot by visiting our documentation, joining our community Discord, or contacting our support team. We also have tutorials and examples to help you get started."
+      answer: "You can learn more about PiPilot by visiting our documentation, joining our community Discord, or contacting our support team. We also have tutorials and examples to help you get started."
     }
   ]
 

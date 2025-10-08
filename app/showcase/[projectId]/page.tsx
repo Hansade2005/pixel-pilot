@@ -123,12 +123,12 @@ export default function ProjectViewPage() {
     {
       id: "ecommerce-platform",
       title: "AI-Powered E-commerce Platform",
-      description: "A complete e-commerce solution built in just 2 hours using Pixel Pilot's AI capabilities. Features include product management, shopping cart, and payment integration.",
+      description: "A complete e-commerce solution built in just 2 hours using PiPilot's AI capabilities. Features include product management, shopping cart, and payment integration.",
       author: "Sarah Chen",
       avatar: "SC",
       tech: ["React", "Next.js", "Stripe", "Tailwind"],
       templateId: "saas-template",
-      longDescription: "This comprehensive e-commerce platform showcases the power of AI-driven development. Built entirely with Pixel Pilot, it includes modern features like product catalog management, shopping cart functionality, secure payment processing with Stripe, and a beautiful responsive design. The platform demonstrates how AI can accelerate development while maintaining high code quality and user experience standards.",
+      longDescription: "This comprehensive e-commerce platform showcases the power of AI-driven development. Built entirely with PiPilot, it includes modern features like product catalog management, shopping cart functionality, secure payment processing with Stripe, and a beautiful responsive design. The platform demonstrates how AI can accelerate development while maintaining high code quality and user experience standards.",
       features: [
         "Product catalog with search and filters",
         "Shopping cart with persistent storage",

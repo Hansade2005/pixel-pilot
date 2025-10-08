@@ -10,17 +10,19 @@ import {
   Database, 
   Zap, 
   Shield, 
-  Globe, 
-  Lock, 
-  Layers, 
-  BarChart3, 
-  Clock, 
+  Key, 
+  FileJson, 
+  Sparkles, 
+  Code2, 
+  Image, 
   Check,
   ArrowRight,
   Code,
   Server,
   FileText,
-  Cloud
+  Cloud,
+  Table2,
+  FileCode
 } from "lucide-react"
 import Link from "next/link"
 
@@ -29,44 +31,44 @@ export default function DatabaseProductPage() {
 
   const features = [
     {
-      icon: Zap,
-      title: "Instant Databases",
-      description: "Create production-ready PostgreSQL databases in seconds. No configuration needed."
+      icon: Database,
+      title: "PostgreSQL Databases",
+      description: "Create unlimited databases with 500MB storage each. Powered by Supabase's reliable infrastructure."
+    },
+    {
+      icon: Sparkles,
+      title: "AI Schema Generation",
+      description: "Describe your data needs in plain English and let AI generate the perfect database schema instantly."
+    },
+    {
+      icon: Table2,
+      title: "Visual Table Builder",
+      description: "Design tables with our intuitive UI. Support for 10+ data types including JSON, UUID, and timestamps."
+    },
+    {
+      icon: Key,
+      title: "API Keys System",
+      description: "Secure API keys for external apps. Built-in rate limiting (1000 req/hour) and usage tracking."
+    },
+    {
+      icon: Code2,
+      title: "Auto-Generated REST APIs",
+      description: "Get instant CRUD endpoints for every table. Full documentation with code examples in 6+ frameworks."
+    },
+    {
+      icon: Image,
+      title: "File Storage (500MB)",
+      description: "Upload images, PDFs, videos up to 10MB each. Public & private files with signed URLs."
+    },
+    {
+      icon: FileCode,
+      title: "API Docs Generator",
+      description: "Framework-specific integration guides with your actual database IDs and API keys auto-filled."
     },
     {
       icon: Shield,
-      title: "Enterprise Security",
-      description: "Row-level security, SSL encryption, and automatic backups keep your data safe."
-    },
-    {
-      icon: Globe,
-      title: "Global CDN",
-      description: "Deploy to multiple regions worldwide for low-latency access from anywhere."
-    },
-    {
-      icon: Lock,
-      title: "Built-in Auth",
-      description: "User authentication and authorization out of the box. No third-party needed."
-    },
-    {
-      icon: Layers,
-      title: "RESTful & GraphQL APIs",
-      description: "Auto-generated APIs for your database. Query with REST or GraphQL instantly."
-    },
-    {
-      icon: BarChart3,
-      title: "Real-time Analytics",
-      description: "Monitor performance, track usage, and optimize your database with live dashboards."
-    },
-    {
-      icon: Clock,
-      title: "Point-in-Time Recovery",
-      description: "Restore your database to any point in time with automatic backups."
-    },
-    {
-      icon: Code,
-      title: "SQL & No-Code",
-      description: "Write SQL queries or use our visual query builder. Your choice."
+      title: "Row Level Security",
+      description: "Built-in RLS policies ensure users only access their own data. Secure by default."
     }
   ]
 
@@ -74,15 +76,18 @@ export default function DatabaseProductPage() {
     {
       name: "Free",
       price: 0,
-      description: "Perfect for side projects and learning",
+      description: "Perfect for learning and testing",
       features: [
-        "500 MB Database Storage",
-        "1 GB File Storage",
-        "Unlimited API Requests",
-        "Up to 2 databases",
-        "Community Support",
-        "SSL Encryption",
-        "Daily Backups (7 days retention)"
+        "Unlimited Databases",
+        "500MB storage per database",
+        "500MB file storage per database",
+        "Unlimited API requests",
+        "10 API keys per database",
+        "AI Schema Generation",
+        "Auto-generated REST APIs",
+        "API Documentation Generator",
+        "Row Level Security",
+        "Community Support"
       ],
       cta: "Get Started Free",
       highlighted: false
@@ -93,36 +98,35 @@ export default function DatabaseProductPage() {
       originalPrice: billingCycle === 'yearly' ? 25 : null,
       description: "For production applications",
       features: [
-        "8 GB Database Storage",
-        "100 GB File Storage",
-        "Unlimited API Requests",
-        "Unlimited databases",
-        "Email Support",
-        "Custom Domains",
-        "Daily Backups (30 days retention)",
-        "Point-in-time Recovery",
-        "Real-time Analytics",
-        "Connection Pooling"
+        "Everything in Free, plus:",
+        "5GB storage per database",
+        "5GB file storage per database",
+        "Unlimited API keys",
+        "Custom domains",
+        "Advanced rate limiting controls",
+        "Priority email support",
+        "Database backups (30 days)",
+        "Real-time database subscriptions",
+        "Advanced analytics"
       ],
-      cta: "Start Pro Trial",
+      cta: "Upgrade to Pro",
       highlighted: true
     },
     {
       name: "Enterprise",
       price: "Custom",
-      description: "For mission-critical applications",
+      description: "For large-scale applications",
       features: [
-        "Unlimited Database Storage",
-        "Unlimited File Storage",
-        "Unlimited API Requests",
-        "Unlimited databases",
-        "Priority Support (24/7)",
-        "Dedicated Infrastructure",
+        "Everything in Pro, plus:",
+        "Custom storage limits",
+        "Dedicated support (24/7)",
         "Custom SLA",
-        "Advanced Security",
-        "On-premise Options",
-        "White-label Solutions",
-        "Custom Integrations"
+        "Advanced security features",
+        "Single Sign-On (SSO)",
+        "Audit logs",
+        "Custom integrations",
+        "On-premise deployment options",
+        "White-label solutions"
       ],
       cta: "Contact Sales",
       highlighted: false
@@ -132,42 +136,66 @@ export default function DatabaseProductPage() {
   const codeExamples = [
     {
       language: "JavaScript",
-      code: `import { createClient } from '@yourplatform/client'
+      code: `// Fetch all records
+const response = await fetch(
+  'https://pipilot.dev/api/v1/databases/YOUR_DB_ID/tables/YOUR_TABLE_ID/records',
+  {
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    }
+  }
+);
 
-const db = createClient({
-  url: process.env.DATABASE_URL,
-  apiKey: process.env.API_KEY
-})
+const { records } = await response.json();
 
-// Query your database
-const { data, error } = await db
-  .from('users')
-  .select('*')
-  .limit(10)
-
-// Insert data
-await db.from('posts').insert({
-  title: 'Hello World',
-  content: 'This is my first post!'
-})`
+// Create a record
+await fetch(
+  'https://pipilot.dev/api/v1/databases/YOUR_DB_ID/tables/YOUR_TABLE_ID/records',
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      data: {
+        name: 'John Doe',
+        email: 'john@example.com'
+      }
+    })
+  }
+);`
     },
     {
       language: "Python",
-      code: `from yourplatform import create_client
+      code: `import requests
 
-db = create_client(
-    url=os.getenv('DATABASE_URL'),
-    api_key=os.getenv('API_KEY')
+# Fetch all records
+response = requests.get(
+    'https://pipilot.dev/api/v1/databases/YOUR_DB_ID/tables/YOUR_TABLE_ID/records',
+    headers={
+        'Authorization': 'Bearer YOUR_API_KEY',
+        'Content-Type': 'application/json'
+    }
 )
 
-# Query your database
-data = db.from_('users').select('*').limit(10).execute()
+records = response.json()['records']
 
-# Insert data
-db.from_('posts').insert({
-    'title': 'Hello World',
-    'content': 'This is my first post!'
-}).execute()`
+# Create a record
+requests.post(
+    'https://pipilot.dev/api/v1/databases/YOUR_DB_ID/tables/YOUR_TABLE_ID/records',
+    headers={
+        'Authorization': 'Bearer YOUR_API_KEY',
+        'Content-Type': 'application/json'
+    },
+    json={
+        'data': {
+            'name': 'John Doe',
+            'email': 'john@example.com'
+        }
+    }
+)`
     }
   ]
 
@@ -189,15 +217,15 @@ db.from_('posts').insert({
               Database as a Service
             </Badge>
             <h1 className="text-5xl md:text-7xl font-bold text-white mb-6">
-              The fastest way to ship
+              PostgreSQL databases
               <br />
               <span className="bg-gradient-to-r from-purple-400 to-pink-400 text-transparent bg-clip-text">
-                with a database
+                powered by AI
               </span>
             </h1>
             <p className="text-xl text-gray-300 mb-8 max-w-3xl mx-auto">
-              Create production-ready PostgreSQL databases in seconds. Built-in authentication, 
-              storage, and auto-generated APIs. Focus on building, not infrastructure.
+              Create databases with AI schema generation, get auto-generated REST APIs, 
+              500MB storage + file uploads. Secure API keys for external apps. All free forever.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/auth/signup">

@@ -1,12 +1,12 @@
-# Pixel Pilot API Reference
+# PiPilot API Reference
 
-## Comprehensive API Documentation for Pixel Pilot Platform
+## Comprehensive API Documentation for PiPilot Platform
 
 **Date:** September 7, 2025  
 **Author:** Anye Happiness Ade  
 **Version:** 1.0.0
 
-This document provides comprehensive API reference for Pixel Pilot's backend services, AI agent system, and integration endpoints. All APIs follow RESTful conventions and return JSON responses.
+This document provides comprehensive API reference for PiPilot's backend services, AI agent system, and integration endpoints. All APIs follow RESTful conventions and return JSON responses.
 
 ## Authentication
 
@@ -762,4 +762,4 @@ result = client.ai.execute(
 
 ---
 
-*For additional support or questions about the Pixel Pilot API, please contact our developer support team.* 🚀
+*For additional support or questions about the PiPilot API, please contact our developer support team.* 🚀

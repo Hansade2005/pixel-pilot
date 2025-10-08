@@ -1,6 +1,6 @@
 # Professional Invoice Generator
 
-A comprehensive invoice creation and PDF generation tool built for Pixel Pilot.
+A comprehensive invoice creation and PDF generation tool built for PiPilot.
 
 ## Features
 
@@ -16,7 +16,7 @@ A comprehensive invoice creation and PDF generation tool built for Pixel Pilot.
 
 1. **Fill Company Information**
    - Company name, address, phone, email
-   - Pre-filled with Pixel Pilot branding
+   - Pre-filled with PiPilot branding
 
 2. **Add Client Details**
    - Client name and billing address
@@ -96,14 +96,14 @@ app/invoice/
 
 ### Professional Features
 - Clean, branded design
-- Pixel Pilot logo integration
+- PiPilot logo integration
 - Professional typography
 - Consistent spacing and layout
 - Mobile-responsive design
 
-## Usage in Pixel Pilot
+## Usage in PiPilot
 
-This invoice generator can be integrated into Pixel Pilot's workflow for:
+This invoice generator can be integrated into PiPilot's workflow for:
 - Client billing for development services
 - Project quotes and estimates
 - Professional service invoices

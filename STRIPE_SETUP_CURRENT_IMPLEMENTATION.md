@@ -1,8 +1,8 @@
-# 🚀 Pixel Pilot Stripe Integration - Current Implementation Guide
+# 🚀 PiPilot Stripe Integration - Current Implementation Guide
 
 ## **📋 Current System Overview**
 
-Our Pixel Pilot subscription system **does NOT currently use webhooks**. Instead, it uses a **polling approach**:
+Our PiPilot subscription system **does NOT currently use webhooks**. Instead, it uses a **polling approach**:
 
 ### **Current Flow:**
 1. **User selects plan** → Frontend opens ClientCheckout modal with subscription intents
@@ -46,8 +46,8 @@ NEXT_PUBLIC_APP_URL=https://pipilot.dev
 
 Go to [Stripe Dashboard → Products](https://dashboard.stripe.com/products) and create:
 
-### **Product: Pixel Pilot Pro**
-- **Name**: `Pixel Pilot Pro`
+### **Product: PiPilot Pro**
+- **Name**: `PiPilot Pro`
 - **Description**: `Professional AI development for serious developers`
 
 **Create Two Prices:**
@@ -269,7 +269,7 @@ curl -X POST https://yourdomain.com/api/stripe/check-subscription
 
 ## **🎉 Your Current System is Production-Ready!**
 
-Your Pixel Pilot subscription system is **fully functional** with:
+Your PiPilot subscription system is **fully functional** with:
 - ✅ **Working payment processing**
 - ✅ **Subscription management**
 - ✅ **Usage limits and tracking**

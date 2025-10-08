@@ -1,14 +1,14 @@
-# Getting Started with Pixel Pilot
+# Getting Started with PiPilot
 
-## Welcome to Pixel Pilot
+## Welcome to PiPilot
 
 **Date:** September 7, 2025  
 **Author:** Anye Happiness Ade  
 **Version:** 1.0.0
 
-Pixel Pilot is a revolutionary AI-powered web development platform that transforms how you create applications. By combining advanced artificial intelligence with professional development tools, Pixel Pilot enables you to build production-ready web applications through natural language conversations.
+PiPilot is a revolutionary AI-powered web development platform that transforms how you create applications. By combining advanced artificial intelligence with professional development tools, PiPilot enables you to build production-ready web applications through natural language conversations.
 
-## What Makes Pixel Pilot Different?
+## What Makes PiPilot Different?
 
 ### 🤖 AI-Powered Development
 - **Conversational Development**: Describe your app in plain English and watch it come to life
@@ -29,7 +29,7 @@ Pixel Pilot is a revolutionary AI-powered web development platform that transfor
 ## Quick Start Guide
 
 ### Step 1: Account Setup
-1. Visit [Pixel Pilot](https://dev.pixelways.co)
+1. Visit [PiPilot](https://dev.pixelways.co)
 2. Click "Get Started" and authenticate with GitHub
 3. Complete your profile setup
 
@@ -41,7 +41,7 @@ Pixel Pilot is a revolutionary AI-powered web development platform that transfor
 ### Step 3: Start Building
 1. Open the chat panel on the left
 2. Describe what you want to build: *"Create a task management app with user authentication"*
-3. Watch as Pixel Pilot generates your application structure
+3. Watch as PiPilot generates your application structure
 
 ### Step 4: Preview and Test
 1. Click the "Preview" tab to launch your app
@@ -177,7 +177,7 @@ Pixel Pilot is a revolutionary AI-powered web development platform that transfor
 ### Continue Learning
 1. **Explore Features**: Try different AI development modes
 2. **Build Projects**: Create sample applications to learn
-3. **Join Community**: Connect with other Pixel Pilot users
+3. **Join Community**: Connect with other PiPilot users
 4. **Advanced Topics**: Learn about deployment and scaling
 
 ### Resources
@@ -202,4 +202,4 @@ Pixel Pilot is a revolutionary AI-powered web development platform that transfor
 
 ---
 
-*Ready to start building? Create your first project and experience the future of web development with Pixel Pilot!* 🚀
+*Ready to start building? Create your first project and experience the future of web development with PiPilot!* 🚀

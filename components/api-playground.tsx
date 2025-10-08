@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,279 +15,533 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Play,
-  Copy,
-  Check,
-  Code,
-  Terminal,
+import { 
+  Play, 
+  Copy, 
+  Check, 
+  Key, 
+  Database, 
+  Table2, 
   Loader2,
   AlertCircle,
-  CheckCircle,
-  Clock,
-  FileJson
+  CheckCircle2,
+  ExternalLink
 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import { useToast } from "@/hooks/use-toast"
+import Link from "next/link"
+
+interface Database {
+  id: number
+  name: string
+}
+
+interface Table {
+  id: number
+  name: string
+  schema: any
+}
+
+interface ApiKey {
+  id: string
+  key_prefix: string
+  name: string
+}
 
 export function APIPlayground() {
-  const [method, setMethod] = useState("GET")
-  const [endpoint, setEndpoint] = useState("/api/v1/users")
-  const [headers, setHeaders] = useState(`{
-  "Authorization": "Bearer your-api-key",
-  "Content-Type": "application/json"
-}`)
-  const [body, setBody] = useState(`{
-  "name": "John Doe",
-  "email": "john@example.com"
-}`)
-  const [response, setResponse] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [responseTime, setResponseTime] = useState<number>(0)
-  const [statusCode, setStatusCode] = useState<number>(0)
-  const [copied, setCopied] = useState(false)
-  const [generatedCode, setGeneratedCode] = useState("")
-  const [selectedLanguage, setSelectedLanguage] = useState("javascript")
+  const [user, setUser] = useState<any>(null)
+  const [databases, setDatabases] = useState<Database[]>([])
+  const [tables, setTables] = useState<Table[]>([])
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([])
+  const [selectedDatabase, setSelectedDatabase] = useState<string>("")
+  const [selectedTable, setSelectedTable] = useState<string>("")
+  const [selectedApiKey, setSelectedApiKey] = useState<string>("")
+  const [selectedMethod, setSelectedMethod] = useState<string>("GET")
+  const [recordId, setRecordId] = useState<string>("")
+  const [requestBody, setRequestBody] = useState<string>('{\n  "data": {\n    "name": "John Doe",\n    "email": "john@example.com"\n  }\n}')
+  const [response, setResponse] = useState<string>("")
+  const [loading, setLoading] = useState(false)
+  const [loadingData, setLoadingData] = useState(true)
+  const [statusCode, setStatusCode] = useState<number | null>(null)
+  const [responseTime, setResponseTime] = useState<number | null>(null)
+  const [copied, setCopied] = useState<string>("")
+  const { toast } = useToast()
 
-  const methods = ["GET", "POST", "PUT", "PATCH", "DELETE"]
-  
-  const quickEndpoints = [
-    { label: "Get all users", method: "GET", path: "/api/v1/users" },
-    { label: "Get user by ID", method: "GET", path: "/api/v1/users/:id" },
-    { label: "Create user", method: "POST", path: "/api/v1/users" },
-    { label: "Update user", method: "PATCH", path: "/api/v1/users/:id" },
-    { label: "Delete user", method: "DELETE", path: "/api/v1/users/:id" },
-    { label: "List tables", method: "GET", path: "/api/v1/tables" },
-    { label: "Query table", method: "POST", path: "/api/v1/query" }
-  ]
+  useEffect(() => {
+    checkUser()
+  }, [])
+
+  useEffect(() => {
+    if (selectedDatabase) {
+      loadTables()
+      loadApiKeys()
+    }
+  }, [selectedDatabase])
+
+  const checkUser = async () => {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      setUser(user)
+      await loadDatabases(user.id)
+    }
+    setLoadingData(false)
+  }
+
+  const loadDatabases = async (userId: string) => {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('databases')
+      .select('id, name')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (data && data.length > 0) {
+      setDatabases(data)
+      setSelectedDatabase(data[0].id.toString())
+    }
+  }
+
+  const loadTables = async () => {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('tables')
+      .select('id, name, schema')
+      .eq('database_id', parseInt(selectedDatabase))
+      .order('created_at', { ascending: false })
+
+    if (data && data.length > 0) {
+      setTables(data)
+      setSelectedTable(data[0].id.toString())
+    } else {
+      setTables([])
+      setSelectedTable("")
+    }
+  }
+
+  const loadApiKeys = async () => {
+    try {
+      const response = await fetch(`/api/database/${selectedDatabase}/api-keys`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.keys && data.keys.length > 0) {
+          setApiKeys(data.keys)
+          setSelectedApiKey(data.keys[0].id)
+        } else {
+          setApiKeys([])
+          setSelectedApiKey("")
+        }
+      }
+    } catch (error) {
+      console.error("Error loading API keys:", error)
+      setApiKeys([])
+    }
+  }
+
+  const getEndpoint = () => {
+    if (!selectedDatabase || !selectedTable) return ""
+    
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://pipilot.dev'
+    let endpoint = `${baseUrl}/api/v1/databases/${selectedDatabase}/tables/${selectedTable}/records`
+    
+    if ((selectedMethod === 'PUT' || selectedMethod === 'DELETE') && recordId) {
+      endpoint += `/${recordId}`
+    }
+    
+    return endpoint
+  }
 
   const executeRequest = async () => {
-    setIsLoading(true)
+    if (!selectedApiKey) {
+      toast({
+        title: "API Key Required",
+        description: "Please select an API key to make requests",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if ((selectedMethod === 'PUT' || selectedMethod === 'DELETE') && !recordId) {
+      toast({
+        title: "Record ID Required",
+        description: `${selectedMethod} requests require a record ID`,
+        variant: "destructive"
+      })
+      return
+    }
+
+    setLoading(true)
+    setResponse("")
+    setStatusCode(null)
+    setResponseTime(null)
+
     const startTime = Date.now()
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 700))
-    
-    const endTime = Date.now()
-    setResponseTime(endTime - startTime)
-    
-    // Mock response based on method
-    let mockResponse: any = {}
-    let mockStatus = 200
-    
-    if (method === "GET") {
-      mockResponse = {
-        data: [
-          { id: "1", name: "John Doe", email: "john@example.com", created_at: "2024-01-15T10:30:00Z" },
-          { id: "2", name: "Jane Smith", email: "jane@example.com", created_at: "2024-01-16T14:20:00Z" }
-        ],
-        count: 2
+
+    try {
+      const endpoint = getEndpoint()
+      const options: RequestInit = {
+        method: selectedMethod,
+        headers: {
+          'Authorization': `Bearer ${selectedApiKey}`,
+          'Content-Type': 'application/json'
+        }
       }
-    } else if (method === "POST") {
-      mockResponse = {
-        data: {
-          id: "3",
-          name: "John Doe",
-          email: "john@example.com",
-          created_at: new Date().toISOString()
-        },
-        message: "User created successfully"
+
+      if ((selectedMethod === 'POST' || selectedMethod === 'PUT') && requestBody) {
+        try {
+          JSON.parse(requestBody) // Validate JSON
+          options.body = requestBody
+        } catch (e) {
+          toast({
+            title: "Invalid JSON",
+            description: "Request body must be valid JSON",
+            variant: "destructive"
+          })
+          setLoading(false)
+          return
+        }
       }
-      mockStatus = 201
-    } else if (method === "PATCH") {
-      mockResponse = {
-        data: {
-          id: "1",
-          name: "John Doe Updated",
-          email: "john.updated@example.com",
-          updated_at: new Date().toISOString()
-        },
-        message: "User updated successfully"
+
+      const response = await fetch(endpoint, options)
+      const endTime = Date.now()
+      setResponseTime(endTime - startTime)
+      setStatusCode(response.status)
+      
+      const data = await response.json()
+      setResponse(JSON.stringify(data, null, 2))
+      
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: `${selectedMethod} request completed successfully`
+        })
+      } else {
+        toast({
+          title: "Request Failed",
+          description: `Status ${response.status}: ${data.error || 'Unknown error'}`,
+          variant: "destructive"
+        })
       }
-    } else if (method === "DELETE") {
-      mockResponse = {
-        message: "User deleted successfully"
-      }
-      mockStatus = 204
+    } catch (error: any) {
+      const endTime = Date.now()
+      setResponseTime(endTime - startTime)
+      setStatusCode(0)
+      setResponse(JSON.stringify({ error: error.message }, null, 2))
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
     }
-    
-    setResponse(mockResponse)
-    setStatusCode(mockStatus)
-    setIsLoading(false)
-    generateCode()
   }
 
-  const generateCode = () => {
-    const parsedHeaders = JSON.parse(headers)
-    const authHeader = parsedHeaders.Authorization || "Bearer your-api-key"
-    
-    const codeSnippets: Record<string, string> = {
-      javascript: `// Using fetch API
-const response = await fetch('https://api.aiappbuilder.com${endpoint}', {
-  method: '${method}',
-  headers: {
-    'Authorization': '${authHeader}',
-    'Content-Type': 'application/json'
-  }${method !== "GET" && method !== "DELETE" ? `,
-  body: JSON.stringify(${body})` : ""}
-})
-
-const data = await response.json()
-console.log(data)`,
-      
-      python: `# Using requests library
-import requests
-
-response = requests.${method.toLowerCase()}(
-    'https://api.aiappbuilder.com${endpoint}',
-    headers={
-        'Authorization': '${authHeader}',
-        'Content-Type': 'application/json'
-    }${method !== "GET" && method !== "DELETE" ? `,
-    json=${body}` : ""}
-)
-
-data = response.json()
-print(data)`,
-      
-      curl: `curl -X ${method} \\
-  'https://api.aiappbuilder.com${endpoint}' \\
-  -H 'Authorization: ${authHeader}' \\
-  -H 'Content-Type: application/json'${method !== "GET" && method !== "DELETE" ? ` \\
-  -d '${body.replace(/\n/g, "").replace(/\s+/g, " ")}'` : ""}`
-    }
-    
-    setGeneratedCode(codeSnippets[selectedLanguage])
-  }
-
-  const copyCode = (code: string) => {
+  const copyCode = (code: string, type: string) => {
     navigator.clipboard.writeText(code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setCopied(type)
+    setTimeout(() => setCopied(""), 2000)
+    toast({
+      title: "Copied!",
+      description: "Code copied to clipboard"
+    })
   }
 
-  const loadQuickEndpoint = (quickEndpoint: typeof quickEndpoints[0]) => {
-    setMethod(quickEndpoint.method)
-    setEndpoint(quickEndpoint.path)
+  const generateCurlCommand = () => {
+    const endpoint = getEndpoint()
+    let curl = `curl -X ${selectedMethod} '${endpoint}' \\\n`
+    curl += `  -H 'Authorization: Bearer ${selectedApiKey || 'YOUR_API_KEY'}' \\\n`
+    curl += `  -H 'Content-Type: application/json'`
     
-    if (quickEndpoint.method === "POST") {
-      setBody(`{
-  "name": "John Doe",
-  "email": "john@example.com"
-}`)
-    } else if (quickEndpoint.method === "PATCH") {
-      setBody(`{
-  "name": "John Doe Updated"
-}`)
+    if ((selectedMethod === 'POST' || selectedMethod === 'PUT') && requestBody) {
+      curl += ` \\\n  -d '${requestBody.replace(/\n/g, '').replace(/\s+/g, ' ')}'`
     }
+    
+    return curl
+  }
+
+  const generateJavaScriptCode = () => {
+    const endpoint = getEndpoint()
+    let code = `const response = await fetch('${endpoint}', {\n`
+    code += `  method: '${selectedMethod}',\n`
+    code += `  headers: {\n`
+    code += `    'Authorization': 'Bearer ${selectedApiKey || 'YOUR_API_KEY'}',\n`
+    code += `    'Content-Type': 'application/json'\n`
+    code += `  }`
+    
+    if ((selectedMethod === 'POST' || selectedMethod === 'PUT') && requestBody) {
+      code += `,\n  body: JSON.stringify(${requestBody})`
+    }
+    
+    code += `\n});\n\nconst data = await response.json();\nconsole.log(data);`
+    
+    return code
+  }
+
+  const generatePythonCode = () => {
+    const endpoint = getEndpoint()
+    let code = `import requests\n\n`
+    code += `response = requests.${selectedMethod.toLowerCase()}(\n`
+    code += `    '${endpoint}',\n`
+    code += `    headers={\n`
+    code += `        'Authorization': 'Bearer ${selectedApiKey || 'YOUR_API_KEY'}',\n`
+    code += `        'Content-Type': 'application/json'\n`
+    code += `    }`
+    
+    if ((selectedMethod === 'POST' || selectedMethod === 'PUT') && requestBody) {
+      code += `,\n    json=${requestBody.replace(/\n/g, '').replace(/\s+/g, ' ')}`
+    }
+    
+    code += `\n)\n\ndata = response.json()\nprint(data)`
+    
+    return code
+  }
+
+  if (loadingData) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Sign In Required</CardTitle>
+          <CardDescription>
+            Please sign in to use the API Playground
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button asChild className="w-full">
+            <Link href="/auth/login">Sign In</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (databases.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>No Databases Found</CardTitle>
+          <CardDescription>
+            Create your first database to start testing the API
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button asChild className="w-full">
+            <Link href="/workspace">Create Database</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (tables.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>No Tables Found</CardTitle>
+          <CardDescription>
+            Create tables in your database to test the API
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button asChild className="w-full">
+            <Link href={`/workspace/${selectedDatabase}/database`}>Create Table</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (apiKeys.length === 0) {
+    return (
+      <Card className="border-orange-500/50 bg-orange-500/5">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-orange-500" />
+            <CardTitle>API Key Required</CardTitle>
+          </div>
+          <CardDescription>
+            You need to create an API key before you can test the API endpoints
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-sm text-muted-foreground">
+            <p className="mb-2">To create an API key:</p>
+            <ol className="list-decimal list-inside space-y-1 ml-2">
+              <li>Go to your database page</li>
+              <li>Click the "API Keys" tab</li>
+              <li>Click "Create API Key"</li>
+              <li>Give it a name and save</li>
+              <li>Come back here to test your API</li>
+            </ol>
+          </div>
+          <Button asChild className="w-full">
+            <Link href={`/workspace/${selectedDatabase}/database`}>
+              Go to Database <ExternalLink className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Terminal className="h-5 w-5" />
-            Quick Actions
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {quickEndpoints.map((qe, idx) => (
-              <Button
-                key={idx}
-                variant="outline"
-                size="sm"
-                onClick={() => loadQuickEndpoint(qe)}
-                className="text-xs"
-              >
-                <Badge variant="outline" className="mr-2 px-1 text-[10px]">
-                  {qe.method}
-                </Badge>
-                {qe.label}
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Request Panel */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Left Side - Request Builder */}
+      <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Code className="h-5 w-5" />
-              Request
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Play className="h-5 w-5" />
+              Request Builder
             </CardTitle>
+            <CardDescription>
+              Configure and execute API requests
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Method & Endpoint */}
-            <div className="flex gap-2">
-              <Select value={method} onValueChange={setMethod}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
+            {/* Database Selection */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Database className="h-4 w-4" />
+                Database
+              </Label>
+              <Select value={selectedDatabase} onValueChange={setSelectedDatabase}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select database" />
                 </SelectTrigger>
                 <SelectContent>
-                  {methods.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      <Badge variant="outline" className={
-                        m === "GET" ? "bg-blue-500/10 border-blue-500/30" :
-                        m === "POST" ? "bg-green-500/10 border-green-500/30" :
-                        m === "PUT" || m === "PATCH" ? "bg-yellow-500/10 border-yellow-500/30" :
-                        "bg-red-500/10 border-red-500/30"
-                      }>
-                        {m}
-                      </Badge>
+                  {databases.map((db) => (
+                    <SelectItem key={db.id} value={db.id.toString()}>
+                      {db.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Input
-                value={endpoint}
-                onChange={(e) => setEndpoint(e.target.value)}
-                placeholder="/api/v1/endpoint"
-                className="flex-1"
-              />
             </div>
 
-            {/* Headers */}
+            {/* Table Selection */}
             <div className="space-y-2">
-              <Label>Headers</Label>
-              <Textarea
-                value={headers}
-                onChange={(e) => setHeaders(e.target.value)}
-                className="font-mono text-sm min-h-24"
-                placeholder="JSON headers"
-              />
+              <Label className="flex items-center gap-2">
+                <Table2 className="h-4 w-4" />
+                Table
+              </Label>
+              <Select value={selectedTable} onValueChange={setSelectedTable} disabled={tables.length === 0}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select table" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tables.map((table) => (
+                    <SelectItem key={table.id} value={table.id.toString()}>
+                      {table.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Body (only for POST, PUT, PATCH) */}
-            {(method === "POST" || method === "PUT" || method === "PATCH") && (
+            {/* API Key Selection */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Key className="h-4 w-4" />
+                API Key
+              </Label>
+              <Select value={selectedApiKey} onValueChange={setSelectedApiKey}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select API key" />
+                </SelectTrigger>
+                <SelectContent>
+                  {apiKeys.map((key) => (
+                    <SelectItem key={key.id} value={key.id}>
+                      {key.name} ({key.key_prefix}...)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Method Selection */}
+            <div className="space-y-2">
+              <Label>HTTP Method</Label>
+              <Select value={selectedMethod} onValueChange={setSelectedMethod}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="GET">GET - List all records</SelectItem>
+                  <SelectItem value="POST">POST - Create a record</SelectItem>
+                  <SelectItem value="PUT">PUT - Update a record</SelectItem>
+                  <SelectItem value="DELETE">DELETE - Delete a record</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Record ID (for PUT/DELETE) */}
+            {(selectedMethod === 'PUT' || selectedMethod === 'DELETE') && (
               <div className="space-y-2">
-                <Label>Request Body</Label>
+                <Label>Record ID</Label>
+                <Input
+                  placeholder="Enter record ID"
+                  value={recordId}
+                  onChange={(e) => setRecordId(e.target.value)}
+                />
+              </div>
+            )}
+
+            {/* Endpoint Display */}
+            <div className="space-y-2">
+              <Label>Endpoint</Label>
+              <div className="relative">
+                <Input 
+                  value={getEndpoint()} 
+                  readOnly 
+                  className="font-mono text-xs pr-10"
+                />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="absolute right-1 top-1 h-7 w-7 p-0"
+                  onClick={() => copyCode(getEndpoint(), 'endpoint')}
+                >
+                  {copied === 'endpoint' ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                </Button>
+              </div>
+            </div>
+
+            {/* Request Body (for POST/PUT) */}
+            {(selectedMethod === 'POST' || selectedMethod === 'PUT') && (
+              <div className="space-y-2">
+                <Label>Request Body (JSON)</Label>
                 <Textarea
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  className="font-mono text-sm min-h-32"
-                  placeholder="JSON body"
+                  value={requestBody}
+                  onChange={(e) => setRequestBody(e.target.value)}
+                  className="font-mono text-sm min-h-[150px]"
+                  placeholder='{"data": {...}}'
                 />
               </div>
             )}
 
             {/* Execute Button */}
-            <Button
-              onClick={executeRequest}
-              disabled={isLoading}
+            <Button 
+              onClick={executeRequest} 
+              disabled={loading || !selectedDatabase || !selectedTable || !selectedApiKey}
               className="w-full"
-              size="lg"
             >
-              {isLoading ? (
+              {loading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Executing...
                 </>
               ) : (
                 <>
-                  <Play className="mr-2 h-4 w-4" />
+                  <Play className="h-4 w-4 mr-2" />
                   Execute Request
                 </>
               )}
@@ -295,112 +549,158 @@ print(data)`,
           </CardContent>
         </Card>
 
-        {/* Response Panel */}
+        {/* Response */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <FileJson className="h-5 w-5" />
-                Response
-              </span>
-              {response && (
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">Response</CardTitle>
+              {statusCode !== null && (
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline" className={
-                    statusCode >= 200 && statusCode < 300 ? "bg-green-500/10 border-green-500/30 text-green-400" :
-                    statusCode >= 400 ? "bg-red-500/10 border-red-500/30 text-red-400" :
-                    "bg-yellow-500/10 border-yellow-500/30 text-yellow-400"
-                  }>
-                    {statusCode >= 200 && statusCode < 300 ? (
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                    ) : (
+                  {statusCode >= 200 && statusCode < 300 ? (
+                    <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      {statusCode}
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
                       <AlertCircle className="h-3 w-3 mr-1" />
-                    )}
-                    {statusCode}
-                  </Badge>
-                  <Badge variant="outline" className="bg-blue-500/10 border-blue-500/30 text-blue-400">
-                    <Clock className="h-3 w-3 mr-1" />
-                    {responseTime}ms
-                  </Badge>
+                      {statusCode || 'Error'}
+                    </Badge>
+                  )}
+                  {responseTime !== null && (
+                    <Badge variant="outline">
+                      {responseTime}ms
+                    </Badge>
+                  )}
                 </div>
               )}
-            </CardTitle>
+            </div>
           </CardHeader>
           <CardContent>
-            {response ? (
-              <div className="bg-black/50 p-4 rounded-lg border border-white/10 overflow-auto max-h-96">
-                <pre className="text-sm text-green-400 whitespace-pre-wrap">
-                  {JSON.stringify(response, null, 2)}
-                </pre>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                <FileJson className="h-12 w-12 mb-4 opacity-50" />
-                <p className="text-sm">Execute a request to see the response</p>
-              </div>
-            )}
+            <div className="relative">
+              {response && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="absolute top-2 right-2 z-10"
+                  onClick={() => copyCode(response, 'response')}
+                >
+                  {copied === 'response' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              )}
+              <pre className="bg-black/50 p-4 rounded-lg overflow-auto max-h-[400px] text-xs font-mono">
+                {response || "// Execute a request to see the response here"}
+              </pre>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Code Generation */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <Code className="h-5 w-5" />
-              Generated Code
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => copyCode(generatedCode)}
-              disabled={!generatedCode}
-            >
-              {copied ? (
-                <>
-                  <Check className="mr-2 h-4 w-4" />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy Code
-                </>
-              )}
+      {/* Right Side - Code Examples */}
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Code Examples</CardTitle>
+            <CardDescription>
+              Copy-paste ready code for your application
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="curl" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="curl">cURL</TabsTrigger>
+                <TabsTrigger value="javascript">JavaScript</TabsTrigger>
+                <TabsTrigger value="python">Python</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="curl" className="mt-4">
+                <div className="relative">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="absolute top-2 right-2 z-10"
+                    onClick={() => copyCode(generateCurlCommand(), 'curl')}
+                  >
+                    {copied === 'curl' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                  <pre className="bg-black/50 p-4 rounded-lg overflow-auto max-h-[500px] text-xs font-mono">
+                    {generateCurlCommand()}
+                  </pre>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="javascript" className="mt-4">
+                <div className="relative">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="absolute top-2 right-2 z-10"
+                    onClick={() => copyCode(generateJavaScriptCode(), 'js')}
+                  >
+                    {copied === 'js' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                  <pre className="bg-black/50 p-4 rounded-lg overflow-auto max-h-[500px] text-xs font-mono">
+                    {generateJavaScriptCode()}
+                  </pre>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="python" className="mt-4">
+                <div className="relative">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="absolute top-2 right-2 z-10"
+                    onClick={() => copyCode(generatePythonCode(), 'python')}
+                  >
+                    {copied === 'python' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                  <pre className="bg-black/50 p-4 rounded-lg overflow-auto max-h-[500px] text-xs font-mono">
+                    {generatePythonCode()}
+                  </pre>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        {/* Tips Card */}
+        <Card className="bg-blue-500/10 border-blue-500/30">
+          <CardHeader>
+            <CardTitle className="text-lg">💡 Tips</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-muted-foreground">
+            <p>• <strong>GET</strong> - Fetches all records from the selected table</p>
+            <p>• <strong>POST</strong> - Creates a new record with the data you provide</p>
+            <p>• <strong>PUT</strong> - Updates an existing record (requires Record ID)</p>
+            <p>• <strong>DELETE</strong> - Removes a record (requires Record ID)</p>
+            <p>• All requests are made against your <strong>real database</strong></p>
+            <p>• Code examples update automatically based on your selections</p>
+            <p>• API keys can be managed in your database settings</p>
+          </CardContent>
+        </Card>
+
+        {/* Quick Links */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Quick Links</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Button variant="outline" className="w-full justify-start" asChild>
+              <Link href={`/workspace/${selectedDatabase}/database`}>
+                <Database className="h-4 w-4 mr-2" />
+                Manage Database
+              </Link>
             </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs value={selectedLanguage} onValueChange={(v) => { setSelectedLanguage(v); generateCode(); }}>
-            <TabsList className="grid w-full max-w-md grid-cols-3">
-              <TabsTrigger value="javascript">JavaScript</TabsTrigger>
-              <TabsTrigger value="python">Python</TabsTrigger>
-              <TabsTrigger value="curl">cURL</TabsTrigger>
-            </TabsList>
-            <TabsContent value="javascript" className="mt-4">
-              <div className="bg-black/50 p-4 rounded-lg border border-white/10">
-                <pre className="text-sm text-green-400 whitespace-pre-wrap overflow-x-auto">
-                  {generatedCode || "Configure your request and click Execute to generate code"}
-                </pre>
-              </div>
-            </TabsContent>
-            <TabsContent value="python" className="mt-4">
-              <div className="bg-black/50 p-4 rounded-lg border border-white/10">
-                <pre className="text-sm text-green-400 whitespace-pre-wrap overflow-x-auto">
-                  {generatedCode || "Configure your request and click Execute to generate code"}
-                </pre>
-              </div>
-            </TabsContent>
-            <TabsContent value="curl" className="mt-4">
-              <div className="bg-black/50 p-4 rounded-lg border border-white/10">
-                <pre className="text-sm text-green-400 whitespace-pre-wrap overflow-x-auto">
-                  {generatedCode || "Configure your request and click Execute to generate code"}
-                </pre>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+            <Button variant="outline" className="w-full justify-start" asChild>
+              <Link href="/docs">
+                <ExternalLink className="h-4 w-4 mr-2" />
+                API Documentation
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

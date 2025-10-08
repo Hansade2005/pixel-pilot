@@ -462,7 +462,7 @@ export default function LearnPage() {
               </div>
             </div>
             <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
-              Pixel Pilot
+              PiPilot
               <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
                 Learning Hub
@@ -1057,7 +1057,7 @@ export default function LearnPage() {
                     <div className="border-t-4 border-b-4 border-purple-400 py-4 mb-6">
                       <h1 className="text-4xl font-bold text-gray-900 mb-2 tracking-wider">CERTIFICATE</h1>
                       <h2 className="text-2xl font-semibold text-purple-700 mb-1">OF COMPLETION</h2>
-                      <p className="text-lg text-gray-600 font-medium">Pixel Pilot Learning Platform</p>
+                      <p className="text-lg text-gray-600 font-medium">PiPilot Learning Platform</p>
                     </div>
                   </div>
 
@@ -1141,7 +1141,7 @@ export default function LearnPage() {
                         <p className="text-lg font-semibold text-gray-900" style={{ fontFamily: 'Dancing Script, cursive' }}>
                           Anye Happiness Ade
                         </p>
-                        <p className="text-xs text-gray-500">Pixel Pilot Learning Platform</p>
+                        <p className="text-xs text-gray-500">PiPilot Learning Platform</p>
                       </div>
                     </div>
                   </div>
@@ -1183,7 +1183,7 @@ export default function LearnPage() {
                     {/* Footer Branding */}
                     <div className="text-center border-t border-gray-200 pt-4">
                       <p className="text-xs text-gray-500 mb-2">
-                        This certificate was issued by Pixel Pilot Learning Platform
+                        This certificate was issued by PiPilot Learning Platform
                       </p>
                       <div className="flex justify-center items-center space-x-4">
                         <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
@@ -1388,7 +1388,7 @@ export default function LearnPage() {
                         <h4 className="text-sm font-medium text-blue-900">Certificate Information</h4>
                         <p className="text-sm text-blue-700 mt-1">
                           Upon successful completion of this course, you'll receive a professional certificate
-                          featuring your name, completion date, and Pixel Pilot branding.
+                          featuring your name, completion date, and PiPilot branding.
                         </p>
                       </div>
                     </div>

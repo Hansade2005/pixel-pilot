@@ -58,7 +58,7 @@ export async function POST(req: Request) {
       // Create GitHub repository
       const { data: createdRepo } = await octokit.rest.repos.createForAuthenticatedUser({
         name: repoName,
-        description: repoDescription || 'Created with Pixel Pilot',
+        description: repoDescription || 'Created with PiPilot',
         private: false,
         auto_init: false,
       })
@@ -138,7 +138,7 @@ module.exports = nextConfig`,
         const { data: commit } = await octokit.rest.git.createCommit({
           owner: githubUser.login,
           repo: repo.name,
-          message: commitMessage || 'Initial commit from Pixel Pilot',
+          message: commitMessage || 'Initial commit from PiPilot',
           tree: createdTree.sha,
         })
 
@@ -189,7 +189,7 @@ module.exports = nextConfig`,
         const { data: commit } = await octokit.rest.git.createCommit({
           owner,
           repo: repoName,
-          message: commitMessage || 'Update from Pixel Pilot',
+          message: commitMessage || 'Update from PiPilot',
           tree: createdTree.sha,
           parents: [ref.object.sha],
         });

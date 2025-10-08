@@ -64,7 +64,7 @@ export default function ShowcasePage() {
     {
       id: "ecommerce-platform",
       title: "AI-Powered E-commerce Platform",
-      description: "A complete e-commerce solution built in just 2 hours using Pixel Pilot's AI capabilities. Features include product management, shopping cart, and payment integration.",
+      description: "A complete e-commerce solution built in just 2 hours using PiPilot's AI capabilities. Features include product management, shopping cart, and payment integration.",
       author: "Sarah Chen",
       avatar: "SC",
       tech: ["React", "React Router", "Lucide Icons", "Tailwind"],
@@ -169,7 +169,7 @@ export default function ShowcasePage() {
               Project Showcase
             </h1>
             <p className="text-xl text-white/80 max-w-3xl mx-auto mb-8">
-              Discover amazing applications built with Pixel Pilot. Get inspired by what our community has created.
+              Discover amazing applications built with PiPilot. Get inspired by what our community has created.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">

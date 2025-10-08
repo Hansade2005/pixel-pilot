@@ -16,19 +16,19 @@ node scripts/create-stripe-products.js
 ```
 🚀 Creating Stripe Products and Prices...
 
-📦 Creating product: Pixel Pilot Pro
+📦 Creating product: PiPilot Pro
 ✅ Product created: prod_xxxxxxxxxxxxxxxxxx
 💰 Monthly price created: price_xxxxxxxxxxxxxxxxxx - $15/month
 💰 Yearly price created: price_xxxxxxxxxxxxxxxxxx - $180/year
 💸 Savings: 20% off when billed annually
 
-📦 Creating product: Pixel Pilot Teams
+📦 Creating product: PiPilot Teams
 ✅ Product created: prod_xxxxxxxxxxxxxxxxxx
 💰 Monthly price created: price_xxxxxxxxxxxxxxxxxx - $30/month
 💰 Yearly price created: price_xxxxxxxxxxxxxxxxxx - $360/year
 💸 Savings: 20% off when billed annually
 
-📦 Creating product: Pixel Pilot Enterprise
+📦 Creating product: PiPilot Enterprise
 ✅ Product created: prod_xxxxxxxxxxxxxxxxxx
 💰 Monthly price created: price_xxxxxxxxxxxxxxxxxx - $60/month
 💰 Yearly price created: price_xxxxxxxxxxxxxxxxxx - $720/year
@@ -55,7 +55,7 @@ If you prefer to create products manually in the Stripe Dashboard:
 1. **Go to**: [Stripe Dashboard → Products](https://dashboard.stripe.com/products)
 2. **Click**: "Create Product"
 3. **Product Details**:
-   - **Name**: `Pixel Pilot Pro`
+   - **Name**: `PiPilot Pro`
    - **Description**: `Perfect for individual developers and small teams`
 
 #### **Monthly Price:**
@@ -74,7 +74,7 @@ If you prefer to create products manually in the Stripe Dashboard:
 
 1. **Click**: "Create Product"
 2. **Product Details**:
-   - **Name**: `Pixel Pilot Teams`
+   - **Name**: `PiPilot Teams`
    - **Description**: `Advanced collaboration tools for growing teams`
 
 #### **Monthly Price:**
@@ -93,7 +93,7 @@ If you prefer to create products manually in the Stripe Dashboard:
 
 1. **Click**: "Create Product"
 2. **Product Details**:
-   - **Name**: `Pixel Pilot Enterprise`
+   - **Name**: `PiPilot Enterprise`
    - **Description**: `Complete solution for large organizations`
 
 #### **Monthly Price:**
@@ -209,6 +209,6 @@ Once you have:
 - ✅ Tested the checkout flow
 - ✅ Verified subscription creation
 
-Your **Pixel Pilot subscription system** with monthly/yearly billing is ready for production! 🚀
+Your **PiPilot subscription system** with monthly/yearly billing is ready for production! 🚀
 
 **Need help?** Check the Stripe Dashboard or run the script again with a fresh API key.

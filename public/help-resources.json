@@ -1,28 +1,28 @@
 {
   "metadata": {
-    "title": "Pixel Pilot Help Resources & Documentation",
+    "title": "PiPilot Help Resources & Documentation",
     "author": "Anye Happiness Ade",
     "date_created": "09/07/2025",
     "version": "2.0.0",
-    "description": "Comprehensive, data-rich help resources for Pixel Pilot PiPilot platform",
+    "description": "Comprehensive, data-rich help resources for PiPilot PiPilot platform",
     "last_updated": "09/07/2025"
   },
   "categories": [
     {
       "id": "getting-started",
       "title": "Getting Started",
-      "description": "Essential guides to help you begin your journey with Pixel Pilot",
+      "description": "Essential guides to help you begin your journey with PiPilot",
       "icon": "🚀",
       "articles": [
         {
           "id": "platform-overview",
           "title": "Platform Overview",
-          "description": "Understand what Pixel Pilot is and how it can transform your app development workflow",
+          "description": "Understand what PiPilot is and how it can transform your app development workflow",
           "content": {
-            "introduction": "Pixel Pilot represents a fundamental shift in how software is created. Imagine a world where building a professional web application doesn't require years of coding experience, complex tooling, or extensive technical knowledge. This is the reality that Pixel Pilot makes possible today.\n\nAt its core, Pixel Pilot is an AI-powered development platform that transforms natural language conversations into production-ready web applications. Whether you're a seasoned developer looking to accelerate your workflow, an entrepreneur bringing an idea to life, or someone completely new to coding, Pixel Pilot democratizes software creation while maintaining professional standards and modern best practices.\n\nThis comprehensive overview will guide you through Pixel Pilot's capabilities, architecture, and transformative potential. By the end, you'll understand not just what Pixel Pilot does, but how it fundamentally changes the software development landscape.",
+            "introduction": "PiPilot represents a fundamental shift in how software is created. Imagine a world where building a professional web application doesn't require years of coding experience, complex tooling, or extensive technical knowledge. This is the reality that PiPilot makes possible today.\n\nAt its core, PiPilot is an AI-powered development platform that transforms natural language conversations into production-ready web applications. Whether you're a seasoned developer looking to accelerate your workflow, an entrepreneur bringing an idea to life, or someone completely new to coding, PiPilot democratizes software creation while maintaining professional standards and modern best practices.\n\nThis comprehensive overview will guide you through PiPilot's capabilities, architecture, and transformative potential. By the end, you'll understand not just what PiPilot does, but how it fundamentally changes the software development landscape.",
             "platform_visualization": {
               "workflow_diagram": {
-                "description": "Visual representation of the Pixel Pilot development workflow",
+                "description": "Visual representation of the PiPilot development workflow",
                 "stages": [
                   {
                     "stage": "1. Natural Language Input",
@@ -63,7 +63,7 @@
                 ]
               },
               "architecture_diagram": {
-                "description": "High-level architecture showing how Pixel Pilot components interact",
+                "description": "High-level architecture showing how PiPilot components interact",
                 "components": {
                   "user_interface": {
                     "description": "Intuitive chat interface and visual development environment",
@@ -182,7 +182,7 @@
                   "deployment_flowchart": [
                     {
                       "stage": "Development Complete",
-                      "visual": "✅ App ready in Pixel Pilot",
+                      "visual": "✅ App ready in PiPilot",
                       "action": "Click 'Deploy to Production'"
                     },
                     {
@@ -533,8 +533,8 @@
                     "1️⃣ Visit pixelpilot.dev → Click 'Get Started'",
                     "2️⃣ Click 'Continue with GitHub' button",
                     "3️⃣ GitHub login page appears",
-                    "4️⃣ Authorize Pixel Pilot permissions",
-                    "5️⃣ Redirected to Pixel Pilot dashboard",
+                    "4️⃣ Authorize PiPilot permissions",
+                    "5️⃣ Redirected to PiPilot dashboard",
                     "6️⃣ Complete profile setup (optional)"
                   ],
                   "expected_outcome": "🎉 Welcome screen with personalized dashboard and sample projects"
@@ -840,25 +840,25 @@
               }
             },
             "conclusion_and_next_steps": {
-              "platform_transformation": "Pixel Pilot represents more than a development tool—it's a fundamental shift in how software is created. By combining the power of advanced AI with professional development practices, Pixel Pilot makes enterprise-grade application development accessible to everyone.",
-              "empowerment_through_ai": "Whether you're a seasoned developer looking to accelerate your workflow, an entrepreneur bringing an idea to life, or someone completely new to programming, Pixel Pilot provides the tools and intelligence to turn your vision into reality.",
+              "platform_transformation": "PiPilot represents more than a development tool—it's a fundamental shift in how software is created. By combining the power of advanced AI with professional development practices, PiPilot makes enterprise-grade application development accessible to everyone.",
+              "empowerment_through_ai": "Whether you're a seasoned developer looking to accelerate your workflow, an entrepreneur bringing an idea to life, or someone completely new to programming, PiPilot provides the tools and intelligence to turn your vision into reality.",
               "continuous_innovation": "The platform continues to evolve with new features, improved AI capabilities, and expanded integrations. Your applications built today will benefit from tomorrow's advancements through automatic updates and optimizations.",
-              "community_and_support": "Join a growing community of developers, entrepreneurs, and innovators using Pixel Pilot to build the future. Access comprehensive documentation, tutorials, and expert support to maximize your success.",
+              "community_and_support": "Join a growing community of developers, entrepreneurs, and innovators using PiPilot to build the future. Access comprehensive documentation, tutorials, and expert support to maximize your success.",
               "immediate_actions": [
-                "Create your Pixel Pilot account using GitHub OAuth",
+                "Create your PiPilot account using GitHub OAuth",
                 "Explore the interactive tutorials and sample projects",
                 "Start with a simple project to experience the platform",
                 "Join the community forums for tips and best practices",
                 "Review the documentation for advanced features and capabilities"
               ],
               "long_term_strategy": [
-                "Build a portfolio of applications using Pixel Pilot",
+                "Build a portfolio of applications using PiPilot",
                 "Explore advanced AI features for complex projects",
                 "Contribute to the platform's improvement through feedback",
                 "Share your success stories and help others learn",
                 "Stay updated with new features and platform enhancements"
               ],
-              "final_thought": "The future of software development is here, and it's more accessible, faster, and more powerful than ever before. Pixel Pilot isn't just changing how we build software—it's democratizing innovation and empowering anyone with an idea to bring it to life. Your next big application is just a conversation away. Start building today and join the revolution in software creation."
+              "final_thought": "The future of software development is here, and it's more accessible, faster, and more powerful than ever before. PiPilot isn't just changing how we build software—it's democratizing innovation and empowering anyone with an idea to bring it to life. Your next big application is just a conversation away. Start building today and join the revolution in software creation."
             }
           },
           "tags": ["overview", "introduction", "features", "architecture", "benefits"],
@@ -869,9 +869,9 @@
         {
           "id": "account-setup",
           "title": "Account Setup & Authentication",
-          "description": "Learn how to create your Pixel Pilot account and set up authentication",
+          "description": "Learn how to create your PiPilot account and set up authentication",
           "content": {
-            "introduction": "Setting up your Pixel Pilot account is quick and secure. We use GitHub OAuth for authentication, which provides enterprise-grade security while making the signup process seamless.\n\nThis comprehensive guide will walk you through the entire account creation process, from initial registration to advanced account management features. You'll learn about security best practices, account verification, and how to optimize your Pixel Pilot experience from day one.",
+            "introduction": "Setting up your PiPilot account is quick and secure. We use GitHub OAuth for authentication, which provides enterprise-grade security while making the signup process seamless.\n\nThis comprehensive guide will walk you through the entire account creation process, from initial registration to advanced account management features. You'll learn about security best practices, account verification, and how to optimize your PiPilot experience from day one.",
             "prerequisites": [
               "A valid GitHub account (personal or organization)",
               "A modern web browser (Chrome 90+, Firefox 88+, Safari 14+, Edge 90+)",
@@ -893,9 +893,9 @@
             },
             "signup_process": {
               "steps": [
-                "Visit the Pixel Pilot homepage",
+                "Visit the PiPilot homepage",
                 "Click 'Sign in with GitHub'",
-                "Authorize Pixel Pilot to access your GitHub account",
+                "Authorize PiPilot to access your GitHub account",
                 "Complete your profile information",
                 "Verify your email address"
               ],
@@ -959,9 +959,9 @@
         {
           "id": "quick-start-guide",
           "title": "Quick Start Guide",
-          "description": "Get up and running with your first Pixel Pilot project in under 10 minutes",
+          "description": "Get up and running with your first PiPilot project in under 10 minutes",
           "content": {
-            "introduction": "Welcome to the comprehensive Quick Start Guide for Pixel Pilot! This detailed walkthrough will transform you from a complete beginner to a confident Pixel Pilot user, capable of building professional web applications in minutes rather than months.",
+            "introduction": "Welcome to the comprehensive Quick Start Guide for PiPilot! This detailed walkthrough will transform you from a complete beginner to a confident PiPilot user, capable of building professional web applications in minutes rather than months.",
             "prerequisites": [
               "GitHub account for authentication and deployment",
               "Basic understanding of web development concepts",
@@ -988,16 +988,16 @@
             "step_by_step_setup": [
               {
                 "step": 1,
-                "title": "Account Creation & Authentication - Complete Pixel Pilot Onboarding",
-                "description": "Secure your Pixel Pilot account using GitHub OAuth with comprehensive setup",
+                "title": "Account Creation & Authentication - Complete PiPilot Onboarding",
+                "description": "Secure your PiPilot account using GitHub OAuth with comprehensive setup",
                 "detailed_steps": [
                   "Navigate to pixelpilot.dev in your preferred web browser",
                   "Locate the prominent 'Get Started' or 'Sign In' button in the top navigation",
                   "Click to initiate GitHub OAuth authentication flow",
                   "You'll be redirected to GitHub's secure authorization page",
-                  "Review the requested permissions carefully - Pixel Pilot only requests necessary access",
-                  "Click 'Authorize Pixel Pilot' to grant access to your account",
-                  "You'll be automatically redirected back to Pixel Pilot dashboard",
+                  "Review the requested permissions carefully - PiPilot only requests necessary access",
+                  "Click 'Authorize PiPilot' to grant access to your account",
+                  "You'll be automatically redirected back to PiPilot dashboard",
                   "Complete your profile setup with additional information",
                   "Verify your email address through the confirmation link",
                   "Set up your development preferences and notification settings",
@@ -1058,7 +1058,7 @@
                   "Ensure you're using a supported browser (Chrome 90+, Firefox 88+, Safari 14+, Edge 90+)",
                   "Check your internet connection and try again if the connection is unstable",
                   "If 2FA is enabled on GitHub, ensure you have your authenticator app ready",
-                  "Try signing out of GitHub first, then attempt Pixel Pilot authentication again",
+                  "Try signing out of GitHub first, then attempt PiPilot authentication again",
                   "Contact support if you receive 'access denied' errors after multiple attempts",
                   "Verify that your GitHub account isn't suspended or restricted"
                 ],
@@ -1117,9 +1117,9 @@
                   "Choose a descriptive project name (e.g., 'my-ecommerce-store' or 'task-management-app')",
                   "Select your preferred technology stack from available options",
                   "Pick a template that matches your needs or start with a blank project",
-                  "Describe your project requirements in natural language to Pixel Pilot",
+                  "Describe your project requirements in natural language to PiPilot",
                   "AI analyzes your requirements and suggests optimal architecture",
-                  "Pixel Pilot generates complete project structure with all necessary files",
+                  "PiPilot generates complete project structure with all necessary files",
                   "All dependencies are automatically installed and configured",
                   "Database schemas are created if required",
                   "API endpoints are generated based on your specifications",
@@ -1237,7 +1237,7 @@
               {
                 "step": 3,
                 "title": "Mastering AI-Powered Development",
-                "description": "Learn to communicate effectively with Pixel Pilot's AI assistant",
+                "description": "Learn to communicate effectively with PiPilot's AI assistant",
                 "communication_best_practices": [
                   {
                     "principle": "Be Specific and Detailed",
@@ -1354,7 +1354,7 @@
                     "step": 1,
                     "title": "Connect Repository",
                     "description": "Link your project to deployment platform",
-                    "details": "Pixel Pilot automatically creates a GitHub repository for your project"
+                    "details": "PiPilot automatically creates a GitHub repository for your project"
                   },
                   {
                     "step": 2,
@@ -1410,7 +1410,7 @@
               ],
               "video_resources": [
                 {
-                  "title": "Pixel Pilot Complete Overview",
+                  "title": "PiPilot Complete Overview",
                   "description": "Full platform walkthrough",
                   "duration": "30 minutes",
                   "instructor": "Anye Happiness Ade"
@@ -1477,7 +1477,7 @@
               "immediate_actions": [
                 "Complete the interactive tutorials",
                 "Build your first simple project",
-                "Join the Pixel Pilot community",
+                "Join the PiPilot community",
                 "Explore the template library",
                 "Set up your development preferences"
               ],
@@ -1933,7 +1933,7 @@
     {
       "id": "ai-development",
       "title": "AI Development Features",
-      "description": "Master the AI-powered development capabilities of Pixel Pilot",
+      "description": "Master the AI-powered development capabilities of PiPilot",
       "icon": "🤖",
       "articles": [
         {
@@ -2131,7 +2131,7 @@
     {
       "id": "development-tools",
       "title": "Development Tools",
-      "description": "Master the development environment and tools within Pixel Pilot",
+      "description": "Master the development environment and tools within PiPilot",
       "icon": "🛠️",
       "articles": [
         {
@@ -2879,7 +2879,7 @@
               ]
             },
             "conclusion_and_next_steps": {
-              "mastering_efficiency": "The professional code editor and file management system in Pixel Pilot represents a significant advancement in development tools. By mastering these features, you'll dramatically improve your development efficiency, code quality, and overall productivity.",
+              "mastering_efficiency": "The professional code editor and file management system in PiPilot represents a significant advancement in development tools. By mastering these features, you'll dramatically improve your development efficiency, code quality, and overall productivity.",
               "continuous_learning": "The editor ecosystem is constantly evolving with new features, extensions, and best practices. Stay updated with the latest developments and continuously refine your workflow.",
               "team_adoption": "Encourage your team to adopt these practices for consistent development experiences and improved collaboration.",
               "resources_for_growth": [
@@ -2897,7 +2897,7 @@
                 "Month 3: Implement team collaboration workflows",
                 "Ongoing: Continuously optimize and refine your workflow"
               ],
-              "final_thought": "The difference between a good developer and a great one often lies in their mastery of development tools. Invest time in learning Pixel Pilot's editor and file management features, and you'll see immediate improvements in your development speed, code quality, and overall satisfaction with your work."
+              "final_thought": "The difference between a good developer and a great one often lies in their mastery of development tools. Invest time in learning PiPilot's editor and file management features, and you'll see immediate improvements in your development speed, code quality, and overall satisfaction with your work."
             }
           },
           "tags": ["editor", "files", "productivity", "shortcuts"],
@@ -2975,7 +2975,7 @@
               "description": "Seamless GitHub integration for professional version control and team collaboration",
               "key_benefits": [
                 "Automatic repository creation with proper project structure",
-                "Real-time synchronization between Pixel Pilot and GitHub",
+                "Real-time synchronization between PiPilot and GitHub",
                 "Collaborative development with pull requests and code reviews",
                 "Automated deployment workflows with GitHub Actions",
                 "Issue tracking and project management integration",
@@ -2994,10 +2994,10 @@
               {
                 "step": 1,
                 "title": "Connect GitHub Account",
-                "description": "Link your GitHub account to Pixel Pilot",
+                "description": "Link your GitHub account to PiPilot",
                 "actions": [
                   "Click 'Connect to GitHub' button in settings",
-                  "Authorize Pixel Pilot OAuth application",
+                  "Authorize PiPilot OAuth application",
                   "Grant repository access permissions",
                   "Verify successful connection"
                 ],
@@ -3005,8 +3005,8 @@
                   "1️⃣ Settings → Integrations → GitHub",
                   "2️⃣ Click 'Connect Account' button",
                   "3️⃣ GitHub login page opens",
-                  "4️⃣ Authorize Pixel Pilot permissions",
-                  "5️⃣ Return to Pixel Pilot dashboard",
+                  "4️⃣ Authorize PiPilot permissions",
+                  "5️⃣ Return to PiPilot dashboard",
                   "6️⃣ ✅ Connection successful message"
                 ],
                 "permissions_required": [
@@ -3023,7 +3023,7 @@
                 "options": [
                   {
                     "option": "Create New Repository",
-                    "description": "Pixel Pilot creates a new GitHub repository automatically",
+                    "description": "PiPilot creates a new GitHub repository automatically",
                     "benefits": "Proper project structure, README, .gitignore, and license files",
                     "process": [
                       "Choose repository name and visibility (public/private)",
@@ -3034,7 +3034,7 @@
                   },
                   {
                     "option": "Connect Existing Repository",
-                    "description": "Link an existing GitHub repository to your Pixel Pilot project",
+                    "description": "Link an existing GitHub repository to your PiPilot project",
                     "benefits": "Preserve existing history and collaborators",
                     "process": [
                       "Select repository from your GitHub account",
@@ -3369,7 +3369,7 @@
                 "category": "Synchronization Problems",
                 "problems": [
                   {
-                    "issue": "Files not syncing between Pixel Pilot and GitHub",
+                    "issue": "Files not syncing between PiPilot and GitHub",
                     "symptoms": "Changes not reflected, sync errors",
                     "solutions": [
                       "Check webhook configuration and status",
@@ -3387,7 +3387,7 @@
                     "solutions": [
                       "Pull latest changes from target branch",
                       "Resolve conflicts manually in editor",
-                      "Use Pixel Pilot's conflict resolution tools",
+                      "Use PiPilot's conflict resolution tools",
                       "Create backup branch before resolving",
                       "Test resolved code thoroughly",
                       "Consider rebasing instead of merging"
@@ -3475,9 +3475,9 @@
           "description": "Deploy your applications to Vercel, Netlify, or other platforms",
           "content": {
             "deployment_overview": {
-              "description": "Comprehensive guide to deploying your Pixel Pilot applications to production environments",
+              "description": "Comprehensive guide to deploying your PiPilot applications to production environments",
               "key_concepts": [
-                "One-click deployment from Pixel Pilot interface",
+                "One-click deployment from PiPilot interface",
                 "Automated build and deployment pipelines",
                 "Environment management and configuration",
                 "Performance monitoring and optimization",
@@ -3614,7 +3614,7 @@
                 "actions": [
                   "Evaluate application requirements and platform features",
                   "Sign up for chosen platform account",
-                  "Connect platform to Pixel Pilot (OAuth integration)",
+                  "Connect platform to PiPilot (OAuth integration)",
                   "Verify account permissions and billing setup",
                   "Configure team access if applicable"
                 ],
@@ -3689,7 +3689,7 @@
                 "deployment_methods": [
                   {
                     "method": "One-Click Deployment",
-                    "description": "Deploy directly from Pixel Pilot interface",
+                    "description": "Deploy directly from PiPilot interface",
                     "process": [
                       "Click 'Deploy to Production' button",
                       "Select target platform",
@@ -3743,7 +3743,7 @@
     {
       "id": "project-management",
       "title": "Project Management",
-      "description": "Organize and manage your projects effectively within Pixel Pilot",
+      "description": "Organize and manage your projects effectively within PiPilot",
       "icon": "📁",
       "articles": [
         {
@@ -3752,7 +3752,7 @@
           "description": "Learn best practices for organizing your project files and folders",
           "content": {
             "project_overview": {
-              "description": "Comprehensive guide to organizing and managing your Pixel Pilot projects effectively",
+              "description": "Comprehensive guide to organizing and managing your PiPilot projects effectively",
               "key_principles": [
                 "Clear folder structure for maintainability",
                 "Consistent naming conventions across files",
@@ -3961,10 +3961,10 @@
         {
           "id": "team-collaboration",
           "title": "Team Collaboration & Workflows",
-          "description": "Work effectively with teams using Pixel Pilot's collaboration features",
+          "description": "Work effectively with teams using PiPilot's collaboration features",
           "content": {
             "collaboration_overview": {
-              "description": "Comprehensive guide to effective team collaboration in Pixel Pilot",
+              "description": "Comprehensive guide to effective team collaboration in PiPilot",
               "key_benefits": [
                 "Accelerated development through shared expertise",
                 "Consistent code quality through peer reviews",
@@ -4434,7 +4434,7 @@
     {
       "id": "troubleshooting",
       "title": "Troubleshooting & Support",
-      "description": "Common issues and their solutions for Pixel Pilot users",
+      "description": "Common issues and their solutions for PiPilot users",
       "icon": "🔧",
       "articles": [
         {
@@ -4462,13 +4462,13 @@
                     "solution": "Check GitHub App Permissions",
                     "steps": [
                       "Go to GitHub Settings → Applications → Authorized OAuth Apps",
-                      "Find Pixel Pilot in the list",
+                      "Find PiPilot in the list",
                       "Verify permissions include repository access",
                       "Re-authorize if permissions are missing"
                     ],
                     "visual_steps": [
                       "1️⃣ GitHub Settings → Applications",
-                      "2️⃣ Find Pixel Pilot OAuth App",
+                      "2️⃣ Find PiPilot OAuth App",
                       "3️⃣ Check granted permissions",
                       "4️⃣ Re-authorize if needed"
                     ]
@@ -4493,7 +4493,7 @@
                     "solution": "Try Different Browser or Incognito Mode",
                     "steps": [
                       "Open incognito/private browsing window",
-                      "Navigate to Pixel Pilot login",
+                      "Navigate to PiPilot login",
                       "Attempt GitHub authentication",
                       "If successful, clear main browser cache"
                     ],
@@ -4513,7 +4513,7 @@
                   "Keep browser updated"
                 ],
                 "escalation_steps": [
-                  "Contact Pixel Pilot support if issue persists",
+                  "Contact PiPilot support if issue persists",
                   "Provide browser console error messages",
                   "Include GitHub account type (personal/org)",
                   "Share network environment details"
@@ -4578,14 +4578,14 @@
                     "steps": [
                       "Open browser extensions page",
                       "Disable privacy/security extensions",
-                      "Test Pixel Pilot session persistence",
+                      "Test PiPilot session persistence",
                       "Re-enable extensions one by one",
                       "Identify conflicting extension"
                     ],
                     "visual_steps": [
                       "1️⃣ chrome://extensions/",
                       "2️⃣ Disable privacy extensions",
-                      "3️⃣ Test Pixel Pilot login",
+                      "3️⃣ Test PiPilot login",
                       "4️⃣ Re-enable one by one",
                       "5️⃣ Identify the culprit"
                     ]
@@ -5269,16 +5269,16 @@
         "category": "Getting Started",
         "questions": [
           {
-            "question": "What is Pixel Pilot and who is it for?",
-            "answer": "Pixel Pilot is an AI-powered web development platform that allows anyone to create applications by chatting with AI. It's designed for developers, entrepreneurs, designers, and anyone who wants to build web applications quickly and efficiently, regardless of their coding experience level."
+            "question": "What is PiPilot and who is it for?",
+            "answer": "PiPilot is an AI-powered web development platform that allows anyone to create applications by chatting with AI. It's designed for developers, entrepreneurs, designers, and anyone who wants to build web applications quickly and efficiently, regardless of their coding experience level."
           },
           {
-            "question": "Do I need coding experience to use Pixel Pilot?",
+            "question": "Do I need coding experience to use PiPilot?",
             "answer": "While some basic understanding of web development concepts is helpful, you don't need extensive coding experience. The AI assistant will guide you through the process and generate code based on your natural language descriptions. However, familiarity with HTML, CSS, and JavaScript concepts will help you get the most out of the platform."
           },
           {
-            "question": "What technologies does Pixel Pilot support?",
-            "answer": "Pixel Pilot supports modern web technologies including React, Next.js, TypeScript, Tailwind CSS, and Node.js. It can generate full-stack applications with databases, APIs, and deployment configurations for Vercel, Netlify, and other platforms."
+            "question": "What technologies does PiPilot support?",
+            "answer": "PiPilot supports modern web technologies including React, Next.js, TypeScript, Tailwind CSS, and Node.js. It can generate full-stack applications with databases, APIs, and deployment configurations for Vercel, Netlify, and other platforms."
           }
         ]
       },
@@ -5291,7 +5291,7 @@
           },
           {
             "question": "Can I preview my app before deploying?",
-            "answer": "Yes! Pixel Pilot includes a powerful preview system using E2B sandboxes. You can see your app running in real-time with hot reload, test it on different devices, and debug issues before deploying to production."
+            "answer": "Yes! PiPilot includes a powerful preview system using E2B sandboxes. You can see your app running in real-time with hot reload, test it on different devices, and debug issues before deploying to production."
           },
           {
             "question": "What deployment options are available?",
@@ -5303,8 +5303,8 @@
         "category": "Pricing & Plans",
         "questions": [
           {
-            "question": "How much does Pixel Pilot cost?",
-            "answer": "Pixel Pilot offers flexible pricing plans. We have a generous free tier for getting started, and paid plans for teams and advanced features. Visit our pricing page for current rates and feature comparisons."
+            "question": "How much does PiPilot cost?",
+            "answer": "PiPilot offers flexible pricing plans. We have a generous free tier for getting started, and paid plans for teams and advanced features. Visit our pricing page for current rates and feature comparisons."
           },
           {
             "question": "Is there a free trial available?",

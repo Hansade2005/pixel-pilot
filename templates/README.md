@@ -1,6 +1,6 @@
-# Pixel Pilot Email Templates
+# PiPilot Email Templates
 
-A collection of professional, responsive email templates for Pixel Pilot's AI-powered app development platform. These templates are designed to work across all major email clients and feature Pixel Pilot's branding with a modern, clean design.
+A collection of professional, responsive email templates for PiPilot's AI-powered app development platform. These templates are designed to work across all major email clients and feature PiPilot's branding with a modern, clean design.
 
 ## 📧 Available Templates
 
@@ -33,7 +33,7 @@ A monthly newsletter template featuring:
 ## 🎨 Design Features
 
 ### Branding
-- **Logo**: Pixel Pilot logo with gradient background
+- **Logo**: PiPilot logo with gradient background
 - **Colors**: Blue (#3b82f6) to Purple (#8b5cf6) to Cyan (#06b6d4) gradient
 - **Typography**: System fonts for better email client compatibility
 - **Icons**: Emojis and simple graphics for visual interest
@@ -56,7 +56,7 @@ A monthly newsletter template featuring:
 
 #### Global Placeholders (used across all templates)
 ```
-{{LOGO_URL}} - URL to Pixel Pilot logo (e.g., https://your-domain.com/logo.svg)
+{{LOGO_URL}} - URL to PiPilot logo (e.g., https://your-domain.com/logo.svg)
 {{USER_NAME}} - Recipient's name
 {{USER_EMAIL}} - Recipient's email address
 {{CURRENT_YEAR}} - Current year (e.g., 2024)
@@ -157,7 +157,7 @@ Replace all placeholders with your specific content:
 ```bash
 # Example for welcome email
 sed -i 's/{{USER_NAME}}/John Doe/g' welcome-email.html
-sed -i 's/{{GREETING}}/Welcome to Pixel Pilot!/g' welcome-email.html
+sed -i 's/{{GREETING}}/Welcome to PiPilot!/g' welcome-email.html
 ```
 
 ### 3. Update URLs
@@ -200,7 +200,7 @@ Before sending, test your email in:
 2. **Strong subject lines**: Personalize and create urgency
 3. **Clear CTAs**: Use action-oriented button text
 4. **Mobile-first**: Test on mobile devices first
-5. **Brand consistency**: Maintain Pixel Pilot's voice and tone
+5. **Brand consistency**: Maintain PiPilot's voice and tone
 
 ### Technical Best Practices
 1. **Inline CSS**: Use inline styles for email compatibility
@@ -247,4 +247,4 @@ For questions about these templates:
 
 ---
 
-**Pixel Pilot** - Build amazing apps with AI-powered development.
+**PiPilot** - Build amazing apps with AI-powered development.

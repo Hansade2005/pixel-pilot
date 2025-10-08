@@ -163,7 +163,7 @@ export default function BlogPostPage() {
                     <p className="text-gray-300 mb-3"><strong>Traditional Approach:</strong> {section.real_world_example.traditional_approach}</p>
                   )}
                   {section.real_world_example.pixel_pilot_approach && (
-                    <p className="text-gray-300 mb-3"><strong>Pixel Pilot Approach:</strong> {section.real_world_example.pixel_pilot_approach}</p>
+                    <p className="text-gray-300 mb-3"><strong>PiPilot Approach:</strong> {section.real_world_example.pixel_pilot_approach}</p>
                   )}
                   {section.real_world_example.code_comparison && (
                     <div className="mt-4 space-y-3">
@@ -174,7 +174,7 @@ export default function BlogPostPage() {
                         </pre>
                       </div>
                       <div>
-                        <p className="text-gray-400 text-sm mb-1">Pixel Pilot Code:</p>
+                        <p className="text-gray-400 text-sm mb-1">PiPilot Code:</p>
                         <pre className="bg-gray-800/50 p-3 rounded text-sm text-gray-300 overflow-x-auto">
                           <code>{section.real_world_example.code_comparison.pixel_pilot}</code>
                         </pre>

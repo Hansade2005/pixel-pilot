@@ -1,4 +1,4 @@
-# Pixel Pilot Documentation Hub
+# PiPilot Documentation Hub
 
 ## Complete Documentation for AI-Powered App Development
 
@@ -6,13 +6,13 @@
 **Author:** Anye Happiness Ade  
 **Version:** 1.0.0
 
-Welcome to the comprehensive documentation hub for Pixel Pilot, your AI-powered web development platform. This documentation provides everything you need to master Pixel Pilot and build amazing applications through conversational AI.
+Welcome to the comprehensive documentation hub for PiPilot, your AI-powered web development platform. This documentation provides everything you need to master PiPilot and build amazing applications through conversational AI.
 
 ## 📚 Documentation Overview
 
 ### Core Documentation
 - **[Getting Started](./getting-started.md)** - Complete guide for new users
-- **[Advanced Features](./advanced-features.md)** - Master Pixel Pilot's sophisticated capabilities
+- **[Advanced Features](./advanced-features.md)** - Master PiPilot's sophisticated capabilities
 - **[API Reference](./api-reference.md)** - Comprehensive API documentation
 - **[Troubleshooting](./troubleshooting.md)** - Problem-solving and support guide
 
@@ -23,13 +23,13 @@ Welcome to the comprehensive documentation hub for Pixel Pilot, your AI-powered 
 ## 🚀 Quick Start
 
 ### For New Users
-1. **Read the Getting Started Guide** - Learn Pixel Pilot basics in 10 minutes
+1. **Read the Getting Started Guide** - Learn PiPilot basics in 10 minutes
 2. **Create Your First Project** - Follow the step-by-step tutorial
 3. **Explore Features** - Try AI chat, live preview, and deployment
 
 ### For Experienced Users
 1. **Advanced Features Guide** - Master AI agent systems and enterprise features
-2. **API Reference** - Integrate Pixel Pilot into your workflows
+2. **API Reference** - Integrate PiPilot into your workflows
 3. **Troubleshooting** - Solve complex issues and optimize performance
 
 ## 🎯 Key Features Documented
@@ -248,7 +248,7 @@ Expert → Enterprise Features → Architecture → Optimization
 
 ---
 
-## 🎉 Ready to Build with Pixel Pilot?
+## 🎉 Ready to Build with PiPilot?
 
 **Start Your Journey:**
 1. **[Getting Started Guide](./getting-started.md)** - Your first 10 minutes
@@ -256,10 +256,10 @@ Expert → Enterprise Features → Architecture → Optimization
 3. **[Explore Advanced Features](./advanced-features.md)** - Unlock full potential
 4. **[Join the Community](../help-resources.json)** - Connect with other builders
 
-**Pixel Pilot Documentation - Built for developers, by developers.** 🚀
+**PiPilot Documentation - Built for developers, by developers.** 🚀
 
 ---
 
 *Documentation Version 1.0.0 - September 7, 2025*  
 *Maintained by Anye Happiness Ade*  
-*Pixel Pilot Development Team*
+*PiPilot Development Team*

@@ -3,14 +3,14 @@
     "author": "Anye Happiness Ade",
     "alsoKnownAs": "Hans Ade",
     "role": "Founder & CEO",
-    "description": "All courses are authored by Anye Happiness Ade (also known as Hans Ade), Founder and CEO of Pixel Pilot."
+    "description": "All courses are authored by Anye Happiness Ade (also known as Hans Ade), Founder and CEO of PiPilot."
   },
   "courses": [
     {
       "id": "pixel-pilot-mastery",
-      "title": "Pixel Pilot Mastery Course",
+      "title": "PiPilot Mastery Course",
       "description": "Master AI-powered development with comprehensive training",
-      "longDescription": "This comprehensive course takes you from beginner to expert in AI-powered development using Pixel Pilot. Learn to build professional web applications, deploy them instantly, and master advanced AI development techniques.",
+      "longDescription": "This comprehensive course takes you from beginner to expert in AI-powered development using PiPilot. Learn to build professional web applications, deploy them instantly, and master advanced AI development techniques.",
       "instructor": "Anye Happiness Ade",
       "duration": "8 weeks",
       "level": "All Levels",
@@ -26,10 +26,10 @@
       "skills": ["AI Development", "Web Applications", "Deployment", "UI/UX Design", "Database Integration"],
       "prerequisites": ["Basic computer skills", "No coding experience required"],
       "content": {
-        "overview": "This course provides a complete journey through AI-powered development, covering everything from basic concepts to advanced techniques. Authored by Anye Happiness Ade (Hans Ade), Founder and CEO of Pixel Pilot.",
+        "overview": "This course provides a complete journey through AI-powered development, covering everything from basic concepts to advanced techniques. Authored by Anye Happiness Ade (Hans Ade), Founder and CEO of PiPilot.",
         "learningObjectives": [
           "Understand AI-powered development principles",
-          "Master Pixel Pilot's core features",
+          "Master PiPilot's core features",
           "Build professional web applications",
           "Implement advanced AI integrations",
           "Deploy applications with confidence"
@@ -37,7 +37,7 @@
         "modules": [
           {
             "id": "getting-started",
-            "title": "Getting Started with Pixel Pilot",
+            "title": "Getting Started with PiPilot",
             "description": "Master the fundamentals of AI-powered development and establish a solid foundation",
             "duration": "4 hours",
             "completed": false,
@@ -45,12 +45,12 @@
             "lessons": [
               {
                 "id": "welcome",
-                "title": "Welcome to Pixel Pilot - Revolutionizing Development",
+                "title": "Welcome to PiPilot - Revolutionizing Development",
                 "description": "Comprehensive introduction to AI-powered development paradigm",
                 "duration": "25 min",
                 "type": "video",
                 "completed": false,
-                "content": "## Welcome to the Future of Development\n\nPixel Pilot represents a paradigm shift in how we approach software development. This course will transform you from a traditional developer into an AI-augmented development expert.\n\n### What You'll Learn\n- The evolution of AI in software development\n- How Pixel Pilot accelerates development workflows\n- Real-world case studies of AI-powered applications\n- The future of development with AI assistance\n\n### Course Structure\nThis comprehensive program includes:\n- **5 Major Modules** covering all aspects of AI development\n- **Hands-on Projects** with real-world applications\n- **Industry Best Practices** from leading tech companies\n- **Certification** upon completion\n\n### Prerequisites\n- Basic computer literacy\n- No prior coding experience required\n- Curiosity and willingness to learn\n\n### Learning Outcomes\nBy the end of this course, you will:\n- Build AI-powered applications from scratch\n- Implement machine learning models in production\n- Deploy scalable applications with confidence\n- Join the next generation of AI developers",
+                "content": "## Welcome to the Future of Development\n\nPiPilot represents a paradigm shift in how we approach software development. This course will transform you from a traditional developer into an AI-augmented development expert.\n\n### What You'll Learn\n- The evolution of AI in software development\n- How PiPilot accelerates development workflows\n- Real-world case studies of AI-powered applications\n- The future of development with AI assistance\n\n### Course Structure\nThis comprehensive program includes:\n- **5 Major Modules** covering all aspects of AI development\n- **Hands-on Projects** with real-world applications\n- **Industry Best Practices** from leading tech companies\n- **Certification** upon completion\n\n### Prerequisites\n- Basic computer literacy\n- No prior coding experience required\n- Curiosity and willingness to learn\n\n### Learning Outcomes\nBy the end of this course, you will:\n- Build AI-powered applications from scratch\n- Implement machine learning models in production\n- Deploy scalable applications with confidence\n- Join the next generation of AI developers",
                 "notes": "### Key Takeaways\n1. **AI-First Development**: Modern applications start with AI capabilities\n2. **Rapid Prototyping**: From idea to MVP in hours, not weeks\n3. **Scalable Architecture**: Build for millions from day one\n4. **Continuous Learning**: Stay ahead in the AI revolution\n\n### Important Concepts\n- **Large Language Models (LLMs)**: The backbone of AI assistance\n- **Prompt Engineering**: Crafting effective AI interactions\n- **API Integration**: Connecting AI services seamlessly\n- **Ethical AI**: Responsible development practices",
                 "examples": [
                   "Example 1: Traditional vs AI-Powered Development Workflow",
@@ -62,7 +62,7 @@
                   "Exercise 1: Write a 500-word reflection on how AI will impact your development career",
                   "Exercise 2: Research and document 3 real-world AI applications in your industry",
                   "Exercise 3: Set up your learning environment and development tools",
-                  "Exercise 4: Join Pixel Pilot community forums and introduce yourself"
+                  "Exercise 4: Join PiPilot community forums and introduce yourself"
                 ],
                 "videoUrl": "https://example.com/welcome-video",
                 "readingMaterials": [
@@ -88,7 +88,7 @@
                 "duration": "35 min",
                 "type": "interactive",
                 "completed": false,
-                "content": "## Development Environment Setup\n\nA properly configured development environment is crucial for efficient AI-powered development. This comprehensive guide will walk you through setting up everything you need.\n\n### System Requirements\n**Minimum Hardware:**\n- 8GB RAM (16GB recommended)\n- 4-core CPU (8-core recommended)\n- 50GB free storage\n- Stable internet connection\n\n**Supported Operating Systems:**\n- macOS 12.0+\n- Windows 10/11 (64-bit)\n- Ubuntu 20.04+ / CentOS 8+\n\n### Software Installation\n\n#### 1. Node.js and npm\n```bash\n# Install Node.js (Latest LTS)\ncurl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -\nsudo apt-get install -y nodejs\n\n# Verify installation\nnode --version\nnpm --version\n```\n\n#### 2. Git Version Control\n```bash\n# Install Git\ngit --version\n# If not installed:\nsudo apt-get install git\n\n# Configure Git\ngit config --global user.name \"Your Name\"\ngit config --global user.email \"your.email@example.com\"\n```\n\n#### 3. Code Editor (VS Code)\n- Download from https://code.visualstudio.com/\n- Essential extensions:\n  - ES7+ React/Redux/React-Native snippets\n  - Prettier - Code formatter\n  - ESLint\n  - GitLens\n  - Auto Rename Tag\n\n#### 4. Pixel Pilot CLI\n```bash\nnpm install -g @pixelpilot/cli\npixelpilot --version\n```\n\n### Environment Configuration\n\n#### API Keys Setup\n```bash\n# Create .env file\necho \"OPENAI_API_KEY=your_key_here\" > .env\necho \"PIXELPILOT_API_KEY=your_key_here\" >> .env\n```\n\n#### IDE Configuration\n- Theme: Dark mode for reduced eye strain\n- Font: Fira Code or JetBrains Mono (14pt)\n- Line numbers: Enabled\n- Auto-save: Enabled\n- Format on save: Enabled",
+                "content": "## Development Environment Setup\n\nA properly configured development environment is crucial for efficient AI-powered development. This comprehensive guide will walk you through setting up everything you need.\n\n### System Requirements\n**Minimum Hardware:**\n- 8GB RAM (16GB recommended)\n- 4-core CPU (8-core recommended)\n- 50GB free storage\n- Stable internet connection\n\n**Supported Operating Systems:**\n- macOS 12.0+\n- Windows 10/11 (64-bit)\n- Ubuntu 20.04+ / CentOS 8+\n\n### Software Installation\n\n#### 1. Node.js and npm\n```bash\n# Install Node.js (Latest LTS)\ncurl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -\nsudo apt-get install -y nodejs\n\n# Verify installation\nnode --version\nnpm --version\n```\n\n#### 2. Git Version Control\n```bash\n# Install Git\ngit --version\n# If not installed:\nsudo apt-get install git\n\n# Configure Git\ngit config --global user.name \"Your Name\"\ngit config --global user.email \"your.email@example.com\"\n```\n\n#### 3. Code Editor (VS Code)\n- Download from https://code.visualstudio.com/\n- Essential extensions:\n  - ES7+ React/Redux/React-Native snippets\n  - Prettier - Code formatter\n  - ESLint\n  - GitLens\n  - Auto Rename Tag\n\n#### 4. PiPilot CLI\n```bash\nnpm install -g @pixelpilot/cli\npixelpilot --version\n```\n\n### Environment Configuration\n\n#### API Keys Setup\n```bash\n# Create .env file\necho \"OPENAI_API_KEY=your_key_here\" > .env\necho \"PIXELPILOT_API_KEY=your_key_here\" >> .env\n```\n\n#### IDE Configuration\n- Theme: Dark mode for reduced eye strain\n- Font: Fira Code or JetBrains Mono (14pt)\n- Line numbers: Enabled\n- Auto-save: Enabled\n- Format on save: Enabled",
                 "notes": "### Best Practices\n1. **Version Control**: Always use Git for project management\n2. **Environment Variables**: Never commit API keys to repositories\n3. **Documentation**: Keep setup instructions updated\n4. **Backup**: Regular backups of your development environment\n\n### Troubleshooting Common Issues\n- **Node.js Installation Issues**: Use Node Version Manager (nvm)\n- **Permission Errors**: Avoid using sudo with npm install\n- **Port Conflicts**: Check for running processes on ports 3000, 8000\n- **Memory Issues**: Monitor RAM usage during development\n\n### Performance Optimization\n- Use SSD storage for faster file operations\n- Configure IDE for optimal performance\n- Keep Node.js and npm updated\n- Use package managers effectively (npm vs yarn vs pnpm)",
                 "examples": [
                   "Example 1: Complete development environment setup walkthrough",
@@ -98,7 +98,7 @@
                 ],
                 "exercises": [
                   "Exercise 1: Install and configure Node.js, Git, and VS Code",
-                  "Exercise 2: Set up Pixel Pilot CLI and verify installation",
+                  "Exercise 2: Set up PiPilot CLI and verify installation",
                   "Exercise 3: Create a sample project and initialize Git repository",
                   "Exercise 4: Configure environment variables and API keys securely",
                   "Exercise 5: Optimize your IDE settings for maximum productivity"
@@ -117,7 +117,7 @@
                       "Check Node.js and npm versions",
                       "Test Git configuration",
                       "Verify VS Code extensions",
-                      "Test Pixel Pilot CLI",
+                      "Test PiPilot CLI",
                       "Validate API key configuration"
                     ]
                   }
@@ -130,8 +130,8 @@
                 "duration": "45 min",
                 "type": "interactive",
                 "completed": false,
-                "content": "## Building Your First AI Application\n\nLet's create a practical AI-powered application from scratch. We'll build a smart task management system that uses AI to prioritize and categorize tasks.\n\n### Project Overview\n**Smart Task Manager** - An AI-powered task management application that:\n- Automatically categorizes tasks using natural language processing\n- Suggests optimal task priorities based on deadlines and importance\n- Generates task completion estimates using historical data\n- Provides intelligent reminders and scheduling\n\n### Step-by-Step Implementation\n\n#### Step 1: Project Initialization\n```bash\n# Create new Pixel Pilot project\npixelpilot create smart-task-manager\ncd smart-task-manager\n\n# Install dependencies\nnpm install\n\n# Start development server\nnpm run dev\n```\n\n#### Step 2: Basic Structure\n```jsx\n// src/App.jsx\nimport React, { useState } from 'react';\n\nfunction App() {\n  const [tasks, setTasks] = useState([]);\n  const [newTask, setNewTask] = useState('');\n\n  return (\n    <div className=\"app\">\n      <h1>Smart Task Manager</h1>\n      <TaskForm />\n      <TaskList />\n    </div>\n  );\n}\n\nexport default App;\n```\n\n#### Step 3: AI Integration\n```javascript\n// AI-powered task categorization\nimport { pixelpilot } from '@pixelpilot/ai';\n\nconst categorizeTask = async (taskText) => {\n  const response = await pixelpilot.analyze({\n    text: taskText,\n    task: 'categorize',\n    categories: ['work', 'personal', 'urgent', 'long-term']\n  });\n  \n  return response.category;\n};\n```\n\n#### Step 4: Smart Prioritization\n```javascript\n// AI-powered task prioritization\nconst prioritizeTask = async (task) => {\n  const priority = await pixelpilot.analyze({\n    text: task.description,\n    deadline: task.deadline,\n    task: 'prioritize'\n  });\n  \n  return priority.score;\n};\n```\n\n### Advanced Features\n\n#### Natural Language Processing\n- Task description analysis\n- Context understanding\n- Intent recognition\n\n#### Machine Learning Integration\n- Task completion prediction\n- User behavior analysis\n- Performance optimization\n\n#### Real-time AI Assistance\n- Instant task suggestions\n- Smart scheduling\n- Progress tracking",
-                "notes": "### Project Architecture\n1. **Frontend**: React with modern hooks\n2. **AI Layer**: Pixel Pilot AI services\n3. **Data Layer**: Local storage with sync capabilities\n4. **UX Layer**: Intuitive drag-and-drop interface\n\n### Best Practices Applied\n- **Component Composition**: Reusable, focused components\n- **State Management**: Efficient state updates\n- **Error Handling**: Graceful error recovery\n- **Performance**: Optimized re-renders\n- **Accessibility**: WCAG compliance\n\n### Deployment Considerations\n- **Build Optimization**: Code splitting and lazy loading\n- **CDN Integration**: Fast asset delivery\n- **Monitoring**: Error tracking and analytics\n- **Scalability**: Cloud-ready architecture",
+                "content": "## Building Your First AI Application\n\nLet's create a practical AI-powered application from scratch. We'll build a smart task management system that uses AI to prioritize and categorize tasks.\n\n### Project Overview\n**Smart Task Manager** - An AI-powered task management application that:\n- Automatically categorizes tasks using natural language processing\n- Suggests optimal task priorities based on deadlines and importance\n- Generates task completion estimates using historical data\n- Provides intelligent reminders and scheduling\n\n### Step-by-Step Implementation\n\n#### Step 1: Project Initialization\n```bash\n# Create new PiPilot project\npixelpilot create smart-task-manager\ncd smart-task-manager\n\n# Install dependencies\nnpm install\n\n# Start development server\nnpm run dev\n```\n\n#### Step 2: Basic Structure\n```jsx\n// src/App.jsx\nimport React, { useState } from 'react';\n\nfunction App() {\n  const [tasks, setTasks] = useState([]);\n  const [newTask, setNewTask] = useState('');\n\n  return (\n    <div className=\"app\">\n      <h1>Smart Task Manager</h1>\n      <TaskForm />\n      <TaskList />\n    </div>\n  );\n}\n\nexport default App;\n```\n\n#### Step 3: AI Integration\n```javascript\n// AI-powered task categorization\nimport { pixelpilot } from '@pixelpilot/ai';\n\nconst categorizeTask = async (taskText) => {\n  const response = await pixelpilot.analyze({\n    text: taskText,\n    task: 'categorize',\n    categories: ['work', 'personal', 'urgent', 'long-term']\n  });\n  \n  return response.category;\n};\n```\n\n#### Step 4: Smart Prioritization\n```javascript\n// AI-powered task prioritization\nconst prioritizeTask = async (task) => {\n  const priority = await pixelpilot.analyze({\n    text: task.description,\n    deadline: task.deadline,\n    task: 'prioritize'\n  });\n  \n  return priority.score;\n};\n```\n\n### Advanced Features\n\n#### Natural Language Processing\n- Task description analysis\n- Context understanding\n- Intent recognition\n\n#### Machine Learning Integration\n- Task completion prediction\n- User behavior analysis\n- Performance optimization\n\n#### Real-time AI Assistance\n- Instant task suggestions\n- Smart scheduling\n- Progress tracking",
+                "notes": "### Project Architecture\n1. **Frontend**: React with modern hooks\n2. **AI Layer**: PiPilot AI services\n3. **Data Layer**: Local storage with sync capabilities\n4. **UX Layer**: Intuitive drag-and-drop interface\n\n### Best Practices Applied\n- **Component Composition**: Reusable, focused components\n- **State Management**: Efficient state updates\n- **Error Handling**: Graceful error recovery\n- **Performance**: Optimized re-renders\n- **Accessibility**: WCAG compliance\n\n### Deployment Considerations\n- **Build Optimization**: Code splitting and lazy loading\n- **CDN Integration**: Fast asset delivery\n- **Monitoring**: Error tracking and analytics\n- **Scalability**: Cloud-ready architecture",
                 "examples": [
                   "Example 1: Complete Smart Task Manager application code",
                   "Example 2: AI categorization logic walkthrough",
@@ -493,10 +493,10 @@
         ],
         "resources": [
           {
-            "title": "Pixel Pilot Documentation",
+            "title": "PiPilot Documentation",
             "type": "documentation",
             "url": "/docs/getting-started",
-            "description": "Official documentation for Pixel Pilot"
+            "description": "Official documentation for PiPilot"
           },
           {
             "title": "AI Development Best Practices",

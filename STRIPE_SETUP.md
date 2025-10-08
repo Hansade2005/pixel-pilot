@@ -26,19 +26,19 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 Go to your [Stripe Dashboard](https://dashboard.stripe.com/) and create the following:
 
 #### Pro Plan ($15/month)
-- **Product Name**: Pixel Pilot Pro
+- **Product Name**: PiPilot Pro
 - **Price**: $15.00 USD per month
 - **Billing**: Monthly subscription
 - **Copy Price ID** and set as `NEXT_PUBLIC_STRIPE_PRICE_PRO`
 
 #### Teams Plan ($30/month)
-- **Product Name**: Pixel Pilot Teams
+- **Product Name**: PiPilot Teams
 - **Price**: $30.00 USD per month
 - **Billing**: Monthly subscription
 - **Copy Price ID** and set as `NEXT_PUBLIC_STRIPE_PRICE_TEAMS`
 
 #### Enterprise Plan ($60/month)
-- **Product Name**: Pixel Pilot Enterprise
+- **Product Name**: PiPilot Enterprise
 - **Price**: $60.00 USD per month
 - **Billing**: Monthly subscription
 - **Copy Price ID** and set as `NEXT_PUBLIC_STRIPE_PRICE_ENTERPRISE`
