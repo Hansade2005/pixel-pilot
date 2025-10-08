@@ -1,156 +1,162 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { 
-  BookOpen, 
-  Search, 
-  ArrowRight, 
-  Zap, 
-  Database, 
-  Cloud, 
-  Lock, 
-  Code, 
+import {
+  BookOpen,
+  Search,
+  ArrowRight,
+  Zap,
+  Database,
+  Cloud,
+  Lock,
+  Code,
   Rocket,
   FileText,
   Server,
   Terminal,
   Layers,
-  Shield
+  Shield,
+  Brain,
+  Settings,
+  Workflow,
+  CheckCircle,
+  AlertCircle,
+  Info,
+  Clock
 } from "lucide-react"
 import Link from "next/link"
 
+interface DocSection {
+  title: string
+  content: string
+  search_keywords: string[]
+  overview: string
+}
+
+interface DocsData {
+  sections: DocSection[]
+}
+
 export default function DocsPage() {
   const [searchQuery, setSearchQuery] = useState("")
+  const [docsData, setDocsData] = useState<DocsData | null>(null)
+  const [filteredSections, setFilteredSections] = useState<DocSection[]>([])
 
-  const docCategories = [
-    {
-      id: "getting-started",
-      title: "Getting Started",
-      description: "Learn the basics and create your first database",
-      icon: Zap,
-      color: "purple",
-      articles: [
-        { title: "Quick Start Guide", href: "/docs/getting-started/quick-start", time: "5 min" },
-        { title: "Core Concepts", href: "/docs/getting-started/concepts", time: "10 min" },
-        { title: "Create Your First Database", href: "#", time: "5 min" },
-        { title: "Using AI Schema Generator", href: "#", time: "10 min" }
-      ]
-    },
-    {
-      id: "database",
-      title: "Database Tables",
-      description: "Create and manage PostgreSQL database tables",
-      icon: Database,
-      color: "blue",
-      articles: [
-        { title: "Creating Tables", href: "#", time: "10 min" },
-        { title: "AI Schema Generation", href: "#", time: "10 min" },
-        { title: "Data Types (Text, Number, UUID, JSON, etc.)", href: "#", time: "15 min" },
-        { title: "Adding & Editing Records", href: "#", time: "10 min" },
-        { title: "Table Schema Management", href: "#", time: "15 min" },
-        { title: "Row Level Security", href: "#", time: "20 min" }
-      ]
-    },
-    {
-      id: "api-keys",
-      title: "API Keys & Authentication",
-      description: "Secure access for external applications",
-      icon: Lock,
-      color: "orange",
-      articles: [
-        { title: "Creating API Keys", href: "#", time: "5 min" },
-        { title: "Using API Keys in Your App", href: "#", time: "10 min" },
-        { title: "Rate Limiting (1000 req/hour)", href: "#", time: "10 min" },
-        { title: "API Key Security Best Practices", href: "#", time: "15 min" },
-        { title: "Revoking & Managing Keys", href: "#", time: "5 min" }
-      ]
-    },
-    {
-      id: "rest-api",
-      title: "REST API",
-      description: "Auto-generated CRUD endpoints for your tables",
-      icon: Code,
-      color: "pink",
-      articles: [
-        { title: "API Documentation Generator", href: "#", time: "10 min" },
-        { title: "GET - List Records", href: "#", time: "10 min" },
-        { title: "POST - Create Records", href: "#", time: "10 min" },
-        { title: "PUT - Update Records", href: "#", time: "10 min" },
-        { title: "DELETE - Remove Records", href: "#", time: "10 min" },
-        { title: "Error Handling", href: "#", time: "10 min" }
-      ]
-    },
-    {
-      id: "storage",
-      title: "File Storage",
-      description: "Upload and manage files (500MB per database)",
-      icon: Cloud,
-      color: "green",
-      articles: [
-        { title: "Uploading Files", href: "#", time: "10 min" },
-        { title: "Supported File Types (Images, PDFs, Videos)", href: "#", time: "5 min" },
-        { title: "Public vs Private Files", href: "#", time: "10 min" },
-        { title: "Signed URLs for Private Files", href: "#", time: "15 min" },
-        { title: "Storage Limits & Usage Tracking", href: "#", time: "10 min" }
-      ]
-    },
-    {
-      id: "integration",
-      title: "Framework Integration",
-      description: "Use PiPilot with popular frameworks",
-      icon: Terminal,
-      color: "indigo",
-      articles: [
-        { title: "Next.js Integration", href: "#", time: "15 min" },
-        { title: "React + Vite Integration", href: "#", time: "15 min" },
-        { title: "Vue.js Integration", href: "#", time: "15 min" },
-        { title: "Node.js Integration", href: "#", time: "15 min" },
-        { title: "Python Integration", href: "#", time: "15 min" },
-        { title: "React Native & Mobile Apps", href: "#", time: "20 min" }
-      ]
-    },
-    {
-      id: "guides",
-      title: "Step-by-Step Guides",
-      description: "Build real-world applications",
-      icon: FileText,
-      color: "yellow",
-      articles: [
-        { title: "Build a Todo App", href: "#", time: "20 min" },
-        { title: "User Authentication System", href: "#", time: "30 min" },
-        { title: "Image Gallery with File Upload", href: "#", time: "25 min" },
-        { title: "Blog with Database Tables", href: "#", time: "35 min" },
-        { title: "Deploy to Vercel/Netlify", href: "#", time: "15 min" }
-      ]
-    },
-    {
-      id: "reference",
-      title: "API Reference",
-      description: "Complete API documentation",
-      icon: Server,
-      color: "red",
-      articles: [
-        { title: "Database API Endpoints", href: "#", time: "10 min" },
-        { title: "Storage API Endpoints", href: "#", time: "10 min" },
-        { title: "Authentication Headers", href: "#", time: "5 min" },
-        { title: "Response Formats", href: "#", time: "5 min" },
-        { title: "Status Codes & Errors", href: "#", time: "10 min" }
-      ]
+  useEffect(() => {
+    const loadDocsData = async () => {
+      try {
+        const response = await fetch('/app/docs/docs.json')
+        const data = await response.json()
+        setDocsData(data)
+        setFilteredSections(data.sections)
+      } catch (error) {
+        console.error('Failed to load docs data:', error)
+      }
     }
-  ]
 
-  const quickLinks = [
-    { title: "Quick Start", href: "/docs/getting-started/quick-start", icon: Zap },
-    { title: "Create API Keys", href: "#", icon: Lock },
-    { title: "AI Schema Generator", href: "#", icon: Layers },
-    { title: "File Storage Guide", href: "#", icon: Cloud }
-  ]
+    loadDocsData()
+  }, [])
+
+  useEffect(() => {
+    if (docsData) {
+      const filtered = docsData.sections.filter(section =>
+        section.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        section.overview.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        section.search_keywords.some(keyword =>
+          keyword.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      )
+      setFilteredSections(filtered)
+    }
+  }, [searchQuery, docsData])
+
+  const getIconForSection = (title: string) => {
+    const iconMap: { [key: string]: any } = {
+      'Introduction': BookOpen,
+      'Core PiPilot Capabilities': Zap,
+      'AI-Powered Development Assistant': Brain,
+      'File System Operations': Settings,
+      'Professional Development Standards': CheckCircle,
+      'Framework Support': Layers,
+      'Professional Design System': FileText,
+      'Available Dependencies': Code,
+      'Backend Integration (Supabase)': Database,
+      'Advanced Features': Rocket,
+      'Database as a Service': Server,
+      'Deployment & Hosting': Cloud,
+      'Communication Standards': Info,
+      'Development Workflow': Workflow,
+      'Use Cases': Terminal,
+      'Security Best Practices': Shield,
+      'Performance Optimization': Zap,
+      'Troubleshooting Guide': AlertCircle
+    }
+    return iconMap[title] || BookOpen
+  }
+
+  const getColorForSection = (title: string) => {
+    const colorMap: { [key: string]: string } = {
+      'Introduction': 'purple',
+      'Core PiPilot Capabilities': 'blue',
+      'AI-Powered Development Assistant': 'green',
+      'File System Operations': 'orange',
+      'Professional Development Standards': 'red',
+      'Framework Support': 'indigo',
+      'Professional Design System': 'pink',
+      'Available Dependencies': 'yellow',
+      'Backend Integration (Supabase)': 'blue',
+      'Advanced Features': 'purple',
+      'Database as a Service': 'green',
+      'Deployment & Hosting': 'orange',
+      'Communication Standards': 'indigo',
+      'Development Workflow': 'pink',
+      'Use Cases': 'yellow',
+      'Security Best Practices': 'red',
+      'Performance Optimization': 'purple',
+      'Troubleshooting Guide': 'gray'
+    }
+    return colorMap[title] || 'purple'
+  }
+
+  const getReadTime = (content: string) => {
+    const wordsPerMinute = 200
+    const wordCount = content.split(' ').length
+    const minutes = Math.ceil(wordCount / wordsPerMinute)
+    return `${minutes} min`
+  }
+
+  const quickLinks = docsData ? [
+    {
+      title: "Getting Started",
+      href: "/docs/introduction",
+      icon: BookOpen,
+      description: docsData.sections.find(s => s.title === "Introduction")?.overview.substring(0, 100) + "..."
+    },
+    {
+      title: "AI Assistant",
+      href: "/docs/ai-powered-development-assistant",
+      icon: Brain,
+      description: docsData.sections.find(s => s.title === "AI-Powered Development Assistant")?.overview.substring(0, 100) + "..."
+    },
+    {
+      title: "Framework Support",
+      href: "/docs/framework-support",
+      icon: Layers,
+      description: docsData.sections.find(s => s.title === "Framework Support")?.overview.substring(0, 100) + "..."
+    },
+    {
+      title: "Security Guide",
+      href: "/docs/security-best-practices",
+      icon: Shield,
+      description: docsData.sections.find(s => s.title === "Security Best Practices")?.overview.substring(0, 100) + "..."
+    }
+  ] : []
 
   const colorClasses = {
     purple: "from-purple-500 to-pink-500",
@@ -160,7 +166,8 @@ export default function DocsPage() {
     pink: "from-pink-500 to-rose-500",
     yellow: "from-yellow-500 to-orange-500",
     indigo: "from-indigo-500 to-purple-500",
-    red: "from-red-500 to-pink-500"
+    red: "from-red-500 to-pink-500",
+    gray: "from-gray-500 to-gray-600"
   }
 
   return (
@@ -221,50 +228,61 @@ export default function DocsPage() {
           </div>
         </section>
 
-        {/* Documentation Categories */}
+        {/* Documentation Sections */}
         <section className="py-16 px-4">
           <div className="container mx-auto max-w-7xl">
             <div className="grid gap-8">
-              {docCategories.map((category) => (
-                <Card key={category.id} className="bg-gray-800/50 border-gray-700 hover:border-gray-600 transition-colors">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-start gap-4">
-                      <div className={`p-3 rounded-lg bg-gradient-to-br ${colorClasses[category.color as keyof typeof colorClasses]}`}>
-                        <category.icon className="h-6 w-6 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <CardTitle className="text-white text-2xl mb-2">{category.title}</CardTitle>
-                        <CardDescription className="text-gray-400 text-base">
-                          {category.description}
-                        </CardDescription>
-                      </div>
-                      <Badge variant="outline" className="border-gray-600 text-gray-400">
-                        {category.articles.length} articles
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {category.articles.map((article, index) => (
-                        <Link key={index} href={article.href}>
-                          <div className="group flex items-center justify-between p-3 rounded-lg bg-gray-700/30 hover:bg-gray-700/50 transition-colors cursor-pointer">
-                            <div className="flex items-center gap-3 flex-1">
-                              <FileText className="h-4 w-4 text-gray-400 group-hover:text-purple-400 transition-colors" />
-                              <span className="text-gray-300 group-hover:text-white transition-colors text-sm">
-                                {article.title}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-gray-500">{article.time}</span>
-                              <ArrowRight className="h-4 w-4 text-gray-500 group-hover:text-purple-400 transition-colors" />
-                            </div>
+              {filteredSections.map((section, index) => {
+                const IconComponent = getIconForSection(section.title)
+                const color = getColorForSection(section.title)
+                const slug = section.title.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/--+/g, '-')
+
+                return (
+                  <Card key={index} className="bg-gray-800/50 border-gray-700 hover:border-gray-600 transition-colors">
+                    <CardHeader className="pb-4">
+                      <div className="flex items-start gap-4">
+                        <div className={`p-3 rounded-lg bg-gradient-to-br ${colorClasses[color as keyof typeof colorClasses]}`}>
+                          <IconComponent className="h-6 w-6 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <CardTitle className="text-white text-2xl mb-2">{section.title}</CardTitle>
+                          <CardDescription className="text-gray-400 text-base">
+                            {section.overview}
+                          </CardDescription>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <Badge variant="outline" className="border-gray-600 text-gray-400">
+                            <Clock className="w-3 h-3 mr-1" />
+                            {getReadTime(section.content)}
+                          </Badge>
+                          <div className="flex flex-wrap gap-1">
+                            {section.search_keywords.slice(0, 3).map((keyword, keywordIndex) => (
+                              <Badge key={keywordIndex} variant="secondary" className="text-xs bg-gray-700/50 text-gray-300">
+                                {keyword}
+                              </Badge>
+                            ))}
                           </div>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="text-sm text-gray-400">
+                            Learn about {section.title.toLowerCase()} features and capabilities
+                          </div>
+                        </div>
+                        <Link href={`/docs/${slug}`}>
+                          <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+                            Read More
+                            <ArrowRight className="ml-2 h-4 w-4" />
+                          </Button>
                         </Link>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           </div>
         </section>

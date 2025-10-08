@@ -11,62 +11,45 @@ import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 
-interface HelpResource {
-  id: string
+interface DocSection {
   title: string
-  description: string
-  content: any
-  tags: string[]
-  difficulty: string
-  estimated_read_time: string
-}
-
-interface Category {
-  id: string
-  title: string
-  description: string
-  icon: string
-  articles: HelpResource[]
+  content: string
+  search_keywords: string[]
+  overview: string
 }
 
 export default function DocPage() {
   const params = useParams()
   const router = useRouter()
-  const [docData, setDocData] = useState<HelpResource | null>(null)
-  const [categoryData, setCategoryData] = useState<Category | null>(null)
-  const [relatedDocs, setRelatedDocs] = useState<HelpResource[]>([])
+  const [docData, setDocData] = useState<DocSection | null>(null)
+  const [allSections, setAllSections] = useState<DocSection[]>([])
+  const [relatedDocs, setRelatedDocs] = useState<DocSection[]>([])
   const [loading, setLoading] = useState(true)
   const [readingProgress, setReadingProgress] = useState(0)
 
   useEffect(() => {
     const loadDocData = async () => {
       try {
-        const response = await fetch('/help-resources.json')
+        const response = await fetch('/app/docs/docs.json')
         const data = await response.json()
         const slug = params.slug as string
 
-        // Find the article by ID or slug
-        let foundArticle: HelpResource | null = null
-        let foundCategory: Category | null = null
+        // Find the section by matching slugified title
+        const foundSection = data.sections.find((section: DocSection) => {
+          const sectionSlug = section.title.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/--+/g, '-')
+          return sectionSlug === slug
+        })
 
-        for (const category of data.categories || []) {
-          const article = category.articles.find((art: HelpResource) =>
-            art.id === slug || art.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '') === slug
-          )
-          if (article) {
-            foundArticle = article
-            foundCategory = category
-            break
-          }
-        }
+        if (foundSection) {
+          setDocData(foundSection)
+          setAllSections(data.sections)
 
-        if (foundArticle && foundCategory) {
-          setDocData(foundArticle)
-          setCategoryData(foundCategory)
-
-          // Get related docs from the same category
-          const related = foundCategory.articles
-            .filter((art: HelpResource) => art.id !== foundArticle!.id)
+          // Get related docs (next 3 sections)
+          const currentIndex = data.sections.findIndex((section: DocSection) => section === foundSection)
+          const related = data.sections
+            .slice(currentIndex + 1, currentIndex + 4)
+            .concat(data.sections.slice(0, Math.max(0, currentIndex + 4 - data.sections.length)))
+            .filter((section: DocSection) => section !== foundSection)
             .slice(0, 3)
           setRelatedDocs(related)
         } else {
@@ -176,7 +159,7 @@ export default function DocPage() {
     )
   }
 
-  if (!docData || !categoryData) {
+  if (!docData) {
     return (
       <div className="min-h-screen relative overflow-hidden">
         <div className="absolute inset-0 lovable-gradient" />
@@ -228,20 +211,16 @@ export default function DocPage() {
                 Documentation
               </Link>
               <ChevronRight className="w-4 h-4" />
-              <Link href={`/docs#${categoryData.id}`} className="hover:text-white transition-colors">
-                {categoryData.title}
-              </Link>
-              <ChevronRight className="w-4 h-4" />
               <span className="text-white">{docData.title}</span>
             </nav>
           </div>
 
           {/* Back Button */}
           <div className="mb-8">
-            <Link href={`/docs#${categoryData.id}`}>
+            <Link href="/docs">
               <Button variant="outline" className="border-gray-600 text-white hover:bg-gray-700">
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to {categoryData.title}
+                Back to Documentation
               </Button>
             </Link>
           </div>
@@ -250,14 +229,10 @@ export default function DocPage() {
           <div className="mb-12">
             <div className="flex flex-wrap gap-2 mb-4">
               <Badge className="bg-blue-600 text-white">
-                {categoryData.title}
+                Documentation
               </Badge>
-              <Badge variant="secondary" className={
-                docData.difficulty === 'beginner' ? 'bg-green-600 text-white' :
-                docData.difficulty === 'intermediate' ? 'bg-yellow-600 text-white' :
-                'bg-red-600 text-white'
-              }>
-                {docData.difficulty.charAt(0).toUpperCase() + docData.difficulty.slice(1)}
+              <Badge variant="secondary" className="bg-green-600 text-white">
+                Guide
               </Badge>
             </div>
 
@@ -266,14 +241,14 @@ export default function DocPage() {
             </h1>
 
             <p className="text-xl text-gray-300 leading-relaxed max-w-4xl mb-8">
-              {docData.description}
+              {docData.overview}
             </p>
 
             {/* Article Meta */}
             <div className="flex flex-wrap items-center gap-6 text-gray-400">
               <div className="flex items-center space-x-2">
                 <Clock className="w-4 h-4" />
-                <span>{docData.estimated_read_time}</span>
+                <span>{Math.ceil(docData.content.split(' ').length / 200)} min read</span>
               </div>
               <div className="flex items-center space-x-2">
                 <Calendar className="w-4 h-4" />
@@ -281,12 +256,12 @@ export default function DocPage() {
               </div>
             </div>
 
-            {/* Tags */}
+            {/* Keywords */}
             <div className="flex flex-wrap gap-2 mt-6">
-              {docData.tags.map((tag: string, tagIndex: number) => (
-                <Badge key={tagIndex} variant="outline" className="border-gray-600 text-gray-400">
+              {docData.search_keywords.map((keyword: string, keywordIndex: number) => (
+                <Badge key={keywordIndex} variant="outline" className="border-gray-600 text-gray-400">
                   <Tag className="w-3 h-3 mr-1" />
-                  {tag}
+                  {keyword}
                 </Badge>
               ))}
             </div>
@@ -294,84 +269,34 @@ export default function DocPage() {
 
           {/* Article Content */}
           <div className="max-w-4xl">
-            {/* Introduction */}
-            {docData.content?.introduction && (
-              <div id="introduction" className="mb-12">
-                <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-2xl p-8 border border-purple-500/20">
-                  <h2 className="text-2xl font-bold text-white mb-4">Introduction</h2>
-                  <p className="text-gray-300 leading-relaxed text-lg">
-                    {docData.content.introduction}
+            {/* Main Content */}
+            <div className="mb-12">
+              <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-2xl p-8 border border-purple-500/20">
+                <h2 className="text-2xl font-bold text-white mb-6">Overview</h2>
+                <div className="prose prose-invert max-w-none">
+                  <p className="text-gray-300 leading-relaxed text-lg mb-6">
+                    {docData.overview}
                   </p>
-                </div>
-              </div>
-            )}
-
-            {/* Main Content Sections */}
-            {docData.content?.main_content?.map((section: any, index: number) =>
-              renderContentSection(section, index)
-            )}
-
-            {/* Special Sections */}
-            {docData.content?.prerequisites && (
-              <div id="prerequisites" className="mb-12">
-                <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-2xl p-8 border border-blue-500/20">
-                  <h2 className="text-2xl font-bold text-white mb-6">Prerequisites</h2>
-                  <ul className="space-y-3">
-                    {docData.content.prerequisites.map((prereq: string, index: number) => (
-                      <li key={index} className="flex items-start space-x-3">
-                        <div className="w-2 h-2 rounded-full bg-blue-400 mt-2 flex-shrink-0"></div>
-                        <span className="text-gray-300">{prereq}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
-
-            {/* Step by Step Guide */}
-            {docData.content?.step_by_step_setup && (
-              <div id="setup-guide" className="mb-12">
-                <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-2xl p-8 border border-green-500/20">
-                  <h2 className="text-2xl font-bold text-white mb-6">Step-by-Step Setup</h2>
-                  <div className="space-y-6">
-                    {docData.content.step_by_step_setup.map((step: any, index: number) => (
-                      <div key={index} className="bg-gray-800/50 rounded-lg p-6 border border-gray-700/50">
-                        <div className="flex items-start space-x-4">
-                          <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-white font-semibold flex-shrink-0">
-                            {index + 1}
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-white mb-2">{step.title}</h3>
-                            <p className="text-gray-300 mb-3">{step.description}</p>
-                            {step.details && (
-                              <div className="bg-gray-900/50 rounded p-3 border border-gray-700/30">
-                                <p className="text-gray-400 text-sm">{step.details}</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="text-gray-300 leading-relaxed text-lg whitespace-pre-line">
+                    {docData.content}
                   </div>
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* Tips */}
-            {docData.content?.tips && (
-              <div id="tips" className="mb-12">
-                <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-2xl p-8 border border-yellow-500/20">
-                  <h2 className="text-2xl font-bold text-white mb-6">💡 Tips & Best Practices</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {docData.content.tips.map((tip: string, index: number) => (
-                      <div key={index} className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
-                        <span className="text-yellow-200">{tip}</span>
-                      </div>
-                    ))}
-                  </div>
+            {/* Keywords Section */}
+            <div className="mb-12">
+              <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-2xl p-8 border border-blue-500/20">
+                <h2 className="text-2xl font-bold text-white mb-6">Related Topics</h2>
+                <div className="flex flex-wrap gap-2">
+                  {docData.search_keywords.map((keyword: string, keywordIndex: number) => (
+                    <Badge key={keywordIndex} variant="outline" className="border-blue-500/50 text-blue-300 bg-blue-500/10">
+                      {keyword}
+                    </Badge>
+                  ))}
                 </div>
               </div>
-            )}
+            </div>
           </div>
 
           {/* Related Documentation */}
@@ -380,25 +305,25 @@ export default function DocPage() {
               <h2 className="text-3xl font-bold text-white mb-8">Related Documentation</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {relatedDocs.map((relatedDoc, index) => (
-                  <Link key={index} href={`/docs/${relatedDoc.id}`}>
+                  <Link key={index} href={`/docs/${relatedDoc.title.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/--+/g, '-')}`}>
                     <Card className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-colors cursor-pointer group">
                       <CardContent className="p-6">
                         <Badge variant="secondary" className="bg-blue-600 text-white mb-3">
-                          {categoryData.title}
+                          Documentation
                         </Badge>
                         <h3 className="text-lg font-semibold text-white mb-3 group-hover:text-purple-400 transition-colors line-clamp-2">
                           {relatedDoc.title}
                         </h3>
                         <p className="text-gray-300 text-sm mb-4 line-clamp-2">
-                          {relatedDoc.description}
+                          {relatedDoc.overview}
                         </p>
                         <div className="flex items-center justify-between text-sm text-gray-400">
                           <span className="flex items-center">
                             <Clock className="w-3 h-3 mr-1" />
-                            {relatedDoc.estimated_read_time}
+                            {Math.ceil(relatedDoc.content.split(' ').length / 200)} min
                           </span>
                           <Badge variant="outline" className="text-xs border-gray-600 text-gray-400">
-                            {relatedDoc.difficulty}
+                            Guide
                           </Badge>
                         </div>
                       </CardContent>
@@ -419,10 +344,10 @@ export default function DocPage() {
               <Bookmark className="w-4 h-4 mr-2" />
               Save for Later
             </Button>
-            <Link href={`/docs#${categoryData.id}`}>
+            <Link href="/docs">
               <Button variant="outline" className="border-gray-600 text-white hover:bg-gray-700">
                 <ExternalLink className="w-4 h-4 mr-2" />
-                View All {categoryData.title}
+                View All Documentation
               </Button>
             </Link>
           </div>
