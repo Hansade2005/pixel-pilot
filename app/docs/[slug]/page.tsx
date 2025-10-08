@@ -30,7 +30,7 @@ export default function DocPage() {
   useEffect(() => {
     const loadDocData = async () => {
       try {
-        const response = await fetch('/app/docs/docs.json')
+        const response = await fetch('/docs.json')
         const data = await response.json()
         const slug = params.slug as string
 

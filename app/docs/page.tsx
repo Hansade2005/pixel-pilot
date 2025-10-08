@@ -51,7 +51,7 @@ export default function DocsPage() {
   useEffect(() => {
     const loadDocsData = async () => {
       try {
-        const response = await fetch('/app/docs/docs.json')
+        const response = await fetch('/docs.json')
         const data = await response.json()
         setDocsData(data)
         setFilteredSections(data.sections)
