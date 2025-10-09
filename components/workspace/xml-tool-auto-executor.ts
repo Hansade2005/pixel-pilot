@@ -440,13 +440,19 @@ class XMLToolAutoExecutor {
 
   // Process multiple JSON tool calls from streaming content - Direct JSON support
   public async processStreamingJsonTools(content: string): Promise<JsonToolCall[]> {
+    // Add safety check for invalid input
+    if (!content || typeof content !== 'string') {
+      console.warn('[XMLToolAutoExecutor] Invalid input content for JSON tools:', content)
+      return []
+    }
+
     const executedTools: JsonToolCall[] = []
-    
+
     try {
       // Use JSON parser for reliable tool parsing
       const parseResult = jsonToolParser.parseJsonTools(content)
       const toolCalls = parseResult.tools
-      
+
       // Execute each tool directly
       for (const toolCall of toolCalls) {
         try {
@@ -456,13 +462,13 @@ class XMLToolAutoExecutor {
               ...toolCall,
               status: 'completed'
             })
-            
+
             // Emit JSON tool execution event
             if (typeof window !== 'undefined') {
               window.dispatchEvent(new CustomEvent('json-tool-executed', {
-                detail: { 
-                  toolCall: {...toolCall, status: 'completed'}, 
-                  result 
+                detail: {
+                  toolCall: {...toolCall, status: 'completed'},
+                  result
                 }
               }))
             }
@@ -473,13 +479,16 @@ class XMLToolAutoExecutor {
             status: 'failed'
           })
           console.error(`[XMLToolAutoExecutor] Error executing JSON tool ${toolCall.tool}:`, error)
+          // Continue processing other tools instead of crashing
         }
       }
-      
+
       return executedTools
-      
+
     } catch (error) {
-      console.error('[XMLToolAutoExecutor] Error processing streaming JSON tools:', error)
+      console.error('[XMLToolAutoExecutor] Critical error processing streaming JSON tools:', error)
+      console.error('[XMLToolAutoExecutor] Problematic content (first 200 chars):', content.substring(0, 200))
+      // Return empty array instead of crashing
       return []
     }
   }

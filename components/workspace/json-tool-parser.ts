@@ -68,29 +68,49 @@ export class JsonToolParser {
    * Extract and parse JSON tool calls from content
    */
   public parseJsonTools(content: string): JsonParseResult {
+    // Add safety check for invalid input
+    if (!content || typeof content !== 'string') {
+      console.warn('[JsonToolParser] Invalid input content:', content)
+      return { tools: [], processedContent: content || '' }
+    }
+
     const tools: JsonToolCall[] = []
     let processedContent = content
 
-    // Find JSON tool patterns in the content using enhanced parsing
-    const toolMatches = this.findJsonToolBlocksEnhanced(content)
+    try {
+      // Find JSON tool patterns in the content using enhanced parsing
+      const toolMatches = this.findJsonToolBlocksEnhanced(content)
 
-    for (const match of toolMatches) {
-      try {
-        const parsedTool = this.parseJsonBlockEnhanced(match.json, match.startIndex)
-        if (parsedTool) {
-          tools.push({
-            ...parsedTool,
-            id: this.generateId(),
-            startTime: Date.now()
-          })
+      for (const match of toolMatches) {
+        try {
+          // Validate match data
+          if (!match || !match.json || typeof match.json !== 'string') {
+            console.warn('[JsonToolParser] Invalid match object:', match)
+            continue
+          }
 
-          // Replace JSON block with placeholder in processed content
-          const placeholder = `[${parsedTool.tool.toUpperCase()}: ${parsedTool.path || parsedTool.args.path || 'unknown'}]`
-          processedContent = processedContent.replace(match.json, placeholder)
+          const parsedTool = this.parseJsonBlockEnhanced(match.json, match.startIndex)
+          if (parsedTool) {
+            tools.push({
+              ...parsedTool,
+              id: this.generateId(),
+              startTime: Date.now()
+            })
+
+            // Replace JSON block with placeholder in processed content
+            const placeholder = `[${parsedTool.tool.toUpperCase()}: ${parsedTool.path || parsedTool.args.path || 'unknown'}]`
+            processedContent = processedContent.replace(match.json, placeholder)
+          }
+        } catch (error) {
+          console.error('[JsonToolParser] Failed to parse individual JSON block:', error)
+          console.error('[JsonToolParser] Problematic JSON block (first 200 chars):', (match?.json || '').substring(0, 200))
+          // Continue processing other blocks instead of crashing
         }
-      } catch (error) {
-        console.error('[JsonToolParser] Failed to parse JSON block:', error, match.json)
       }
+    } catch (error) {
+      console.error('[JsonToolParser] Critical error in parseJsonTools:', error)
+      // Return empty result instead of crashing
+      return { tools: [], processedContent: content }
     }
 
     return { tools, processedContent }

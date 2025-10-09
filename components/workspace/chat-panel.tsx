@@ -1795,14 +1795,27 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string, t
 
 // Direct JSON tool detection - returns JsonToolCall[] directly (no XML conversion)
 function detectJsonTools(content: string): JsonToolCall[] {
+  // Add safety check for invalid input
+  if (!content || typeof content !== 'string') {
+    console.warn('[detectJsonTools] Invalid input content:', content)
+    return []
+  }
+
   console.log('[DEBUG] detectJsonTools called with content length:', content.length)
   console.log('[DEBUG] Content preview:', content.substring(0, 200))
 
-  // Use JSON parser for reliable tool detection
-  const parseResult = jsonToolParser.parseJsonTools(content)
-  console.log('[DEBUG] JSON parser detected', parseResult.tools.length, 'tools')
-  
-  return parseResult.tools
+  try {
+    // Use JSON parser for reliable tool detection
+    const parseResult = jsonToolParser.parseJsonTools(content)
+    console.log('[DEBUG] JSON parser detected', parseResult.tools.length, 'tools')
+
+    return parseResult.tools
+  } catch (error) {
+    console.error('[detectJsonTools] Critical error during JSON parsing:', error)
+    console.error('[detectJsonTools] Problematic content (first 200 chars):', content.substring(0, 200))
+    // Return empty array instead of crashing
+    return []
+  }
 }
 
 // Enhanced tool detection using JSON parser (more reliable than XML) - Legacy support
@@ -6794,15 +6807,20 @@ export function ChatPanel({
                                           parsed = JSON.parse(jsonContent)
                                         } catch (parseError) {
                                           console.log('[DEBUG] Standard JSON.parse failed, using schema-aware repair engine...')
-                                          const repairResult = schemaAwareRepairEngine.repair(jsonContent) as RepairResult
-                                          if (repairResult.data && repairResult.confidence > 0.5) {
-                                            parsed = repairResult.data
-                                            console.log('[DEBUG] Successfully repaired JSON with confidence:', repairResult.confidence)
-                                            if (repairResult.fixes && repairResult.fixes.length > 0) {
-                                              console.log('[DEBUG] Applied fixes:', repairResult.fixes)
+                                          try {
+                                            const repairResult = schemaAwareRepairEngine.repair(jsonContent) as RepairResult
+                                            if (repairResult && repairResult.data && repairResult.confidence > 0.5) {
+                                              parsed = repairResult.data
+                                              console.log('[DEBUG] Successfully repaired JSON with confidence:', repairResult.confidence)
+                                              if (repairResult.fixes && repairResult.fixes.length > 0) {
+                                                console.log('[DEBUG] Applied fixes:', repairResult.fixes)
+                                              }
+                                            } else {
+                                              console.warn('[DEBUG] Schema-aware repair failed or low confidence:', repairResult?.confidence || 'unknown')
+                                              throw new Error('Failed to repair JSON')
                                             }
-                                          } else {
-                                            console.warn('[DEBUG] Schema-aware repair failed or low confidence:', repairResult.confidence)
+                                          } catch (repairError) {
+                                            console.warn('[DEBUG] Schema-aware repair engine threw exception:', repairError)
                                             throw new Error('Failed to repair JSON')
                                           }
                                         }
