@@ -4258,184 +4258,30 @@ Remember: This is the INFORMATION GATHERING phase. Your job is to understand and
 }
 
 
-// Extract framework-specific dependencies from template definitions
-function getFrameworkDependencies(template?: 'vite-react' | 'nextjs'): { dependencies: string[]; devDependencies: string[] } {
-  // Vite React template dependencies
-  const viteReactDeps = {
-    dependencies: [
-      'react@^18.2.0',
-      'react-dom@^18.2.0',
-      'react-router-dom@^6.28.0',
-      '@radix-ui/react-accordion@1.2.2',
-      '@radix-ui/react-alert-dialog@1.1.4',
-      '@radix-ui/react-aspect-ratio@1.1.1',
-      '@radix-ui/react-avatar@1.1.2',
-      '@radix-ui/react-checkbox@1.1.3',
-      '@radix-ui/react-collapsible@1.1.2',
-      '@radix-ui/react-context-menu@2.2.4',
-      '@radix-ui/react-dialog@1.1.4',
-      '@radix-ui/react-dropdown-menu@2.1.4',
-      '@radix-ui/react-hover-card@1.1.4',
-      '@radix-ui/react-label@2.1.1',
-      '@radix-ui/react-menubar@1.1.4',
-      '@radix-ui/react-navigation-menu@1.2.3',
-      '@radix-ui/react-popover@1.1.4',
-      '@radix-ui/react-progress@1.1.1',
-      '@radix-ui/react-radio-group@1.2.2',
-      '@radix-ui/react-scroll-area@1.2.2',
-      '@radix-ui/react-select@2.1.4',
-      '@radix-ui/react-separator@1.1.1',
-      '@radix-ui/react-slider@1.2.2',
-      '@radix-ui/react-slot@1.1.1',
-      '@radix-ui/react-switch@1.1.2',
-      '@radix-ui/react-tabs@1.1.2',
-      '@radix-ui/react-toast@1.2.4',
-      '@radix-ui/react-toggle@1.1.1',
-      '@radix-ui/react-toggle-group@1.1.1',
-      '@radix-ui/react-tooltip@1.1.6',
-      '@radix-ui/react-icons@^1.3.0',
-      'lucide-react@^0.454.0',
-      'framer-motion@^12.23.12',
-      'class-variance-authority@^0.7.1',
-      'clsx@^2.1.1',
-      'tailwind-merge@^2.5.5',
-      'cmdk@1.0.4',
-      'next-themes@^0.4.6',
-      'react-hook-form@^7.60.0',
-      'zod@3.25.67',
-      '@hookform/resolvers@^3.10.0',
-      'date-fns@4.1.0',
-      'recharts@2.15.4',
-      'sonner@^1.7.4',
-      'react-day-picker@9.8.0',
-      'input-otp@1.4.1',
-      'vaul@^0.9.9',
-      'embla-carousel-react@8.5.1',
-      'react-resizable-panels@^2.1.7',
-      'react-markdown@^10.1.0',
-      'remark-gfm@^4.0.1',
-      '@tanstack/react-table@^8.20.5',
-      '@vercel/node@^3.0.0'
-    ],
-    devDependencies: [
-      '@types/react@^18.2.43',
-      '@types/react-dom@^18.2.17',
-      '@typescript-eslint/eslint-plugin@^6.14.0',
-      '@typescript-eslint/parser@^6.14.0',
-      '@vitejs/plugin-react@^4.2.1',
-      'autoprefixer@^10.4.16',
-      'eslint@^8.55.0',
-      'eslint-plugin-react-hooks@^4.6.0',
-      'eslint-plugin-react-refresh@^0.4.5',
-      'postcss@^8.4.32',
-      'tailwindcss@^3.3.6',
-      'typescript@^5.2.2',
-      'vite@^5.0.8',
-      'tailwindcss-animate@^1.0.7'
-    ]
-  }
-
-  // Next.js template dependencies
-  const nextjsDeps = {
-    dependencies: [
-      'next@14.0.4',
-      'react@^18.2.0',
-      'react-dom@^18.2.0',
-      'react-router-dom@^6.28.0',
-      '@radix-ui/react-accordion@1.2.2',
-      '@radix-ui/react-alert-dialog@1.1.4',
-      '@radix-ui/react-aspect-ratio@1.1.1',
-      '@radix-ui/react-avatar@1.1.2',
-      '@radix-ui/react-checkbox@1.1.3',
-      '@radix-ui/react-collapsible@1.1.2',
-      '@radix-ui/react-context-menu@2.2.4',
-      '@radix-ui/react-dialog@1.1.4',
-      '@radix-ui/react-dropdown-menu@2.1.4',
-      '@radix-ui/react-hover-card@1.1.4',
-      '@radix-ui/react-label@2.1.1',
-      '@radix-ui/react-menubar@1.1.4',
-      '@radix-ui/react-navigation-menu@1.2.3',
-      '@radix-ui/react-popover@1.1.4',
-      '@radix-ui/react-progress@1.1.1',
-      '@radix-ui/react-radio-group@1.2.2',
-      '@radix-ui/react-scroll-area@1.2.2',
-      '@radix-ui/react-select@2.1.4',
-      '@radix-ui/react-separator@1.1.1',
-      '@radix-ui/react-slider@1.2.2',
-      '@radix-ui/react-slot@1.1.1',
-      '@radix-ui/react-switch@1.1.2',
-      '@radix-ui/react-tabs@1.1.2',
-      '@radix-ui/react-toast@1.2.4',
-      '@radix-ui/react-toggle@1.1.1',
-      '@radix-ui/react-toggle-group@1.1.1',
-      '@radix-ui/react-tooltip@1.1.6',
-      '@radix-ui/react-icons@^1.3.0',
-      'lucide-react@^0.454.0',
-      'framer-motion@^12.23.12',
-      'class-variance-authority@^0.7.1',
-      'clsx@^2.1.1',
-      'tailwind-merge@^2.5.5',
-      'cmdk@1.0.4',
-      'next-themes@^0.4.6',
-      'react-hook-form@^7.60.0',
-      'zod@3.25.67',
-      '@hookform/resolvers@^3.10.0',
-      'date-fns@4.1.0',
-      'recharts@2.15.4',
-      'sonner@^1.7.4',
-      'react-day-picker@9.8.0',
-      'input-otp@1.4.1',
-      'vaul@^0.9.9',
-      'embla-carousel-react@8.5.1',
-      'react-resizable-panels@^2.1.7',
-      'react-markdown@^10.1.0',
-      'remark-gfm@^4.0.1',
-      '@tanstack/react-table@^8.20.5'
-    ],
-    devDependencies: [
-      '@types/react@^18.2.43',
-      '@types/react-dom@^18.2.17',
-      '@types/node@^20.10.5',
-      'typescript@^5.2.2',
-      'tailwindcss@^3.3.6',
-      'autoprefixer@^10.4.16',
-      'postcss@^8.4.32',
-      'eslint@^8.55.0',
-      'eslint-config-next@14.0.4',
-      'tailwindcss-animate@^1.0.7'
-    ]
-  }
-
-  // Return appropriate dependencies based on template
-  return template === 'nextjs' ? nextjsDeps : viteReactDeps
+// NEW: Build complete messages array with system prompt + history
+function buildMessagesArrayForStreaming(
+  conversationHistory: Array<{ role: 'user' | 'assistant' | 'system', content: string }>,
+  currentUserMessage: string,
+  projectContext?: string,
+  template?: 'vite-react' | 'nextjs'
+): Array<{ role: 'user' | 'assistant' | 'system', content: string }> {
+  // Get system prompt content
+  const systemPrompt = getStreamingSystemPrompt(projectContext, undefined, template)
+  
+  // Build clean messages array: [system, ...history, user]
+  return [
+    { role: 'system' as const, content: systemPrompt },
+    ...conversationHistory,
+    { role: 'user' as const, content: currentUserMessage }
+  ]
 }
 
-function getStreamingSystemPrompt(projectContext?: string, conversationHistory?: any[], template?: 'vite-react' | 'nextjs'): string {
+function getStreamingSystemPrompt(projectContext?: string, memoryContext?: any, template?: 'vite-react' | 'nextjs'): string {
   // Determine if this is a Next.js project
   const isNextJS = template === 'nextjs'
-  
-  // Format conversation history for context
-  const formattedHistory = conversationHistory && conversationHistory.length > 0 ? 
-    conversationHistory
-      .slice(-10) // Last 10 messages for context
-      .map(msg => `**${msg.role}**: ${msg.content.substring(0, 200)}${msg.content.length > 200 ? '...' : ''}`)
-      .join('\n\n') : 
-    'No previous conversation history available.'
-  
-  // Extract framework-specific dependencies from template definitions
-  const frameworkDeps = getFrameworkDependencies(template)
-  const formattedDependencies = `
-**Framework**: ${template === 'nextjs' ? 'Next.js 14' : 'Vite React'}
 
-**Production Dependencies** (${frameworkDeps.dependencies.length} packages):
-${frameworkDeps.dependencies.map(dep => `  • ${dep}`).join('\n')}
-
-**Development Dependencies** (${frameworkDeps.devDependencies.length} packages):
-${frameworkDeps.devDependencies.map(dep => `  • ${dep}`).join('\n')}
-
-**Note**: All these packages are pre-installed and available for import. Use them freely in your code.`
-
-  return `# PIPILOT - Ultimate System Prompt
+  return `<role>
+# PIPILOT - Ultimate System Prompt
 
 You are PIPILOT — the world's most advanced AI developer. Your mission: build flawless, production-ready fullstack web applications that make users say "wow, this is professional."
 
@@ -4444,29 +4290,6 @@ You are PIPILOT — the world's most advanced AI developer. Your mission: build 
 **Core Promise:** ZERO broken code. ZERO syntax errors. ZERO compromises on quality.
 
 **Vibe:** Confident, concise, billion-dollar execution. Every output is production-grade.
-
-**Context Awareness:** Use the PROJECT_CONTEXT and CONVERSATION_HISTORY sections below to understand the current project state, previous decisions, and build intelligently upon existing work. Never ignore context — it's your memory.
-
----
-
-## 🏗️ PROJECT CONTEXT
-
-${projectContext || 'No project context available. Use list_files tool to explore the project structure.'}
-
----
-
-## 🧠 CONVERSATION HISTORY
-
-${formattedHistory}
-
----
-
-## 📦 AVAILABLE DEPENDENCIES
-
-${formattedDependencies}
-
----
-
 ## AVAILABLE TOOLS
 
 **Primary Tools:**
@@ -4728,7 +4551,7 @@ src/
   hooks/          → Custom hooks
 public/           → Static assets
 \`\`\`
-
+ ${isNextJS ? `
 **Next.js 14 Structure:**
 \`\`\`
 src/
@@ -4742,6 +4565,7 @@ src/
   hooks/          → Custom hooks
 public/           → Static assets
 \`\`\`
+` : ''}
 
 ### Secrets Management
 
@@ -4922,6 +4746,25 @@ After successful operations:
 ---
 
 **You are PIPILOT. You don\'t make mistakes. You build billion-dollar products. Execute with precision.**
+</role>
+
+---
+ * When building new features:
+ ${isNextJS ? `* - Create new pages in src/app/ directory with page.tsx files
+ * - Always update README.md with app info and features
+ * - Update src/app/layout.tsx entry file to reflect latest features` :
+ `* - Only update index.html for app branding.
+ * - Always update README.md with app info and features.
+ * - Always update App.tsx to reflect the latest feature.`}
+ *
+
+---
+
+## 🏗️ PROJECT CONTEXT
+
+${projectContext || 'No project context available. Use list_files tool to explore the project structure.'}
+
+- If user wants to add products, edit files, or modify code, use file operations only
 
 `
 }
@@ -5699,14 +5542,6 @@ Use read_file tool to read specific files when needed.`
       // Use tools-enabled generation with multi-step support
       const abortController = new AbortController()
       
-      // ========================================
-      // OPTIMAL MESSAGE ORDER STRUCTURE
-      // ========================================
-      // 1. System Prompt (with PROJECT_CONTEXT, CONVERSATION_HISTORY, DEPENDENCIES embedded)
-      // 2. Conversation History (chronological user/assistant turns)
-      // 3. Current User Prompt (the actual request to respond to)
-      // ========================================
-      
       // Filter and validate conversation memory messages, ensuring proper typing
       const validMemoryMessages = conversationMemory ? 
         conversationMemory.messages
@@ -5716,54 +5551,34 @@ Use read_file tool to read specific files when needed.`
             content: msg.content
           })) : []
       
-      // Get the current user message (what AI should act on NOW)
+      // CLEAN APPROACH: Get the current user message directly without merging
       const currentUserMessage = messages[messages.length - 1]
+      const userMessageContent = currentUserMessage?.content || ''
       
-      // Build the system prompt with embedded context (PROJECT_CONTEXT + CONVERSATION_HISTORY + FRAMEWORK_DEPENDENCIES)
-      const systemPromptWithContext = getStreamingSystemPrompt(
-        projectContext, 
-        validMemoryMessages,
-        detectedTemplate // Framework-specific deps extracted automatically
+      // CLEAN APPROACH: Build messages array using new helper function
+      // This creates: [system_with_context, ...history, current_user_message]
+      // Project context is now in the system prompt, not mixed with user message
+      const conversationHistoryWithoutLast = validMemoryMessages.slice(0, -1)
+      
+      const finalMessages = buildMessagesArrayForStreaming(
+        conversationHistoryWithoutLast,
+        userMessageContent,
+        projectContext,
+        detectedTemplate
       )
       
-      // STEP 1: System Message (includes all context in one place)
-      const systemMessage = {
-        role: 'system' as const,
-        content: systemPromptWithContext
-      }
-      
-      // STEP 2: Conversation History (chronological turns, excluding latest user message)
-      // Only include recent conversation to stay within token budget
-      const recentConversationHistory = validMemoryMessages.slice(-6) // Last 3 turns (6 messages: 3 user + 3 assistant)
-      
-      // STEP 3: Current User Prompt (the actual request)
-      const currentUserPrompt = {
-        role: 'user' as const,
-        content: currentUserMessage?.content || ''
-      }
-      
-      // Assemble final messages in optimal order
-      const finalMessages = [
-        systemMessage,                    // 1. System prompt with embedded context
-        ...recentConversationHistory,     // 2. Recent conversation history
-        currentUserPrompt                 // 3. Current user request
-      ]
-      
-      console.log('[DEBUG] Optimal Message Structure:', {
+      console.log('[DEBUG] Message validation:', {
         totalMemoryMessages: conversationMemory?.messages?.length || 0,
         validMemoryMessages: validMemoryMessages.length,
         invalidMessages: (conversationMemory?.messages?.length || 0) - validMemoryMessages.length,
-        recentHistoryUsed: recentConversationHistory.length,
         currentUserMessageLength: currentUserMessage?.content?.length || 0,
         projectContextLength: projectContext?.length || 0,
-        systemPromptLength: systemPromptWithContext.length,
+        userMessageLength: userMessageContent.length,
         finalMessagesCount: finalMessages.length,
-        messageOrder: finalMessages.map((m, i) => `${i + 1}. ${m.role}`).join(' → '),
-        estimatedTotalTokens: Math.ceil(
-          (systemPromptWithContext.length + 
-           recentConversationHistory.reduce((sum, msg) => sum + msg.content.length, 0) +
-           (currentUserMessage?.content?.length || 0)) / 4
-        ),
+        finalMessagesStructure: {
+          hasSystemPrompt: finalMessages[0]?.role === 'system',
+          messageRoles: finalMessages.map(m => m.role)
+        },
         sampleValidMessage: validMemoryMessages[0] ? {
           role: validMemoryMessages[0].role,
           contentLength: validMemoryMessages[0].content?.length || 0,
@@ -5990,38 +5805,41 @@ Use read_file tool to read specific files when needed.`
         
         console.log('[PREPROCESSING] Read-only tools available:', Object.keys(filteredReadOnlyTools))
         
+        // TEMPORARILY DISABLED: Preprocessing phase disabled for refactoring
         // Step 2: Check if request needs read-only tools (intelligent detection)
-        const needsReading = /\b(read|list|show|display|get|find|search|analyze|extract|what|how|where|which)\b/i.test(userMessage || '') ||
-                            /\b(files?|content|structure|dependencies|code|implementation)\b/i.test(userMessage || '')
+        // const needsReading = /\b(read|list|show|display|get|find|search|analyze|extract|what|how|where|which)\b/i.test(userMessage || '') ||
+        //                     /\b(files?|content|structure|dependencies|code|implementation)\b/i.test(userMessage || '')
         
         let preprocessingResults: any = null
         
-        if (needsReading && Object.keys(filteredReadOnlyTools).length > 0) {
-          console.log('[PREPROCESSING] Executing read-only tools with generateText')
-          
-          // Execute read-only tools first with focused system prompt
-          const preprocessingPrompt = getPreprocessingSystemPrompt(projectContext)
+        // if (needsReading && Object.keys(filteredReadOnlyTools).length > 0) {
+        //   console.log('[PREPROCESSING] Executing read-only tools with generateText')
+        //   
+        //   // Execute read-only tools first with focused system prompt
+        //   const preprocessingPrompt = getPreprocessingSystemPrompt(projectContext)
 
-          const preprocessingMessages = [
-            { role: 'system' as const, content: preprocessingPrompt },
-            { role: 'user' as const, content: userMessage }
-          ]
-          
-          preprocessingResults = await generateText({
-            model: model,
-            messages: preprocessingMessages,
-            temperature: 0.1,
-            abortSignal: abortController.signal,
-            tools: filteredReadOnlyTools,
-            toolChoice: 'auto'
-          })
-          
-          console.log('[PREPROCESSING] Read-only tool execution result:', {
-            hasToolCalls: !!preprocessingResults.toolCalls?.length,
-            toolCallsCount: preprocessingResults.toolCalls?.length || 0,
-            textLength: preprocessingResults.text?.length || 0
-          })
-        }
+        //   const preprocessingMessages = [
+        //     { role: 'system' as const, content: preprocessingPrompt },
+        //     { role: 'user' as const, content: userMessage }
+        //   ]
+        //   
+        //   preprocessingResults = await generateText({
+        //     model: model,
+        //     messages: preprocessingMessages,
+        //     temperature: 0.1,
+        //     abortSignal: abortController.signal,
+        //     tools: filteredReadOnlyTools,
+        //     toolChoice: 'auto'
+        //   })
+        //   
+        //   console.log('[PREPROCESSING] Read-only tool execution result:', {
+        //     hasToolCalls: !!preprocessingResults.toolCalls?.length,
+        //     toolCallsCount: preprocessingResults.toolCalls?.length || 0,
+        //     textLength: preprocessingResults.text?.length || 0
+        //   })
+        // }
+        
+        console.log('[PREPROCESSING] DISABLED - Skipping preprocessing phase for clean message architecture')
 
         const hasToolCalls = preprocessingResults?.toolCalls && preprocessingResults.toolCalls.length > 0
         const hasSignificantText = preprocessingResults?.text && preprocessingResults.text.trim().length > 50
@@ -6039,65 +5857,14 @@ Use read_file tool to read specific files when needed.`
         // Step 3: Now use streamText with JSON command system for all responses
         console.log('[STREAMING] Starting JSON-enhanced streaming response')
         
-        // ========================================
-        // MAINTAIN OPTIMAL MESSAGE ORDER
-        // ========================================
-        // finalMessages already has optimal structure:
-        // 1. System (with embedded context)
-        // 2. Conversation history
-        // 3. Current user prompt
-        // ========================================
-        
-        let enhancedMessages = [...finalMessages]
-        
-        if (hasToolCalls && preprocessingResults) {
-          // Add preprocessing results as additional user context (appended after current prompt)
-          const preprocessingContext = `## 📊 Preprocessing Results
-
-${preprocessingResults.text || 'Information gathered successfully.'}
-
-## 📁 Available Information
-${preprocessingResults.toolResults?.map((result: any, index: number) => {
-  const toolCall = preprocessingResults.toolCalls?.[index]
-  return `- **${toolCall?.toolName}**: ${JSON.stringify(result, null, 2)}`
-}).join('\n') || 'No additional context available.'}
-
----
-
-**Instructions**: Now respond to the user's request above. If you need to create, edit, or delete files, use JSON tool commands in code blocks:
-
-\`\`\`json
-{
-  "tool": "write_file",
-  "path": "file/path.ext", 
-  "content": "file content here"
-}
-\`\`\`
-
-\`\`\`json
-{
-  "tool": "delete_file",
-  "path": "file/path.ext"
-}
-\`\`\`
-
-Provide a comprehensive response addressing the user's request.`
-          
-          // Append preprocessing results after current user prompt
-          enhancedMessages.push({
-            role: 'user' as const,
-            content: preprocessingContext
-          })
-          
-          console.log('[STREAMING] Enhanced messages with preprocessing:', {
-            totalMessages: enhancedMessages.length,
-            hasSystemPrompt: enhancedMessages[0].role === 'system',
-            hasPreprocessing: true,
-            messageOrder: enhancedMessages.map((m, i) => `${i + 1}. ${m.role}`).join(' → ')
-          })
-        }
-        
-        // NOTE: No need for else branch - finalMessages already has system prompt with context
+        // CLEAN MESSAGES ARCHITECTURE:
+        // finalMessages already contains: [system_prompt, ...history, current_user_message]
+        // No more preprocessing context or merged user messages
+        console.log('[MESSAGES] Clean messages array structure:', {
+          totalMessages: finalMessages.length,
+          hasSystem: finalMessages[0]?.role === 'system',
+          lastMessage: finalMessages[finalMessages.length - 1]?.role
+        })
 
         // Helper function to detect content type for better frontend handling
         const detectContentType = (chunk: string): string => {
@@ -6260,13 +6027,13 @@ Provide a comprehensive response addressing the user's request.`
               // Convert AI SDK messages to a0.dev format with message limit
               // a0.dev may timeout with too many messages, so limit to recent conversation
               const maxMessages = 6; // Keep only the most recent messages
-              const recentMessages = enhancedMessages.slice(-maxMessages);
+              const recentMessages = finalMessages.slice(-maxMessages);
               const a0Messages = recentMessages.map((msg: any) => ({
                 role: msg.role,
                 content: msg.content
               }));
               
-              console.log(`[A0-DEV] Sending ${a0Messages.length} messages (${enhancedMessages.length} total, limited for performance)`);
+              console.log(`[A0-DEV] Sending ${a0Messages.length} messages (${finalMessages.length} total, limited for performance)`);
               
               // Smart Context: select relevant files and src patch for a0.dev
               const { storageManager } = await import('@/lib/storage-manager');
@@ -6319,44 +6086,32 @@ Provide a comprehensive response addressing the user's request.`
               const userMsg = messages[messages.length - 1]?.content || '';
               const smartContext = await buildSmartContextForA0(projectId, userMsg, storageManager);
               
-              // ========================================
-              // SMART CONTEXT INTEGRATION (Maintains Optimal Order)
-              // ========================================
-              // Add smart context to system prompt (already first in enhancedMessages)
-              // This preserves the optimal message order while adding file-specific context
-              // ========================================
+              // CLEAN APPROACH: Use finalMessages directly with smart context prepended
+              // Structure: [smart_context_system, system_prompt, ...history, user_message]
+              let messagesToSend = [...finalMessages];
               
-              if (enhancedMessages[0]?.role === 'system') {
-                // Append smart context to existing system prompt
-                const smartContextAddition = `
+              if (smartContext.selectedFiles.length > 0 || smartContext.srcPatch) {
+                // Add smart context as a separate system message at the beginning
+                const smartContextMessage = {
+                  role: 'system' as const,
+                  content: `## Smart Context - Relevant Project Files
 
----
-
-## 📂 SMART CONTEXT - RELEVANT PROJECT FILES
-
-${smartContext.srcPatch ? `**Source Structure Changes**: ${smartContext.srcPatch}\n\n` : ''}**Selected Files for Context:**
-
+${smartContext.srcPatch ? `**Source Structure Changes:** ${smartContext.srcPatch}\n\n` : ''}**Selected Files for Context:**
 ${smartContext.selectedFiles.map((file: any) => 
-  `### ${file.path}
-\`\`\`${file.path.split('.').pop() || 'txt'}
-${file.content}
-\`\`\``
+  `### ${file.path}\n\`\`\`\n${file.content}\n\`\`\``
 ).join('\n\n')}
 
----
-
-Use this smart context to provide accurate, file-aware responses to the user's request.`
+Use this context to provide accurate, file-aware responses to the user's request.`
+                };
                 
-                enhancedMessages[0].content += smartContextAddition
-                
-                console.log('[SMART CONTEXT] Enhanced system prompt with', smartContext.selectedFiles.length, 'relevant files')
+                // Insert smart context before the main system prompt
+                messagesToSend = [smartContextMessage, ...finalMessages];
               }
               
               // Standard AI SDK streaming for all other providers
-              // Messages maintain optimal order: System (with all context) → History → Current prompt
               result = await streamText({
                 model: model,
-                messages: enhancedMessages,
+                messages: messagesToSend,
                 temperature: 0.3,
                 abortSignal: abortController.signal,
               });
