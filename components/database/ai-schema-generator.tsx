@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-// import { SchemaRefinementDialog, type SchemaDefinition } from './schema-refinement-dialog'
-import { Sparkles, Loader2, AlertTriangle, Database, Plus } from 'lucide-react'
+import { SchemaRefinementDialog, type SchemaDefinition } from './schema-refinement-dialog'
+import { Sparkles, Loader2, AlertTriangle, Database, Plus, Edit3 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 interface Column {
@@ -30,28 +30,24 @@ interface GeneratedSchema {
   explanation: string
 }
 
-interface MultiTableSchema {
-  tables: GeneratedSchema[]
-  overallExplanation: string
-}
-
 interface AISchemaGeneratorProps {
   workspaceId: string
   databaseId: string
-  onSchemaGenerated?: (schema: MultiTableSchema) => void
-  onCreateTables?: (schema: MultiTableSchema) => void
+  onSchemaGenerated?: (schema: GeneratedSchema) => void
+  onCreateTable?: (schema: GeneratedSchema) => void
 }
 
 export function AISchemaGenerator({
   workspaceId,
   databaseId,
   onSchemaGenerated,
-  onCreateTables
+  onCreateTable
 }: AISchemaGeneratorProps) {
   const [description, setDescription] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
-  const [generatedSchema, setGeneratedSchema] = useState<MultiTableSchema | null>(null)
+  const [generatedSchema, setGeneratedSchema] = useState<GeneratedSchema | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showRefinementDialog, setShowRefinementDialog] = useState(false)
   const { toast } = useToast()
 
   const generateSchema = async () => {
@@ -92,25 +88,12 @@ export function AISchemaGenerator({
       console.log('[AI Schema] Success:', data)
       const schema = data.schema
 
-      // Normalize schema format (ensure it's always in multi-table format)
-      let normalizedSchema: MultiTableSchema
-      if (schema.tables) {
-        // Already in multi-table format
-        normalizedSchema = schema
-      } else {
-        // Single table format - convert to multi-table
-        normalizedSchema = {
-          tables: [schema],
-          overallExplanation: schema.explanation
-        }
-      }
-
-      setGeneratedSchema(normalizedSchema)
-      onSchemaGenerated?.(normalizedSchema)
+      setGeneratedSchema(schema)
+      onSchemaGenerated?.(schema)
 
       toast({
         title: 'Schema generated!',
-        description: `Created ${normalizedSchema.tables.length} table${normalizedSchema.tables.length > 1 ? 's' : ''} with ${data.metadata.totalColumnsGenerated} total columns.`,
+        description: `Created ${schema.tableName} with ${schema.columns.length} columns.`,
       })
 
     } catch (err) {
@@ -130,12 +113,15 @@ export function AISchemaGenerator({
   const handleCreateTable = () => {
     if (!generatedSchema) return
 
-    onCreateTables?.(generatedSchema)
+    onCreateTable?.(generatedSchema)
   }
 
-  const handleRefineSchema = (refinedSchema: MultiTableSchema) => {
-    setGeneratedSchema(refinedSchema)
-    onSchemaGenerated?.(refinedSchema)
+  const handleRefineSchema = (refinedSchema: SchemaDefinition) => {
+    setGeneratedSchema(refinedSchema as GeneratedSchema)
+    toast({
+      title: 'Schema refined!',
+      description: 'Your changes have been saved.',
+    })
   }
 
   const getTypeColor = (type: string) => {
@@ -168,48 +154,6 @@ export function AISchemaGenerator({
       url: '🔗'
     }
     return icons[type as keyof typeof icons] || '📄'
-  }
-
-  const handleCreateTables = async () => {
-    if (!generatedSchema) return
-
-    try {
-      console.log('[Bulk Create] Creating tables for database:', databaseId)
-      const response = await fetch(`/api/database/${databaseId}/tables/create-bulk`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          tables: generatedSchema.tables
-        })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        console.error('[Bulk Create] Error response:', errorData)
-        throw new Error(errorData.error || 'Failed to create tables')
-      }
-
-      const data = await response.json()
-      console.log('[Bulk Create] Success:', data)
-
-      // Call the parent callback if provided
-      onCreateTables?.(generatedSchema)
-
-      toast({
-        title: 'Tables created successfully!',
-        description: `Created ${data.created.length} tables, ${data.errors.length} failed.`,
-      })
-
-      // Reset the form
-      setGeneratedSchema(null)
-      setDescription('')
-
-    } catch (err) {
-      console.error('Bulk table creation error:', err)
-      setError(err instanceof Error ? err.message : 'Failed to create tables')
-    }
   }
 
   return (
@@ -275,128 +219,109 @@ export function AISchemaGenerator({
 
       {/* Generated Schema Display */}
       {generatedSchema && (
-        <div className="space-y-6">
-          {/* Overall Summary */}
-          <Card className="bg-gray-800 border-gray-700">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-white">
-                <Database className="h-5 w-5 text-green-400" />
-                Generated Database Schema
-              </CardTitle>
-              <CardDescription className="text-gray-400">
-                {generatedSchema.overallExplanation}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-4 text-sm text-gray-300">
-                <span>{generatedSchema.tables.length} tables</span>
-                <span>{generatedSchema.tables.reduce((sum, table) => sum + table.columns.length, 0)} total columns</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Individual Tables */}
-          {generatedSchema.tables.map((table, tableIndex) => (
-            <Card key={tableIndex} className="bg-gray-800 border-gray-700">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-white">
-                  <Database className="h-5 w-5 text-blue-400" />
-                  Table: {table.tableName}
-                </CardTitle>
-                <CardDescription className="text-gray-400">
-                  {table.explanation}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Columns List */}
-                <div className="space-y-3">
-                  <h4 className="font-medium text-sm text-white">Columns ({table.columns.length})</h4>
-                  <div className="space-y-2">
-                    {table.columns.map((column, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg border border-gray-700"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="text-lg">{getTypeIcon(column.type)}</span>
-                          <div>
-                            <div className="font-medium text-white">{column.name}</div>
-                            {column.description && (
-                              <div className="text-sm text-gray-400">{column.description}</div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <Badge className={getTypeColor(column.type)}>
-                            {column.type}
-                          </Badge>
-
-                          {column.required && (
-                            <Badge variant="destructive" className="text-xs">
-                              Required
-                            </Badge>
-                          )}
-
-                          {column.unique && (
-                            <Badge variant="secondary" className="text-xs bg-gray-700 text-white border-gray-600">
-                              Unique
-                            </Badge>
-                          )}
-
-                          {column.references && (
-                            <Badge variant="outline" className="text-xs border-gray-600 text-gray-300">
-                              FK → {column.references.table}.{column.references.column}
-                            </Badge>
-                          )}
-                        </div>
+        <Card className="bg-gray-800 border-gray-700">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-white">
+              <Database className="h-5 w-5 text-green-400" />
+              Generated Schema: {generatedSchema.tableName}
+            </CardTitle>
+            <CardDescription className="text-gray-400">
+              {generatedSchema.explanation}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Columns List */}
+            <div className="space-y-3">
+              <h4 className="font-medium text-sm text-white">Columns ({generatedSchema.columns.length})</h4>
+              <div className="space-y-2">
+                {generatedSchema.columns.map((column, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg border border-gray-700"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg">{getTypeIcon(column.type)}</span>
+                      <div>
+                        <div className="font-medium text-white">{column.name}</div>
+                        {column.description && (
+                          <div className="text-sm text-gray-400">{column.description}</div>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
 
-                {/* Indexes */}
-                {table.indexes.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-sm text-white">Suggested Indexes</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {table.indexes.map((index, idx) => (
-                        <Badge key={idx} variant="outline" className="text-xs border-gray-600 text-gray-300">
-                          {index}
+                    <div className="flex items-center gap-2">
+                      <Badge className={getTypeColor(column.type)}>
+                        {column.type}
+                      </Badge>
+
+                      {column.required && (
+                        <Badge variant="destructive" className="text-xs">
+                          Required
                         </Badge>
-                      ))}
+                      )}
+
+                      {column.unique && (
+                        <Badge variant="secondary" className="text-xs bg-gray-700 text-white border-gray-600">
+                          Unique
+                        </Badge>
+                      )}
+
+                      {column.references && (
+                        <Badge variant="outline" className="text-xs border-gray-600 text-gray-300">
+                          FK → {column.references.table}.{column.references.column}
+                        </Badge>
+                      )}
                     </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-
-          {/* Bulk Action Buttons */}
-          <Card className="bg-gray-800 border-gray-700">
-            <CardContent className="pt-6">
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleCreateTables}
-                  className="flex items-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Create All Tables ({generatedSchema.tables.length})
-                </Button>
-
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setGeneratedSchema(null)
-                    setDescription('')
-                  }}
-                >
-                  Start Over
-                </Button>
+                ))}
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+
+            {/* Indexes */}
+            {generatedSchema.indexes.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm text-white">Suggested Indexes</h4>
+                <div className="flex flex-wrap gap-2">
+                  {generatedSchema.indexes.map((index, idx) => (
+                    <Badge key={idx} variant="outline" className="text-xs border-gray-600 text-gray-300">
+                      {index}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-2 pt-4 border-t border-gray-700">
+              <Button
+                onClick={handleCreateTable}
+                className="flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Create Table
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => setShowRefinementDialog(true)}
+                className="flex items-center gap-2"
+              >
+                <Edit3 className="h-4 w-4" />
+                Refine Schema
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setGeneratedSchema(null)
+                  setDescription('')
+                }}
+              >
+                Start Over
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Empty State */}
@@ -414,13 +339,13 @@ export function AISchemaGenerator({
         </Card>
       )}
 
-      {/* Schema Refinement Dialog - Temporarily disabled for multi-table schemas */}
-      {/* <SchemaRefinementDialog
+      {/* Schema Refinement Dialog */}
+      <SchemaRefinementDialog
         open={showRefinementDialog}
         onOpenChange={setShowRefinementDialog}
         schema={generatedSchema}
         onSave={handleRefineSchema}
-      /> */}
+      />
     </div>
   )
 }

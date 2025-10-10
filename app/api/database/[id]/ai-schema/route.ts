@@ -18,20 +18,12 @@ const ColumnSchema = z.object({
   }).optional()
 })
 
-const SingleTableSchemaOutput = z.object({
+const TableSchemaOutput = z.object({
   tableName: z.string().min(1).describe('The name of the table in snake_case (singular)'),
   columns: z.array(ColumnSchema).min(1).describe('Array of column definitions'),
   indexes: z.array(z.string()).default([]).describe('Array of column names to index'),
   explanation: z.string().describe('Detailed explanation of the table schema and design decisions')
 })
-
-const MultiTableSchemaOutput = z.object({
-  tables: z.array(SingleTableSchemaOutput).min(1).max(8).describe('Array of related table schemas'),
-  overallExplanation: z.string().describe('Explanation of how the tables work together as a system')
-})
-
-// Union schema to handle both single and multi-table responses
-const FlexibleSchemaOutput = z.union([SingleTableSchemaOutput, MultiTableSchemaOutput])
 
 export async function POST(
   req: NextRequest,
@@ -116,39 +108,18 @@ export async function POST(
 ❌ 'serial' → Use 'number' instead
 
 **SCHEMA REQUIREMENTS:**
-1. Analyze the user's description carefully - create ONLY the tables they explicitly mention or clearly imply they want
-2. If user asks for ONE table, create only that single table
-3. If user asks for MULTIPLE tables, create those specific tables
-4. Do NOT automatically add extra related tables unless they are explicitly mentioned
-5. Always include an 'id' column as 'uuid' with default gen_random_uuid() in each table
-6. Always include 'created_at' as 'timestamp' with default NOW() in each table
-7. Always include 'updated_at' as 'timestamp' with default NOW() in each table
-8. Use snake_case for all column names and table names
+1. Generate ONLY ONE table schema (not multiple tables)
+2. Always include an 'id' column as 'uuid' with default gen_random_uuid()
+3. Always include 'created_at' as 'timestamp' with default NOW()
+4. Always include 'updated_at' as 'timestamp' with default NOW()
+5. Use snake_case for all column names and table names
 6. Choose ONLY from the 10 allowed datatypes above
-7. Add foreign keys for relationships (references) - use proper table relationships
+7. Add foreign keys for relationships (references)
 8. Mark required fields appropriately
 9. Suggest useful indexes for performance (return column names as strings in indexes array)
 10. Keep table names singular (e.g., 'user' not 'users')
 11. Ensure column names are descriptive and clear
 12. MUST include an 'explanation' field describing your schema decisions
-
-**USER INTENT ANALYSIS:**
-- If user mentions ONE table (e.g., "create a users table", "design a product table"), create ONLY that single table
-- If user mentions MULTIPLE tables (e.g., "create users and posts tables", "design a blog with users, posts, and comments"), create those specific tables
-- Do NOT add extra tables unless they are explicitly mentioned or logically required for the described relationships
-- For single tables, return as a single table object, not in an array
-
-**MULTI-TABLE SYSTEM DESIGN (ONLY WHEN USER REQUESTS MULTIPLE TABLES):**
-- Only create the tables the user specifically mentioned
-- Use foreign keys to establish relationships between the requested tables
-- Ensure referential integrity with proper foreign key constraints
-- Create indexes on foreign key columns and frequently queried columns
-- Include junction tables only if user explicitly requests many-to-many relationships
-
-**DEPENDENCY ORDERING (FOR MULTIPLE TABLES):**
-- Tables with foreign keys should reference tables that exist
-- Return tables in creation order (referenced tables first, then referencing tables)
-- Use proper foreign key relationships to maintain data integrity
 
 **FOREIGN KEYS:**
 When creating relationships:
@@ -170,17 +141,11 @@ Suggest indexes for:
 - Use appropriate constraints
 - Think about query patterns
 - Consider scalability
-- ONLY USE THE 10 ALLOWED DATATYPES LISTED ABOVE
-- Create a complete, functional system with multiple interconnected tables`
+- ONLY USE THE 10 ALLOWED DATATYPES LISTED ABOVE`
 
-    const userPrompt = `Analyze this request: "${description}"${refinementPrompt ? `\n\nRefinement: ${refinementPrompt}` : ''}
+    const userPrompt = `Generate a SINGLE table schema for: "${description}"${refinementPrompt ? `\n\nRefinement: ${refinementPrompt}` : ''}
 
 ${existingTableNames.length > 0 ? `\nExisting tables in this database: ${existingTableNames.join(', ')}` : ''}
-
-**INSTRUCTION: Determine what tables the user wants to create**
-- If they mention ONE table (e.g., "create a users table", "design a product table"), create ONLY that single table
-- If they mention MULTIPLE tables (e.g., "create users and posts", "design a blog with users, posts, comments"), create those specific tables
-- Do NOT add extra tables they didn't mention
 
 **CRITICAL: You MUST ONLY use these PiPilot datatypes:**
 - 'text', 'number', 'boolean', 'date', 'datetime', 'timestamp', 'uuid', 'json', 'email', 'url'
@@ -193,23 +158,13 @@ ${existingTableNames.length > 0 ? `\nExisting tables in this database: ${existin
 - uuid → 'uuid'
 - json → 'json'
 
-**RESPONSE FORMAT:**
-- If user wants ONE table: Return a single table object with tableName, columns, indexes, explanation
-- If user wants MULTIPLE tables: Return tables array with table objects, plus overallExplanation
-
-**For SINGLE TABLE:**
-Return the schema directly with:
+IMPORTANT: Generate ONLY ONE table. Do not wrap it in a "tables" array. Return the schema directly with:
 - tableName: string (the table name)
 - columns: array (list of column definitions)
 - indexes: array of strings (column names to index)
 - explanation: string (why you designed it this way)
 
-**For MULTIPLE TABLES:**
-Return the schema as:
-- tables: array of table objects (each with tableName, columns, indexes, explanation)
-- overallExplanation: string explaining how the tables work together
-
-Be precise and only create what the user asked for. ONLY USE THE 10 ALLOWED PIPILOT DATATYPES.`
+Be creative but practical. ONLY USE THE 10 ALLOWED PIPILOT DATATYPES.`
 
     console.log('[AI Schema] Generating schema with Codestral...')
     const startTime = Date.now()
@@ -217,7 +172,7 @@ Be precise and only create what the user asked for. ONLY USE THE 10 ALLOWED PIPI
     // Generate structured schema using AI SDK's generateObject
     const result = await generateObject({
       model: codestral,
-      schema: FlexibleSchemaOutput,
+      schema: TableSchemaOutput,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
@@ -230,79 +185,58 @@ Be precise and only create what the user asked for. ONLY USE THE 10 ALLOWED PIPI
 
     const schema = result.object
 
-    // Detect response format and normalize to multi-table format
-    let normalizedSchema: { tables: any[], overallExplanation?: string }
-    
-    if ('tables' in schema) {
-      // Multi-table response
-      normalizedSchema = schema
-    } else {
-      // Single table response - convert to multi-table format
-      normalizedSchema = {
-        tables: [schema],
-        overallExplanation: schema.explanation
-      }
+    // Post-process: Ensure required columns are present
+    const requiredColumns = ['id', 'created_at', 'updated_at']
+    const existingColumnNames = schema.columns.map(c => c.name)
+
+    // Add missing required columns
+    if (!existingColumnNames.includes('id')) {
+      schema.columns.unshift({
+        name: 'id',
+        type: 'uuid',
+        required: true,
+        defaultValue: 'gen_random_uuid()',
+        unique: true,
+        description: 'Primary key'
+      })
     }
 
-    // Post-process: Ensure required columns are present in each table
-    const requiredColumns = ['id', 'created_at', 'updated_at']
-    
-    // Process each table in the schema
-    normalizedSchema.tables = normalizedSchema.tables.map(table => {
-      const existingColumnNames = table.columns.map((c: z.infer<typeof ColumnSchema>) => c.name)
+    if (!existingColumnNames.includes('created_at')) {
+      schema.columns.push({
+        name: 'created_at',
+        type: 'timestamp',
+        required: true,
+        defaultValue: 'NOW()',
+        unique: false,
+        description: 'Record creation timestamp'
+      })
+    }
 
-      // Add missing required columns
-      if (!existingColumnNames.includes('id')) {
-        table.columns.unshift({
-          name: 'id',
-          type: 'uuid',
-          required: true,
-          defaultValue: 'gen_random_uuid()',
-          unique: true,
-          description: 'Primary key'
-        })
-      }
+    if (!existingColumnNames.includes('updated_at')) {
+      schema.columns.push({
+        name: 'updated_at',
+        type: 'timestamp',
+        required: true,
+        defaultValue: 'NOW()',
+        unique: false,
+        description: 'Record last update timestamp'
+      })
+    }
 
-      if (!existingColumnNames.includes('created_at')) {
-        table.columns.push({
-          name: 'created_at',
-          type: 'timestamp',
-          required: true,
-          defaultValue: 'NOW()',
-          unique: false,
-          description: 'Record creation timestamp'
-        })
-      }
-
-      if (!existingColumnNames.includes('updated_at')) {
-        table.columns.push({
-          name: 'updated_at',
-          type: 'timestamp',
-          required: true,
-          defaultValue: 'NOW()',
-          unique: false,
-          description: 'Record last update timestamp'
-        })
-      }
-
-      // Validate table name doesn't conflict
-      if (existingTableNames.includes(table.tableName)) {
-        // Add suffix to avoid conflict
-        table.tableName = `${table.tableName}_v2`
-        table.explanation = `${table.explanation}\n\nNote: Table name modified to avoid conflict with existing table.`
-      }
-
-      return table
-    })
+    // Validate table name doesn't conflict
+    if (existingTableNames.includes(schema.tableName)) {
+      // Add suffix to avoid conflict
+      schema.tableName = `${schema.tableName}_v2`
+      schema.explanation = `${schema.explanation}\n\nNote: Table name modified to avoid conflict with existing table.`
+    }
 
     return NextResponse.json({
       success: true,
-      schema: normalizedSchema,
+      schema,
       metadata: {
         generationTime,
         model: 'codestral-latest',
-        tablesGenerated: normalizedSchema.tables.length,
-        totalColumnsGenerated: normalizedSchema.tables.reduce((sum, table) => sum + table.columns.length, 0)
+        columnsGenerated: schema.columns.length
       }
     })
 
