@@ -6054,11 +6054,8 @@ Please respond to the user's request above, taking into account the project cont
         // Step 1: Create read-only tools for preprocessing phase
         const readOnlyTools = {
           read_file: tools.read_file,
-          list_files: tools.list_files,
           web_search: tools.web_search,
-          web_extract: tools.web_extract,
-          analyze_dependencies: tools.analyze_dependencies,
-          knowledge_search: tools.knowledge_search
+          web_extract: tools.web_extract
         }
         
         // Filter out undefined tools
@@ -6348,16 +6345,17 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
               
               console.log(`[A0-DEV] Sending ${a0Messages.length} messages (${enhancedMessages.length} total, limited for performance)`);
               
-              // Smart Context: select relevant files and src patch for a0.dev
-              const { storageManager } = await import('@/lib/storage-manager');
-              await storageManager.init();
-              const userMsg = messages[messages.length - 1]?.content || '';
-              const smartContext = await buildSmartContextForA0(projectId, userMsg, storageManager);
+              // Smart Context: DISABLED temporarily until fixed
+              // const { storageManager } = await import('@/lib/storage-manager');
+              // await storageManager.init();
+              // const userMsg = messages[messages.length - 1]?.content || '';
+              // const smartContext = await buildSmartContextForA0(projectId, userMsg, storageManager);
+              
               // Direct generate: fetch once, yield full completion at once (no stream)
               result = {
                 textStream: (async function* () {
                   try {
-                    console.log('[A0-DEV] Making API request to a0.dev with', a0Messages.length, 'messages and', smartContext.selectedFiles.length, 'context files');
+                    console.log('[A0-DEV] Making API request to a0.dev with', a0Messages.length, 'messages');
                     const response = await fetch('https://api.a0.dev/ai/llm', {
                       method: 'POST',
                       headers: {
@@ -6366,9 +6364,9 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
                       body: JSON.stringify({
                         messages: a0Messages,
                         temperature: 0.3,
-                        stream: false,
-                        projectFiles: smartContext.selectedFiles,
-                        srcPatch: smartContext.srcPatch
+                        stream: false
+                        // projectFiles: smartContext.selectedFiles,  // DISABLED
+                        // srcPatch: smartContext.srcPatch  // DISABLED
                       }),
                       signal: AbortSignal.timeout(32000)
                     });
@@ -6393,31 +6391,31 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
                 })()
               };
             } else {
-              // Smart Context: select relevant files and src patch for standard AI SDK streaming
-              const { storageManager } = await import('@/lib/storage-manager');
-              await storageManager.init();
-              const userMsg = messages[messages.length - 1]?.content || '';
-              const smartContext = await buildSmartContextForA0(projectId, userMsg, storageManager);
+              // Smart Context: DISABLED temporarily until fixed
+              // const { storageManager } = await import('@/lib/storage-manager');
+              // await storageManager.init();
+              // const userMsg = messages[messages.length - 1]?.content || '';
+              // const smartContext = await buildSmartContextForA0(projectId, userMsg, storageManager);
               
               // Add smart context to enhanced messages for standard providers
-              const smartContextMessage = {
-                role: 'system' as const,
-                content: `## Smart Context - Relevant Project Files
-
-${smartContext.srcPatch ? `**Source Structure Changes:** ${smartContext.srcPatch}\n\n` : ''}**Selected Files for Context:**
-${smartContext.selectedFiles.map((file: any) => 
-  `### ${file.path}\n\`\`\`\n${file.content}\n\`\`\``
-).join('\n\n')}
-
-Use this context to provide accurate, file-aware responses to the user's request.`
-              };
+              // const smartContextMessage = {
+              //   role: 'system' as const,
+              //   content: `## Smart Context - Relevant Project Files
+              //
+              // ${smartContext.srcPatch ? `**Source Structure Changes:** ${smartContext.srcPatch}\n\n` : ''}**Selected Files for Context:**
+              // ${smartContext.selectedFiles.map((file: any) => 
+              //   `### ${file.path}\n\`\`\`\n${file.content}\n\`\`\``
+              // ).join('\n\n')}
+              //
+              // Use this context to provide accurate, file-aware responses to the user's request.`
+              // };
               
-              const enhancedMessagesWithContext = [smartContextMessage, ...enhancedMessages];
+              // const enhancedMessagesWithContext = [smartContextMessage, ...enhancedMessages];
               
               // Standard AI SDK streaming for all other providers
               result = await streamText({
                 model: model,
-                messages: enhancedMessagesWithContext,
+                messages: enhancedMessages,
                 temperature: 0.3,
                 abortSignal: abortController.signal,
               });
