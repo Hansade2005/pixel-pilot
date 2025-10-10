@@ -4306,8 +4306,8 @@ ${conversationSummary}
 - **Charts**: Recharts for data visualization
 - **Themes**: Dark/light mode support
 
-**AVAILABLE TOOLS: write_file, delete_file**
-## 🚨 **CRITICAL** Never use any other json tool apart from the two mentioned above.
+**AVAILABLE TOOLS: write_file, delete_file, add_package, remove_package**
+## 🚨 **CRITICAL** Never use any other json tool apart from the four mentioned above.
 
 ## 🚨 **CRITICAL COMMENT RULES - NO EXCEPTIONS**
 
@@ -5087,7 +5087,7 @@ Your task is to create a comprehensive, detailed summary of the entire conversat
 ## 🕵️‍♂️ Recent Context Analysis
 
 Pay special attention to the **most recent agent commands and tool executions** that led to this summarization, including:
-- **Last Agent Commands:** Exactly what actions/tools were just executed (e.g. \`write_file\`, \`delete_file\`)
+- **Last Agent Commands:** Exactly what actions/tools were just executed (e.g. \`write_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`)
 - **Tool Results:** Key outcomes from recent tool calls (truncate very long results, but preserve essential information)
 - **Immediate State:** What was being worked on right before summarization
 - **Triggering Context:** What caused the summarization (e.g., token budget exceeded, context window full)
@@ -5101,7 +5101,7 @@ Before providing your summary, analyze the session as follows:
 1. **Chronological Review:** Go through the conversation chronologically, identifying key phases and transitions.
 2. **Intent Mapping:** Extract all explicit and implicit user requests, goals, and expectations (with direct message context/quotes).
 3. **Technical Inventory:** Catalog all technologies, tools, and decisions mentioned.
-4. **File Operations Extraction:** Systematically extract and validate all \`write_file\` and \`delete_file\` JSON tool blocks from assistant responses:
+4. **File Operations Extraction:** Systematically extract and validate all \`write_file\`, \`delete_file\`, \`add_package\`, and \`remove_package\` JSON tool blocks from assistant responses:
     - Attempt to parse each JSON block.
     - If parsing succeeds, log the operation (created, updated, or deleted) with content and reason.
     - If parsing fails (syntax error, bad escaping, etc.), record as a **failed operation** with error details and raw block.
@@ -5114,11 +5114,11 @@ Before providing your summary, analyze the session as follows:
 
 This summary allows the AI or a developer to instantly pick up where the session left off and to identify any failed file actions.
 
-- **Step 1:** Scan all assistant responses for JSON code blocks with \`"tool": "write_file"\` or \`"tool": "delete_file"\`.
+- **Step 1:** Scan all assistant responses for JSON code blocks with \`"tool": "write_file"\`, \`"tool": "delete_file"\`, \`"tool": "add_package"\`, or \`"tool": "remove_package"\`.
     - Only consider blocks that are in triple-backtick \`json\` code blocks.
 - **Step 2:** Attempt to parse each detected JSON block.
     - If parsing is successful, treat as a valid file operation.
-    - If parsing **fails** (e.g. due to syntax error, bad escaping, missing or extra commas, etc.), record this as a **failed file operation** for that file path (if the path can be read; otherwise, note as "unknown path").
+    - If parsing **fails** (e.g. due to syntax error, bad escaping, missing or extra commas, etc.), record this as a **failed operation** for that file/package (if the name can be read; otherwise, note as "unknown").
     - Clearly log the invalid block and the error reason in the summary.
 
 ---
