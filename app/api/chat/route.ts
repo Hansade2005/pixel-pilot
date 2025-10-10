@@ -5079,47 +5079,36 @@ src/             → Frontend React app
 
 // Enhanced Summarizer System Prompt for Codestral
 const ENHANCED_SUMMARIZER_PROMPT = `# 📋 
-Your task is to create a comprehensive, detailed summary of the entire conversation that captures all essential information needed to seamlessly continue the work without any loss of context. This summary is used to compact the conversation while preserving all technical details, decisions, and progress.
+Your task is to create a detailed summary of the conversation, preserving all technical details, decisions, and progress so work can continue seamlessly.
 
 ---
 
-## 🕵️‍♂️ Recent Context Analysis
-
-Pay special attention to the **most recent agent commands and tool executions** that led to this summarization, including:
-- **Last Agent Commands:** Exactly what actions/tools were just executed (e.g. \`write_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`)
-- **Tool Results:** Key outcomes from recent tool calls (truncate very long results, but preserve essential information)
-- **Immediate State:** What was being worked on right before summarization
-- **Triggering Context:** What caused the summarization (e.g., token budget exceeded, context window full)
-
----
-
-## 🧩 Analysis Process
-
-Before providing your summary, analyze the session as follows:
-
-1. **Chronological Review:** Go through the conversation chronologically, identifying key phases and transitions.
-2. **Intent Mapping:** Extract all explicit and implicit user requests, goals, and expectations (with direct message context/quotes).
-3. **Technical Inventory:** Catalog all technologies, tools, and decisions mentioned.
-4. **File Operations Extraction:** Systematically extract and validate all \`write_file\`, \`delete_file\`, \`add_package\`, and \`remove_package\` JSON tool blocks from assistant responses:
-    - Attempt to parse each JSON block.
-    - If parsing succeeds, log the operation (created, updated, or deleted) with content and reason.
-    - If parsing fails (syntax error, bad escaping, etc.), record as a **failed operation** with error details and raw block.
-5. **Progress Assessment:** Summarize what's done vs. pending, and validate all critical context for continuation.
-6. **Recent Commands Analysis:** List the specific agent commands and tool results from the most recent operations.
+## 🕵️‍♂️ Recent Context
+Focus on the **latest agent actions and tool calls**, including:
+- **Commands:** Tools just executed (\`write_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`)
+- **Results:** Key tool outcomes (truncate long ones, keep essentials)
+- **State:** What was being worked on last
+- **Trigger:** Why summarization occurred (e.g., token limit reached)
 
 ---
 
-## 🚨 **CRITICAL: File Operation Extraction and Validation**
+## 🧩 Analysis Steps
+1. **Chronological Review:** Trace key phases and transitions.  
+2. **Intent Mapping:** Capture all user goals and expectations (with short quotes).  
+3. **Technical Inventory:** List all tools, frameworks, and decisions used.  
+4. **File Operations:** Extract and validate all JSON tool blocks.  
+   - Parse each block; log success or failure (with reason).  
+5. **Progress Summary:** Note completed vs. pending work.  
+6. **Recent Commands:** List latest tool calls and outcomes.
 
-This summary allows the AI or a developer to instantly pick up where the session left off and to identify any failed file actions.
+---
 
-- **Step 1:** Scan all assistant responses for JSON code blocks with \`"tool": "write_file"\`, \`"tool": "delete_file"\`, \`"tool": "add_package"\`, or \`"tool": "remove_package"\`.
-    - Only consider blocks that are in triple-backtick \`json\` code blocks.
-- **Step 2:** Attempt to parse each detected JSON block.
-    - If parsing is successful, treat as a valid file operation.
-    - If parsing **fails** (e.g. due to syntax error, bad escaping, missing or extra commas, etc.), record this as a **failed operation** for that file/package (if the name can be read; otherwise, note as "unknown").
-    - Clearly log the invalid block and the error reason in the summary.
+## 🚨 File Operation Validation
+This ensures continuity and detects failed file actions.
 
+1. **Scan** all assistant responses for JSON blocks using \`write_file\`, \`delete_file\`, \`add_package\`, or \`remove_package\`.  
+2. **Parse** valid ones; if parsing fails, record as **failed** with the file name (if known) and error reason.  
+3. **Log** invalid or unparsed blocks with short error details.
 ---
 
 ## ✨ Required Output Structure
@@ -5143,32 +5132,28 @@ Output a JSON array. For each file, include:
         - \`"status"\`: \`"failed"\`
 - \`"final_state"\`: \`"present"\`, \`"deleted"\`, or \`"failed"\`
 
-### 3. Full Content Snapshots
-For all files with \`"final_state": "present"\`, output the **latest full content** in a code block, labeled by language and file path.
+### 3. Full File Snapshots  
+Include the **latest content** of all files with \`"final_state": "present"\` in code blocks, labeled by language and path.  
 
-### 4. Active Work State & Recent Commands
-- **Current Focus:** What was being worked on in the most recent exchanges.
-- **Recent Commands:** List the last agent tool commands (with tool names and file paths), and summarize their results (especially any errors).
+### 4. Current Focus & Commands  
+- **Focus:** Describe what was being worked on last.  
+- **Commands:** List recent tool actions (with file paths and results).  
 
-### 5. Pending and Next Steps
-- List all unresolved user requests or open tasks (with direct quotes if possible).
-- Clearly specify the immediate next action(s) for the assistant.
-
----
-
-## 🛠️ Quality Guidelines
-
-- **Precision:** Use exact filenames, variable names, and technical terms.
-- **Completeness:** All context required to continue work must be included.
-- **Clarity:** Write for someone who needs to pick up exactly where the session left off.
-- **Verbatim Accuracy:** Use direct quotes for task specs and recent context.
-- **Technical Depth:** Include detail for all important technical/code decisions.
-- **Logical Flow:** Present the summary in a way that builds understanding progressively.
-- **Error Awareness:** Explicitly log any failed file operations with error details.
+### 5. Next Steps  
+Summarize any **unfinished tasks or user requests** and the **next actions** needed.  
 
 ---
 
-**This summary must serve as a comprehensive handoff document, preserving the full technical and contextual richness of the session, and highlighting any failures or pending work that must be addressed.**`
+### 🛠️ Guidelines  
+- Use exact filenames, variables, and technical terms.  
+- Include only context needed to resume seamlessly.  
+- Keep details accurate, clear, and logically ordered.  
+- Note any failed operations or errors.  
+
+---
+
+**The summary must function as a clear handoff — preserving all vital progress, context, and pending work.**
+`
 
 // Generate conversation summary using Mistral Pixtral (optimized approach)
 async function generateConversationSummary(
@@ -5187,13 +5172,13 @@ async function generateConversationSummary(
 
     const mistralPixtral = getMistralPixtralModel()
 
-    const summaryPrompt = `Create a concise conversation summary for these messages. Include:
+    const summaryPrompt = `Create a concise conversation summary for these :
 
 Conversation History: ${fullHistory}
 `
 
     const summary = await generateText({
-      model: mistralPixtral,
+      model: getModel('codestral-latest'),
       messages: [
         { role: 'system', content: 
           ENHANCED_SUMMARIZER_PROMPT },
