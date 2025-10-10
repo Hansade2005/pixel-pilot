@@ -310,6 +310,49 @@ export class JsonToolParser {
       return content.substring(startIndex, jsonEnd + 1)
     }
 
+    // Fallback: If we can't find a complete JSON object, try to extract until we hit a reasonable stopping point
+    // This handles cases where the JSON might be at the end of the content or followed by other content
+    let fallbackEnd = -1
+    let fallbackBraceCount = 0
+    let fallbackInString = false
+    let fallbackEscapeNext = false
+
+    for (let i = startIndex; i < content.length; i++) {
+      const char = content[i]
+
+      if (fallbackEscapeNext) {
+        fallbackEscapeNext = false
+        continue
+      }
+
+      if (char === '\\') {
+        fallbackEscapeNext = true
+        continue
+      }
+
+      if (char === '"' || char === "'") {
+        fallbackInString = !fallbackInString
+        continue
+      }
+
+      if (!fallbackInString) {
+        if (char === '{') {
+          fallbackBraceCount++
+        } else if (char === '}') {
+          fallbackBraceCount--
+          // If we've closed all braces and we're past the opening brace, this is likely our JSON
+          if (fallbackBraceCount === 0 && i > startIndex) {
+            fallbackEnd = i
+            break
+          }
+        }
+      }
+    }
+
+    if (fallbackEnd > startIndex) {
+      return content.substring(startIndex, fallbackEnd + 1)
+    }
+
     return null
   }
 
