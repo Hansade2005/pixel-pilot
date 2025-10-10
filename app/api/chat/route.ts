@@ -5078,8 +5078,7 @@ src/             → Frontend React app
 }
 
 // Enhanced Summarizer System Prompt for Codestral
-const ENHANCED_SUMMARIZER_PROMPT = `# 📋 Enhanced Summarizer System Prompt for Project Chat Sessions
-
+const ENHANCED_SUMMARIZER_PROMPT = `# 📋 
 Your task is to create a comprehensive, detailed summary of the entire conversation that captures all essential information needed to seamlessly continue the work without any loss of context. This summary is used to compact the conversation while preserving all technical details, decisions, and progress.
 
 ---
@@ -5171,74 +5170,78 @@ For all files with \`"final_state": "present"\`, output the **latest full conten
 
 **This summary must serve as a comprehensive handoff document, preserving the full technical and contextual richness of the session, and highlighting any failures or pending work that must be addressed.**`
 
-// Generate conversation summary using Codestral
+// Generate conversation summary using Mistral Pixtral (optimized approach)
 async function generateConversationSummary(
   messages: Array<{ role: string; content: string }>,
   projectId: string,
   userId: string
 ): Promise<any> {
   try {
-    console.log('[SUMMARIZER] Generating conversation summary with Codestral...')
-    
-    // Format conversation history for Codestral
-    const conversationHistory = messages
-      .map((msg, idx) => `### Message ${idx + 1} (${msg.role}):\n${msg.content}`)
-      .join('\n\n---\n\n')
-    
-    const summaryPrompt = `${ENHANCED_SUMMARIZER_PROMPT}
+    console.log('[SUMMARIZER] Generating conversation summary with Mistral Pixtral (optimized)...')
 
----
+    // Use last 10 messages with full content (no truncation)
+    const recentMessages = messages.slice(-10)
+    const fullHistory = recentMessages
+      .map((msg, idx) => `${msg.role[0].toUpperCase()}:${msg.content}`)
+      .join('|')
 
-## Conversation to Summarize:
+    const mistralPixtral = getMistralPixtralModel()
 
-${conversationHistory}
+    const summaryPrompt = `Create a concise conversation summary for these messages. Include:
 
----
+Conversation History: ${fullHistory}
+`
 
-Please provide a comprehensive structured summary following the format specified above.`
-
-    // Call OpenAI GPT-4o Mini for summarization (fast and reliable)
-    const model = getModel('gpt-4o-mini')
-    const { text } = await generateText({
-      model: model,
+    const summary = await generateText({
+      model: mistralPixtral,
       messages: [
-        {
-          role: 'system',
-          content: 'You are an expert technical summarizer. Create detailed, structured summaries of development conversations.'
-        },
-        {
-          role: 'user',
-          content: summaryPrompt
-        }
+        { role: 'system', content: 
+          ENHANCED_SUMMARIZER_PROMPT },
+        { role: 'user', content: summaryPrompt }
       ],
-      temperature: 0.3
+      temperature: 0.0
     })
-    
-    console.log('[SUMMARIZER] Summary generated successfully')
-    
-    // Parse the summary into structured format
-    const structuredSummary = {
-      conversationOverview: extractSection(text, 'Conversation Overview', '# 2.') || 'No overview available',
-      fileOperationsLog: parseFileOperationsLog(text) || [],
-      activeWorkState: {
-        currentFocus: extractSection(text, 'Active Work State', '# 5.') || 'No current focus',
-        recentCommands: extractRecentCommands(text) || []
-      },
-      pendingSteps: extractPendingSteps(text) || []
+
+    // Parse the JSON response
+    try {
+      let text = summary.text || ''
+      if (text.includes('```json')) {
+        text = text.replace(/```json\s*/, '').replace(/\s*```$/, '')
+      } else if (text.includes('```')) {
+        text = text.replace(/```\s*/, '').replace(/\s*```$/, '')
+      }
+      text = text.trim()
+      const start = text.indexOf('{')
+      const end = text.lastIndexOf('}')
+      if (start !== -1 && end !== -1) {
+        const jsonText = text.substring(start, end + 1)
+        return JSON.parse(jsonText)
+      }
+    } catch (e) {
+      console.warn('[SUMMARIZER] Failed to parse summary JSON, using fallback')
     }
-    
-    return structuredSummary
-  } catch (error) {
-    console.error('[SUMMARIZER] Error generating summary:', error)
-    // Return a basic summary on error
+
+    // Fallback summary
     return {
-      conversationOverview: 'Error generating summary',
-      fileOperationsLog: [],
+      conversationOverview: `Recent conversation with ${recentMessages.length} messages`,
       activeWorkState: {
-        currentFocus: 'Unknown',
+        currentFocus: 'Continuing development work',
         recentCommands: []
       },
-      pendingSteps: []
+      fileOperationsLog: [],
+      pendingSteps: ['Continue with current tasks']
+    }
+
+  } catch (error) {
+    console.error('[SUMMARIZER] Error generating conversation summary:', error)
+    return {
+      conversationOverview: 'Summary generation failed',
+      activeWorkState: {
+        currentFocus: 'Unable to determine current focus',
+        recentCommands: []
+      },
+      fileOperationsLog: [],
+      pendingSteps: ['Retry summary generation']
     }
   }
 }
@@ -5570,7 +5573,7 @@ Use read_file tool to read specific files when needed.`
         
         // Generate new summary if none exists or if conversation has grown significantly
         if (!existingSummary || conversationMemory.messages.length - (existingSummary.summary?.fileOperationsLog?.length || 0) > 10) {
-          console.log('[SUMMARIZER] Generating new conversation summary with Codestral...')
+          console.log('[SUMMARIZER] Generating new conversation summary with Mistral Pixtral (optimized)...')
           
           // Generate summary using Codestral
           const structuredSummary = await generateConversationSummary(
