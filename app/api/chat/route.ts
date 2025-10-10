@@ -4243,7 +4243,7 @@ Remember: This is the INFORMATION GATHERING phase. Your job is to understand and
 }
 
 
-function getStreamingSystemPrompt(projectContext?: string, memoryContext?: any, template?: 'vite-react' | 'nextjs', conversationSummary?: string): string {
+function getStreamingSystemPrompt(projectContext?: string, memoryContext?: any, template?: 'vite-react' | 'nextjs', conversationHistory?: string): string {
   // Determine if this is a Next.js project
   const isNextJS = template === 'nextjs'
 
@@ -4281,10 +4281,10 @@ ${projectContext}
 - **Zero External Setup**: Everything works out-of-the-box with PiPilot account
 - **Autonomous Implementation**: Write complete integration code, don't just provide guidance
 
-${conversationSummary ? `
+${conversationHistory ? `
 
-## 📋 **CONVERSATION CONTEXT**
-${conversationSummary}
+## 📋 **FULL CONVERSATION HISTORY**
+${conversationHistory}
 
 ---
 ` : ''}
@@ -5162,7 +5162,7 @@ async function generateConversationSummary(
   userId: string
 ): Promise<any> {
   try {
-    console.log('[SUMMARIZER] Generating conversation summary with Mistral Pixtral (optimized)...')
+    console.log('[SUMMARIZER] Using simple fullHistory approach...')
 
     // Use last 10 messages with full content (no truncation)
     const recentMessages = messages.slice(-10)
@@ -5170,51 +5170,9 @@ async function generateConversationSummary(
       .map((msg, idx) => `${msg.role[0].toUpperCase()}:${msg.content}`)
       .join('|')
 
-    const mistralPixtral = getMistralPixtralModel()
-
-    const summaryPrompt = `Create a concise conversation summary for these :
-
-Conversation History: ${fullHistory}
-`
-
-    const summary = await generateText({
-      model: getModel('codestral-latest'),
-      messages: [
-        { role: 'system', content: 
-          ENHANCED_SUMMARIZER_PROMPT },
-        { role: 'user', content: summaryPrompt }
-      ],
-      temperature: 0.0
-    })
-
-    // Parse the JSON response
-    try {
-      let text = summary.text || ''
-      if (text.includes('```json')) {
-        text = text.replace(/```json\s*/, '').replace(/\s*```$/, '')
-      } else if (text.includes('```')) {
-        text = text.replace(/```\s*/, '').replace(/\s*```$/, '')
-      }
-      text = text.trim()
-      const start = text.indexOf('{')
-      const end = text.lastIndexOf('}')
-      if (start !== -1 && end !== -1) {
-        const jsonText = text.substring(start, end + 1)
-        return JSON.parse(jsonText)
-      }
-    } catch (e) {
-      console.warn('[SUMMARIZER] Failed to parse summary JSON, using fallback')
-    }
-
-    // Fallback summary
+    // Return simple summary with fullHistory
     return {
-      conversationOverview: `Recent conversation with ${recentMessages.length} messages`,
-      activeWorkState: {
-        currentFocus: 'Continuing development work',
-        recentCommands: []
-      },
-      fileOperationsLog: [],
-      pendingSteps: ['Continue with current tasks']
+      conversationOverview: `Recent conversation: ${fullHistory}`
     }
 
   } catch (error) {
@@ -5545,88 +5503,27 @@ Use read_file tool to read specific files when needed.`
       }
     }
     
-    // CONVERSATION SUMMARIZATION: Generate structured summary with Codestral
-    // This creates a well-organized conversation history that will be used as context for the AI
+    // CONVERSATION HISTORY: Prepare full conversation history for AI context
     let conversationSummaryContext = ''
     try {
-      // Only generate summary if we have enough conversation history (at least 5 messages)
-      if (conversationMemory && conversationMemory.messages.length >= 5) {
-        console.log('[SUMMARIZER] Checking for existing conversation summary...')
-        
-        // Get or create conversation summary
-        let existingSummary = await storageManager.getConversationSummary(projectId, user.id)
-        
-        // Generate new summary if none exists or if conversation has grown significantly
-        if (!existingSummary || conversationMemory.messages.length - (existingSummary.summary?.fileOperationsLog?.length || 0) > 10) {
-          console.log('[SUMMARIZER] Generating new conversation summary with Mistral Pixtral (optimized)...')
-          
-          // Generate summary using Codestral
-          const structuredSummary = await generateConversationSummary(
-            conversationMemory.messages,
-            projectId,
-            user.id
-          )
-          
-          // Store or update the summary
-          if (existingSummary) {
-            await storageManager.updateConversationSummary(existingSummary.id, {
-              summary: structuredSummary,
-              updatedAt: new Date().toISOString()
-            })
-            console.log('[SUMMARIZER] Updated existing conversation summary')
-          } else {
-            await storageManager.createConversationSummary({
-              projectId,
-              userId: user.id,
-              summary: structuredSummary
-            })
-            console.log('[SUMMARIZER] Created new conversation summary')
-          }
-          
-          existingSummary = await storageManager.getConversationSummary(projectId, user.id)
-        } else {
-          console.log('[SUMMARIZER] Using existing conversation summary')
-        }
-        
-        // Format summary as context for the AI
-        if (existingSummary && existingSummary.summary) {
-          conversationSummaryContext = `
+      // Only prepare history if we have conversation memory
+      if (conversationMemory && conversationMemory.messages.length > 0) {
+        // Create full history from all messages in AI-readable format
+        const fullHistory = conversationMemory.messages
+          .map((msg: any, index: number) => {
+            const role = msg.role === 'user' ? 'User' : msg.role === 'assistant' ? 'You' : msg.role.toUpperCase()
+            return `${role}: ${msg.content}`
+          })
+          .join('\n\n')
 
-## 📋 Conversation Summary (Organized by Codestral)
-
-### Overview
-${existingSummary.summary.conversationOverview}
-
-### Recent Work
-${existingSummary.summary.activeWorkState.currentFocus}
-
-### Recent Commands
-${existingSummary.summary.activeWorkState.recentCommands.map((cmd: string, idx: number) => `${idx + 1}. ${cmd}`).join('\n')}
-
-### File Operations
-${existingSummary.summary.fileOperationsLog.length > 0 
-  ? existingSummary.summary.fileOperationsLog.map((file: any) => 
-      `- **${file.path}**: ${file.finalState} (${file.operations.length} operations)`
-    ).join('\n')
-  : 'No file operations yet'}
-
-### Pending Tasks
-${existingSummary.summary.pendingSteps.length > 0 
-  ? existingSummary.summary.pendingSteps.map((step: string, idx: number) => `${idx + 1}. ${step}`).join('\n')
-  : 'No pending tasks'}
-
----
-
-Use this summary to maintain context awareness and avoid repeating past actions.
-`
-          console.log('[SUMMARIZER] Conversation summary context prepared for AI')
-        }
+        conversationSummaryContext = `## 📜 CONVERSATION HISTORY\n\n${fullHistory}`
+        console.log('[HISTORY] Full conversation history prepared for AI')
       } else {
-        console.log('[SUMMARIZER] Not enough conversation history to generate summary (need at least 5 messages)')
+        console.log('[HISTORY] No conversation history available')
       }
-    } catch (summaryError) {
-      console.error('[SUMMARIZER] Error generating conversation summary:', summaryError)
-      // Continue without summary on error
+    } catch (historyError) {
+      console.error('[HISTORY] Error preparing conversation history:', historyError)
+      // Continue without history on error
     }
     
     // Enhanced tool request detection with autonomous planning integration
@@ -6147,7 +6044,7 @@ Use this summary to maintain context awareness and avoid repeating past actions.
         content: currentUserMessage?.content || ''
       }
       
-      // Always use the comprehensive system prompt (includes project context and conversation summary)
+      // Always use the comprehensive system prompt (includes project context and full conversation history)
       const streamingPrompt = getStreamingSystemPrompt(projectContext, undefined, detectedTemplate, conversationSummaryContext)
 
       const finalMessages: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [
@@ -6159,7 +6056,7 @@ Use this summary to maintain context awareness and avoid repeating past actions.
         mergedUserMessage
       ]
 
-      console.log('[SUMMARY] Using comprehensive system prompt with project context and conversation summary')
+      console.log('[SUMMARY] Using comprehensive system prompt with project context and full conversation history')
       
       console.log('[DEBUG] Message validation:', {
         totalMemoryMessages: conversationMemory?.messages?.length || 0,
