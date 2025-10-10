@@ -5512,11 +5512,14 @@ Use read_file tool to read specific files when needed.`
         const fullHistory = conversationMemory.messages
           .map((msg: any, index: number) => {
             const role = msg.role === 'user' ? 'User' : msg.role === 'assistant' ? 'You' : msg.role.toUpperCase()
-            return `${role}: ${msg.content}`
+            const message = `${role}: ${msg.content}`
+            // Add separator after assistant messages to separate interaction pairs
+            const separator = msg.role === 'assistant' ? '\n\n---\n\n' : '\n\n'
+            return message + separator
           })
-          .join('\n\n')
+          .join('')
 
-        conversationSummaryContext = `## 📜 CONVERSATION HISTORY\n\n${fullHistory}`
+        conversationSummaryContext = `## 📜 CONVERSATION HISTORY\n\n${fullHistory.trim()}`
         console.log('[HISTORY] Full conversation history prepared for AI')
       } else {
         console.log('[HISTORY] No conversation history available')
