@@ -73,7 +73,7 @@ export function TableDetailsView({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    toast.success('Schema exported as JSON');
+    toast.success(`Schema exported as JSON: ${table.name}_schema.json`);
   };
 
   const exportToCSV = () => {
@@ -100,7 +100,7 @@ export function TableDetailsView({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    toast.success('Schema exported as CSV');
+    toast.success(`Schema exported as CSV: ${table.name}_schema.csv`);
   };
 
   const exportToSQL = () => {
@@ -133,7 +133,7 @@ export function TableDetailsView({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    toast.success('Schema exported as SQL');
+    toast.success(`Schema exported as SQL: ${table.name}_schema.sql`);
   };
 
   const copyToClipboard = async () => {
@@ -147,7 +147,7 @@ export function TableDetailsView({
 
     try {
       await navigator.clipboard.writeText(jsonString);
-      toast.success('Schema copied to clipboard');
+      toast.success(`Schema copied to clipboard: ${table.name} (${schema.columns.length} columns)`);
     } catch (err) {
       // Fallback for older browsers
       const textArea = document.createElement('textarea');
@@ -156,7 +156,7 @@ export function TableDetailsView({
       textArea.select();
       document.execCommand('copy');
       document.body.removeChild(textArea);
-      toast.success('Schema copied to clipboard');
+      toast.success(`Schema copied to clipboard: ${table.name} (${schema.columns.length} columns)`);
     }
   };
 
