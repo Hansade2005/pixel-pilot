@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,20 @@ import {
   Database,
   Calendar,
   Hash,
+  Download,
+  Copy,
+  FileJson,
+  FileText,
+  Code,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 import type { Table, TableSchema } from "@/lib/supabase";
 
 interface TableDetailsViewProps {
@@ -40,6 +53,128 @@ export function TableDetailsView({
       const workspaceId = params.id;
       router.push(`/workspace/${workspaceId}/database/tables/${table.id}`);
     }
+  };
+
+  // Export functions
+  const exportToJSON = () => {
+    const exportData = {
+      tableName: table.name,
+      schema: schema,
+      created_at: table.created_at,
+      recordCount: table.recordCount || 0,
+    };
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${table.name}_schema.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success('Schema exported as JSON');
+  };
+
+  const exportToCSV = () => {
+    const headers = ['Column Name', 'Type', 'Required', 'Unique', 'Default Value', 'Description'];
+    const rows = schema.columns.map(col => [
+      col.name,
+      col.type,
+      col.required ? 'Yes' : 'No',
+      col.unique ? 'Yes' : 'No',
+      col.defaultValue || '',
+      col.description || ''
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(field => `"${field}"`).join(','))
+      .join('\n');
+
+    const dataBlob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${table.name}_schema.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success('Schema exported as CSV');
+  };
+
+  const exportToSQL = () => {
+    let sql = `-- PiPilot Table Schema Export\n-- Table: ${table.name}\n-- Generated: ${new Date().toISOString()}\n\n`;
+
+    // Create table statement
+    sql += `CREATE TABLE ${table.name} (\n`;
+    sql += schema.columns.map(col => {
+      let colDef = `  ${col.name} ${mapTypeToSQL(col.type)}`;
+      if (col.required) colDef += ' NOT NULL';
+      if (col.unique) colDef += ' UNIQUE';
+      if (col.defaultValue) colDef += ` DEFAULT ${col.defaultValue}`;
+      return colDef;
+    }).join(',\n');
+    sql += '\n);\n\n';
+
+    // Add comments for descriptions
+    schema.columns.forEach(col => {
+      if (col.description) {
+        sql += `COMMENT ON COLUMN ${table.name}.${col.name} IS '${col.description.replace(/'/g, "''")}';\n`;
+      }
+    });
+
+    const dataBlob = new Blob([sql], { type: 'text/plain' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${table.name}_schema.sql`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success('Schema exported as SQL');
+  };
+
+  const copyToClipboard = async () => {
+    const exportData = {
+      tableName: table.name,
+      schema: schema,
+      created_at: table.created_at,
+      recordCount: table.recordCount || 0,
+    };
+    const jsonString = JSON.stringify(exportData, null, 2);
+
+    try {
+      await navigator.clipboard.writeText(jsonString);
+      toast.success('Schema copied to clipboard');
+    } catch (err) {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = jsonString;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      toast.success('Schema copied to clipboard');
+    }
+  };
+
+  // Helper function to map PiPilot types to SQL types
+  const mapTypeToSQL = (type: string): string => {
+    const typeMap: Record<string, string> = {
+      text: 'TEXT',
+      number: 'NUMERIC',
+      boolean: 'BOOLEAN',
+      date: 'DATE',
+      datetime: 'TIMESTAMP',
+      timestamp: 'TIMESTAMP',
+      uuid: 'UUID',
+      json: 'JSONB',
+      email: 'TEXT',
+      url: 'TEXT'
+    };
+    return typeMap[type] || 'TEXT';
   };
 
   // Format date
@@ -98,6 +233,34 @@ export function TableDetailsView({
 
           {/* Actions */}
           <div className="flex items-center gap-2 flex-shrink-0">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Download className="h-4 w-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Export</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={exportToJSON}>
+                  <FileJson className="h-4 w-4 mr-2" />
+                  Export as JSON
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportToCSV}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportToSQL}>
+                  <Code className="h-4 w-4 mr-2" />
+                  Export as SQL
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={copyToClipboard}>
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy to Clipboard
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             {onEdit && (
               <Button variant="outline" size="sm" onClick={onEdit}>
                 <Edit className="h-4 w-4 sm:mr-1" />

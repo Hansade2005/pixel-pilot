@@ -48,6 +48,7 @@ export interface Column {
   unique?: boolean;
   default?: any;
   defaultValue?: string; // Alias for default
+  description?: string; // Column description/documentation
   references?: {
     table: string;
     column: string;
