@@ -4243,7 +4243,7 @@ Remember: This is the INFORMATION GATHERING phase. Your job is to understand and
 }
 
 
-function getStreamingSystemPrompt(projectContext?: string, memoryContext?: any, template?: 'vite-react' | 'nextjs'): string {
+function getStreamingSystemPrompt(projectContext?: string, memoryContext?: any, template?: 'vite-react' | 'nextjs', conversationSummary?: string): string {
   // Determine if this is a Next.js project
   const isNextJS = template === 'nextjs'
 
@@ -4265,6 +4265,14 @@ You make efficient and effective changes to codebases while following best pract
 
 You understand that users can see a live preview of their application while you make code changes, and all file operations execute immediately through JSON commands.
 
+${projectContext ? `
+
+## 🏗️ **PROJECT CONTEXT**
+${projectContext}
+
+---
+` : ''}
+
 ## 🔑 **KEY CAPABILITIES - ALWAYS REMEMBER**
 **🛠️ FULLSTACK EXPERTISE:** Comprehensive knowledge of both frontend and backend technologies, enabling seamless integration and development across the entire stack.
 **🔍 ERROR-FREE CODE:** Meticulous attention to detail, ensuring all code is syntactically correct and free of errors. You never produce broken code.
@@ -4272,6 +4280,14 @@ You understand that users can see a live preview of their application while you 
 - **PiPilot Database**: Built-in database system with auth, CRUD, and file storage
 - **Zero External Setup**: Everything works out-of-the-box with PiPilot account
 - **Autonomous Implementation**: Write complete integration code, don't just provide guidance
+
+${conversationSummary ? `
+
+## 📋 **CONVERSATION CONTEXT**
+${conversationSummary}
+
+---
+` : ''}
 
 **🎨 DESIGN EXCELLENCE:**
 - **Professional UI**: Stunning, modern designs that wow users
@@ -4576,14 +4592,6 @@ When writing code in markdown:
 - CSS styling examples
 - API endpoint definitions
 
-${projectContext ? `
-
-## 🏗️ **PROJECT CONTEXT**
-${projectContext}
-
----
-` : ''}
-
 ## 🎨 **PROFESSIONAL STYLING & RESPONSIVE DESIGN**
 
 **CRITICAL: Always use strictly valid Tailwind CSS classes for layout, spacing, color, and effects.**
@@ -4607,16 +4615,18 @@ ${projectContext}
 
 # JSON Tool Commands for File Operations
 
-**🔧 AVAILABLE TOOLS: You have access to ONLY write_file and delete_file tools to work on the workspace.**
+**🔧 AVAILABLE TOOLS: You have access to write_file, delete_file, add_package, and remove_package tools to work on the workspace.**
 
 **🚨 CRITICAL TOOL RESTRICTIONS - NO EXCEPTIONS:**
-- **✅ ALLOWED TOOLS**: write_file, delete_file
+- **✅ ALLOWED TOOLS**: write_file, delete_file, add_package, remove_package
 - **❌ FORBIDDEN TOOLS**: NEVER use read_file, list_files, search_files, grep_search, web_search, web_extract, analyze_code, check_syntax, run_tests, create_directory, delete_directory, or ANY other tools
 - **PENALTY FOR VIOLATION**: If you attempt to use any forbidden tools, your response will be rejected and you will be penalized
 
 **📝 TOOL USAGE:**
 - **write_file**: Use for ALL file operations - creating new files, updating existing files, and modifying content with complete content
 - **delete_file**: Use for removing files from the project
+- **add_package**: Use for adding npm packages to package.json dependencies
+- **remove_package**: Use for removing npm packages from package.json dependencies
 
 **⚠️ CRITICAL: Always use write_file for file modifications. 
 
@@ -4624,6 +4634,8 @@ Do *not* tell the user to run shell commands. Instead, use JSON tool commands fo
 
 - **write_file**: Create or overwrite files with complete content
 - **delete_file**: Delete files from the project
+- **add_package**: Add npm packages to dependencies
+- **remove_package**: Remove npm packages from dependencies
 
 You can use these commands by embedding JSON tools in code blocks in your response like this:
 
@@ -4642,6 +4654,23 @@ You can use these commands by embedding JSON tools in code blocks in your respon
 }
 \`\`\`
 
+\`\`\`json
+{
+  "tool": "add_package",
+  "name": "lodash",
+  "version": "^4.17.21",
+  "isDev": false
+}
+\`\`\`
+
+\`\`\`json
+{
+  "tool": "remove_package",
+  "name": "lodash",
+  "isDev": false
+}
+\`\`\`
+
 ## 📋 **SHORT JSON TOOL RULES - CRITICAL**
 
 **✅ CORRECT write_file usage:**
@@ -4650,6 +4679,25 @@ You can use these commands by embedding JSON tools in code blocks in your respon
   "tool": "write_file",
   "path": "src/components/Component.tsx",
   "content": "import React from 'react'\\n\\nexport default function Component() {\\n  return <div>Hello</div>\\n}"
+}
+\`\`\`
+
+**✅ CORRECT add_package usage:**
+\`\`\`json
+{
+  "tool": "add_package",
+  "name": "lodash",
+  "version": "^4.17.21",
+  "isDev": false
+}
+\`\`\`
+
+**✅ CORRECT remove_package usage:**
+\`\`\`json
+{
+  "tool": "remove_package",
+  "name": "lodash",
+  "isDev": false
 }
 \`\`\`
 
@@ -4667,12 +4715,12 @@ You can use these commands by embedding JSON tools in code blocks in your respon
 - **ALWAYS wrap JSON tool commands in markdown code blocks with \`\`\`json**
 - Use proper JSON syntax with double quotes for all strings
 - Escape newlines in content as \\n for proper JSON formatting
-- **Supported tool names ONLY**: "write_file", "delete_file"
+- **Supported tool names ONLY**: "write_file", "delete_file", "add_package", "remove_package"
 - Each tool command must be a separate JSON code block
 - The JSON must be valid and properly formatted
 - **write_file content**: Escape quotes as \\" and newlines as \\n
 - **NEVER use single quotes** in JSON - always double quotes
-- **NEVER use any tool other than write_file or delete_file**
+- **NEVER use any tool other than write_file, delete_file, add_package, or remove_package**
 
 **🖼️ IMAGE API:** Use https://api.a0.dev/assets/image?text={description}&aspect=1:1&seed={number} for any images needed
 
@@ -5029,6 +5077,215 @@ src/             → Frontend React app
 `
 }
 
+// Enhanced Summarizer System Prompt for Codestral
+const ENHANCED_SUMMARIZER_PROMPT = `# 📋 Enhanced Summarizer System Prompt for Project Chat Sessions
+
+Your task is to create a comprehensive, detailed summary of the entire conversation that captures all essential information needed to seamlessly continue the work without any loss of context. This summary is used to compact the conversation while preserving all technical details, decisions, and progress.
+
+---
+
+## 🕵️‍♂️ Recent Context Analysis
+
+Pay special attention to the **most recent agent commands and tool executions** that led to this summarization, including:
+- **Last Agent Commands:** Exactly what actions/tools were just executed (e.g. \`write_file\`, \`delete_file\`)
+- **Tool Results:** Key outcomes from recent tool calls (truncate very long results, but preserve essential information)
+- **Immediate State:** What was being worked on right before summarization
+- **Triggering Context:** What caused the summarization (e.g., token budget exceeded, context window full)
+
+---
+
+## 🧩 Analysis Process
+
+Before providing your summary, analyze the session as follows:
+
+1. **Chronological Review:** Go through the conversation chronologically, identifying key phases and transitions.
+2. **Intent Mapping:** Extract all explicit and implicit user requests, goals, and expectations (with direct message context/quotes).
+3. **Technical Inventory:** Catalog all technologies, tools, and decisions mentioned.
+4. **File Operations Extraction:** Systematically extract and validate all \`write_file\` and \`delete_file\` JSON tool blocks from assistant responses:
+    - Attempt to parse each JSON block.
+    - If parsing succeeds, log the operation (created, updated, or deleted) with content and reason.
+    - If parsing fails (syntax error, bad escaping, etc.), record as a **failed operation** with error details and raw block.
+5. **Progress Assessment:** Summarize what's done vs. pending, and validate all critical context for continuation.
+6. **Recent Commands Analysis:** List the specific agent commands and tool results from the most recent operations.
+
+---
+
+## 🚨 **CRITICAL: File Operation Extraction and Validation**
+
+This summary allows the AI or a developer to instantly pick up where the session left off and to identify any failed file actions.
+
+- **Step 1:** Scan all assistant responses for JSON code blocks with \`"tool": "write_file"\` or \`"tool": "delete_file"\`.
+    - Only consider blocks that are in triple-backtick \`json\` code blocks.
+- **Step 2:** Attempt to parse each detected JSON block.
+    - If parsing is successful, treat as a valid file operation.
+    - If parsing **fails** (e.g. due to syntax error, bad escaping, missing or extra commas, etc.), record this as a **failed file operation** for that file path (if the path can be read; otherwise, note as "unknown path").
+    - Clearly log the invalid block and the error reason in the summary.
+
+---
+
+## ✨ Required Output Structure
+
+### 1. Conversation Overview
+- List user requests (with direct quotes) and assistant actions, in chronological order.
+
+### 2. File Operations Log
+Output a JSON array. For each file, include:
+- \`"path"\`: Relative file path (or \`"unknown"\` if undetermined).
+- \`"operations"\`: Chronological list of operations:
+    - For valid blocks:
+        - \`"type"\`: \`"created"\`, \`"updated"\`, \`"deleted"\`
+        - \`"content"\`: File content after operation (for \`created\`/\`updated\`)
+        - \`"reason"\`: Why this operation happened (with context)
+        - \`"status"\`: \`"success"\`
+    - For failed blocks:
+        - \`"type"\`: Attempted operation (e.g., \`"created"\`, \`"deleted"\`)
+        - \`"error"\`: Error message or parsing failure reason
+        - \`"raw_block"\`: The unparsed/invalid JSON block (truncated if long)
+        - \`"status"\`: \`"failed"\`
+- \`"final_state"\`: \`"present"\`, \`"deleted"\`, or \`"failed"\`
+
+### 3. Full Content Snapshots
+For all files with \`"final_state": "present"\`, output the **latest full content** in a code block, labeled by language and file path.
+
+### 4. Active Work State & Recent Commands
+- **Current Focus:** What was being worked on in the most recent exchanges.
+- **Recent Commands:** List the last agent tool commands (with tool names and file paths), and summarize their results (especially any errors).
+
+### 5. Pending and Next Steps
+- List all unresolved user requests or open tasks (with direct quotes if possible).
+- Clearly specify the immediate next action(s) for the assistant.
+
+---
+
+## 🛠️ Quality Guidelines
+
+- **Precision:** Use exact filenames, variable names, and technical terms.
+- **Completeness:** All context required to continue work must be included.
+- **Clarity:** Write for someone who needs to pick up exactly where the session left off.
+- **Verbatim Accuracy:** Use direct quotes for task specs and recent context.
+- **Technical Depth:** Include detail for all important technical/code decisions.
+- **Logical Flow:** Present the summary in a way that builds understanding progressively.
+- **Error Awareness:** Explicitly log any failed file operations with error details.
+
+---
+
+**This summary must serve as a comprehensive handoff document, preserving the full technical and contextual richness of the session, and highlighting any failures or pending work that must be addressed.**`
+
+// Generate conversation summary using Codestral
+async function generateConversationSummary(
+  messages: Array<{ role: string; content: string }>,
+  projectId: string,
+  userId: string
+): Promise<any> {
+  try {
+    console.log('[SUMMARIZER] Generating conversation summary with Codestral...')
+    
+    // Format conversation history for Codestral
+    const conversationHistory = messages
+      .map((msg, idx) => `### Message ${idx + 1} (${msg.role}):\n${msg.content}`)
+      .join('\n\n---\n\n')
+    
+    const summaryPrompt = `${ENHANCED_SUMMARIZER_PROMPT}
+
+---
+
+## Conversation to Summarize:
+
+${conversationHistory}
+
+---
+
+Please provide a comprehensive structured summary following the format specified above.`
+
+    // Call Codestral for summarization
+    const model = getModel('codestral-latest')
+    const { text } = await generateText({
+      model: model,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert technical summarizer. Create detailed, structured summaries of development conversations.'
+        },
+        {
+          role: 'user',
+          content: summaryPrompt
+        }
+      ],
+      temperature: 0.3
+    })
+    
+    console.log('[SUMMARIZER] Summary generated successfully')
+    
+    // Parse the summary into structured format
+    const structuredSummary = {
+      conversationOverview: extractSection(text, 'Conversation Overview', '# 2.') || 'No overview available',
+      fileOperationsLog: parseFileOperationsLog(text) || [],
+      activeWorkState: {
+        currentFocus: extractSection(text, 'Active Work State', '# 5.') || 'No current focus',
+        recentCommands: extractRecentCommands(text) || []
+      },
+      pendingSteps: extractPendingSteps(text) || []
+    }
+    
+    return structuredSummary
+  } catch (error) {
+    console.error('[SUMMARIZER] Error generating summary:', error)
+    // Return a basic summary on error
+    return {
+      conversationOverview: 'Error generating summary',
+      fileOperationsLog: [],
+      activeWorkState: {
+        currentFocus: 'Unknown',
+        recentCommands: []
+      },
+      pendingSteps: []
+    }
+  }
+}
+
+// Helper functions for parsing summary
+function extractSection(text: string, sectionName: string, nextSection?: string): string {
+  const regex = new RegExp(`## ${sectionName}[\\s\\S]*?\\n([\\s\\S]*?)(?=\\n##${nextSection ? `|${nextSection}` : ''}|$)`)
+  const match = text.match(regex)
+  return match ? match[1].trim() : ''
+}
+
+function parseFileOperationsLog(text: string): any[] {
+  try {
+    // Look for JSON code block containing file operations
+    const jsonMatch = text.match(/```json\s*\n([\s\S]*?)\n```/)
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[1])
+    }
+  } catch (error) {
+    console.warn('[SUMMARIZER] Failed to parse file operations log:', error)
+  }
+  return []
+}
+
+function extractRecentCommands(text: string): string[] {
+  const commandsSection = extractSection(text, 'Recent Commands')
+  if (!commandsSection) return []
+  
+  // Extract bullet points or numbered items
+  const lines = commandsSection.split('\n')
+  return lines
+    .filter(line => line.trim().match(/^[-*•]\s+|^\d+\.\s+/))
+    .map(line => line.replace(/^[-*•]\s+|^\d+\.\s+/, '').trim())
+    .slice(0, 5) // Keep last 5 commands
+}
+
+function extractPendingSteps(text: string): string[] {
+  const pendingSection = extractSection(text, 'Pending and Next Steps')
+  if (!pendingSection) return []
+  
+  // Extract bullet points or numbered items
+  const lines = pendingSection.split('\n')
+  return lines
+    .filter(line => line.trim().match(/^[-*•]\s+|^\d+\.\s+/))
+    .map(line => line.replace(/^[-*•]\s+|^\d+\.\s+/, '').trim())
+}
+
 
 export async function POST(req: Request) {
   try {
@@ -5298,6 +5555,90 @@ Use read_file tool to read specific files when needed.`
           console.warn('[WARNING] Failed to update cleaned conversation memory:', cleanupError)
         }
       }
+    }
+    
+    // CONVERSATION SUMMARIZATION: Generate structured summary with Codestral
+    // This creates a well-organized conversation history that will be used as context for the AI
+    let conversationSummaryContext = ''
+    try {
+      // Only generate summary if we have enough conversation history (at least 5 messages)
+      if (conversationMemory && conversationMemory.messages.length >= 5) {
+        console.log('[SUMMARIZER] Checking for existing conversation summary...')
+        
+        // Get or create conversation summary
+        let existingSummary = await storageManager.getConversationSummary(projectId, user.id)
+        
+        // Generate new summary if none exists or if conversation has grown significantly
+        if (!existingSummary || conversationMemory.messages.length - (existingSummary.summary?.fileOperationsLog?.length || 0) > 10) {
+          console.log('[SUMMARIZER] Generating new conversation summary with Codestral...')
+          
+          // Generate summary using Codestral
+          const structuredSummary = await generateConversationSummary(
+            conversationMemory.messages,
+            projectId,
+            user.id
+          )
+          
+          // Store or update the summary
+          if (existingSummary) {
+            await storageManager.updateConversationSummary(existingSummary.id, {
+              summary: structuredSummary,
+              updatedAt: new Date().toISOString()
+            })
+            console.log('[SUMMARIZER] Updated existing conversation summary')
+          } else {
+            await storageManager.createConversationSummary({
+              projectId,
+              userId: user.id,
+              summary: structuredSummary
+            })
+            console.log('[SUMMARIZER] Created new conversation summary')
+          }
+          
+          existingSummary = await storageManager.getConversationSummary(projectId, user.id)
+        } else {
+          console.log('[SUMMARIZER] Using existing conversation summary')
+        }
+        
+        // Format summary as context for the AI
+        if (existingSummary && existingSummary.summary) {
+          conversationSummaryContext = `
+
+## 📋 Conversation Summary (Organized by Codestral)
+
+### Overview
+${existingSummary.summary.conversationOverview}
+
+### Recent Work
+${existingSummary.summary.activeWorkState.currentFocus}
+
+### Recent Commands
+${existingSummary.summary.activeWorkState.recentCommands.map((cmd: string, idx: number) => `${idx + 1}. ${cmd}`).join('\n')}
+
+### File Operations
+${existingSummary.summary.fileOperationsLog.length > 0 
+  ? existingSummary.summary.fileOperationsLog.map((file: any) => 
+      `- **${file.path}**: ${file.finalState} (${file.operations.length} operations)`
+    ).join('\n')
+  : 'No file operations yet'}
+
+### Pending Tasks
+${existingSummary.summary.pendingSteps.length > 0 
+  ? existingSummary.summary.pendingSteps.map((step: string, idx: number) => `${idx + 1}. ${step}`).join('\n')
+  : 'No pending tasks'}
+
+---
+
+Use this summary to maintain context awareness and avoid repeating past actions.
+`
+          console.log('[SUMMARIZER] Conversation summary context prepared for AI')
+        }
+      } else {
+        console.log('[SUMMARIZER] Not enough conversation history to generate summary (need at least 5 messages)')
+      }
+    } catch (summaryError) {
+      console.error('[SUMMARIZER] Error generating conversation summary:', summaryError)
+      // Continue without summary on error
     }
     
     // Enhanced tool request detection with autonomous planning integration
@@ -5811,28 +6152,26 @@ Use read_file tool to read specific files when needed.`
             content: msg.content
           })) : []
       
-      // Get the latest user message and merge with project context
+      // Get the latest user message (no need to merge with project context since it's already in system prompt)
       const currentUserMessage = messages[messages.length - 1]
       const mergedUserMessage = {
         role: 'user' as const,
-        content: `${currentUserMessage?.content || ''}
-
-## Project Context
-
-${projectContext || 'No project context available'}
-
----
-
-Please respond to the user's request above, taking into account the project context provided.`
+        content: currentUserMessage?.content || ''
       }
       
-      // Prepare messages: include system message + conversation history + merged user message with context
-      const finalMessages = [
-        // Include conversation history (excluding the latest user message since we're merging it)
-        ...validMemoryMessages.slice(0, -1), // Remove last message if it exists to avoid duplication
-        // Add the merged user message with project context
+      // Always use the comprehensive system prompt (includes project context and conversation summary)
+      const streamingPrompt = getStreamingSystemPrompt(projectContext, undefined, detectedTemplate, conversationSummaryContext)
+
+      const finalMessages: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [
+        {
+          role: 'system' as const,
+          content: streamingPrompt
+        },
+        // Add the merged user message
         mergedUserMessage
       ]
+
+      console.log('[SUMMARY] Using comprehensive system prompt with project context and conversation summary')
       
       console.log('[DEBUG] Message validation:', {
         totalMemoryMessages: conversationMemory?.messages?.length || 0,
@@ -6115,7 +6454,7 @@ Please respond to the user's request above, taking into account the project cont
         console.log('[STREAMING] Starting JSON-enhanced streaming response')
         
         // Create enhanced messages with preprocessing context
-        let enhancedMessages = [...finalMessages]
+        let enhancedMessages: any = [...finalMessages]
         
         if (hasToolCalls && preprocessingResults) {
           // Add preprocessing context to the conversation
@@ -6168,7 +6507,7 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
           // Add JSON command instructions for cases without preprocessing using focused prompt
           // DISABLED: Memory functionality temporarily disabled for future use
           // const streamingPrompt = getStreamingSystemPrompt(projectContext, memoryContext)
-          const streamingPrompt = getStreamingSystemPrompt(projectContext, undefined, detectedTemplate)
+          const streamingPrompt = getStreamingSystemPrompt(projectContext, undefined, detectedTemplate, conversationSummaryContext)
           
           enhancedMessages.push({
             role: 'system' as const,

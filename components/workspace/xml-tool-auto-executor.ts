@@ -44,7 +44,7 @@ class XMLToolAutoExecutor {
     const validCommands = [
       'pilotwrite', 'pilotedit', 'pilotdelete',
       'write_file', 'edit_file', 'delete_file',
-      'execute_sql'
+      'execute_sql', 'add_package', 'remove_package'
     ]
     return validCommands.includes(toolCall.command)
   }
@@ -626,6 +626,87 @@ class XMLToolAutoExecutor {
           }
           
           return { message: `File ${toolCall.path} deleted successfully` }
+
+        case 'add_package':
+          if (!toolCall.args.name) {
+            throw new Error('add_package requires name parameter')
+          }
+          
+          const packageName = toolCall.args.name
+          const packageVersion = toolCall.args.version || 'latest'
+          const isDev = toolCall.args.isDev || false
+          
+          // Read current package.json
+          const packageJsonFile = await storageManager.getFile(projectId, 'package.json')
+          if (!packageJsonFile) {
+            throw new Error('package.json not found')
+          }
+          
+          const packageJson = JSON.parse(packageJsonFile.content)
+          
+          // Add package to dependencies or devDependencies
+          const depType = isDev ? 'devDependencies' : 'dependencies'
+          if (!packageJson[depType]) {
+            packageJson[depType] = {}
+          }
+          packageJson[depType][packageName] = packageVersion
+          
+          // Update package.json
+          await storageManager.updateFile(projectId, 'package.json', { 
+            content: JSON.stringify(packageJson, null, 2) 
+          })
+          
+          // Emit files-changed event
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('files-changed', {
+              detail: { projectId: this.options.projectId }
+            }))
+          }
+          
+          return { message: `Package ${packageName}@${packageVersion} added to ${depType} successfully` }
+
+        case 'remove_package':
+          if (!toolCall.args.name) {
+            throw new Error('remove_package requires name parameter')
+          }
+          
+          const removePackageName = toolCall.args.name
+          const removeIsDev = toolCall.args.isDev || false
+          
+          // Read current package.json
+          const removePackageJsonFile = await storageManager.getFile(projectId, 'package.json')
+          if (!removePackageJsonFile) {
+            throw new Error('package.json not found')
+          }
+          
+          const removePackageJson = JSON.parse(removePackageJsonFile.content)
+          
+          // Remove package from dependencies or devDependencies
+          const removeDepType = removeIsDev ? 'devDependencies' : 'dependencies'
+          let removed = false
+          
+          if (removePackageJson[removeDepType] && removePackageJson[removeDepType][removePackageName]) {
+            delete removePackageJson[removeDepType][removePackageName]
+            removed = true
+          }
+          
+          if (!removed) {
+            throw new Error(`Package ${removePackageName} not found in ${removeDepType}`)
+          }
+          
+          // Update package.json
+          await storageManager.updateFile(projectId, 'package.json', { 
+            content: JSON.stringify(removePackageJson, null, 2) 
+          })
+          
+          // Emit files-changed event
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('files-changed', {
+              detail: { projectId: this.options.projectId }
+            }))
+          }
+          
+          return { message: `Package ${removePackageName} removed from ${removeDepType} successfully` }
 
         default:
           throw new Error(`Unsupported JSON tool: ${toolCall.tool}`)

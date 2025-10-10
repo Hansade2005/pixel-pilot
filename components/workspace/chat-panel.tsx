@@ -44,7 +44,9 @@ import {
   Mic,
   MicOff,
   Sparkles,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Package,
+  PackageMinus
 } from "lucide-react"
 import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown"
 import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
@@ -334,15 +336,15 @@ function sanitizeStreamingContent(content: string): string {
     .replace(/```xml\s*([\s\S]*?)```/g, '$1')
     .replace(/```([\s\S]*?)```/g, (match, content) => {
       // Only remove code blocks that contain XML tags
-      if (/<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory)/.test(content)) {
+      if (/<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory|add_package|remove_package)/.test(content)) {
         console.log('[SANITIZER] Removing code block wrapper around XML content')
         return content
       }
       return match
     })
-    .replace(/<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory)[^>]*>[\s\S]*?<\/\1>/gi, '')
+    .replace(/<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory|add_package|remove_package)[^>]*>[\s\S]*?<\/\1>/gi, '')
     // Remove self-closing XML tool tags
-    .replace(/<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory)[^>]*\/>/gi, '')
+    .replace(/<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory|add_package|remove_package)[^>]*\/>/gi, '')
     // Clean up multiple newlines
     .replace(/\n\n\n+/g, '\n\n')
     // Remove leading/trailing whitespace
@@ -475,7 +477,7 @@ export interface XMLToolCall {
   startTime?: number
   endTime?: number
   // Additional properties for pill rendering
-  command?: 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file' | 'execute_sql'
+  command?: 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file' | 'execute_sql' | 'add_package' | 'remove_package'
   path?: string
   content?: string
 }
@@ -696,6 +698,8 @@ const JSONToolPill = ({
       case 'pilotedit': return Edit3
       case 'delete_file': 
       case 'pilotdelete': return X
+      case 'add_package': return Package
+      case 'remove_package': return PackageMinus
       default: return Wrench
     }
   }
@@ -708,6 +712,8 @@ const JSONToolPill = ({
       case 'pilotedit': return 'Modified'
       case 'delete_file': 
       case 'pilotdelete': return 'Deleted'
+      case 'add_package': return 'Added'
+      case 'remove_package': return 'Removed'
       default: return 'Executed'
     }
   }
@@ -720,6 +726,8 @@ const JSONToolPill = ({
       case 'pilotedit': return 'File Modified'
       case 'delete_file': 
       case 'pilotdelete': return 'File Deleted'
+      case 'add_package': return 'Package Added'
+      case 'remove_package': return 'Package Removed'
       default: return 'Tool Executed'
     }
   }
@@ -858,6 +866,8 @@ const XMLToolPill = ({ toolCall, status = 'completed' }: { toolCall: XMLToolCall
       case 'pilotwrite': return FileText
       case 'pilotedit': return Edit3
       case 'pilotdelete': return X
+      case 'add_package': return Package
+      case 'remove_package': return PackageMinus
       default: return Wrench
     }
   }
@@ -867,6 +877,8 @@ const XMLToolPill = ({ toolCall, status = 'completed' }: { toolCall: XMLToolCall
       case 'pilotwrite': return 'Created'
       case 'pilotedit': return 'Modified'
       case 'pilotdelete': return 'Deleted'
+      case 'add_package': return 'Added'
+      case 'remove_package': return 'Removed'
       default: return 'Executed'
     }
   }
@@ -876,6 +888,8 @@ const XMLToolPill = ({ toolCall, status = 'completed' }: { toolCall: XMLToolCall
       case 'pilotwrite': return 'File Created'
       case 'pilotedit': return 'File Modified'
       case 'pilotdelete': return 'File Deleted'
+      case 'add_package': return 'Package Added'
+      case 'remove_package': return 'Package Removed'
       default: return 'Tool Executed'
     }
   }
@@ -1994,7 +2008,7 @@ function cleanXMLToolTags(content: string): string {
   })
   
   // Also remove any remaining XML tool tags that might have been missed
-  const xmlTagRegex = /<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory)[^>]*>[\s\S]*?<\/\1>/g
+  const xmlTagRegex = /<(pilotwrite|pilotedit|pilotdelete|write_file|edit_file|delete_file|read_file|list_files|search_files|grep_search|web_search|web_extract|analyze_code|check_syntax|run_tests|create_directory|delete_directory|add_package|remove_package)[^>]*>[\s\S]*?<\/\1>/g
   cleaned = cleaned.replace(xmlTagRegex, '')
   
   // Clean up extra whitespace and newlines
