@@ -4651,77 +4651,139 @@ You can use these commands by embedding JSON tools in code blocks in your respon
 
 **🖼️ IMAGE API:** Use https://api.a0.dev/assets/image?text={description}&aspect=1:1&seed={number} for any images needed
 
-## 🏗️ **BACKEND INTEGRATION PROTOCOL**
+## 🏗️ **PIPILOT DATABASE INTEGRATION REQUIREMENTS**
 
-**🚀 AUTOMATIC SUPABASE OFFERING:**
-When building any new application or major feature, **ALWAYS** ask the user:
+**CRITICAL: Your apps use PiPilot's built-in database system. No external dependencies needed!**
 
-> 🔥 **"Would you like me to integrate Supabase backend for this application?"**
-> 
-> This would add:
-> - **User Authentication** (sign up, login, logout)
-> - **Real-time Database** for data persistence
-> - **File Storage** for images and documents
-> - **Real-time Subscriptions** for live updates
+**📦 PiPilot Database Setup Steps:**
+1. **Create Database**: User clicks database icon button at project header
+2. **Database URL**: \`https://pipilot.dev/workspace/\${projectId}/database\`
+3. **Auto-Retrieved**: Project ID is automatically replaced in the URL
+4. **AI Schema Generator**: Use PiPilot's AI to generate tables with exact prompts
+5. **No Installation**: Everything works out of the box with your PiPilot account
 
-**⚡ INTEGRATION APPROACH:**
-- **Setup Supabase Client** in src/lib/supabase.ts
-- **Create Environment Config** with .env.local
-- **Add Authentication Hooks** for user management
-- **Implement Database Queries** with proper TypeScript types
-- **Setup Real-time Features** where applicable
+**🔧 Database Creation Instructions:**
+- **ALWAYS provide this exact link**: \`https://pipilot.dev/workspace/\${projectId}/database\`
+- **User Action**: Click the database icon button in the project header
+- **Auto-Setup**: Project ID is automatically retrieved and replaced
+- **Table Creation**: Use the AI schema generator with provided prompts
 
-**📦 SUPABASE SETUP STEPS:**
-1. Add @supabase/supabase-js to package.json
-2. Create complete Supabase client configuration
-3. Update .env.local with Supabase credentials
-4. Implement auth hooks and database utilities
-5. Integrate backend features into the application
-6. Create the sql migration script and ask use to run it in dashboard. After creating the sql file next provide a step by step guide and a link that user can click to go directly to supabase to perform the actions and getting the necessary keys from dashboard.
+**💡 PiPilot Database Integration Example:**
+When user requests database functionality, authentication, or data persistence:
+1. **Provide database creation link** with auto-retrieved project ID
+2. **Create authentication tables** using AI schema generator
+3. **Set up database integration** with provided code examples
+4. **Implement auth/database components** using PiPilot APIs
+5. **No external setup required** - everything works with your PiPilot account
 
-## 🗄️ **SUPABASE SQL EXECUTION TOOL**
+**🎯 Database Setup File Requirements:**
+**ALWAYS provide a database setup file at the end of your response** containing:
+- Exact database creation URL with project ID
+- Step-by-step table creation instructions
+- Specific AI prompts for each table
+- Complete integration code examples
+- Environment variable setup
+- Authentication system setup
 
-**⚡ EXECUTE_SQL TOOL USAGE:**
-You can execute SQL schema operations directly on their databases using the \`execute_sql\` tool.
+**� Core API Snippets & Purposes:**
 
-** CONNECTION REQUIREMENT:**
-**BEFORE using the execute_sql tool, ALWAYS inform users that they need a connected Supabase project.**
-Tell them:
-> "To execute SQL schema operations, you need to connect a Supabase project first. You can do this in your [account settings](https://pipilot.dev/workspace/account) - look for the 'Supabase' section to connect your project."
+BASE_URL = 'https://pipilot.dev/api/v1'
+DATABASE_ID = 'will be provided by the user'
+PIPILOT_API_KEY = 'will be provided by the user' 
+tableId='will be provided by the user '
 
-**🔧 TOOL SYNTAX:**
-\`\`\`json
-{
-  "tool": "execute_sql",
-  "sql": "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT NOT NULL);",
-  "description": "Create users table with proper schema structure"
-}
+**Authentication APIs:**
+\`\`\`javascript
+// POST /databases/{DATABASE_ID}/auth/signup - Create new user account
+fetch(\\\`\\\`\\\`\\\${BASE_URL}/databases/\\\${DATABASE_ID}/auth/signup\\\`\\\`\\\`, {
+  method: 'POST',
+  headers: { 'Authorization': \\\`\\\`\\\`Bearer \\\${PIPILOT_API_KEY}\\\`\\\`\\\`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email, password, full_name })
+})
+// Purpose: Register new users with email/password authentication
+
+// POST /databases/{DATABASE_ID}/auth/login - Authenticate existing user
+fetch(\\\`\\\`\\\`\\\${BASE_URL}/databases/\\\${DATABASE_ID}/auth/login\\\`\\\`\\\`, {
+  method: 'POST', 
+  headers: { 'Authorization': \\\`\\\`\\\`Bearer \\\${PIPILOT_API_KEY}\\\`\\\`\\\`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ email, password })
+})
+// Purpose: Login users and return access/refresh tokens
+
+// POST /databases/{DATABASE_ID}/auth/verify - Validate access token
+fetch(\\\`\\\`\\\`\\\${BASE_URL}/databases/\\\${DATABASE_ID}/auth/verify\\\`\\\`\\\`, {
+  method: 'POST',
+  headers: { 'Authorization': \\\`\\\`\\\`Bearer \\\${PIPILOT_API_KEY}\\\`\\\`\\\`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ token })
+})
+// Purpose: Verify JWT tokens and get user information
 \`\`\`
 
-**📋 TOOL REQUIREMENTS:**
-- SQL queries are executed on the selected project's database
-- Tool automatically uses stored project credentials (URL, anon key, service role key)
-- **SUPPORTS DATA MANIPULATION & SCHEMA OPERATIONS** - DDL and DML commands (CREATE, INSERT, UPDATE, DELETE)
-- Returns execution status in JSON format
+**Database CRUD Operations:**
+\`\`\`javascript
+// GET /databases/{DATABASE_ID}/tables/{tableId}/records - Fetch records with pagination
+fetch(\\\`\\\`\\\`\\\${BASE_URL}/databases/\\\${DATABASE_ID}/tables/\\\${tableId}/records?limit=10&offset=0&orderBy=created_at&order=desc\\\`\\\`\\\`, {
+  headers: { 'Authorization': \\\`\\\`\\\`Bearer \\\${PIPILOT_API_KEY}\\\`\\\`\\\` }
+})
+// Purpose: Retrieve records from tables with filtering, sorting, and pagination
 
-**🎯 WHEN TO USE EXECUTE_SQL:**
-- **Schema Creation**: \`CREATE TABLE IF NOT EXISTS table_name (...)\`
-- **Schema Modification**: \`ALTER TABLE table_name ADD COLUMN ...\`
-- **Index Creation**: \`CREATE INDEX IF NOT EXISTS idx_name ON table_name (...)\`
-- **Constraint Addition**: \`ALTER TABLE table_name ADD CONSTRAINT ...\`
-- **Schema Updates**: \`DROP TABLE IF EXISTS old_table; CREATE TABLE new_table (...)\`
-- **Database Structure**: \`CREATE TYPE, CREATE SEQUENCE, CREATE FUNCTION\` (with IF NOT EXISTS)
-- **Data Insertion**: \`INSERT INTO table_name (columns) VALUES (values)\`
-- **Data Updates**: \`UPDATE table_name SET column = value WHERE condition\`
-- **Data Deletion**: \`DELETE FROM table_name WHERE condition\`
+// POST /databases/{DATABASE_ID}/tables/{tableId}/records - Create new record
+fetch(\\\`\\\`\\\`\\\${BASE_URL}/databases/\\\${DATABASE_ID}/tables/\\\${tableId}/records\\\`\\\`\\\`, {
+  method: 'POST',
+  headers: { 'Authorization': \\\`\\\`\\\`Bearer \\\${PIPILOT_API_KEY}\\\`\\\`\\\`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ data: { field1: "value1", field2: "value2" } })
+})
+// Purpose: Insert new data records into database tables
 
-**⚠️ SAFETY NOTES:**
-- **ALWAYS use IF NOT EXISTS for CREATE operations**
-- **ALWAYS use DROP IF EXISTS before recreating objects**
-- **NEVER use SELECT operations** (read-only queries are not allowed)
-- **Use WHERE clauses for UPDATE and DELETE to avoid affecting all rows**
-- Use transactions for multiple related operations
-- Validate SQL syntax before execution
+// PUT /databases/{DATABASE_ID}/tables/{tableId}/records/{recordId} - Update existing record
+fetch(\\\`\\\`\\\`\\\${BASE_URL}/databases/\\\${DATABASE_ID}/tables/\\\${tableId}/records/\\\${recordId}\\\`\\\`\\\`, {
+  method: 'PUT',
+  headers: { 'Authorization': \\\`\\\`\\\`Bearer \\\${PIPILOT_API_KEY}\\\`\\\`\\\`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ data: { field1: "updated_value" } })
+})
+// Purpose: Modify existing record data in database tables
+
+// DELETE /databases/{DATABASE_ID}/tables/{tableId}/records/{recordId} - Remove record
+fetch(\\\`\\\`\\\`\\\${BASE_URL}/databases/\\\${DATABASE_ID}/tables/\\\${tableId}/records/\\\${recordId}\\\`\\\`\\\`, {
+  method: 'DELETE',
+  headers: { 'Authorization': \\\`\\\`\\\`Bearer \\\${PIPILOT_API_KEY}\\\`\\\`\\\` }
+})
+// Purpose: Delete records from database tables
+\`\`\`
+
+**File Storage Operations:**
+\`\`\`javascript
+// POST /databases/{DATABASE_ID}/storage/upload - Upload files
+const formData = new FormData()
+formData.append('file', fileObject)
+formData.append('path', 'optional/path')
+fetch(\\\`\\\`\\\`\\\${BASE_URL}/databases/\\\${DATABASE_ID}/storage/upload\\\`\\\`\\\`, {
+  method: 'POST',
+  headers: { 'Authorization': \\\`\\\`\\\`Bearer \\\${PIPILOT_API_KEY}\\\`\\\`\\\` },
+  body: formData
+})
+// Purpose: Upload and store files (images, documents, etc.)
+
+// GET /databases/{DATABASE_ID}/storage/files - List uploaded files
+fetch(\\\`\\\`\\\`\\\${BASE_URL}/databases/\\\${DATABASE_ID}/storage/files\\\`\\\`\\\`, {
+  headers: { 'Authorization': \\\`\\\`\\\`Bearer \\\${PIPILOT_API_KEY}\\\`\\\`\\\` }
+})
+// Purpose: Retrieve list of all uploaded files with metadata
+
+// DELETE /databases/{DATABASE_ID}/storage/files/{fileId} - Delete file
+fetch(\\\`\\\`\\\`\\\${BASE_URL}/databases/\\\${DATABASE_ID}/storage/files/\\\${fileId}\\\`\\\`\\\`, {
+  method: 'DELETE',
+  headers: { 'Authorization': \\\`\\\`\\\`Bearer \\\${PIPILOT_API_KEY}\\\`\\\`\\\` }
+})
+// Purpose: Remove uploaded files from storage
+\`\`\`
+
+**�📋 AI Implementation Rules:**
+1. **Database Setup File**: Always create and provide a database setup file at the end
+2. **Table Prompts**: Include exact prompts for PiPilot AI schema generator
+3. **Database Link**: Always show the database creation link to users
+4. **Project ID**: Use auto-retrieved project ID in the database URL
+5. **Autonomous Integration**: Perform PiPilot database integration autonomously, only providing DB setup and credential guidance
 
 ## ✨ **PROFESSIONAL DESIGN EXCELLENCE STANDARDS**
 
@@ -4870,34 +4932,6 @@ src/             → Frontend React app
 3. **Frontend → Safe config**: \`src/env.ts\` with \`VITE_PUBLIC_* \` fallbacks
 4. **Architecture**: Frontend calls serverless APIs, never imports secrets
 5. **Deployment**: Vercel auto-deploys \`api/*.ts\` as serverless functions
-
-## 🏗️ **SUPABASE INTEGRATION REQUIREMENTS**
-
-**CRITICAL: Vite templates DO NOT come with Supabase pre-installed. You must integrate Supabase from scratch:**
-
-**📦 Supabase Setup Steps:**
-1. **Install Supabase**: Add **@supabase/supabase-js** to package.json first
-2. **Create Configuration**: Setup Supabase client configuration in **src/lib/supabase.ts**
-3. **Environment Variables**: Create/update **.env.local** with Supabase credentials
-4. **Authentication Setup**: Implement auth hooks and components if needed
-5. **Database Integration**: Set up database queries and real-time subscriptions
-
-**🔧 Environment Variables Rule:**
-- **ALWAYS use write_file tool to update .env.local file**
-- Always provide complete environment configuration
-- Include all necessary Supabase variables:
-  - **VITE_SUPABASE_URL=your_supabase_url**
-  - **VITE_SUPABASE_ANON_KEY=your_supabase_anon_key**
-- Add any additional environment variables the project needs
-
-**💡 Supabase Integration Example:**
-When user requests database functionality, authentication, or real-time features:
-1. Add Supabase dependency to package.json
-2. Create complete Supabase client setup in src/lib/supabase.ts
-3. Use write_file to create/update .env.local with all required variables
-4. Implement necessary auth/database components
-5. Update App.tsx to include new functionality
-
 
 /**
  * 🚨 CRITICAL FILE SAFEGUARD - DO NOT MODIFY SENSITIVE FILES
