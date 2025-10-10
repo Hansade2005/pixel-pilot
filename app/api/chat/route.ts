@@ -5197,8 +5197,8 @@ ${conversationHistory}
 
 Please provide a comprehensive structured summary following the format specified above.`
 
-    // Call Codestral for summarization
-    const model = getModel('codestral-latest')
+    // Call OpenAI GPT-4o Mini for summarization (fast and reliable)
+    const model = getModel('gpt-4o-mini')
     const { text } = await generateText({
       model: model,
       messages: [
