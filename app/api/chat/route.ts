@@ -4705,7 +4705,9 @@ When user requests database functionality, authentication, or data persistence:
 **ALWAYS provide a database setup file at the end of your response** containing:
 - Exact database creation URL with project ID
 - Step-by-step table creation instructions
-- Specific AI prompts for each table
+- Specific AI prompts for each table using ONLY these PiPilot datatypes:
+  * 'text', 'number', 'boolean', 'date', 'datetime', 'timestamp', 'uuid', 'json', 'email', 'url'
+  * NEVER use SQL types like 'integer', 'decimal', 'varchar' - map to PiPilot types
 - Complete integration code examples
 - Environment variable setup
 - Authentication system setup
@@ -4807,7 +4809,7 @@ fetch(\\\`\\\`\\\`\\\${BASE_URL}/databases/\\\${DATABASE_ID}/storage/files/\\\${
 
 **�📋 AI Implementation Rules:**
 1. **Database Setup File**: Always create and provide a database setup file at the end
-2. **Table Prompts**: Include exact prompts for PiPilot AI schema generator
+2. **Table Prompts**: Include exact prompts for PiPilot AI schema generator using ONLY supported datatypes ('text', 'number', 'boolean', 'date', 'datetime', 'timestamp', 'uuid', 'json', 'email', 'url')
 3. **Database Link**: Always show the database creation link to users
 4. **Project ID**: Use auto-retrieved project ID in the database URL
 5. **Autonomous Integration**: Perform complete PiPilot database integration by writing all necessary files and code changes - DO NOT provide guidance, actually implement the integration

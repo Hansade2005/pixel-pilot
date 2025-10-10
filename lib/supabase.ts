@@ -38,6 +38,7 @@ export interface Table {
 
 export interface TableSchema {
   columns: Column[];
+  indexes?: string[];
 }
 
 export interface Column {

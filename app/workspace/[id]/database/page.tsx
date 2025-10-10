@@ -18,6 +18,8 @@ import { AISchemaGenerator } from '@/components/database/ai-schema-generator';
 import ApiKeysManager from '@/components/database/api-keys-manager';
 import StorageManager from '@/components/database/storage-manager';
 import { ApiDocsGenerator } from '@/components/database/api-docs-generator';
+
+import { TableExport } from '@/components/database/table-export';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Navigation } from '@/components/navigation';
@@ -410,6 +412,7 @@ export default function DatabasePage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <TableExport tables={tables} databaseName={database.name} />
               <Button
                 variant="outline"
                 onClick={() => setShowApiDocsGenerator(true)}
@@ -530,54 +533,85 @@ export default function DatabasePage() {
             onSchemaGenerated={(schema) => {
               console.log('Schema generated:', schema);
             }}
-            onCreateTable={async (schema) => {
+            onCreateTables={async (schema) => {
               try {
-                // Convert AI schema to table creation format
-                const tableData = {
-                  name: schema.tableName,
-                  schema_json: {
-                    columns: schema.columns.map(col => ({
-                      name: col.name,
-                      type: col.type,
-                      required: col.required || false,
-                      defaultValue: col.defaultValue || null,
-                      unique: col.unique || false,
-                      primary_key: col.name === 'id',
-                      description: col.description || '',
-                      references: col.references || null
-                    })),
-                    indexes: schema.indexes || []
+                const tableCount = schema.tables.length;
+                console.log(`[Table Creation] Creating ${tableCount} table${tableCount > 1 ? 's' : ''}:`, schema.tables.map(t => t.tableName));
+
+                if (tableCount === 1) {
+                  // Single table - use existing single table API
+                  const singleTable = schema.tables[0];
+                  const tableData = {
+                    name: singleTable.tableName,
+                    schema_json: {
+                      columns: singleTable.columns.map(col => ({
+                        name: col.name,
+                        type: col.type,
+                        required: col.required || false,
+                        defaultValue: col.defaultValue || null,
+                        unique: col.unique || false,
+                        primary_key: col.name === 'id',
+                        description: col.description || '',
+                        references: col.references || null
+                      })),
+                      indexes: singleTable.indexes || []
+                    }
+                  };
+
+                  console.log('[Single Table] Sending request:', tableData);
+
+                  const response = await fetch(`/api/database/${database.id}/tables/create`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(tableData)
+                  });
+
+                  console.log('[Single Table] Response status:', response.status);
+
+                  if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('[Single Table] Error response:', errorData);
+                    throw new Error(errorData.error || 'Failed to create table');
                   }
-                };
 
-                console.log('[Create Table] Sending request:', tableData);
+                  const result = await response.json();
+                  console.log('[Single Table] Success:', result);
 
-                // Create the table using the correct endpoint
-                const response = await fetch(`/api/database/${database.id}/tables/create`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify(tableData)
-                });
+                  toast.success(`Table "${singleTable.tableName}" created successfully!`);
+                  setShowAISchemaGenerator(false);
+                  await loadDatabase(database.id);
+                } else {
+                  // Multiple tables - use bulk creation API
+                  const response = await fetch(`/api/database/${database.id}/tables/create-bulk`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                      tables: schema.tables
+                    })
+                  });
 
-                console.log('[Create Table] Response status:', response.status);
+                  console.log('[Bulk Create] Response status:', response.status);
 
-                if (!response.ok) {
-                  const errorData = await response.json();
-                  console.error('[Create Table] Error response:', errorData);
-                  throw new Error(errorData.error || 'Failed to create table');
+                  if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('[Bulk Create] Error response:', errorData);
+                    throw new Error(errorData.error || 'Failed to create tables');
+                  }
+
+                  const result = await response.json();
+                  console.log('[Bulk Create] Success:', result);
+
+                  toast.success(`Successfully created ${result.created.length} tables!${result.errors.length > 0 ? ` (${result.errors.length} failed)` : ''}`);
+                  setShowAISchemaGenerator(false);
+                  await loadDatabase(database.id);
                 }
-
-                const result = await response.json();
-                console.log('[Create Table] Success:', result);
-
-                toast.success(`Table "${schema.tableName}" created successfully!`);
-                setShowAISchemaGenerator(false);
-                await loadDatabase(database.id);
               } catch (error) {
-                console.error('Error creating table from AI schema:', error);
-                toast.error(error instanceof Error ? error.message : 'Failed to create table');
+                console.error('Error creating tables from AI schema:', error);
+                toast.error(error instanceof Error ? error.message : 'Failed to create tables');
               }
             }}
           />
