@@ -828,7 +828,11 @@ const JSONToolPill = ({
   }
 
   const isSuccess = executionStatus !== 'failed'
-  const fileName = toolCall.path ? (toolCall.path.split('/').pop() || toolCall.path) : `tool.${toolCall.id.split('_').pop()}`
+  const fileName = toolCall.path 
+    ? (toolCall.path.split('/').pop() || toolCall.path) 
+    : (toolCall.tool === 'add_package' || toolCall.tool === 'remove_package')
+      ? toolCall.args?.name || `tool.${toolCall.id.split('_').pop()}`
+      : `tool.${toolCall.id.split('_').pop()}`
   const IconComponent = getToolIcon(toolCall.tool || toolCall.name || 'unknown')
 
   // Special handling for write_file and edit_file with content
@@ -990,9 +994,11 @@ const XMLToolPill = ({ toolCall, status = 'completed' }: { toolCall: XMLToolCall
   }
 
   const isSuccess = status !== 'failed'
-  const fileName = toolCall.path && toolCall.path !== 'Unknown' ? 
-    (toolCall.path.split('/').pop() || toolCall.path) : 
-    `${toolCall.name || 'tool'}.${toolCall.id.split('_').pop()}`
+  const fileName = toolCall.path && toolCall.path !== 'Unknown' 
+    ? (toolCall.path.split('/').pop() || toolCall.path) 
+    : (toolCall.command === 'add_package' || toolCall.command === 'remove_package')
+      ? toolCall.args?.name || `${toolCall.name || 'tool'}.${toolCall.id.split('_').pop()}`
+      : `${toolCall.name || 'tool'}.${toolCall.id.split('_').pop()}`
   const IconComponent = getToolIcon(toolCall.command || toolCall.name || 'unknown')
 
   // Special handling for pilotwrite and pilotedit with content
