@@ -46,10 +46,7 @@ import {
   Sparkles,
   Link as LinkIcon,
   Package,
-  PackageMinus,
-  BarChart3,
-  FileStack,
-  History
+  PackageMinus
 } from "lucide-react"
 import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown"
 import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
@@ -63,7 +60,6 @@ import { AuthModal } from "@/components/auth-modal"
 import { ChatDiagnostics } from "./chat-diagnostics"
 import { AiModeSelector, type AIMode } from "@/components/ui/ai-mode-selector"
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai-models"
-import { ConversationMessage } from "@/lib/conversation-summarizer"
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
 import { createCheckpoint } from '@/lib/checkpoint-utils'
 import { ThinkingIndicator } from "@/components/ui/thinking-indicator"
@@ -3867,12 +3863,6 @@ export function ChatPanel({
   const [xmlCommands, setXmlCommands] = useState<any[]>([]) // State for XML tool commands
   const [autoExecutor, setAutoExecutor] = useState<XMLToolAutoExecutor | null>(null) // XML Auto Executor
   
-  // Summarization state
-  const [contextUsage, setContextUsage] = useState<{ percentage: number; tokens: number; limit: number }>({ percentage: 0, tokens: 0, limit: 0 })
-  const [isSummarizing, setIsSummarizing] = useState(false)
-  const [showSummaryHistory, setShowSummaryHistory] = useState(false)
-  const [conversationSummaries, setConversationSummaries] = useState<any[]>([])
-  
   // Chat session state
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [chatSessions, setChatSessions] = useState<any[]>([])
@@ -4147,22 +4137,6 @@ export function ChatPanel({
     autoSendInitialPrompt()
   }, [initialPrompt, project, messages.length, isLoading])
 
-  // Load conversation summaries when session changes
-  React.useEffect(() => {
-    if (currentSessionId) {
-      loadConversationSummaries()
-    } else {
-      setConversationSummaries([])
-    }
-  }, [currentSessionId])
-
-  // Update context usage when messages or model changes
-  React.useEffect(() => {
-    if (currentSessionId && selectedModel) {
-      updateContextUsage()
-    }
-  }, [messages, selectedModel, currentSessionId])
-
   // Load chat history from IndexedDB for a specific project
   const loadChatHistory = async (projectToLoad: Project | null = null) => {
     const targetProject = projectToLoad || project
@@ -4388,110 +4362,6 @@ export function ChatPanel({
         title: "Generation Stopped",
         description: "AI response generation has been cancelled.",
       })
-    }
-  }
-
-  // Manual summarization handler
-  const handleManualSummarize = async () => {
-    if (!project || !currentSessionId || isSummarizing) return
-
-    try {
-      setIsSummarizing(true)
-      
-      const { ConversationSummarizer } = await import('@/lib/conversation-summarizer')
-      const { storageManager } = await import('@/lib/storage-manager')
-      await storageManager.init()
-
-      // Get current messages and convert to ConversationMessage format
-      const rawMessages = await storageManager.getMessages(currentSessionId)
-      const sessionMessages: ConversationMessage[] = rawMessages.map(msg => ({
-        id: msg.id,
-        role: msg.role,
-        content: msg.content,
-        timestamp: new Date(msg.createdAt),
-        tokenCount: msg.tokensUsed
-      }))
-      
-      // Generate summary
-      const summary = await ConversationSummarizer.generateSummary(
-        sessionMessages,
-        `conv_${currentSessionId}_${Date.now()}`,
-        'manual',
-        selectedModel
-      )
-      
-      // Save summary
-      await storageManager.createConversationSummary({
-        projectId: currentSessionId,
-        userId: 'current-user', // TODO: Get from auth context
-        summary: {
-          conversationOverview: summary.summaryText,
-          fileOperationsLog: [], // Will be populated by actual file operations
-          activeWorkState: {
-            currentFocus: summary.progressAssessment.currentFocus,
-            recentCommands: summary.progressAssessment.completedTasks
-          },
-          pendingSteps: summary.progressAssessment.pendingTasks
-        }
-      })
-      
-      // Update local state
-      setConversationSummaries(prev => [summary, ...prev])
-      
-      toast({
-        title: "Summary Created",
-        description: "Conversation has been summarized successfully.",
-      })
-    } catch (error) {
-      console.error('[ChatPanel] Error creating manual summary:', error)
-      toast({
-        title: "Summary Failed",
-        description: "Failed to create conversation summary. Please try again.",
-        variant: "destructive"
-      })
-    } finally {
-      setIsSummarizing(false)
-    }
-  }
-
-  // Load conversation summaries
-  const loadConversationSummaries = async () => {
-    if (!currentSessionId) return
-
-    try {
-      const { storageManager } = await import('@/lib/storage-manager')
-      await storageManager.init()
-      
-      const summary = await storageManager.getConversationSummary(currentSessionId, 'current-user')
-      setConversationSummaries(summary ? [summary] : [])
-    } catch (error) {
-      console.error('[ChatPanel] Error loading conversation summaries:', error)
-    }
-  }
-
-  // Update context usage (message count)
-  const updateContextUsage = async () => {
-    if (!currentSessionId) return
-
-    try {
-      const { storageManager } = await import('@/lib/storage-manager')
-      await storageManager.init()
-
-      // Get current messages
-      const sessionMessages = await storageManager.getMessages(currentSessionId)
-      const messageCount = sessionMessages.length
-      const messageThreshold = 15
-      
-      // Calculate percentage towards summarization threshold
-      const percentage = Math.min(Math.round((messageCount / messageThreshold) * 100), 100)
-      
-      setContextUsage({ 
-        percentage, 
-        tokens: messageCount, // Using tokens field for message count
-        limit: messageThreshold 
-      })
-    } catch (error) {
-      console.error('[ChatPanel] Error updating context usage:', error)
     }
   }
 
@@ -7274,46 +7144,6 @@ Please provide just the title, nothing else. Make it concise and descriptive.`
         </div>
         
         <div className="flex items-center gap-2">
-          {/* Context Usage Indicator */}
-          {contextUsage.tokens > 0 && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-muted/50 rounded-lg text-xs">
-              <BarChart3 className="w-3 h-3 text-muted-foreground" />
-              <span className={`font-medium ${contextUsage.percentage >= 80 ? 'text-amber-500' : contextUsage.percentage >= 100 ? 'text-red-500' : 'text-muted-foreground'}`}>
-                {contextUsage.percentage}%
-              </span>
-              <span className="text-muted-foreground">
-                {contextUsage.tokens.toLocaleString()}/{contextUsage.limit.toLocaleString()} messages
-              </span>
-            </div>
-          )}
-          
-          {/* Manual Summarize Button */}
-          {currentSessionId && contextUsage.tokens > 0 && (
-            <button
-              onClick={handleManualSummarize}
-              disabled={isSummarizing || isLoading}
-              className="p-2 rounded-lg hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Create conversation summary"
-            >
-              {isSummarizing ? (
-                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <FileStack className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-              )}
-            </button>
-          )}
-          
-          {/* Summary History Button */}
-          {conversationSummaries.length > 0 && (
-            <button
-              onClick={() => setShowSummaryHistory(!showSummaryHistory)}
-              className="p-2 rounded-lg hover:bg-muted transition-colors"
-              title="View conversation summaries"
-            >
-              <History className={`w-4 h-4 ${showSummaryHistory ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`} />
-            </button>
-          )}
-          
           {/* New Session Button */}
           <button
             onClick={handleCreateNewSession}
@@ -7376,44 +7206,6 @@ Please provide just the title, nothing else. Make it concise and descriptive.`
           </div>
         </div>
       </div>
-      
-      {/* Summary History Panel */}
-      {showSummaryHistory && conversationSummaries.length > 0 && (
-        <div className="border-b border-border bg-muted/20">
-          <div className="px-4 py-3">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-foreground">Conversation Summaries</h3>
-              <button
-                onClick={() => setShowSummaryHistory(false)}
-                className="p-1 rounded hover:bg-muted transition-colors"
-              >
-                <X className="w-3 h-3 text-muted-foreground" />
-              </button>
-            </div>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {conversationSummaries.map((summary, index) => (
-                <div key={index} className="bg-background/50 rounded-lg p-3 border border-border">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-muted-foreground">
-                      {summary.createdAt ? new Date(summary.createdAt).toLocaleString() : 'Recent'}
-                    </span>
-                    <button
-                      onClick={() => navigator.clipboard.writeText(summary.content)}
-                      className="p-1 rounded hover:bg-muted transition-colors"
-                      title="Copy summary"
-                    >
-                      <Copy className="w-3 h-3 text-muted-foreground" />
-                    </button>
-                  </div>
-                  <div className="text-sm text-foreground whitespace-pre-wrap">
-                    {summary.content.length > 200 ? `${summary.content.substring(0, 200)}...` : summary.content}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
       
       {/* Messages Container - Fixed height, scrollable */}
       <div className={`flex-1 min-h-0 overflow-hidden bg-background relative ${

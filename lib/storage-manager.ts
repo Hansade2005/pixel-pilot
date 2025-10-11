@@ -237,7 +237,6 @@ export interface StorageInterface {
   // Conversation summary methods for Codestral-generated summaries
   createConversationSummary(summary: Omit<ConversationSummary, 'id' | 'createdAt' | 'updatedAt'>): Promise<ConversationSummary>;
   getConversationSummary(projectId: string, userId: string): Promise<ConversationSummary | null>;
-  getConversationSummaries(projectId: string, userId: string): Promise<ConversationSummary[]>;
   updateConversationSummary(id: string, updates: Partial<ConversationSummary>): Promise<ConversationSummary | null>;
   deleteConversationSummary(id: string): Promise<boolean>;
   
@@ -746,13 +745,6 @@ class InMemoryStorage implements StorageInterface {
       }
     }
     return null
-  }
-
-  async getConversationSummaries(projectId: string, userId: string): Promise<ConversationSummary[]> {
-    // Find all summaries by projectId and userId combination
-    return Array.from(this.conversationSummaries.values()).filter(summary =>
-      summary.projectId === projectId && summary.userId === userId
-    )
   }
 
   async updateConversationSummary(id: string, updates: Partial<ConversationSummary>): Promise<ConversationSummary | null> {
@@ -1949,47 +1941,6 @@ class IndexedDBStorage implements StorageInterface {
       const request = store.delete(id)
       
       request.onsuccess = () => resolve(true)
-      request.onerror = () => reject(request.error)
-    })
-  }
-
-  async saveConversationSummary(summary: Omit<ConversationSummary, 'id' | 'createdAt' | 'updatedAt'>): Promise<ConversationSummary> {
-    if (!this.db) throw new Error('Database not initialized')
-
-    const id = `summary_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    const now = new Date().toISOString()
-    const newSummary: ConversationSummary = {
-      ...summary,
-      id,
-      createdAt: now,
-      updatedAt: now
-    }
-
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['conversationSummaries'], 'readwrite')
-      const store = transaction.objectStore('conversationSummaries')
-      const request = store.add(newSummary)
-
-      request.onsuccess = () => resolve(newSummary)
-      request.onerror = () => reject(request.error)
-    })
-  }
-
-  async getConversationSummaries(projectId: string, userId: string): Promise<ConversationSummary[]> {
-    if (!this.db) throw new Error('Database not initialized')
-    
-    return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['conversationSummaries'], 'readonly')
-      const store = transaction.objectStore('conversationSummaries')
-      const index = store.index('projectId')
-      const request = index.getAll(projectId)
-
-      request.onsuccess = () => {
-        const summaries = request.result || []
-        // Find summaries that match both projectId and userId
-        const filteredSummaries = summaries.filter(s => s.userId === userId)
-        resolve(filteredSummaries)
-      }
       request.onerror = () => reject(request.error)
     })
   }
