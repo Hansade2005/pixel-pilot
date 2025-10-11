@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react"
+import React, { useState, useRef, useEffect, useCallback } from "react"
 
 // Simple debounce utility to prevent excessive function calls
 function debounce<T extends (...args: any[]) => any>(
@@ -147,14 +147,7 @@ interface ChatPanelProps {
   aiMode?: AIMode
   onModeChange?: (mode: AIMode) => void
   onClearChat?: () => void
-  onCreateNewSession?: () => void
-  onChatSessionsChange?: (sessions: any[], currentId: string | null) => void
   initialPrompt?: string
-}
-
-export interface ChatPanelRef {
-  createNewSession: () => void
-  switchSession: (sessionId: string) => void
 }
 
 // Workflow Message Component for sophisticated workflow rendering
@@ -587,11 +580,6 @@ const JSONToolPill = ({
       setExecutionStatus('executing')
       setHasExecuted(true)
 
-      // Add delay for package tools to prevent race conditions
-      if (toolCall.tool === 'add_package' || toolCall.tool === 'remove_package') {
-        await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 500)) // 500-1500ms delay
-      }
-
       try {
         // Use project.id directly like specs route - get storage manager the same way
         const { storageManager } = await import('@/lib/storage-manager')
@@ -682,7 +670,13 @@ const JSONToolPill = ({
             break
 
           case 'add_package':
+            // Add delay for package tools to prevent race conditions
+            if (toolCall.tool === 'add_package' || toolCall.tool === 'remove_package') {
+              await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 500))
+            }
+
             console.log('[JSONToolPill] Executing add_package:', toolCall.args)
+
             // Read current package.json
             const packageJsonFile = await storageManager.getFile(projectId, 'package.json')
             if (!packageJsonFile) {
@@ -690,7 +684,8 @@ const JSONToolPill = ({
             }
             
             const packageJson = JSON.parse(packageJsonFile.content)
-            console.log('[JSONToolPill] Current package.json:', packageJson)
+            console.log('[JSONToolPill] Current package.json dependencies:', Object.keys(packageJson.dependencies || {}))
+            console.log('[JSONToolPill] Current package.json devDependencies:', Object.keys(packageJson.devDependencies || {}))
             
             // Add package to dependencies or devDependencies
             const depType = toolCall.args.isDev ? 'devDependencies' : 'dependencies'
@@ -700,7 +695,11 @@ const JSONToolPill = ({
             }
             packageJson[depType][toolCall.args.name] = toolCall.args.version || 'latest'
             
-            console.log('[JSONToolPill] Updated package.json:', packageJson)
+            console.log('[JSONToolPill] Updated package.json:', {
+              dependencies: Object.keys(packageJson.dependencies || {}),
+              devDependencies: Object.keys(packageJson.devDependencies || {})
+            })
+            
             // Update package.json
             await storageManager.updateFile(projectId, 'package.json', { 
               content: JSON.stringify(packageJson, null, 2) 
@@ -828,11 +827,7 @@ const JSONToolPill = ({
   }
 
   const isSuccess = executionStatus !== 'failed'
-  const fileName = toolCall.path 
-    ? (toolCall.path.split('/').pop() || toolCall.path) 
-    : (toolCall.tool === 'add_package' || toolCall.tool === 'remove_package')
-      ? toolCall.args?.name || `tool.${toolCall.id.split('_').pop()}`
-      : `tool.${toolCall.id.split('_').pop()}`
+  const fileName = toolCall.path ? (toolCall.path.split('/').pop() || toolCall.path) : `tool.${toolCall.id.split('_').pop()}`
   const IconComponent = getToolIcon(toolCall.tool || toolCall.name || 'unknown')
 
   // Special handling for write_file and edit_file with content
@@ -994,11 +989,9 @@ const XMLToolPill = ({ toolCall, status = 'completed' }: { toolCall: XMLToolCall
   }
 
   const isSuccess = status !== 'failed'
-  const fileName = toolCall.path && toolCall.path !== 'Unknown' 
-    ? (toolCall.path.split('/').pop() || toolCall.path) 
-    : (toolCall.command === 'add_package' || toolCall.command === 'remove_package')
-      ? toolCall.args?.name || `${toolCall.name || 'tool'}.${toolCall.id.split('_').pop()}`
-      : `${toolCall.name || 'tool'}.${toolCall.id.split('_').pop()}`
+  const fileName = toolCall.path && toolCall.path !== 'Unknown' ? 
+    (toolCall.path.split('/').pop() || toolCall.path) : 
+    `${toolCall.name || 'tool'}.${toolCall.id.split('_').pop()}`
   const IconComponent = getToolIcon(toolCall.command || toolCall.name || 'unknown')
 
   // Special handling for pilotwrite and pilotedit with content
@@ -3752,17 +3745,15 @@ const HighlightLoader = () => {
   return null
 }
 
-export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(function ChatPanel({
+export function ChatPanel({
   project,
   isMobile = false,
   selectedModel = DEFAULT_CHAT_MODEL,
   aiMode = 'agent',
   onModeChange,
   onClearChat: externalOnClearChat,
-  onCreateNewSession,
-  onChatSessionsChange,
   initialPrompt
-}: ChatPanelProps, ref: React.Ref<ChatPanelRef>) {
+}: ChatPanelProps) {
   const { toast } = useToast()
   const { triggerAutoBackup, triggerInstantBackup } = useAutoCloudBackup({
     debounceMs: 0, // No debounce for instant AI operations
@@ -6920,9 +6911,6 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(function ChatP
       )
       
       setChatSessions(sessionsWithCounts)
-      
-      // Notify parent component of session changes
-      onChatSessionsChange?.(sessionsWithCounts, currentSessionId)
     } catch (error) {
       console.error('Error loading chat sessions:', error)
     }
@@ -7019,17 +7007,6 @@ Please provide just the title, nothing else. Make it concise and descriptive.`
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showSessionDropdown])
   
-  // Notify parent component when sessions or current session changes
-  React.useEffect(() => {
-    onChatSessionsChange?.(chatSessions, currentSessionId)
-  }, [chatSessions, currentSessionId, onChatSessionsChange])
-  
-  // Expose methods to parent component via ref
-  useImperativeHandle(ref, () => ({
-    createNewSession: handleCreateNewSession,
-    switchSession: handleSwitchSession
-  }), [handleCreateNewSession, handleSwitchSession])
-  
   return (
     <div className="flex flex-col h-full">
       
@@ -7064,7 +7041,7 @@ Please provide just the title, nothing else. Make it concise and descriptive.`
         </div>
       )}
       
-      {/* Chat Header */}
+      {/* Chat Header with Session Controls */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background/50 sticky top-0 z-10">
 
         <div className="flex items-center gap-3">
@@ -7077,7 +7054,66 @@ Please provide just the title, nothing else. Make it concise and descriptive.`
         </div>
         
         <div className="flex items-center gap-2">
-          {/* Header actions can be added here if needed */}
+          {/* New Session Button */}
+          <button
+            onClick={handleCreateNewSession}
+            className="p-2 rounded-lg hover:bg-muted transition-colors"
+            title="Create new chat session"
+          >
+            <Plus className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+          </button>
+          
+          {/* Session History Dropdown */}
+          <div className="relative session-dropdown-container">
+            <button
+              onClick={() => setShowSessionDropdown(!showSessionDropdown)}
+              className="p-2 rounded-lg hover:bg-muted transition-colors"
+              title="Chat session history"
+            >
+              <Clock className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+            </button>
+            
+            {/* Session Dropdown */}
+            {showSessionDropdown && (
+              <div className="absolute right-0 top-full mt-2 w-80 bg-popover border border-border rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+                <div className="p-2">
+                  <div className="text-sm font-medium text-popover-foreground mb-2 px-2">
+                    Chat Sessions
+                  </div>
+                  {chatSessions.map((session) => (
+                    <button
+                      key={session.id}
+                      onClick={() => handleSwitchSession(session.id)}
+                      className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                        session.id === currentSessionId
+                          ? 'bg-accent text-accent-foreground font-medium'
+                          : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="truncate">
+                            {session.title || `Session ${session.id.slice(-8)}`}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {session.messageCount || 0} messages • {session.lastMessageAt ? new Date(session.lastMessageAt).toLocaleDateString() : 'No messages'}
+                          </div>
+                        </div>
+                        {session.id === currentSessionId && (
+                          <div className="w-2 h-2 bg-primary rounded-full ml-2" />
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                  {chatSessions.length === 0 && (
+                    <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                      No chat sessions yet
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       
@@ -8266,6 +8302,4 @@ Please provide just the title, nothing else. Make it concise and descriptive.`
       
     </div>
   )
-})
-
-ChatPanel.displayName = 'ChatPanel'
+}

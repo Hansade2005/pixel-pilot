@@ -10,12 +10,12 @@ import { useRouter, useSearchParams } from "next/navigation"
 import type { User } from "@supabase/supabase-js"
 import type { Workspace, File } from "@/lib/storage-manager"
 import { Sidebar } from "./sidebar"
-import { ChatPanel, type ChatPanelRef } from "./chat-panel"
+import { ChatPanel } from "./chat-panel"
 import { CodePreviewPanel } from "./code-preview-panel"
 import { ProjectHeader } from "./project-header"
 import { FileExplorer } from "./file-explorer"
 import { CodeEditor } from "./code-editor"
-import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone, Database, Clock } from "lucide-react"
+import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone, Database } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -98,11 +98,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [hasAutoOpenedCreateDialog, setHasAutoOpenedCreateDialog] = useState(false)
   const [hasProcessedInitialPrompt, setHasProcessedInitialPrompt] = useState(false)
   
-  // Chat session state for mobile header
-  const [showSessionDropdown, setShowSessionDropdown] = useState(false)
-  const [chatSessions, setChatSessions] = useState<any[]>([])
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
-  
   // Preview-related state
   const [customUrl, setCustomUrl] = useState("")
   const [preview, setPreview] = useState({
@@ -114,7 +109,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   
   // Refs to access CodePreviewPanel methods
   const codePreviewRef = useRef<import('./code-preview-panel').CodePreviewPanelRef | null>(null)
-  const chatPanelRef = useRef<ChatPanelRef | null>(null)
   
   // Sync preview state from CodePreviewPanel
   const [syncedPreview, setSyncedPreview] = useState({
@@ -946,15 +940,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 <ResizablePanel defaultSize={35} minSize={20} maxSize={40}>
                   <div className="h-full flex flex-col border-r border-border">
                     <ChatPanel 
-                      ref={chatPanelRef}
                       project={selectedProject}
                       selectedModel={selectedModel}
                       aiMode={aiMode}
                       onModeChange={setAiMode}
-                      onChatSessionsChange={(sessions, currentId) => {
-                        setChatSessions(sessions)
-                        setCurrentSessionId(currentId)
-                      }}
                       initialPrompt={initialChatPrompt}
                     />
                   </div>
@@ -1353,93 +1342,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             </div>
             
             <div className="flex items-center space-x-1">
-              {/* Chat Session Controls */}
-              <div className="flex items-center gap-1">
-                {/* New Session Button */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                  onClick={() => {
-                    chatPanelRef.current?.createNewSession()
-                  }}
-                  title="Create new chat session"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-                
-                {/* Session History Dropdown */}
-                <div className="relative session-dropdown-container">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={() => setShowSessionDropdown(!showSessionDropdown)}
-                    title="Chat session history"
-                  >
-                    <Clock className="h-4 w-4" />
-                  </Button>
-                  
-                  {/* Session Dropdown */}
-                  {showSessionDropdown && (
-                    <div className="absolute right-0 top-full mt-2 w-80 bg-popover border border-border rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
-                      <div className="p-2">
-                        <div className="flex items-center justify-between mb-2 px-2">
-                          <div className="text-sm font-medium text-popover-foreground">
-                            Chat Sessions
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0"
-                            onClick={() => {
-                              chatPanelRef.current?.createNewSession()
-                            }}
-                            title="Create new session"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
-                        {chatSessions.length > 0 ? (
-                          chatSessions.map((session) => (
-                            <button
-                              key={session.id}
-                              onClick={() => {
-                                chatPanelRef.current?.switchSession(session.id)
-                                setShowSessionDropdown(false)
-                              }}
-                              className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                                session.id === currentSessionId
-                                  ? 'bg-accent text-accent-foreground font-medium'
-                                  : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1 min-w-0">
-                                  <div className="truncate">
-                                    {session.title || `Session ${session.id.slice(-8)}`}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    {session.messageCount || 0} messages • {session.lastMessageAt ? new Date(session.lastMessageAt).toLocaleDateString() : 'No messages'}
-                                  </div>
-                                </div>
-                                {session.id === currentSessionId && (
-                                  <div className="w-2 h-2 bg-primary rounded-full ml-2" />
-                                )}
-                              </div>
-                            </button>
-                          ))
-                        ) : (
-                          <div className="px-3 py-4 text-sm text-muted-foreground text-center">
-                            No chat sessions yet
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
               <Button
                 variant="ghost"
                 size="sm"
@@ -1473,6 +1375,15 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 title="Deploy"
               >
                 <Rocket className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => window.open('/workspace/management', '_blank')}
+                title="Settings"
+              >
+                <Settings className="h-4 w-4" />
               </Button>
             </div>
           </div>
