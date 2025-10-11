@@ -167,7 +167,7 @@ export class ConversationSummarizer {
       const progressAssessment = this.extractProgressAssessment(sections.progressTracking)
 
       // Calculate token count
-      const tokenCount = countTokens(summaryText, 'default')
+      const tokenCount = await countTokens(summaryText, 'default')
 
       const summary: ConversationSummary = {
         id: `summary_${conversationId}_${Date.now()}`,

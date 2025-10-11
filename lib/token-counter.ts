@@ -1,8 +1,28 @@
 // Token counting utility for accurate context window monitoring
 // Supports multiple AI providers with different tokenization schemes
 
-import { Tiktoken, get_encoding } from 'tiktoken'
-const getEncoding = get_encoding as (name: string) => Tiktoken
+// import { Tiktoken, get_encoding } from 'tiktoken'
+
+// Initialize tiktoken asynchronously
+// let tiktokenReady = false
+// let getEncoding: (name: string) => Tiktoken
+
+// Initialize tiktoken
+// const initializeTiktoken = async () => {
+//   if (!tiktokenReady) {
+//     try {
+//       // Dynamic import to ensure proper loading
+//       const tiktokenModule = await import('tiktoken')
+//       getEncoding = tiktokenModule.get_encoding as (name: string) => Tiktoken
+//       tiktokenReady = true
+//       console.log('[TOKEN_COUNTER] Tiktoken initialized successfully')
+//     } catch (error) {
+//       console.error('[TOKEN_COUNTER] Failed to initialize tiktoken:', error)
+//       throw error
+//     }
+//   }
+// }
+
 // Cache for token counts to improve performance
 const tokenCache = new Map<string, number>()
 const MAX_CACHE_SIZE = 1000
@@ -169,7 +189,10 @@ const encoderCache = new Map<string, Tiktoken>()
 /**
  * Get the appropriate tokenizer for a model
  */
-function getTokenizer(modelId: string): Tiktoken {
+async function getTokenizer(modelId: string): Promise<Tiktoken> {
+  // Ensure tiktoken is initialized
+  await initializeTiktoken()
+
   const scheme = TOKENIZATION_SCHEMES[modelId as keyof typeof TOKENIZATION_SCHEMES] || TOKENIZATION_SCHEMES.default
 
   if (!encoderCache.has(scheme)) {
@@ -187,7 +210,7 @@ function getTokenizer(modelId: string): Tiktoken {
 /**
  * Count tokens in a text string for a specific model
  */
-export function countTokens(text: string, modelId: string = 'default'): number {
+export async function countTokens(text: string, modelId: string = 'default'): Promise<number> {
   if (!text || typeof text !== 'string') {
     return 0
   }
@@ -199,7 +222,7 @@ export function countTokens(text: string, modelId: string = 'default'): number {
   }
 
   try {
-    const tokenizer = getTokenizer(modelId)
+    const tokenizer = await getTokenizer(modelId)
     const tokens = tokenizer.encode(text)
     const count = tokens.length
 
@@ -219,16 +242,16 @@ export function countTokens(text: string, modelId: string = 'default'): number {
 /**
  * Count tokens in a conversation message array
  */
-export function countConversationTokens(
+export async function countConversationTokens(
   messages: Array<{ role: string; content: string }>,
   modelId: string = 'default'
-): number {
+): Promise<number> {
   let totalTokens = 0
 
   for (const message of messages) {
     // Add tokens for role and content
-    const roleTokens = countTokens(`role: ${message.role}`, modelId)
-    const contentTokens = countTokens(message.content, modelId)
+    const roleTokens = await countTokens(`role: ${message.role}`, modelId)
+    const contentTokens = await countTokens(message.content, modelId)
     totalTokens += roleTokens + contentTokens
 
     // Add formatting tokens (approximate)
@@ -287,18 +310,18 @@ export function getContextWindowStatus(
 /**
  * Estimate tokens for a conversation with system prompt and history
  */
-export function estimateConversationTokens(
+export async function estimateConversationTokens(
   systemPrompt: string,
   messages: Array<{ role: string; content: string }>,
   modelId: string = 'default'
-): {
+): Promise<{
   systemTokens: number
   messageTokens: number
   totalTokens: number
   status: ReturnType<typeof getContextWindowStatus>
-} {
-  const systemTokens = countTokens(systemPrompt, modelId)
-  const messageTokens = countConversationTokens(messages, modelId)
+}> {
+  const systemTokens = await countTokens(systemPrompt, modelId)
+  const messageTokens = await countConversationTokens(messages, modelId)
   const totalTokens = systemTokens + messageTokens
 
   const status = getContextWindowStatus(totalTokens, modelId)
@@ -328,11 +351,11 @@ export function getSupportedModels(): string[] {
 /**
  * Validate token count accuracy (for testing)
  */
-export function validateTokenCount(
+export async function validateTokenCount(
   text: string,
   expectedRange: { min: number; max: number },
   modelId: string = 'default'
-): boolean {
-  const actual = countTokens(text, modelId)
+): Promise<boolean> {
+  const actual = await countTokens(text, modelId)
   return actual >= expectedRange.min && actual <= expectedRange.max
 }
