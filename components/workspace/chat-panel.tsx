@@ -843,7 +843,11 @@ const JSONToolPill = ({
   }
 
   const isSuccess = executionStatus !== 'failed'
-  const fileName = toolCall.path ? (toolCall.path.split('/').pop() || toolCall.path) : `tool.${toolCall.id.split('_').pop()}`
+  const fileName = toolCall.tool === 'add_package' || toolCall.tool === 'remove_package' 
+    ? toolCall.args?.name || 'unknown-package'
+    : toolCall.path 
+      ? (toolCall.path.split('/').pop() || toolCall.path) 
+      : `tool.${toolCall.id.split('_').pop()}`
   const IconComponent = getToolIcon(toolCall.tool || toolCall.name || 'unknown')
 
   // Special handling for write_file and edit_file with content
