@@ -96,6 +96,7 @@
     "stripe": "^18.5.0",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
+    "tiktoken": "^1.0.22",
     "uuid": "^11.1.0",
     "vaul": "^0.9.9",
     "xml-js": "^1.6.11",

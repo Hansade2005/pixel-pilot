@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { getModel } from '@/lib/ai-providers'
 import { DEFAULT_CHAT_MODEL, getModelById } from '@/lib/ai-models'
+import { ConversationSummarizer } from '@/lib/conversation-summarizer'
 
 // Global user ID for tool access
 declare global {
@@ -6583,7 +6584,89 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
             
             // Start streaming the main response with JSON command support
             let result;
-            
+
+            // 🔄 CONVERSATION SUMMARIZATION TRIGGER
+            // Check if conversation needs summarization before processing
+            let summarizationTriggered = false
+            let summaryContext = ''
+
+            try {
+              const { conversationSummarizer } = await import('@/lib/conversation-summarizer')
+
+              // Convert conversation memory to summarizer format
+              const conversationMessages: Array<{
+                id: string
+                role: 'user' | 'assistant' | 'system'
+                content: string
+                timestamp: Date
+              }> = conversationMemory?.messages?.map((msg: any, index: number) => ({
+                id: `msg_${index}`,
+                role: msg.role,
+                content: msg.content,
+                timestamp: new Date(msg.timestamp || Date.now())
+              })) || []
+
+              // Check if summarization is needed (after 15 messages)
+              const summarizationCheck = ConversationSummarizer.shouldSummarizeByMessageCount(
+                conversationMessages,
+                15 // Trigger after 15 messages
+              )
+
+              if (summarizationCheck.shouldSummarize) {
+                console.log(`[SUMMARIZATION] Triggering automatic summarization: ${summarizationCheck.reason}`)
+
+                // Generate summary
+                const summary = await ConversationSummarizer.generateSummary(
+                  conversationMessages,
+                  `conv_${projectId}_${user.id}`,
+                  'auto-token-limit',
+                  selectedModelId
+                )
+
+                // Store summary in database
+                const { storageManager } = await import('@/lib/storage-manager')
+                await storageManager.init()
+
+                await storageManager.createConversationSummary({
+                  projectId,
+                  userId: user.id,
+                  summary: {
+                    conversationOverview: summary.summaryText,
+                    fileOperationsLog: [], // Will be populated by actual file operations
+                    activeWorkState: {
+                      currentFocus: summary.progressAssessment.currentFocus,
+                      recentCommands: summary.progressAssessment.completedTasks
+                    },
+                    pendingSteps: summary.progressAssessment.pendingTasks
+                  }
+                })
+
+                // Add summary context to system prompt
+                summaryContext = `\n\n## 📋 CONVERSATION SUMMARY (Auto-generated)\n\n${summary.contextForContinuation}\n\n**Key Points:**\n${summary.keyPoints.map((point: string) => `• ${point}`).join('\n')}\n\n**Current Focus:** ${summary.progressAssessment.currentFocus}`
+
+                summarizationTriggered = true
+
+                console.log(`[SUMMARIZATION] Summary generated and stored (${summary.tokenCount} tokens)`)
+              }
+            } catch (summarizationError) {
+              console.error('[SUMMARIZATION] Error during summarization check:', summarizationError)
+              // Continue without summarization on error
+            }
+
+            // Add summarization context to system message if available
+            if (summaryContext) {
+              const lastSystemMessageIndex = enhancedMessages.findLastIndex((msg: { role: string }) => msg.role === 'system')
+              if (lastSystemMessageIndex !== -1) {
+                enhancedMessages[lastSystemMessageIndex].content += summaryContext
+              } else {
+                // Add as new system message
+                enhancedMessages.unshift({
+                  role: 'system',
+                  content: `You are an AI assistant with conversation context.${summaryContext}`
+                })
+              }
+            }
+
             // SPECIAL HANDLING: a0.dev uses custom streaming, not AI SDK streamText
             if (modelId === 'a0-dev-llm') {
               console.log('[A0-DEV] Using custom a0.dev streaming instead of AI SDK streamText');
