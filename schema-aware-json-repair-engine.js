@@ -59,6 +59,37 @@ export class SchemaAwareJSONRepairEngine extends AIJSONRepairEngine {
           dryRun: { type: 'boolean' },
           rollbackOnFailure: { type: 'boolean' }
         }
+      },
+      add_package: {
+        type: 'object',
+        required: ['tool', 'args'],
+        properties: {
+          tool: { type: 'string', enum: ['add_package'] },
+          args: {
+            type: 'object',
+            required: ['name'],
+            properties: {
+              name: { type: 'string' },
+              version: { type: 'string' },
+              isDev: { type: 'boolean' }
+            }
+          }
+        }
+      },
+      remove_package: {
+        type: 'object',
+        required: ['tool', 'args'],
+        properties: {
+          tool: { type: 'string', enum: ['remove_package'] },
+          args: {
+            type: 'object',
+            required: ['name'],
+            properties: {
+              name: { type: 'string' },
+              isDev: { type: 'boolean' }
+            }
+          }
+        }
       }
     };
   }

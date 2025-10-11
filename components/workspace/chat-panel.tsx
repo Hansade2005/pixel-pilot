@@ -595,6 +595,12 @@ const JSONToolPill = ({
         // Execute file operation directly like specs route does
         let result: any
         
+        // Add delay for package tools to prevent race conditions
+        if (toolCall.tool === 'add_package' || toolCall.tool === 'remove_package') {
+          console.log(`[JSONToolPill] Adding delay for ${toolCall.tool} to prevent race conditions`)
+          await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 500))
+        }
+        
         switch (toolCall.tool) {
           case 'write_file':
           case 'pilotwrite':
@@ -670,11 +676,6 @@ const JSONToolPill = ({
             break
 
           case 'add_package':
-            // Add delay for package tools to prevent race conditions
-            if (toolCall.tool === 'add_package' || toolCall.tool === 'remove_package') {
-              await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 500))
-            }
-
             console.log('[JSONToolPill] Executing add_package:', toolCall.args)
 
             // Read current package.json
@@ -701,9 +702,12 @@ const JSONToolPill = ({
             })
             
             // Update package.json
-            await storageManager.updateFile(projectId, 'package.json', { 
+            const updatedFile = await storageManager.updateFile(projectId, 'package.json', { 
               content: JSON.stringify(packageJson, null, 2) 
             })
+            
+            console.log('[JSONToolPill] Package added successfully:', toolCall.args.name, 'to', depType)
+            console.log('[JSONToolPill] File update result:', updatedFile ? 'success' : 'failed')
             
             result = { 
               message: `Package ${toolCall.args.name} added to ${depType} successfully`, 
@@ -716,6 +720,8 @@ const JSONToolPill = ({
             break
 
           case 'remove_package':
+            console.log('[JSONToolPill] Executing remove_package:', toolCall.args)
+
             // Read current package.json
             const removePackageJsonFile = await storageManager.getFile(projectId, 'package.json')
             if (!removePackageJsonFile) {
@@ -723,19 +729,29 @@ const JSONToolPill = ({
             }
             
             const removePackageJson = JSON.parse(removePackageJsonFile.content)
+            console.log('[JSONToolPill] Current package.json before removal - dependencies:', Object.keys(removePackageJson.dependencies || {}))
+            console.log('[JSONToolPill] Current package.json before removal - devDependencies:', Object.keys(removePackageJson.devDependencies || {}))
             
             // Remove package from dependencies or devDependencies
             const removeDepType = toolCall.args.isDev ? 'devDependencies' : 'dependencies'
+            console.log('[JSONToolPill] Removing from depType:', removeDepType, 'package:', toolCall.args.name)
             if (!removePackageJson[removeDepType] || !removePackageJson[removeDepType][toolCall.args.name]) {
               throw new Error(`Package ${toolCall.args.name} not found in ${removeDepType}`)
             }
             
             delete removePackageJson[removeDepType][toolCall.args.name]
+            console.log('[JSONToolPill] Package removed. Updated package.json:', {
+              dependencies: Object.keys(removePackageJson.dependencies || {}),
+              devDependencies: Object.keys(removePackageJson.devDependencies || {})
+            })
             
             // Update package.json
-            await storageManager.updateFile(projectId, 'package.json', { 
+            const removeUpdatedFile = await storageManager.updateFile(projectId, 'package.json', { 
               content: JSON.stringify(removePackageJson, null, 2) 
             })
+            
+            console.log('[JSONToolPill] Package removed successfully:', toolCall.args.name, 'from', removeDepType)
+            console.log('[JSONToolPill] File update result:', removeUpdatedFile ? 'success' : 'failed')
             
             result = { 
               message: `Package ${toolCall.args.name} removed from ${removeDepType} successfully`, 
