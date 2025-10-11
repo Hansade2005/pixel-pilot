@@ -4068,7 +4068,7 @@ export function ChatPanel({
           chatSession = await storageManager.createChatSession({
             workspaceId: project.id,
             userId: project.userId,
-            title: `${project.name} - AI Chat Session`,
+            title: `New Chat Session`,
             isActive: true,
             lastMessageAt: new Date().toISOString()
           })
@@ -5063,6 +5063,45 @@ export function ChatPanel({
 
     // Save user message to IndexedDB
     await saveMessageToIndexedDB(userMessage)
+
+    // Generate title for new chat session if this is the first user message (async, non-blocking)
+    if (currentSessionId) {
+      // Run title generation asynchronously to avoid blocking the UI
+      setTimeout(async () => {
+        try {
+          const { storageManager } = await import('@/lib/storage-manager')
+          await storageManager.init()
+
+          // Get current session to check if it needs a title update
+          const currentSession = await storageManager.getChatSession(currentSessionId)
+          if (currentSession && currentSession.title === 'New Chat Session') {
+            // Check if this is the first user message in the session
+            const existingMessages = await storageManager.getMessages(currentSessionId)
+            const userMessages = existingMessages.filter(msg => msg.role === 'user')
+            
+            if (userMessages.length === 1 && userMessage.content.trim().length > 5) { // Only for substantial messages
+              // Get all existing session titles for uniqueness check
+              const allSessions = await storageManager.getChatSessions(project.userId)
+              const existingTitles = allSessions
+                .filter(session => session.workspaceId === project.id)
+                .map(session => session.title)
+
+              // Generate new title using Pixtral
+              const newTitle = await generateChatSessionTitle(userMessage.content, existingTitles)
+
+              // Update session title
+              await storageManager.updateChatSession(currentSessionId, { title: newTitle })
+
+              // Refresh session list to show updated title
+              await loadChatSessions()
+            }
+          }
+        } catch (error) {
+          console.error('Error generating chat session title:', error)
+          // Silently fail - users can still use the session with placeholder title
+        }
+      }, 100) // Small delay to ensure message is fully saved
+    }
     
     // Create checkpoint for this message
     if (project) {
@@ -6668,7 +6707,7 @@ export function ChatPanel({
       const newSession = await storageManager.createChatSession({
         userId: project.userId,
         workspaceId: project.id,
-        title: `Chat Session ${new Date().toLocaleString()}`,
+        title: `New Chat Session`,
         isActive: true,
         lastMessageAt: new Date().toISOString()
       })
@@ -6780,6 +6819,77 @@ export function ChatPanel({
       setChatSessions(sessionsWithCounts)
     } catch (error) {
       console.error('Error loading chat sessions:', error)
+    }
+  }
+
+  // Generate a unique chat session title using Pixtral model
+  const generateChatSessionTitle = async (firstMessage: string, existingTitles: string[]): Promise<string> => {
+    try {
+      // Skip title generation for very short messages
+      if (firstMessage.trim().length < 10) {
+        return 'New Chat Session'
+      }
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'system',
+              content: `You are a helpful assistant that generates concise, descriptive titles for chat conversations. Create a title that captures the main topic or intent of the user's first message. Keep titles under 50 characters and make them natural and engaging. Focus on the core subject matter.`
+            },
+            {
+              role: 'user',
+              content: `Generate a chat session title for this conversation starter: "${firstMessage.substring(0, 200)}${firstMessage.length > 200 ? '...' : ''}"
+
+Please provide just the title, nothing else. Make it concise and descriptive.`
+            }
+          ],
+          modelId: 'pixtral-12b-2409', // Use Pixtral model specifically
+          useTools: false,
+          generateTitle: true // Special flag to indicate this is for title generation
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`)
+      }
+
+      const data = await response.json()
+      let generatedTitle = data.content?.trim() || 'New Chat Session'
+
+      // Clean up the title (remove quotes, extra spaces, etc.)
+      generatedTitle = generatedTitle.replace(/^["']|["']$/g, '').trim()
+
+      // Limit title length
+      if (generatedTitle.length > 50) {
+        generatedTitle = generatedTitle.substring(0, 47) + '...'
+      }
+
+      // Ensure uniqueness by checking against existing titles
+      let uniqueTitle = generatedTitle
+      let counter = 1
+      const baseTitle = generatedTitle
+
+      while (existingTitles.includes(uniqueTitle)) {
+        uniqueTitle = `${baseTitle} (${counter})`
+        counter++
+        // Prevent infinite loops
+        if (counter > 10) {
+          uniqueTitle = `${baseTitle} (${Date.now()})`
+          break
+        }
+      }
+
+      return uniqueTitle
+    } catch (error) {
+      console.error('Error generating chat session title:', error)
+      // Return a fallback title based on message content
+      const fallbackTitle = firstMessage.trim().split(' ').slice(0, 3).join(' ')
+      return fallbackTitle.length > 5 ? `${fallbackTitle}...` : 'New Chat Session'
     }
   }
   

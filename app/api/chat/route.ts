@@ -5237,7 +5237,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
     // FORCE TOOLS TO BE ALWAYS ENABLED
-    let { messages, projectId, useTools = true, modelId, aiMode = 'agent' } = body
+    let { messages, projectId, useTools = true, modelId, aiMode = 'agent', generateTitle = false } = body
     
     // Ensure we always have a projectId - generate one if missing
     if (!projectId) {
@@ -5263,6 +5263,32 @@ export async function POST(req: Request) {
 
     // Set global user ID for tool access
     global.currentUserId = user.id
+
+    // Handle title generation requests
+    if (generateTitle) {
+      try {
+        const model = getMistralPixtralModel()
+        const result = await generateText({
+          model: model,
+          messages: messages,
+          temperature: 0.3
+        })
+
+        // Clean and validate the generated title
+        let title = result.text?.trim() || 'New Chat Session'
+        title = title.replace(/^["']|["']$/g, '').trim() // Remove quotes
+        title = title.substring(0, 50) // Limit length
+
+        return new Response(JSON.stringify({ content: title }), {
+          headers: { 'Content-Type': 'application/json' }
+        })
+      } catch (error) {
+        console.error('Error generating title:', error)
+        return new Response(JSON.stringify({ content: 'New Chat Session' }), {
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
+    }
 
     // Get memory context to prevent duplicates and provide AI awareness
     // DISABLED: Memory functionality temporarily disabled for future use
