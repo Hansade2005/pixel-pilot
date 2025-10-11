@@ -2405,6 +2405,7 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
       }
     })
 
+    // Package management tools - only available in Agent mode
     tools.edit_file = tool({
       description: 'Edit an existing file using precise search/replace operations. Provide the search and replace blocks directly as parameters.',
       inputSchema: z.object({

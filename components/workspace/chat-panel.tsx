@@ -558,8 +558,14 @@ const JSONToolPill = ({
   // IMMEDIATE EXECUTION: Execute the tool as soon as the pill is rendered, just like specs route
   useEffect(() => {
     const executeImmediately = async () => {
-      // Only execute if not already executed and is a valid file operation
-      if (hasExecuted || executionStatus === 'failed' || !toolCall.tool || !toolCall.path) {
+      // Only execute if not already executed and is a valid operation
+      if (hasExecuted || executionStatus === 'failed' || !toolCall.tool) {
+        return
+      }
+
+      // For package tools, we don't need a path
+      const needsPath = !['add_package', 'remove_package'].includes(toolCall.tool)
+      if (needsPath && !toolCall.path) {
         return
       }
 
@@ -581,7 +587,9 @@ const JSONToolPill = ({
         const projectId = project.id
 
         // Generate unique execution ID to prevent duplicates (like specs route)
-        const executionId = `${toolCall.tool}_${toolCall.path.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        const executionId = toolCall.tool.includes('package') 
+          ? `${toolCall.tool}_${toolCall.args.name}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          : `${toolCall.tool}_${(toolCall.path || 'unknown').replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
         console.log('[JSONToolPill] Execution ID:', executionId)
 
         // Execute file operation directly like specs route does
@@ -590,6 +598,9 @@ const JSONToolPill = ({
         switch (toolCall.tool) {
           case 'write_file':
           case 'pilotwrite':
+            if (!toolCall.path) {
+              throw new Error(`${toolCall.tool} requires path`)
+            }
             if (!toolCall.content) {
               throw new Error('write_file requires content')
             }
@@ -624,6 +635,9 @@ const JSONToolPill = ({
 
           case 'edit_file':
           case 'pilotedit':
+            if (!toolCall.path) {
+              throw new Error(`${toolCall.tool} requires path`)
+            }
             // Use the autoExecutor's advanced edit logic if available, otherwise fallback to simple update
             if (autoExecutor) {
               result = await autoExecutor.executeJsonTool({
@@ -647,9 +661,74 @@ const JSONToolPill = ({
 
           case 'delete_file':
           case 'pilotdelete':
+            if (!toolCall.path) {
+              throw new Error(`${toolCall.tool} requires path`)
+            }
             await storageManager.deleteFile(projectId, toolCall.path)
             result = { message: `File ${toolCall.path} deleted successfully`, action: 'deleted' }
             triggerAutoBackup(`Tool deleted file: ${toolCall.path}`)
+            break
+
+          case 'add_package':
+            // Read current package.json
+            const packageJsonFile = await storageManager.getFile(projectId, 'package.json')
+            if (!packageJsonFile) {
+              throw new Error('package.json not found')
+            }
+            
+            const packageJson = JSON.parse(packageJsonFile.content)
+            
+            // Add package to dependencies or devDependencies
+            const depType = toolCall.args.isDev ? 'devDependencies' : 'dependencies'
+            if (!packageJson[depType]) {
+              packageJson[depType] = {}
+            }
+            packageJson[depType][toolCall.args.name] = toolCall.args.version || 'latest'
+            
+            // Update package.json
+            await storageManager.updateFile(projectId, 'package.json', { 
+              content: JSON.stringify(packageJson, null, 2) 
+            })
+            
+            result = { 
+              message: `Package ${toolCall.args.name} added to ${depType} successfully`, 
+              action: 'package_added',
+              package: toolCall.args.name,
+              version: toolCall.args.version || 'latest',
+              dependencyType: depType
+            }
+            triggerAutoBackup(`Tool added package: ${toolCall.args.name}`)
+            break
+
+          case 'remove_package':
+            // Read current package.json
+            const removePackageJsonFile = await storageManager.getFile(projectId, 'package.json')
+            if (!removePackageJsonFile) {
+              throw new Error('package.json not found')
+            }
+            
+            const removePackageJson = JSON.parse(removePackageJsonFile.content)
+            
+            // Remove package from dependencies or devDependencies
+            const removeDepType = toolCall.args.isDev ? 'devDependencies' : 'dependencies'
+            if (!removePackageJson[removeDepType] || !removePackageJson[removeDepType][toolCall.args.name]) {
+              throw new Error(`Package ${toolCall.args.name} not found in ${removeDepType}`)
+            }
+            
+            delete removePackageJson[removeDepType][toolCall.args.name]
+            
+            // Update package.json
+            await storageManager.updateFile(projectId, 'package.json', { 
+              content: JSON.stringify(removePackageJson, null, 2) 
+            })
+            
+            result = { 
+              message: `Package ${toolCall.args.name} removed from ${removeDepType} successfully`, 
+              action: 'package_removed',
+              package: toolCall.args.name,
+              dependencyType: removeDepType
+            }
+            triggerAutoBackup(`Tool removed package: ${toolCall.args.name}`)
             break
 
           default:
@@ -675,7 +754,7 @@ const JSONToolPill = ({
             detail: {
               projectId: projectId,
               action: toolCall.tool,
-              path: toolCall.path,
+              path: toolCall.tool.includes('package') ? 'package.json' : (toolCall.path || 'unknown'),
               source: 'json-tool-immediate',
               executionId
             }
@@ -1025,7 +1104,7 @@ function validateXMLToolCall(toolCall: XMLToolCall): boolean {
   }
   
   // Ensure command is valid
-  const validCommands = ['pilotwrite', 'pilotedit', 'pilotdelete']
+  const validCommands = ['pilotwrite', 'pilotedit', 'pilotdelete', 'write_file', 'edit_file', 'delete_file', 'add_package', 'remove_package']
   if (toolCall.command && !validCommands.includes(toolCall.command)) {
     return false
   }
@@ -1844,7 +1923,7 @@ function detectXMLTools(content: string): XMLToolCall[] {
   const detectedTools: XMLToolCall[] = parseResult.tools.map(tool => ({
     id: tool.id,
     name: tool.name || tool.tool,
-    command: tool.tool as 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file',
+    command: tool.tool as 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file' | 'execute_sql' | 'add_package' | 'remove_package',
     path: tool.path,
     content: tool.content,
     args: tool.args,
@@ -7211,7 +7290,7 @@ Please provide just the title, nothing else. Make it concise and descriptive.`
                                           }
                                           
                                           // If still no match, create a synthetic tool call from the JSON
-                                          if (!matchingTool && parsed.tool && (parsed.path || parsed.content)) {
+                                          if (!matchingTool && parsed.tool && (parsed.path || parsed.content || parsed.tool === 'add_package' || parsed.tool === 'remove_package')) {
                                             matchingTool = {
                                               id: `synthetic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                                               tool: parsed.tool,

@@ -781,7 +781,7 @@ class XMLToolAutoExecutor {
     return jsonTools.map(tool => ({
       id: tool.id,
       name: tool.tool || tool.name || 'unknown',
-      command: tool.tool as 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file',
+      command: tool.tool as 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file' | 'execute_sql' | 'add_package' | 'remove_package',
       path: tool.path || '',
       content: tool.content || '',
       args: tool.args,
