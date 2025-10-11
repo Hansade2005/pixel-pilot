@@ -48,6 +48,7 @@ export interface ChatSession {
   title: string
   isActive: boolean
   lastMessageAt: string
+  messageCount?: number
   endedAt?: string
   createdAt: string
   updatedAt: string

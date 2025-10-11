@@ -3678,6 +3678,11 @@ export function ChatPanel({
   const [showScrollToBottom, setShowScrollToBottom] = useState(false) // State for floating chevron visibility
   const [xmlCommands, setXmlCommands] = useState<any[]>([]) // State for XML tool commands
   const [autoExecutor, setAutoExecutor] = useState<XMLToolAutoExecutor | null>(null) // XML Auto Executor
+  
+  // Chat session state
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
+  const [chatSessions, setChatSessions] = useState<any[]>([])
+  const [showSessionDropdown, setShowSessionDropdown] = useState(false)
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null) // Ref for messages container
 
@@ -3855,6 +3860,7 @@ export function ChatPanel({
         
         setMessages([])
         setCurrentProjectId(project.id)
+        setCurrentSessionId(null) // Reset session ID when switching projects
         // Clear restore state when project changes
         setRestoreMessageId(null)
         
@@ -3965,6 +3971,8 @@ export function ChatPanel({
       
       if (activeSession) {
         console.log(`[ChatPanel] Found active session for project ${targetProject.id}:`, activeSession.id)
+        // Set current session ID
+        setCurrentSessionId(activeSession.id)
         // Get messages for this session
         const sessionMessages = await storageManager.getMessages(activeSession.id)
         
@@ -4045,47 +4053,58 @@ export function ChatPanel({
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
       
-      // Get or create chat session for this specific project
-      let chatSessions = await storageManager.getChatSessions(project.userId)
-      let chatSession = chatSessions.find((session: any) => 
-        session.workspaceId === project.id && session.isActive
-      )
+      // Use current session ID if available, otherwise get/create active session
+      let chatSessionId = currentSessionId
       
-      if (!chatSession) {
-        console.log(`[ChatPanel] Creating new chat session for project ${project.id}`)
-        chatSession = await storageManager.createChatSession({
-          workspaceId: project.id,
-          userId: project.userId,
-          title: `${project.name} - AI Chat Session`,
-          isActive: true,
-          lastMessageAt: new Date().toISOString()
-        })
-        console.log(`[ChatPanel] Created chat session:`, chatSession.id)
-      } else {
-        console.log(`[ChatPanel] Using existing chat session:`, chatSession.id)
+      if (!chatSessionId) {
+        // Fallback to finding active session (for backward compatibility)
+        let chatSessions = await storageManager.getChatSessions(project.userId)
+        let chatSession = chatSessions.find((session: any) => 
+          session.workspaceId === project.id && session.isActive
+        )
+        
+        if (!chatSession) {
+          console.log(`[ChatPanel] Creating new chat session for project ${project.id}`)
+          chatSession = await storageManager.createChatSession({
+            workspaceId: project.id,
+            userId: project.userId,
+            title: `${project.name} - AI Chat Session`,
+            isActive: true,
+            lastMessageAt: new Date().toISOString()
+          })
+          console.log(`[ChatPanel] Created chat session:`, chatSession.id)
+          setCurrentSessionId(chatSession.id)
+        } else {
+          console.log(`[ChatPanel] Using existing chat session:`, chatSession.id)
+          setCurrentSessionId(chatSession.id)
+        }
+        
+        chatSessionId = chatSession.id
       }
       
       // Check if message with this ID already exists and delete it (to prevent duplicates)
-      const existingMessages = await storageManager.getMessages(chatSession.id)
+      const existingMessages = await storageManager.getMessages(chatSessionId)
       const existingMessage = existingMessages.find((m: any) => m.id === message.id)
       
       if (existingMessage) {
         console.log(`[ChatPanel] Deleting existing message with ID ${message.id} to prevent duplicates`)
-        await storageManager.deleteMessage(chatSession.id, message.id)
+        await storageManager.deleteMessage(chatSessionId, message.id)
       }
       
       // Create the message (fresh or replacement)
       await storageManager.createMessage({
-        chatSessionId: chatSession.id,
+        chatSessionId: chatSessionId,
         role: message.role,
         content: message.content,
         metadata: message.metadata || {},
         tokensUsed: 0
       })
       
-      // Update session's last message time
-      await storageManager.updateChatSession(chatSession.id, {
-        lastMessageAt: new Date().toISOString()
+      // Update session's last message time and message count
+      const messageCount = existingMessages.length + 1
+      await storageManager.updateChatSession(chatSessionId, {
+        lastMessageAt: new Date().toISOString(),
+        messageCount: messageCount
       })
       
       console.log(`[ChatPanel] Message saved successfully for project ${project.id}`)
@@ -4123,6 +4142,7 @@ export function ChatPanel({
           endedAt: new Date().toISOString()
         })
         console.log(`[ChatPanel] Deactivated session ${activeSession.id} for project ${project.id}`)
+        setCurrentSessionId(null)
       }
       
       // Clear local messages
@@ -6633,6 +6653,131 @@ export function ChatPanel({
     }
   }, [messages.length, scrollToBottom, checkScrollPosition])
   
+  // Chat session handlers
+  const handleCreateNewSession = async () => {
+    if (!project) return
+    
+    try {
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+      
+      // Create new chat session
+      const newSession = await storageManager.createChatSession({
+        userId: project.userId,
+        workspaceId: project.id,
+        title: `Chat Session ${new Date().toLocaleString()}`,
+        isActive: true,
+        lastMessageAt: new Date().toISOString()
+      })
+      
+      // Deactivate current session if exists
+      if (currentSessionId) {
+        await storageManager.updateChatSession(currentSessionId, { isActive: false })
+      }
+      
+      // Set new session as active
+      setCurrentSessionId(newSession.id)
+      setMessages([])
+      
+      // Update sessions list
+      await loadChatSessions()
+      
+      toast({
+        title: "New Chat Session Created",
+        description: "Started a new conversation session"
+      })
+    } catch (error) {
+      console.error('Error creating new session:', error)
+      toast({
+        title: "Failed to Create Session",
+        description: "Could not create a new chat session",
+        variant: "destructive"
+      })
+    }
+  }
+  
+  const handleSwitchSession = async (sessionId: string) => {
+    if (!project || sessionId === currentSessionId) return
+    
+    try {
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+      
+      // Deactivate current session
+      if (currentSessionId) {
+        await storageManager.updateChatSession(currentSessionId, { isActive: false })
+      }
+      
+      // Activate new session
+      await storageManager.updateChatSession(sessionId, { isActive: true })
+      
+      // Load messages for the new session
+      const sessionMessages = await storageManager.getMessages(sessionId)
+      const formattedMessages: Message[] = sessionMessages.map((msg: any) => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content,
+        createdAt: msg.createdAt,
+        metadata: msg.metadata
+      }))
+      
+      setCurrentSessionId(sessionId)
+      setMessages(formattedMessages)
+      setShowSessionDropdown(false)
+      
+      toast({
+        title: "Switched Chat Session",
+        description: "Loaded previous conversation"
+      })
+    } catch (error) {
+      console.error('Error switching session:', error)
+      toast({
+        title: "Failed to Switch Session",
+        description: "Could not load the selected chat session",
+        variant: "destructive"
+      })
+    }
+  }
+  
+  const loadChatSessions = async () => {
+    if (!project) return
+    
+    try {
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+      
+      const sessions = await storageManager.getChatSessions(project.userId)
+      // Filter sessions for this project
+      const projectSessions = sessions.filter((session: any) => 
+        session.workspaceId === project.id
+      )
+      
+      setChatSessions(projectSessions)
+    } catch (error) {
+      console.error('Error loading chat sessions:', error)
+    }
+  }
+  
+  // Load sessions when project changes
+  useEffect(() => {
+    loadChatSessions()
+  }, [project])
+  
+  // Close session dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showSessionDropdown) {
+        const target = event.target as Element
+        if (!target.closest('.session-dropdown-container')) {
+          setShowSessionDropdown(false)
+        }
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showSessionDropdown])
+  
   return (
     <div className="flex flex-col h-full">
       
@@ -6666,6 +6811,81 @@ export function ChatPanel({
           <ChatDiagnostics project={project} />
         </div>
       )}
+      
+      {/* Chat Header with Session Controls */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background/50">
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-foreground">Chat</h2>
+          {currentSessionId && (
+            <span className="text-sm text-muted-foreground">
+              Session: {currentSessionId.slice(-8)}
+            </span>
+          )}
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {/* New Session Button */}
+          <button
+            onClick={handleCreateNewSession}
+            className="p-2 rounded-lg hover:bg-muted transition-colors"
+            title="Create new chat session"
+          >
+            <Plus className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+          </button>
+          
+          {/* Session History Dropdown */}
+          <div className="relative session-dropdown-container">
+            <button
+              onClick={() => setShowSessionDropdown(!showSessionDropdown)}
+              className="p-2 rounded-lg hover:bg-muted transition-colors"
+              title="Chat session history"
+            >
+              <Clock className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+            </button>
+            
+            {/* Session Dropdown */}
+            {showSessionDropdown && (
+              <div className="absolute right-0 top-full mt-2 w-80 bg-popover border border-border rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+                <div className="p-2">
+                  <div className="text-sm font-medium text-popover-foreground mb-2 px-2">
+                    Chat Sessions
+                  </div>
+                  {chatSessions.map((session) => (
+                    <button
+                      key={session.id}
+                      onClick={() => handleSwitchSession(session.id)}
+                      className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                        session.id === currentSessionId
+                          ? 'bg-accent text-accent-foreground font-medium'
+                          : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="truncate">
+                            {session.title || `Session ${session.id.slice(-8)}`}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {session.messageCount || 0} messages • {session.lastMessageAt ? new Date(session.lastMessageAt).toLocaleDateString() : 'No messages'}
+                          </div>
+                        </div>
+                        {session.id === currentSessionId && (
+                          <div className="w-2 h-2 bg-primary rounded-full ml-2" />
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                  {chatSessions.length === 0 && (
+                    <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                      No chat sessions yet
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
       
       {/* Messages Container - Fixed height, scrollable */}
       <div className={`flex-1 min-h-0 overflow-hidden bg-background relative ${
