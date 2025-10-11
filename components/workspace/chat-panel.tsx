@@ -80,6 +80,42 @@ import { SchemaAwareJSONRepairEngine } from '@/schema-aware-json-repair-engine.j
 // Create schema-aware repair engine instance for JSON parsing
 const schemaAwareRepairEngine = new SchemaAwareJSONRepairEngine()
 
+// Global package tool execution queue to prevent race conditions
+class PackageToolQueue {
+  private queue: Array<() => Promise<void>> = []
+  private isProcessing = false
+
+  async add(executionFn: () => Promise<void>) {
+    this.queue.push(executionFn)
+    await this.processQueue()
+  }
+
+  private async processQueue() {
+    if (this.isProcessing || this.queue.length === 0) {
+      return
+    }
+
+    this.isProcessing = true
+
+    while (this.queue.length > 0) {
+      const executionFn = this.queue.shift()
+      if (executionFn) {
+        try {
+          await executionFn()
+          // Add a small delay between executions to ensure file system consistency
+          await new Promise(resolve => setTimeout(resolve, 100))
+        } catch (error) {
+          console.error('[PackageToolQueue] Execution failed:', error)
+        }
+      }
+    }
+
+    this.isProcessing = false
+  }
+}
+
+const packageToolQueue = new PackageToolQueue()
+
 // Type definition for repair engine result
 interface RepairResult {
   data: any | null
@@ -595,10 +631,131 @@ const JSONToolPill = ({
         // Execute file operation directly like specs route does
         let result: any
         
-        // Add delay for package tools to prevent race conditions
+        // For package tools, use the global queue to prevent race conditions
         if (toolCall.tool === 'add_package' || toolCall.tool === 'remove_package') {
-          console.log(`[JSONToolPill] Adding delay for ${toolCall.tool} to prevent race conditions`)
-          await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 500))
+          console.log(`[JSONToolPill] Adding ${toolCall.tool} to execution queue`)
+          
+          await packageToolQueue.add(async () => {
+            console.log(`[JSONToolPill] Executing queued ${toolCall.tool}:`, toolCall.args)
+            
+            // Package tool execution logic goes here
+            let packageResult: any
+            
+            if (toolCall.tool === 'add_package') {
+              console.log('[JSONToolPill] Executing add_package:', toolCall.args)
+
+              // Read current package.json
+              const packageJsonFile = await storageManager.getFile(projectId, 'package.json')
+              if (!packageJsonFile) {
+                throw new Error('package.json not found')
+              }
+              
+              const packageJson = JSON.parse(packageJsonFile.content)
+              console.log('[JSONToolPill] Current package.json dependencies:', Object.keys(packageJson.dependencies || {}))
+              console.log('[JSONToolPill] Current package.json devDependencies:', Object.keys(packageJson.devDependencies || {}))
+              
+              // Add package to dependencies or devDependencies
+              const depType = toolCall.args.isDev ? 'devDependencies' : 'dependencies'
+              console.log('[JSONToolPill] Adding to depType:', depType, 'package:', toolCall.args.name)
+              if (!packageJson[depType]) {
+                packageJson[depType] = {}
+              }
+              packageJson[depType][toolCall.args.name] = toolCall.args.version || 'latest'
+              
+              console.log('[JSONToolPill] Updated package.json:', {
+                dependencies: Object.keys(packageJson.dependencies || {}),
+                devDependencies: Object.keys(packageJson.devDependencies || {})
+              })
+              
+              // Update package.json
+              const updatedFile = await storageManager.updateFile(projectId, 'package.json', { 
+                content: JSON.stringify(packageJson, null, 2) 
+              })
+              
+              console.log('[JSONToolPill] Package added successfully:', toolCall.args.name, 'to', depType)
+              console.log('[JSONToolPill] File update result:', updatedFile ? 'success' : 'failed')
+              
+              packageResult = { 
+                message: `Package ${toolCall.args.name} added to ${depType} successfully`, 
+                action: 'package_added',
+                package: toolCall.args.name,
+                version: toolCall.args.version || 'latest',
+                dependencyType: depType
+              }
+              triggerAutoBackup(`Tool added package: ${toolCall.args.name}`)
+            } else if (toolCall.tool === 'remove_package') {
+              console.log('[JSONToolPill] Executing remove_package:', toolCall.args)
+
+              // Read current package.json
+              const removePackageJsonFile = await storageManager.getFile(projectId, 'package.json')
+              if (!removePackageJsonFile) {
+                throw new Error('package.json not found')
+              }
+              
+              const removePackageJson = JSON.parse(removePackageJsonFile.content)
+              console.log('[JSONToolPill] Current package.json before removal - dependencies:', Object.keys(removePackageJson.dependencies || {}))
+              console.log('[JSONToolPill] Current package.json before removal - devDependencies:', Object.keys(removePackageJson.devDependencies || {}))
+              
+              // Remove package from dependencies or devDependencies
+              const removeDepType = toolCall.args.isDev ? 'devDependencies' : 'dependencies'
+              console.log('[JSONToolPill] Removing from depType:', removeDepType, 'package:', toolCall.args.name)
+              if (!removePackageJson[removeDepType] || !removePackageJson[removeDepType][toolCall.args.name]) {
+                throw new Error(`Package ${toolCall.args.name} not found in ${removeDepType}`)
+              }
+              
+              delete removePackageJson[removeDepType][toolCall.args.name]
+              console.log('[JSONToolPill] Package removed. Updated package.json:', {
+                dependencies: Object.keys(removePackageJson.dependencies || {}),
+                devDependencies: Object.keys(removePackageJson.devDependencies || {})
+              })
+              
+              // Update package.json
+              const removeUpdatedFile = await storageManager.updateFile(projectId, 'package.json', { 
+                content: JSON.stringify(removePackageJson, null, 2) 
+              })
+              
+              console.log('[JSONToolPill] Package removed successfully:', toolCall.args.name, 'from', removeDepType)
+              console.log('[JSONToolPill] File update result:', removeUpdatedFile ? 'success' : 'failed')
+              
+              packageResult = { 
+                message: `Package ${toolCall.args.name} removed from ${removeDepType} successfully`, 
+                action: 'package_removed',
+                package: toolCall.args.name,
+                dependencyType: removeDepType
+              }
+              triggerAutoBackup(`Tool removed package: ${toolCall.args.name}`)
+            }
+            
+            result = packageResult
+            
+            console.log('[JSONToolPill] Package tool executed successfully:', toolCall.args.name, result)
+            setExecutionStatus('completed')
+
+            // Dispatch events with proper projectId like specs route
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('json-tool-executed', {
+                detail: { 
+                  toolCall: {...toolCall, status: 'completed', id: executionId}, 
+                  result,
+                  immediate: true,
+                  projectId: projectId
+                }
+              }))
+
+              // Dispatch files-changed event with projectId (like specs route)
+              window.dispatchEvent(new CustomEvent('files-changed', {
+                detail: {
+                  projectId: projectId,
+                  action: toolCall.tool,
+                  path: 'package.json',
+                  source: 'json-tool-immediate',
+                  executionId
+                }
+              }))
+            }
+          })
+          
+          return // Exit early for package tools since they're handled in the queue
         }
         
         switch (toolCall.tool) {
@@ -673,93 +830,6 @@ const JSONToolPill = ({
             await storageManager.deleteFile(projectId, toolCall.path)
             result = { message: `File ${toolCall.path} deleted successfully`, action: 'deleted' }
             triggerAutoBackup(`Tool deleted file: ${toolCall.path}`)
-            break
-
-          case 'add_package':
-            console.log('[JSONToolPill] Executing add_package:', toolCall.args)
-
-            // Read current package.json
-            const packageJsonFile = await storageManager.getFile(projectId, 'package.json')
-            if (!packageJsonFile) {
-              throw new Error('package.json not found')
-            }
-            
-            const packageJson = JSON.parse(packageJsonFile.content)
-            console.log('[JSONToolPill] Current package.json dependencies:', Object.keys(packageJson.dependencies || {}))
-            console.log('[JSONToolPill] Current package.json devDependencies:', Object.keys(packageJson.devDependencies || {}))
-            
-            // Add package to dependencies or devDependencies
-            const depType = toolCall.args.isDev ? 'devDependencies' : 'dependencies'
-            console.log('[JSONToolPill] Adding to depType:', depType, 'package:', toolCall.args.name)
-            if (!packageJson[depType]) {
-              packageJson[depType] = {}
-            }
-            packageJson[depType][toolCall.args.name] = toolCall.args.version || 'latest'
-            
-            console.log('[JSONToolPill] Updated package.json:', {
-              dependencies: Object.keys(packageJson.dependencies || {}),
-              devDependencies: Object.keys(packageJson.devDependencies || {})
-            })
-            
-            // Update package.json
-            const updatedFile = await storageManager.updateFile(projectId, 'package.json', { 
-              content: JSON.stringify(packageJson, null, 2) 
-            })
-            
-            console.log('[JSONToolPill] Package added successfully:', toolCall.args.name, 'to', depType)
-            console.log('[JSONToolPill] File update result:', updatedFile ? 'success' : 'failed')
-            
-            result = { 
-              message: `Package ${toolCall.args.name} added to ${depType} successfully`, 
-              action: 'package_added',
-              package: toolCall.args.name,
-              version: toolCall.args.version || 'latest',
-              dependencyType: depType
-            }
-            triggerAutoBackup(`Tool added package: ${toolCall.args.name}`)
-            break
-
-          case 'remove_package':
-            console.log('[JSONToolPill] Executing remove_package:', toolCall.args)
-
-            // Read current package.json
-            const removePackageJsonFile = await storageManager.getFile(projectId, 'package.json')
-            if (!removePackageJsonFile) {
-              throw new Error('package.json not found')
-            }
-            
-            const removePackageJson = JSON.parse(removePackageJsonFile.content)
-            console.log('[JSONToolPill] Current package.json before removal - dependencies:', Object.keys(removePackageJson.dependencies || {}))
-            console.log('[JSONToolPill] Current package.json before removal - devDependencies:', Object.keys(removePackageJson.devDependencies || {}))
-            
-            // Remove package from dependencies or devDependencies
-            const removeDepType = toolCall.args.isDev ? 'devDependencies' : 'dependencies'
-            console.log('[JSONToolPill] Removing from depType:', removeDepType, 'package:', toolCall.args.name)
-            if (!removePackageJson[removeDepType] || !removePackageJson[removeDepType][toolCall.args.name]) {
-              throw new Error(`Package ${toolCall.args.name} not found in ${removeDepType}`)
-            }
-            
-            delete removePackageJson[removeDepType][toolCall.args.name]
-            console.log('[JSONToolPill] Package removed. Updated package.json:', {
-              dependencies: Object.keys(removePackageJson.dependencies || {}),
-              devDependencies: Object.keys(removePackageJson.devDependencies || {})
-            })
-            
-            // Update package.json
-            const removeUpdatedFile = await storageManager.updateFile(projectId, 'package.json', { 
-              content: JSON.stringify(removePackageJson, null, 2) 
-            })
-            
-            console.log('[JSONToolPill] Package removed successfully:', toolCall.args.name, 'from', removeDepType)
-            console.log('[JSONToolPill] File update result:', removeUpdatedFile ? 'success' : 'failed')
-            
-            result = { 
-              message: `Package ${toolCall.args.name} removed from ${removeDepType} successfully`, 
-              action: 'package_removed',
-              package: toolCall.args.name,
-              dependencyType: removeDepType
-            }
-            triggerAutoBackup(`Tool removed package: ${toolCall.args.name}`)
             break
 
           default:
