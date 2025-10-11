@@ -6948,7 +6948,7 @@ Please provide just the title, nothing else. Make it concise and descriptive.`
       )}
       
       {/* Chat Header with Session Controls */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background/50">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background/50 sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold text-foreground">Chat</h2>
           {currentSessionId && (
