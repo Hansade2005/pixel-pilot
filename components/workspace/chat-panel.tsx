@@ -4107,6 +4107,9 @@ export function ChatPanel({
         messageCount: messageCount
       })
       
+      // Refresh session list to update message counts in dropdown
+      await loadChatSessions()
+      
       console.log(`[ChatPanel] Message saved successfully for project ${project.id}`)
     } catch (error) {
       console.error(`[ChatPanel] Error saving message for project ${project?.id}:`, error)
@@ -6725,6 +6728,9 @@ export function ChatPanel({
       setMessages(formattedMessages)
       setShowSessionDropdown(false)
       
+      // Refresh session list to ensure counts are up-to-date
+      await loadChatSessions()
+      
       toast({
         title: "Switched Chat Session",
         description: "Loaded previous conversation"
@@ -6752,7 +6758,26 @@ export function ChatPanel({
         session.workspaceId === project.id
       )
       
-      setChatSessions(projectSessions)
+      // Calculate message count for each session
+      const sessionsWithCounts = await Promise.all(
+        projectSessions.map(async (session: any) => {
+          try {
+            const messages = await storageManager.getMessages(session.id)
+            return {
+              ...session,
+              messageCount: messages.length
+            }
+          } catch (error) {
+            console.error(`Error loading messages for session ${session.id}:`, error)
+            return {
+              ...session,
+              messageCount: 0
+            }
+          }
+        })
+      )
+      
+      setChatSessions(sessionsWithCounts)
     } catch (error) {
       console.error('Error loading chat sessions:', error)
     }
