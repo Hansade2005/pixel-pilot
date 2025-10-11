@@ -1477,8 +1477,9 @@ async function learnFromPatterns(
     ).join(',')
     const promptContent = `${messagesSummary}|${filesSummary}`
 
-    const estimatedTokens = Math.ceil(promptContent.length / 4)
-    console.log(`[ULTRA-COMPACT] Token estimate: ${estimatedTokens}`)
+    // Token estimation commented out - now using message-based counting
+    // const estimatedTokens = Math.ceil(promptContent.length / 4)
+    // console.log(`[ULTRA-COMPACT] Token estimate: ${estimatedTokens}`)
 
     const learningInsights = await generateText({
       model: mistralPixtral,
@@ -5926,7 +5927,8 @@ Use read_file tool to read specific files when needed.`
     // Initialize real-time updates array
     const realtimeUpdates: any[] = []
 
-    // ENHANCED TOKEN BUDGETING: Intelligent token management with dynamic allocation
+    // ENHANCED TOKEN BUDGETING: Commented out - now using message-based counting instead of tokens
+    /*
     const tokenBudget = {
       maxTotal: 2000,
       system: { min: 300, max: 600 },
@@ -6031,6 +6033,7 @@ Use read_file tool to read specific files when needed.`
         console.log('[CONTEXT] Failed to load additional context for complex task')
       }
     }
+    */
 
     // Get the AI model based on the selected modelId
 

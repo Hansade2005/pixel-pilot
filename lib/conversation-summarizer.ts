@@ -3,7 +3,7 @@
 
 import { generateText } from 'ai'
 import { getModel } from '@/lib/ai-providers'
-import { countTokens, estimateConversationTokens } from '@/lib/token-counter'
+// import { countTokens, estimateConversationTokens } from '@/lib/token-counter'
 
 export interface ConversationMessage {
   id: string
@@ -166,8 +166,9 @@ export class ConversationSummarizer {
       // Extract progress information
       const progressAssessment = this.extractProgressAssessment(sections.progressTracking)
 
-      // Calculate token count
-      const tokenCount = await countTokens(summaryText, 'default')
+      // Token count commented out - now using message-based counting
+      // const tokenCount = await countTokens(summaryText, 'default')
+      const tokenCount = 0
 
       const summary: ConversationSummary = {
         id: `summary_${conversationId}_${Date.now()}`,

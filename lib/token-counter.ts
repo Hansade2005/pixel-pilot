@@ -184,28 +184,28 @@ export const CONTEXT_WINDOW_LIMITS = {
 } as const
 
 // Encoder cache to avoid recreating encoders
-const encoderCache = new Map<string, Tiktoken>()
+// const encoderCache = new Map<string, Tiktoken>()
 
 /**
  * Get the appropriate tokenizer for a model
  */
-async function getTokenizer(modelId: string): Promise<Tiktoken> {
-  // Ensure tiktoken is initialized
-  await initializeTiktoken()
+// async function getTokenizer(modelId: string): Promise<Tiktoken> {
+//   // Ensure tiktoken is initialized
+//   await initializeTiktoken()
 
-  const scheme = TOKENIZATION_SCHEMES[modelId as keyof typeof TOKENIZATION_SCHEMES] || TOKENIZATION_SCHEMES.default
+//   const scheme = TOKENIZATION_SCHEMES[modelId as keyof typeof TOKENIZATION_SCHEMES] || TOKENIZATION_SCHEMES.default
 
-  if (!encoderCache.has(scheme)) {
-    try {
-      encoderCache.set(scheme, getEncoding(scheme))
-    } catch (error) {
-      console.warn(`Failed to load tokenizer for scheme ${scheme}, falling back to cl100k_base:`, error)
-      encoderCache.set(scheme, getEncoding('cl100k_base'))
-    }
-  }
+//   if (!encoderCache.has(scheme)) {
+//     try {
+//       encoderCache.set(scheme, getEncoding(scheme))
+//     } catch (error) {
+//       console.warn(`Failed to load tokenizer for scheme ${scheme}, falling back to cl100k_base:`, error)
+//       encoderCache.set(scheme, getEncoding('cl100k_base'))
+//     }
+//   }
 
-  return encoderCache.get(scheme)!
-}
+//   return encoderCache.get(scheme)!
+// }
 
 /**
  * Count tokens in a text string for a specific model
@@ -222,9 +222,13 @@ export async function countTokens(text: string, modelId: string = 'default'): Pr
   }
 
   try {
-    const tokenizer = await getTokenizer(modelId)
-    const tokens = tokenizer.encode(text)
-    const count = tokens.length
+    // Temporarily disabled tiktoken - using fallback estimation
+    // const tokenizer = await getTokenizer(modelId)
+    // const tokens = tokenizer.encode(text)
+    // const count = tokens.length
+
+    // Use fallback estimation for now
+    const count = Math.ceil(text.length / 4)
 
     // Cache the result (with size limit)
     if (tokenCache.size < MAX_CACHE_SIZE) {
