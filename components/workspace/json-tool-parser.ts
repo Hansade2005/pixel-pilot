@@ -125,19 +125,26 @@ export class JsonToolParser {
 
     // First try the enhanced parsing method from the schema-aware engine
     const enhancedResult = (this.repairEngine as any).parseToolCall(content)
-    if (enhancedResult) {
-      // If enhanced parsing found a tool call, extract the JSON portion
-      const jsonMatch = content.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        blocks.push({
-          json: jsonMatch[0],
-          startIndex: jsonMatch.index || 0
-        })
-        return blocks // Return early if enhanced parsing worked
+    if (enhancedResult && Array.isArray(enhancedResult) && enhancedResult.length > 0) {
+      // If enhanced parsing found tool calls, convert them to the expected format
+      for (const tool of enhancedResult) {
+        if (tool.tool && this.supportedTools.includes(tool.tool)) {
+          // Find the JSON portion in the content
+          const jsonMatch = content.match(/\{[\s\S]*?\}/)
+          if (jsonMatch) {
+            blocks.push({
+              json: jsonMatch[0],
+              startIndex: jsonMatch.index || 0
+            })
+          }
+        }
+      }
+      if (blocks.length > 0) {
+        return blocks // Return if enhanced parsing found tools
       }
     }
 
-    // Fall back to original method for multiple tool calls or when enhanced parsing doesn't find anything
+    // Fall back to manual parsing methods if enhanced parsing didn't find tools
     // Pattern to find JSON objects with "tool" property
     const jsonToolPattern = /\{\s*["\']tool["\']\s*:\s*["\']([^"\']+)["\']\s*[,}][\s\S]*?\}/g
 
@@ -247,11 +254,26 @@ export class JsonToolParser {
     }
 
     // Also look for code blocks containing JSON
-    const codeBlockPattern = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/g
+    const codeBlockPattern = /```(?:json)?\s*\n?(\{[\s\S]*?\n?\})\s*\n?```/g
     while ((match = codeBlockPattern.exec(content)) !== null) {
       try {
-        const jsonContent = match[1]
-        const parsed = JSON.parse(jsonContent)
+        const jsonContent = match[1].trim()
+
+        // Try standard JSON.parse first
+        let parsed: any
+        try {
+          parsed = JSON.parse(jsonContent)
+        } catch (parseError) {
+          // If standard parsing fails, use schema-aware repair engine
+          const repairResult = this.repairEngine.repair(jsonContent) as RepairResult
+
+          if (repairResult.data && repairResult.confidence > 0.5) {
+            parsed = repairResult.data
+          } else {
+            continue
+          }
+        }
+
         if (parsed.tool && this.supportedTools.includes(parsed.tool)) {
           blocks.push({
             json: jsonContent,
@@ -259,7 +281,7 @@ export class JsonToolParser {
           })
         }
       } catch (error) {
-        // Ignore malformed JSON in code blocks
+        // Continue processing other blocks
       }
     }
 

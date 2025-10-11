@@ -7027,8 +7027,8 @@ Please provide just the title, nothing else. Make it concise and descriptive.`
       )}
       
       {/* Chat Header with Session Controls */}
-      <div className={`flex items-center justify-between px-4 py-3 border-b border-border bg-background/50 ${
-        isMobile ? 'fixed top-0 left-0 right-0 z-20' : 'sticky top-0 z-10'
+      <div className={`flex items-center justify-between px-4 py-3 border-b border-border bg-background/50 z-10 ${
+        isMobile ? 'fixed top-0 left-0 right-0' : 'sticky top-0'
       }`}>
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold text-foreground">Chat</h2>
@@ -7105,7 +7105,7 @@ Please provide just the title, nothing else. Make it concise and descriptive.`
       
       {/* Messages Container - Fixed height, scrollable */}
       <div className={`flex-1 min-h-0 overflow-hidden bg-background relative ${
-        isMobile ? 'pb-52 pt-16' : ''
+        isMobile ? 'pt-16 pb-52' : ''
       }`}>
         <div
           ref={messagesContainerRef}
