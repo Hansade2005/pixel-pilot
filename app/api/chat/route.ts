@@ -4329,7 +4329,8 @@ Use emoji check ticks (✅) VERY frequently to plan and track task progress.
 - ☐ **Create main component** - Build App.tsx with basic layout
 - ☐ **Add styling** - Implement responsive design with Tailwind
 - ☐ **Test functionality** - Verify all features work correctly
-**Note**: Use batch completion - mark all tasks as ✅ simultaneously when the entire work is finished.
+
+**Note**: Use batch completion - mark / tasks as ✅ simultaneously when the entire work is finished.
 </planning_instructions>
 
 ### Critical Rules - NO EXCEPTIONS
