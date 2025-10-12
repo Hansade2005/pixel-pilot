@@ -1855,27 +1855,34 @@ function createFileOperationTools(projectId: string, aiMode: 'ask' | 'agent' = '
             msg.content.includes('"tool": "remove_package"')
           )
 
-          // If it has JSON tool calls, include it
+          // If it has JSON tool calls, definitely include it
           if (hasJsonToolCall) return true
 
-          // If it's just announcements without tool calls, exclude it
-          const announcementPatterns = [
-            /^Now, create/i,
-            /^Now, update/i,
-            /^🔄 Creating/i,
-            /^🔄 Updating/i,
-            /^First, create/i,
-            /^First, update/i,
-            /^Let's create/i,
-            /^Let's update/i
+          // Check for problematic announcement patterns that are NOT followed by tool calls
+          const problematicAnnouncementPatterns = [
+            /^Now, create the .* component/i,
+            /^Now, update the .* component/i,
+            /^🔄 Creating the .* component/i,
+            /^🔄 Updating the .* component/i,
+            /^First, create the .* component/i,
+            /^First, update the .* component/i,
+            /^Let's create the .* component/i,
+            /^Let's update the .* component/i,
+            /^Now, create the .* page/i,
+            /^Now, update the .* page/i,
+            /^🔄 Creating the .* page/i,
+            /^🔄 Updating the .* page/i
           ]
 
-          const isJustAnnouncement = announcementPatterns.some(pattern => pattern.test(msg.content))
+          // For problematic announcements, add a system warning but keep the message
+          const isProblematicAnnouncement = problematicAnnouncementPatterns.some(pattern => pattern.test(msg.content.trim()))
 
-          // If it's a pure announcement without tool calls, exclude it
-          if (isJustAnnouncement && !hasJsonToolCall) return false
+          if (isProblematicAnnouncement && !hasJsonToolCall) {
+            // Add system warning to the message content
+            msg.content = `⚠️ **SYSTEM WARNING: Unfulfilled Announcement** ⚠️\n\nThis message announced an action that was never executed with JSON tools. This indicates a previous AI error that should be corrected.\n\n${msg.content}\n\n---\n**ACTION REQUIRED:** The announced action should be completed using proper JSON tool calls.`
+          }
 
-          // Include other assistant messages (explanations, summaries, etc.)
+          // Include all messages (both good and flagged ones)
           return true
         })
 
@@ -5171,8 +5178,51 @@ Use read_file tool to read specific files when needed.`
     try {
       // Only prepare history if we have conversation memory
       if (conversationMemory && conversationMemory.messages.length > 0) {
-        // Create full history from all messages in AI-readable format
-        const fullHistory = conversationMemory.messages
+        // Filter out messages that are just announcements without actual tool executions
+        const filteredMessages = conversationMemory.messages.filter((msg: any) => {
+          if (msg.role !== 'assistant') return true
+
+          // Check if message contains actual JSON tool calls
+          const hasJsonToolCall = msg.content.includes('```json') && (
+            msg.content.includes('"tool": "write_file"') ||
+            msg.content.includes('"tool": "delete_file"') ||
+            msg.content.includes('"tool": "add_package"') ||
+            msg.content.includes('"tool": "remove_package"')
+          )
+
+          // If it has JSON tool calls, definitely include it
+          if (hasJsonToolCall) return true
+
+          // Check for problematic announcement patterns that are NOT followed by tool calls
+          const problematicAnnouncementPatterns = [
+            /^Now, create the .* component/i,
+            /^Now, update the .* component/i,
+            /^🔄 Creating the .* component/i,
+            /^🔄 Updating the .* component/i,
+            /^First, create the .* component/i,
+            /^First, update the .* component/i,
+            /^Let's create the .* component/i,
+            /^Let's update the .* component/i,
+            /^Now, create the .* page/i,
+            /^Now, update the .* page/i,
+            /^🔄 Creating the .* page/i,
+            /^🔄 Updating the .* page/i
+          ]
+
+          // For problematic announcements, add a system warning but keep the message
+          const isProblematicAnnouncement = problematicAnnouncementPatterns.some(pattern => pattern.test(msg.content.trim()))
+
+          if (isProblematicAnnouncement && !hasJsonToolCall) {
+            // Add system warning to the message content
+            msg.content = `⚠️ **SYSTEM WARNING: Unfulfilled Announcement** ⚠️\n\nThis message announced an action that was never executed with JSON tools. This indicates a previous AI error that should be corrected.\n\n${msg.content}\n\n---\n**ACTION REQUIRED:** The announced action should be completed using proper JSON tool calls.`
+          }
+
+          // Include all messages (both good and flagged ones)
+          return true
+        })
+
+        // Create full history from filtered messages in AI-readable format
+        const fullHistory = filteredMessages
           .map((msg: any, index: number) => {
             const role = msg.role === 'user' ? 'User' : msg.role === 'assistant' ? 'You' : msg.role.toUpperCase()
             const message = `${role}: ${msg.content}`
@@ -5183,7 +5233,7 @@ Use read_file tool to read specific files when needed.`
           .join('')
 
         conversationSummaryContext = `## 📜 CONVERSATION HISTORY\n\n${fullHistory.trim()}`
-        console.log('[HISTORY] Full conversation history prepared for AI')
+        console.log('[HISTORY] Filtered conversation history prepared for AI')
       } else {
         console.log('[HISTORY] No conversation history available')
       }
