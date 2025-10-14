@@ -851,8 +851,9 @@ export function ChatPanelV2({
 
     // Build enhanced message content with attachments
     let enhancedContent = input.trim()
+    let displayContent = input.trim() // Content shown to user (without hidden contexts)
 
-    // Add image descriptions
+    // Add image descriptions (hidden from user display)
     if (attachedImages.length > 0) {
       const imageDescriptions = attachedImages
         .filter((img: AttachedImage) => img.description)
@@ -861,10 +862,11 @@ export function ChatPanelV2({
 
       if (imageDescriptions) {
         enhancedContent = `${enhancedContent}\n\n=== ATTACHED IMAGES CONTEXT ===${imageDescriptions}\n=== END ATTACHED IMAGES ===`
+        // Note: displayContent remains unchanged - image context is hidden from users
       }
     }
 
-    // Add URL contents
+    // Add URL contents (shown to user)
     if (attachedUrls.length > 0) {
       const urlContents = attachedUrls
         .filter((url: AttachedUrl) => url.content)
@@ -873,10 +875,11 @@ export function ChatPanelV2({
 
       if (urlContents) {
         enhancedContent = `${enhancedContent}\n\n=== ATTACHED WEBSITES CONTEXT ===${urlContents}\n=== END ATTACHED WEBSITES ===`
+        displayContent = `${displayContent}\n\n=== ATTACHED WEBSITES ===${urlContents}\n=== END ATTACHED WEBSITES ===`
       }
     }
 
-    // Add uploaded file contents
+    // Add uploaded file contents (shown to user)
     if (attachedUploadedFiles.length > 0) {
       const uploadedFileContexts = attachedUploadedFiles
         .map(file => `\n\n--- Uploaded File: ${file.name} ---\n${file.content}\n--- End of ${file.name} ---`)
@@ -884,10 +887,11 @@ export function ChatPanelV2({
 
       if (uploadedFileContexts) {
         enhancedContent = `${enhancedContent}\n\n=== UPLOADED FILES CONTEXT ===${uploadedFileContexts}\n=== END UPLOADED FILES ===`
+        displayContent = `${displayContent}\n\n=== UPLOADED FILES ===${uploadedFileContexts}\n=== END UPLOADED FILES ===`
       }
     }
 
-    // Add project files attached via @ command
+    // Add project files attached via @ command (shown to user)
     if (attachedFiles.length > 0) {
       const fileContexts: string[] = []
 
@@ -909,6 +913,7 @@ export function ChatPanelV2({
 
         if (fileContexts.length > 0) {
           enhancedContent = `${enhancedContent}\n\n=== PROJECT FILES CONTEXT ===${fileContexts.join('')}\n=== END PROJECT FILES ===`
+          displayContent = `${displayContent}\n\n=== PROJECT FILES ===${fileContexts.join('')}\n=== END PROJECT FILES ===`
         }
       } catch (error) {
         console.error('Error loading attached files:', error)
@@ -931,7 +936,7 @@ export function ChatPanelV2({
     const userMessage = {
       id: userMessageId,
       role: 'user',
-      content: enhancedContent
+      content: displayContent
     }
 
     // Add user message to local state immediately for better UX
