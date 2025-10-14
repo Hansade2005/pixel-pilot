@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { Task, TaskTrigger, TaskContent, TaskItem } from '@/components/ai-elements/task'
 import { Reasoning, ReasoningTrigger, ReasoningContent } from '@/components/ai-elements/reasoning'
 import { Response } from '@/components/ai-elements/response'
-import { FileText, Edit3, X, Package, PackageMinus, Loader2, CheckCircle2, XCircle, BrainIcon, FileCode, FileImage, FileJson, FileType, Settings, Package as PackageIcon, File, Globe } from 'lucide-react'
+import { FileText, Edit3, X, Package, PackageMinus, Loader2, CheckCircle2, XCircle, BrainIcon, FileCode, FileImage, FileJson, FileType, Settings, Package as PackageIcon, File, Globe, Eye } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // Message type compatible with AI SDK v5
@@ -205,9 +205,11 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
       case 'write_file': return FileText
       case 'edit_file': return Edit3
       case 'delete_file': return X
+      case 'read_file': return Eye
       case 'add_package': return Package
       case 'remove_package': return PackageMinus
       case 'web_search': return Globe
+      case 'web_extract': return Globe
       default: return FileText
     }
   }
@@ -217,9 +219,11 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
       case 'write_file': return 'Creating file'
       case 'edit_file': return 'Editing file'
       case 'delete_file': return 'Deleting file'
+      case 'read_file': return 'Reading file'
       case 'add_package': return 'Adding package'
       case 'remove_package': return 'Removing package'
       case 'web_search': return 'Searching web'
+      case 'web_extract': return 'Extracting web content'
       default: return toolName
     }
   }
@@ -229,9 +233,11 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
       case 'write_file': return 'Created'
       case 'edit_file': return 'Modified'
       case 'delete_file': return 'Deleted'
+      case 'read_file': return 'Read'
       case 'add_package': return 'Added'
       case 'remove_package': return 'Removed'
       case 'web_search': return 'Searched'
+      case 'web_extract': return 'Extracted'
       default: return 'Completed'
     }
   }
@@ -245,7 +251,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
     // Get display text based on tool
     let displayText = ''
     let triggerTitle = ''
-    if (['write_file', 'edit_file', 'delete_file'].includes(toolInvocation.toolName)) {
+    if (['write_file', 'edit_file', 'delete_file', 'read_file'].includes(toolInvocation.toolName)) {
       const filePath = toolInvocation.args?.path || 'file'
       displayText = filePath
       if (isLoading) {
@@ -258,24 +264,47 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
           operation = action === 'updated' ? 'Modified file' : 'Created file'
         } else if (toolInvocation.toolName === 'edit_file') {
           operation = 'Modified file'
-        } else {
+        } else if (toolInvocation.toolName === 'delete_file') {
           operation = 'Deleted file'
+        } else if (toolInvocation.toolName === 'read_file') {
+          operation = 'Read file'
         }
         triggerTitle = `${operation}: ${filePath}`
       }
     } else if (['add_package', 'remove_package'].includes(toolInvocation.toolName)) {
-      const packageNames = toolInvocation.args?.name
-      if (Array.isArray(packageNames)) {
-        displayText = packageNames.join(', ')
+      const packageNames = toolInvocation.result?.packages || toolInvocation.args?.name || []
+      const packageList = Array.isArray(packageNames) ? packageNames : [packageNames]
+      const packageString = packageList.join(', ')
+      displayText = packageString
+
+      if (isLoading) {
+        triggerTitle = getToolLabel(toolInvocation.toolName)
       } else {
-        displayText = packageNames || 'package'
+        const action = toolInvocation.toolName === 'add_package' ? 'Added packages' : 'Removed packages'
+        triggerTitle = `${action}: ${packageString}`
       }
-      triggerTitle = isLoading ? getToolLabel(toolInvocation.toolName) : getToolCompletedLabel(toolInvocation.toolName)
     } else if (toolInvocation.toolName === 'web_search') {
       const query = toolInvocation.result?.query || toolInvocation.args?.query || 'web search'
       const truncatedQuery = query.length > 12 ? `${query.substring(0, 12)}...` : query
       displayText = truncatedQuery
-      triggerTitle = isLoading ? getToolLabel(toolInvocation.toolName) : getToolCompletedLabel(toolInvocation.toolName)
+
+      if (isLoading) {
+        triggerTitle = getToolLabel(toolInvocation.toolName)
+      } else {
+        triggerTitle = `Web search: "${query}"`
+      }
+    } else if (toolInvocation.toolName === 'web_extract') {
+      const urls = toolInvocation.result?.metadata?.urls || toolInvocation.args?.urls || []
+      const urlList = Array.isArray(urls) ? urls : [urls]
+      const urlString = urlList.length > 1 ? `${urlList.length} URLs` : (urlList[0] || 'URL')
+      const truncatedUrl = urlString.length > 20 ? `${urlString.substring(0, 20)}...` : urlString
+      displayText = truncatedUrl
+
+      if (isLoading) {
+        triggerTitle = getToolLabel(toolInvocation.toolName)
+      } else {
+        triggerTitle = `Web extract: ${urlString}`
+      }
     } else {
       triggerTitle = isLoading ? getToolLabel(toolInvocation.toolName) : getToolCompletedLabel(toolInvocation.toolName)
     }
@@ -286,18 +315,35 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
           title={triggerTitle}
         >
           <div className="flex w-full cursor-pointer items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground">
-            {/* For file operations, show action + icon + filename + status */}
-            {['write_file', 'edit_file', 'delete_file'].includes(toolInvocation.toolName) && !isLoading ? (
+            {/* For file operations, show rich title with action + filename */}
+            {['write_file', 'edit_file', 'delete_file', 'read_file'].includes(toolInvocation.toolName) && !isLoading ? (
               <>
-                <span className="text-xs font-medium text-muted-foreground">
-                  {toolInvocation.toolName === 'write_file' 
-                    ? (toolInvocation.result?.action === 'updated' ? 'Modified' : 'Created')
-                    : toolInvocation.toolName === 'edit_file' ? 'Modified' : 'Deleted'
-                  }
-                </span>
-                {getFileIcon(toolInvocation.args?.path || 'file')}
+                <Icon className="size-4" />
                 <span className="flex-1 truncate text-sm">
-                  {toolInvocation.args?.path?.split('/').pop() || 'file'}
+                  {(() => {
+                    const fileName = toolInvocation.args?.path?.split('/').pop() || 'file';
+                    const action = toolInvocation.toolName === 'write_file'
+                      ? (toolInvocation.result?.action === 'updated' ? 'Modified' : 'Created')
+                      : toolInvocation.toolName === 'edit_file' ? 'Modified'
+                      : toolInvocation.toolName === 'delete_file' ? 'Deleted'
+                      : 'Read';
+                    return `${action} file: ${fileName}`;
+                  })()}
+                </span>
+              </>
+            ) : ['add_package', 'remove_package'].includes(toolInvocation.toolName) && !isLoading ? (
+              /* For package operations, show package icon + package names + status */
+              <>
+                <PackageIcon className="size-4" />
+                <span className="flex-1 truncate text-sm">
+                  {(() => {
+                    const packages = toolInvocation.result?.packages || toolInvocation.args?.name || [];
+                    const packageList = Array.isArray(packages) ? packages : [packages];
+                    const packageNames = packageList.join(', ');
+                    const action = toolInvocation.toolName === 'add_package' ? 'Added' : 'Removed';
+                    const depType = toolInvocation.result?.dependencyType || (toolInvocation.args?.isDev ? 'devDependencies' : 'dependencies');
+                    return `${action} packages: ${packageNames}`;
+                  })()}
                 </span>
               </>
             ) : toolInvocation.toolName === 'web_search' && !isLoading ? (
@@ -309,6 +355,23 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
                     const query = toolInvocation.result?.query || toolInvocation.args?.query || 'Unknown query';
                     return query.length > 12 ? `${query.substring(0, 12)}...` : query;
                   })()}"
+                </span>
+              </>
+            ) : toolInvocation.toolName === 'web_extract' && !isLoading ? (
+              /* For web extract, show globe icon + URLs + status */
+              <>
+                <Globe className="size-4" />
+                <span className="flex-1 truncate text-sm">
+                  Web extract: {(() => {
+                    const urls = toolInvocation.result?.metadata?.urls || toolInvocation.args?.urls || [];
+                    const urlList = Array.isArray(urls) ? urls : [urls];
+                    if (urlList.length === 1) {
+                      const url = urlList[0] || 'Unknown URL';
+                      return url.length > 20 ? `${url.substring(0, 20)}...` : url;
+                    } else {
+                      return `${urlList.length} URLs`;
+                    }
+                  })()}
                 </span>
               </>
             ) : (
