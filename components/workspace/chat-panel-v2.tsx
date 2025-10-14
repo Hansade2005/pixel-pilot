@@ -1781,7 +1781,8 @@ export function ChatPanelV2({
                 const items = e.clipboardData?.items
                 if (!items) return
 
-                // Check for URLs in pasted text first
+                // TEMPORARILY DISABLED: Check for URLs in pasted text first
+                /*
                 const pastedText = e.clipboardData?.getData('text')
                 if (pastedText) {
                   // URL regex pattern
@@ -1862,6 +1863,7 @@ export function ChatPanelV2({
                     return // Don't process images if URLs were found
                   }
                 }
+                */
 
                 // Handle image pasting (existing logic)
                 for (let i = 0; i < items.length; i++) {

@@ -73,13 +73,13 @@ function cleanWebContent(url: string, content: string): string {
     .replace(/\n+/g, ' ')  // Replace multiple newlines with single space
     .trim();
   
-  // Truncate to 1500 characters
-  const truncatedContent = cleanedContent.substring(0, 1500);
+  // REMOVED: Truncate to 1500 characters
+  // const truncatedContent = cleanedContent.substring(0, 1500);
   
   // Create markdown-formatted output
   return `### Web Content from ${url}
 
-${truncatedContent}${cleanedContent.length > 1500 ? '...' : ''}`;
+${cleanedContent}`;
 }
 
 /**
