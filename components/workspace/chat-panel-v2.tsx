@@ -856,8 +856,10 @@ export function ChatPanelV2({
     // Add image descriptions (hidden from user display)
     if (attachedImages.length > 0) {
       const imageDescriptions = attachedImages
-        .filter((img: AttachedImage) => img.description)
-        .map((img: AttachedImage) => `\n\n--- Image: ${img.name} ---\n${img.description}\n--- End of Image ---`)
+        .map((img: AttachedImage) => {
+          const description = img.description || (img.isProcessing ? '[Image processing...]' : '[Image description not available]')
+          return `\n\n--- Image: ${img.name} ---\n${description}\n--- End of Image ---`
+        })
         .join('')
 
       if (imageDescriptions) {
@@ -1488,6 +1490,9 @@ export function ChatPanelV2({
     const files = e.target.files
     if (!files) return
 
+    // Close the attachment menu
+    setShowAttachmentMenu(false)
+
     for (const file of Array.from(files)) {
       const reader = new FileReader()
       reader.onload = async (event) => {
@@ -1536,6 +1541,9 @@ export function ChatPanelV2({
     const files = e.target.files
     if (!files) return
 
+    // Close the attachment menu
+    setShowAttachmentMenu(false)
+
     for (const file of Array.from(files)) {
       const reader = new FileReader()
       reader.onload = (event) => {
@@ -1553,6 +1561,9 @@ export function ChatPanelV2({
 
   const handleUrlAttachment = async () => {
     if (!urlInput.trim()) return
+
+    // Close the attachment menu
+    setShowAttachmentMenu(false)
 
     const urlId = Date.now().toString()
     setAttachedUrls((prev: AttachedUrl[]) => [...prev, {
@@ -1952,7 +1963,7 @@ export function ChatPanelV2({
           {/* Bottom Left: Attachment and Voice Buttons */}
           <div className="absolute bottom-2 left-2 flex gap-2">
             {/* Attachment Popover */}
-            <Popover>
+            <Popover open={showAttachmentMenu} onOpenChange={setShowAttachmentMenu}>
               <PopoverTrigger asChild>
                 <Button
                   type="button"
