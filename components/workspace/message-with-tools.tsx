@@ -177,7 +177,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
             detail: {
               projectId: projectId,
               action: toolInvocation.toolName,
-              path: toolInvocation.args?.path || 'unknown',
+              path: toolInvocation.result?.path || toolInvocation.args?.path || 'unknown',
               source: 'ai-sdk-tool',
               toolCallId: toolInvocation.toolCallId
             }
@@ -252,7 +252,8 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
     let displayText = ''
     let triggerTitle = ''
     if (['write_file', 'edit_file', 'delete_file', 'read_file'].includes(toolInvocation.toolName)) {
-      const filePath = toolInvocation.args?.path || 'file'
+      // Use result path for completed operations, args path for loading
+      const filePath = (isCompleted ? toolInvocation.result?.path : null) || toolInvocation.args?.path || 'file'
       displayText = filePath
       if (isLoading) {
         triggerTitle = getToolLabel(toolInvocation.toolName)
@@ -321,7 +322,9 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
                 <Icon className="size-4" />
                 <span className="flex-1 truncate text-sm">
                   {(() => {
-                    const fileName = toolInvocation.args?.path?.split('/').pop() || 'file';
+                    // Use result path for completed operations, args path for loading
+                    const filePath = toolInvocation.result?.path || toolInvocation.args?.path || 'file';
+                    const fileName = filePath.split('/').pop() || 'file';
                     const action = toolInvocation.toolName === 'write_file'
                       ? (toolInvocation.result?.action === 'updated' ? 'Modified' : 'Created')
                       : toolInvocation.toolName === 'edit_file' ? 'Modified'
@@ -409,10 +412,10 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
               <div className="mt-3">
                 <div className="bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
                   <div className="px-3 py-2 bg-gray-700 border-b border-gray-600 text-xs font-medium text-white">
-                    {toolInvocation.args?.path || 'file'} • {toolInvocation.args?.path?.split('.').pop() || 'text'}
+                    {toolInvocation.result?.path || toolInvocation.args?.path || 'file'} • {(toolInvocation.result?.path || toolInvocation.args?.path || 'file').split('.').pop() || 'text'}
                   </div>
                   <pre className="p-4 overflow-x-auto bg-[#1e1e1e] max-h-96">
-                    <code className={`hljs language-${toolInvocation.args?.path?.split('.').pop() || 'text'} text-sm text-white`}>
+                    <code className={`hljs language-${(toolInvocation.result?.path || toolInvocation.args?.path || 'file').split('.').pop() || 'text'} text-sm text-white`}>
                       {toolInvocation.result.content}
                     </code>
                   </pre>
