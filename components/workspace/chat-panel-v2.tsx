@@ -16,29 +16,35 @@ import { useToast } from "@/components/ui/use-toast"
 import { MessageWithTools } from './message-with-tools'
 import {
   Send, Paperclip, Mic, MicOff, X, FileText, Image as ImageIcon,
-  Link as LinkIcon, Loader2, ChevronDown,ChevronUp, StopCircle, Trash2, Plus,
-  Copy, Edit3, ArrowUp, Undo2, Redo2, Check, AlertTriangle, Zap
+  Link as LinkIcon, Loader2, ChevronDown, ChevronUp, StopCircle, Trash2, Plus,
+  Copy, ArrowUp, Undo2, Redo2, Check, AlertTriangle, Zap
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Actions, Action } from '@/components/ai-elements/actions'
+import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown"
+import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
+import { FileSearchResult } from "@/lib/file-lookup-service"
+import { createCheckpoint } from '@/lib/checkpoint-utils'
 
 // ExpandableUserMessage component for long user messages
 const ExpandableUserMessage = ({
   content,
   messageId,
   onCopy,
-  onEdit,
   onDelete,
   onRetry,
+  onRevert,
+  showRestore = false,
   isExpanded: controlledExpanded,
   onExpandedChange
 }: {
   content: string
   messageId: string
   onCopy: (messageId: string, content: string) => void
-  onEdit: (messageId: string, content: string) => void
   onDelete: (messageId: string) => void
   onRetry: (messageId: string, content: string) => void
+  onRevert: (messageId: string) => void
+  showRestore?: boolean
   isExpanded?: boolean
   onExpandedChange?: (expanded: boolean) => void
 }) => {
@@ -69,9 +75,9 @@ const ExpandableUserMessage = ({
     onRetry(messageId, content);
   };
 
-  const handleEdit = (e: React.MouseEvent) => {
+  const handleRevert = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onEdit(messageId, content);
+    onRevert(messageId);
   };
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -82,6 +88,22 @@ const ExpandableUserMessage = ({
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
     onCopy(messageId, content);
+  };
+
+  const renderCheckpointButton = () => {
+    if (showRestore) {
+      return (
+        <Action tooltip="Restore to this version" onClick={handleRevert}>
+          <Redo2 className="w-4 h-4" />
+        </Action>
+      );
+    }
+    
+    return (
+      <Action tooltip="Revert to this version" onClick={handleRevert}>
+        <Undo2 className="w-4 h-4" />
+      </Action>
+    );
   };
 
   if (!shouldTruncate) {
@@ -98,11 +120,9 @@ const ExpandableUserMessage = ({
               <Action tooltip="Retry message" onClick={handleIconClick}>
                 <ArrowUp className="w-4 h-4" />
               </Action>
+              {renderCheckpointButton()}
               <Action tooltip="Copy message" onClick={handleCopy}>
                 <Copy className="w-4 h-4" />
-              </Action>
-              <Action tooltip="Edit message" onClick={handleEdit}>
-                <Edit3 className="w-4 h-4" />
               </Action>
               <Action tooltip="Delete message" onClick={handleDelete}>
                 <Trash2 className="w-4 h-4" />
@@ -163,11 +183,9 @@ const ExpandableUserMessage = ({
             <Action tooltip="Retry message" onClick={handleIconClick}>
               <ArrowUp className="w-4 h-4" />
             </Action>
+            {renderCheckpointButton()}
             <Action tooltip="Copy message" onClick={handleCopy}>
               <Copy className="w-4 h-4" />
-            </Action>
-            <Action tooltip="Edit message" onClick={handleEdit}>
-              <Edit3 className="w-4 h-4" />
             </Action>
             <Action tooltip="Delete message" onClick={handleDelete}>
               <Trash2 className="w-4 h-4" />
@@ -260,6 +278,18 @@ export function ChatPanelV2({
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([])
   const [attachedUploadedFiles, setAttachedUploadedFiles] = useState<AttachedUploadedFile[]>([])
   const [attachedUrls, setAttachedUrls] = useState<AttachedUrl[]>([])
+  
+  // @ command file attachment dropdown state
+  const [showFileDropdown, setShowFileDropdown] = useState(false)
+  const [fileQuery, setFileQuery] = useState("")
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 })
+  const [atCommandStartIndex, setAtCommandStartIndex] = useState(-1)
+  
+  // Checkpoint/restore state
+  const [restoreMessageId, setRestoreMessageId] = useState<string | null>(null)
+  const [showRevertDialog, setShowRevertDialog] = useState(false)
+  const [revertMessageId, setRevertMessageId] = useState<string | null>(null)
+  const [isReverting, setIsReverting] = useState(false)
   
   // UI state
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
@@ -400,6 +430,156 @@ export function ChatPanelV2({
     }
   }
 
+  // @ Command file attachment detection
+  const detectAtCommand = (text: string, cursorPosition: number) => {
+    const beforeCursor = text.substring(0, cursorPosition);
+    const atIndex = beforeCursor.lastIndexOf('@');
+    
+    if (atIndex === -1) return null;
+    
+    // Check if @ is at start of line or preceded by whitespace
+    const charBeforeAt = atIndex > 0 ? beforeCursor[atIndex - 1] : ' ';
+    if (charBeforeAt !== ' ' && charBeforeAt !== '\n' && atIndex !== 0) {
+      return null;
+    }
+    
+    // Find the end of the command (space, newline, or end of string)
+    const afterAt = text.substring(atIndex + 1);
+    const spaceIndex = afterAt.search(/[\s\n]/);
+    const endIndex = spaceIndex === -1 ? text.length : atIndex + 1 + spaceIndex;
+    
+    return {
+      startIndex: atIndex,
+      endIndex,
+      query: text.substring(atIndex + 1, endIndex)
+    };
+  };
+
+  const calculateDropdownPosition = (textarea: HTMLTextAreaElement, atIndex: number) => {
+    const rect = textarea.getBoundingClientRect();
+    const dropdownHeight = 320;
+    const viewportHeight = window.innerHeight;
+    const spaceAbove = rect.top;
+    const spaceBelow = viewportHeight - rect.bottom;
+    
+    let top: number;
+    if (spaceAbove >= dropdownHeight + 16) {
+      top = rect.top - dropdownHeight - 8;
+    } else if (spaceBelow >= dropdownHeight + 16) {
+      top = rect.bottom + 8;
+    } else {
+      top = Math.max(16, rect.top - dropdownHeight - 8);
+    }
+    
+    const left = rect.left;
+    return { top, left };
+  };
+
+  const handleFileSelect = (file: FileSearchResult) => {
+    if (!textareaRef.current) return;
+    
+    const textarea = textareaRef.current;
+    const cursorPos = textarea.selectionStart;
+    const atCommand = detectAtCommand(input, cursorPos);
+    
+    if (atCommand) {
+      const before = input.substring(0, atCommand.startIndex);
+      const after = input.substring(atCommand.endIndex);
+      const replacement = `@${file.name}`;
+      
+      setInput(before + replacement + after);
+      setAttachedFiles(prev => [...prev, file]);
+      
+      setTimeout(() => {
+        if (textareaRef.current) {
+          const newCursorPos = before.length + replacement.length;
+          textareaRef.current.focus();
+          textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+        }
+      }, 0);
+    }
+    
+    closeFileDropdown();
+  };
+
+  const closeFileDropdown = () => {
+    setShowFileDropdown(false);
+    setFileQuery('');
+    setAtCommandStartIndex(-1);
+  };
+
+  // Checkpoint handlers
+  const handleRevertToCheckpoint = async (messageId: string) => {
+    if (!project || isReverting) return
+    
+    if (restoreMessageId === messageId) {
+      await handleRestoreForMessage(messageId);
+      return;
+    }
+    
+    setRevertMessageId(messageId)
+    setShowRevertDialog(true)
+  }
+
+  const handleRestoreForMessage = async (messageId: string) => {
+    if (!project) return
+    
+    try {
+      const { isRestoreAvailableForMessage, restorePreRevertState } = await import('@/lib/checkpoint-utils')
+      
+      if (!isRestoreAvailableForMessage(project.id, messageId)) {
+        toast({
+          title: "Restore Unavailable",
+          description: "The restore option is only available for 5 minutes after reverting.",
+          variant: "destructive"
+        })
+        setRestoreMessageId(null)
+        return
+      }
+      
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+      
+      const chatSessions = await storageManager.getChatSessions(project.userId)
+      const activeSession = chatSessions.find((session: any) => 
+        session.workspaceId === project.id && session.isActive
+      )
+      
+      if (!activeSession) {
+        toast({
+          title: "Restore Failed",
+          description: "Could not find chat session for this project.",
+          variant: "destructive"
+        })
+        return
+      }
+      
+      const success = await restorePreRevertState(project.id, activeSession.id, messageId)
+      
+      if (success) {
+        await loadMessages()
+        
+        window.dispatchEvent(new CustomEvent('files-changed', { 
+          detail: { projectId: project.id, forceRefresh: true } 
+        }))
+        
+        setRestoreMessageId(null)
+        
+        toast({
+          title: "Restored Successfully",
+          description: "Files and messages have been restored to their previous state."
+        })
+      }
+    } catch (error) {
+      console.error('[Checkpoint] Error restoring for message:', error)
+      toast({
+        title: "Restore Failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred.",
+        variant: "destructive"
+      })
+    }
+  }
+
   // Message action handlers
   const handleCopyMessage = async (messageId: string, content: string) => {
     try {
@@ -416,12 +596,6 @@ export function ChatPanelV2({
         variant: 'destructive'
       })
     }
-  }
-
-  const handleEditMessage = (messageId: string, content: string) => {
-    setEditingMessageId(messageId)
-    setEditingMessageContent(content)
-    setInput(content)
   }
 
   const handleDeleteMessage = async (messageId: string) => {
@@ -766,6 +940,18 @@ export function ChatPanelV2({
     // Save user message to IndexedDB immediately
     await saveMessageToIndexedDB(userMessage)
     console.log(`[ChatPanelV2] User message saved to database: ${userMessageId}`)
+
+    // Create checkpoint for this message
+    if (project) {
+      try {
+        setTimeout(async () => {
+          await createCheckpoint(project.id, userMessage.id)
+          console.log(`[Checkpoint] Created checkpoint for message ${userMessage.id}`)
+        }, 100)
+      } catch (error) {
+        console.error('[Checkpoint] Error creating checkpoint:', error)
+      }
+    }
 
     // Add placeholder assistant message
     const assistantMessageId = (Date.now() + 1).toString()
@@ -1432,9 +1618,10 @@ export function ChatPanelV2({
                   content={message.content}
                   messageId={message.id}
                   onCopy={handleCopyMessage}
-                  onEdit={handleEditMessage}
                   onDelete={handleDeleteMessage}
                   onRetry={handleRetryMessage}
+                  onRevert={handleRevertToCheckpoint}
+                  showRestore={restoreMessageId === message.id}
                 />
               </div>
             ) : (
@@ -1534,20 +1721,224 @@ export function ChatPanelV2({
               ref={textareaRef}
               value={input}
               onChange={(e) => {
-                setInput(e.target.value)
-                // Trigger height adjustment immediately for better UX
+                const newValue = e.target.value
+                setInput(newValue)
+                
+                // @ command detection
+                if (textareaRef.current && project) {
+                  const cursorPos = e.target.selectionStart
+                  const atCommand = detectAtCommand(newValue, cursorPos)
+                  
+                  if (atCommand) {
+                    setFileQuery(atCommand.query)
+                    setAtCommandStartIndex(atCommand.startIndex)
+                    
+                    if (!showFileDropdown) {
+                      const position = calculateDropdownPosition(textareaRef.current, atCommand.startIndex)
+                      setDropdownPosition(position)
+                      setShowFileDropdown(true)
+                    }
+                  } else {
+                    if (showFileDropdown) {
+                      closeFileDropdown()
+                    }
+                  }
+                }
+                
+                // Trigger height adjustment
                 setTimeout(() => {
                   if (textareaRef.current) {
                     debouncedHeightAdjustment(textareaRef.current)
                   }
                 }, 0)
               }}
-              placeholder="Type your message..."
+              placeholder="Type, @ for files, paste images or URLs, or attach..."
               className="min-h-[48px] max-h-[140px] resize-none pr-12 pb-12"
               onKeyDown={(e: any) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
                   handleEnhancedSubmit(e)
+                }
+              }}
+              onPaste={async (e) => {
+                // Handle image pasting
+                const items = e.clipboardData?.items
+                if (!items) return
+
+                // Check for URLs in pasted text first
+                const pastedText = e.clipboardData?.getData('text')
+                if (pastedText) {
+                  // URL regex pattern
+                  const urlRegex = /(https?:\/\/[^\s]+)/g
+                  const urls = pastedText.match(urlRegex)
+                  
+                  if (urls && urls.length > 0) {
+                    e.preventDefault()
+                    
+                    // Check total attachment limit
+                    const totalAttachments = attachedImages.length + attachedUploadedFiles.length + attachedUrls.length
+                    if (totalAttachments >= 2) {
+                      toast({
+                        title: "Maximum attachments reached",
+                        description: "You can attach a maximum of 2 items (images, files, and/or URLs)",
+                        variant: "destructive"
+                      })
+                      return
+                    }
+                    
+                    // Process each URL
+                    for (const url of urls.slice(0, 2 - totalAttachments)) { // Limit to remaining slots
+                      const urlId = `pasted_url_${Date.now()}_${Math.random()}`
+                      
+                      // Add URL with processing flag
+                      setAttachedUrls(prev => [...prev, {
+                        id: urlId,
+                        url: url,
+                        isProcessing: true
+                      }])
+                      
+                      // Fetch URL content
+                      try {
+                        console.log('🌐 Auto-attaching pasted URL:', url);
+                        
+                        const response = await fetch('/api/redesign', {
+                          method: 'PUT',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({ url: url }),
+                        })
+                        
+                        if (!response.ok) {
+                          throw new Error('Failed to fetch URL content')
+                        }
+                        
+                        const data = await response.json()
+                        
+                        console.log('✅ URL content fetched:', {
+                          url: url,
+                          contentLength: data.markdown?.length,
+                          hasContent: !!data.markdown
+                        })
+                        
+                        // Update URL with content
+                        setAttachedUrls(prev => prev.map((attachedUrl: AttachedUrl) =>
+                          attachedUrl.id === urlId 
+                            ? { ...attachedUrl, title: url, content: data.markdown, isProcessing: false } 
+                            : attachedUrl
+                        ))
+                        
+                        toast({
+                          title: "URL attached",
+                          description: `Auto-attached ${url}`
+                        })
+                      } catch (error) {
+                        console.error('Error fetching pasted URL:', error)
+                        toast({
+                          title: "URL attachment failed",
+                          description: `Failed to attach ${url}`,
+                          variant: "destructive"
+                        })
+                        setAttachedUrls(prev => prev.filter(attachedUrl => attachedUrl.id !== urlId))
+                      }
+                    }
+                    
+                    return // Don't process images if URLs were found
+                  }
+                }
+
+                // Handle image pasting (existing logic)
+                for (let i = 0; i < items.length; i++) {
+                  const item = items[i]
+                  
+                  if (item.type.indexOf('image') !== -1) {
+                    e.preventDefault()
+                    
+                    // Check total attachment limit
+                    const totalAttachments = attachedImages.length + attachedUploadedFiles.length + attachedUrls.length
+                    if (totalAttachments >= 2) {
+                      toast({
+                        title: "Maximum attachments reached",
+                        description: "You can attach a maximum of 2 items (images, files, and/or URLs)",
+                        variant: "destructive"
+                      })
+                      return
+                    }
+
+                    const file = item.getAsFile()
+                    if (!file) continue
+
+                    // Validate file size (max 10MB)
+                    if (file.size > 10 * 1024 * 1024) {
+                      toast({
+                        title: "File too large",
+                        description: "Pasted image is too large. Maximum size is 10MB",
+                        variant: "destructive"
+                      })
+                      continue
+                    }
+
+                    // Convert to base64
+                    const reader = new FileReader()
+                    reader.onload = async (event) => {
+                      const base64 = event.target?.result as string
+                      const imageId = `pasted_img_${Date.now()}_${i}`
+
+                      // Add image with processing flag
+                      setAttachedImages(prev => [...prev, {
+                        id: imageId,
+                        name: `Pasted Image ${attachedImages.length + 1}`,
+                        base64: base64,
+                        isProcessing: true
+                      }])
+
+                      // Send to Pixtral for description
+                      try {
+                        const response = await fetch('/api/describe-image', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            image: base64,
+                            prompt: "Describe this image in detail, including layout, colors, text, UI elements, and any other relevant information."
+                          })
+                        })
+
+                        if (!response.ok) throw new Error('Failed to describe image')
+
+                        const data = await response.json()
+
+                        // Update image with description
+                        setAttachedImages(prev => prev.map(img => 
+                          img.id === imageId 
+                            ? { ...img, description: data.description, isProcessing: false }
+                            : img
+                        ))
+
+                        toast({
+                          title: "Image pasted and processed",
+                          description: "Image attached successfully"
+                        })
+                      } catch (error) {
+                        console.error('Error describing pasted image:', error)
+                        toast({
+                          title: "Processing failed",
+                          description: "Failed to process pasted image",
+                          variant: "destructive"
+                        })
+                        setAttachedImages(prev => prev.filter(img => img.id !== imageId))
+                      }
+                    }
+
+                    reader.onerror = () => {
+                      toast({
+                        title: "Read error",
+                        description: "Failed to read pasted image",
+                        variant: "destructive"
+                      })
+                    }
+
+                    reader.readAsDataURL(file)
+                  }
                 }
               }}
             />
@@ -1685,6 +2076,118 @@ export function ChatPanelV2({
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Attach URL
+              </button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* File Attachment Dropdown (@ command) */}
+        {showFileDropdown && project && (
+          <FileAttachmentDropdown
+            isVisible={showFileDropdown}
+            onClose={closeFileDropdown}
+            onFileSelect={handleFileSelect}
+            projectId={project.id}
+            query={fileQuery}
+            position={dropdownPosition}
+          />
+        )}
+
+        {/* Checkpoint Revert Confirmation Dialog */}
+        <AlertDialog open={showRevertDialog} onOpenChange={setShowRevertDialog}>
+          <AlertDialogContent className="bg-gray-900 border-gray-700 z-[70]">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-white">Revert to Checkpoint?</AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-400">
+                This will restore all files to their state at this message and remove all messages after it. You can restore within 5 minutes if needed.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="bg-gray-700 text-gray-300 hover:bg-gray-600">
+                Cancel
+              </AlertDialogCancel>
+              <button
+                onClick={async () => {
+                  if (!project || !revertMessageId) return
+                  
+                  setIsReverting(true)
+                  setShowRevertDialog(false)
+                  
+                  try {
+                    const { storageManager } = await import('@/lib/storage-manager')
+                    await storageManager.init()
+                    
+                    const chatSessions = await storageManager.getChatSessions(project.userId)
+                    const activeSession = chatSessions.find((session: any) => 
+                      session.workspaceId === project.id && session.isActive
+                    )
+                    
+                    if (!activeSession) {
+                      toast({
+                        title: "Revert Failed",
+                        description: "Could not find chat session for this project.",
+                        variant: "destructive"
+                      })
+                      return
+                    }
+                    
+                    // Capture state before revert
+                    const { capturePreRevertState, getCheckpoints, deleteMessagesAfter, restoreCheckpoint } = await import('@/lib/checkpoint-utils')
+                    await capturePreRevertState(project.id, activeSession.id, revertMessageId)
+                    
+                    // Find checkpoint for this message
+                    const checkpoints = await getCheckpoints(project.id)
+                    const checkpoint = checkpoints.find(cp => cp.messageId === revertMessageId)
+                    
+                    if (!checkpoint) {
+                      toast({
+                        title: "Revert Failed",
+                        description: "Could not find checkpoint for this message.",
+                        variant: "destructive"
+                      })
+                      return
+                    }
+                    
+                    // Delete messages after this point
+                    const allMessages = await storageManager.getMessages(activeSession.id)
+                    const targetMessage = allMessages.find(msg => msg.id === revertMessageId)
+                    
+                    if (targetMessage) {
+                      await deleteMessagesAfter(activeSession.id, targetMessage.createdAt)
+                    }
+                    
+                    // Restore files
+                    const success = await restoreCheckpoint(checkpoint.id)
+                    
+                    if (success) {
+                      await loadMessages()
+                      
+                      window.dispatchEvent(new CustomEvent('files-changed', { 
+                        detail: { projectId: project.id, forceRefresh: true } 
+                      }))
+                      
+                      setRestoreMessageId(revertMessageId)
+                      
+                      toast({
+                        title: "Reverted Successfully",
+                        description: "Files and messages have been restored. You can undo this action for 5 minutes."
+                      })
+                    }
+                  } catch (error) {
+                    console.error('[Checkpoint] Error reverting:', error)
+                    toast({
+                      title: "Revert Failed",
+                      description: error instanceof Error ? error.message : "An unknown error occurred.",
+                      variant: "destructive"
+                    })
+                  } finally {
+                    setIsReverting(false)
+                    setRevertMessageId(null)
+                  }
+                }}
+                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-500 transition-colors"
+              >
+                Revert
               </button>
             </AlertDialogFooter>
           </AlertDialogContent>
