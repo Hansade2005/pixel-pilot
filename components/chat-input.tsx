@@ -80,7 +80,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ count: 6 }),
+        body: JSON.stringify({ count: 15 }),
       })
 
       if (response.ok) {

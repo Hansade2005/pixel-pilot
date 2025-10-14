@@ -3,9 +3,19 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { getModel } from '@/lib/ai-providers'
 
+// In-memory cache for recently generated suggestions (simple deduplication)
+// In production, this could be stored in Redis or database
+let recentSuggestionsCache: Set<string> = new Set()
+const MAX_CACHE_SIZE = 100
+
+type Suggestion = {
+  display: string
+  prompt: string
+}
+
 // Input validation schema
 const generatePromptSuggestionsSchema = z.object({
-  count: z.number().min(1).max(10).default(6),
+  count: z.number().min(1).max(15).default(15),
 })
 
 export async function POST(request: Request) {
@@ -23,23 +33,32 @@ export async function POST(request: Request) {
 
     // Parse and validate request body
     const body = await request.json()
-    const { count = 6 } = generatePromptSuggestionsSchema.parse(body)
+    const { count = 15 } = generatePromptSuggestionsSchema.parse(body)
 
     console.log('🎯 Generating prompt suggestions using Codestral')
+
+    // Generate a unique seed for this session to ensure variety
+    const sessionSeed = Date.now() + Math.random()
+    const timestamp = new Date().toISOString()
 
     // Get Codestral model for generating prompt suggestions
     const codestralModel = getModel('codestral-latest')
 
-    // Generate prompt suggestions using Codestral
+    // Generate prompt suggestions using Codestral with deduplication instructions
     const result = await generateText({
       model: codestralModel,
       prompt: `Generate ${count} diverse and creative prompt suggestions for building web applications using AI. Each suggestion should be a complete, actionable prompt that users can use to create different types of web apps.
 
 Requirements:
 - Each prompt should be 10-25 words long
-- Cover different categories: business, e-commerce, productivity, creative, social, utility
+- Cover different categories: business, e-commerce, productivity, creative, social, utility, gaming, education, health, finance, AI projects
 - Make them specific and inspiring
 - Focus on modern web app concepts
+- Generate UNIQUE suggestions - avoid common templates like "landing page", "portfolio", "blog"
+- Include variety in technologies: React, Vue, Next.js, Svelte, etc.
+- Include different app types: dashboards, tools, platforms, marketplaces, AI assistants, chatbots, etc.
+
+Session info: ${timestamp} (seed: ${sessionSeed})
 
 Return a JSON array of objects, each with:
 - "display": A short title (3-5 words) for the pill button
@@ -48,8 +67,8 @@ Return a JSON array of objects, each with:
 Example format:
 [
   {
-    "display": "Landing Page",
-    "prompt": "Create a modern landing page for my startup with hero section, features, and contact form"
+    "display": "Analytics Dashboard",
+    "prompt": "Create a real-time analytics dashboard for tracking user engagement metrics"
   }
 ]
 
@@ -59,7 +78,7 @@ Generate ${count} unique suggestions:`,
     console.log('🤖 Codestral generated suggestions:', result.text)
 
     // Parse the JSON response - handle markdown code blocks
-    let suggestions
+    let suggestions: Suggestion[]
     try {
       let jsonText = result.text.trim()
       
@@ -87,9 +106,41 @@ Generate ${count} unique suggestions:`,
       ]
     }
 
+    // Deduplication logic: Filter out recently generated suggestions
+    let uniqueSuggestions = suggestions.filter((suggestion: Suggestion) => {
+      const suggestionKey = `${suggestion.display}:${suggestion.prompt}`.toLowerCase()
+      if (recentSuggestionsCache.has(suggestionKey)) {
+        return false // Skip duplicate
+      }
+      return true
+    })
+
+    // If we don't have enough unique suggestions, add some variety by regenerating
+    // For now, we'll just take what we have and add to cache
+    if (uniqueSuggestions.length < count && suggestions.length >= count) {
+      // Take the first 'count' suggestions that aren't duplicates
+      uniqueSuggestions = suggestions.slice(0, count).filter((suggestion: Suggestion) => {
+        const suggestionKey = `${suggestion.display}:${suggestion.prompt}`.toLowerCase()
+        return !recentSuggestionsCache.has(suggestionKey)
+      })
+    }
+
+    // Add new suggestions to cache
+    uniqueSuggestions.forEach((suggestion: Suggestion) => {
+      const suggestionKey = `${suggestion.display}:${suggestion.prompt}`.toLowerCase()
+      recentSuggestionsCache.add(suggestionKey)
+    })
+
+    // Maintain cache size limit
+    if (recentSuggestionsCache.size > MAX_CACHE_SIZE) {
+      // Simple cache cleanup - remove oldest entries (in production, use LRU)
+      const cacheArray = Array.from(recentSuggestionsCache)
+      recentSuggestionsCache = new Set(cacheArray.slice(-MAX_CACHE_SIZE))
+    }
+
     return Response.json({
       success: true,
-      suggestions: suggestions.slice(0, count)
+      suggestions: uniqueSuggestions.slice(0, count)
     })
 
   } catch (error) {
