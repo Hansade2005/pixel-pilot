@@ -11,6 +11,7 @@ import type { User } from "@supabase/supabase-js"
 import type { Workspace, File } from "@/lib/storage-manager"
 import { Sidebar } from "./sidebar"
 import { ChatPanel } from "./chat-panel"
+import { ChatPanelV2 } from "./chat-panel-v2"
 import { CodePreviewPanel } from "./code-preview-panel"
 import { ProjectHeader } from "./project-header"
 import { FileExplorer } from "./file-explorer"
@@ -939,11 +940,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 {/* Left Panel - Chat (Resizable) */}
                 <ResizablePanel defaultSize={35} minSize={20} maxSize={40}>
                   <div className="h-full flex flex-col border-r border-border">
-                    <ChatPanel 
+                    <ChatPanelV2 
                       project={selectedProject}
                       selectedModel={selectedModel}
                       aiMode={aiMode}
-                      onModeChange={setAiMode}
+      
                       initialPrompt={initialChatPrompt}
                     />
                   </div>
@@ -1415,7 +1416,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               <Tabs value={mobileTab} onValueChange={(value) => setMobileTab(value as any)} className="h-full flex flex-col">
                 <TabsContent value="chat" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
                   <div className="h-full overflow-hidden">
-                    <ChatPanel 
+                    <ChatPanelV2 
                       project={selectedProject} 
                       isMobile={true}
                       selectedModel={selectedModel}

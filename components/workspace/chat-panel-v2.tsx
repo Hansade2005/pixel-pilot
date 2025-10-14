@@ -1,0 +1,1695 @@
+/* 
+ * ChatPanel V2 - AI SDK Real-Time Streaming Implementation
+ * Uses @ai-sdk/react useChat hook with native tool support
+ * Preserves all features from original chat-panel.tsx
+ */
+
+'use client'
+
+import React, { useState, useRef, useEffect, useCallback } from 'react'
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { Card } from "@/components/ui/card"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog"
+import { useToast } from "@/components/ui/use-toast"
+import { MessageWithTools } from './message-with-tools'
+import {
+  Send, Paperclip, Mic, MicOff, X, FileText, Image as ImageIcon,
+  Link as LinkIcon, Loader2, ChevronDown,ChevronUp, StopCircle, Trash2, Plus,
+  Copy, Edit3, ArrowUp, Undo2, Redo2, Check, AlertTriangle, Zap
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Actions, Action } from '@/components/ai-elements/actions'
+
+// ExpandableUserMessage component for long user messages
+const ExpandableUserMessage = ({
+  content,
+  messageId,
+  onCopy,
+  onEdit,
+  onDelete,
+  onRetry,
+  isExpanded: controlledExpanded,
+  onExpandedChange
+}: {
+  content: string
+  messageId: string
+  onCopy: (messageId: string, content: string) => void
+  onEdit: (messageId: string, content: string) => void
+  onDelete: (messageId: string) => void
+  onRetry: (messageId: string, content: string) => void
+  isExpanded?: boolean
+  onExpandedChange?: (expanded: boolean) => void
+}) => {
+  const [isExpanded, setIsExpanded] = useState(controlledExpanded ?? false)
+  const [shouldTruncate, setShouldTruncate] = useState(false)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const CHAR_LIMIT = 140 // Character limit before truncation
+
+  useEffect(() => {
+    // Check if content exceeds character limit
+    setShouldTruncate(content.length > CHAR_LIMIT)
+  }, [content])
+
+  useEffect(() => {
+    if (controlledExpanded !== undefined) {
+      setIsExpanded(controlledExpanded)
+    }
+  }, [controlledExpanded])
+
+  useEffect(() => {
+    if (onExpandedChange) {
+      onExpandedChange(isExpanded)
+    }
+  }, [isExpanded, onExpandedChange])
+
+  const handleIconClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onRetry(messageId, content);
+  };
+
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEdit(messageId, content);
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete(messageId);
+  };
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onCopy(messageId, content);
+  };
+
+  if (!shouldTruncate) {
+    return (
+      <div className="relative w-full">
+        <div className="bg-card text-card-foreground border rounded-xl shadow-sm overflow-hidden w-full flex flex-col">
+          <div className="p-4">
+            <p className="text-card-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
+              {content}
+            </p>
+          </div>
+          <div className="px-4 pb-2 flex justify-end">
+            <Actions>
+              <Action tooltip="Retry message" onClick={handleIconClick}>
+                <ArrowUp className="w-4 h-4" />
+              </Action>
+              <Action tooltip="Copy message" onClick={handleCopy}>
+                <Copy className="w-4 h-4" />
+              </Action>
+              <Action tooltip="Edit message" onClick={handleEdit}>
+                <Edit3 className="w-4 h-4" />
+              </Action>
+              <Action tooltip="Delete message" onClick={handleDelete}>
+                <Trash2 className="w-4 h-4" />
+              </Action>
+            </Actions>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="relative w-full">
+      <div className="bg-card text-card-foreground border rounded-xl overflow-hidden relative shadow-sm w-full flex flex-col">
+        <div className="p-4">
+          {/* Show truncated content when collapsed */}
+          {!isExpanded ? (
+            <div>
+              <p className="text-card-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
+                {content.substring(0, CHAR_LIMIT)}
+                {content.length > CHAR_LIMIT && '...'}
+              </p>
+            </div>
+          ) : (
+            /* Show full content when expanded with scrollable area */
+            <div
+              ref={contentRef}
+              className="max-h-[300px] overflow-y-auto"
+              style={{
+                scrollBehavior: 'smooth',
+                WebkitOverflowScrolling: 'touch'
+              }}
+            >
+              <p className="text-card-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
+                {content}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Expand/Collapse trigger */}
+        <div
+          className="flex items-center justify-center px-4 py-2 border-t hover:bg-muted transition-colors cursor-pointer"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <span className="text-xs text-muted-foreground mr-2">
+            {isExpanded ? 'Show less' : 'Show more'}
+          </span>
+          {isExpanded ? (
+            <ChevronUp className="w-3 h-3 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="w-3 h-3 text-muted-foreground" />
+          )}
+        </div>
+
+        <div className="px-4 pb-2 flex justify-end">
+          <Actions>
+            <Action tooltip="Retry message" onClick={handleIconClick}>
+              <ArrowUp className="w-4 h-4" />
+            </Action>
+            <Action tooltip="Copy message" onClick={handleCopy}>
+              <Copy className="w-4 h-4" />
+            </Action>
+            <Action tooltip="Edit message" onClick={handleEdit}>
+              <Edit3 className="w-4 h-4" />
+            </Action>
+            <Action tooltip="Delete message" onClick={handleDelete}>
+              <Trash2 className="w-4 h-4" />
+            </Action>
+          </Actions>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Types
+interface AttachedFile {
+  id: string
+  name: string
+  path: string
+  content?: string
+}
+
+interface AttachedImage {
+  id: string
+  name: string
+  base64: string
+  description?: string
+  isProcessing?: boolean
+}
+
+interface AttachedUrl {
+  id: string
+  url: string
+  title?: string
+  content?: string
+  isProcessing?: boolean
+}
+
+interface AttachedUploadedFile {
+  id: string
+  name: string
+  content: string
+  size: number
+}
+
+interface ChatPanelV2Props {
+  project: any
+  isMobile?: boolean
+  selectedModel?: string
+  aiMode?: string
+  onModeChange?: (mode: string) => void
+  onClearChat?: () => void
+  initialPrompt?: string
+}
+
+export function ChatPanelV2({
+  project,
+  isMobile = false,
+  selectedModel = 'gpt-4o',
+  aiMode = 'code',
+  onModeChange,
+  onClearChat,
+  initialPrompt
+}: ChatPanelV2Props) {
+  const { toast } = useToast()
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Debounce utility function
+  const debounce = (func: Function, wait: number) => {
+    let timeout: NodeJS.Timeout
+    return (...args: any[]) => {
+      clearTimeout(timeout)
+      timeout = setTimeout(() => func.apply(null, args), wait)
+    }
+  }
+
+  // Debounced textarea height adjustment to prevent lag during typing
+  const debouncedHeightAdjustment = useCallback(
+    debounce((textarea: HTMLTextAreaElement) => {
+      // Reset to baseline then expand up to the max (90px)
+      textarea.style.height = '90px';
+      const newHeight = Math.min(textarea.scrollHeight, 140)
+      textarea.style.height = newHeight + 'px';
+      // Only show a vertical scrollbar when content exceeds the max height
+      textarea.style.overflowY = textarea.scrollHeight > 140 ? 'auto' : 'hidden'
+    }, 50), // 50ms debounce for height adjustments
+    []
+  );
+
+  // File attachments state (preserve from original)
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
+  const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([])
+  const [attachedUploadedFiles, setAttachedUploadedFiles] = useState<AttachedUploadedFile[]>([])
+  const [attachedUrls, setAttachedUrls] = useState<AttachedUrl[]>([])
+  
+  // UI state
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
+  const [showUrlDialog, setShowUrlDialog] = useState(false)
+  const [urlInput, setUrlInput] = useState('')
+  
+  // Speech-to-text state (Web Speech API real-time implementation)
+  const [isRecording, setIsRecording] = useState(false)
+  const [isTranscribing, setIsTranscribing] = useState(false)
+  const recognitionRef = useRef<any>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+
+  // Load project files for context
+  const [projectFiles, setProjectFiles] = useState<any[]>([])
+
+  // Local state for input (not using useChat's input)
+  const [input, setInput] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+
+  // Auto-adjust textarea height on input change
+  useEffect(() => {
+    if (textareaRef.current) {
+      debouncedHeightAdjustment(textareaRef.current)
+    }
+  }, [input, debouncedHeightAdjustment])
+
+  // Local state for messages (since we're not using useChat hook for complex attachment handling)
+  const [messages, setMessages] = useState<any[]>([])
+  const [error, setError] = useState<Error | null>(null)
+  const [abortController, setAbortController] = useState<AbortController | null>(null)
+
+  // Message actions state
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
+  const [editingMessageContent, setEditingMessageContent] = useState('')
+
+  // Save message to IndexedDB for the current project
+  const saveMessageToIndexedDB = async (message: any) => {
+    if (!project) {
+      console.warn('[ChatPanelV2] Cannot save message: no project selected')
+      return
+    }
+
+    try {
+      console.log(`[ChatPanelV2] Saving message to project ${project.id}:`, {
+        id: message.id,
+        role: message.role,
+        contentLength: message.content.length,
+        hasReasoning: !!message.reasoning,
+        reasoningLength: message.reasoning?.length || 0,
+        hasTools: message.toolInvocations?.length > 0,
+        toolCount: message.toolInvocations?.length || 0,
+        metadataKeys: Object.keys(message.metadata || {})
+      })
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+
+      // Get or create chat session for this project
+      let chatSessions = await storageManager.getChatSessions(project.userId)
+      let chatSession = chatSessions.find((session: any) =>
+        session.workspaceId === project.id && session.isActive
+      )
+
+      if (!chatSession) {
+        console.log(`[ChatPanelV2] Creating new chat session for project ${project.id}`)
+        const sessionTitle = project.name ? `${project.name} Chat` : `Project Chat Session`
+        chatSession = await storageManager.createChatSession({
+          workspaceId: project.id,
+          userId: project.userId,
+          title: sessionTitle,
+          isActive: true,
+          lastMessageAt: new Date().toISOString()
+        })
+        console.log(`[ChatPanelV2] Created chat session:`, chatSession.id)
+      }
+
+      // Check if message with this ID already exists and delete it (to prevent duplicates)
+      const existingMessages = await storageManager.getMessages(chatSession.id)
+      const existingMessage = existingMessages.find((m: any) => m.id === message.id)
+
+      if (existingMessage) {
+        console.log(`[ChatPanelV2] Deleting existing message with ID ${message.id} to prevent duplicates`)
+        await storageManager.deleteMessage(chatSession.id, message.id)
+      }
+
+      // Create the message (fresh or replacement)
+      await storageManager.createMessage({
+        chatSessionId: chatSession.id,
+        role: message.role,
+        content: message.content,
+        metadata: message.metadata || {},
+        tokensUsed: 0
+      })
+      // Update session's last message time and message count
+      const messageCount = existingMessages.length + 1
+      await storageManager.updateChatSession(chatSession.id, {
+        lastMessageAt: new Date().toISOString(),
+        messageCount: messageCount
+      })
+
+      console.log(`[ChatPanelV2] Message saved successfully for project ${project.id}`)
+    } catch (error) {
+      console.error(`[ChatPanelV2] Error saving message for project ${project?.id}:`, error)
+    }
+  }
+
+  // Save assistant message after streaming is complete
+  const saveAssistantMessageAfterStreaming = async (
+    assistantMessageId: string,
+    accumulatedContent: string,
+    accumulatedReasoning: string,
+    accumulatedToolInvocations: any[]
+  ) => {
+    if (!project) {
+      console.warn('[ChatPanelV2] Cannot save assistant message: no project selected')
+      return
+    }
+
+    try {
+      console.log(`[ChatPanelV2] Saving complete assistant message after streaming: ${assistantMessageId}`)
+
+      const finalAssistantMessage = {
+        id: assistantMessageId,
+        role: 'assistant',
+        content: accumulatedContent || (accumulatedToolInvocations.length > 0 ? 'Tool execution completed.' : ''),
+        createdAt: new Date().toISOString(),
+        metadata: {
+          toolInvocations: accumulatedToolInvocations,
+          reasoning: accumulatedReasoning,
+          hasToolCalls: accumulatedToolInvocations.length > 0
+        }
+      }
+
+      await saveMessageToIndexedDB(finalAssistantMessage)
+      console.log(`[ChatPanelV2] Complete assistant message saved to database: ${assistantMessageId}`)
+    } catch (error) {
+      console.error(`[ChatPanelV2] Error saving complete assistant message ${assistantMessageId}:`, error)
+    }
+  }
+
+  // Message action handlers
+  const handleCopyMessage = async (messageId: string, content: string) => {
+    try {
+      await navigator.clipboard.writeText(content)
+      toast({
+        title: 'Copied',
+        description: 'Message copied to clipboard'
+      })
+    } catch (err) {
+      console.error('Copy failed', err)
+      toast({
+        title: 'Copy failed',
+        description: 'Unable to copy message',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const handleEditMessage = (messageId: string, content: string) => {
+    setEditingMessageId(messageId)
+    setEditingMessageContent(content)
+    setInput(content)
+  }
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!project) return
+
+    try {
+      // Remove message from UI immediately for better UX
+      setMessages(prev => prev.filter(msg => msg.id !== messageId))
+
+      // Delete message from IndexedDB
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+
+      // Get chat session for this project
+      const chatSessions = await storageManager.getChatSessions(project.userId)
+      const activeSession = chatSessions.find((session: any) =>
+        session.workspaceId === project.id && session.isActive
+      )
+
+      if (activeSession) {
+        // Delete the message from the database
+        const success = await storageManager.deleteMessage(activeSession.id, messageId)
+        if (success) {
+          console.log(`[ChatPanelV2] Deleted message ${messageId} from database`)
+        } else {
+          console.warn(`[ChatPanelV2] Failed to delete message ${messageId} from database`)
+        }
+      }
+
+      toast({
+        title: "Message Deleted",
+        description: "The message has been removed from the chat history."
+      })
+    } catch (error) {
+      console.error('[ChatPanelV2] Error deleting message:', error)
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete the message. Please try again.",
+        variant: "destructive"
+      })
+
+      // Reload messages on error to maintain consistency
+      if (project) {
+        await loadProjectFiles()
+      }
+    }
+  }
+
+  const handleRetryMessage = async (messageId: string, content: string) => {
+    if (!project || isLoading) return
+
+    // Find the message being retried
+    const messageToRetry = messages.find(msg => msg.id === messageId)
+    if (!messageToRetry) return
+
+    // Clear all messages that came after this message (including AI responses)
+    const messageIndex = messages.findIndex(msg => msg.id === messageId)
+    if (messageIndex !== -1) {
+      setMessages(prev => prev.slice(0, messageIndex + 1))
+    }
+
+    // Set the content as input and submit fresh
+    setInput(content)
+    setIsLoading(true)
+
+    // Small delay to ensure state is updated
+    setTimeout(() => {
+      // Create a synthetic form event to trigger handleEnhancedSubmit
+      const syntheticEvent = {
+        preventDefault: () => {},
+      } as React.FormEvent
+
+      handleEnhancedSubmit(syntheticEvent)
+    }, 100)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingMessageId || !project) return
+
+    try {
+      // Update the message in local state
+      setMessages(prev => prev.map(msg =>
+        msg.id === editingMessageId
+          ? { ...msg, content: editingMessageContent }
+          : msg
+      ))
+
+      toast({
+        title: "Message Updated",
+        description: "The message has been updated successfully."
+      })
+    } catch (error) {
+      console.error('[ChatPanelV2] Error updating message:', error)
+      toast({
+        title: "Update Failed",
+        description: "Failed to update the message. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      // Reset edit mode
+      setEditingMessageId(null)
+      setEditingMessageContent('')
+      setInput('')
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null)
+    setEditingMessageContent('')
+    setInput('')
+  }
+
+  // Stop function for aborting requests
+  const stop = () => {
+    if (abortController) {
+      abortController.abort()
+      setAbortController(null)
+      setIsLoading(false)
+    }
+  }
+
+  // Load project files on mount
+  useEffect(() => {
+    if (project?.id) {
+      loadProjectFiles()
+      loadMessages()
+    }
+  }, [project?.id])
+
+  const loadProjectFiles = async () => {
+    try {
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+      const files = await storageManager.getFiles(project.id)
+      setProjectFiles(files)
+    } catch (error) {
+      console.error('[ChatPanelV2] Error loading files:', error)
+    }
+  }
+
+  const loadMessages = async () => {
+    if (!project?.id) return
+
+    try {
+      console.log(`[ChatPanelV2] Loading messages for project ${project.id}`)
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+
+      // Get chat sessions for this user
+      const chatSessions = await storageManager.getChatSessions(project.userId)
+      
+      // Find the active chat session for this project
+      const activeSession = chatSessions.find((session: any) =>
+        session.workspaceId === project.id && session.isActive
+      )
+
+      if (activeSession) {
+        console.log(`[ChatPanelV2] Found active chat session: ${activeSession.id}`)
+        
+        // Load messages for this session
+        const storedMessages = await storageManager.getMessages(activeSession.id)
+        
+        // Convert stored messages to the format expected by the UI
+        const uiMessages = storedMessages.map((msg: any) => {
+          const uiMessage = {
+            id: msg.id,
+            role: msg.role,
+            content: msg.content,
+            createdAt: msg.createdAt,
+            // Extract reasoning and toolInvocations from metadata for UI compatibility
+            reasoning: msg.metadata?.reasoning || '',
+            toolInvocations: msg.metadata?.toolInvocations || [],
+            metadata: msg.metadata || {}
+          }
+          console.log(`[ChatPanelV2] Loaded message ${msg.id}:`, {
+            role: msg.role,
+            hasReasoning: !!uiMessage.reasoning,
+            reasoningLength: uiMessage.reasoning.length,
+            hasTools: uiMessage.toolInvocations.length > 0,
+            toolCount: uiMessage.toolInvocations.length
+          })
+          return uiMessage
+        })
+
+        console.log(`[ChatPanelV2] Loaded ${uiMessages.length} messages from database`)
+        setMessages(uiMessages)
+      } else {
+        console.log(`[ChatPanelV2] No active chat session found for project ${project.id}, starting fresh`)
+        setMessages([])
+      }
+    } catch (error) {
+      console.error(`[ChatPanelV2] Error loading messages for project ${project?.id}:`, error)
+      // Don't show error toast for loading messages, just log it
+    }
+  }
+
+  // Handle initial prompt
+  useEffect(() => {
+    if (initialPrompt && messages.length === 0) {
+      setInput(initialPrompt)
+    }
+  }, [initialPrompt])
+
+  // Handle loading state based on isLoading state
+  useEffect(() => {
+    // Loading is managed by isLoading state
+  }, [isLoading])
+
+  // Handle errors
+  useEffect(() => {
+    if (error) {
+      console.error('[ChatPanelV2] Error:', error)
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to get AI response',
+        variant: 'destructive'
+      })
+    }
+  }, [error, toast])
+
+  // Auto-scroll on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  // Enhanced submit with attachments - AI SDK Pattern: Send last 5 messages
+  const handleEnhancedSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!input.trim() && attachedFiles.length === 0 && attachedImages.length === 0) {
+      return
+    }
+
+    // Check if images are still processing
+    if (attachedImages.some((img: AttachedImage) => img.isProcessing)) {
+      toast({
+        title: 'Images processing',
+        description: 'Please wait for images to finish processing',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    // Check if URLs are still processing
+    if (attachedUrls.some((url: AttachedUrl) => url.isProcessing)) {
+      toast({
+        title: 'URLs processing',
+        description: 'Please wait for URLs to finish processing',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    // Build enhanced message content with attachments
+    let enhancedContent = input.trim()
+
+    // Add image descriptions
+    if (attachedImages.length > 0) {
+      const imageDescriptions = attachedImages
+        .filter((img: AttachedImage) => img.description)
+        .map((img: AttachedImage) => `\n\n--- Image: ${img.name} ---\n${img.description}\n--- End of Image ---`)
+        .join('')
+
+      if (imageDescriptions) {
+        enhancedContent = `${enhancedContent}\n\n=== ATTACHED IMAGES CONTEXT ===${imageDescriptions}\n=== END ATTACHED IMAGES ===`
+      }
+    }
+
+    // Add URL contents
+    if (attachedUrls.length > 0) {
+      const urlContents = attachedUrls
+        .filter((url: AttachedUrl) => url.content)
+        .map((url: AttachedUrl) => `\n\n--- Website: ${url.title || url.url} ---\nURL: ${url.url}\n\nContent:\n${url.content}\n--- End of Website ---`)
+        .join('')
+
+      if (urlContents) {
+        enhancedContent = `${enhancedContent}\n\n=== ATTACHED WEBSITES CONTEXT ===${urlContents}\n=== END ATTACHED WEBSITES ===`
+      }
+    }
+
+    // Add uploaded file contents
+    if (attachedUploadedFiles.length > 0) {
+      const uploadedFileContexts = attachedUploadedFiles
+        .map(file => `\n\n--- Uploaded File: ${file.name} ---\n${file.content}\n--- End of ${file.name} ---`)
+        .join('')
+
+      if (uploadedFileContexts) {
+        enhancedContent = `${enhancedContent}\n\n=== UPLOADED FILES CONTEXT ===${uploadedFileContexts}\n=== END UPLOADED FILES ===`
+      }
+    }
+
+    // Add project files attached via @ command
+    if (attachedFiles.length > 0) {
+      const fileContexts: string[] = []
+
+      try {
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+
+        for (const attachedFile of attachedFiles) {
+          try {
+            const fileData = await storageManager.getFile(project.id, attachedFile.path)
+            if (fileData && fileData.content) {
+              fileContexts.push(`\n\n--- Project File: ${attachedFile.path} ---\n${fileData.content}\n--- End of ${attachedFile.name} ---`)
+            }
+          } catch (error) {
+            console.error(`Error loading attached file ${attachedFile.path}:`, error)
+            fileContexts.push(`\n\n--- Project File: ${attachedFile.path} ---\n[Error loading file content]\n--- End of ${attachedFile.name} ---`)
+          }
+        }
+
+        if (fileContexts.length > 0) {
+          enhancedContent = `${enhancedContent}\n\n=== PROJECT FILES CONTEXT ===${fileContexts.join('')}\n=== END PROJECT FILES ===`
+        }
+      } catch (error) {
+        console.error('Error loading attached files:', error)
+      }
+    }
+
+    // Clear attachments
+    setAttachedFiles([])
+    setAttachedImages([])
+    setAttachedUploadedFiles([])
+    setAttachedUrls([])
+    setInput('')
+    setIsLoading(true)
+
+    // Clear any previous errors
+    setError(null)
+
+    // Create user message
+    const userMessageId = Date.now().toString()
+    const userMessage = {
+      id: userMessageId,
+      role: 'user',
+      content: enhancedContent
+    }
+
+    // Add user message to local state immediately for better UX
+    setMessages(prev => [...prev, userMessage])
+
+    // Save user message to IndexedDB immediately
+    await saveMessageToIndexedDB(userMessage)
+    console.log(`[ChatPanelV2] User message saved to database: ${userMessageId}`)
+
+    // Add placeholder assistant message
+    const assistantMessageId = (Date.now() + 1).toString()
+    const assistantMessage = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: 'Thinking...'
+    }
+    setMessages(prev => [...prev, assistantMessage])
+
+    // Create abort controller for this request
+    const controller = new AbortController()
+    setAbortController(controller)
+
+    // AI SDK Pattern: Send only last 5 messages + new message
+    try {
+      // Get last 5 messages from current conversation
+      const recentMessages = messages.slice(-5) // Last 5 messages
+      const messagesToSend = [
+        ...recentMessages.map((m: any) => ({ role: m.role, content: m.content })),
+        { role: 'user', content: enhancedContent }
+      ]
+
+      console.log(`[ChatPanelV2] Sending ${messagesToSend.length} messages to server (last 5 + new)`)
+
+      const response = await fetch('/api/chat-v2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: messagesToSend, // Send last 5 + new message
+          id: project?.id, // Chat session ID for server-side storage
+          projectId: project?.id,
+          project,
+          files: projectFiles,
+          modelId: selectedModel,
+          aiMode
+        }),
+        signal: controller.signal
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to send message')
+      }
+
+      // Handle streaming response with AI SDK v5 data stream protocol
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('No response body')
+
+      const decoder = new TextDecoder()
+      let accumulatedContent = ''
+      let accumulatedReasoning = ''
+      let accumulatedToolInvocations: any[] = []
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+        console.log('[ChatPanelV2][DataStream] Raw chunk:', chunk)
+        
+        // AI SDK v5 data stream format uses newline-delimited JSON
+        const lines = chunk.split('\n').filter(line => line.trim())
+
+        for (const line of lines) {
+          try {
+            // Parse AI SDK v5 stream protocol
+            // Format: {"type":"0","value":"text"} or {"type":"tool-call",...}
+            const parsed = JSON.parse(line)
+            console.log('[ChatPanelV2][DataStream] Parsed stream part:', parsed)
+
+            // Handle different stream part types
+            if (parsed.type === 'text-delta') {
+              // Text delta - accumulate the text
+              if (parsed.text) {
+                accumulatedContent += parsed.text
+                setMessages(prev => prev.map(msg =>
+                  msg.id === assistantMessageId
+                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: [...accumulatedToolInvocations] }
+                    : msg
+                ))
+              }
+            } else if (parsed.type === 'reasoning-delta') {
+              // Reasoning delta - accumulate reasoning separately
+              if (parsed.text) {
+                accumulatedReasoning += parsed.text
+                setMessages(prev => prev.map(msg =>
+                  msg.id === assistantMessageId
+                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: [...accumulatedToolInvocations] }
+                    : msg
+                ))
+              }
+            } else if (parsed.type === 'tool-call') {
+              // Tool call start
+              const toolInvocation = {
+                toolCallId: parsed.toolCallId,
+                toolName: parsed.toolName,
+                args: parsed.args,
+                state: 'call'
+              }
+              const idx = accumulatedToolInvocations.findIndex((ti: any) => ti.toolCallId === toolInvocation.toolCallId)
+              if (idx >= 0) {
+                accumulatedToolInvocations[idx] = toolInvocation
+              } else {
+                accumulatedToolInvocations.push(toolInvocation)
+              }
+              setMessages(prev => prev.map(msg =>
+                msg.id === assistantMessageId
+                  ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: [...accumulatedToolInvocations] }
+                  : msg
+              ))
+            } else if (parsed.type === 'tool-result') {
+              // Tool result
+              const toolCallId = parsed.toolCallId
+              const result = parsed.result
+              const idx = accumulatedToolInvocations.findIndex((ti: any) => ti.toolCallId === toolCallId)
+              if (idx >= 0) {
+                accumulatedToolInvocations[idx] = {
+                  ...accumulatedToolInvocations[idx],
+                  result,
+                  state: 'result'
+                }
+              } else {
+                // Tool result without prior call
+                accumulatedToolInvocations.push({
+                  toolCallId,
+                  result,
+                  state: 'result'
+                })
+              }
+              setMessages(prev => prev.map(msg =>
+                msg.id === assistantMessageId
+                  ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: [...accumulatedToolInvocations] }
+                  : msg
+              ))
+            } else if (parsed.type === 'metadata') {
+              // Final metadata with complete tool invocations and file operations
+              if (parsed.toolInvocations && Array.isArray(parsed.toolInvocations)) {
+                accumulatedToolInvocations = parsed.toolInvocations
+                setMessages(prev => prev.map(msg =>
+                  msg.id === assistantMessageId
+                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: [...accumulatedToolInvocations] }
+                    : msg
+                ))
+              }
+
+              // Apply file operations to client-side IndexedDB for persistence
+              if (parsed.fileOperations && Array.isArray(parsed.fileOperations) && parsed.fileOperations.length > 0 && project) {
+                console.log('[ChatPanelV2][DataStream] Processing file operations:', parsed.fileOperations)
+
+                // Apply file operations asynchronously
+                setTimeout(async () => {
+                  try {
+                    const { storageManager } = await import('@/lib/storage-manager')
+                    await storageManager.init()
+
+                    let operationsApplied = 0
+
+                    for (const fileOp of parsed.fileOperations) {
+                      console.log('[ChatPanelV2][DataStream] Applying file operation:', fileOp)
+
+                      if (fileOp.type === 'write_file' && fileOp.path) {
+                        // Check if file exists
+                        const existingFile = await storageManager.getFile(project.id, fileOp.path)
+
+                        if (existingFile) {
+                          // Update existing file
+                          await storageManager.updateFile(project.id, fileOp.path, {
+                            content: fileOp.content || '',
+                            updatedAt: new Date().toISOString()
+                          })
+                          console.log(`[ChatPanelV2][DataStream] Updated existing file: ${fileOp.path}`)
+                        } else {
+                          // Create new file
+                          const newFile = await storageManager.createFile({
+                            workspaceId: project.id,
+                            name: fileOp.path.split('/').pop() || fileOp.path,
+                            path: fileOp.path,
+                            content: fileOp.content || '',
+                            fileType: fileOp.path.split('.').pop() || 'text',
+                            type: fileOp.path.split('.').pop() || 'text',
+                            size: (fileOp.content || '').length,
+                            isDirectory: false
+                          })
+                          console.log(`[ChatPanelV2][DataStream] Created new file: ${fileOp.path}`, newFile)
+                        }
+                        operationsApplied++
+                      } else if (fileOp.type === 'edit_file' && fileOp.path && fileOp.content) {
+                        // Update existing file with new content
+                        await storageManager.updateFile(project.id, fileOp.path, {
+                          content: fileOp.content,
+                          updatedAt: new Date().toISOString()
+                        })
+                        console.log(`[ChatPanelV2][DataStream] Edited file: ${fileOp.path}`)
+                        operationsApplied++
+                      } else if (fileOp.type === 'delete_file' && fileOp.path) {
+                        // Delete file
+                        await storageManager.deleteFile(project.id, fileOp.path)
+                        console.log(`[ChatPanelV2][DataStream] Deleted file: ${fileOp.path}`)
+                        operationsApplied++
+                      } else if ((fileOp.type === 'add_package' || fileOp.type === 'remove_package') && fileOp.path === 'package.json' && fileOp.content) {
+                        // Update package.json for package operations
+                        await storageManager.updateFile(project.id, 'package.json', {
+                          content: fileOp.content,
+                          updatedAt: new Date().toISOString()
+                        })
+                        console.log(`[ChatPanelV2][DataStream] Updated package.json for ${fileOp.type}: ${fileOp.package}`)
+                        operationsApplied++
+                      } else {
+                        console.warn('[ChatPanelV2][DataStream] Skipped invalid file operation:', fileOp)
+                      }
+                    }
+
+                    console.log(`[ChatPanelV2][DataStream] Applied ${operationsApplied}/${parsed.fileOperations.length} file operations to IndexedDB`)
+
+                    if (operationsApplied > 0) {
+                      // Force refresh the file explorer
+                      setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent('files-changed', {
+                          detail: { projectId: project.id, forceRefresh: true }
+                        }))
+                      }, 100)
+                    }
+                  } catch (error) {
+                    console.error('[ChatPanelV2][DataStream] Failed to apply file operations to IndexedDB:', error)
+                    toast({
+                      title: "Storage Warning",
+                      description: `File operations completed but may not persist: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                      variant: "destructive"
+                    })
+                  }
+                }, 0) // Use setTimeout to avoid blocking the streaming
+              }
+            }
+            console.log('[ChatPanelV2][DataStream] State:', { content: accumulatedContent, reasoning: accumulatedReasoning, tools: accumulatedToolInvocations.length })
+          } catch (e) {
+            // Malformed JSON or incomplete chunk, skip
+            console.warn('[ChatPanelV2][DataStream] Failed to parse line:', line, e)
+          }
+        }
+      }
+
+      // Save assistant message to database ONCE after streaming completes
+      // Only save if we have content or tool invocations
+      if (accumulatedContent.trim() || accumulatedToolInvocations.length > 0) {
+        await saveAssistantMessageAfterStreaming(
+          assistantMessageId,
+          accumulatedContent,
+          accumulatedReasoning,
+          accumulatedToolInvocations
+        )
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        // Request was aborted, remove the placeholder assistant message
+        setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
+      } else {
+        setError(error)
+        // Remove the placeholder assistant message on error
+        setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
+      }
+    } finally {
+      setIsLoading(false)
+      setAbortController(null)
+    }
+  }
+
+  // Web Speech API real-time speech-to-text implementation
+  const startWebSpeechRecognition = () => {
+    try {
+      // @ts-ignore - Web Speech API types
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+      const recognition = new SpeechRecognition()
+
+      // Enhanced settings for real-time typing
+      recognition.continuous = true
+      recognition.interimResults = true // Enable instant real-time results
+      recognition.lang = 'en-US'
+      recognition.maxAlternatives = 1
+
+      // Store the initial input value when starting
+      const initialInput = input
+      let lastFinalTranscript = ''
+      let silenceTimer: NodeJS.Timeout | null = null
+
+      recognition.onstart = () => {
+        setIsRecording(true)
+        lastFinalTranscript = ''
+        toast({
+          title: "🎤 Listening...",
+          description: "Speak now. I'll stop automatically when you're done."
+        })
+      }
+
+      recognition.onresult = (event: any) => {
+        // Clear any existing silence timer
+        if (silenceTimer) {
+          clearTimeout(silenceTimer)
+        }
+
+        let interimTranscript = ''
+        let finalTranscript = ''
+
+        // Process all results for instant typing effect
+        for (let i = 0; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript
+
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' '
+          } else {
+            interimTranscript += transcript
+          }
+        }
+
+        // Combine final and interim for instant real-time typing
+        const combinedText = (finalTranscript || lastFinalTranscript) + interimTranscript
+
+        // Update final transcript tracker
+        if (finalTranscript) {
+          lastFinalTranscript = finalTranscript
+        }
+
+        // Instantly update the input field with real-time text
+        if (combinedText.trim()) {
+          const updatedInput = initialInput
+            ? `${initialInput} ${combinedText.trim()}`
+            : combinedText.trim()
+          setInput(updatedInput)
+        }
+
+        // Auto-stop detection: Set timer to stop after 2 seconds of silence
+        silenceTimer = setTimeout(() => {
+          if (recognition && recognitionRef.current) {
+            recognition.stop()
+            toast({
+              title: "Recording stopped",
+              description: "Stopped due to silence detected"
+            })
+          }
+        }, 2000) // 2 seconds of silence triggers auto-stop
+      }
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error)
+
+        // Clear silence timer on error
+        if (silenceTimer) {
+          clearTimeout(silenceTimer)
+        }
+
+        if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+          toast({
+            title: "❌ Microphone access denied",
+            description: "Please allow microphone access to use voice input",
+            variant: "destructive"
+          })
+        } else if (event.error === 'no-speech') {
+          toast({
+            title: "⚠️ No speech detected",
+            description: "Please try speaking louder or closer to the microphone",
+            variant: "destructive"
+          })
+        } else if (event.error === 'aborted') {
+          // User manually stopped, don't show error
+          console.log('Recognition aborted by user')
+        } else {
+          toast({
+            title: "Recognition error",
+            description: `Error: ${event.error}. Please try again.`,
+            variant: "destructive"
+          })
+        }
+        setIsRecording(false)
+      }
+
+      recognition.onend = () => {
+        // Clear any pending silence timer
+        if (silenceTimer) {
+          clearTimeout(silenceTimer)
+        }
+
+        // Only show success if we actually captured text
+        if (lastFinalTranscript.trim()) {
+          toast({
+            title: "✅ Speech recognized successfully",
+            description: "Your speech has been converted to text"
+          })
+        }
+
+        setIsRecording(false)
+        recognitionRef.current = null
+      }
+
+      recognitionRef.current = recognition
+      recognition.start()
+    } catch (error) {
+      console.error('Error starting Web Speech Recognition:', error)
+      toast({
+        title: "Speech recognition not available",
+        description: "Your browser doesn't support speech recognition",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const startDeepgramRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mediaRecorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = mediaRecorder
+      audioChunksRef.current = []
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
+        }
+      }
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' })
+        await transcribeWithDeepgram(audioBlob)
+
+        // Stop all tracks to release microphone
+        stream.getTracks().forEach(track => track.stop())
+      }
+
+      mediaRecorder.start()
+      setIsRecording(true)
+
+      toast({
+        title: "Recording started",
+        description: "Speak now... Click again to stop"
+      })
+    } catch (error) {
+      console.error('Error starting recording:', error)
+      toast({
+        title: "Recording failed",
+        description: "Could not access microphone. Please check permissions.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const stopDeepgramRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop()
+      setIsRecording(false)
+      setIsTranscribing(true)
+    }
+  }
+
+  const transcribeWithDeepgram = async (audioBlob: Blob) => {
+    try {
+      // Convert blob to base64
+      const reader = new FileReader()
+      reader.readAsDataURL(audioBlob)
+
+      reader.onloadend = async () => {
+        const base64Audio = (reader.result as string).split(',')[1]
+
+        // Send to speech-to-text API
+        const response = await fetch('/api/speech-to-text', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ audio: base64Audio }),
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to transcribe audio')
+        }
+
+        const data = await response.json()
+
+        if (data.success && data.text) {
+          // Append transcribed text to input
+          setInput(prev => prev ? `${prev} ${data.text}` : data.text)
+
+          toast({
+            title: "Transcription complete",
+            description: "Your speech has been converted to text"
+          })
+        } else {
+          throw new Error('No transcription received')
+        }
+      }
+
+      reader.onerror = () => {
+        throw new Error('Failed to read audio file')
+      }
+    } catch (error) {
+      console.error('Error transcribing audio:', error)
+      toast({
+        title: "Transcription failed",
+        description: "Could not convert speech to text",
+        variant: "destructive"
+      })
+    } finally {
+      setIsTranscribing(false)
+    }
+  }
+
+  const handleMicrophoneClick = () => {
+    if (isRecording) {
+      // Stop current recording
+      if (recognitionRef.current) {
+        recognitionRef.current.stop()
+      } else if (mediaRecorderRef.current) {
+        stopDeepgramRecording()
+      }
+    } else {
+      // Check if Web Speech API is available, otherwise fallback to Deepgram
+      if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+        startWebSpeechRecognition()
+      } else {
+        // Fallback to Deepgram for browsers without Web Speech API (like Firefox)
+        console.log('Web Speech API not supported, using Deepgram fallback')
+        toast({
+          title: "Using Deepgram",
+          description: "Your browser doesn't support Web Speech API"
+        })
+        startDeepgramRecording()
+      }
+    }
+  }
+
+  // File attachment handlers
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    for (const file of Array.from(files)) {
+      const reader = new FileReader()
+      reader.onload = async (event) => {
+        const base64 = event.target?.result as string
+        const imageId = Date.now().toString() + Math.random()
+        
+        // Add image with processing flag
+        setAttachedImages((prev: AttachedImage[]) => [...prev, {
+          id: imageId,
+          name: file.name,
+          base64,
+          isProcessing: true
+        }])
+
+        // Get description using vision API
+        try {
+          const response = await fetch('/api/describe-image', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              image: base64,
+              prompt: "Describe this image in detail, including layout, colors, text, UI elements, and any other relevant information that would help recreate or understand this design."
+            }),
+          })
+
+          const { description } = await response.json()
+          
+          // Update with description
+          setAttachedImages((prev: AttachedImage[]) => prev.map((img: AttachedImage) => 
+            img.id === imageId ? { ...img, description, isProcessing: false } : img
+          ))
+        } catch (error) {
+          console.error('Error describing image:', error)
+          setAttachedImages((prev: AttachedImage[]) => prev.map((img: AttachedImage) => 
+            img.id === imageId ? { ...img, isProcessing: false } : img
+          ))
+        }
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    for (const file of Array.from(files)) {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+          const content = event.target?.result as string
+          setAttachedUploadedFiles((prev: AttachedUploadedFile[]) => [...prev, {
+          id: Date.now().toString() + Math.random(),
+          name: file.name,
+          content,
+          size: file.size
+        }])
+      }
+      reader.readAsText(file)
+    }
+  }
+
+  const handleUrlAttachment = async () => {
+    if (!urlInput.trim()) return
+
+    const urlId = Date.now().toString()
+    setAttachedUrls((prev: AttachedUrl[]) => [...prev, {
+      id: urlId,
+      url: urlInput,
+      isProcessing: true
+    }])
+    setUrlInput('')
+    setShowUrlDialog(false)
+
+    // Fetch URL content
+    try {
+      console.log('🌐 Fetching URL content:', urlInput);
+
+      const response = await fetch('/api/redesign', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: urlInput }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch URL content')
+      }
+
+      const data = await response.json()
+
+      console.log('✅ URL content fetched:', {
+        url: urlInput,
+        contentLength: data.markdown?.length,
+        hasContent: !!data.markdown
+      })
+
+      // Update URL with content (API returns markdown field)
+      setAttachedUrls((prev: AttachedUrl[]) => prev.map((url: AttachedUrl) =>
+        url.id === urlId ? { ...url, title: urlInput, content: data.markdown, isProcessing: false } : url
+      ))
+    } catch (error) {
+      console.error('Error fetching URL:', error)
+      setAttachedUrls((prev: AttachedUrl[]) => prev.map((url: AttachedUrl) => 
+        url.id === urlId ? { ...url, isProcessing: false } : url
+      ))
+    }
+  }
+
+  return (
+    <div className={`flex flex-col ${isMobile ? 'h-[calc(100vh-9.5rem)]' : 'h-full'}`}>
+      {/* Messages Area - Scrollable container */}
+      <div className={`flex-1 min-h-0 overflow-y-auto space-y-4 ${isMobile ? 'p-4 pb-20' : 'p-4'}`}>
+        {messages.length === 0 && (
+          <div className="flex items-center justify-center h-full text-muted-foreground">
+            <p>Start a conversation with PiPilot...</p>
+          </div>
+        )}
+
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={cn(
+              'flex',
+              message.role === 'user' ? 'justify-end' : 'justify-start'
+            )}
+          >
+            {message.role === 'user' ? (
+              <div className="max-w-[80%] w-fit">
+                <ExpandableUserMessage
+                  content={message.content}
+                  messageId={message.id}
+                  onCopy={handleCopyMessage}
+                  onEdit={handleEditMessage}
+                  onDelete={handleDeleteMessage}
+                  onRetry={handleRetryMessage}
+                />
+              </div>
+            ) : (
+              <Card className={cn("w-full",
+                message.reasoning || message.content || (message.toolInvocations && message.toolInvocations.length > 0)
+                  ? "bg-muted"
+                  : "bg-transparent border-0"
+              )}>
+                <div className="p-4">
+                  <MessageWithTools
+                    message={message}
+                    projectId={project?.id}
+                    isStreaming={isLoading && message.id === messages[messages.length - 1]?.id}
+                  />
+                </div>
+                {/* AI Message Actions - Only show if message has content */}
+                {message.content && message.content.trim().length > 0 && (
+                  <div className="px-4 pb-2 flex justify-end">
+                    <Actions>
+                      <Action
+                        tooltip="Copy message"
+                        onClick={() => handleCopyMessage(message.id, message.content)}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Action>
+                      <Action
+                        tooltip="Delete message"
+                        onClick={() => handleDeleteMessage(message.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Action>
+                    </Actions>
+                  </div>
+                )}
+              </Card>
+            )}
+          </div>
+        ))}
+
+        {/* Don't show separate loading spinner - MessageWithTools handles it */}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input Area - Fixed at bottom */}
+      <div className={`border-t bg-background p-4 ${isMobile
+          ? 'fixed bottom-12 left-0 right-0 p-4 z-[60] border-b'
+          : 'p-4'
+      }`}>
+        {/* Attachments Display */}
+        {(attachedFiles.length > 0 || attachedImages.length > 0 || attachedUploadedFiles.length > 0 || attachedUrls.length > 0) && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {attachedFiles.map((file: AttachedFile) => (
+              <div key={file.id} className="flex items-center gap-1 bg-secondary px-2 py-1 rounded text-xs">
+                <FileText className="size-3" />
+                <span>{file.name}</span>
+                <button onClick={() => setAttachedFiles((prev: AttachedFile[]) => prev.filter((f: AttachedFile) => f.id !== file.id))}>
+                  <X className="size-3" />
+                </button>
+              </div>
+            ))}
+            {attachedImages.map((img: AttachedImage) => (
+              <div key={img.id} className="flex items-center gap-1 bg-secondary px-2 py-1 rounded text-xs">
+                <ImageIcon className="size-3" />
+                <span>{img.name}</span>
+                {img.isProcessing && <Loader2 className="size-3 animate-spin" />}
+                <button onClick={() => setAttachedImages((prev: AttachedImage[]) => prev.filter((i: AttachedImage) => i.id !== img.id))}>
+                  <X className="size-3" />
+                </button>
+              </div>
+            ))}
+            {attachedUploadedFiles.map((file: AttachedUploadedFile) => (
+              <div key={file.id} className="flex items-center gap-1 bg-secondary px-2 py-1 rounded text-xs">
+                <FileText className="size-3" />
+                <span>{file.name}</span>
+                <button onClick={() => setAttachedUploadedFiles((prev: AttachedUploadedFile[]) => prev.filter((f: AttachedUploadedFile) => f.id !== file.id))}>
+                  <X className="size-3" />
+                </button>
+              </div>
+            ))}
+            {attachedUrls.map((url: AttachedUrl) => (
+              <div key={url.id} className="flex items-center gap-1 bg-secondary px-2 py-1 rounded text-xs">
+                <LinkIcon className="size-3" />
+                <span>{url.title || url.url}</span>
+                {url.isProcessing && <Loader2 className="size-3 animate-spin" />}
+                <button onClick={() => setAttachedUrls((prev: AttachedUrl[]) => prev.filter((u: AttachedUrl) => u.id !== url.id))}>
+                  <X className="size-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="relative">
+          <form onSubmit={handleEnhancedSubmit}>
+            <Textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => {
+                setInput(e.target.value)
+                // Trigger height adjustment immediately for better UX
+                setTimeout(() => {
+                  if (textareaRef.current) {
+                    debouncedHeightAdjustment(textareaRef.current)
+                  }
+                }, 0)
+              }}
+              placeholder="Type your message..."
+              className="min-h-[48px] max-h-[140px] resize-none pr-12 pb-12"
+              onKeyDown={(e: any) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleEnhancedSubmit(e)
+                }
+              }}
+            />
+          </form>
+
+          {/* Bottom Left: Attachment and Voice Buttons */}
+          <div className="absolute bottom-2 left-2 flex gap-2">
+            {/* Attachment Popover */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                >
+                  <Plus className="size-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-48 p-2 z-[70]" side="top" align="start">
+                <div className="flex flex-col gap-1">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="image-upload"
+                  />
+                  <label htmlFor="image-upload">
+                    <Button type="button" variant="ghost" size="sm" className="w-full justify-start" asChild>
+                      <span><ImageIcon className="size-4 mr-2" /> Images</span>
+                    </Button>
+                  </label>
+
+                  <input
+                    type="file"
+                    multiple
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="file-upload"
+                  />
+                  <label htmlFor="file-upload">
+                    <Button type="button" variant="ghost" size="sm" className="w-full justify-start" asChild>
+                      <span><FileText className="size-4 mr-2" /> Files</span>
+                    </Button>
+                  </label>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => setShowUrlDialog(true)}
+                  >
+                    <LinkIcon className="size-4 mr-2" /> URL
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Voice Button */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleMicrophoneClick}
+              disabled={isTranscribing}
+            >
+              {isRecording ? <MicOff className="size-4" /> : <Mic className="size-4" />}
+            </Button>
+          </div>
+
+          {/* Bottom Right: Send/Stop Button */}
+          <div className="absolute bottom-2 right-2">
+            {isLoading ? (
+              <Button
+                type="button"
+                variant="default"
+                size="icon"
+                className="h-8 w-8"
+                onClick={stop}
+              >
+                <StopCircle className="size-4" />
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                size="icon"
+                className="h-8 w-8"
+                disabled={!input.trim() && attachedFiles.length === 0}
+                onClick={handleEnhancedSubmit}
+              >
+                <Send className="size-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+
+
+        {/* URL Attachment Dialog */}
+        <AlertDialog open={showUrlDialog} onOpenChange={setShowUrlDialog}>
+          <AlertDialogContent className="bg-gray-900 border-gray-700 z-[70]">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-white">Attach Website URL</AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-400">
+                Enter a website URL to fetch its content. The AI will analyze the website structure and content.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4">
+              <input
+                type="url"
+                placeholder="https://example.com"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleUrlAttachment()
+                  }
+                }}
+                className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+                autoFocus
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="bg-gray-700 text-gray-300 hover:bg-gray-600">
+                Cancel
+              </AlertDialogCancel>
+              <button
+                onClick={handleUrlAttachment}
+                disabled={!urlInput.trim()}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Attach URL
+              </button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </div>
+  )
+}

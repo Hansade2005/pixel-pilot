@@ -37,7 +37,7 @@ export type ReasoningProps = ComponentProps<typeof Collapsible> & {
   duration?: number;
 };
 
-const AUTO_CLOSE_DELAY = 1000;
+const AUTO_CLOSE_DELAY = 3000; // Increased from 1000 to 3000ms to show duration
 const MS_IN_S = 1000;
 
 export const Reasoning = memo(
@@ -71,7 +71,8 @@ export const Reasoning = memo(
           setStartTime(Date.now());
         }
       } else if (startTime !== null) {
-        setDuration(Math.ceil((Date.now() - startTime) / MS_IN_S));
+        const calculatedDuration = Math.ceil((Date.now() - startTime) / MS_IN_S);
+        setDuration(Math.max(1, calculatedDuration)); // Ensure minimum 1 second
         setStartTime(null);
       }
     }, [isStreaming, startTime, setDuration]);
@@ -113,11 +114,14 @@ export const Reasoning = memo(
 export type ReasoningTriggerProps = ComponentProps<typeof CollapsibleTrigger>;
 
 const getThinkingMessage = (isStreaming: boolean, duration?: number) => {
-  if (isStreaming || duration === 0) {
+  if (isStreaming) {
     return <p>Thinking...</p>;
   }
-  if (duration === undefined) {
-    return <p>Thought for a few seconds</p>;
+  if (duration === undefined || duration === 0) {
+    return <p>Thought for a moment</p>;
+  }
+  if (duration === 1) {
+    return <p>Thought for 1 second</p>;
   }
   return <p>Thought for {duration} seconds</p>;
 };

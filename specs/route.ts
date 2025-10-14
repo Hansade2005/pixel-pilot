@@ -1297,7 +1297,8 @@ Format as a natural assistant response with emojis that would appear in a chat b
         path: z.string().describe('File path relative to project root'),
         content: z.string().describe('File content to write')
       }),
-      execute: async ({ path, content }, { abortSignal, toolCallId }) => {
+      execute: async ({ path, content },
+         { abortSignal, toolCallId }) => {
         // Check for cancellation
         if (abortSignal?.aborted) {
           throw new Error('Operation cancelled')
