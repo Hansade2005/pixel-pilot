@@ -31,7 +31,10 @@ This README documents the a0.dev APIs I know and practical guidance for using th
 Two core a0.dev APIs covered here:
 
 1. LLM API — `POST https://api.a0.dev/ai/llm`
-   - Send conversation-style messages to the model and receive completions. Supports streaming and non-streaming usage patterns.
+   - Send conversation-style messages to the model and receive completions. Supports 
+streaming and non-streaming usage patterns.
+
+response format  API response always wraps the completion in JSON {"completion": "..."}
 2. Image Generation API — `GET https://api.a0.dev/assets/image`
    - Generate images on demand given a text prompt and optional parameters.
 

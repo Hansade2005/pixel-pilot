@@ -1629,7 +1629,7 @@ export function ChatPanelV2({
             )}
           >
             {message.role === 'user' ? (
-              <div className="max-w-[80%] w-fit">
+              <div className="w-full">
                 <ExpandableUserMessage
                   content={message.content}
                   messageId={message.id}
