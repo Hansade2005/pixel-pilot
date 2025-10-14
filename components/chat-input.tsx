@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Suggestions, Suggestion } from "@/components/ai-elements/suggestion"
 
 interface ChatInputProps {
   onAuthRequired: () => void
@@ -760,18 +761,20 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
       {/* Suggestion Pills */}
       {suggestions.length > 0 && (
-        <div className="mt-6 flex flex-wrap gap-3 justify-center">
-          {suggestions.map((suggestion, index) => (
-            <button
-              key={index}
-              onClick={() => setPrompt(suggestion.prompt)}
-              disabled={isGenerating}
-              className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 text-white text-sm font-medium hover:bg-white/20 hover:border-white/30 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed max-w-xs truncate"
-              title={suggestion.prompt}
-            >
-              {suggestion.display}
-            </button>
-          ))}
+        <div className="mt-6">
+          <Suggestions>
+            {suggestions.map((suggestion, index) => (
+              <Suggestion
+                key={index}
+                suggestion={suggestion.display}
+                onClick={(displayText) => setPrompt(suggestion.prompt)}
+                disabled={isGenerating}
+                title={suggestion.prompt}
+              >
+                {suggestion.display}
+              </Suggestion>
+            ))}
+          </Suggestions>
         </div>
       )}
     </div>

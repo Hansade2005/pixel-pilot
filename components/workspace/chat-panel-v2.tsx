@@ -414,7 +414,7 @@ export function ChatPanelV2({
       const finalAssistantMessage = {
         id: assistantMessageId,
         role: 'assistant',
-        content: accumulatedContent || (accumulatedToolInvocations.length > 0 ? 'Tool execution completed.' : ''),
+        content: accumulatedContent || (accumulatedToolInvocations.length > 0 ? 'Task completed successfully!.' : ''),
         createdAt: new Date().toISOString(),
         metadata: {
           toolInvocations: accumulatedToolInvocations,
@@ -659,7 +659,7 @@ export function ChatPanelV2({
 
     // Set the content as input and submit fresh
     setInput(content)
-    setIsLoading(true)
+    // Note: Don't set isLoading here - handleEnhancedSubmit will handle it
 
     // Small delay to ensure state is updated
     setTimeout(() => {

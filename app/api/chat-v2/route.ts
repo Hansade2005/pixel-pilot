@@ -761,7 +761,7 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
         })
         
       },
-      stopWhen: stepCountIs(20),
+      stopWhen: stepCountIs(50),
       onFinish: ({ response }) => {
         console.log(`[Chat-V2] Finished with ${response.messages.length} messages`)
       }
