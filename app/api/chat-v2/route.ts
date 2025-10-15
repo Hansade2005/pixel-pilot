@@ -734,7 +734,7 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                     });
                     
                     // Extract content from the scraper result
-                    const extractContentFromResult = (result: any): string => {
+                    const extractContent = (result: any): string => {
                       // The webScraper returns cleanResults directly
                       if (result && typeof result === 'object' && result.cleanResults) {
                         return result.cleanResults;
@@ -758,52 +758,14 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                       }
                     };
                     
-                    let extractedContent = extractContentFromResult(scraperResult);
-                    const originalLength = extractedContent.length;
-                    
-                    // Truncate individual URL content to prevent token explosion
-                    const MAX_TOKENS_PER_URL = 500; // 500 tokens per URL = ~2000 chars
-                    const EST_CHARS_PER_TOKEN = 4;
-                    const MAX_CHARS_PER_URL = MAX_TOKENS_PER_URL * EST_CHARS_PER_TOKEN;
-                    
-                    let wasTruncated = false;
-                    if (extractedContent.length > MAX_CHARS_PER_URL) {
-                      // Find a good truncation point (try to break at sentence or paragraph)
-                      let truncateAt = MAX_CHARS_PER_URL;
-                      
-                      // Look for paragraph break within last 300 chars
-                      const lastParagraphBreak = extractedContent.lastIndexOf('\n\n', MAX_CHARS_PER_URL);
-                      if (lastParagraphBreak > MAX_CHARS_PER_URL - 300 && lastParagraphBreak > 0) {
-                        truncateAt = lastParagraphBreak;
-                      } else {
-                        // Look for sentence break within last 100 chars
-                        const lastSentenceBreak = Math.max(
-                          extractedContent.lastIndexOf('. ', MAX_CHARS_PER_URL),
-                          extractedContent.lastIndexOf('! ', MAX_CHARS_PER_URL),
-                          extractedContent.lastIndexOf('? ', MAX_CHARS_PER_URL)
-                        );
-                        if (lastSentenceBreak > MAX_CHARS_PER_URL - 100 && lastSentenceBreak > 0) {
-                          truncateAt = lastSentenceBreak + 1; // Include the punctuation
-                        }
-                      }
-                      
-                      extractedContent = extractedContent.substring(0, truncateAt);
-                      wasTruncated = true;
-                      
-                      console.log(`[DEBUG] Truncated ${url} from ${originalLength} to ${extractedContent.length} chars (${Math.round(extractedContent.length / EST_CHARS_PER_TOKEN)} tokens)`);
-                    }
-                    
                     return {
                       success: true,
                       url,
-                      cleanResults: extractedContent,
+                      cleanResults: extractContent(scraperResult),
                       metadata: {
                         url,
                         timestamp: new Date().toISOString(),
-                        apiKeyUsed: scraperResult.metadata?.apiKeyUsed || 'unknown',
-                        wasTruncated,
-                        originalLength,
-                        truncatedLength: extractedContent.length
+                        apiKeyUsed: scraperResult.metadata?.apiKeyUsed || 'unknown'
                       }
                     };
                   } catch (error) {
@@ -822,76 +784,25 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
               const successfulResults = extractionResults.filter(result => result.success);
               const failedResults = extractionResults.filter(result => !result.success);
               
-              // Combine all clean results
-              let combinedResults = successfulResults.map(result => result.cleanResults).join('\n\n');
-              
-              // Final safety truncation (each URL already limited to 500 tokens, so 6 URLs = 3000 tokens max)
-              const FINAL_MAX_TOKENS = 2500; // Safety net - should rarely trigger
-              const EST_CHARS_PER_TOKEN = 4;
-              const FINAL_MAX_CHARS = FINAL_MAX_TOKENS * EST_CHARS_PER_TOKEN;
-              
-              let finalWasTruncated = false;
-              if (combinedResults.length > FINAL_MAX_CHARS) {
-                // Find a good truncation point (try to break at sentence or paragraph)
-                let truncateAt = FINAL_MAX_CHARS;
-                
-                // Look for paragraph break within last 500 chars
-                const lastParagraphBreak = combinedResults.lastIndexOf('\n\n', FINAL_MAX_CHARS);
-                if (lastParagraphBreak > FINAL_MAX_CHARS - 500 && lastParagraphBreak > 0) {
-                  truncateAt = lastParagraphBreak;
-                } else {
-                  // Look for sentence break within last 200 chars
-                  const lastSentenceBreak = Math.max(
-                    combinedResults.lastIndexOf('. ', FINAL_MAX_CHARS),
-                    combinedResults.lastIndexOf('! ', FINAL_MAX_CHARS),
-                    combinedResults.lastIndexOf('? ', FINAL_MAX_CHARS)
-                  );
-                  if (lastSentenceBreak > FINAL_MAX_CHARS - 200 && lastSentenceBreak > 0) {
-                    truncateAt = lastSentenceBreak + 1; // Include the punctuation
-                  }
-                }
-                
-                combinedResults = combinedResults.substring(0, truncateAt);
-                finalWasTruncated = true;
-                
-                console.log(`[DEBUG] Final truncation applied: ${successfulResults.map(r => r.cleanResults?.length || 0).reduce((a, b) => a + b, 0)} to ${combinedResults.length} chars (${Math.round(combinedResults.length / EST_CHARS_PER_TOKEN)} tokens)`);
-              }
-              
               // Debug logging for final result
               console.log('[DEBUG] Web extract final result:', {
                 totalUrls: urlArray.length,
                 successfulCount: successfulResults.length,
                 failedCount: failedResults.length,
-                individualLengths: successfulResults.map(r => r.cleanResults?.length || 0),
-                totalLength: combinedResults.length,
-                estimatedTokens: Math.round(combinedResults.length / EST_CHARS_PER_TOKEN),
-                finalWasTruncated,
-                urlsTruncated: successfulResults.filter(r => r.metadata?.wasTruncated).length,
-                sampleCleanResults: combinedResults.substring(0, 100) || 'none'
+                cleanResultsLength: successfulResults.map(r => r.cleanResults?.length || 0),
+                sampleCleanResults: successfulResults[0]?.cleanResults?.substring(0, 100) || 'none'
               });
-              
-              // Check if any individual URLs were truncated
-              const anyUrlsTruncated = successfulResults.some(r => r.metadata?.wasTruncated);
               
               return {
                 success: successfulResults.length > 0,
                 message: successfulResults.length > 0 
-                  ? `Successfully extracted content from ${successfulResults.length} URL(s)${anyUrlsTruncated ? ' (some URLs truncated)' : ''}${finalWasTruncated ? ' (final result truncated)' : ''}` 
+                  ? `Successfully extracted content from ${successfulResults.length} URL(s)` 
                   : 'Failed to extract content from any URLs',
-                cleanResults: combinedResults,
+                cleanResults: successfulResults.map(result => result.cleanResults).join('\n\n'),
                 metadata: {
                   successCount: successfulResults.length,
                   failedCount: failedResults.length,
-                  urls: urlArray,
-                  finalWasTruncated,
-                  anyUrlsTruncated,
-                  estimatedTokens: Math.round(combinedResults.length / EST_CHARS_PER_TOKEN),
-                  urlDetails: successfulResults.map(r => ({
-                    url: r.url,
-                    length: r.cleanResults?.length || 0,
-                    wasTruncated: r.metadata?.wasTruncated || false,
-                    originalLength: r.metadata?.originalLength || r.cleanResults?.length || 0
-                  }))
+                  urls: urlArray
                 },
                 toolCallId
               };
@@ -1525,18 +1436,7 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
           const encoder = new TextEncoder()
           const fileOperations: any[] = []
           const toolCalls: Map<string, any> = new Map() // Store tool calls by ID
-          let streamError: any = null
-
-          // Helper to safely get steps (some providers may throw when accessing steps)
-          const safeGetSteps = async () => {
-            try {
-              return await result.steps
-            } catch (e) {
-              console.warn('[Chat-V2] Failed to read result.steps:', e)
-              return []
-            }
-          }
-
+          
           try {
             for await (const part of result.fullStream) {
               // Collect tool calls
@@ -1549,18 +1449,18 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                   state: 'call'
                 })
               }
-
+              
               // Process tool results and combine with calls
               if (part.type === 'tool-result') {
                 const toolResult = part as any
                 const toolCallId = toolResult.toolCallId
                 const existingCall = toolCalls.get(toolCallId)
-
+                
                 if (existingCall) {
                   // Update the tool call with result
                   existingCall.result = toolResult.result || toolResult.output
                   existingCall.state = 'result'
-
+                  
                   // Collect file operations from tool results
                   const toolResultData = toolResult.result || toolResult.output
                   if (toolResultData && toolResultData.success !== false && toolResultData.path) {
@@ -1575,110 +1475,104 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                   }
                 }
               }
-
+              
               // Stream each part as newline-delimited JSON
               const json = JSON.stringify(part)
               controller.enqueue(encoder.encode(json + '\n'))
             }
-          } catch (error) {
-            // Capture the error but continue to finalization to ensure metadata is sent
-            console.error('[Chat-V2] Stream error while iterating fullStream:', error)
-            streamError = error
-
-            // TELEMETRY: Log stream iteration errors for monitoring
-            console.log('[Chat-V2][TELEMETRY] Stream iteration failed:', {
-              error: String(error),
-              errorType: error instanceof Error ? error.constructor.name : 'Unknown',
-              projectId,
-              modelId,
-              messageCount: messages.length,
-              toolCallsCount: toolCalls.size,
-              timestamp: new Date().toISOString()
-            })
-          } finally {
-            // Always attempt to send metadata so frontend receives tool results and a clear end signal
-            try {
-              const stepsInfo = await safeGetSteps()
+            
+            // After streaming is complete, process file operations for server-side persistence
+            if (fileOperations.length > 0) {
+              console.log('[DEBUG] Processing file operations for server-side persistence:', fileOperations)
+              
+              try {
+                const { storageManager } = await import('@/lib/storage-manager')
+                await storageManager.init()
+                
+                let operationsApplied = 0
+                
+                for (const fileOp of fileOperations) {
+                  console.log('[DEBUG] Applying file operation to server storage:', fileOp)
+                  
+                  if (fileOp.type === 'write_file' && fileOp.path) {
+                    // Check if file exists
+                    const existingFile = await storageManager.getFile(projectId, fileOp.path)
+                    
+                    if (existingFile) {
+                      // Update existing file
+                      await storageManager.updateFile(projectId, fileOp.path, { 
+                        content: fileOp.content || '',
+                        updatedAt: new Date().toISOString()
+                      })
+                      console.log(`[DEBUG] Updated existing file in server storage: ${fileOp.path}`)
+                    } else {
+                      // Create new file
+                      const newFile = await storageManager.createFile({
+                        workspaceId: projectId,
+                        name: fileOp.path.split('/').pop() || fileOp.path,
+                        path: fileOp.path,
+                        content: fileOp.content || '',
+                        fileType: fileOp.path.split('.').pop() || 'text',
+                        type: fileOp.path.split('.').pop() || 'text',
+                        size: (fileOp.content || '').length,
+                        isDirectory: false
+                      })
+                      console.log(`[DEBUG] Created new file in server storage: ${fileOp.path}`, newFile)
+                    }
+                    operationsApplied++
+                  } else if (fileOp.type === 'edit_file' && fileOp.path && fileOp.content) {
+                    // Update existing file with new content
+                    await storageManager.updateFile(projectId, fileOp.path, { 
+                      content: fileOp.content,
+                      updatedAt: new Date().toISOString()
+                    })
+                    console.log(`[DEBUG] Edited file in server storage: ${fileOp.path}`)
+                    operationsApplied++
+                  } else if (fileOp.type === 'delete_file' && fileOp.path) {
+                    // Delete file
+                    await storageManager.deleteFile(projectId, fileOp.path)
+                    console.log(`[DEBUG] Deleted file from server storage: ${fileOp.path}`)
+                    operationsApplied++
+                  } else {
+                    console.warn('[DEBUG] Skipped invalid file operation:', fileOp)
+                  }
+                }
+                
+                console.log(`[DEBUG] Applied ${operationsApplied}/${fileOperations.length} file operations to server storage`)
+                
+              } catch (error) {
+                console.error('[ERROR] Failed to apply file operations to server storage:', error)
+              }
+            }
+            
+            // Send final metadata with file operations and tool invocations for client-side processing
+            if (fileOperations.length > 0 || toolCalls.size > 0) {
+              // Get steps info after streaming is complete
+              const stepsInfo = await result.steps
               const toolInvocations = Array.from(toolCalls.values())
               
-              // TELEMETRY: Log final stream state for monitoring
-              const telemetryData = {
-                projectId,
-                modelId,
-                messageCount: messages.length,
-                toolCallsInitiated: toolCalls.size,
-                toolResultsReceived: toolInvocations.filter(t => t.state === 'result').length,
-                fileOperationsCount: fileOperations.length,
-                stepsCount: stepsInfo?.length || 0,
-                streamError: streamError ? String(streamError) : null,
-                hasMissingToolResults: toolCalls.size > toolInvocations.filter(t => t.state === 'result').length,
-                timestamp: new Date().toISOString()
-              }
-
-              console.log('[Chat-V2][TELEMETRY] Stream completed:', telemetryData)
-
-              // Log warning if tool results are missing
-              if (telemetryData.hasMissingToolResults) {
-                console.warn('[Chat-V2][TELEMETRY] WARNING: Tool calls initiated but results missing:', {
-                  toolCallsWithoutResults: toolInvocations.filter(t => t.state === 'call').map(t => ({
-                    toolCallId: t.toolCallId,
-                    toolName: t.toolName
-                  })),
-                  totalToolCalls: toolCalls.size,
-                  totalResults: toolInvocations.filter(t => t.state === 'result').length
-                })
-              }
-
-              const metadataMessage: any = {
+              const metadataMessage = {
                 type: 'metadata',
+                fileOperations: fileOperations,
+                toolInvocations: toolInvocations, // Include combined tool invocations
                 serverSideExecution: true,
                 hasToolCalls: toolInvocations.length > 0,
-                fileOperations,
-                toolInvocations,
-                stepCount: stepsInfo?.length || 0,
-                steps: (stepsInfo || []).map((step: any, index: number) => ({
+                stepCount: stepsInfo?.length || 1,
+                steps: stepsInfo?.map((step: any, index: number) => ({
                   stepNumber: index + 1,
                   hasText: !!step.text,
                   toolCallsCount: step.toolCalls?.length || 0,
                   toolResultsCount: step.toolResults?.length || 0,
                   finishReason: step.finishReason
-                })),
-                finished: true
+                })) || []
               }
-
-              if (streamError) {
-                metadataMessage.streamError = String(streamError)
-              }
-
-              // Ensure the client always receives a metadata object (even if empty)
               controller.enqueue(encoder.encode(JSON.stringify(metadataMessage) + '\n'))
-            } catch (metaErr) {
-              // If metadata construction or enqueue fails, try a minimal fallback message
-              console.error('[Chat-V2] Failed to enqueue metadata after stream:', metaErr)
-              
-              // TELEMETRY: Log metadata construction failures
-              console.log('[Chat-V2][TELEMETRY] Metadata construction failed:', {
-                error: String(metaErr),
-                projectId,
-                modelId,
-                toolCallsCount: toolCalls.size,
-                fileOperationsCount: fileOperations.length,
-                timestamp: new Date().toISOString()
-              })
-              
-              try {
-                controller.enqueue(encoder.encode(JSON.stringify({ type: 'metadata', error: String(metaErr), finished: true }) + '\n'))
-              } catch (e) {
-                console.error('[Chat-V2] Failed to enqueue fallback metadata:', e)
-              }
-            } finally {
-              // Always close the stream after attempting to send final metadata
-              try {
-                controller.close()
-              } catch (e) {
-                console.warn('[Chat-V2] Controller close failed:', e)
-              }
             }
+            
+          } catch (error) {
+            console.error('[Chat-V2] Stream error:', error)
+          } finally {
+            controller.close()
           }
         }
       }),

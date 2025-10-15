@@ -171,9 +171,6 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
           }
         }))
 
-        // File operations are now handled by metadata processing in chat-panel-v2.tsx
-        // No need to dispatch files-changed events here to avoid duplicates
-        /*
         // Dispatch files-changed event for file operations
         if (['write_file', 'edit_file', 'delete_file'].includes(toolInvocation.toolName)) {
           let filePath = 'unknown';
@@ -209,7 +206,6 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
             }
           }))
         }
-        */
       }
     })
   }, [toolInvocations, projectId, hasTools])
