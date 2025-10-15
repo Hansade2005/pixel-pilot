@@ -1126,7 +1126,15 @@ export function ChatPanelV2({
           let operationsApplied = 0
 
           for (const fileOp of finalFileOperations) {
-            console.log(`[ChatPanelV2][DataStream] 📝 Applying file operation ${operationsApplied + 1}/${finalFileOperations.length}:`, fileOp.type, fileOp.path)
+            console.log(`[ChatPanelV2][DataStream] 📝 Processing file operation ${operationsApplied + 1}/${finalFileOperations.length}:`, fileOp.type, fileOp.path)
+
+            // CRITICAL: Skip read-only operations at APPLICATION level (not collection level)
+            // Read operations are collected for pill display but don't need IndexedDB application
+            const readOnlyOperations = ['read_file', 'list_files', 'search_files', 'get_file_info']
+            if (readOnlyOperations.includes(fileOp.type)) {
+              console.log(`[ChatPanelV2][DataStream] ⏭️ Skipping read-only operation (for pill display only): ${fileOp.type} - ${fileOp.path}`)
+              continue
+            }
 
             if (fileOp.type === 'write_file' && fileOp.path) {
               // Check if file exists
@@ -1183,7 +1191,11 @@ export function ChatPanelV2({
             }
           }
 
-          console.log(`[ChatPanelV2][DataStream] ✅ Applied ${operationsApplied}/${finalFileOperations.length} file operations to IndexedDB at end of stream`)
+          const readOnlyOperations = ['read_file', 'list_files', 'search_files', 'get_file_info']
+          const readOnlyOps = finalFileOperations.filter(op => readOnlyOperations.includes(op.type)).length
+          const writeOps = finalFileOperations.length - readOnlyOps
+          
+          console.log(`[ChatPanelV2][DataStream] ✅ Processed ${finalFileOperations.length} operations: ${writeOps} write operations applied, ${readOnlyOps} read-only operations skipped (displayed in pills)`)
 
           if (operationsApplied > 0) {
             // Force refresh the file explorer
