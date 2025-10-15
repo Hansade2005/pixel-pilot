@@ -1096,7 +1096,37 @@ export function ChatPanelV2({
             } else if (parsed.type === 'metadata') {
               // Final metadata with complete tool invocations and file operations
               if (parsed.toolInvocations && Array.isArray(parsed.toolInvocations)) {
-                accumulatedToolInvocations = parsed.toolInvocations
+                // Merge metadata tool invocations with accumulated ones to preserve streaming results
+                // Metadata should be authoritative, but preserve any results that might be missing
+                const mergedToolInvocations = parsed.toolInvocations.map((metaTool: any) => {
+                  // Find matching accumulated tool invocation
+                  const accumulatedTool = accumulatedToolInvocations.find((accTool: any) =>
+                    accTool.toolCallId === metaTool.toolCallId
+                  )
+
+                  // If accumulated has result but metadata doesn't, preserve the result
+                  if (accumulatedTool && accumulatedTool.result && (!metaTool.result || metaTool.state !== 'result')) {
+                    return {
+                      ...metaTool,
+                      result: accumulatedTool.result,
+                      state: 'result'
+                    }
+                  }
+
+                  return metaTool
+                })
+
+                // Add any accumulated tools that aren't in metadata
+                accumulatedToolInvocations.forEach((accTool: any) => {
+                  const existsInMetadata = mergedToolInvocations.some((metaTool: any) =>
+                    metaTool.toolCallId === accTool.toolCallId
+                  )
+                  if (!existsInMetadata) {
+                    mergedToolInvocations.push(accTool)
+                  }
+                })
+
+                accumulatedToolInvocations = mergedToolInvocations
                 setMessages(prev => prev.map(msg =>
                   msg.id === assistantMessageId
                     ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: [...accumulatedToolInvocations] }
@@ -1166,6 +1196,9 @@ export function ChatPanelV2({
                         })
                         console.log(`[ChatPanelV2][DataStream] Updated package.json for ${fileOp.type}: ${fileOp.package}`)
                         operationsApplied++
+                      } else if (fileOp.type === 'read_file') {
+                        // Skip read_file operations entirely - they don't need client-side application
+                        console.log(`[ChatPanelV2][DataStream] Skipping read_file operation: ${fileOp.path}`)
                       } else {
                         console.warn('[ChatPanelV2][DataStream] Skipped invalid file operation:', fileOp)
                       }
