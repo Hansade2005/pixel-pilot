@@ -1012,17 +1012,46 @@ export function ChatPanelV2({
       let accumulatedReasoning = ''
       let finalToolInvocations: any[] = []
       let finalFileOperations: any[] = []
+      let lineBuffer = '' // Buffer for incomplete lines across chunks
 
       while (true) {
         const { done, value } = await reader.read()
-        if (done) break
+        if (done) {
+          // Process any remaining buffered line
+          if (lineBuffer.trim()) {
+            console.log('[ChatPanelV2][DataStream] Processing final buffered line:', lineBuffer.substring(0, 100))
+            try {
+              const parsed = JSON.parse(lineBuffer)
+              if (parsed.type === 'metadata') {
+                console.log('[ChatPanelV2][DataStream] 📥 Received final metadata from buffer')
+                if (parsed.fileOperations && Array.isArray(parsed.fileOperations)) {
+                  finalFileOperations = parsed.fileOperations
+                }
+                if (parsed.toolInvocations && Array.isArray(parsed.toolInvocations)) {
+                  finalToolInvocations = parsed.toolInvocations
+                }
+              }
+            } catch (e) {
+              console.error('[ChatPanelV2][DataStream] Failed to parse final buffer:', e)
+            }
+          }
+          break
+        }
 
         const chunk = decoder.decode(value, { stream: true })
         
-        // AI SDK v5 data stream format uses newline-delimited JSON
-        const lines = chunk.split('\n').filter(line => line.trim())
+        // Add chunk to buffer and split by newlines
+        // Important: Don't trim individual lines yet - metadata might span multiple chunks
+        lineBuffer += chunk
+        const lines = lineBuffer.split('\n')
+        
+        // Keep the last incomplete line in the buffer
+        lineBuffer = lines.pop() || ''
+        
+        // Process complete lines
+        const completeLines = lines.filter(line => line.trim())
 
-        for (const line of lines) {
+        for (const line of completeLines) {
           try {
             // Parse AI SDK v5 stream protocol
             // Format: {"type":"0","value":"text"} or {"type":"tool-call",...}
@@ -1066,17 +1095,20 @@ export function ChatPanelV2({
             } else if (parsed.type === 'metadata') {
               // Final metadata with complete tool invocations and file operations from server
               // Server-only accumulation: Use metadata as the single source of truth
-              console.log('[ChatPanelV2][DataStream] 🎯 Received metadata from server:', {
+              console.log('[ChatPanelV2][DataStream] 📥 Received metadata from backend:', {
                 hasToolInvocations: !!parsed.toolInvocations,
                 toolInvocationsCount: parsed.toolInvocations?.length || 0,
                 hasFileOperations: !!parsed.fileOperations,
                 fileOperationsCount: parsed.fileOperations?.length || 0,
-                fileOperationTypes: parsed.fileOperations?.map((op: any) => `${op.type}:${op.path}`) || []
+                fileOperationTypes: parsed.fileOperations?.map((op: any) => `${op.type}:${op.path}`) || [],
+                rawMetadata: parsed // Log full metadata for debugging
               })
               
               if (parsed.toolInvocations && Array.isArray(parsed.toolInvocations)) {
                 finalToolInvocations = parsed.toolInvocations
                 console.log('[ChatPanelV2][DataStream] ✅ Stored tool invocations:', finalToolInvocations.length)
+              } else {
+                console.warn('[ChatPanelV2][DataStream] ⚠️ Metadata received but no tool invocations array found')
               }
 
               // Collect file operations for application at end of stream
@@ -1089,7 +1121,11 @@ export function ChatPanelV2({
                   console.log(`[ChatPanelV2][DataStream]   ${idx + 1}. ${op.type}: ${op.path}`)
                 })
               } else {
-                console.warn('[ChatPanelV2][DataStream] ⚠️ Metadata received but no file operations array found')
+                console.warn('[ChatPanelV2][DataStream] ⚠️ Metadata received but no file operations array found:', {
+                  hasFileOperations: 'fileOperations' in parsed,
+                  fileOperationsType: typeof parsed.fileOperations,
+                  fileOperationsValue: parsed.fileOperations
+                })
               }
 
               // Update message with final tool invocations
@@ -1098,11 +1134,17 @@ export function ChatPanelV2({
                   ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: finalToolInvocations }
                   : msg
               ))
+              
+              console.log('[ChatPanelV2][DataStream] 🎉 Metadata processing complete')
             }
             console.log('[ChatPanelV2][DataStream] State:', { content: accumulatedContent, reasoning: accumulatedReasoning, tools: finalToolInvocations.length })
           } catch (e) {
-            // Skip malformed chunks that aren't valid client stream data
-            console.warn('[ChatPanelV2][DataStream] Skipping malformed chunk')
+            // Log error details to help debug parsing issues
+            console.error('[ChatPanelV2][DataStream] ❌ Failed to parse chunk:', {
+              error: e instanceof Error ? e.message : String(e),
+              line: line.substring(0, 200), // Log first 200 chars of problematic line
+              lineLength: line.length
+            })
             continue
           }
         }
