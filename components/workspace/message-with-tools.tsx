@@ -173,11 +173,21 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
 
         // Dispatch files-changed event for file operations
         if (['write_file', 'edit_file', 'delete_file'].includes(toolInvocation.toolName)) {
+          let filePath = 'unknown';
+          
+          if (toolInvocation.toolName === 'edit_file') {
+            // For edit_file, the path is in args.filePath
+            filePath = toolInvocation.result?.path || toolInvocation.args?.filePath || 'unknown';
+          } else {
+            // For other file operations, path is in args.path
+            filePath = toolInvocation.result?.path || toolInvocation.args?.path || 'unknown';
+          }
+          
           window.dispatchEvent(new CustomEvent('files-changed', {
             detail: {
               projectId: projectId,
               action: toolInvocation.toolName,
-              path: toolInvocation.result?.path || toolInvocation.args?.path || 'unknown',
+              path: filePath,
               source: 'ai-sdk-tool',
               toolCallId: toolInvocation.toolCallId
             }
@@ -210,6 +220,8 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
       case 'remove_package': return PackageMinus
       case 'web_search': return Globe
       case 'web_extract': return Globe
+      case 'semantic_code_navigator': return BrainIcon
+      case 'check_dev_errors': return Settings
       default: return FileText
     }
   }
@@ -224,6 +236,8 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
       case 'remove_package': return 'Removing package'
       case 'web_search': return 'Searching web'
       case 'web_extract': return 'Extracting web content'
+      case 'semantic_code_navigator': return 'Searching code'
+      case 'check_dev_errors': return 'Checking errors'
       default: return toolName
     }
   }
@@ -238,6 +252,8 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
       case 'remove_package': return 'Removed'
       case 'web_search': return 'Searched'
       case 'web_extract': return 'Extracted'
+      case 'semantic_code_navigator': return 'Found'
+      case 'check_dev_errors': return 'Checked'
       default: return 'Completed'
     }
   }
@@ -253,7 +269,16 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
     let triggerTitle = ''
     if (['write_file', 'edit_file', 'delete_file', 'read_file'].includes(toolInvocation.toolName)) {
       // Use result path for completed operations, args path for loading
-      const filePath = (isCompleted ? toolInvocation.result?.path : null) || toolInvocation.args?.path || 'file'
+      let filePath = 'file';
+      
+      if (toolInvocation.toolName === 'edit_file') {
+        // For edit_file, the path is in args.filePath
+        filePath = (isCompleted ? toolInvocation.result?.path : null) || toolInvocation.args?.filePath || 'file';
+      } else {
+        // For other file operations, path is in args.path
+        filePath = (isCompleted ? toolInvocation.result?.path : null) || toolInvocation.args?.path || 'file';
+      }
+      
       displayText = filePath
       if (isLoading) {
         triggerTitle = getToolLabel(toolInvocation.toolName)
@@ -306,6 +331,28 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
       } else {
         triggerTitle = `Web extract: ${urlString}`
       }
+    } else if (toolInvocation.toolName === 'semantic_code_navigator') {
+      const query = toolInvocation.result?.query || toolInvocation.args?.query || 'code search'
+      const truncatedQuery = query.length > 15 ? `${query.substring(0, 15)}...` : query
+      displayText = truncatedQuery
+
+      if (isLoading) {
+        triggerTitle = getToolLabel(toolInvocation.toolName)
+      } else {
+        const resultsCount = toolInvocation.result?.totalResults || 0
+        triggerTitle = `Code search: "${query}" (${resultsCount} results)`
+      }
+    } else if (toolInvocation.toolName === 'check_dev_errors') {
+      const mode = toolInvocation.result?.mode || toolInvocation.args?.mode || 'dev'
+      displayText = `${mode} check`
+
+      if (isLoading) {
+        triggerTitle = getToolLabel(toolInvocation.toolName)
+      } else {
+        const hasErrors = toolInvocation.result?.errorCount > 0
+        const modeLabel = mode === 'dev' ? 'Dev server' : 'Build'
+        triggerTitle = `${modeLabel} check: ${hasErrors ? 'Errors found' : 'No errors'}`
+      }
     } else {
       triggerTitle = isLoading ? getToolLabel(toolInvocation.toolName) : getToolCompletedLabel(toolInvocation.toolName)
     }
@@ -323,7 +370,16 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
                 <span className="flex-1 truncate text-sm">
                   {(() => {
                     // Use result path for completed operations, args path for loading
-                    const filePath = toolInvocation.result?.path || toolInvocation.args?.path || 'file';
+                    let filePath = 'file';
+                    
+                    if (toolInvocation.toolName === 'edit_file') {
+                      // For edit_file, the path is in args.filePath
+                      filePath = toolInvocation.result?.path || toolInvocation.args?.filePath || 'file';
+                    } else {
+                      // For other file operations, path is in args.path
+                      filePath = toolInvocation.result?.path || toolInvocation.args?.path || 'file';
+                    }
+                    
                     const fileName = filePath.split('/').pop() || 'file';
                     const action = toolInvocation.toolName === 'write_file'
                       ? (toolInvocation.result?.action === 'updated' ? 'Modified' : 'Created')
@@ -374,6 +430,32 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
                     } else {
                       return `${urlList.length} URLs`;
                     }
+                  })()}
+                </span>
+              </>
+            ) : toolInvocation.toolName === 'semantic_code_navigator' && !isLoading ? (
+              /* For semantic code navigator, show brain icon + query + results count */
+              <>
+                <BrainIcon className="size-4" />
+                <span className="flex-1 truncate text-sm">
+                  Code search: "{(() => {
+                    const query = toolInvocation.result?.query || toolInvocation.args?.query || 'Unknown query';
+                    const resultsCount = toolInvocation.result?.totalResults || 0;
+                    return `${query.length > 15 ? `${query.substring(0, 15)}...` : query}" (${resultsCount} results)`;
+                  })()}"
+                </span>
+              </>
+            ) : toolInvocation.toolName === 'check_dev_errors' && !isLoading ? (
+              /* For check dev errors, show settings icon + mode + status */
+              <>
+                <Settings className="size-4" />
+                <span className="flex-1 truncate text-sm">
+                  {(() => {
+                    const mode = toolInvocation.result?.mode || toolInvocation.args?.mode || 'dev';
+                    const hasErrors = toolInvocation.result?.errorCount > 0;
+                    const modeLabel = mode === 'dev' ? 'Dev server' : 'Build';
+                    const status = hasErrors ? `${toolInvocation.result.errorCount} errors` : 'No errors';
+                    return `${modeLabel} check: ${status}`;
                   })()}
                 </span>
               </>
@@ -454,6 +536,130 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
                     ) : (
                       <div className="text-gray-400 text-sm">
                         No search results available to display.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </TaskItem>
+          )}
+          {/* Show semantic code navigator results */}
+          {isCompleted && !hasError && toolInvocation.toolName === 'semantic_code_navigator' && toolInvocation.result?.results && (
+            <TaskItem>
+              <div className="mt-3">
+                <div className="bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-gray-700 border-b border-gray-600 text-xs font-medium text-white">
+                    Code Search Results
+                  </div>
+                  <div className="max-h-96 overflow-y-auto p-4 bg-[#1e1e1e]">
+                    {/* Query Header */}
+                    <div className="mb-4">
+                      <h3 className="text-sm font-bold text-white mb-2">Search Query</h3>
+                      <p className="text-gray-300 text-sm bg-gray-800 px-3 py-2 rounded border border-gray-600">
+                        "{toolInvocation.result.query || 'Unknown query'}"
+                      </p>
+                    </div>
+
+                    {/* Results Content */}
+                    {toolInvocation.result.results && toolInvocation.result.results.length > 0 ? (
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-bold text-white">Found {toolInvocation.result.results.length} matches:</h4>
+                        {toolInvocation.result.results.map((result: any, index: number) => (
+                          <div key={index} className="bg-gray-800 rounded border border-gray-600 p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs font-medium text-blue-400 bg-blue-900 px-2 py-1 rounded">
+                                {result.type}
+                              </span>
+                              <span className="text-xs text-gray-400">
+                                {result.file}:{result.lineNumber}
+                              </span>
+                            </div>
+                            <div className="text-sm font-medium text-white mb-1">
+                              {result.match}
+                            </div>
+                            <div className="text-xs text-gray-300">
+                              {result.description}
+                            </div>
+                            {result.context && (
+                              <pre className="mt-2 text-xs text-gray-400 bg-gray-900 p-2 rounded overflow-x-auto">
+                                <code>{result.context}</code>
+                              </pre>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-gray-400 text-sm">
+                        No code matches found.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </TaskItem>
+          )}
+          {/* Show check dev errors results */}
+          {isCompleted && toolInvocation.toolName === 'check_dev_errors' && toolInvocation.result && (
+            <TaskItem>
+              <div className="mt-3">
+                <div className="bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-gray-700 border-b border-gray-600 text-xs font-medium text-white">
+                    {toolInvocation.result.mode === 'dev' ? 'Dev Server Check' : 'Build Check'} Results
+                  </div>
+                  <div className="max-h-96 overflow-y-auto p-4 bg-[#1e1e1e]">
+                    {/* Status Header */}
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        {toolInvocation.result.success ? (
+                          <CheckCircle2 className="size-4 text-green-500" />
+                        ) : (
+                          <XCircle className="size-4 text-red-500" />
+                        )}
+                        <h3 className="text-sm font-bold text-white">
+                          {toolInvocation.result.success ? '✅ Success' : '❌ Failed'}
+                        </h3>
+                      </div>
+                      <p className="text-gray-300 text-sm">
+                        {toolInvocation.result.message || 'Check completed'}
+                      </p>
+                      {toolInvocation.result.serverUrl && (
+                        <p className="text-blue-400 text-sm mt-1">
+                          Server URL: {toolInvocation.result.serverUrl}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Error Summary */}
+                    {toolInvocation.result.errorCount > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-bold text-red-400 mb-2">
+                          Errors Found ({toolInvocation.result.errorCount})
+                        </h4>
+                        <div className="bg-red-900/20 border border-red-700 rounded p-3">
+                          <div className="text-red-300 text-sm whitespace-pre-wrap">
+                            {Array.isArray(toolInvocation.result.errors)
+                              ? toolInvocation.result.errors.slice(0, 5).join('\n')
+                              : toolInvocation.result.errors
+                            }
+                            {Array.isArray(toolInvocation.result.errors) && toolInvocation.result.errors.length > 5 && (
+                              <span className="text-red-400 text-xs block mt-2">
+                                ... and {toolInvocation.result.errors.length - 5} more errors
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Logs */}
+                    {toolInvocation.result.logs && toolInvocation.result.logs.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-bold text-white mb-2">Logs</h4>
+                        <div className="bg-gray-900 rounded p-3 max-h-48 overflow-y-auto">
+                          <pre className="text-xs text-gray-300 whitespace-pre-wrap">
+                            {toolInvocation.result.logs.slice(-20).join('\n')}
+                          </pre>
+                        </div>
                       </div>
                     )}
                   </div>

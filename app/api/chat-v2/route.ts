@@ -127,7 +127,7 @@ You're not just an expert full-stack architect - you're a digital superhero with
 - **DELIVER**: 🚀 Implement with production-ready code that impresses
 
 ## 🛠️ Tools in Your Utility Belt
-- read_file (with line numbers), write_file, edit_file, delete_file, add_package, remove_package, web_search, web_extract, semantic_code_navigator (with line numbers)
+- read_file (with line numbers), write_file, edit_file, delete_file, add_package, remove_package, web_search, web_extract, semantic_code_navigator (with line numbers), check_dev_errors
 
 ## ✅ Essential Checklist
 - **Functionality**: ✅ Happy path, edge cases, error handling
@@ -826,12 +826,11 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
             }
 
             try {
-              // Validate inputs
               if (!filePath || typeof filePath !== 'string') {
                 return {
                   success: false,
                   error: `Invalid file path provided`,
-                  filePath,
+                  path: filePath,
                   toolCallId
                 }
               }
@@ -840,7 +839,7 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                 return {
                   success: false,
                   error: `Invalid search/replace block provided`,
-                  filePath,
+                  path: filePath,
                   toolCallId
                 }
               }
@@ -856,7 +855,7 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                 return {
                   success: false,
                   error: `File not found: ${filePath}. Use list_files to see available files.`,
-                  filePath,
+                  path: filePath,
                   toolCallId
                 }
               }
@@ -870,7 +869,7 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                 return {
                   success: false,
                   error: `Failed to parse search/replace block. Ensure it follows the format: <<<<<<< SEARCH\\n[old code]\\n=======\\n[new code]\\n>>>>>>> REPLACE`,
-                  filePath,
+                  path: filePath,
                   toolCallId
                 }
               }
@@ -903,7 +902,8 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                 return {
                   success: true,
                   message: `✅ File ${filePath} edited successfully.`,
-                  filePath,
+                  path: filePath,
+                  content: modifiedContent,
                   appliedEdits,
                   failedEdits,
                   action: 'edited',
@@ -913,7 +913,7 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                 return {
                   success: false,
                   error: `Failed to apply edit: ${failedEdits[0]?.reason || 'Unknown error'}`,
-                  filePath,
+                  path: filePath,
                   appliedEdits,
                   failedEdits,
                   toolCallId
@@ -927,7 +927,7 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
               return {
                 success: false,
                 error: `Failed to edit file ${filePath}: ${errorMessage}`,
-                filePath,
+                path: filePath,
                 toolCallId
               }
             }
@@ -1074,6 +1074,259 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                 success: false,
                 error: `Failed to search code: ${errorMessage}`,
                 query,
+                toolCallId
+              }
+            }
+          }
+        }),
+
+        check_dev_errors: tool({
+          description: 'Run development server or build process and check for runtime/build errors. Monitors console logs to detect any errors and reports success/failure status.',
+          inputSchema: z.object({
+            mode: z.enum(['dev', 'build']).describe('Whether to run dev server or build process'),
+            timeoutSeconds: z.number().optional().describe('How long to monitor for errors after startup (default: 5 seconds for dev, 0 for build)')
+          }),
+          execute: async ({ mode, timeoutSeconds = mode === 'dev' ? 5 : 0 }, { abortSignal, toolCallId }) => {
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            try {
+              const e2bApiKey = process.env.E2B_API_KEY
+              if (!e2bApiKey) {
+                return {
+                  success: false,
+                  error: 'E2B API key not configured',
+                  mode,
+                  toolCallId
+                }
+              }
+
+              // Get all files in the project
+              const { storageManager } = await import('@/lib/storage-manager')
+              await storageManager.init()
+              const allFiles = await storageManager.getFiles(projectId)
+
+              if (!allFiles || allFiles.length === 0) {
+                return {
+                  success: false,
+                  error: 'No files found in project',
+                  mode,
+                  toolCallId
+                }
+              }
+
+              // Import E2B functions
+              const {
+                createEnhancedSandbox,
+                SandboxError
+              } = await import('@/lib/e2b-enhanced')
+
+              const logs: string[] = []
+              const errors: string[] = []
+              let serverStarted = false
+              let buildCompleted = false
+
+              // Create sandbox
+              const sandbox = await createEnhancedSandbox({
+                template: "pipilot",
+                timeoutMs: 300000, // 5 minutes timeout
+                env: {}
+              })
+
+              logs.push('Sandbox created successfully')
+
+              // Prepare files for sandbox
+              const sandboxFiles: any[] = allFiles
+                .filter(file => file.content && !file.isDirectory)
+                .map(file => ({
+                  path: `/project/${file.path}`,
+                  content: file.content,
+                }))
+
+              // Ensure package.json exists
+              const hasPackageJson = allFiles.some(f => f.path === 'package.json')
+              if (!hasPackageJson) {
+                const packageJson = {
+                  name: 'error-check-app',
+                  version: '0.1.0',
+                  private: true,
+                  packageManager: 'pnpm@8.15.0',
+                  scripts: {
+                    dev: 'vite --host 0.0.0.0',
+                    build: 'tsc && vite build',
+                    preview: 'vite preview',
+                    lint: 'eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0'
+                  },
+                  dependencies: {
+                    'react': '^18.2.0',
+                    'react-dom': '^18.2.0'
+                  },
+                  devDependencies: {
+                    '@types/react': '^18.2.43',
+                    '@types/react-dom': '^18.2.17',
+                    '@typescript-eslint/eslint-plugin': '^6.14.0',
+                    '@typescript-eslint/parser': '^6.14.0',
+                    '@vitejs/plugin-react': '^4.2.1',
+                    'eslint': '^8.55.0',
+                    'eslint-plugin-react-hooks': '^4.6.0',
+                    'eslint-plugin-react-refresh': '^0.4.5',
+                    'typescript': '^5.2.2',
+                    'vite': '^5.0.8'
+                  }
+                }
+                sandboxFiles.push({
+                  path: '/project/package.json',
+                  content: JSON.stringify(packageJson, null, 2)
+                })
+              }
+
+              // Write files to sandbox
+              await sandbox.writeFiles(sandboxFiles)
+              logs.push('Project files written to sandbox')
+
+              // Install dependencies
+              logs.push('Installing dependencies...')
+              const installResult = await sandbox.installDependenciesRobust("/project", {
+                timeoutMs: 120000, // 2 minutes
+                envVars: {},
+                onStdout: (data) => logs.push(`[INSTALL] ${data.trim()}`),
+                onStderr: (data) => {
+                  errors.push(`[INSTALL ERROR] ${data.trim()}`)
+                  logs.push(`[INSTALL ERROR] ${data.trim()}`)
+                },
+              })
+
+              if (installResult.exitCode !== 0) {
+                return {
+                  success: false,
+                  error: 'Dependency installation failed',
+                  mode,
+                  logs,
+                  errors,
+                  toolCallId
+                }
+              }
+
+              logs.push('Dependencies installed successfully')
+
+              if (mode === 'dev') {
+                // Start dev server and monitor for errors
+                logs.push('Starting development server...')
+                const devServer = await sandbox.startDevServer({
+                  command: "npm run dev",
+                  workingDirectory: "/project",
+                  port: 3000,
+                  timeoutMs: 30000, // 30 seconds to start
+                  envVars: {},
+                  onStdout: (data) => {
+                    const message = data.trim()
+                    logs.push(`[DEV] ${message}`)
+                    if (message.includes('ready') || message.includes('listening') || message.includes('Local:')) {
+                      serverStarted = true
+                    }
+                  },
+                  onStderr: (data) => {
+                    const message = data.trim()
+                    errors.push(`[DEV ERROR] ${message}`)
+                    logs.push(`[DEV ERROR] ${message}`)
+                  },
+                })
+
+                if (!serverStarted) {
+                  return {
+                    success: false,
+                    error: 'Dev server failed to start',
+                    mode,
+                    logs,
+                    errors,
+                    toolCallId
+                  }
+                }
+
+                logs.push(`Dev server started successfully at ${devServer.url}`)
+
+                // Wait for the specified timeout to monitor for runtime errors
+                logs.push(`Monitoring for runtime errors for ${timeoutSeconds} seconds...`)
+                await new Promise(resolve => setTimeout(resolve, timeoutSeconds * 1000))
+
+                // Check if any errors occurred during monitoring
+                const runtimeErrors = errors.filter(error =>
+                  error.includes('[DEV ERROR]') &&
+                  !error.includes('ExperimentalWarning') &&
+                  !error.includes('DeprecationWarning')
+                )
+
+                return {
+                  success: runtimeErrors.length === 0,
+                  message: runtimeErrors.length === 0
+                    ? 'Dev server started successfully with no runtime errors'
+                    : `Dev server started but ${runtimeErrors.length} runtime errors detected`,
+                  mode,
+                  serverUrl: devServer.url,
+                  logs,
+                  errors: runtimeErrors,
+                  errorCount: runtimeErrors.length,
+                  toolCallId
+                }
+
+              } else if (mode === 'build') {
+                // Run build process
+                logs.push('Starting build process...')
+                const buildResult = await sandbox.executeCommand("npm run build", {
+                  workingDirectory: "/project",
+                  timeoutMs: 120000, // 2 minutes
+                  envVars: {},
+                  onStdout: (data: string) => logs.push(`[BUILD] ${data.trim()}`),
+                  onStderr: (data: string) => {
+                    const message = data.trim()
+                    errors.push(`[BUILD ERROR] ${message}`)
+                    logs.push(`[BUILD ERROR] ${message}`)
+                  },
+                })
+
+                buildCompleted = buildResult.exitCode === 0
+
+                if (!buildCompleted) {
+                  return {
+                    success: false,
+                    error: 'Build failed',
+                    mode,
+                    logs,
+                    errors,
+                    exitCode: buildResult.exitCode,
+                    toolCallId
+                  }
+                }
+
+                // Filter out warnings and keep only actual errors
+                const buildErrors = errors.filter(error =>
+                  error.includes('[BUILD ERROR]') &&
+                  !error.includes('warning') &&
+                  !error.includes('Warning')
+                )
+
+                return {
+                  success: buildErrors.length === 0,
+                  message: buildErrors.length === 0
+                    ? 'Build completed successfully with no errors'
+                    : `Build completed but ${buildErrors.length} errors detected`,
+                  mode,
+                  logs,
+                  errors: buildErrors,
+                  errorCount: buildErrors.length,
+                  toolCallId
+                }
+              }
+
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+              console.error(`[ERROR] check_dev_errors failed for mode ${mode}:`, error)
+
+              return {
+                success: false,
+                error: `Failed to check ${mode} errors: ${errorMessage}`,
+                mode,
                 toolCallId
               }
             }
