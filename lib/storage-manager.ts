@@ -194,6 +194,7 @@ export interface StorageInterface {
   createWorkspace(workspace: Omit<Workspace, 'id' | 'createdAt' | 'updatedAt'>): Promise<Workspace>;
   getWorkspace(id: string): Promise<Workspace | null>;
   getWorkspaces(userId: string): Promise<Workspace[]>;
+  getWorkspaceBySlug(userId: string, slug: string): Promise<Workspace | null>;
   updateWorkspace(id: string, updates: Partial<Workspace>): Promise<Workspace | null>;
   deleteWorkspace(id: string): Promise<boolean>;
   createFile(file: Omit<File, 'id' | 'createdAt' | 'updatedAt'>): Promise<File>;
@@ -300,6 +301,11 @@ class InMemoryStorage implements StorageInterface {
 
   async getWorkspaces(userId: string): Promise<Workspace[]> {
     return Array.from(this.workspaces.values()).filter(w => w.userId === userId)
+  }
+
+  async getWorkspaceBySlug(userId: string, slug: string): Promise<Workspace | null> {
+    const workspaces = Array.from(this.workspaces.values())
+    return workspaces.find(w => w.userId === userId && w.slug === slug) || null
   }
 
   async updateWorkspace(id: string, updates: Partial<Workspace>): Promise<Workspace | null> {
@@ -959,6 +965,28 @@ class IndexedDBStorage implements StorageInterface {
       const request = index.getAll(userId)
 
       request.onsuccess = () => resolve(request.result || [])
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getWorkspaceBySlug(userId: string, slug: string): Promise<Workspace | null> {
+    if (!this.db) throw new Error('Database not initialized')
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['workspaces'], 'readonly')
+      const store = transaction.objectStore('workspaces')
+      const index = store.index('slug')
+      const request = index.get(slug)
+
+      request.onsuccess = () => {
+        const workspace = request.result
+        // Since slug is globally unique, we still need to check userId
+        if (workspace && workspace.userId === userId) {
+          resolve(workspace)
+        } else {
+          resolve(null)
+        }
+      }
       request.onerror = () => reject(request.error)
     })
   }
@@ -2109,6 +2137,11 @@ class StorageManager {
   async getWorkspaces(userId: string): Promise<Workspace[]> {
     await this.init()
     return this.storage!.getWorkspaces(userId)
+  }
+
+  async getWorkspaceBySlug(userId: string, slug: string): Promise<Workspace | null> {
+    await this.init()
+    return this.storage!.getWorkspaceBySlug(userId, slug)
   }
 
   async updateWorkspace(id: string, updates: Partial<Workspace>): Promise<Workspace | null> {

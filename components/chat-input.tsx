@@ -415,13 +415,29 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         // Create project immediately with generated details
         const projectName = data.suggestion.name
         const projectDescription = data.suggestion.description
-        const slug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
         
-        console.log('📝 Creating project with name:', projectName)
-        
-        // Client-side project creation
+        // Generate unique slug
         const { storageManager } = await import('@/lib/storage-manager')
         await storageManager.init()
+        
+        const baseSlug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+        let slug = baseSlug
+        let counter = 1
+        
+        // Check if slug exists and append number if needed
+        while (await storageManager.getWorkspaceBySlug(user.id, slug)) {
+          slug = `${baseSlug}-${counter}`
+          counter++
+          
+          // Prevent infinite loop
+          if (counter > 100) {
+            // Fallback to timestamp-based slug
+            slug = `${baseSlug}-${Date.now()}`
+            break
+          }
+        }
+        
+        console.log('📝 Creating project with name:', projectName, 'and slug:', slug)
         const workspace = await storageManager.createWorkspace({
           name: projectName,
           description: projectDescription,
