@@ -2171,6 +2171,12 @@ export function ChatPanelV2({
                     const targetMessage = allMessages.find(msg => msg.id === revertMessageId)
                     
                     if (targetMessage) {
+                      // Clear all messages that came after this message (including AI responses)
+                      const messageIndex = messages.findIndex(msg => msg.id === revertMessageId)
+                      if (messageIndex !== -1) {
+                        setMessages(prev => prev.slice(0, messageIndex + 1))
+                      }
+                      
                       await deleteMessagesAfter(activeSession.id, targetMessage.createdAt)
                     }
                     
