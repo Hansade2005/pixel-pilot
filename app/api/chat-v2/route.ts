@@ -1438,7 +1438,12 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
           const toolCalls: Map<string, any> = new Map() // Store tool calls by ID
           
           try {
+            console.log('[DEBUG] Starting fullStream processing...')
+            let partsProcessed = 0
+            
             for await (const part of result.fullStream) {
+              partsProcessed++
+              
               // Collect tool calls
               if (part.type === 'tool-call') {
                 const toolCall = part as any
@@ -1448,6 +1453,7 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                   args: toolCall.args,
                   state: 'call'
                 })
+                console.log(`[DEBUG] Collected tool call: ${toolCall.toolName}`)
               }
               
               // Process tool results and combine with calls
@@ -1462,9 +1468,12 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                   existingCall.state = 'result'
                   
                   // Collect file operations from tool results
+                  // CRITICAL FIX: Only collect operations that modify files, not read operations
                   const toolResultData = toolResult.result || toolResult.output
-                  if (toolResultData && toolResultData.success !== false && toolResultData.path) {
-                    // This is a file operation
+                  const isWriteOperation = ['write_file', 'edit_file', 'delete_file', 'add_package', 'remove_package'].includes(toolResult.toolName)
+                  
+                  if (toolResultData && toolResultData.success !== false && toolResultData.path && isWriteOperation) {
+                    // This is a file operation that should be synced to frontend
                     fileOperations.push({
                       type: toolResult.toolName,
                       path: toolResultData.path,
@@ -1472,6 +1481,9 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                       projectId: projectId,
                       success: toolResultData.success !== false
                     })
+                    console.log(`[DEBUG] ✅ Collected file operation for frontend: ${toolResult.toolName} - ${toolResultData.path}`)
+                  } else if (toolResultData && toolResultData.path) {
+                    console.log(`[DEBUG] ⏭️ Skipped read-only operation: ${toolResult.toolName} - ${toolResultData.path}`)
                   }
                 }
               }
@@ -1481,9 +1493,11 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
               controller.enqueue(encoder.encode(json + '\n'))
             }
             
-            // Send final metadata immediately to client before server-side file operations
-            if (fileOperations.length > 0 || toolCalls.size > 0) {
-              // Get steps info after streaming is complete
+            console.log(`[DEBUG] Finished fullStream processing. Total parts: ${partsProcessed}, Tool calls: ${toolCalls.size}, File operations: ${fileOperations.length}`)
+            
+            // CRITICAL: Always send metadata message to ensure frontend receives tool results
+            // Even with empty arrays, this signals stream completion to frontend
+            try {
               const stepsInfo = await result.steps
               const toolInvocations = Array.from(toolCalls.values())
               
@@ -1502,7 +1516,34 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                   finishReason: step.finishReason
                 })) || []
               }
-              controller.enqueue(encoder.encode(JSON.stringify(metadataMessage) + '\n'))
+              
+              console.log('[DEBUG] 📤 Sending metadata to frontend:', {
+                fileOperationsCount: fileOperations.length,
+                toolInvocationsCount: toolInvocations.length,
+                fileOperationsPaths: fileOperations.map(op => `${op.type}:${op.path}`),
+                metadataSize: JSON.stringify(metadataMessage).length
+              })
+              
+              const metadataEncoded = encoder.encode(JSON.stringify(metadataMessage) + '\n')
+              controller.enqueue(metadataEncoded)
+              
+              console.log('[DEBUG] ✅ Metadata sent successfully to frontend')
+            } catch (metadataError) {
+              console.error('[ERROR] ❌ Failed to send metadata to frontend:', metadataError)
+              // Try to send a minimal metadata message as fallback
+              try {
+                const fallbackMetadata = {
+                  type: 'metadata',
+                  fileOperations: fileOperations,
+                  toolInvocations: [],
+                  serverSideExecution: true,
+                  error: 'Failed to retrieve full metadata'
+                }
+                controller.enqueue(encoder.encode(JSON.stringify(fallbackMetadata) + '\n'))
+                console.log('[DEBUG] 🔄 Sent fallback metadata to frontend')
+              } catch (fallbackError) {
+                console.error('[ERROR] ❌ Failed to send even fallback metadata:', fallbackError)
+              }
             }
             
             // After streaming is complete, process file operations for server-side persistence

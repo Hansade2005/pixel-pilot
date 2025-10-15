@@ -1066,15 +1066,30 @@ export function ChatPanelV2({
             } else if (parsed.type === 'metadata') {
               // Final metadata with complete tool invocations and file operations from server
               // Server-only accumulation: Use metadata as the single source of truth
+              console.log('[ChatPanelV2][DataStream] 🎯 Received metadata from server:', {
+                hasToolInvocations: !!parsed.toolInvocations,
+                toolInvocationsCount: parsed.toolInvocations?.length || 0,
+                hasFileOperations: !!parsed.fileOperations,
+                fileOperationsCount: parsed.fileOperations?.length || 0,
+                fileOperationTypes: parsed.fileOperations?.map((op: any) => `${op.type}:${op.path}`) || []
+              })
+              
               if (parsed.toolInvocations && Array.isArray(parsed.toolInvocations)) {
                 finalToolInvocations = parsed.toolInvocations
-                console.log('[ChatPanelV2][DataStream] Received complete tool invocations from server:', finalToolInvocations.length)
+                console.log('[ChatPanelV2][DataStream] ✅ Stored tool invocations:', finalToolInvocations.length)
               }
 
               // Collect file operations for application at end of stream
               if (parsed.fileOperations && Array.isArray(parsed.fileOperations)) {
                 finalFileOperations = parsed.fileOperations
-                console.log('[ChatPanelV2][DataStream] Received complete file operations from server:', finalFileOperations.length)
+                console.log('[ChatPanelV2][DataStream] ✅ Stored file operations for application:', finalFileOperations.length)
+                
+                // Log each file operation path for debugging
+                parsed.fileOperations.forEach((op: any, idx: number) => {
+                  console.log(`[ChatPanelV2][DataStream]   ${idx + 1}. ${op.type}: ${op.path}`)
+                })
+              } else {
+                console.warn('[ChatPanelV2][DataStream] ⚠️ Metadata received but no file operations array found')
               }
 
               // Update message with final tool invocations
@@ -1094,8 +1109,15 @@ export function ChatPanelV2({
       }
 
       // Apply all file operations received from server at the end of streaming
+      console.log('[ChatPanelV2][DataStream] 📊 Stream complete. Final state:', {
+        contentLength: accumulatedContent.length,
+        toolInvocationsCount: finalToolInvocations.length,
+        fileOperationsCount: finalFileOperations.length,
+        hasProject: !!project
+      })
+      
       if (finalFileOperations.length > 0 && project) {
-        console.log('[ChatPanelV2][DataStream] Applying all file operations from server at end of stream:', finalFileOperations)
+        console.log('[ChatPanelV2][DataStream] 🔄 Applying all file operations from server at end of stream:', finalFileOperations.length, 'operations')
 
         try {
           const { storageManager } = await import('@/lib/storage-manager')
@@ -1104,7 +1126,7 @@ export function ChatPanelV2({
           let operationsApplied = 0
 
           for (const fileOp of finalFileOperations) {
-            console.log('[ChatPanelV2][DataStream] Applying file operation:', fileOp)
+            console.log(`[ChatPanelV2][DataStream] 📝 Applying file operation ${operationsApplied + 1}/${finalFileOperations.length}:`, fileOp.type, fileOp.path)
 
             if (fileOp.type === 'write_file' && fileOp.path) {
               // Check if file exists
@@ -1161,21 +1183,45 @@ export function ChatPanelV2({
             }
           }
 
-          console.log(`[ChatPanelV2][DataStream] Applied ${operationsApplied}/${finalFileOperations.length} file operations to IndexedDB at end of stream`)
+          console.log(`[ChatPanelV2][DataStream] ✅ Applied ${operationsApplied}/${finalFileOperations.length} file operations to IndexedDB at end of stream`)
 
           if (operationsApplied > 0) {
             // Force refresh the file explorer
+            console.log('[ChatPanelV2][DataStream] 🔄 Triggering file explorer refresh...')
             setTimeout(() => {
               window.dispatchEvent(new CustomEvent('files-changed', {
                 detail: { projectId: project.id, forceRefresh: true }
               }))
             }, 100)
+            
+            // Show success toast
+            toast({
+              title: "Files Updated",
+              description: `Successfully applied ${operationsApplied} file operation(s) to your workspace.`,
+            })
           }
         } catch (error) {
-          console.error('[ChatPanelV2][DataStream] Failed to apply file operations to IndexedDB at end of stream:', error)
+          console.error('[ChatPanelV2][DataStream] ❌ Failed to apply file operations to IndexedDB at end of stream:', error)
           toast({
             title: "Storage Warning",
             description: `File operations completed but may not persist: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            variant: "destructive"
+          })
+        }
+      } else if (finalToolInvocations.length > 0 && project) {
+        // We have tool invocations but no file operations - this might indicate a problem
+        const writeToolCalls = finalToolInvocations.filter((tool: any) => 
+          ['write_file', 'edit_file', 'delete_file'].includes(tool.toolName)
+        )
+        
+        if (writeToolCalls.length > 0) {
+          console.warn('[ChatPanelV2][DataStream] ⚠️ WARNING: Tool invocations included file operations but no file operations were received in metadata!', {
+            toolCallsWithFiles: writeToolCalls.map((t: any) => `${t.toolName}:${t.args?.path}`)
+          })
+          
+          toast({
+            title: "Sync Warning",
+            description: "Some file changes may not have been applied. Please check the file tree.",
             variant: "destructive"
           })
         }
