@@ -290,7 +290,6 @@ export function ChatPanelV2({
   const [showRevertDialog, setShowRevertDialog] = useState(false)
   const [revertMessageId, setRevertMessageId] = useState<string | null>(null)
   const [isReverting, setIsReverting] = useState(false)
-  const [isRestoreAvailable, setIsRestoreAvailable] = useState(false)
   
   // UI state
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
@@ -2133,7 +2132,6 @@ export function ChatPanelV2({
                   setShowRevertDialog(false)
                   
                   try {
-                    // Get the chat session for this project
                     const { storageManager } = await import('@/lib/storage-manager')
                     await storageManager.init()
                     
@@ -2148,157 +2146,57 @@ export function ChatPanelV2({
                         description: "Could not find chat session for this project.",
                         variant: "destructive"
                       })
-                      setIsReverting(false)
-                      setRevertMessageId(null)
                       return
                     }
                     
-                    // Capture the current state before revert for potential restore
-                    const { capturePreRevertState } = await import('@/lib/checkpoint-utils')
+                    // Capture state before revert
+                    const { capturePreRevertState, getCheckpoints, deleteMessagesAfter, restoreCheckpoint } = await import('@/lib/checkpoint-utils')
                     await capturePreRevertState(project.id, activeSession.id, revertMessageId)
                     
-                    // Update restore availability state
-                    setIsRestoreAvailable(true)
-                    
-                    // Get all checkpoints for this workspace
-                    const { getCheckpoints } = await import('@/lib/checkpoint-utils')
+                    // Find checkpoint for this message
                     const checkpoints = await getCheckpoints(project.id)
-                    
-                    // Find the checkpoint associated with this message
-                    let checkpoint = checkpoints.find(cp => cp.messageId === revertMessageId) || undefined
+                    const checkpoint = checkpoints.find(cp => cp.messageId === revertMessageId)
                     
                     if (!checkpoint) {
-                      // Try to find checkpoint by timestamp if message ID doesn't match
-                      // This handles cases where message ID might not match due to timing issues
-                      const allMessages = await storageManager.getMessages(activeSession.id)
-                      const targetMessage = allMessages.find(msg => msg.id === revertMessageId)
-                      
-                      if (targetMessage) {
-                        // Find checkpoint closest to message creation time
-                        const targetTime = new Date(targetMessage.createdAt).getTime()
-                        const foundCheckpoint = checkpoints.find(cp => {
-                          const checkpointTime = new Date(cp.createdAt).getTime()
-                          const timeDiff = Math.abs(checkpointTime - targetTime)
-                          return timeDiff <= 2000 // 2 seconds tolerance
-                        });
-                        
-                        if (foundCheckpoint) {
-                          checkpoint = foundCheckpoint;
-                        }
-                      }
-                      
-                      if (!checkpoint) {
-                        toast({
-                          title: "Revert Failed",
-                          description: "Could not find checkpoint for this message. This might happen if the message is too recent or if there was a timing issue.",
-                          variant: "destructive"
-                        })
-                        setIsReverting(false)
-                        setRevertMessageId(null)
-                        return
-                      }
-                    }
-                    
-                    // Get all messages in the session
-                    const allMessages = await storageManager.getMessages(activeSession.id)
-                    
-                    // Try to find the message by ID first
-                    let revertMessageIndex = allMessages.findIndex(msg => msg.id === revertMessageId)
-                    let revertTimestamp = ''
-                    let revertMessage = null
-                    
-                    if (revertMessageIndex !== -1) {
-                      // Found the message by ID
-                      revertMessage = allMessages[revertMessageIndex]
-                      revertTimestamp = revertMessage.createdAt
-                      console.log(`[Checkpoint] Found message by ID: ${revertMessageId}`)
-                    } else {
-                      // Log detailed information for debugging
-                      console.log(`[Checkpoint] Message not found by ID: ${revertMessageId}`)
-                      console.log(`[Checkpoint] Available messages:`, allMessages.map(msg => ({
-                        id: msg.id,
-                        content: msg.content.substring(0, 50) + '...',
-                        createdAt: msg.createdAt
-                      })))
-                      
-                      // If we can't find by ID, try to find by checkpoint creation time
-                      // This handles cases where the message hasn't been saved to DB yet or there's a timing issue
-                      const checkpointTime = new Date(checkpoint.createdAt).getTime()
-                      console.log(`[Checkpoint] Looking for message near checkpoint time: ${checkpoint.createdAt} (${checkpointTime})`)
-                      
-                      // Find the message closest to the checkpoint creation time
-                      revertMessageIndex = allMessages.findIndex(msg => {
-                        const msgTime = new Date(msg.createdAt).getTime()
-                        // Allow for a small time difference (2 seconds) to account for timing issues
-                        const timeDiff = Math.abs(msgTime - checkpointTime)
-                        console.log(`[Checkpoint] Message ${msg.id} time diff: ${timeDiff}ms`)
-                        return timeDiff <= 2000
-                      })
-                      
-                      if (revertMessageIndex !== -1) {
-                        // Found a message close to checkpoint time
-                        revertMessage = allMessages[revertMessageIndex]
-                        revertTimestamp = revertMessage.createdAt
-                        console.log(`[Checkpoint] Found message by timestamp: ${revertMessage.id}`)
-                      } else {
-                        // Last resort: use the checkpoint creation time as the timestamp
-                        revertTimestamp = checkpoint.createdAt
-                        console.log(`[Checkpoint] Using checkpoint timestamp as fallback: ${revertTimestamp}`)
-                      }
-                    }
-                    
-                    if (!revertTimestamp) {
                       toast({
                         title: "Revert Failed",
-                        description: "Could not determine the timestamp for the selected message.",
+                        description: "Could not find checkpoint for this message.",
                         variant: "destructive"
                       })
-                      setIsReverting(false)
-                      setRevertMessageId(null)
                       return
                     }
                     
-                    // Delete messages that came after this timestamp
-                    const { deleteMessagesAfter } = await import('@/lib/checkpoint-utils')
-                    const deletedCount = await deleteMessagesAfter(activeSession.id, revertTimestamp)
-                    console.log(`[Checkpoint] Deleted ${deletedCount} messages after timestamp ${revertTimestamp}`)
+                    // Delete messages after this point
+                    const allMessages = await storageManager.getMessages(activeSession.id)
+                    const targetMessage = allMessages.find(msg => msg.id === revertMessageId)
                     
-                    // Update the messages state to remove messages after the revert point
-                    // First, we'll update the UI immediately for better UX
-                    setMessages(prevMessages => {
-                      // If we found the message by ID, slice up to and including that message
-                      const index = prevMessages.findIndex(msg => msg.id === revertMessageId)
-                      if (index !== -1) {
-                        return prevMessages.slice(0, index + 1)
+                    if (targetMessage) {
+                      // Clear all messages that came after this message (including AI responses)
+                      const messageIndex = messages.findIndex(msg => msg.id === revertMessageId)
+                      if (messageIndex !== -1) {
+                        setMessages(prev => prev.slice(0, messageIndex + 1))
                       }
-                      // If we couldn't find by ID, we'll reload after the restore completes
-                      return prevMessages
-                    })
+                      
+                      // Set the reverted message content in input for editing
+                      const revertedMessage = messages.find(msg => msg.id === revertMessageId)
+                      if (revertedMessage) {
+                        setInput(revertedMessage.content)
+                      }
+                      
+                      await deleteMessagesAfter(activeSession.id, targetMessage.createdAt)
+                    }
                     
-                    // Restore the checkpoint
-                    const { restoreCheckpoint } = await import('@/lib/checkpoint-utils')
+                    // Restore files
                     const success = await restoreCheckpoint(checkpoint.id)
                     
                     if (success) {
-                      // Force refresh the file explorer
+                      await loadMessages()
+                      
                       window.dispatchEvent(new CustomEvent('files-changed', { 
                         detail: { projectId: project.id, forceRefresh: true } 
                       }))
                       
-                      // Small delay to ensure UI updates properly
-                      await new Promise(resolve => setTimeout(resolve, 100))
-                      
-                      // Reload messages to ensure consistency between UI and database
-                      // This also helps avoid "Node cannot be found" errors
-                      await loadMessages()
-                      
-                      // Set this message to show restore icon
                       setRestoreMessageId(revertMessageId)
-                      
-                      // Populate the input area with the reverted message content for editing
-                      if (revertMessage) {
-                        setInput(revertMessage.content);
-                      }
                       
                       toast({
                         title: "Reverted Successfully",

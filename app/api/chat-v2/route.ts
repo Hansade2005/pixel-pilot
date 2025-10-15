@@ -784,12 +784,6 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
               const successfulResults = extractionResults.filter(result => result.success);
               const failedResults = extractionResults.filter(result => !result.success);
               
-              // Combine all clean results and apply 2000 character limit
-              const combinedResults = successfulResults.map(result => result.cleanResults).join('\n\n');
-              const limitedResults = combinedResults.length > 2000 
-                ? combinedResults.substring(0, 2000) + '\n\n[Content truncated to 2000 characters]'
-                : combinedResults;
-              
               // Debug logging for final result
               console.log('[DEBUG] Web extract final result:', {
                 totalUrls: urlArray.length,
@@ -804,12 +798,11 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                 message: successfulResults.length > 0 
                   ? `Successfully extracted content from ${successfulResults.length} URL(s)` 
                   : 'Failed to extract content from any URLs',
-                cleanResults: limitedResults,
+                cleanResults: successfulResults.map(result => result.cleanResults).join('\n\n'),
                 metadata: {
                   successCount: successfulResults.length,
                   failedCount: failedResults.length,
-                  urls: urlArray,
-                  truncated: combinedResults.length > 2000
+                  urls: urlArray
                 },
                 toolCallId
               };
