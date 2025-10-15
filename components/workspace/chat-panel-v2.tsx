@@ -2177,6 +2177,12 @@ export function ChatPanelV2({
                         setMessages(prev => prev.slice(0, messageIndex + 1))
                       }
                       
+                      // Set the reverted message content in input for editing
+                      const revertedMessage = messages.find(msg => msg.id === revertMessageId)
+                      if (revertedMessage) {
+                        setInput(revertedMessage.content)
+                      }
+                      
                       await deleteMessagesAfter(activeSession.id, targetMessage.createdAt)
                     }
                     
