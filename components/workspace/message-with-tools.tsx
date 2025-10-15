@@ -651,6 +651,53 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
                       </div>
                     )}
 
+                    {/* Detailed Error Logs (stdout/stderr) */}
+                    {(toolInvocation.result.stdout || toolInvocation.result.stderr) && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-bold text-orange-400 mb-2">
+                          Detailed Error Logs
+                        </h4>
+                        {toolInvocation.result.stdout && (
+                          <div className="mb-3">
+                            <h5 className="text-xs font-medium text-orange-300 mb-1">STDOUT:</h5>
+                            <div className="bg-gray-900 border border-gray-600 rounded p-3 max-h-48 overflow-y-auto">
+                              <pre className="text-xs text-gray-300 whitespace-pre-wrap">
+                                {toolInvocation.result.stdout}
+                              </pre>
+                            </div>
+                          </div>
+                        )}
+                        {toolInvocation.result.stderr && (
+                          <div className="mb-3">
+                            <h5 className="text-xs font-medium text-red-300 mb-1">STDERR:</h5>
+                            <div className="bg-red-900/20 border border-red-700 rounded p-3 max-h-48 overflow-y-auto">
+                              <pre className="text-xs text-red-300 whitespace-pre-wrap">
+                                {toolInvocation.result.stderr}
+                              </pre>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Full Error Details */}
+                    {toolInvocation.result.fullErrorDetails && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-bold text-yellow-400 mb-2">
+                          Full Error Details
+                        </h4>
+                        <div className="bg-yellow-900/20 border border-yellow-700 rounded p-3">
+                          <div className="text-yellow-300 text-xs">
+                            <div><strong>Exit Code:</strong> {toolInvocation.result.fullErrorDetails.exitCode || 'N/A'}</div>
+                            <div className="mt-2"><strong>Message:</strong></div>
+                            <pre className="text-xs text-yellow-200 whitespace-pre-wrap mt-1">
+                              {toolInvocation.result.fullErrorDetails.errorMessage || 'N/A'}
+                            </pre>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Logs */}
                     {toolInvocation.result.logs && toolInvocation.result.logs.length > 0 && (
                       <div>

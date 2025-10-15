@@ -1212,6 +1212,15 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                   mode,
                   logs,
                   errors,
+                  exitCode: installResult.exitCode,
+                  stdout: installResult.stdout || '',
+                  stderr: installResult.stderr || '',
+                  fullErrorDetails: {
+                    errorMessage: (installResult as any).error || 'Installation failed',
+                    exitCode: installResult.exitCode,
+                    stdout: installResult.stdout || '',
+                    stderr: installResult.stderr || ''
+                  },
                   toolCallId
                 }
               }
@@ -1221,6 +1230,13 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
               if (mode === 'dev') {
                 // Start dev server and monitor for errors
                 logs.push('Starting development server...')
+                
+                // Create a promise that resolves when server is ready
+                let serverReadyResolve: () => void
+                const serverReadyPromise = new Promise<void>((resolve) => {
+                  serverReadyResolve = resolve
+                })
+                
                 const devServer = await sandbox.startDevServer({
                   command: "npm run dev",
                   workingDirectory: "/project",
@@ -1230,8 +1246,9 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                   onStdout: (data) => {
                     const message = data.trim()
                     logs.push(`[DEV] ${message}`)
-                    if (message.includes('ready') || message.includes('listening') || message.includes('Local:')) {
+                    if ((message.includes('ready') || message.includes('listening') || message.includes('Local:')) && !serverStarted) {
                       serverStarted = true
+                      serverReadyResolve()
                     }
                   },
                   onStderr: (data) => {
@@ -1241,13 +1258,26 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                   },
                 })
 
+                // Wait for server to be ready or timeout
+                const timeoutPromise = new Promise<void>((resolve) => {
+                  setTimeout(() => resolve(), 15000) // 15 second timeout
+                })
+                
+                await Promise.race([serverReadyPromise, timeoutPromise])
+
                 if (!serverStarted) {
                   return {
                     success: false,
-                    error: 'Dev server failed to start',
+                    error: 'Dev server failed to start within timeout',
                     mode,
                     logs,
                     errors,
+                    fullErrorDetails: {
+                      errorMessage: 'Dev server failed to start within 15 seconds',
+                      exitCode: null,
+                      stdout: '',
+                      stderr: ''
+                    },
                     toolCallId
                   }
                 }
@@ -1262,7 +1292,10 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                 const runtimeErrors = errors.filter(error =>
                   error.includes('[DEV ERROR]') &&
                   !error.includes('ExperimentalWarning') &&
-                  !error.includes('DeprecationWarning')
+                  !error.includes('DeprecationWarning') &&
+                  !error.includes('⚠') && // Exclude warnings
+                  !error.includes('detected:') && // Exclude config detection warnings
+                  !error.includes('Warning') // Exclude general warnings
                 )
 
                 return {
@@ -1303,6 +1336,14 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                     logs,
                     errors,
                     exitCode: buildResult.exitCode,
+                    stdout: buildResult.stdout || '',
+                    stderr: buildResult.stderr || '',
+                    fullErrorDetails: {
+                      errorMessage: (buildResult as any).error || 'Build failed',
+                      exitCode: buildResult.exitCode,
+                      stdout: buildResult.stdout || '',
+                      stderr: buildResult.stderr || ''
+                    },
                     toolCallId
                   }
                 }
@@ -1331,10 +1372,47 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
               const errorMessage = error instanceof Error ? error.message : 'Unknown error'
               console.error(`[ERROR] check_dev_errors failed for mode ${mode}:`, error)
 
+              // Extract detailed error information from SandboxError
+              let detailedError = errorMessage
+              let stdout = ''
+              let stderr = ''
+              let exitCode = null
+
+              if (error && typeof error === 'object') {
+                // Check if it's a SandboxError with result details
+                const sandboxError = error as any
+                if (sandboxError.result) {
+                  const result = sandboxError.result
+                  exitCode = result.exitCode || null
+                  stdout = result.stdout || ''
+                  stderr = result.stderr || ''
+
+                  // Build detailed error message with full logs
+                  detailedError = `Command execution failed: exit status ${exitCode || 'unknown'}\n\nSTDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`
+                } else if (sandboxError.originalError && sandboxError.originalError.result) {
+                  // Handle nested error structure
+                  const result = sandboxError.originalError.result
+                  exitCode = result.exitCode || null
+                  stdout = result.stdout || ''
+                  stderr = result.stderr || ''
+
+                  detailedError = `Command execution failed: exit status ${exitCode || 'unknown'}\n\nSTDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`
+                }
+              }
+
               return {
                 success: false,
-                error: `Failed to check ${mode} errors: ${errorMessage}`,
+                error: `Failed to check ${mode} errors: ${detailedError}`,
                 mode,
+                exitCode,
+                stdout,
+                stderr,
+                fullErrorDetails: {
+                  errorMessage,
+                  exitCode,
+                  stdout,
+                  stderr
+                },
                 toolCallId
               }
             }
