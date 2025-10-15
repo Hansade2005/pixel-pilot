@@ -734,7 +734,7 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                     });
                     
                     // Extract content from the scraper result
-                    const extractContent = (result: any): string => {
+                    const extractContentFromResult = (result: any): string => {
                       // The webScraper returns cleanResults directly
                       if (result && typeof result === 'object' && result.cleanResults) {
                         return result.cleanResults;
@@ -758,14 +758,52 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                       }
                     };
                     
+                    let extractedContent = extractContentFromResult(scraperResult);
+                    const originalLength = extractedContent.length;
+                    
+                    // Truncate individual URL content to prevent token explosion
+                    const MAX_TOKENS_PER_URL = 500; // 500 tokens per URL = ~2000 chars
+                    const EST_CHARS_PER_TOKEN = 4;
+                    const MAX_CHARS_PER_URL = MAX_TOKENS_PER_URL * EST_CHARS_PER_TOKEN;
+                    
+                    let wasTruncated = false;
+                    if (extractedContent.length > MAX_CHARS_PER_URL) {
+                      // Find a good truncation point (try to break at sentence or paragraph)
+                      let truncateAt = MAX_CHARS_PER_URL;
+                      
+                      // Look for paragraph break within last 300 chars
+                      const lastParagraphBreak = extractedContent.lastIndexOf('\n\n', MAX_CHARS_PER_URL);
+                      if (lastParagraphBreak > MAX_CHARS_PER_URL - 300 && lastParagraphBreak > 0) {
+                        truncateAt = lastParagraphBreak;
+                      } else {
+                        // Look for sentence break within last 100 chars
+                        const lastSentenceBreak = Math.max(
+                          extractedContent.lastIndexOf('. ', MAX_CHARS_PER_URL),
+                          extractedContent.lastIndexOf('! ', MAX_CHARS_PER_URL),
+                          extractedContent.lastIndexOf('? ', MAX_CHARS_PER_URL)
+                        );
+                        if (lastSentenceBreak > MAX_CHARS_PER_URL - 100 && lastSentenceBreak > 0) {
+                          truncateAt = lastSentenceBreak + 1; // Include the punctuation
+                        }
+                      }
+                      
+                      extractedContent = extractedContent.substring(0, truncateAt);
+                      wasTruncated = true;
+                      
+                      console.log(`[DEBUG] Truncated ${url} from ${originalLength} to ${extractedContent.length} chars (${Math.round(extractedContent.length / EST_CHARS_PER_TOKEN)} tokens)`);
+                    }
+                    
                     return {
                       success: true,
                       url,
-                      cleanResults: extractContent(scraperResult),
+                      cleanResults: extractedContent,
                       metadata: {
                         url,
                         timestamp: new Date().toISOString(),
-                        apiKeyUsed: scraperResult.metadata?.apiKeyUsed || 'unknown'
+                        apiKeyUsed: scraperResult.metadata?.apiKeyUsed || 'unknown',
+                        wasTruncated,
+                        originalLength,
+                        truncatedLength: extractedContent.length
                       }
                     };
                   } catch (error) {
@@ -784,25 +822,76 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
               const successfulResults = extractionResults.filter(result => result.success);
               const failedResults = extractionResults.filter(result => !result.success);
               
+              // Combine all clean results
+              let combinedResults = successfulResults.map(result => result.cleanResults).join('\n\n');
+              
+              // Final safety truncation (each URL already limited to 500 tokens, so 6 URLs = 3000 tokens max)
+              const FINAL_MAX_TOKENS = 2500; // Safety net - should rarely trigger
+              const EST_CHARS_PER_TOKEN = 4;
+              const FINAL_MAX_CHARS = FINAL_MAX_TOKENS * EST_CHARS_PER_TOKEN;
+              
+              let finalWasTruncated = false;
+              if (combinedResults.length > FINAL_MAX_CHARS) {
+                // Find a good truncation point (try to break at sentence or paragraph)
+                let truncateAt = FINAL_MAX_CHARS;
+                
+                // Look for paragraph break within last 500 chars
+                const lastParagraphBreak = combinedResults.lastIndexOf('\n\n', FINAL_MAX_CHARS);
+                if (lastParagraphBreak > FINAL_MAX_CHARS - 500 && lastParagraphBreak > 0) {
+                  truncateAt = lastParagraphBreak;
+                } else {
+                  // Look for sentence break within last 200 chars
+                  const lastSentenceBreak = Math.max(
+                    combinedResults.lastIndexOf('. ', FINAL_MAX_CHARS),
+                    combinedResults.lastIndexOf('! ', FINAL_MAX_CHARS),
+                    combinedResults.lastIndexOf('? ', FINAL_MAX_CHARS)
+                  );
+                  if (lastSentenceBreak > FINAL_MAX_CHARS - 200 && lastSentenceBreak > 0) {
+                    truncateAt = lastSentenceBreak + 1; // Include the punctuation
+                  }
+                }
+                
+                combinedResults = combinedResults.substring(0, truncateAt);
+                finalWasTruncated = true;
+                
+                console.log(`[DEBUG] Final truncation applied: ${successfulResults.map(r => r.cleanResults?.length || 0).reduce((a, b) => a + b, 0)} to ${combinedResults.length} chars (${Math.round(combinedResults.length / EST_CHARS_PER_TOKEN)} tokens)`);
+              }
+              
               // Debug logging for final result
               console.log('[DEBUG] Web extract final result:', {
                 totalUrls: urlArray.length,
                 successfulCount: successfulResults.length,
                 failedCount: failedResults.length,
-                cleanResultsLength: successfulResults.map(r => r.cleanResults?.length || 0),
-                sampleCleanResults: successfulResults[0]?.cleanResults?.substring(0, 100) || 'none'
+                individualLengths: successfulResults.map(r => r.cleanResults?.length || 0),
+                totalLength: combinedResults.length,
+                estimatedTokens: Math.round(combinedResults.length / EST_CHARS_PER_TOKEN),
+                finalWasTruncated,
+                urlsTruncated: successfulResults.filter(r => r.metadata?.wasTruncated).length,
+                sampleCleanResults: combinedResults.substring(0, 100) || 'none'
               });
+              
+              // Check if any individual URLs were truncated
+              const anyUrlsTruncated = successfulResults.some(r => r.metadata?.wasTruncated);
               
               return {
                 success: successfulResults.length > 0,
                 message: successfulResults.length > 0 
-                  ? `Successfully extracted content from ${successfulResults.length} URL(s)` 
+                  ? `Successfully extracted content from ${successfulResults.length} URL(s)${anyUrlsTruncated ? ' (some URLs truncated)' : ''}${finalWasTruncated ? ' (final result truncated)' : ''}` 
                   : 'Failed to extract content from any URLs',
-                cleanResults: successfulResults.map(result => result.cleanResults).join('\n\n'),
+                cleanResults: combinedResults,
                 metadata: {
                   successCount: successfulResults.length,
                   failedCount: failedResults.length,
-                  urls: urlArray
+                  urls: urlArray,
+                  finalWasTruncated,
+                  anyUrlsTruncated,
+                  estimatedTokens: Math.round(combinedResults.length / EST_CHARS_PER_TOKEN),
+                  urlDetails: successfulResults.map(r => ({
+                    url: r.url,
+                    length: r.cleanResults?.length || 0,
+                    wasTruncated: r.metadata?.wasTruncated || false,
+                    originalLength: r.metadata?.originalLength || r.cleanResults?.length || 0
+                  }))
                 },
                 toolCallId
               };
