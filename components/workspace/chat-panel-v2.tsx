@@ -976,7 +976,7 @@ export function ChatPanelV2({
     // AI SDK Pattern: Send only last 5 messages + new message
     try {
       // Get last 5 messages from current conversation
-      const recentMessages = messages.slice(-5) // Last 5 messages
+      const recentMessages = messages.slice(-10) // Last 5 messages
       const messagesToSend = [
         ...recentMessages.map((m: any) => ({ role: m.role, content: m.content })),
         { role: 'user', content: enhancedContent }

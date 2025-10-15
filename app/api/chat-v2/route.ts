@@ -104,8 +104,9 @@ export async function POST(req: Request) {
       ? `\n\n## 📁 Project Files\n${files.map((f: any) => `- ${f.path} (${f.type})`).join('\n')}`
       : ''
 
-    // Get conversation history for context
-    const conversationHistory = messages.map((msg: any) => 
+    // Get conversation history for context (last 10 messages)
+    const recentMessages = messages.slice(-10)
+    const conversationHistory = recentMessages.map((msg: any) => 
       `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content.substring(0, 200)}${msg.content.length > 200 ? '...' : ''}`
     ).join('\n')
 
@@ -126,7 +127,7 @@ You're not just an expert full-stack architect - you're a digital superhero with
 - **DELIVER**: 🚀 Implement with production-ready code that impresses
 
 ## 🛠️ Tools in Your Utility Belt
-- read_file, write_file, delete_file, add_package, remove_package, web_search, Web_extract
+- read_file, write_file, edit_file, delete_file, add_package, remove_package, web_search, web_extract
 
 ## ✅ Essential Checklist
 - **Functionality**: ✅ Happy path, edge cases, error handling
@@ -794,8 +795,128 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
               };
             }
           }
+        }),
+
+        edit_file: tool({
+          description: 'Edit a file by applying search and replace operations using search/replace blocks. Use this tool to make precise modifications to existing files.',
+          inputSchema: z.object({
+            filePath: z.string().describe('The file path relative to project root to edit'),
+            searchReplaceBlock: z.string().describe('Search/replace block in format: <<<<<<< SEARCH\\n[old code]\\n=======\\n[new code]\\n>>>>>>> REPLACE')
+          }),
+          execute: async ({ filePath, searchReplaceBlock }, { abortSignal, toolCallId }) => {
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            try {
+              // Validate inputs
+              if (!filePath || typeof filePath !== 'string') {
+                return {
+                  success: false,
+                  error: `Invalid file path provided`,
+                  filePath,
+                  toolCallId
+                }
+              }
+
+              if (!searchReplaceBlock || typeof searchReplaceBlock !== 'string') {
+                return {
+                  success: false,
+                  error: `Invalid search/replace block provided`,
+                  filePath,
+                  toolCallId
+                }
+              }
+
+              // Import storage manager
+              const { storageManager } = await import('@/lib/storage-manager')
+              await storageManager.init()
+
+              // Read the current file content
+              const existingFile = await storageManager.getFile(projectId, filePath)
+
+              if (!existingFile) {
+                return {
+                  success: false,
+                  error: `File not found: ${filePath}. Use list_files to see available files.`,
+                  filePath,
+                  toolCallId
+                }
+              }
+
+              const currentContent = existingFile.content || ''
+
+              // Parse the search/replace block
+              const editBlock = parseSearchReplaceBlock(searchReplaceBlock)
+
+              if (!editBlock) {
+                return {
+                  success: false,
+                  error: `Failed to parse search/replace block. Ensure it follows the format: <<<<<<< SEARCH\\n[old code]\\n=======\\n[new code]\\n>>>>>>> REPLACE`,
+                  filePath,
+                  toolCallId
+                }
+              }
+
+              // Apply the search/replace
+              let modifiedContent = currentContent
+              const appliedEdits = []
+              const failedEdits = []
+
+              if (modifiedContent.includes(editBlock.search)) {
+                modifiedContent = modifiedContent.replace(editBlock.search, editBlock.replace)
+                appliedEdits.push({
+                  search: editBlock.search,
+                  replace: editBlock.replace,
+                  status: 'applied'
+                })
+              } else {
+                failedEdits.push({
+                  search: editBlock.search,
+                  replace: editBlock.replace,
+                  status: 'failed',
+                  reason: 'Search text not found in file content'
+                })
+              }
+
+              // Save the modified content back to the file
+              if (appliedEdits.length > 0) {
+                await storageManager.updateFile(projectId, filePath, { content: modifiedContent })
+
+                return {
+                  success: true,
+                  message: `✅ File ${filePath} edited successfully.`,
+                  filePath,
+                  appliedEdits,
+                  failedEdits,
+                  action: 'edited',
+                  toolCallId
+                }
+              } else {
+                return {
+                  success: false,
+                  error: `Failed to apply edit: ${failedEdits[0]?.reason || 'Unknown error'}`,
+                  filePath,
+                  appliedEdits,
+                  failedEdits,
+                  toolCallId
+                }
+              }
+
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+              console.error(`[ERROR] edit_file failed for ${filePath}:`, error)
+
+              return {
+                success: false,
+                error: `Failed to edit file ${filePath}: ${errorMessage}`,
+                filePath,
+                toolCallId
+              }
+            }
+          }
         })
-        
+
       },
       stopWhen: stepCountIs(50),
       onFinish: ({ response }) => {
@@ -1160,4 +1281,47 @@ async function extractContent(urls: string | string[]) {
     console.error('Content extraction error:', error);
     throw error;
   }
+}
+
+// Parse a single search/replace block
+function parseSearchReplaceBlock(blockText: string) {
+  const SEARCH_START = "<<<<<<< SEARCH";
+  const DIVIDER = "=======";
+  const REPLACE_END = ">>>>>>> REPLACE";
+
+  const lines = blockText.split('\n');
+  let searchLines = [];
+  let replaceLines = [];
+  let mode = 'none'; // 'search' | 'replace'
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (line.trim() === SEARCH_START) {
+      mode = 'search';
+    } else if (line.trim() === DIVIDER && mode === 'search') {
+      mode = 'replace';
+    } else if (line.trim() === REPLACE_END && mode === 'replace') {
+      break; // End of block
+    } else if (mode === 'search') {
+      searchLines.push(line);
+    } else if (mode === 'replace') {
+      replaceLines.push(line);
+    }
+  }
+
+  // Remove empty lines from start and end
+  while (searchLines.length > 0 && searchLines[0].trim() === '') searchLines.shift();
+  while (searchLines.length > 0 && searchLines[searchLines.length - 1].trim() === '') searchLines.pop();
+  while (replaceLines.length > 0 && replaceLines[0].trim() === '') replaceLines.shift();
+  while (replaceLines.length > 0 && replaceLines[replaceLines.length - 1].trim() === '') replaceLines.pop();
+
+  if (searchLines.length === 0) {
+    return null; // Invalid block
+  }
+
+  return {
+    search: searchLines.join('\n'),
+    replace: replaceLines.join('\n')
+  };
 }
