@@ -1557,6 +1557,13 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                 for (const fileOp of fileOperations) {
                   console.log('[DEBUG] Applying file operation to server storage:', fileOp)
                   
+                  // Skip read-only operations at APPLICATION level
+                  const readOnlyOperations = ['read_file', 'list_files', 'search_files', 'get_file_info']
+                  if (readOnlyOperations.includes(fileOp.type)) {
+                    console.log(`[DEBUG] Skipped read-only operation (for metadata only): ${fileOp.type} - ${fileOp.path}`)
+                    continue
+                  }
+                  
                   if (fileOp.type === 'write_file' && fileOp.path) {
                     // Check if file exists
                     const existingFile = await storageManager.getFile(projectId, fileOp.path)
@@ -1601,7 +1608,11 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                   }
                 }
                 
-                console.log(`[DEBUG] Applied ${operationsApplied}/${fileOperations.length} file operations to server storage`)
+                const readOnlyOperations = ['read_file', 'list_files', 'search_files', 'get_file_info']
+                const readOnlyCount = fileOperations.filter(op => readOnlyOperations.includes(op.type)).length
+                const writeCount = fileOperations.length - readOnlyCount
+                
+                console.log(`[DEBUG] Processed ${fileOperations.length} operations: ${operationsApplied}/${writeCount} write operations applied to server storage, ${readOnlyCount} read-only operations skipped`)
                 
               } catch (error) {
                 console.error('[ERROR] Failed to apply file operations to server storage:', error)
