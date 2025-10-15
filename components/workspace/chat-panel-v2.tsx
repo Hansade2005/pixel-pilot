@@ -1185,8 +1185,8 @@ export function ChatPanelV2({
                   } catch (error) {
                     console.error('[ChatPanelV2][DataStream] Failed to apply file operations to IndexedDB:', error)
                     toast({
-                      title: "Storage Warning",
-                      description: `File operations completed but may not persist: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                      title: "File Operation Failed",
+                      description: `Failed to apply file operations: ${error instanceof Error ? error.message : 'Unknown error'}`,
                       variant: "destructive"
                     })
                   }

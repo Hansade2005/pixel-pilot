@@ -1570,71 +1570,7 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
               controller.enqueue(encoder.encode(json + '\n'))
             }
             
-            // After streaming is complete, process file operations for server-side persistence
-            if (fileOperations.length > 0) {
-              console.log('[DEBUG] Processing file operations for server-side persistence:', fileOperations)
-              
-              try {
-                const { storageManager } = await import('@/lib/storage-manager')
-                await storageManager.init()
-                
-                let operationsApplied = 0
-                
-                for (const fileOp of fileOperations) {
-                  console.log('[DEBUG] Applying file operation to server storage:', fileOp)
-                  
-                  if (fileOp.type === 'write_file' && fileOp.path) {
-                    // Check if file exists
-                    const existingFile = await storageManager.getFile(projectId, fileOp.path)
-                    
-                    if (existingFile) {
-                      // Update existing file
-                      await storageManager.updateFile(projectId, fileOp.path, { 
-                        content: fileOp.content || '',
-                        updatedAt: new Date().toISOString()
-                      })
-                      console.log(`[DEBUG] Updated existing file in server storage: ${fileOp.path}`)
-                    } else {
-                      // Create new file
-                      const newFile = await storageManager.createFile({
-                        workspaceId: projectId,
-                        name: fileOp.path.split('/').pop() || fileOp.path,
-                        path: fileOp.path,
-                        content: fileOp.content || '',
-                        fileType: fileOp.path.split('.').pop() || 'text',
-                        type: fileOp.path.split('.').pop() || 'text',
-                        size: (fileOp.content || '').length,
-                        isDirectory: false
-                      })
-                      console.log(`[DEBUG] Created new file in server storage: ${fileOp.path}`, newFile)
-                    }
-                    operationsApplied++
-                  } else if (fileOp.type === 'edit_file' && fileOp.path && fileOp.content) {
-                    // Update existing file with new content
-                    await storageManager.updateFile(projectId, fileOp.path, { 
-                      content: fileOp.content,
-                      updatedAt: new Date().toISOString()
-                    })
-                    console.log(`[DEBUG] Edited file in server storage: ${fileOp.path}`)
-                    operationsApplied++
-                  } else if (fileOp.type === 'delete_file' && fileOp.path) {
-                    // Delete file
-                    await storageManager.deleteFile(projectId, fileOp.path)
-                    console.log(`[DEBUG] Deleted file from server storage: ${fileOp.path}`)
-                    operationsApplied++
-                  } else {
-                    console.warn('[DEBUG] Skipped invalid file operation:', fileOp)
-                  }
-                }
-                
-                console.log(`[DEBUG] Applied ${operationsApplied}/${fileOperations.length} file operations to server storage`)
-                
-              } catch (error) {
-                console.error('[ERROR] Failed to apply file operations to server storage:', error)
-              }
-            }
-            
-            // Send final metadata with file operations and tool invocations for client-side processing
+            // After streaming is complete, send final metadata with tool invocations for client-side processing
             if (fileOperations.length > 0 || toolCalls.size > 0) {
               // Get steps info after streaming is complete
               const stepsInfo = await result.steps
