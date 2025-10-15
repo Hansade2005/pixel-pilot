@@ -14,7 +14,7 @@
 
 ## Root Causes Identified
 
-### 1. **Overly Restrictive File Operation Filtering** (Line 1466)
+### 1. **File Operations Collection vs Application Separation** (Line 1466)
 
 **Before:**
 ```typescript
@@ -24,21 +24,29 @@ if (toolResultData && toolResultData.success !== false && toolResultData.path) {
 ```
 
 **Problem**: 
-- This condition collected **ALL** operations with a `path`, including `read_file` operations
-- `read_file` operations don't need frontend sync but were being included
-- This cluttered the `fileOperations` array with unnecessary data
+- Operations were collected but filtering logic was unclear
+- No distinction between "operations for pill display" vs "operations to apply"
+- Frontend and backend had inconsistent handling
 
 **After:**
 ```typescript
-const isWriteOperation = ['write_file', 'edit_file', 'delete_file', 'add_package', 'remove_package'].includes(toolResult.toolName)
-
-if (toolResultData && toolResultData.success !== false && toolResultData.path && isWriteOperation) {
-  fileOperations.push({ ... })
+// Collect ALL file operations (including reads) for metadata/pill display
+if (toolResultData && toolResultData.success !== false && toolResultData.path) {
+  fileOperations.push({
+    type: toolResult.toolName,
+    path: toolResultData.path,
+    content: toolResultData.content,
+    projectId: projectId,
+    success: toolResultData.success !== false
+  })
   console.log(`[DEBUG] ✅ Collected file operation for frontend: ${toolResult.toolName} - ${toolResultData.path}`)
 }
 ```
 
-**Fix**: Only collect write operations that need client-side application.
+**Fix**: 
+- ✅ Collect **ALL** operations (read, write, edit, delete, list, etc.)
+- ✅ Frontend uses ALL operations for pill display
+- ✅ Filtering happens at **APPLICATION** level, not collection level
 
 ---
 
@@ -118,10 +126,10 @@ console.log('[ChatPanelV2][DataStream] 🎯 Received metadata from server:', {
 
 ### Backend Changes (`app/api/chat-v2/route.ts`)
 
-1. **Improved Filtering Logic** (Lines 1453-1480)
-   - Only collect write operations: `write_file`, `edit_file`, `delete_file`, `add_package`, `remove_package`
-   - Skip read-only operations: `read_file`, `list_files`, etc.
-   - Add debug logging for each decision
+1. **Collect All Operations for Pill Display** (Lines 1453-1480)
+   - ✅ Collect **ALL** operations: `read_file`, `write_file`, `edit_file`, `delete_file`, `list_files`, etc.
+   - ✅ Send ALL operations to frontend in metadata
+   - ✅ Frontend needs all operations to display tool pills in UI
 
 2. **Always Send Metadata** (Lines 1486-1530)
    - Removed conditional check
@@ -129,26 +137,37 @@ console.log('[ChatPanelV2][DataStream] 🎯 Received metadata from server:', {
    - Add try-catch with fallback mechanism
    - Enhanced logging at every step
 
-3. **Enhanced Stream Logging** (Lines 1439-1487)
+3. **Application-Level Filtering** (Lines 1560-1620)
+   - ✅ Skip read-only operations during server-side application
+   - ✅ Only apply write operations: `write_file`, `edit_file`, `delete_file`, `add_package`, `remove_package`
+   - ✅ Log which operations are applied vs skipped
+
+4. **Enhanced Stream Logging** (Lines 1439-1487)
    - Track total parts processed
    - Log each tool call and result
    - Count file operations collected
-   - Report final statistics
+   - Report final statistics with read vs write breakdown
 
 ### Frontend Changes (`components/workspace/chat-panel-v2.tsx`)
 
 1. **Enhanced Metadata Reception** (Lines 1066-1095)
-   - Detailed logging of received metadata
-   - Log each file operation path
-   - Warning if metadata format is unexpected
+   - ✅ Receive **ALL** file operations from backend
+   - ✅ Detailed logging of received metadata
+   - ✅ Log each file operation path (for pill display)
+   - ✅ Warning if metadata format is unexpected
 
-2. **Stream Completion Validation** (Lines 1097-1181)
+2. **Application-Level Filtering** (Lines 1110-1120)
+   - ✅ Skip read-only operations during IndexedDB application
+   - ✅ Only apply: `write_file`, `edit_file`, `delete_file`, `add_package`, `remove_package`
+   - ✅ Read operations used for pill display, not file system changes
+
+3. **Stream Completion Validation** (Lines 1097-1181)
    - Log final state after stream completes
    - Check if file operations were received
    - Warning if tool calls included writes but no operations received
-   - User-facing toast notifications
+   - Breakdown: write operations applied vs read-only operations skipped
 
-3. **Success Feedback** (Lines 1164-1177)
+4. **Success Feedback** (Lines 1164-1177)
    - Success toast when files are updated
    - File explorer auto-refresh trigger
    - Operation count in notification
@@ -162,17 +181,22 @@ console.log('[ChatPanelV2][DataStream] 🎯 Received metadata from server:', {
 **Backend (Server Console):**
 ```
 [DEBUG] Starting fullStream processing...
+[DEBUG] Collected tool call: read_file
 [DEBUG] Collected tool call: write_file
+[DEBUG] ✅ Collected file operation for frontend: read_file - package.json
 [DEBUG] ✅ Collected file operation for frontend: write_file - src/App.tsx
-[DEBUG] ⏭️ Skipped read-only operation: read_file - package.json
-[DEBUG] Finished fullStream processing. Total parts: 15, Tool calls: 3, File operations: 2
+[DEBUG] ✅ Collected file operation for frontend: edit_file - src/index.tsx
+[DEBUG] Finished fullStream processing. Total parts: 15, Tool calls: 3, File operations: 3
 [DEBUG] 📤 Sending metadata to frontend: {
-  fileOperationsCount: 2,
+  fileOperationsCount: 3,
   toolInvocationsCount: 3,
-  fileOperationsPaths: ['write_file:src/App.tsx', 'edit_file:src/index.tsx']
+  fileOperationsPaths: ['read_file:package.json', 'write_file:src/App.tsx', 'edit_file:src/index.tsx']
 }
 [DEBUG] ✅ Metadata sent successfully to frontend
-[DEBUG] Applied 2/2 file operations to server storage
+[DEBUG] Skipped read-only operation (for metadata only): read_file - package.json
+[DEBUG] Updated existing file in server storage: src/App.tsx
+[DEBUG] Edited file in server storage: src/index.tsx
+[DEBUG] Processed 3 operations: 2/2 write operations applied to server storage, 1 read-only operations skipped
 ```
 
 **Frontend (Browser Console):**
@@ -181,22 +205,27 @@ console.log('[ChatPanelV2][DataStream] 🎯 Received metadata from server:', {
   hasToolInvocations: true,
   toolInvocationsCount: 3,
   hasFileOperations: true,
-  fileOperationsCount: 2,
-  fileOperationTypes: ['write_file:src/App.tsx', 'edit_file:src/index.tsx']
+  fileOperationsCount: 3,
+  fileOperationTypes: ['read_file:package.json', 'write_file:src/App.tsx', 'edit_file:src/index.tsx']
 }
-[ChatPanelV2][DataStream] ✅ Stored file operations for application: 2
-[ChatPanelV2][DataStream]   1. write_file: src/App.tsx
-[ChatPanelV2][DataStream]   2. edit_file: src/index.tsx
+[ChatPanelV2][DataStream] ✅ Stored file operations for application: 3
+[ChatPanelV2][DataStream]   1. read_file: package.json
+[ChatPanelV2][DataStream]   2. write_file: src/App.tsx
+[ChatPanelV2][DataStream]   3. edit_file: src/index.tsx
 [ChatPanelV2][DataStream] 📊 Stream complete. Final state: {
   contentLength: 1234,
   toolInvocationsCount: 3,
-  fileOperationsCount: 2,
+  fileOperationsCount: 3,
   hasProject: true
 }
-[ChatPanelV2][DataStream] 🔄 Applying all file operations from server at end of stream: 2 operations
-[ChatPanelV2][DataStream] 📝 Applying file operation 1/2: write_file src/App.tsx
-[ChatPanelV2][DataStream] 📝 Applying file operation 2/2: edit_file src/index.tsx
-[ChatPanelV2][DataStream] ✅ Applied 2/2 file operations to IndexedDB at end of stream
+[ChatPanelV2][DataStream] 🔄 Applying all file operations from server at end of stream: 3 operations
+[ChatPanelV2][DataStream] 📝 Processing file operation 1/3: read_file package.json
+[ChatPanelV2][DataStream] ⏭️ Skipping read-only operation (for pill display only): read_file - package.json
+[ChatPanelV2][DataStream] 📝 Processing file operation 2/3: write_file src/App.tsx
+[ChatPanelV2][DataStream] ✅ Created new file: src/App.tsx
+[ChatPanelV2][DataStream] 📝 Processing file operation 3/3: edit_file src/index.tsx
+[ChatPanelV2][DataStream] ✅ Updated existing file: src/index.tsx
+[ChatPanelV2][DataStream] ✅ Processed 3 operations: 2 write operations applied, 1 read-only operations skipped (displayed in pills)
 [ChatPanelV2][DataStream] 🔄 Triggering file explorer refresh...
 ```
 
@@ -232,21 +261,30 @@ console.log('[ChatPanelV2][DataStream] 🎯 Received metadata from server:', {
     └─> Store in toolCalls Map
 
 3.  Collect tool-result parts        →    Detect tool-result
-    └─> Filter for write ops
+    └─> Collect ALL operations
     └─> Add to fileOperations[]
+        (read, write, list, etc.)
 
 4.  Stream completes                 →    Wait for metadata
     └─> Build metadata message
-    └─> ALWAYS send metadata         →    Receive metadata type
-        (even if empty)                    └─> Extract fileOperations
+    └─> ALWAYS send ALL operations   →    Receive metadata type
+        (for pill display)                 └─> Extract ALL fileOperations
                                            └─> Store in finalFileOperations
+                                           └─> Display pills for ALL ops
 
 5.  Apply ops to server storage      →    Apply ops to IndexedDB
-    (InMemoryStorage)                      └─> Update file tree
-                                           └─> Refresh explorer
-                                           └─> Show success toast
+    └─> Skip read-only ops                └─> Skip read-only ops
+    └─> Apply write ops only              └─> Apply write ops only
+        (InMemoryStorage)                     └─> Update file tree
+                                              └─> Refresh explorer
+                                              └─> Show success toast
 
 6.  Close stream                     →    Save message to DB
+
+KEY DISTINCTION:
+├─ Collection: ALL operations (read + write)
+├─ Display: ALL operations (tool pills show everything)
+└─ Application: WRITE operations only (file system changes)
 ```
 
 ---
