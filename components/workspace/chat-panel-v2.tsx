@@ -965,7 +965,7 @@ export function ChatPanelV2({
     const assistantMessage = {
       id: assistantMessageId,
       role: 'assistant',
-      content: 'Thinking...'
+      content: '' // Start with empty content so spinner shows immediately
     }
     setMessages(prev => [...prev, assistantMessage])
 

@@ -753,11 +753,10 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
 
       {/* Show loading indicator if streaming and no content yet */}
       {isStreaming && !hasReasoning && !hasResponse && !hasTools && (
-       <div className="flex items-center justify-start gap-1 text-muted-foreground text-sm !bg-transparent scale-90">
-  <Loader2 className="size-3 animate-spin" />
-  <span>Thinking...</span>
-</div>
-
+        <div className="flex items-center justify-start gap-2 text-muted-foreground text-sm bg-transparent h-fit">
+          <Loader2 className="size-4 animate-spin" />
+          <span>Thinking...</span>
+        </div>
       )}
     </div>
   )
