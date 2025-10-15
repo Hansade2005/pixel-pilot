@@ -127,7 +127,7 @@ You're not just an expert full-stack architect - you're a digital superhero with
 - **DELIVER**: 🚀 Implement with production-ready code that impresses
 
 ## 🛠️ Tools in Your Utility Belt
-- read_file, write_file, edit_file, delete_file, add_package, remove_package, web_search, web_extract
+- read_file (with line numbers), write_file, edit_file, delete_file, add_package, remove_package, web_search, web_extract, semantic_code_navigator (with line numbers)
 
 ## ✅ Essential Checklist
 - **Functionality**: ✅ Happy path, edge cases, error handling
@@ -279,11 +279,12 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
         }),
 
         read_file: tool({
-          description: 'Read the contents of a file',
+          description: 'Read the contents of a file with optional line number information',
           inputSchema: z.object({
-            path: z.string().describe('File path to read')
+            path: z.string().describe('File path to read'),
+            includeLineNumbers: z.boolean().optional().describe('Whether to include line numbers in the response (default: false)')
           }),
-          execute: async ({ path }, { abortSignal, toolCallId }) => {
+          execute: async ({ path, includeLineNumbers = false }, { abortSignal, toolCallId }) => {
             if (abortSignal?.aborted) {
               throw new Error('Operation cancelled')
             }
@@ -313,17 +314,33 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                 }
               }
 
-              return { 
+              const content = file.content || ''
+              let response: any = { 
                 success: true, 
                 message: `✅ File ${path} read successfully.`,
                 path,
-                content: file.content || '',
+                content,
                 name: file.name,
                 type: file.type,
                 size: file.size,
                 action: 'read',
                 toolCallId
               }
+
+              // Add line number information if requested
+              if (includeLineNumbers) {
+                const lines = content.split('\n')
+                const lineCount = lines.length
+                const linesWithNumbers = lines.map((line, index) => 
+                  `${String(index + 1).padStart(4, ' ')}: ${line}`
+                ).join('\n')
+                
+                response.lineCount = lineCount
+                response.contentWithLineNumbers = linesWithNumbers
+                response.lines = lines // Array of individual lines for programmatic access
+              }
+
+              return response
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : 'Unknown error'
               console.error(`[ERROR] read_file failed for ${path}:`, error)
@@ -911,6 +928,152 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                 success: false,
                 error: `Failed to edit file ${filePath}: ${errorMessage}`,
                 filePath,
+                toolCallId
+              }
+            }
+          }
+        }),
+
+        semantic_code_navigator: tool({
+          description: 'Search and discover code sections, patterns, or structures in files using natural language queries. Returns results with accurate line numbers matching Monaco editor display.',
+          inputSchema: z.object({
+            query: z.string().describe('Natural language description of what to search for (e.g., "find all React components", "show database models", "locate error handlers")'),
+            filePath: z.string().optional().describe('Optional: Specific file path to search within. If omitted, searches the entire workspace'),
+            maxResults: z.number().optional().describe('Maximum number of results to return (default: 10)')
+          }),
+          execute: async ({ query, filePath, maxResults = 10 }, { abortSignal, toolCallId }) => {
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            try {
+              const { storageManager } = await import('@/lib/storage-manager')
+              await storageManager.init()
+
+              // Get all files in the project
+              const allFiles = await storageManager.getFiles(projectId)
+
+              // Filter files based on filePath if provided
+              let filesToSearch = allFiles
+              if (filePath) {
+                filesToSearch = allFiles.filter((file: any) => file.path === filePath)
+                if (filesToSearch.length === 0) {
+                  return {
+                    success: false,
+                    error: `File not found: ${filePath}`,
+                    query,
+                    toolCallId
+                  }
+                }
+              }
+
+              const results: any[] = []
+
+              // Search through each file
+              for (const file of filesToSearch) {
+                if (!file.content || file.isDirectory) continue
+
+                const content = file.content
+                const lines = content.split('\n')
+                const lowerQuery = query.toLowerCase()
+
+                // Search for different types of code patterns
+                const searchPatterns = [
+                  // Function/class definitions
+                  {
+                    type: 'function',
+                    regex: /^\s*(export\s+)?(async\s+)?(function|const|let|var)\s+(\w+)\s*[=({]/gm,
+                    description: 'Function or method definition'
+                  },
+                  {
+                    type: 'class',
+                    regex: /^\s*(export\s+)?(class|interface|type)\s+(\w+)/gm,
+                    description: 'Class, interface, or type definition'
+                  },
+                  {
+                    type: 'import',
+                    regex: /^\s*import\s+.*from\s+['"`].*['"`]/gm,
+                    description: 'Import statement'
+                  },
+                  {
+                    type: 'export',
+                    regex: /^\s*export\s+/gm,
+                    description: 'Export statement'
+                  },
+                  // Generic text search for other queries
+                  {
+                    type: 'text_match',
+                    regex: new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+                    description: 'Text match'
+                  }
+                ]
+
+                // Search for each pattern
+                for (const pattern of searchPatterns) {
+                  let match
+                  while ((match = pattern.regex.exec(content)) !== null && results.length < maxResults) {
+                    // Calculate line number (1-indexed)
+                    const matchIndex = match.index
+                    let lineNumber = 1
+                    let charCount = 0
+
+                    for (let i = 0; i < lines.length; i++) {
+                      charCount += lines[i].length + 1 // +1 for newline
+                      if (charCount > matchIndex) {
+                        lineNumber = i + 1
+                        break
+                      }
+                    }
+
+                    // Extract context around the match
+                    const startLine = Math.max(1, lineNumber - 2)
+                    const endLine = Math.min(lines.length, lineNumber + 2)
+                    const contextLines = lines.slice(startLine - 1, endLine)
+                    const contextWithNumbers = contextLines.map((line: string, idx: number) =>
+                      `${String(startLine + idx).padStart(4, ' ')}: ${line}`
+                    ).join('\n')
+
+                    // Highlight the match in context
+                    const highlightedContext = contextWithNumbers.replace(
+                      new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+                      '**$&**'
+                    )
+
+                    results.push({
+                      file: file.path,
+                      type: pattern.type,
+                      description: pattern.description,
+                      lineNumber,
+                      match: match[0].trim(),
+                      context: highlightedContext,
+                      fullMatch: match[0]
+                    })
+
+                    // Prevent infinite loops for global regex
+                    if (!pattern.regex.global) break
+                  }
+                }
+
+                if (results.length >= maxResults) break
+              }
+
+              return {
+                success: true,
+                message: `Found ${results.length} code sections matching "${query}"`,
+                query,
+                results,
+                totalResults: results.length,
+                toolCallId
+              }
+
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+              console.error(`[ERROR] semantic_code_navigator failed for query "${query}":`, error)
+
+              return {
+                success: false,
+                error: `Failed to search code: ${errorMessage}`,
+                query,
                 toolCallId
               }
             }
