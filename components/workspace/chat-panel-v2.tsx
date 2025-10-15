@@ -1096,6 +1096,29 @@ export function ChatPanelV2({
               ))
             } else if (parsed.type === 'metadata') {
               // Final metadata with complete tool invocations and file operations
+              console.log('[ChatPanelV2][DataStream] Received metadata:', {
+                finished: parsed.finished,
+                hasToolCalls: parsed.hasToolCalls,
+                toolInvocationsCount: parsed.toolInvocations?.length || 0,
+                fileOperationsCount: parsed.fileOperations?.length || 0,
+                hasStreamError: !!parsed.streamError
+              })
+
+              // Handle stream errors gracefully
+              if (parsed.streamError) {
+                console.warn('[ChatPanelV2][DataStream] Stream error detected:', parsed.streamError)
+                toast({
+                  title: "Stream Warning",
+                  description: `AI processing encountered an issue: ${parsed.streamError}`,
+                  variant: "destructive"
+                })
+              }
+
+              // Validate that we received the expected metadata structure
+              if (parsed.finished !== true) {
+                console.warn('[ChatPanelV2][DataStream] Metadata missing finished=true flag')
+              }
+
               if (parsed.toolInvocations && Array.isArray(parsed.toolInvocations)) {
                 accumulatedToolInvocations = parsed.toolInvocations
                 setMessages(prev => prev.map(msg =>
@@ -1191,6 +1214,12 @@ export function ChatPanelV2({
                     })
                   }
                 }, 0) // Use setTimeout to avoid blocking the streaming
+              }
+
+              // Mark streaming as complete when finished=true is received
+              if (parsed.finished === true) {
+                console.log('[ChatPanelV2][DataStream] Stream finished successfully')
+                // The stream will naturally end after this metadata object
               }
             }
             console.log('[ChatPanelV2][DataStream] State:', { content: accumulatedContent, reasoning: accumulatedReasoning, tools: accumulatedToolInvocations.length })
