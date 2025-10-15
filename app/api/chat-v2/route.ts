@@ -1467,13 +1467,13 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                   existingCall.result = toolResult.result || toolResult.output
                   existingCall.state = 'result'
                   
-                  // Collect file operations from tool results
-                  // CRITICAL FIX: Only collect operations that modify files, not read operations
+                  // Collect ALL file operations from tool results (including reads)
+                  // Frontend needs ALL operations for pill display
+                  // Filtering happens at application level, not collection level
                   const toolResultData = toolResult.result || toolResult.output
-                  const isWriteOperation = ['write_file', 'edit_file', 'delete_file', 'add_package', 'remove_package'].includes(toolResult.toolName)
                   
-                  if (toolResultData && toolResultData.success !== false && toolResultData.path && isWriteOperation) {
-                    // This is a file operation that should be synced to frontend
+                  if (toolResultData && toolResultData.success !== false && toolResultData.path) {
+                    // Collect ALL file operations (read, write, edit, delete, etc.)
                     fileOperations.push({
                       type: toolResult.toolName,
                       path: toolResultData.path,
@@ -1482,8 +1482,6 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                       success: toolResultData.success !== false
                     })
                     console.log(`[DEBUG] ✅ Collected file operation for frontend: ${toolResult.toolName} - ${toolResultData.path}`)
-                  } else if (toolResultData && toolResultData.path) {
-                    console.log(`[DEBUG] ⏭️ Skipped read-only operation: ${toolResult.toolName} - ${toolResultData.path}`)
                   }
                 }
               }
