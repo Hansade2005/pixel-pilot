@@ -39,6 +39,7 @@ export interface File {
   isDirectory: boolean
   createdAt: string
   updatedAt: string
+  metadata?: Record<string, any>
 }
 
 export interface ChatSession {

@@ -55,21 +55,27 @@ export async function POST(req: Request) {
 
     // CRITICAL: Sync client-side files to server-side InMemoryStorage
     // This ensures AI tools can access the files that exist in IndexedDB
+    // Preserve AI-created files while syncing client files
     const clientFiles = files || []
     console.log(`[DEBUG] Syncing ${clientFiles.length} files to server-side storage for AI access`)
     
-    if (clientFiles.length > 0) {
+    if (clientFiles.length > 0 || true) { // Always check for AI files to preserve
       try {
         const { storageManager } = await import('@/lib/storage-manager')
         await storageManager.init()
         
-        // Clear existing files in InMemoryStorage to ensure clean state
+        // Get existing files to preserve AI-created ones
         const existingFiles = await storageManager.getFiles(projectId)
+        const aiCreatedFiles = existingFiles.filter(f => f.metadata?.createdBy === 'ai')
+        
+        // Clear existing files EXCEPT AI-created ones
         for (const existingFile of existingFiles) {
-          await storageManager.deleteFile(projectId, existingFile.path)
+          if (existingFile.metadata?.createdBy !== 'ai') {
+            await storageManager.deleteFile(projectId, existingFile.path)
+          }
         }
         
-        // Sync all client files to server storage
+        // Sync all client files to server storage (these are not AI-created)
         for (const file of clientFiles) {
           if (file.path && !file.isDirectory) {
             await storageManager.createFile({
@@ -80,15 +86,16 @@ export async function POST(req: Request) {
               fileType: file.type || file.fileType || 'text',
               type: file.type || file.fileType || 'text',
               size: file.size || (file.content || '').length,
-              isDirectory: false
+              isDirectory: false,
+              metadata: { createdBy: 'client' }
             })
-            console.log(`[DEBUG] Synced file to server storage: ${file.path}`)
+            console.log(`[DEBUG] Synced client file to server storage: ${file.path}`)
           }
         }
         
         // Verify sync worked
         const syncedFiles = await storageManager.getFiles(projectId)
-        console.log(`[DEBUG] File sync complete: ${syncedFiles.length} files now available to AI tools`)
+        console.log(`[DEBUG] File sync complete: ${syncedFiles.length} files now available to AI tools (${aiCreatedFiles.length} AI-created, ${clientFiles.length} client files)`)
         
       } catch (syncError) {
         console.error('[ERROR] Failed to sync files to server storage:', syncError)
@@ -250,7 +257,8 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                   fileType: path.split('.').pop() || 'text',
                   type: path.split('.').pop() || 'text',
                   size: content.length,
-                  isDirectory: false
+                  isDirectory: false,
+                  metadata: { createdBy: 'ai' }
                 })
                 
                 return { 
