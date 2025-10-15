@@ -1481,6 +1481,30 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
               controller.enqueue(encoder.encode(json + '\n'))
             }
             
+            // Send final metadata immediately to client before server-side file operations
+            if (fileOperations.length > 0 || toolCalls.size > 0) {
+              // Get steps info after streaming is complete
+              const stepsInfo = await result.steps
+              const toolInvocations = Array.from(toolCalls.values())
+              
+              const metadataMessage = {
+                type: 'metadata',
+                fileOperations: fileOperations,
+                toolInvocations: toolInvocations, // Include combined tool invocations
+                serverSideExecution: true,
+                hasToolCalls: toolInvocations.length > 0,
+                stepCount: stepsInfo?.length || 1,
+                steps: stepsInfo?.map((step: any, index: number) => ({
+                  stepNumber: index + 1,
+                  hasText: !!step.text,
+                  toolCallsCount: step.toolCalls?.length || 0,
+                  toolResultsCount: step.toolResults?.length || 0,
+                  finishReason: step.finishReason
+                })) || []
+              }
+              controller.enqueue(encoder.encode(JSON.stringify(metadataMessage) + '\n'))
+            }
+            
             // After streaming is complete, process file operations for server-side persistence
             if (fileOperations.length > 0) {
               console.log('[DEBUG] Processing file operations for server-side persistence:', fileOperations)
@@ -1543,30 +1567,6 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
               } catch (error) {
                 console.error('[ERROR] Failed to apply file operations to server storage:', error)
               }
-            }
-            
-            // Send final metadata with file operations and tool invocations for client-side processing
-            if (fileOperations.length > 0 || toolCalls.size > 0) {
-              // Get steps info after streaming is complete
-              const stepsInfo = await result.steps
-              const toolInvocations = Array.from(toolCalls.values())
-              
-              const metadataMessage = {
-                type: 'metadata',
-                fileOperations: fileOperations,
-                toolInvocations: toolInvocations, // Include combined tool invocations
-                serverSideExecution: true,
-                hasToolCalls: toolInvocations.length > 0,
-                stepCount: stepsInfo?.length || 1,
-                steps: stepsInfo?.map((step: any, index: number) => ({
-                  stepNumber: index + 1,
-                  hasText: !!step.text,
-                  toolCallsCount: step.toolCalls?.length || 0,
-                  toolResultsCount: step.toolResults?.length || 0,
-                  finishReason: step.finishReason
-                })) || []
-              }
-              controller.enqueue(encoder.encode(JSON.stringify(metadataMessage) + '\n'))
             }
             
           } catch (error) {

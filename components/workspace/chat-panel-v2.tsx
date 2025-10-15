@@ -1010,8 +1010,8 @@ export function ChatPanelV2({
       const decoder = new TextDecoder()
       let accumulatedContent = ''
       let accumulatedReasoning = ''
-      let accumulatedToolInvocations: any[] = []
-      let accumulatedFileOperations: any[] = []
+      let finalToolInvocations: any[] = []
+      let finalFileOperations: any[] = []
 
       while (true) {
         const { done, value } = await reader.read()
@@ -1043,7 +1043,7 @@ export function ChatPanelV2({
                 accumulatedContent += parsed.text
                 setMessages(prev => prev.map(msg =>
                   msg.id === assistantMessageId
-                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: [...accumulatedToolInvocations] }
+                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: finalToolInvocations }
                     : msg
                 ))
               }
@@ -1053,130 +1053,49 @@ export function ChatPanelV2({
                 accumulatedReasoning += parsed.text
                 setMessages(prev => prev.map(msg =>
                   msg.id === assistantMessageId
-                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: [...accumulatedToolInvocations] }
+                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: finalToolInvocations }
                     : msg
                 ))
               }
             } else if (parsed.type === 'tool-call') {
-              // Tool call start
-              const toolInvocation = {
-                toolCallId: parsed.toolCallId,
-                toolName: parsed.toolName,
-                args: parsed.args,
-                state: 'call'
-              }
-              const idx = accumulatedToolInvocations.findIndex((ti: any) => ti.toolCallId === toolInvocation.toolCallId)
-              if (idx >= 0) {
-                accumulatedToolInvocations[idx] = toolInvocation
-              } else {
-                accumulatedToolInvocations.push(toolInvocation)
-              }
-              setMessages(prev => prev.map(msg =>
-                msg.id === assistantMessageId
-                  ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: [...accumulatedToolInvocations] }
-                    : msg
-              ))
+              // Tool call - skip client-side accumulation, server handles this
+              console.log('[ChatPanelV2][DataStream] Tool call received, server accumulating:', parsed.toolCallId)
             } else if (parsed.type === 'tool-result') {
-              // Tool result
-              const toolCallId = parsed.toolCallId
-              const result = parsed.result
-              const idx = accumulatedToolInvocations.findIndex((ti: any) => ti.toolCallId === toolCallId)
-              if (idx >= 0) {
-                accumulatedToolInvocations[idx] = {
-                  ...accumulatedToolInvocations[idx],
-                  result,
-                  state: 'result'
-                }
-              } else {
-                // Tool result without prior call
-                accumulatedToolInvocations.push({
-                  toolCallId,
-                  result,
-                  state: 'result'
-                })
-              }
-              setMessages(prev => prev.map(msg =>
-                msg.id === assistantMessageId
-                  ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: [...accumulatedToolInvocations] }
-                    : msg
-              ))
+              // Tool result - skip client-side accumulation, server handles this
+              console.log('[ChatPanelV2][DataStream] Tool result received, server accumulating:', parsed.toolCallId)
             } else if (parsed.type === 'metadata') {
-              // Final metadata with complete tool invocations and file operations
+              // Final metadata with complete tool invocations and file operations from server
+              // Server-only accumulation: Use metadata as the single source of truth
               if (parsed.toolInvocations && Array.isArray(parsed.toolInvocations)) {
-                // Merge metadata tool invocations with accumulated ones to preserve streaming results
-                // Metadata should be authoritative, but preserve any results that might be missing
-                const mergedToolInvocations = parsed.toolInvocations.map((metaTool: any) => {
-                  // Find matching accumulated tool invocation
-                  const accumulatedTool = accumulatedToolInvocations.find((accTool: any) =>
-                    accTool.toolCallId === metaTool.toolCallId
-                  )
-
-                  // If accumulated has result but metadata doesn't, preserve the result
-                  if (accumulatedTool && accumulatedTool.result && (!metaTool.result || metaTool.state !== 'result')) {
-                    return {
-                      ...metaTool,
-                      result: accumulatedTool.result,
-                      state: 'result'
-                    }
-                  }
-
-                  return metaTool
-                })
-
-                // Add any accumulated tools that aren't in metadata
-                accumulatedToolInvocations.forEach((accTool: any) => {
-                  const existsInMetadata = mergedToolInvocations.some((metaTool: any) =>
-                    metaTool.toolCallId === accTool.toolCallId
-                  )
-                  if (!existsInMetadata) {
-                    mergedToolInvocations.push(accTool)
-                  }
-                })
-
-                accumulatedToolInvocations = mergedToolInvocations
-                setMessages(prev => prev.map(msg =>
-                  msg.id === assistantMessageId
-                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: [...accumulatedToolInvocations] }
-                    : msg
-                ))
+                finalToolInvocations = parsed.toolInvocations
+                console.log('[ChatPanelV2][DataStream] Received complete tool invocations from server:', finalToolInvocations.length)
               }
 
               // Collect file operations for application at end of stream
               if (parsed.fileOperations && Array.isArray(parsed.fileOperations)) {
-                console.log('[ChatPanelV2][DataStream] Collecting file operations for end-of-stream application:', parsed.fileOperations)
-                accumulatedFileOperations.push(...parsed.fileOperations)
+                finalFileOperations = parsed.fileOperations
+                console.log('[ChatPanelV2][DataStream] Received complete file operations from server:', finalFileOperations.length)
               }
+
+              // Update message with final tool invocations
+              setMessages(prev => prev.map(msg =>
+                msg.id === assistantMessageId
+                  ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: finalToolInvocations }
+                  : msg
+              ))
             }
-            console.log('[ChatPanelV2][DataStream] State:', { content: accumulatedContent, reasoning: accumulatedReasoning, tools: accumulatedToolInvocations.length })
+            console.log('[ChatPanelV2][DataStream] State:', { content: accumulatedContent, reasoning: accumulatedReasoning, tools: finalToolInvocations.length })
           } catch (e) {
             // Skip malformed chunks that aren't valid client stream data
-            console.warn('[ChatPanelV2][DataStream] Skipping malformed chunk:', line.substring(0, 100) + '...')
+            console.warn('[ChatPanelV2][DataStream] Skipping malformed chunk')
             continue
           }
         }
       }
 
-      // Apply all collected file operations at the end of streaming
-      if (accumulatedFileOperations.length > 0 && project) {
-        console.log('[ChatPanelV2][DataStream] Applying all collected file operations at end of stream:', accumulatedFileOperations)
-
-        // Validate that we have results for all tools that were supposed to produce file operations
-        const toolsWithFileOps = accumulatedToolInvocations.filter((tool: any) =>
-          tool.state === 'result' && tool.result && tool.result.success !== false
-        )
-        const expectedFileOps = toolsWithFileOps.length
-        const actualFileOps = accumulatedFileOperations.length
-
-        if (expectedFileOps > 0 && actualFileOps === 0) {
-          console.warn('[ChatPanelV2][DataStream] Expected file operations from successful tools but got none - possible streaming interruption')
-          toast({
-            title: "Partial Results",
-            description: `Tools completed successfully but file operations may be incomplete. Some changes might not have been applied.`,
-            variant: "destructive"
-          })
-        } else if (actualFileOps > 0) {
-          console.log(`[ChatPanelV2][DataStream] Validation: ${toolsWithFileOps.length} successful tools produced ${actualFileOps} file operations`)
-        }
+      // Apply all file operations received from server at the end of streaming
+      if (finalFileOperations.length > 0 && project) {
+        console.log('[ChatPanelV2][DataStream] Applying all file operations from server at end of stream:', finalFileOperations)
 
         try {
           const { storageManager } = await import('@/lib/storage-manager')
@@ -1184,7 +1103,7 @@ export function ChatPanelV2({
 
           let operationsApplied = 0
 
-          for (const fileOp of accumulatedFileOperations) {
+          for (const fileOp of finalFileOperations) {
             console.log('[ChatPanelV2][DataStream] Applying file operation:', fileOp)
 
             if (fileOp.type === 'write_file' && fileOp.path) {
@@ -1242,7 +1161,7 @@ export function ChatPanelV2({
             }
           }
 
-          console.log(`[ChatPanelV2][DataStream] Applied ${operationsApplied}/${accumulatedFileOperations.length} file operations to IndexedDB at end of stream`)
+          console.log(`[ChatPanelV2][DataStream] Applied ${operationsApplied}/${finalFileOperations.length} file operations to IndexedDB at end of stream`)
 
           if (operationsApplied > 0) {
             // Force refresh the file explorer
@@ -1262,12 +1181,12 @@ export function ChatPanelV2({
         }
       }      // Save assistant message to database ONCE after streaming completes
       // Only save if we have content or tool invocations
-      if (accumulatedContent.trim() || accumulatedToolInvocations.length > 0) {
+      if (accumulatedContent.trim() || finalToolInvocations.length > 0) {
         await saveAssistantMessageAfterStreaming(
           assistantMessageId,
           accumulatedContent,
           accumulatedReasoning,
-          accumulatedToolInvocations
+          finalToolInvocations
         )
       }
     } catch (error: any) {
