@@ -32,10 +32,240 @@ const getStorageManager = async () => {
   return storageManager
 }
 
+// Helper function to get file extension for syntax highlighting
+const getFileExtension = (filePath: string): string => {
+  const ext = filePath.split('.').pop()?.toLowerCase()
+  switch (ext) {
+    case 'ts': return 'typescript'
+    case 'tsx': return 'typescript'
+    case 'js': return 'javascript'
+    case 'jsx': return 'javascript'
+    case 'json': return 'json'
+    case 'css': return 'css'
+    case 'scss': return 'scss'
+    case 'sass': return 'sass'
+    case 'html': return 'html'
+    case 'xml': return 'xml'
+    case 'md': return 'markdown'
+    case 'py': return 'python'
+    case 'java': return 'java'
+    case 'cpp': return 'cpp'
+    case 'c': return 'c'
+    case 'php': return 'php'
+    case 'rb': return 'ruby'
+    case 'go': return 'go'
+    case 'rs': return 'rust'
+    case 'sh': return 'bash'
+    case 'sql': return 'sql'
+    case 'yaml': return 'yaml'
+    case 'yml': return 'yaml'
+    default: return 'text'
+  }
+}
+
+// Build optimized project context from synced files (same as chat route)
+async function buildOptimizedProjectContext(projectId: string, storageManager: any, userIntent?: any) {
+  try {
+    const files = await storageManager.getFiles(projectId)
+    
+    // Get current time and working directory for context
+    const currentTime = new Date().toLocaleString('en-US', {
+      timeZone: 'Africa/Douala',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZoneName: 'long'
+    })
+
+    // Filter out shadcn UI components and common excluded files
+    const filteredFiles = files.filter((file: any) => {
+      const path = file.path.toLowerCase()
+      // Exclude shadcn UI components
+      if (path.includes('components/ui/') && (
+        path.includes('button.tsx') ||
+        path.includes('input.tsx') ||
+        path.includes('dialog.tsx') ||
+        path.includes('card.tsx') ||
+        path.includes('badge.tsx') ||
+        path.includes('alert.tsx') ||
+        path.includes('accordion.tsx') ||
+        path.includes('avatar.tsx') ||
+        path.includes('checkbox.tsx') ||
+        path.includes('dropdown-menu.tsx') ||
+        path.includes('form.tsx') ||
+        path.includes('label.tsx') ||
+        path.includes('select.tsx') ||
+        path.includes('sheet.tsx') ||
+        path.includes('tabs.tsx') ||
+        path.includes('textarea.tsx') ||
+        path.includes('toast.tsx') ||
+        path.includes('tooltip.tsx') ||
+        path.includes('separator.tsx') ||
+        path.includes('skeleton.tsx') ||
+        path.includes('scroll-area.tsx') ||
+        path.includes('progress.tsx') ||
+        path.includes('popover.tsx') ||
+        path.includes('navigation-menu.tsx') ||
+        path.includes('menubar.tsx') ||
+        path.includes('hover-card.tsx') ||
+        path.includes('command.tsx') ||
+        path.includes('calendar.tsx') ||
+        path.includes('table.tsx') ||
+        path.includes('switch.tsx') ||
+        path.includes('slider.tsx') ||
+        path.includes('radio-group.tsx')
+      )) {
+        return false
+      }
+      
+      // Exclude node_modules, .git, build outputs
+      if (path.includes('node_modules') || 
+          path.includes('.git/') || 
+          path.includes('dist/') || 
+          path.includes('build/') ||
+          path.includes('.next/')) {
+        return false
+      }
+      
+      return true
+    })
+
+    // Detect project type (Vite or Next.js)
+    const hasNextConfig = files.some((f: any) => f.path === 'next.config.js' || f.path === 'next.config.mjs')
+    const hasViteConfig = files.some((f: any) => f.path === 'vite.config.ts' || f.path === 'vite.config.js')
+    const projectType = hasNextConfig ? 'nextjs' : hasViteConfig ? 'vite-react' : 'unknown'
+
+    // Build file tree structure
+    const fileTree: string[] = []
+    const directories = new Set<string>()
+    
+    // Sort files for better organization
+    const sortedFiles = filteredFiles.sort((a: any, b: any) => {
+      return a.path.localeCompare(b.path)
+    })
+
+    // Collect all directories
+    sortedFiles.forEach((file: any) => {
+      const pathParts = file.path.split('/')
+      if (pathParts.length > 1) {
+        // Add all parent directories
+        for (let i = 1; i < pathParts.length; i++) {
+          const dirPath = pathParts.slice(0, i).join('/')
+          if (dirPath) {
+            directories.add(dirPath)
+          }
+        }
+      }
+    })
+
+    // Add root files first
+    const rootFiles = sortedFiles.filter((file: any) => !file.path.includes('/'))
+    rootFiles.forEach((file: any) => {
+      fileTree.push(file.path)
+    })
+
+    // Add directories and their files
+    const sortedDirectories = Array.from(directories).sort()
+    sortedDirectories.forEach((dir: string) => {
+      fileTree.push(`${dir}/`)
+      
+      // Add files in this directory
+      const dirFiles = sortedFiles.filter((file: any) => {
+        const filePath = file.path
+        const fileDir = filePath.substring(0, filePath.lastIndexOf('/'))
+        return fileDir === dir
+      })
+      
+      dirFiles.forEach((file: any) => {
+        fileTree.push(file.path)
+      })
+    })
+
+    // Build the context
+    let context = `# Current Time
+${currentTime}
+
+# Project Type
+${projectType === 'nextjs' ? '**Next.js** - Full-stack React framework with App Router' : projectType === 'vite-react' ? '**Vite + React** - Fast build tool with React' : 'Unknown'}
+
+${projectType === 'nextjs' ? `## Next.js Project Structure
+- **src/app/** - App Router pages and layouts
+- **src/components/** - React components  
+- **src/lib/** - Utilities and helpers
+- **public/** - Static assets
+- **API Routes:** Create in src/app/api/[name]/route.ts` : 
+`## Vite Project Structure
+- **src/** - Source code directory
+- **src/components/** - React components
+- **src/lib/** - Utilities and helpers
+- **public/** - Static assets
+- **api/** - Serverless functions (Vercel)`}
+
+# Current Project Structure
+${fileTree.join('\n')}
+# Important Files Content
+---`
+
+    console.log(`[CONTEXT] Built file tree with ${fileTree.length} files`)
+    return context
+
+  } catch (error) {
+    console.error('Error building project context:', error)
+    return `# Current Time
+${new Date().toLocaleString()}
+
+# Project Context Error
+Unable to load project structure. Use list_files tool to explore the project.`
+  }
+}
+
 // Powerful function to construct proper tool result messages
-const constructToolResult = async (toolName: string, input: any, projectId: string, toolCallId: string) => {
+const constructToolResult = async (toolName: string, input: any, projectId: string, toolCallId: string, clientFiles?: any[]) => {
   try {
     const storageManager = await getStorageManager()
+
+    // For read operations, ensure files are synced first
+    if (['read_file', 'edit_file'].includes(toolName) && clientFiles && clientFiles.length > 0) {
+      console.log(`[constructToolResult] Syncing ${clientFiles.length} files before ${toolName} operation`)
+      
+      try {
+        // Get existing files to preserve AI-created ones
+        const existingFiles = await storageManager.getFiles(projectId)
+        const aiCreatedFiles = existingFiles.filter(f => f.metadata?.createdBy === 'ai')
+
+        // Clear existing files EXCEPT AI-created ones
+        for (const existingFile of existingFiles) {
+          if (existingFile.metadata?.createdBy !== 'ai') {
+            await storageManager.deleteFile(projectId, existingFile.path)
+          }
+        }
+
+        // Sync all client files to server storage (these are not AI-created)
+        for (const file of clientFiles) {
+          if (file.path && !file.isDirectory) {
+            await storageManager.createFile({
+              workspaceId: projectId,
+              name: file.name,
+              path: file.path,
+              content: file.content || '',
+              fileType: file.type || file.fileType || 'text',
+              type: file.type || file.fileType || 'text',
+              size: file.size || (file.content || '').length,
+              isDirectory: false,
+              metadata: { createdBy: 'client' }
+            })
+          }
+        }
+        
+        console.log(`[constructToolResult] File sync complete for ${toolName}`)
+      } catch (syncError) {
+        console.error('[ERROR] Failed to sync files in constructToolResult:', syncError)
+        // Continue anyway - might still work
+      }
+    }
 
     switch (toolName) {
       case 'write_file': {
@@ -563,10 +793,8 @@ export async function POST(req: Request) {
     // Get storage manager
     const storageManager = await getStorageManager()
 
-    // Build project context from files
-    const projectContext = files && files.length > 0 
-      ? `\n\n## 📁 Project Files\n${files.map((f: any) => `- ${f.path} (${f.type})`).join('\n')}`
-      : ''
+    // Build project context from synced files (same as chat route)
+    const projectContext = await buildOptimizedProjectContext(projectId, storageManager)
 
     // Get conversation history for context (last 10 messages) - Same format as /api/chat/route.ts
     let conversationSummaryContext = ''
@@ -723,7 +951,7 @@ ${conversationSummaryContext || ''}`
           }),
           execute: async ({ path, includeLineNumbers }, { toolCallId }) => {
             // Use the powerful constructor to get actual results
-            return await constructToolResult('read_file', { path, includeLineNumbers }, projectId, toolCallId)
+            return await constructToolResult('read_file', { path, includeLineNumbers }, projectId, toolCallId, files)
           }
         }),
 
@@ -753,7 +981,7 @@ ${conversationSummaryContext || ''}`
           }),
           execute: async ({ filePath, searchReplaceBlock }, { toolCallId }) => {
             // Use the powerful constructor to get actual results
-            return await constructToolResult('edit_file', { filePath, searchReplaceBlock }, projectId, toolCallId)
+            return await constructToolResult('edit_file', { filePath, searchReplaceBlock }, projectId, toolCallId, files)
           }
         }),
 
