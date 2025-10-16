@@ -276,7 +276,13 @@ export async function handleClientFileOperation(
         const failedEdits = [];
 
         if (modifiedContent.includes(editBlock.search)) {
-          modifiedContent = modifiedContent.replace(editBlock.search, editBlock.replace);
+          // Use indexOf + substring for memory-efficient first-occurrence replacement in browser
+          const searchIndex = modifiedContent.indexOf(editBlock.search);
+          if (searchIndex !== -1) {
+            modifiedContent = modifiedContent.substring(0, searchIndex) +
+                             editBlock.replace +
+                             modifiedContent.substring(searchIndex + editBlock.search.length);
+          }
           appliedEdits.push({
             search: editBlock.search,
             replace: editBlock.replace,
