@@ -34,31 +34,16 @@ const getStorageManager = async () => {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
     const {
-      messages = [], // Default to empty array if not provided
+      messages,
       projectId,
       project,
-      files = [], // Default to empty array
+      files,
       modelId,
       aiMode
-    } = body
+    } = await req.json()
 
-    // Validate messages is an array
-    if (!Array.isArray(messages)) {
-      console.error('[Chat-V2] Invalid messages format:', typeof messages)
-      return NextResponse.json({ 
-        error: 'Invalid messages format - must be an array' 
-      }, { status: 400 })
-    }
-
-    console.log('[Chat-V2] Request received:', { 
-      projectId, 
-      modelId, 
-      aiMode, 
-      messageCount: messages?.length || 0,
-      hasMessages: !!messages
-    })
+    console.log('[Chat-V2] Request received:', { projectId, modelId, aiMode, messageCount: messages.length })
 
     // Auth check
     const supabase = await createClient()
@@ -68,11 +53,55 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // NOTE: File operations are now client-side only
-    // No server-side file sync needed - client handles file operations directly on IndexedDB
-    console.log(`[Chat-V2] Client-side file operations enabled - all file operations execute on IndexedDB`)
+    // CRITICAL: Sync client-side files to server-side InMemoryStorage
+    // This ensures AI tools can access the files that exist in IndexedDB
+    // Preserve AI-created files while syncing client files
     const clientFiles = files || []
-    console.log(`[Chat-V2] Project has ${clientFiles.length} files available in IndexedDB`)
+    console.log(`[DEBUG] Syncing ${clientFiles.length} files to server-side storage for AI access`)
+    
+    if (clientFiles.length > 0 || true) { // Always check for AI files to preserve
+      try {
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        
+        // Get existing files to preserve AI-created ones
+        const existingFiles = await storageManager.getFiles(projectId)
+        const aiCreatedFiles = existingFiles.filter(f => f.metadata?.createdBy === 'ai')
+        
+        // Clear existing files EXCEPT AI-created ones
+        for (const existingFile of existingFiles) {
+          if (existingFile.metadata?.createdBy !== 'ai') {
+            await storageManager.deleteFile(projectId, existingFile.path)
+          }
+        }
+        
+        // Sync all client files to server storage (these are not AI-created)
+        for (const file of clientFiles) {
+          if (file.path && !file.isDirectory) {
+            await storageManager.createFile({
+              workspaceId: projectId,
+              name: file.name,
+              path: file.path,
+              content: file.content || '',
+              fileType: file.type || file.fileType || 'text',
+              type: file.type || file.fileType || 'text',
+              size: file.size || (file.content || '').length,
+              isDirectory: false,
+              metadata: { createdBy: 'client' }
+            })
+            console.log(`[DEBUG] Synced client file to server storage: ${file.path}`)
+          }
+        }
+        
+        // Verify sync worked
+        const syncedFiles = await storageManager.getFiles(projectId)
+        console.log(`[DEBUG] File sync complete: ${syncedFiles.length} files now available to AI tools (${aiCreatedFiles.length} AI-created, ${clientFiles.length} client files)`)
+        
+      } catch (syncError) {
+        console.error('[ERROR] Failed to sync files to server storage:', syncError)
+        // Continue anyway - tools may still work for write operations
+      }
+    }
 
     // Get storage manager
     const storageManager = await getStorageManager()
@@ -82,43 +111,11 @@ export async function POST(req: Request) {
       ? `\n\n## 📁 Project Files\n${files.map((f: any) => `- ${f.path} (${f.type})`).join('\n')}`
       : ''
 
-    // Get conversation history for context (last 10 messages) - Same format as /api/chat/route.ts
-    let conversationSummaryContext = ''
-    try {
-      // Ensure messages is an array before using slice
-      const recentMessages = Array.isArray(messages) ? messages.slice(-20) : []
-      
-      if (recentMessages && recentMessages.length > 0) {
-        // Filter out system messages and empty content
-        const filteredMessages = recentMessages.filter((msg: any) => 
-          msg.role !== 'system' && msg.content && msg.content.trim().length > 0
-        )
-
-        // Create full history from filtered messages in AI-readable format
-        // Exact same format as /api/chat/route.ts
-        const fullHistory = filteredMessages
-          .map((msg: any, index: number) => {
-            const role = msg.role === 'user' ? 'User' : msg.role === 'assistant' ? 'You' : msg.role.toUpperCase()
-            const message = `${role}: ${msg.content}`
-            // Add separator after assistant messages to separate interaction pairs
-            const separator = msg.role === 'assistant' ? '\n\n---\n\n' : '\n\n'
-            return message + separator
-          })
-          .join('')
-
-        conversationSummaryContext = `## 📜 CONVERSATION HISTORY\n\n${fullHistory.trim()}`
-        console.log('[Chat-V2][HISTORY] Formatted conversation history for AI:', {
-          totalMessages: recentMessages.length,
-          filteredMessages: filteredMessages.length,
-          historyLength: conversationSummaryContext.length
-        })
-      } else {
-        console.log('[Chat-V2][HISTORY] No conversation history available')
-      }
-    } catch (historyError) {
-      console.error('[Chat-V2][HISTORY] Error preparing conversation history:', historyError)
-      // Continue without history on error
-    }
+    // Get conversation history for context (last 10 messages)
+    const recentMessages = messages.slice(-10)
+    const conversationHistory = recentMessages.map((msg: any) => 
+      `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content.substring(0, 200)}${msg.content.length > 200 ? '...' : ''}`
+    ).join('\n')
 
     // Build system prompt from pixel_forge_system_prompt.ts
     const isNextJS = true // We're using Next.js
@@ -137,12 +134,7 @@ You're not just an expert full-stack architect - you're a digital superhero with
 - **DELIVER**: 🚀 Implement with production-ready code that impresses
 
 ## 🛠️ Tools in Your Utility Belt
-- **CLIENT-SIDE TOOLS** (Execute on IndexedDB): read_file (with line numbers), write_file, edit_file, delete_file, add_package, remove_package
-- **SERVER-SIDE TOOLS**: web_search, web_extract, semantic_code_navigator (with line numbers), check_dev_errors, list_files
-
-Note: File and package operation tools (read_file, write_file, edit_file, delete_file, add_package, remove_package) execute on the client-side IndexedDB directly. You call them and the client handles the actual operations automatically.
-
-Note: You may call the 'check error' tool at most 2 times during a single request  if the tool returns an error log, fix it then ask the user to switch to the preview  tab and run the app then rport any logs they see in the console tab below
+- read_file (with line numbers), write_file, edit_file, delete_file, add_package, remove_package, web_search, web_extract, semantic_code_navigator (with line numbers), check_dev_errors
 
 ## ✅ Essential Checklist
 - **Functionality**: ✅ Happy path, edge cases, error handling
@@ -192,114 +184,259 @@ Remember: You're not just coding - you're crafting digital magic! Every detail m
 
 ${projectContext}
 
-${conversationSummaryContext || ''}`
+${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
 
     // Get AI model
     const model = getAIModel(modelId)
 
-    // Validate messages
-    if (!messages || messages.length === 0) {
-      console.error('[Chat-V2] No messages provided')
-      return NextResponse.json({ 
-        error: 'No messages provided' 
-      }, { status: 400 })
-    }
-
     console.log('[Chat-V2] Starting streamText with multi-step tooling')
 
     // Stream with AI SDK native tools
-    // Pass messages directly without conversion (same as stream.ts)
     const result = await streamText({
       model,
       system: systemPrompt,
       messages,
       tools: {
-        // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
-        // The execute function forwards the call to the client
         write_file: tool({
-          description: 'Create or update a file in the project. Use this tool to create new files or update existing ones with new content. This tool executes on the client-side IndexedDB.',
+          description: 'Create or update a file in the project. Use this tool to create new files or update existing ones with new content.',
           inputSchema: z.object({
             path: z.string().describe('The file path relative to project root (e.g., "src/components/Button.tsx")'),
             content: z.string().describe('The complete file content to write')
           }),
-          execute: async ({ path, content }, { toolCallId }) => {
-            // Return a marker indicating this tool is handled by the client
-            // The client will intercept the tool-call event and execute it on IndexedDB
-            console.log(`[Chat-V2][write_file] Forwarding to client: ${path}`)
-            return {
-              _clientSideTool: true,
-              toolName: 'write_file',
-              path,
-              message: `File operation forwarded to client: ${path}`,
-              toolCallId
+          execute: async ({ path, content }, { abortSignal, toolCallId }) => {
+            // Check for cancellation
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+            
+            try {
+              // Validate inputs
+              if (!path || typeof path !== 'string') {
+                return { 
+                  success: false, 
+                  error: `Invalid file path provided`,
+                  path,
+                  toolCallId
+                }
+              }
+              
+              if (content === undefined || content === null) {
+                return { 
+                  success: false, 
+                  error: `Invalid content provided`,
+                  path,
+                  toolCallId
+                }
+              }
+              
+              // Import storage manager
+              const { storageManager } = await import('@/lib/storage-manager')
+              await storageManager.init()
+              
+              // Check if file already exists
+              const existingFile = await storageManager.getFile(projectId, path)
+
+              if (existingFile) {
+                // Update existing file
+                await storageManager.updateFile(projectId, path, { content })
+                return { 
+                  success: true, 
+                  message: `✅ File ${path} updated successfully.`,
+                  path,
+                  content,
+                  action: 'updated',
+                  toolCallId
+                }
+              } else {
+                // Create new file
+                const newFile = await storageManager.createFile({
+                  workspaceId: projectId,
+                  name: path.split('/').pop() || path,
+                  path,
+                  content,
+                  fileType: path.split('.').pop() || 'text',
+                  type: path.split('.').pop() || 'text',
+                  size: content.length,
+                  isDirectory: false,
+                  metadata: { createdBy: 'ai' }
+                })
+                
+                return { 
+                  success: true, 
+                  message: `✅ File ${path} created successfully.`,
+                  path,
+                  content,
+                  action: 'created',
+                  fileId: newFile.id,
+                  toolCallId
+                }
+              }
+            } catch (error) {
+              // Enhanced error handling
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+              console.error(`[ERROR] write_file failed for ${path}:`, error)
+              
+              return { 
+                success: false, 
+                error: `Failed to write file ${path}: ${errorMessage}`,
+                path,
+                toolCallId
+              }
             }
           }
         }),
 
-        // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
         read_file: tool({
-          description: 'Read the contents of a file with optional line number information. This tool executes on the client-side IndexedDB.',
+          description: 'Read the contents of a file with optional line number information',
           inputSchema: z.object({
             path: z.string().describe('File path to read'),
             includeLineNumbers: z.boolean().optional().describe('Whether to include line numbers in the response (default: false)')
           }),
-          execute: async ({ path, includeLineNumbers }, { toolCallId }) => {
-            console.log(`[Chat-V2][read_file] Forwarding to client: ${path}`)
-            return {
-              _clientSideTool: true,
-              toolName: 'read_file',
-              path,
-              message: `File operation forwarded to client: ${path}`,
-              toolCallId
+          execute: async ({ path, includeLineNumbers = false }, { abortSignal, toolCallId }) => {
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+            
+            try {
+              const { storageManager } = await import('@/lib/storage-manager')
+              await storageManager.init()
+              
+              // Validate path
+              if (!path || typeof path !== 'string') {
+                return { 
+                  success: false, 
+                  error: `Invalid file path provided`,
+                  path,
+                  toolCallId
+                }
+              }
+              
+              const file = await storageManager.getFile(projectId, path)
+
+              if (!file) {
+                return { 
+                  success: false, 
+                  error: `File not found: ${path}. Use list_files to see available files.`,
+                  path,
+                  toolCallId
+                }
+              }
+
+              const content = file.content || ''
+              let response: any = { 
+                success: true, 
+                message: `✅ File ${path} read successfully.`,
+                path,
+                content,
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                action: 'read',
+                toolCallId
+              }
+
+              // Add line number information if requested
+              if (includeLineNumbers) {
+                const lines = content.split('\n')
+                const lineCount = lines.length
+                const linesWithNumbers = lines.map((line, index) => 
+                  `${String(index + 1).padStart(4, ' ')}: ${line}`
+                ).join('\n')
+                
+                response.lineCount = lineCount
+                response.contentWithLineNumbers = linesWithNumbers
+                response.lines = lines // Array of individual lines for programmatic access
+              }
+
+              return response
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+              console.error(`[ERROR] read_file failed for ${path}:`, error)
+              
+              return { 
+                success: false, 
+                error: `Failed to read file ${path}: ${errorMessage}`,
+                path,
+                toolCallId
+              }
             }
           }
         }),
 
-        // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
         delete_file: tool({
-          description: 'Delete a file from the project. Use this tool to remove files that are no longer needed. This tool executes on the client-side IndexedDB.',
+          description: 'Delete a file from the project. Use this tool to remove files that are no longer needed.',
           inputSchema: z.object({
             path: z.string().describe('The file path relative to project root to delete')
           }),
-          execute: async ({ path }, { toolCallId }) => {
-            console.log(`[Chat-V2][delete_file] Forwarding to client: ${path}`)
-            return {
-              _clientSideTool: true,
-              toolName: 'delete_file',
-              path,
-              message: `File operation forwarded to client: ${path}`,
-              toolCallId
+          execute: async ({ path }, { abortSignal, toolCallId }) => {
+            // Check for cancellation
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+            
+            try {
+              // Validate path
+              if (!path || typeof path !== 'string') {
+                return { 
+                  success: false, 
+                  error: `Invalid file path provided`,
+                  path,
+                  toolCallId
+                }
+              }
+              
+              // Import storage manager
+              const { storageManager } = await import('@/lib/storage-manager')
+              await storageManager.init()
+              
+              // Check if file exists
+              const existingFile = await storageManager.getFile(projectId, path)
+
+              if (!existingFile) {
+                return { 
+                  success: false, 
+                  error: `File not found: ${path}. Use list_files to see available files.`,
+                  path,
+                  toolCallId
+                }
+              }
+
+              // Delete the file
+              const result = await storageManager.deleteFile(projectId, path)
+              
+              if (result) {
+                return { 
+                  success: true, 
+                  message: `✅ File ${path} deleted successfully.`,
+                  path,
+                  action: 'deleted',
+                  toolCallId
+                }
+              } else {
+                return { 
+                  success: false, 
+                  error: `Failed to delete file ${path}`,
+                  path,
+                  toolCallId
+                }
+              }
+            } catch (error) {
+              // Enhanced error handling
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+              console.error(`[ERROR] delete_file failed for ${path}:`, error)
+              
+              return { 
+                success: false, 
+                error: `Failed to delete file ${path}: ${errorMessage}`,
+                path,
+                toolCallId
+              }
             }
           }
         }),
 
-        // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
-        edit_file: tool({
-          description: 'Edit an existing file using search/replace blocks. Use this tool to make precise modifications to file content. This tool executes on the client-side IndexedDB.',
-          inputSchema: z.object({
-            filePath: z.string().describe('The file path relative to project root'),
-            searchReplaceBlock: z.string().describe(`Search/replace block in format:
-<<<<<<< SEARCH
-[exact code to find]
-=======
-[new code to replace with]
->>>>>>> REPLACE`)
-          }),
-          execute: async ({ filePath, searchReplaceBlock }, { toolCallId }) => {
-            console.log(`[Chat-V2][edit_file] Forwarding to client: ${filePath}`)
-            return {
-              _clientSideTool: true,
-              toolName: 'edit_file',
-              path: filePath,
-              message: `File operation forwarded to client: ${filePath}`,
-              toolCallId
-            }
-          }
-        }),
-
-        // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
         add_package: tool({
-          description: 'Add one or more npm packages to package.json. Use this tool to install new dependencies. This tool executes on the client-side IndexedDB.',
+          description: 'Add one or more npm packages to package.json. Use this tool to install new dependencies.',
           inputSchema: z.object({
             name: z.union([
               z.string().describe('The package name (e.g., "lodash") or comma-separated names (e.g., "lodash, axios, react-router-dom")'),
@@ -308,21 +445,126 @@ ${conversationSummaryContext || ''}`
             version: z.string().optional().describe('The package version (e.g., "^4.17.21"). Defaults to "latest". Applied to all packages if array provided'),
             isDev: z.boolean().optional().describe('Whether to add as dev dependency (default: false)')
           }),
-          execute: async (input: { name: string | string[]; version?: string; isDev?: boolean }, { toolCallId }) => {
+          execute: async (input: { name: string | string[]; version?: string; isDev?: boolean }, { abortSignal, toolCallId }) => {
             const { name: packageNames, version = 'latest', isDev = false } = input
-            console.log(`[Chat-V2][add_package] Forwarding to client:`, { packageNames, version, isDev })
-            return {
-              _clientSideTool: true,
-              toolName: 'add_package',
-              message: `Package operation forwarded to client: ${Array.isArray(packageNames) ? packageNames.join(', ') : packageNames}`,
-              toolCallId
+            console.log(`[Chat-V2][add_package] Received input:`, { packageNames, version, isDev })
+            
+            // Ensure packageNames is always an array
+            let names: string[]
+            if (Array.isArray(packageNames)) {
+              names = packageNames
+            } else {
+              // Handle comma-separated strings or JSON array strings
+              const nameStr = packageNames.trim()
+              if (nameStr.startsWith('[') && nameStr.endsWith(']')) {
+                // Try to parse as JSON array
+                try {
+                  const parsed = JSON.parse(nameStr)
+                  names = Array.isArray(parsed) ? parsed : [nameStr]
+                } catch {
+                  names = [nameStr]
+                }
+              } else if (nameStr.includes(',')) {
+                // Split comma-separated values
+                names = nameStr.split(',').map(s => s.trim()).filter(s => s.length > 0)
+              } else {
+                names = [nameStr]
+              }
+            }
+            
+            // Check for cancellation
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+            
+            try {
+              console.log(`[Chat-V2][add_package] Executing: ${names.join(', ')}@${version} (dev: ${isDev})`)
+              
+              // Import storage manager
+              const { storageManager } = await import('@/lib/storage-manager')
+              await storageManager.init()
+              
+              // Get package.json or create if it doesn't exist
+              let packageFile = await storageManager.getFile(projectId, 'package.json')
+              let packageJson: any = {}
+              
+              if (!packageFile) {
+                console.log(`[Chat-V2][add_package] package.json not found, creating new one`)
+                // Create a basic package.json
+                packageJson = {
+                  name: "ai-generated-project",
+                  version: "1.0.0",
+                  description: "AI-generated project",
+                  main: "index.js",
+                  scripts: {
+                    test: "echo \"Error: no test specified\" && exit 1"
+                  },
+                  keywords: [],
+                  author: "",
+                  license: "ISC"
+                }
+                // Create the file
+                await storageManager.createFile({
+                  workspaceId: projectId,
+                  name: 'package.json',
+                  path: 'package.json',
+                  content: JSON.stringify(packageJson, null, 2),
+                  fileType: 'json',
+                  type: 'json',
+                  size: JSON.stringify(packageJson, null, 2).length,
+                  isDirectory: false
+                })
+              } else {
+                packageJson = JSON.parse(packageFile.content || '{}')
+              }
+
+              const depType = isDev ? 'devDependencies' : 'dependencies'
+              
+              // Initialize dependency section if it doesn't exist
+              if (!packageJson[depType]) {
+                packageJson[depType] = {}
+              }
+
+              // Add all packages
+              const addedPackages: string[] = []
+              for (const packageName of names) {
+                // Use appropriate version - for 'latest', use a reasonable default or just 'latest'
+                const packageVersion = version === 'latest' ? `^1.0.0` : version
+                packageJson[depType][packageName] = packageVersion
+                addedPackages.push(packageName)
+              }
+
+              // Update package.json
+              await storageManager.updateFile(projectId, 'package.json', {
+                content: JSON.stringify(packageJson, null, 2)
+              })
+
+              console.log(`[Chat-V2][add_package] Added: ${addedPackages.join(', ')}@${version} to ${depType}`)
+              return {
+                success: true,
+                action: 'packages_added',
+                packages: addedPackages,
+                version,
+                dependencyType: depType,
+                path: 'package.json',
+                content: JSON.stringify(packageJson, null, 2),
+                message: `Packages ${addedPackages.join(', ')} added to ${depType} successfully`,
+                toolCallId
+              }
+            } catch (error: any) {
+              console.error(`[Chat-V2][add_package] Error:`, error)
+              return {
+                success: false,
+                error: error.message,
+                packages: names,
+                toolCallId
+              }
             }
           }
         }),
 
-        // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
         remove_package: tool({
-          description: 'Remove one or more npm packages from package.json. Use this tool to uninstall dependencies. This tool executes on the client-side IndexedDB.',
+          description: 'Remove one or more npm packages from package.json. Use this tool to uninstall dependencies.',
           inputSchema: z.object({
             name: z.union([
               z.string().describe('The package name to remove or comma-separated names (e.g., "lodash, axios")'),
@@ -332,12 +574,84 @@ ${conversationSummaryContext || ''}`
           }),
           execute: async (input: { name: string | string[]; isDev?: boolean }, { toolCallId }) => {
             const { name: packageNames, isDev = false } = input
-            console.log(`[Chat-V2][remove_package] Forwarding to client:`, { packageNames, isDev })
-            return {
-              _clientSideTool: true,
-              toolName: 'remove_package',
-              message: `Package operation forwarded to client: ${Array.isArray(packageNames) ? packageNames.join(', ') : packageNames}`,
-              toolCallId
+            
+            // Ensure packageNames is always an array
+            let names: string[]
+            if (Array.isArray(packageNames)) {
+              names = packageNames
+            } else {
+              // Handle comma-separated strings or JSON array strings
+              const nameStr = packageNames.trim()
+              if (nameStr.startsWith('[') && nameStr.endsWith(']')) {
+                // Try to parse as JSON array
+                try {
+                  const parsed = JSON.parse(nameStr)
+                  names = Array.isArray(parsed) ? parsed : [nameStr]
+                } catch {
+                  names = [nameStr]
+                }
+              } else if (nameStr.includes(',')) {
+                // Split comma-separated values
+                names = nameStr.split(',').map(s => s.trim()).filter(s => s.length > 0)
+              } else {
+                names = [nameStr]
+              }
+            }
+            try {
+              console.log(`[Chat-V2][remove_package] Executing: ${names.join(', ')} (dev: ${isDev})`)
+              
+              // Get package.json
+              const packageFile = await storageManager.getFile(projectId, 'package.json')
+              if (!packageFile) {
+                throw new Error('package.json not found')
+              }
+
+              const packageJson = JSON.parse(packageFile.content || '{}')
+              const depType = isDev ? 'devDependencies' : 'dependencies'
+              
+              // Check if all packages exist
+              const missingPackages: string[] = []
+              for (const packageName of names) {
+                if (!packageJson[depType] || !packageJson[depType][packageName]) {
+                  missingPackages.push(packageName)
+                }
+              }
+              
+              if (missingPackages.length > 0) {
+                throw new Error(`Package(s) ${missingPackages.join(', ')} not found in ${depType}`)
+              }
+
+              // Remove all packages
+              const removedPackages: string[] = []
+              for (const packageName of names) {
+                delete packageJson[depType][packageName]
+                removedPackages.push(packageName)
+              }
+
+              // Update package.json
+              await storageManager.updateFile(projectId, 'package.json', {
+                content: JSON.stringify(packageJson, null, 2)
+              })
+
+              console.log(`[Chat-V2][remove_package] Removed: ${removedPackages.join(', ')} from ${depType}`)
+              return {
+                success: true,
+                action: 'packages_removed',
+                packages: removedPackages,
+                dependencyType: depType,
+                path: 'package.json',
+                content: JSON.stringify(packageJson, null, 2),
+                message: `Packages ${removedPackages.join(', ')} removed from ${depType} successfully`,
+                toolCallId
+              }
+            } catch (error: any) {
+              console.error(`[Chat-V2][remove_package] Error:`, error)
+              return {
+                success: false,
+                error: error.message,
+                packages: names,
+                toolCallId
+              }
             }
           }
         }),
@@ -504,6 +818,126 @@ ${conversationSummaryContext || ''}`
                 },
                 toolCallId
               };
+            }
+          }
+        }),
+
+        edit_file: tool({
+          description: 'Edit a file by applying search and replace operations using search/replace blocks. Use this tool to make precise modifications to existing files.',
+          inputSchema: z.object({
+            filePath: z.string().describe('The file path relative to project root to edit'),
+            searchReplaceBlock: z.string().describe('Search/replace block in format: <<<<<<< SEARCH\\n[old code]\\n=======\\n[new code]\\n>>>>>>> REPLACE')
+          }),
+          execute: async ({ filePath, searchReplaceBlock }, { abortSignal, toolCallId }) => {
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            try {
+              if (!filePath || typeof filePath !== 'string') {
+                return {
+                  success: false,
+                  error: `Invalid file path provided`,
+                  path: filePath,
+                  toolCallId
+                }
+              }
+
+              if (!searchReplaceBlock || typeof searchReplaceBlock !== 'string') {
+                return {
+                  success: false,
+                  error: `Invalid search/replace block provided`,
+                  path: filePath,
+                  toolCallId
+                }
+              }
+
+              // Import storage manager
+              const { storageManager } = await import('@/lib/storage-manager')
+              await storageManager.init()
+
+              // Read the current file content
+              const existingFile = await storageManager.getFile(projectId, filePath)
+
+              if (!existingFile) {
+                return {
+                  success: false,
+                  error: `File not found: ${filePath}. Use list_files to see available files.`,
+                  path: filePath,
+                  toolCallId
+                }
+              }
+
+              const currentContent = existingFile.content || ''
+
+              // Parse the search/replace block
+              const editBlock = parseSearchReplaceBlock(searchReplaceBlock)
+
+              if (!editBlock) {
+                return {
+                  success: false,
+                  error: `Failed to parse search/replace block. Ensure it follows the format: <<<<<<< SEARCH\\n[old code]\\n=======\\n[new code]\\n>>>>>>> REPLACE`,
+                  path: filePath,
+                  toolCallId
+                }
+              }
+
+              // Apply the search/replace
+              let modifiedContent = currentContent
+              const appliedEdits = []
+              const failedEdits = []
+
+              if (modifiedContent.includes(editBlock.search)) {
+                modifiedContent = modifiedContent.replace(editBlock.search, editBlock.replace)
+                appliedEdits.push({
+                  search: editBlock.search,
+                  replace: editBlock.replace,
+                  status: 'applied'
+                })
+              } else {
+                failedEdits.push({
+                  search: editBlock.search,
+                  replace: editBlock.replace,
+                  status: 'failed',
+                  reason: 'Search text not found in file content'
+                })
+              }
+
+              // Save the modified content back to the file
+              if (appliedEdits.length > 0) {
+                await storageManager.updateFile(projectId, filePath, { content: modifiedContent })
+
+                return {
+                  success: true,
+                  message: `✅ File ${filePath} edited successfully.`,
+                  path: filePath,
+                  content: modifiedContent,
+                  appliedEdits,
+                  failedEdits,
+                  action: 'edited',
+                  toolCallId
+                }
+              } else {
+                return {
+                  success: false,
+                  error: `Failed to apply edit: ${failedEdits[0]?.reason || 'Unknown error'}`,
+                  path: filePath,
+                  appliedEdits,
+                  failedEdits,
+                  toolCallId
+                }
+              }
+
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+              console.error(`[ERROR] edit_file failed for ${filePath}:`, error)
+
+              return {
+                success: false,
+                error: `Failed to edit file ${filePath}: ${errorMessage}`,
+                path: filePath,
+                toolCallId
+              }
             }
           }
         }),
@@ -992,11 +1426,163 @@ ${conversationSummaryContext || ''}`
       }
     })
 
-    console.log('[Chat-V2] Streaming with AI SDK UI Message Stream (client-side file operations)')
+    console.log('[Chat-V2] Streaming full stream with tool invocations')
 
-    // Use AI SDK's built-in UI message streaming for client-side tools
-    // File operations will be executed directly on the client via onToolCall
-    return result.toUIMessageStreamResponse()
+    // Stream the full result including tool invocations using fullStream
+    // AI SDK v5 fullStream includes all parts: text, tool calls, tool results
+    return new Response(
+      new ReadableStream({
+        async start(controller) {
+          const encoder = new TextEncoder()
+          const fileOperations: any[] = []
+          const toolCalls: Map<string, any> = new Map() // Store tool calls by ID
+          
+          try {
+            for await (const part of result.fullStream) {
+              // Collect tool calls
+              if (part.type === 'tool-call') {
+                const toolCall = part as any
+                toolCalls.set(toolCall.toolCallId, {
+                  toolCallId: toolCall.toolCallId,
+                  toolName: toolCall.toolName,
+                  args: toolCall.args,
+                  state: 'call'
+                })
+              }
+              
+              // Process tool results and combine with calls
+              if (part.type === 'tool-result') {
+                const toolResult = part as any
+                const toolCallId = toolResult.toolCallId
+                const existingCall = toolCalls.get(toolCallId)
+                
+                if (existingCall) {
+                  // Update the tool call with result
+                  existingCall.result = toolResult.result || toolResult.output
+                  existingCall.state = 'result'
+                  
+                  // Collect file operations from tool results
+                  const toolResultData = toolResult.result || toolResult.output
+                  if (toolResultData && toolResultData.success !== false && toolResultData.path) {
+                    // This is a file operation
+                    fileOperations.push({
+                      type: toolResult.toolName,
+                      path: toolResultData.path,
+                      content: toolResultData.content,
+                      projectId: projectId,
+                      success: toolResultData.success !== false
+                    })
+                  }
+                }
+              }
+              
+              // Stream each part as newline-delimited JSON
+              const json = JSON.stringify(part)
+              controller.enqueue(encoder.encode(json + '\n'))
+            }
+            
+            // After streaming is complete, process file operations for server-side persistence
+            if (fileOperations.length > 0) {
+              console.log('[DEBUG] Processing file operations for server-side persistence:', fileOperations)
+              
+              try {
+                const { storageManager } = await import('@/lib/storage-manager')
+                await storageManager.init()
+                
+                let operationsApplied = 0
+                
+                for (const fileOp of fileOperations) {
+                  console.log('[DEBUG] Applying file operation to server storage:', fileOp)
+                  
+                  if (fileOp.type === 'write_file' && fileOp.path) {
+                    // Check if file exists
+                    const existingFile = await storageManager.getFile(projectId, fileOp.path)
+                    
+                    if (existingFile) {
+                      // Update existing file
+                      await storageManager.updateFile(projectId, fileOp.path, { 
+                        content: fileOp.content || '',
+                        updatedAt: new Date().toISOString()
+                      })
+                      console.log(`[DEBUG] Updated existing file in server storage: ${fileOp.path}`)
+                    } else {
+                      // Create new file
+                      const newFile = await storageManager.createFile({
+                        workspaceId: projectId,
+                        name: fileOp.path.split('/').pop() || fileOp.path,
+                        path: fileOp.path,
+                        content: fileOp.content || '',
+                        fileType: fileOp.path.split('.').pop() || 'text',
+                        type: fileOp.path.split('.').pop() || 'text',
+                        size: (fileOp.content || '').length,
+                        isDirectory: false
+                      })
+                      console.log(`[DEBUG] Created new file in server storage: ${fileOp.path}`, newFile)
+                    }
+                    operationsApplied++
+                  } else if (fileOp.type === 'edit_file' && fileOp.path && fileOp.content) {
+                    // Update existing file with new content
+                    await storageManager.updateFile(projectId, fileOp.path, { 
+                      content: fileOp.content,
+                      updatedAt: new Date().toISOString()
+                    })
+                    console.log(`[DEBUG] Edited file in server storage: ${fileOp.path}`)
+                    operationsApplied++
+                  } else if (fileOp.type === 'delete_file' && fileOp.path) {
+                    // Delete file
+                    await storageManager.deleteFile(projectId, fileOp.path)
+                    console.log(`[DEBUG] Deleted file from server storage: ${fileOp.path}`)
+                    operationsApplied++
+                  } else {
+                    console.warn('[DEBUG] Skipped invalid file operation:', fileOp)
+                  }
+                }
+                
+                console.log(`[DEBUG] Applied ${operationsApplied}/${fileOperations.length} file operations to server storage`)
+                
+              } catch (error) {
+                console.error('[ERROR] Failed to apply file operations to server storage:', error)
+              }
+            }
+            
+            // Send final metadata with file operations and tool invocations for client-side processing
+            if (fileOperations.length > 0 || toolCalls.size > 0) {
+              // Get steps info after streaming is complete
+              const stepsInfo = await result.steps
+              const toolInvocations = Array.from(toolCalls.values())
+              
+              const metadataMessage = {
+                type: 'metadata',
+                fileOperations: fileOperations,
+                toolInvocations: toolInvocations, // Include combined tool invocations
+                serverSideExecution: true,
+                hasToolCalls: toolInvocations.length > 0,
+                stepCount: stepsInfo?.length || 1,
+                steps: stepsInfo?.map((step: any, index: number) => ({
+                  stepNumber: index + 1,
+                  hasText: !!step.text,
+                  toolCallsCount: step.toolCalls?.length || 0,
+                  toolResultsCount: step.toolResults?.length || 0,
+                  finishReason: step.finishReason
+                })) || []
+              }
+              controller.enqueue(encoder.encode(JSON.stringify(metadataMessage) + '\n'))
+            }
+            
+          } catch (error) {
+            console.error('[Chat-V2] Stream error:', error)
+          } finally {
+            controller.close()
+          }
+        }
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Transfer-Encoding': 'chunked',
+        }
+      }
+    )
 
   } catch (error: any) {
     console.error('[Chat-V2] Error:', error)
