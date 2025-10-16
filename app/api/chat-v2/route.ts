@@ -992,11 +992,35 @@ ${conversationSummaryContext || ''}`
       }
     })
 
-    console.log('[Chat-V2] Streaming with AI SDK UI Message Stream (client-side file operations)')
+    console.log('[Chat-V2] Streaming with newline-delimited JSON (same as stream.ts)')
 
-    // Use AI SDK's built-in UI message streaming for client-side tools
-    // File operations will be executed directly on the client via onToolCall
-    return result.toUIMessageStreamResponse()
+    // Stream the response using newline-delimited JSON format (not SSE)
+    // This matches the format used in stream.ts and expected by chatparse.tsx
+    return new Response(
+      new ReadableStream({
+        async start(controller) {
+          const encoder = new TextEncoder()
+          
+          try {
+            // Stream the text and tool calls
+            for await (const part of result.fullStream) {
+              // Send each part as newline-delimited JSON (no SSE "data:" prefix)
+              controller.enqueue(encoder.encode(JSON.stringify(part) + '\n'))
+            }
+          } catch (error) {
+            console.error('[Chat-V2] Stream error:', error)
+          } finally {
+            controller.close()
+          }
+        }
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Transfer-Encoding': 'chunked',
+        }
+      }
+    )
 
   } catch (error: any) {
     console.error('[Chat-V2] Error:', error)
