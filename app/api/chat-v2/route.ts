@@ -70,7 +70,8 @@ export async function POST(req: Request) {
     // Get conversation history for context (last 10 messages) - Same format as /api/chat/route.ts
     let conversationSummaryContext = ''
     try {
-      const recentMessages = messages.slice(-20) // Last 20 messages for better context
+      // Ensure messages is an array before using slice
+      const recentMessages = Array.isArray(messages) ? messages.slice(-20) : []
       
       if (recentMessages && recentMessages.length > 0) {
         // Filter out system messages and empty content
