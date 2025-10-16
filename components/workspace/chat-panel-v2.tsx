@@ -56,11 +56,14 @@ const ExpandableUserMessage = ({
   const [shouldTruncate, setShouldTruncate] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
   const CHAR_LIMIT = 140 // Character limit before truncation
+  
+  // Ensure content is always a string
+  const safeContent = content || ''
 
   useEffect(() => {
     // Check if content exceeds character limit
-    setShouldTruncate(content.length > CHAR_LIMIT)
-  }, [content])
+    setShouldTruncate(safeContent.length > CHAR_LIMIT)
+  }, [safeContent])
 
   useEffect(() => {
     if (controlledExpanded !== undefined) {
@@ -116,7 +119,7 @@ const ExpandableUserMessage = ({
         <div className="bg-card text-card-foreground border rounded-xl shadow-sm overflow-hidden w-full flex flex-col">
           <div className="p-4">
             <p className="text-card-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
-              {content}
+              {safeContent}
             </p>
           </div>
           <div className="px-4 pb-2 flex justify-end">
@@ -146,8 +149,8 @@ const ExpandableUserMessage = ({
           {!isExpanded ? (
             <div>
               <p className="text-card-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
-                {content.substring(0, CHAR_LIMIT)}
-                {content.length > CHAR_LIMIT && '...'}
+                {safeContent.substring(0, CHAR_LIMIT)}
+                {safeContent.length > CHAR_LIMIT && '...'}
               </p>
             </div>
           ) : (
@@ -161,7 +164,7 @@ const ExpandableUserMessage = ({
               }}
             >
               <p className="text-card-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
-                {content}
+                {safeContent}
               </p>
             </div>
           )}
@@ -312,11 +315,13 @@ export function ChatPanelV2({
 
   // Helper functions to safely access message content from AI SDK v5 UIMessage
   const getMessageContent = (message: any): string => {
+    if (!message) return ''
+    
     // Try parts array first (AI SDK v5)
     if (message.parts && Array.isArray(message.parts)) {
-      const textParts = message.parts.filter((p: any) => p.type === 'text')
+      const textParts = message.parts.filter((p: any) => p && p.type === 'text')
       if (textParts.length > 0) {
-        return textParts.map((p: any) => p.text).join('')
+        return textParts.map((p: any) => p.text || '').join('')
       }
     }
     // Fallback to content property
@@ -324,8 +329,9 @@ export function ChatPanelV2({
   }
 
   const hasMessageContent = (message: any): boolean => {
+    if (!message) return false
     const content = getMessageContent(message)
-    return content.trim().length > 0
+    return !!(content && typeof content === 'string' && content.trim().length > 0)
   }
 
   // AI SDK useChat hook with client-side tool handling
@@ -1255,7 +1261,7 @@ export function ChatPanelV2({
           </div>
         )}
 
-        {messages.map((message: any) => (
+        {messages.filter((m: any) => m && m.id).map((message: any) => (
           <div
             key={message.id}
             className={cn(
