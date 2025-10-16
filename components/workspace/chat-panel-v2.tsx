@@ -1010,6 +1010,7 @@ export function ChatPanelV2({
       const decoder = new TextDecoder()
       let accumulatedContent = ''
       let accumulatedReasoning = ''
+      let accumulatedToolInvocations: any[] = [] // ✅ Track tool invocations during streaming
       let lineBuffer = '' // Buffer for incomplete lines across chunks
 
       while (true) {
@@ -1090,6 +1091,26 @@ export function ChatPanelV2({
                 args: toolCall.args
               })
 
+              // ✅ Track tool invocation in loading state
+              accumulatedToolInvocations.push({
+                toolCallId: toolCall.toolCallId,
+                toolName: toolCall.toolName,
+                args: toolCall.args,
+                state: 'call' // Loading state
+              })
+
+              // ✅ Update UI to show tool invocations in real-time
+              setMessages(prev => prev.map(msg =>
+                msg.id === assistantMessageId
+                  ? { 
+                      ...msg, 
+                      content: accumulatedContent, 
+                      reasoning: accumulatedReasoning,
+                      toolInvocations: [...accumulatedToolInvocations] // Update with current tool invocations
+                    }
+                  : msg
+              ))
+
               // Check if this is a client-side tool (file operations + package management)
               const clientSideTools = ['write_file', 'read_file', 'edit_file', 'delete_file', 'add_package', 'remove_package']
               if (clientSideTools.includes(toolCall.toolName)) {
@@ -1129,6 +1150,36 @@ export function ChatPanelV2({
                 toolName: parsed.toolName,
                 toolCallId: parsed.toolCallId
               })
+
+              // ✅ Update tool invocation with result
+              const existingInvocation = accumulatedToolInvocations.find(
+                inv => inv.toolCallId === parsed.toolCallId
+              )
+              if (existingInvocation) {
+                existingInvocation.state = 'result' // Completed state
+                existingInvocation.result = parsed.output || parsed.result
+              } else {
+                // Tool result arrived before tool-call (shouldn't happen but handle it)
+                accumulatedToolInvocations.push({
+                  toolCallId: parsed.toolCallId,
+                  toolName: parsed.toolName,
+                  args: parsed.input || {},
+                  state: 'result',
+                  result: parsed.output || parsed.result
+                })
+              }
+
+              // ✅ Update UI to show tool completion in real-time
+              setMessages(prev => prev.map(msg =>
+                msg.id === assistantMessageId
+                  ? { 
+                      ...msg, 
+                      content: accumulatedContent, 
+                      reasoning: accumulatedReasoning,
+                      toolInvocations: [...accumulatedToolInvocations] // Update with completed tool
+                    }
+                  : msg
+              ))
             }
           } catch (e) {
             // Log error details to help debug parsing issues
@@ -1145,18 +1196,19 @@ export function ChatPanelV2({
       // Stream complete - client-side tools executed during streaming
       console.log('[ChatPanelV2][DataStream] 📊 Stream complete:', {
         contentLength: accumulatedContent.length,
+        toolInvocationsCount: accumulatedToolInvocations.length,
         hasProject: !!project
       })
       
       // All file operations now execute client-side during streaming - no end-of-stream processing needed
        
       // Save assistant message to database after streaming completes
-      if (accumulatedContent.trim()) {
+      if (accumulatedContent.trim() || accumulatedToolInvocations.length > 0) {
         await saveAssistantMessageAfterStreaming(
           assistantMessageId,
           accumulatedContent,
           accumulatedReasoning,
-          [] // No tool invocations tracking - tools execute during streaming
+          accumulatedToolInvocations // ✅ Save tool invocations to message history
         )
       }
     } catch (error: any) {
