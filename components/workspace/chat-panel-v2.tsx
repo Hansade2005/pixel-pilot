@@ -1010,31 +1010,12 @@ export function ChatPanelV2({
       const decoder = new TextDecoder()
       let accumulatedContent = ''
       let accumulatedReasoning = ''
-      let finalToolInvocations: any[] = []
-      let finalFileOperations: any[] = []
       let lineBuffer = '' // Buffer for incomplete lines across chunks
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) {
-          // Process any remaining buffered line
-          if (lineBuffer.trim()) {
-            console.log('[ChatPanelV2][DataStream] Processing final buffered line:', lineBuffer.substring(0, 100))
-            try {
-              const parsed = JSON.parse(lineBuffer)
-              if (parsed.type === 'metadata') {
-                console.log('[ChatPanelV2][DataStream] 📥 Received final metadata from buffer')
-                if (parsed.fileOperations && Array.isArray(parsed.fileOperations)) {
-                  finalFileOperations = parsed.fileOperations
-                }
-                if (parsed.toolInvocations && Array.isArray(parsed.toolInvocations)) {
-                  finalToolInvocations = parsed.toolInvocations
-                }
-              }
-            } catch (e) {
-              console.error('[ChatPanelV2][DataStream] Failed to parse final buffer:', e)
-            }
-          }
+          console.log('[ChatPanelV2][DataStream] 📊 Stream complete')
           break
         }
 
@@ -1072,7 +1053,7 @@ export function ChatPanelV2({
                 accumulatedContent += parsed.text
                 setMessages(prev => prev.map(msg =>
                   msg.id === assistantMessageId
-                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: finalToolInvocations }
+                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
                     : msg
                 ))
               }
@@ -1082,62 +1063,65 @@ export function ChatPanelV2({
                 accumulatedReasoning += parsed.text
                 setMessages(prev => prev.map(msg =>
                   msg.id === assistantMessageId
-                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: finalToolInvocations }
+                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
                     : msg
                 ))
               }
             } else if (parsed.type === 'tool-call') {
-              // Tool call - skip client-side accumulation, server handles this
-              console.log('[ChatPanelV2][DataStream] Tool call received, server accumulating:', parsed.toolCallId)
-            } else if (parsed.type === 'tool-result') {
-              // Tool result - skip client-side accumulation, server handles this
-              console.log('[ChatPanelV2][DataStream] Tool result received, server accumulating:', parsed.toolCallId)
-            } else if (parsed.type === 'metadata') {
-              // Final metadata with complete tool invocations and file operations from server
-              // Server-only accumulation: Use metadata as the single source of truth
-              console.log('[ChatPanelV2][DataStream] 📥 Received metadata from backend:', {
-                hasToolInvocations: !!parsed.toolInvocations,
-                toolInvocationsCount: parsed.toolInvocations?.length || 0,
-                hasFileOperations: !!parsed.fileOperations,
-                fileOperationsCount: parsed.fileOperations?.length || 0,
-                fileOperationTypes: parsed.fileOperations?.map((op: any) => `${op.type}:${op.path}`) || [],
-                rawMetadata: parsed // Log full metadata for debugging
+              // CLIENT-SIDE TOOL EXECUTION: Execute file operation tools on IndexedDB
+              const toolCall = {
+                toolName: parsed.toolName,
+                toolCallId: parsed.toolCallId,
+                args: parsed.args,
+                dynamic: false // We don't use dynamic tools
+              }
+              
+              console.log('[ChatPanelV2][ClientTool] 🔧 Tool call received:', {
+                toolName: toolCall.toolName,
+                toolCallId: toolCall.toolCallId,
+                args: toolCall.args
               })
-              
-              if (parsed.toolInvocations && Array.isArray(parsed.toolInvocations)) {
-                finalToolInvocations = parsed.toolInvocations
-                console.log('[ChatPanelV2][DataStream] ✅ Stored tool invocations:', finalToolInvocations.length)
-              } else {
-                console.warn('[ChatPanelV2][DataStream] ⚠️ Metadata received but no tool invocations array found')
-              }
 
-              // Collect file operations for application at end of stream
-              if (parsed.fileOperations && Array.isArray(parsed.fileOperations)) {
-                finalFileOperations = parsed.fileOperations
-                console.log('[ChatPanelV2][DataStream] ✅ Stored file operations for application:', finalFileOperations.length)
+              // Check if this is a client-side tool (file operations + package management)
+              const clientSideTools = ['write_file', 'read_file', 'edit_file', 'delete_file', 'add_package', 'remove_package']
+              if (clientSideTools.includes(toolCall.toolName)) {
+                console.log('[ChatPanelV2][ClientTool] ⚡ Executing client-side tool:', toolCall.toolName)
                 
-                // Log each file operation path for debugging
-                parsed.fileOperations.forEach((op: any, idx: number) => {
-                  console.log(`[ChatPanelV2][DataStream]   ${idx + 1}. ${op.type}: ${op.path}`)
-                })
+                // Execute the tool on client-side IndexedDB immediately
+                // This applies the file operation to IndexedDB without waiting for the stream to complete
+                const { handleClientFileOperation } = await import('@/lib/client-file-tools')
+                
+                // Define addToolResult function - this is just for logging/tracking
+                // The actual file operation happens inside handleClientFileOperation
+                const addToolResult = (result: any) => {
+                  console.log('[ChatPanelV2][ClientTool] ✅ Client-side tool completed:', {
+                    tool: result.tool,
+                    toolCallId: result.toolCallId,
+                    success: !result.errorText,
+                    output: result.output
+                  })
+                  
+                  // The tool result is returned to the AI via the server's streamText
+                  // We don't need to send it back manually - the AI SDK handles this
+                  // when tools don't have execute functions, they're treated as client-side tools
+                }
+                
+                // Execute the tool asynchronously (don't await - per AI SDK docs)
+                // The tool will update IndexedDB immediately
+                handleClientFileOperation(toolCall, project?.id, addToolResult)
+                  .catch(error => {
+                    console.error('[ChatPanelV2][ClientTool] ❌ Tool execution error:', error)
+                  })
               } else {
-                console.warn('[ChatPanelV2][DataStream] ⚠️ Metadata received but no file operations array found:', {
-                  hasFileOperations: 'fileOperations' in parsed,
-                  fileOperationsType: typeof parsed.fileOperations,
-                  fileOperationsValue: parsed.fileOperations
-                })
+                console.log('[ChatPanelV2][DataStream] Server-side tool call, server handles:', parsed.toolName)
               }
-
-              // Update message with final tool invocations
-              setMessages(prev => prev.map(msg =>
-                msg.id === assistantMessageId
-                  ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning, toolInvocations: finalToolInvocations }
-                  : msg
-              ))
-              
-              console.log('[ChatPanelV2][DataStream] 🎉 Metadata processing complete')
+            } else if (parsed.type === 'tool-result') {
+              // Tool result - these come from server-side tool executions
+              console.log('[ChatPanelV2][DataStream] Tool result received:', {
+                toolName: parsed.toolName,
+                toolCallId: parsed.toolCallId
+              })
             }
-            console.log('[ChatPanelV2][DataStream] State:', { content: accumulatedContent, reasoning: accumulatedReasoning, tools: finalToolInvocations.length })
           } catch (e) {
             // Log error details to help debug parsing issues
             console.error('[ChatPanelV2][DataStream] ❌ Failed to parse chunk:', {
@@ -1150,143 +1134,21 @@ export function ChatPanelV2({
         }
       }
 
-      // Apply all file operations received from server at the end of streaming
-      console.log('[ChatPanelV2][DataStream] 📊 Stream complete. Final state:', {
+      // Stream complete - client-side tools executed during streaming
+      console.log('[ChatPanelV2][DataStream] 📊 Stream complete:', {
         contentLength: accumulatedContent.length,
-        toolInvocationsCount: finalToolInvocations.length,
-        fileOperationsCount: finalFileOperations.length,
         hasProject: !!project
       })
       
-      if (finalFileOperations.length > 0 && project) {
-        console.log('[ChatPanelV2][DataStream] 🔄 Applying all file operations from server at end of stream:', finalFileOperations.length, 'operations')
-
-        try {
-          const { storageManager } = await import('@/lib/storage-manager')
-          await storageManager.init()
-
-          let operationsApplied = 0
-
-          for (const fileOp of finalFileOperations) {
-            console.log(`[ChatPanelV2][DataStream] 📝 Processing file operation ${operationsApplied + 1}/${finalFileOperations.length}:`, fileOp.type, fileOp.path)
-
-            // CRITICAL: Skip read-only operations at APPLICATION level (not collection level)
-            // Read operations are collected for pill display but don't need IndexedDB application
-            const readOnlyOperations = ['read_file', 'list_files', 'search_files', 'get_file_info']
-            if (readOnlyOperations.includes(fileOp.type)) {
-              console.log(`[ChatPanelV2][DataStream] ⏭️ Skipping read-only operation (for pill display only): ${fileOp.type} - ${fileOp.path}`)
-              continue
-            }
-
-            if (fileOp.type === 'write_file' && fileOp.path) {
-              // Check if file exists
-              const existingFile = await storageManager.getFile(project.id, fileOp.path)
-
-              if (existingFile) {
-                // Update existing file
-                await storageManager.updateFile(project.id, fileOp.path, {
-                  content: fileOp.content || '',
-                  updatedAt: new Date().toISOString()
-                })
-                console.log(`[ChatPanelV2][DataStream] Updated existing file: ${fileOp.path}`)
-              } else {
-                // Create new file
-                const newFile = await storageManager.createFile({
-                  workspaceId: project.id,
-                  name: fileOp.path.split('/').pop() || fileOp.path,
-                  path: fileOp.path,
-                  content: fileOp.content || '',
-                  fileType: fileOp.path.split('.').pop() || 'text',
-                  type: fileOp.path.split('.').pop() || 'text',
-                  size: (fileOp.content || '').length,
-                  isDirectory: false
-                })
-                console.log(`[ChatPanelV2][DataStream] Created new file: ${fileOp.path}`, newFile)
-              }
-              operationsApplied++
-            } else if (fileOp.type === 'edit_file' && fileOp.path && fileOp.content) {
-              // Update existing file with new content
-              await storageManager.updateFile(project.id, fileOp.path, {
-                content: fileOp.content,
-                updatedAt: new Date().toISOString()
-              })
-              console.log(`[ChatPanelV2][DataStream] Edited file: ${fileOp.path}`)
-              operationsApplied++
-            } else if (fileOp.type === 'delete_file' && fileOp.path) {
-              // Delete file
-              await storageManager.deleteFile(project.id, fileOp.path)
-              console.log(`[ChatPanelV2][DataStream] Deleted file: ${fileOp.path}`)
-              operationsApplied++
-            } else if ((fileOp.type === 'add_package' || fileOp.type === 'remove_package') && fileOp.path === 'package.json' && fileOp.content) {
-              // Update package.json for package operations
-              await storageManager.updateFile(project.id, 'package.json', {
-                content: fileOp.content,
-                updatedAt: new Date().toISOString()
-              })
-              console.log(`[ChatPanelV2][DataStream] Updated package.json for ${fileOp.type}: ${fileOp.package}`)
-              operationsApplied++
-            } else if (fileOp.type === 'read_file') {
-              // Skip read_file operations entirely - they don't need client-side application
-              console.log(`[ChatPanelV2][DataStream] Skipping read_file operation: ${fileOp.path}`)
-            } else {
-              console.warn('[ChatPanelV2][DataStream] Skipped invalid file operation:', fileOp)
-            }
-          }
-
-          const readOnlyOperations = ['read_file', 'list_files', 'search_files', 'get_file_info']
-          const readOnlyOps = finalFileOperations.filter(op => readOnlyOperations.includes(op.type)).length
-          const writeOps = finalFileOperations.length - readOnlyOps
-          
-          console.log(`[ChatPanelV2][DataStream] ✅ Processed ${finalFileOperations.length} operations: ${writeOps} write operations applied, ${readOnlyOps} read-only operations skipped (displayed in pills)`)
-
-          if (operationsApplied > 0) {
-            // Force refresh the file explorer
-            console.log('[ChatPanelV2][DataStream] 🔄 Triggering file explorer refresh...')
-            setTimeout(() => {
-              window.dispatchEvent(new CustomEvent('files-changed', {
-                detail: { projectId: project.id, forceRefresh: true }
-              }))
-            }, 100)
-            
-            // Show success toast
-            toast({
-              title: "Files Updated",
-              description: `Successfully applied ${operationsApplied} file operation(s) to your workspace.`,
-            })
-          }
-        } catch (error) {
-          console.error('[ChatPanelV2][DataStream] ❌ Failed to apply file operations to IndexedDB at end of stream:', error)
-          toast({
-            title: "Storage Warning",
-            description: `File operations completed but may not persist: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            variant: "destructive"
-          })
-        }
-      } else if (finalToolInvocations.length > 0 && project) {
-        // We have tool invocations but no file operations - this might indicate a problem
-        const writeToolCalls = finalToolInvocations.filter((tool: any) => 
-          ['write_file', 'edit_file', 'delete_file'].includes(tool.toolName)
-        )
-        
-        if (writeToolCalls.length > 0) {
-          console.warn('[ChatPanelV2][DataStream] ⚠️ WARNING: Tool invocations included file operations but no file operations were received in metadata!', {
-            toolCallsWithFiles: writeToolCalls.map((t: any) => `${t.toolName}:${t.args?.path}`)
-          })
-          
-          toast({
-            title: "Sync Warning",
-            description: "Some file changes may not have been applied. Please check the file tree.",
-            variant: "destructive"
-          })
-        }
-      }      // Save assistant message to database ONCE after streaming completes
-      // Only save if we have content or tool invocations
-      if (accumulatedContent.trim() || finalToolInvocations.length > 0) {
+      // All file operations now execute client-side during streaming - no end-of-stream processing needed
+       
+      // Save assistant message to database after streaming completes
+      if (accumulatedContent.trim()) {
         await saveAssistantMessageAfterStreaming(
           assistantMessageId,
           accumulatedContent,
           accumulatedReasoning,
-          finalToolInvocations
+          [] // No tool invocations tracking - tools execute during streaming
         )
       }
     } catch (error: any) {
@@ -2227,7 +2089,7 @@ export function ChatPanelV2({
                       })
                       return
                     }
-                    
+                     
                     // Capture state before revert
                     const { capturePreRevertState, getCheckpoints, deleteMessagesAfter, restoreCheckpoint } = await import('@/lib/checkpoint-utils')
                     await capturePreRevertState(project.id, activeSession.id, revertMessageId)

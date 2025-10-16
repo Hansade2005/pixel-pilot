@@ -1,6 +1,11 @@
 /**
  * Client-Side File Operation Tools for AI SDK
  * These tools execute directly on IndexedDB when called by the AI
+ * 
+ * IMPORTANT: Follows AI SDK client-side tool pattern:
+ * 1. Check if toolCall.dynamic is true (skip if true)
+ * 2. Match toolName and execute client-side logic
+ * 3. Call addToolResult() immediately (NEVER await it - causes deadlocks)
  */
 
 // Helper to parse search/replace blocks (same logic as server)
@@ -47,21 +52,31 @@ export function parseSearchReplaceBlock(blockText: string) {
 }
 
 /**
- * Handle client-side file operations
- * @param toolCall The tool call from AI SDK
+ * Handle client-side file operations following AI SDK pattern
+ * @param toolCall The tool call from AI SDK (contains toolName, toolCallId, args)
  * @param projectId The current project ID
  * @param addToolResult Function to add the tool result back to the chat
  * @returns Promise<void>
+ * 
+ * CRITICAL: This function MUST NOT await addToolResult() - it causes deadlocks in AI SDK streaming.
+ * The function can be async internally, but addToolResult is called synchronously without await.
  */
 export async function handleClientFileOperation(
   toolCall: any,
   projectId: string,
   addToolResult: (result: any) => void
 ) {
+  // Step 1: Always check if the tool is dynamic (per AI SDK docs)
+  if (toolCall.dynamic) {
+    console.log('[ClientFileTool] Skipping dynamic tool:', toolCall.toolName);
+    return;
+  }
+
   const { storageManager } = await import('@/lib/storage-manager');
   await storageManager.init();
 
   try {
+    // Step 2: Match tool names
     switch (toolCall.toolName) {
       case 'write_file': {
         const { path, content } = toolCall.args;
@@ -365,6 +380,217 @@ export async function handleClientFileOperation(
             toolCallId: toolCall.toolCallId,
             state: 'output-error',
             errorText: `Failed to delete file ${path}`
+          });
+        }
+        break;
+      }
+
+      case 'add_package': {
+        const { name: packageNames, version = 'latest', isDev = false } = toolCall.args;
+        console.log(`[ClientFileTool] add_package:`, { packageNames, version, isDev });
+
+        // Normalize package names to array
+        let names: string[];
+        if (Array.isArray(packageNames)) {
+          names = packageNames;
+        } else {
+          const nameStr = packageNames.trim();
+          if (nameStr.startsWith('[') && nameStr.endsWith(']')) {
+            try {
+              const parsed = JSON.parse(nameStr);
+              names = Array.isArray(parsed) ? parsed : [nameStr];
+            } catch {
+              names = [nameStr];
+            }
+          } else if (nameStr.includes(',')) {
+            names = nameStr.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+          } else {
+            names = [nameStr];
+          }
+        }
+
+        try {
+          // Get package.json or create if it doesn't exist
+          let packageFile = await storageManager.getFile(projectId, 'package.json');
+          let packageJson: any = {};
+
+          if (!packageFile) {
+            console.log(`[ClientFileTool] package.json not found, creating new one`);
+            packageJson = {
+              name: 'ai-generated-project',
+              version: '1.0.0',
+              description: 'AI-generated project',
+              main: 'index.js',
+              scripts: {
+                test: 'echo "Error: no test specified" && exit 1'
+              },
+              keywords: [],
+              author: '',
+              license: 'ISC'
+            };
+            
+            await storageManager.createFile({
+              workspaceId: projectId,
+              name: 'package.json',
+              path: 'package.json',
+              content: JSON.stringify(packageJson, null, 2),
+              fileType: 'json',
+              type: 'json',
+              size: JSON.stringify(packageJson, null, 2).length,
+              isDirectory: false
+            });
+          } else {
+            packageJson = JSON.parse(packageFile.content || '{}');
+          }
+
+          const depType = isDev ? 'devDependencies' : 'dependencies';
+
+          // Initialize dependency section if it doesn't exist
+          if (!packageJson[depType]) {
+            packageJson[depType] = {};
+          }
+
+          // Add all packages
+          const addedPackages: string[] = [];
+          for (const packageName of names) {
+            const packageVersion = version === 'latest' ? `^1.0.0` : version;
+            packageJson[depType][packageName] = packageVersion;
+            addedPackages.push(packageName);
+          }
+
+          // Update package.json
+          await storageManager.updateFile(projectId, 'package.json', {
+            content: JSON.stringify(packageJson, null, 2)
+          });
+
+          console.log(`[ClientFileTool] Added packages: ${addedPackages.join(', ')}`);
+
+          addToolResult({
+            tool: 'add_package',
+            toolCallId: toolCall.toolCallId,
+            output: {
+              success: true,
+              message: `✅ Packages ${addedPackages.join(', ')} added to ${depType} successfully.`,
+              packages: addedPackages,
+              version,
+              dependencyType: depType,
+              path: 'package.json',
+              action: 'packages_added'
+            }
+          });
+
+          // Trigger file refresh event
+          window.dispatchEvent(new CustomEvent('files-changed', {
+            detail: { projectId, forceRefresh: true }
+          }));
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          addToolResult({
+            tool: 'add_package',
+            toolCallId: toolCall.toolCallId,
+            state: 'output-error',
+            errorText: `Failed to add packages: ${errorMessage}`
+          });
+        }
+        break;
+      }
+
+      case 'remove_package': {
+        const { name: packageNames, isDev = false } = toolCall.args;
+        console.log(`[ClientFileTool] remove_package:`, { packageNames, isDev });
+
+        // Normalize package names to array
+        let names: string[];
+        if (Array.isArray(packageNames)) {
+          names = packageNames;
+        } else {
+          const nameStr = packageNames.trim();
+          if (nameStr.startsWith('[') && nameStr.endsWith(']')) {
+            try {
+              const parsed = JSON.parse(nameStr);
+              names = Array.isArray(parsed) ? parsed : [nameStr];
+            } catch {
+              names = [nameStr];
+            }
+          } else if (nameStr.includes(',')) {
+            names = nameStr.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+          } else {
+            names = [nameStr];
+          }
+        }
+
+        try {
+          // Get package.json
+          const packageFile = await storageManager.getFile(projectId, 'package.json');
+          if (!packageFile) {
+            addToolResult({
+              tool: 'remove_package',
+              toolCallId: toolCall.toolCallId,
+              state: 'output-error',
+              errorText: 'package.json not found'
+            });
+            return;
+          }
+
+          const packageJson = JSON.parse(packageFile.content || '{}');
+          const depType = isDev ? 'devDependencies' : 'dependencies';
+
+          // Check if all packages exist
+          const missingPackages: string[] = [];
+          for (const packageName of names) {
+            if (!packageJson[depType] || !packageJson[depType][packageName]) {
+              missingPackages.push(packageName);
+            }
+          }
+
+          if (missingPackages.length > 0) {
+            addToolResult({
+              tool: 'remove_package',
+              toolCallId: toolCall.toolCallId,
+              state: 'output-error',
+              errorText: `Package(s) ${missingPackages.join(', ')} not found in ${depType}`
+            });
+            return;
+          }
+
+          // Remove all packages
+          const removedPackages: string[] = [];
+          for (const packageName of names) {
+            delete packageJson[depType][packageName];
+            removedPackages.push(packageName);
+          }
+
+          // Update package.json
+          await storageManager.updateFile(projectId, 'package.json', {
+            content: JSON.stringify(packageJson, null, 2)
+          });
+
+          console.log(`[ClientFileTool] Removed packages: ${removedPackages.join(', ')}`);
+
+          addToolResult({
+            tool: 'remove_package',
+            toolCallId: toolCall.toolCallId,
+            output: {
+              success: true,
+              message: `✅ Packages ${removedPackages.join(', ')} removed from ${depType} successfully.`,
+              packages: removedPackages,
+              dependencyType: depType,
+              path: 'package.json',
+              action: 'packages_removed'
+            }
+          });
+
+          // Trigger file refresh event
+          window.dispatchEvent(new CustomEvent('files-changed', {
+            detail: { projectId, forceRefresh: true }
+          }));
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          addToolResult({
+            tool: 'remove_package',
+            toolCallId: toolCall.toolCallId,
+            state: 'output-error',
+            errorText: `Failed to remove packages: ${errorMessage}`
           });
         }
         break;

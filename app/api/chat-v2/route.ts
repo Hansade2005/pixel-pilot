@@ -121,10 +121,10 @@ You're not just an expert full-stack architect - you're a digital superhero with
 - **DELIVER**: 🚀 Implement with production-ready code that impresses
 
 ## 🛠️ Tools in Your Utility Belt
-- **CLIENT-SIDE TOOLS** (Execute on IndexedDB): read_file (with line numbers), write_file, edit_file, delete_file
-- **SERVER-SIDE TOOLS**: add_package, remove_package, web_search, web_extract, semantic_code_navigator (with line numbers), check_dev_errors, list_files
+- **CLIENT-SIDE TOOLS** (Execute on IndexedDB): read_file (with line numbers), write_file, edit_file, delete_file, add_package, remove_package
+- **SERVER-SIDE TOOLS**: web_search, web_extract, semantic_code_navigator (with line numbers), check_dev_errors, list_files
 
-Note: File operation tools (read_file, write_file, edit_file, delete_file) execute on the client-side IndexedDB directly. You call them and the client handles the actual file operations automatically.
+Note: File and package operation tools (read_file, write_file, edit_file, delete_file, add_package, remove_package) execute on the client-side IndexedDB directly. You call them and the client handles the actual operations automatically.
 
 Note: You may call the 'check error' tool at most 2 times during a single request  if the tool returns an error log, fix it then ask the user to switch to the preview  tab and run the app then rport any logs they see in the console tab below
 
@@ -191,13 +191,25 @@ ${conversationSummaryContext || ''}`
       messages: convertToModelMessages(messages),
       tools: {
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
+        // The execute function forwards the call to the client
         write_file: tool({
           description: 'Create or update a file in the project. Use this tool to create new files or update existing ones with new content. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
             path: z.string().describe('The file path relative to project root (e.g., "src/components/Button.tsx")'),
             content: z.string().describe('The complete file content to write')
           }),
-          // NO execute function - handled by client onToolCall
+          execute: async ({ path, content }, { toolCallId }) => {
+            // Return a marker indicating this tool is handled by the client
+            // The client will intercept the tool-call event and execute it on IndexedDB
+            console.log(`[Chat-V2][write_file] Forwarding to client: ${path}`)
+            return {
+              _clientSideTool: true,
+              toolName: 'write_file',
+              path,
+              message: `File operation forwarded to client: ${path}`,
+              toolCallId
+            }
+          }
         }),
 
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
@@ -207,7 +219,16 @@ ${conversationSummaryContext || ''}`
             path: z.string().describe('File path to read'),
             includeLineNumbers: z.boolean().optional().describe('Whether to include line numbers in the response (default: false)')
           }),
-          // NO execute function - handled by client onToolCall
+          execute: async ({ path, includeLineNumbers }, { toolCallId }) => {
+            console.log(`[Chat-V2][read_file] Forwarding to client: ${path}`)
+            return {
+              _clientSideTool: true,
+              toolName: 'read_file',
+              path,
+              message: `File operation forwarded to client: ${path}`,
+              toolCallId
+            }
+          }
         }),
 
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
@@ -216,11 +237,45 @@ ${conversationSummaryContext || ''}`
           inputSchema: z.object({
             path: z.string().describe('The file path relative to project root to delete')
           }),
-          // NO execute function - handled by client onToolCall
+          execute: async ({ path }, { toolCallId }) => {
+            console.log(`[Chat-V2][delete_file] Forwarding to client: ${path}`)
+            return {
+              _clientSideTool: true,
+              toolName: 'delete_file',
+              path,
+              message: `File operation forwarded to client: ${path}`,
+              toolCallId
+            }
+          }
         }),
 
+        // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
+        edit_file: tool({
+          description: 'Edit an existing file using search/replace blocks. Use this tool to make precise modifications to file content. This tool executes on the client-side IndexedDB.',
+          inputSchema: z.object({
+            filePath: z.string().describe('The file path relative to project root'),
+            searchReplaceBlock: z.string().describe(`Search/replace block in format:
+<<<<<<< SEARCH
+[exact code to find]
+=======
+[new code to replace with]
+>>>>>>> REPLACE`)
+          }),
+          execute: async ({ filePath, searchReplaceBlock }, { toolCallId }) => {
+            console.log(`[Chat-V2][edit_file] Forwarding to client: ${filePath}`)
+            return {
+              _clientSideTool: true,
+              toolName: 'edit_file',
+              path: filePath,
+              message: `File operation forwarded to client: ${filePath}`,
+              toolCallId
+            }
+          }
+        }),
+
+        // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
         add_package: tool({
-          description: 'Add one or more npm packages to package.json. Use this tool to install new dependencies.',
+          description: 'Add one or more npm packages to package.json. Use this tool to install new dependencies. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
             name: z.union([
               z.string().describe('The package name (e.g., "lodash") or comma-separated names (e.g., "lodash, axios, react-router-dom")'),
@@ -229,126 +284,21 @@ ${conversationSummaryContext || ''}`
             version: z.string().optional().describe('The package version (e.g., "^4.17.21"). Defaults to "latest". Applied to all packages if array provided'),
             isDev: z.boolean().optional().describe('Whether to add as dev dependency (default: false)')
           }),
-          execute: async (input: { name: string | string[]; version?: string; isDev?: boolean }, { abortSignal, toolCallId }) => {
+          execute: async (input: { name: string | string[]; version?: string; isDev?: boolean }, { toolCallId }) => {
             const { name: packageNames, version = 'latest', isDev = false } = input
-            console.log(`[Chat-V2][add_package] Received input:`, { packageNames, version, isDev })
-            
-            // Ensure packageNames is always an array
-            let names: string[]
-            if (Array.isArray(packageNames)) {
-              names = packageNames
-            } else {
-              // Handle comma-separated strings or JSON array strings
-              const nameStr = packageNames.trim()
-              if (nameStr.startsWith('[') && nameStr.endsWith(']')) {
-                // Try to parse as JSON array
-                try {
-                  const parsed = JSON.parse(nameStr)
-                  names = Array.isArray(parsed) ? parsed : [nameStr]
-                } catch {
-                  names = [nameStr]
-                }
-              } else if (nameStr.includes(',')) {
-                // Split comma-separated values
-                names = nameStr.split(',').map(s => s.trim()).filter(s => s.length > 0)
-              } else {
-                names = [nameStr]
-              }
-            }
-            
-            // Check for cancellation
-            if (abortSignal?.aborted) {
-              throw new Error('Operation cancelled')
-            }
-            
-            try {
-              console.log(`[Chat-V2][add_package] Executing: ${names.join(', ')}@${version} (dev: ${isDev})`)
-              
-              // Import storage manager
-              const { storageManager } = await import('@/lib/storage-manager')
-              await storageManager.init()
-              
-              // Get package.json or create if it doesn't exist
-              let packageFile = await storageManager.getFile(projectId, 'package.json')
-              let packageJson: any = {}
-              
-              if (!packageFile) {
-                console.log(`[Chat-V2][add_package] package.json not found, creating new one`)
-                // Create a basic package.json
-                packageJson = {
-                  name: "ai-generated-project",
-                  version: "1.0.0",
-                  description: "AI-generated project",
-                  main: "index.js",
-                  scripts: {
-                    test: "echo \"Error: no test specified\" && exit 1"
-                  },
-                  keywords: [],
-                  author: "",
-                  license: "ISC"
-                }
-                // Create the file
-                await storageManager.createFile({
-                  workspaceId: projectId,
-                  name: 'package.json',
-                  path: 'package.json',
-                  content: JSON.stringify(packageJson, null, 2),
-                  fileType: 'json',
-                  type: 'json',
-                  size: JSON.stringify(packageJson, null, 2).length,
-                  isDirectory: false
-                })
-              } else {
-                packageJson = JSON.parse(packageFile.content || '{}')
-              }
-
-              const depType = isDev ? 'devDependencies' : 'dependencies'
-              
-              // Initialize dependency section if it doesn't exist
-              if (!packageJson[depType]) {
-                packageJson[depType] = {}
-              }
-
-              // Add all packages
-              const addedPackages: string[] = []
-              for (const packageName of names) {
-                // Use appropriate version - for 'latest', use a reasonable default or just 'latest'
-                const packageVersion = version === 'latest' ? `^1.0.0` : version
-                packageJson[depType][packageName] = packageVersion
-                addedPackages.push(packageName)
-              }
-
-              // Update package.json
-              await storageManager.updateFile(projectId, 'package.json', {
-                content: JSON.stringify(packageJson, null, 2)
-              })
-
-              console.log(`[Chat-V2][add_package] Added: ${addedPackages.join(', ')}@${version} to ${depType}`)
-              return {
-                success: true,
-                action: 'packages_added',
-                packages: addedPackages,
-                version,
-                dependencyType: depType,
-                path: 'package.json',
-                content: JSON.stringify(packageJson, null, 2),
-                message: `Packages ${addedPackages.join(', ')} added to ${depType} successfully`,
-                toolCallId
-              }
-            } catch (error: any) {
-              console.error(`[Chat-V2][add_package] Error:`, error)
-              return {
-                success: false,
-                error: error.message,
-                packages: names,
-                toolCallId
-              }
+            console.log(`[Chat-V2][add_package] Forwarding to client:`, { packageNames, version, isDev })
+            return {
+              _clientSideTool: true,
+              toolName: 'add_package',
+              message: `Package operation forwarded to client: ${Array.isArray(packageNames) ? packageNames.join(', ') : packageNames}`,
+              toolCallId
             }
           }
         }),
 
+        // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
         remove_package: tool({
-          description: 'Remove one or more npm packages from package.json. Use this tool to uninstall dependencies.',
+          description: 'Remove one or more npm packages from package.json. Use this tool to uninstall dependencies. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
             name: z.union([
               z.string().describe('The package name to remove or comma-separated names (e.g., "lodash, axios")'),
@@ -358,84 +308,12 @@ ${conversationSummaryContext || ''}`
           }),
           execute: async (input: { name: string | string[]; isDev?: boolean }, { toolCallId }) => {
             const { name: packageNames, isDev = false } = input
-            
-            // Ensure packageNames is always an array
-            let names: string[]
-            if (Array.isArray(packageNames)) {
-              names = packageNames
-            } else {
-              // Handle comma-separated strings or JSON array strings
-              const nameStr = packageNames.trim()
-              if (nameStr.startsWith('[') && nameStr.endsWith(']')) {
-                // Try to parse as JSON array
-                try {
-                  const parsed = JSON.parse(nameStr)
-                  names = Array.isArray(parsed) ? parsed : [nameStr]
-                } catch {
-                  names = [nameStr]
-                }
-              } else if (nameStr.includes(',')) {
-                // Split comma-separated values
-                names = nameStr.split(',').map(s => s.trim()).filter(s => s.length > 0)
-              } else {
-                names = [nameStr]
-              }
-            }
-            try {
-              console.log(`[Chat-V2][remove_package] Executing: ${names.join(', ')} (dev: ${isDev})`)
-              
-              // Get package.json
-              const packageFile = await storageManager.getFile(projectId, 'package.json')
-              if (!packageFile) {
-                throw new Error('package.json not found')
-              }
-
-              const packageJson = JSON.parse(packageFile.content || '{}')
-              const depType = isDev ? 'devDependencies' : 'dependencies'
-              
-              // Check if all packages exist
-              const missingPackages: string[] = []
-              for (const packageName of names) {
-                if (!packageJson[depType] || !packageJson[depType][packageName]) {
-                  missingPackages.push(packageName)
-                }
-              }
-              
-              if (missingPackages.length > 0) {
-                throw new Error(`Package(s) ${missingPackages.join(', ')} not found in ${depType}`)
-              }
-
-              // Remove all packages
-              const removedPackages: string[] = []
-              for (const packageName of names) {
-                delete packageJson[depType][packageName]
-                removedPackages.push(packageName)
-              }
-
-              // Update package.json
-              await storageManager.updateFile(projectId, 'package.json', {
-                content: JSON.stringify(packageJson, null, 2)
-              })
-
-              console.log(`[Chat-V2][remove_package] Removed: ${removedPackages.join(', ')} from ${depType}`)
-              return {
-                success: true,
-                action: 'packages_removed',
-                packages: removedPackages,
-                dependencyType: depType,
-                path: 'package.json',
-                content: JSON.stringify(packageJson, null, 2),
-                message: `Packages ${removedPackages.join(', ')} removed from ${depType} successfully`,
-                toolCallId
-              }
-            } catch (error: any) {
-              console.error(`[Chat-V2][remove_package] Error:`, error)
-              return {
-                success: false,
-                error: error.message,
-                packages: names,
-                toolCallId
-              }
+            console.log(`[Chat-V2][remove_package] Forwarding to client:`, { packageNames, isDev })
+            return {
+              _clientSideTool: true,
+              toolName: 'remove_package',
+              message: `Package operation forwarded to client: ${Array.isArray(packageNames) ? packageNames.join(', ') : packageNames}`,
+              toolCallId
             }
           }
         }),
@@ -604,16 +482,6 @@ ${conversationSummaryContext || ''}`
               };
             }
           }
-        }),
-
-        // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
-        edit_file: tool({
-          description: 'Edit a file by applying search and replace operations using search/replace blocks. Use this tool to make precise modifications to existing files. This tool executes on the client-side IndexedDB.',
-          inputSchema: z.object({
-            filePath: z.string().describe('The file path relative to project root to edit'),
-            searchReplaceBlock: z.string().describe('Search/replace block in format: <<<<<<< SEARCH\\n[old code]\\n=======\\n[new code]\\n>>>>>>> REPLACE')
-          }),
-          // NO execute function - handled by client onToolCall
         }),
 
         semantic_code_navigator: tool({
