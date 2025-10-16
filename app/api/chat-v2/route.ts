@@ -32,6 +32,448 @@ const getStorageManager = async () => {
   return storageManager
 }
 
+// Powerful function to construct proper tool result messages
+const constructToolResult = async (toolName: string, input: any, projectId: string, toolCallId: string) => {
+  try {
+    const storageManager = await getStorageManager()
+
+    switch (toolName) {
+      case 'write_file': {
+        const { path, content } = input
+
+        // Validate inputs
+        if (!path || typeof path !== 'string') {
+          return {
+            success: false,
+            error: `Invalid file path provided`,
+            path,
+            toolCallId
+          }
+        }
+
+        if (content === undefined || content === null) {
+          return {
+            success: false,
+            error: `Invalid content provided`,
+            path,
+            toolCallId
+          }
+        }
+
+        // Check if file already exists
+        const existingFile = await storageManager.getFile(projectId, path)
+
+        if (existingFile) {
+          // Update existing file
+          await storageManager.updateFile(projectId, path, { content })
+          return {
+            success: true,
+            message: `✅ File ${path} updated successfully.`,
+            path,
+            content,
+            action: 'updated',
+            toolCallId
+          }
+        } else {
+          // Create new file
+          const newFile = await storageManager.createFile({
+            workspaceId: projectId,
+            name: path.split('/').pop() || path,
+            path,
+            content,
+            fileType: path.split('.').pop() || 'text',
+            type: path.split('.').pop() || 'text',
+            size: content.length,
+            isDirectory: false,
+            metadata: { createdBy: 'ai' }
+          })
+
+          return {
+            success: true,
+            message: `✅ File ${path} created successfully.`,
+            path,
+            content,
+            action: 'created',
+            fileId: newFile.id,
+            toolCallId
+          }
+        }
+      }
+
+      case 'read_file': {
+        const { path, includeLineNumbers = false } = input
+
+        // Validate path
+        if (!path || typeof path !== 'string') {
+          return {
+            success: false,
+            error: `Invalid file path provided`,
+            path,
+            toolCallId
+          }
+        }
+
+        const file = await storageManager.getFile(projectId, path)
+
+        if (!file) {
+          return {
+            success: false,
+            error: `File not found: ${path}. Use list_files to see available files.`,
+            path,
+            toolCallId
+          }
+        }
+
+        const content = file.content || ''
+        let response: any = {
+          success: true,
+          message: `✅ File ${path} read successfully.`,
+          path,
+          content,
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          action: 'read',
+          toolCallId
+        }
+
+        // Add line number information if requested
+        if (includeLineNumbers) {
+          const lines = content.split('\n')
+          const lineCount = lines.length
+          const linesWithNumbers = lines.map((line, index) =>
+            `${String(index + 1).padStart(4, ' ')}: ${line}`
+          ).join('\n')
+
+          response.lineCount = lineCount
+          response.contentWithLineNumbers = linesWithNumbers
+          response.lines = lines // Array of individual lines for programmatic access
+        }
+
+        return response
+      }
+
+      case 'edit_file': {
+        const { filePath, searchReplaceBlock } = input
+
+        // Validate inputs
+        if (!filePath || typeof filePath !== 'string') {
+          return {
+            success: false,
+            error: `Invalid file path provided`,
+            filePath,
+            toolCallId
+          }
+        }
+
+        if (!searchReplaceBlock || typeof searchReplaceBlock !== 'string') {
+          return {
+            success: false,
+            error: `Invalid search/replace block provided`,
+            filePath,
+            toolCallId
+          }
+        }
+
+        // Parse the search/replace block
+        const parsedBlock = parseSearchReplaceBlock(searchReplaceBlock)
+        if (!parsedBlock) {
+          return {
+            success: false,
+            error: `Invalid search/replace block format`,
+            filePath,
+            searchReplaceBlock,
+            toolCallId
+          }
+        }
+
+        // Get the file
+        const file = await storageManager.getFile(projectId, filePath)
+        if (!file) {
+          return {
+            success: false,
+            error: `File not found: ${filePath}`,
+            filePath,
+            toolCallId
+          }
+        }
+
+        const originalContent = file.content || ''
+        const { search, replace } = parsedBlock
+
+        // Check if search text exists in file
+        if (!originalContent.includes(search)) {
+          return {
+            success: false,
+            error: `Search text not found in file: ${filePath}`,
+            filePath,
+            searchText: search,
+            toolCallId
+          }
+        }
+
+        // Perform the replacement
+        const newContent = originalContent.replace(search, replace)
+
+        // Update the file
+        await storageManager.updateFile(projectId, filePath, { content: newContent })
+
+        return {
+          success: true,
+          message: `✅ File ${filePath} modified successfully.`,
+          path: filePath,
+          originalContent,
+          newContent,
+          searchText: search,
+          replaceText: replace,
+          action: 'modified',
+          toolCallId
+        }
+      }
+
+      case 'delete_file': {
+        const { path } = input
+
+        // Validate path
+        if (!path || typeof path !== 'string') {
+          return {
+            success: false,
+            error: `Invalid file path provided`,
+            path,
+            toolCallId
+          }
+        }
+
+        // Check if file exists
+        const existingFile = await storageManager.getFile(projectId, path)
+        if (!existingFile) {
+          return {
+            success: false,
+            error: `File not found: ${path}. Use list_files to see available files.`,
+            path,
+            toolCallId
+          }
+        }
+
+        // Delete the file
+        const result = await storageManager.deleteFile(projectId, path)
+
+        if (result) {
+          return {
+            success: true,
+            message: `✅ File ${path} deleted successfully.`,
+            path,
+            action: 'deleted',
+            toolCallId
+          }
+        } else {
+          return {
+            success: false,
+            error: `Failed to delete file ${path}`,
+            path,
+            toolCallId
+          }
+        }
+      }
+
+      case 'add_package': {
+        const { name: packageNames, version = 'latest', isDev = false } = input
+
+        // Ensure packageNames is always an array
+        let names: string[]
+        if (Array.isArray(packageNames)) {
+          names = packageNames
+        } else {
+          // Handle comma-separated strings or JSON array strings
+          const nameStr = packageNames.trim()
+          if (nameStr.startsWith('[') && nameStr.endsWith(']')) {
+            // Try to parse as JSON array
+            try {
+              const parsed = JSON.parse(nameStr)
+              names = Array.isArray(parsed) ? parsed : [nameStr]
+            } catch {
+              names = [nameStr]
+            }
+          } else if (nameStr.includes(',')) {
+            // Split comma-separated values
+            names = nameStr.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
+          } else {
+            names = [nameStr]
+          }
+        }
+
+        // Get package.json or create if it doesn't exist
+        let packageFile = await storageManager.getFile(projectId, 'package.json')
+        let packageJson: any = {}
+
+        if (!packageFile) {
+          // Create a basic package.json
+          packageJson = {
+            name: "ai-generated-project",
+            version: "1.0.0",
+            description: "AI-generated project",
+            main: "index.js",
+            scripts: {
+              test: "echo \"Error: no test specified\" && exit 1"
+            },
+            keywords: [],
+            author: "",
+            license: "ISC"
+          }
+          // Create the file
+          await storageManager.createFile({
+            workspaceId: projectId,
+            name: 'package.json',
+            path: 'package.json',
+            content: JSON.stringify(packageJson, null, 2),
+            fileType: 'json',
+            type: 'json',
+            size: JSON.stringify(packageJson, null, 2).length,
+            isDirectory: false
+          })
+        } else {
+          packageJson = JSON.parse(packageFile.content || '{}')
+        }
+
+        const depType = isDev ? 'devDependencies' : 'dependencies'
+
+        // Initialize dependency section if it doesn't exist
+        if (!packageJson[depType]) {
+          packageJson[depType] = {}
+        }
+
+        // Add all packages
+        const addedPackages: string[] = []
+        for (const packageName of names) {
+          // Use appropriate version - for 'latest', use a reasonable default
+          const packageVersion = version === 'latest' ? `^1.0.0` : version
+          packageJson[depType][packageName] = packageVersion
+          addedPackages.push(packageName)
+        }
+
+        // Update package.json
+        await storageManager.updateFile(projectId, 'package.json', {
+          content: JSON.stringify(packageJson, null, 2)
+        })
+
+        return {
+          success: true,
+          action: 'packages_added',
+          packages: addedPackages,
+          version,
+          dependencyType: depType,
+          path: 'package.json',
+          content: JSON.stringify(packageJson, null, 2),
+          message: `Packages ${addedPackages.join(', ')} added to ${depType} successfully`,
+          toolCallId
+        }
+      }
+
+      case 'remove_package': {
+        const { name: packageNames, isDev = false } = input
+
+        // Ensure packageNames is always an array
+        let names: string[]
+        if (Array.isArray(packageNames)) {
+          names = packageNames
+        } else {
+          // Handle comma-separated strings or JSON array strings
+          const nameStr = packageNames.trim()
+          if (nameStr.startsWith('[') && nameStr.endsWith(']')) {
+            // Try to parse as JSON array
+            try {
+              const parsed = JSON.parse(nameStr)
+              names = Array.isArray(parsed) ? parsed : [nameStr]
+            } catch {
+              names = [nameStr]
+            }
+          } else if (nameStr.includes(',')) {
+            // Split comma-separated values
+            names = nameStr.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
+          } else {
+            names = [nameStr]
+          }
+        }
+
+        // Get package.json
+        const packageFile = await storageManager.getFile(projectId, 'package.json')
+        if (!packageFile) {
+          return {
+            success: false,
+            error: `package.json not found`,
+            toolCallId
+          }
+        }
+
+        const packageJson = JSON.parse(packageFile.content || '{}')
+        const depType = isDev ? 'devDependencies' : 'dependencies'
+
+        // Check if dependency section exists
+        if (!packageJson[depType]) {
+          return {
+            success: false,
+            error: `No ${depType} found in package.json`,
+            toolCallId
+          }
+        }
+
+        // Remove packages
+        const removedPackages: string[] = []
+        const notFoundPackages: string[] = []
+
+        for (const packageName of names) {
+          if (packageJson[depType][packageName]) {
+            delete packageJson[depType][packageName]
+            removedPackages.push(packageName)
+          } else {
+            notFoundPackages.push(packageName)
+          }
+        }
+
+        if (removedPackages.length === 0) {
+          return {
+            success: false,
+            error: `Packages not found in ${depType}: ${notFoundPackages.join(', ')}`,
+            toolCallId
+          }
+        }
+
+        // Update package.json
+        await storageManager.updateFile(projectId, 'package.json', {
+          content: JSON.stringify(packageJson, null, 2)
+        })
+
+        return {
+          success: true,
+          action: 'packages_removed',
+          packages: removedPackages,
+          dependencyType: depType,
+          path: 'package.json',
+          content: JSON.stringify(packageJson, null, 2),
+          message: `Packages ${removedPackages.join(', ')} removed from ${depType} successfully`,
+          toolCallId
+        }
+      }
+
+      default:
+        return {
+          success: false,
+          error: `Unknown tool: ${toolName}`,
+          toolCallId
+        }
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error(`[ERROR] ${toolName} failed:`, error)
+
+    return {
+      success: false,
+      error: `Failed to execute ${toolName}: ${errorMessage}`,
+      toolCallId
+    }
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json()
@@ -68,11 +510,55 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // NOTE: File operations are now client-side only
-    // No server-side file sync needed - client handles file operations directly on IndexedDB
-    console.log(`[Chat-V2] Client-side file operations enabled - all file operations execute on IndexedDB`)
+    // CRITICAL: Sync client-side files to server-side InMemoryStorage
+    // This ensures AI tools can access the files that exist in IndexedDB
+    // Preserve AI-created files while syncing client files
     const clientFiles = files || []
-    console.log(`[Chat-V2] Project has ${clientFiles.length} files available in IndexedDB`)
+    console.log(`[DEBUG] Syncing ${clientFiles.length} files to server-side storage for AI access`)
+
+    if (clientFiles.length > 0 || true) { // Always check for AI files to preserve
+      try {
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+
+        // Get existing files to preserve AI-created ones
+        const existingFiles = await storageManager.getFiles(projectId)
+        const aiCreatedFiles = existingFiles.filter(f => f.metadata?.createdBy === 'ai')
+
+        // Clear existing files EXCEPT AI-created ones
+        for (const existingFile of existingFiles) {
+          if (existingFile.metadata?.createdBy !== 'ai') {
+            await storageManager.deleteFile(projectId, existingFile.path)
+          }
+        }
+
+        // Sync all client files to server storage (these are not AI-created)
+        for (const file of clientFiles) {
+          if (file.path && !file.isDirectory) {
+            await storageManager.createFile({
+              workspaceId: projectId,
+              name: file.name,
+              path: file.path,
+              content: file.content || '',
+              fileType: file.type || file.fileType || 'text',
+              type: file.type || file.fileType || 'text',
+              size: file.size || (file.content || '').length,
+              isDirectory: false,
+              metadata: { createdBy: 'client' }
+            })
+            console.log(`[DEBUG] Synced client file to server storage: ${file.path}`)
+          }
+        }
+
+        // Verify sync worked
+        const syncedFiles = await storageManager.getFiles(projectId)
+        console.log(`[DEBUG] File sync complete: ${syncedFiles.length} files now available to AI tools (${aiCreatedFiles.length} AI-created, ${clientFiles.length} client files)`)
+
+      } catch (syncError) {
+        console.error('[ERROR] Failed to sync files to server storage:', syncError)
+        // Continue anyway - tools may still work for write operations
+      }
+    }
 
     // Get storage manager
     const storageManager = await getStorageManager()
@@ -215,7 +701,7 @@ ${conversationSummaryContext || ''}`
       messages,
       tools: {
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
-        // The execute function forwards the call to the client
+        // The execute function now returns actual results instead of forwarding messages
         write_file: tool({
           description: 'Create or update a file in the project. Use this tool to create new files or update existing ones with new content. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
@@ -223,16 +709,8 @@ ${conversationSummaryContext || ''}`
             content: z.string().describe('The complete file content to write')
           }),
           execute: async ({ path, content }, { toolCallId }) => {
-            // Return a marker indicating this tool is handled by the client
-            // The client will intercept the tool-call event and execute it on IndexedDB
-            console.log(`[Chat-V2][write_file] Forwarding to client: ${path}`)
-            return {
-              _clientSideTool: true,
-              toolName: 'write_file',
-              path,
-              message: `File operation forwarded to client: ${path}`,
-              toolCallId
-            }
+            // Use the powerful constructor to get actual results
+            return await constructToolResult('write_file', { path, content }, projectId, toolCallId)
           }
         }),
 
@@ -244,14 +722,8 @@ ${conversationSummaryContext || ''}`
             includeLineNumbers: z.boolean().optional().describe('Whether to include line numbers in the response (default: false)')
           }),
           execute: async ({ path, includeLineNumbers }, { toolCallId }) => {
-            console.log(`[Chat-V2][read_file] Forwarding to client: ${path}`)
-            return {
-              _clientSideTool: true,
-              toolName: 'read_file',
-              path,
-              message: `File operation forwarded to client: ${path}`,
-              toolCallId
-            }
+            // Use the powerful constructor to get actual results
+            return await constructToolResult('read_file', { path, includeLineNumbers }, projectId, toolCallId)
           }
         }),
 
@@ -262,14 +734,8 @@ ${conversationSummaryContext || ''}`
             path: z.string().describe('The file path relative to project root to delete')
           }),
           execute: async ({ path }, { toolCallId }) => {
-            console.log(`[Chat-V2][delete_file] Forwarding to client: ${path}`)
-            return {
-              _clientSideTool: true,
-              toolName: 'delete_file',
-              path,
-              message: `File operation forwarded to client: ${path}`,
-              toolCallId
-            }
+            // Use the powerful constructor to get actual results
+            return await constructToolResult('delete_file', { path }, projectId, toolCallId)
           }
         }),
 
@@ -286,14 +752,8 @@ ${conversationSummaryContext || ''}`
 >>>>>>> REPLACE`)
           }),
           execute: async ({ filePath, searchReplaceBlock }, { toolCallId }) => {
-            console.log(`[Chat-V2][edit_file] Forwarding to client: ${filePath}`)
-            return {
-              _clientSideTool: true,
-              toolName: 'edit_file',
-              path: filePath,
-              message: `File operation forwarded to client: ${filePath}`,
-              toolCallId
-            }
+            // Use the powerful constructor to get actual results
+            return await constructToolResult('edit_file', { filePath, searchReplaceBlock }, projectId, toolCallId)
           }
         }),
 
@@ -309,14 +769,8 @@ ${conversationSummaryContext || ''}`
             isDev: z.boolean().optional().describe('Whether to add as dev dependency (default: false)')
           }),
           execute: async (input: { name: string | string[]; version?: string; isDev?: boolean }, { toolCallId }) => {
-            const { name: packageNames, version = 'latest', isDev = false } = input
-            console.log(`[Chat-V2][add_package] Forwarding to client:`, { packageNames, version, isDev })
-            return {
-              _clientSideTool: true,
-              toolName: 'add_package',
-              message: `Package operation forwarded to client: ${Array.isArray(packageNames) ? packageNames.join(', ') : packageNames}`,
-              toolCallId
-            }
+            // Use the powerful constructor to get actual results
+            return await constructToolResult('add_package', input, projectId, toolCallId)
           }
         }),
 
@@ -331,14 +785,8 @@ ${conversationSummaryContext || ''}`
             isDev: z.boolean().optional().describe('Whether to remove from dev dependencies (default: false)')
           }),
           execute: async (input: { name: string | string[]; isDev?: boolean }, { toolCallId }) => {
-            const { name: packageNames, isDev = false } = input
-            console.log(`[Chat-V2][remove_package] Forwarding to client:`, { packageNames, isDev })
-            return {
-              _clientSideTool: true,
-              toolName: 'remove_package',
-              message: `Package operation forwarded to client: ${Array.isArray(packageNames) ? packageNames.join(', ') : packageNames}`,
-              toolCallId
-            }
+            // Use the powerful constructor to get actual results
+            return await constructToolResult('remove_package', input, projectId, toolCallId)
           }
         }),
 
