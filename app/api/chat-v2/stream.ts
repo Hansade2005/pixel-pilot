@@ -1445,7 +1445,7 @@ ${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
                 toolCalls.set(toolCall.toolCallId, {
                   toolCallId: toolCall.toolCallId,
                   toolName: toolCall.toolName,
-                  args: toolCall.input, // ✅ FIXED: AI SDK sends 'input' not 'args'
+                  args: toolCall.args,
                   state: 'call'
                 })
               }
