@@ -741,7 +741,7 @@ ${conversationSummaryContext || ''}`
 
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
         edit_file: tool({
-          description: 'Edit an existing file using search/replace blocks. Use this tool to make precise modifications to file content. This tool executes on the client-side IndexedDB.',
+          description: 'Edit an existing file using search/replace blocks. This tool cannot handle very large replacements. Use it only for small changes, small additions, or modifications in files. For large changes, prioritize the write_file tool instead. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
             filePath: z.string().describe('The file path relative to project root'),
             searchReplaceBlock: z.string().describe(`Search/replace block in format:
