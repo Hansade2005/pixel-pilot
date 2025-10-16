@@ -111,11 +111,42 @@ export async function POST(req: Request) {
       ? `\n\n## 📁 Project Files\n${files.map((f: any) => `- ${f.path} (${f.type})`).join('\n')}`
       : ''
 
-    // Get conversation history for context (last 10 messages)
-    const recentMessages = messages.slice(-10)
-    const conversationHistory = recentMessages.map((msg: any) => 
-      `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content.substring(0, 200)}${msg.content.length > 200 ? '...' : ''}`
-    ).join('\n')
+    // Get conversation history for context (last 10 messages) - Same format as /api/chat/route.ts
+    let conversationSummaryContext = ''
+    try {
+      const recentMessages = messages.slice(-20) // Last 20 messages for better context
+      
+      if (recentMessages && recentMessages.length > 0) {
+        // Filter out system messages and empty content
+        const filteredMessages = recentMessages.filter((msg: any) => 
+          msg.role !== 'system' && msg.content && msg.content.trim().length > 0
+        )
+
+        // Create full history from filtered messages in AI-readable format
+        // Exact same format as /api/chat/route.ts
+        const fullHistory = filteredMessages
+          .map((msg: any, index: number) => {
+            const role = msg.role === 'user' ? 'User' : msg.role === 'assistant' ? 'You' : msg.role.toUpperCase()
+            const message = `${role}: ${msg.content}`
+            // Add separator after assistant messages to separate interaction pairs
+            const separator = msg.role === 'assistant' ? '\n\n---\n\n' : '\n\n'
+            return message + separator
+          })
+          .join('')
+
+        conversationSummaryContext = `## 📜 CONVERSATION HISTORY\n\n${fullHistory.trim()}`
+        console.log('[Chat-V2][HISTORY] Formatted conversation history for AI:', {
+          totalMessages: recentMessages.length,
+          filteredMessages: filteredMessages.length,
+          historyLength: conversationSummaryContext.length
+        })
+      } else {
+        console.log('[Chat-V2][HISTORY] No conversation history available')
+      }
+    } catch (historyError) {
+      console.error('[Chat-V2][HISTORY] Error preparing conversation history:', historyError)
+      // Continue without history on error
+    }
 
     // Build system prompt from pixel_forge_system_prompt.ts
     const isNextJS = true // We're using Next.js
@@ -186,7 +217,7 @@ Remember: You're not just coding - you're crafting digital magic! Every detail m
 
 ${projectContext}
 
-${conversationHistory ? `## Recent Conversation\n${conversationHistory}` : ''}`
+${conversationSummaryContext || ''}`
 
     // Get AI model
     const model = getAIModel(modelId)
