@@ -126,27 +126,57 @@ const getFileIcon = (fileName: string) => {
 }
 
 export function MessageWithTools({ message, projectId, isStreaming = false }: MessageWithToolsProps) {
-  // In AI SDK v5, messages have different structure
-  // Check for both possible tool structures
-  const toolInvocations = (message as any).toolInvocations || []
-  const hasTools = toolInvocations && toolInvocations.length > 0
-
-  // Get reasoning and response content
-  const reasoningContent = (message as any).reasoning || ''
-  const responseContent = (message as any).content || ''
+  // AI SDK v5 uses parts array for structured message content
+  const parts = (message as any).parts || []
   
+  // Extract different part types from the parts array
+  const toolCallParts = parts.filter((part: any) => part.type === 'tool-call')
+  const toolResultParts = parts.filter((part: any) => part.type === 'tool-result')
+  const textParts = parts.filter((part: any) => part.type === 'text')
+  
+  // Fallback to old structure for backwards compatibility
+  const legacyToolInvocations = (message as any).toolInvocations || []
+  const legacyContent = (message as any).content || ''
+  const legacyReasoning = (message as any).reasoning || ''
+  
+  // Combine parts-based and legacy structure
+  const hasTools = toolCallParts.length > 0 || legacyToolInvocations.length > 0
+  const textContent = textParts.map((p: any) => p.text).join('') || legacyContent
+  const hasResponse = textContent.trim().length > 0
+  
+  // Extract reasoning (could be in experimental_providerMetadata or legacy field)
+  const reasoningContent = (message as any).experimental_providerMetadata?.anthropic?.reasoning || legacyReasoning || ''
   const hasReasoning = reasoningContent.trim().length > 0
-  const hasResponse = responseContent.trim().length > 0
-
+  
+  // Merge tool calls and results for rendering
+  const toolInvocations = toolCallParts.map((toolCall: any) => {
+    const result = toolResultParts.find((r: any) => r.toolCallId === toolCall.toolCallId)
+    return {
+      toolCallId: toolCall.toolCallId,
+      toolName: toolCall.toolName,
+      args: toolCall.args,
+      state: result ? 'result' : 'call',
+      result: result ? result.result : null
+    }
+  })
+  
+  // Add legacy tool invocations if present
+  if (legacyToolInvocations.length > 0) {
+    toolInvocations.push(...legacyToolInvocations)
+  }
+  
   // Debug logging
   console.log(`[MessageWithTools] Message ${message.id}:`, {
     role: message.role,
+    hasParts: parts.length > 0,
+    partsCount: parts.length,
+    toolCallParts: toolCallParts.length,
+    toolResultParts: toolResultParts.length,
+    textParts: textParts.length,
     hasReasoning,
     reasoningLength: reasoningContent.length,
     hasTools,
-    toolCount: toolInvocations.length,
     hasResponse,
-    responseLength: responseContent.length,
     isStreaming
   })
 
@@ -171,7 +201,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
           }
         }))
 
-        // Dispatch files-changed event for file operations
+        // Dispatch files-changed event for file operations (CLIENT-SIDE TOOLS)
         if (['write_file', 'edit_file', 'delete_file'].includes(toolInvocation.toolName)) {
           let filePath = 'unknown';
           
@@ -183,12 +213,14 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
             filePath = toolInvocation.result?.path || toolInvocation.args?.path || 'unknown';
           }
           
+          console.log(`[MessageWithTools] File operation completed: ${toolInvocation.toolName} - ${filePath}`)
+          
           window.dispatchEvent(new CustomEvent('files-changed', {
             detail: {
               projectId: projectId,
               action: toolInvocation.toolName,
               path: filePath,
-              source: 'ai-sdk-tool',
+              source: 'client-side-tool',
               toolCallId: toolInvocation.toolCallId
             }
           }))
@@ -746,7 +778,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
           'prose-code:text-foreground prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded'
         )}>
           <Response>
-            {responseContent}
+            {textContent}
           </Response>
         </div>
       )}

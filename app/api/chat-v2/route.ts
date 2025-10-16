@@ -1,4 +1,4 @@
-import { streamText, tool, stepCountIs } from 'ai'
+import { streamText, tool, stepCountIs, convertToModelMessages, UIMessage } from 'ai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { getModel } from '@/lib/ai-providers'
@@ -53,55 +53,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // CRITICAL: Sync client-side files to server-side InMemoryStorage
-    // This ensures AI tools can access the files that exist in IndexedDB
-    // Preserve AI-created files while syncing client files
+    // NOTE: File operations are now client-side only
+    // No server-side file sync needed - client handles file operations directly on IndexedDB
+    console.log(`[Chat-V2] Client-side file operations enabled - all file operations execute on IndexedDB`)
     const clientFiles = files || []
-    console.log(`[DEBUG] Syncing ${clientFiles.length} files to server-side storage for AI access`)
-    
-    if (clientFiles.length > 0 || true) { // Always check for AI files to preserve
-      try {
-        const { storageManager } = await import('@/lib/storage-manager')
-        await storageManager.init()
-        
-        // Get existing files to preserve AI-created ones
-        const existingFiles = await storageManager.getFiles(projectId)
-        const aiCreatedFiles = existingFiles.filter(f => f.metadata?.createdBy === 'ai')
-        
-        // Clear existing files EXCEPT AI-created ones
-        for (const existingFile of existingFiles) {
-          if (existingFile.metadata?.createdBy !== 'ai') {
-            await storageManager.deleteFile(projectId, existingFile.path)
-          }
-        }
-        
-        // Sync all client files to server storage (these are not AI-created)
-        for (const file of clientFiles) {
-          if (file.path && !file.isDirectory) {
-            await storageManager.createFile({
-              workspaceId: projectId,
-              name: file.name,
-              path: file.path,
-              content: file.content || '',
-              fileType: file.type || file.fileType || 'text',
-              type: file.type || file.fileType || 'text',
-              size: file.size || (file.content || '').length,
-              isDirectory: false,
-              metadata: { createdBy: 'client' }
-            })
-            console.log(`[DEBUG] Synced client file to server storage: ${file.path}`)
-          }
-        }
-        
-        // Verify sync worked
-        const syncedFiles = await storageManager.getFiles(projectId)
-        console.log(`[DEBUG] File sync complete: ${syncedFiles.length} files now available to AI tools (${aiCreatedFiles.length} AI-created, ${clientFiles.length} client files)`)
-        
-      } catch (syncError) {
-        console.error('[ERROR] Failed to sync files to server storage:', syncError)
-        // Continue anyway - tools may still work for write operations
-      }
-    }
+    console.log(`[Chat-V2] Project has ${clientFiles.length} files available in IndexedDB`)
 
     // Get storage manager
     const storageManager = await getStorageManager()
@@ -165,7 +121,10 @@ You're not just an expert full-stack architect - you're a digital superhero with
 - **DELIVER**: 🚀 Implement with production-ready code that impresses
 
 ## 🛠️ Tools in Your Utility Belt
-- read_file (with line numbers), write_file, edit_file, delete_file, add_package, remove_package, web_search, web_extract, semantic_code_navigator (with line numbers), check_dev_errors
+- **CLIENT-SIDE TOOLS** (Execute on IndexedDB): read_file (with line numbers), write_file, edit_file, delete_file
+- **SERVER-SIDE TOOLS**: add_package, remove_package, web_search, web_extract, semantic_code_navigator (with line numbers), check_dev_errors, list_files
+
+Note: File operation tools (read_file, write_file, edit_file, delete_file) execute on the client-side IndexedDB directly. You call them and the client handles the actual file operations automatically.
 
 Note: You may call the 'check error' tool at most 2 times during a single request  if the tool returns an error log, fix it then ask the user to switch to the preview  tab and run the app then rport any logs they see in the console tab below
 
@@ -225,247 +184,39 @@ ${conversationSummaryContext || ''}`
     console.log('[Chat-V2] Starting streamText with multi-step tooling')
 
     // Stream with AI SDK native tools
+    // Convert UI messages to model messages for streamText
     const result = await streamText({
       model,
       system: systemPrompt,
-      messages,
+      messages: convertToModelMessages(messages),
       tools: {
+        // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
         write_file: tool({
-          description: 'Create or update a file in the project. Use this tool to create new files or update existing ones with new content.',
+          description: 'Create or update a file in the project. Use this tool to create new files or update existing ones with new content. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
             path: z.string().describe('The file path relative to project root (e.g., "src/components/Button.tsx")'),
             content: z.string().describe('The complete file content to write')
           }),
-          execute: async ({ path, content }, { abortSignal, toolCallId }) => {
-            // Check for cancellation
-            if (abortSignal?.aborted) {
-              throw new Error('Operation cancelled')
-            }
-            
-            try {
-              // Validate inputs
-              if (!path || typeof path !== 'string') {
-                return { 
-                  success: false, 
-                  error: `Invalid file path provided`,
-                  path,
-                  toolCallId
-                }
-              }
-              
-              if (content === undefined || content === null) {
-                return { 
-                  success: false, 
-                  error: `Invalid content provided`,
-                  path,
-                  toolCallId
-                }
-              }
-              
-              // Import storage manager
-              const { storageManager } = await import('@/lib/storage-manager')
-              await storageManager.init()
-              
-              // Check if file already exists
-              const existingFile = await storageManager.getFile(projectId, path)
-
-              if (existingFile) {
-                // Update existing file
-                await storageManager.updateFile(projectId, path, { content })
-                return { 
-                  success: true, 
-                  message: `✅ File ${path} updated successfully.`,
-                  path,
-                  content,
-                  action: 'updated',
-                  toolCallId
-                }
-              } else {
-                // Create new file
-                const newFile = await storageManager.createFile({
-                  workspaceId: projectId,
-                  name: path.split('/').pop() || path,
-                  path,
-                  content,
-                  fileType: path.split('.').pop() || 'text',
-                  type: path.split('.').pop() || 'text',
-                  size: content.length,
-                  isDirectory: false,
-                  metadata: { createdBy: 'ai' }
-                })
-                
-                return { 
-                  success: true, 
-                  message: `✅ File ${path} created successfully.`,
-                  path,
-                  content,
-                  action: 'created',
-                  fileId: newFile.id,
-                  toolCallId
-                }
-              }
-            } catch (error) {
-              // Enhanced error handling
-              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-              console.error(`[ERROR] write_file failed for ${path}:`, error)
-              
-              return { 
-                success: false, 
-                error: `Failed to write file ${path}: ${errorMessage}`,
-                path,
-                toolCallId
-              }
-            }
-          }
+          // NO execute function - handled by client onToolCall
         }),
 
+        // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
         read_file: tool({
-          description: 'Read the contents of a file with optional line number information',
+          description: 'Read the contents of a file with optional line number information. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
             path: z.string().describe('File path to read'),
             includeLineNumbers: z.boolean().optional().describe('Whether to include line numbers in the response (default: false)')
           }),
-          execute: async ({ path, includeLineNumbers = false }, { abortSignal, toolCallId }) => {
-            if (abortSignal?.aborted) {
-              throw new Error('Operation cancelled')
-            }
-            
-            try {
-              const { storageManager } = await import('@/lib/storage-manager')
-              await storageManager.init()
-              
-              // Validate path
-              if (!path || typeof path !== 'string') {
-                return { 
-                  success: false, 
-                  error: `Invalid file path provided`,
-                  path,
-                  toolCallId
-                }
-              }
-              
-              const file = await storageManager.getFile(projectId, path)
-
-              if (!file) {
-                return { 
-                  success: false, 
-                  error: `File not found: ${path}. Use list_files to see available files.`,
-                  path,
-                  toolCallId
-                }
-              }
-
-              const content = file.content || ''
-              let response: any = { 
-                success: true, 
-                message: `✅ File ${path} read successfully.`,
-                path,
-                content,
-                name: file.name,
-                type: file.type,
-                size: file.size,
-                action: 'read',
-                toolCallId
-              }
-
-              // Add line number information if requested
-              if (includeLineNumbers) {
-                const lines = content.split('\n')
-                const lineCount = lines.length
-                const linesWithNumbers = lines.map((line, index) => 
-                  `${String(index + 1).padStart(4, ' ')}: ${line}`
-                ).join('\n')
-                
-                response.lineCount = lineCount
-                response.contentWithLineNumbers = linesWithNumbers
-                response.lines = lines // Array of individual lines for programmatic access
-              }
-
-              return response
-            } catch (error) {
-              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-              console.error(`[ERROR] read_file failed for ${path}:`, error)
-              
-              return { 
-                success: false, 
-                error: `Failed to read file ${path}: ${errorMessage}`,
-                path,
-                toolCallId
-              }
-            }
-          }
+          // NO execute function - handled by client onToolCall
         }),
 
+        // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
         delete_file: tool({
-          description: 'Delete a file from the project. Use this tool to remove files that are no longer needed.',
+          description: 'Delete a file from the project. Use this tool to remove files that are no longer needed. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
             path: z.string().describe('The file path relative to project root to delete')
           }),
-          execute: async ({ path }, { abortSignal, toolCallId }) => {
-            // Check for cancellation
-            if (abortSignal?.aborted) {
-              throw new Error('Operation cancelled')
-            }
-            
-            try {
-              // Validate path
-              if (!path || typeof path !== 'string') {
-                return { 
-                  success: false, 
-                  error: `Invalid file path provided`,
-                  path,
-                  toolCallId
-                }
-              }
-              
-              // Import storage manager
-              const { storageManager } = await import('@/lib/storage-manager')
-              await storageManager.init()
-              
-              // Check if file exists
-              const existingFile = await storageManager.getFile(projectId, path)
-
-              if (!existingFile) {
-                return { 
-                  success: false, 
-                  error: `File not found: ${path}. Use list_files to see available files.`,
-                  path,
-                  toolCallId
-                }
-              }
-
-              // Delete the file
-              const result = await storageManager.deleteFile(projectId, path)
-              
-              if (result) {
-                return { 
-                  success: true, 
-                  message: `✅ File ${path} deleted successfully.`,
-                  path,
-                  action: 'deleted',
-                  toolCallId
-                }
-              } else {
-                return { 
-                  success: false, 
-                  error: `Failed to delete file ${path}`,
-                  path,
-                  toolCallId
-                }
-              }
-            } catch (error) {
-              // Enhanced error handling
-              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-              console.error(`[ERROR] delete_file failed for ${path}:`, error)
-              
-              return { 
-                success: false, 
-                error: `Failed to delete file ${path}: ${errorMessage}`,
-                path,
-                toolCallId
-              }
-            }
-          }
+          // NO execute function - handled by client onToolCall
         }),
 
         add_package: tool({
@@ -855,124 +606,14 @@ ${conversationSummaryContext || ''}`
           }
         }),
 
+        // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
         edit_file: tool({
-          description: 'Edit a file by applying search and replace operations using search/replace blocks. Use this tool to make precise modifications to existing files.',
+          description: 'Edit a file by applying search and replace operations using search/replace blocks. Use this tool to make precise modifications to existing files. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
             filePath: z.string().describe('The file path relative to project root to edit'),
             searchReplaceBlock: z.string().describe('Search/replace block in format: <<<<<<< SEARCH\\n[old code]\\n=======\\n[new code]\\n>>>>>>> REPLACE')
           }),
-          execute: async ({ filePath, searchReplaceBlock }, { abortSignal, toolCallId }) => {
-            if (abortSignal?.aborted) {
-              throw new Error('Operation cancelled')
-            }
-
-            try {
-              if (!filePath || typeof filePath !== 'string') {
-                return {
-                  success: false,
-                  error: `Invalid file path provided`,
-                  path: filePath,
-                  toolCallId
-                }
-              }
-
-              if (!searchReplaceBlock || typeof searchReplaceBlock !== 'string') {
-                return {
-                  success: false,
-                  error: `Invalid search/replace block provided`,
-                  path: filePath,
-                  toolCallId
-                }
-              }
-
-              // Import storage manager
-              const { storageManager } = await import('@/lib/storage-manager')
-              await storageManager.init()
-
-              // Read the current file content
-              const existingFile = await storageManager.getFile(projectId, filePath)
-
-              if (!existingFile) {
-                return {
-                  success: false,
-                  error: `File not found: ${filePath}. Use list_files to see available files.`,
-                  path: filePath,
-                  toolCallId
-                }
-              }
-
-              const currentContent = existingFile.content || ''
-
-              // Parse the search/replace block
-              const editBlock = parseSearchReplaceBlock(searchReplaceBlock)
-
-              if (!editBlock) {
-                return {
-                  success: false,
-                  error: `Failed to parse search/replace block. Ensure it follows the format: <<<<<<< SEARCH\\n[old code]\\n=======\\n[new code]\\n>>>>>>> REPLACE`,
-                  path: filePath,
-                  toolCallId
-                }
-              }
-
-              // Apply the search/replace
-              let modifiedContent = currentContent
-              const appliedEdits = []
-              const failedEdits = []
-
-              if (modifiedContent.includes(editBlock.search)) {
-                modifiedContent = modifiedContent.replace(editBlock.search, editBlock.replace)
-                appliedEdits.push({
-                  search: editBlock.search,
-                  replace: editBlock.replace,
-                  status: 'applied'
-                })
-              } else {
-                failedEdits.push({
-                  search: editBlock.search,
-                  replace: editBlock.replace,
-                  status: 'failed',
-                  reason: 'Search text not found in file content'
-                })
-              }
-
-              // Save the modified content back to the file
-              if (appliedEdits.length > 0) {
-                await storageManager.updateFile(projectId, filePath, { content: modifiedContent })
-
-                return {
-                  success: true,
-                  message: `✅ File ${filePath} edited successfully.`,
-                  path: filePath,
-                  content: modifiedContent,
-                  appliedEdits,
-                  failedEdits,
-                  action: 'edited',
-                  toolCallId
-                }
-              } else {
-                return {
-                  success: false,
-                  error: `Failed to apply edit: ${failedEdits[0]?.reason || 'Unknown error'}`,
-                  path: filePath,
-                  appliedEdits,
-                  failedEdits,
-                  toolCallId
-                }
-              }
-
-            } catch (error) {
-              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-              console.error(`[ERROR] edit_file failed for ${filePath}:`, error)
-
-              return {
-                success: false,
-                error: `Failed to edit file ${filePath}: ${errorMessage}`,
-                path: filePath,
-                toolCallId
-              }
-            }
-          }
+          // NO execute function - handled by client onToolCall
         }),
 
         semantic_code_navigator: tool({
@@ -1459,213 +1100,11 @@ ${conversationSummaryContext || ''}`
       }
     })
 
-    console.log('[Chat-V2] Streaming full stream with tool invocations')
+    console.log('[Chat-V2] Streaming with AI SDK UI Message Stream (client-side file operations)')
 
-    // Stream the full result including tool invocations using fullStream
-    // AI SDK v5 fullStream includes all parts: text, tool calls, tool results
-    return new Response(
-      new ReadableStream({
-        async start(controller) {
-          const encoder = new TextEncoder()
-          const fileOperations: any[] = []
-          const toolCalls: Map<string, any> = new Map() // Store tool calls by ID
-          
-          try {
-            console.log('[DEBUG] Starting fullStream processing...')
-            let partsProcessed = 0
-            
-            for await (const part of result.fullStream) {
-              partsProcessed++
-              
-              // Collect tool calls
-              if (part.type === 'tool-call') {
-                const toolCall = part as any
-                toolCalls.set(toolCall.toolCallId, {
-                  toolCallId: toolCall.toolCallId,
-                  toolName: toolCall.toolName,
-                  args: toolCall.args,
-                  state: 'call'
-                })
-                console.log(`[DEBUG] Collected tool call: ${toolCall.toolName}`)
-              }
-              
-              // Process tool results and combine with calls
-              if (part.type === 'tool-result') {
-                const toolResult = part as any
-                const toolCallId = toolResult.toolCallId
-                const existingCall = toolCalls.get(toolCallId)
-                
-                if (existingCall) {
-                  // Update the tool call with result
-                  existingCall.result = toolResult.result || toolResult.output
-                  existingCall.state = 'result'
-                  
-                  // Collect ALL file operations from tool results (including reads)
-                  // Frontend needs ALL operations for pill display
-                  // Filtering happens at application level, not collection level
-                  const toolResultData = toolResult.result || toolResult.output
-                  
-                  if (toolResultData && toolResultData.success !== false && toolResultData.path) {
-                    // Collect ALL file operations (read, write, edit, delete, etc.)
-                    fileOperations.push({
-                      type: toolResult.toolName,
-                      path: toolResultData.path,
-                      content: toolResultData.content,
-                      projectId: projectId,
-                      success: toolResultData.success !== false
-                    })
-                    console.log(`[DEBUG] ✅ Collected file operation for frontend: ${toolResult.toolName} - ${toolResultData.path}`)
-                  }
-                }
-              }
-              
-              // Stream each part as newline-delimited JSON
-              const json = JSON.stringify(part)
-              controller.enqueue(encoder.encode(json + '\n'))
-            }
-            
-            console.log(`[DEBUG] Finished fullStream processing. Total parts: ${partsProcessed}, Tool calls: ${toolCalls.size}, File operations: ${fileOperations.length}`)
-            
-            // CRITICAL: Always send metadata message to ensure frontend receives tool results
-            // Even with empty arrays, this signals stream completion to frontend
-            try {
-              const stepsInfo = await result.steps
-              const toolInvocations = Array.from(toolCalls.values())
-              
-              const metadataMessage = {
-                type: 'metadata',
-                fileOperations: fileOperations,
-                toolInvocations: toolInvocations, // Include combined tool invocations
-                serverSideExecution: true,
-                hasToolCalls: toolInvocations.length > 0,
-                stepCount: stepsInfo?.length || 1,
-                steps: stepsInfo?.map((step: any, index: number) => ({
-                  stepNumber: index + 1,
-                  hasText: !!step.text,
-                  toolCallsCount: step.toolCalls?.length || 0,
-                  toolResultsCount: step.toolResults?.length || 0,
-                  finishReason: step.finishReason
-                })) || []
-              }
-              
-              console.log('[DEBUG] 📤 Sending metadata to frontend:', {
-                fileOperationsCount: fileOperations.length,
-                toolInvocationsCount: toolInvocations.length,
-                fileOperationsPaths: fileOperations.map(op => `${op.type}:${op.path}`),
-                metadataSize: JSON.stringify(metadataMessage).length
-              })
-              
-              const metadataEncoded = encoder.encode(JSON.stringify(metadataMessage) + '\n')
-              controller.enqueue(metadataEncoded)
-              
-              console.log('[DEBUG] ✅ Metadata sent successfully to frontend')
-            } catch (metadataError) {
-              console.error('[ERROR] ❌ Failed to send metadata to frontend:', metadataError)
-              // Try to send a minimal metadata message as fallback
-              try {
-                const fallbackMetadata = {
-                  type: 'metadata',
-                  fileOperations: fileOperations,
-                  toolInvocations: [],
-                  serverSideExecution: true,
-                  error: 'Failed to retrieve full metadata'
-                }
-                controller.enqueue(encoder.encode(JSON.stringify(fallbackMetadata) + '\n'))
-                console.log('[DEBUG] 🔄 Sent fallback metadata to frontend')
-              } catch (fallbackError) {
-                console.error('[ERROR] ❌ Failed to send even fallback metadata:', fallbackError)
-              }
-            }
-            
-            // After streaming is complete, process file operations for server-side persistence
-            if (fileOperations.length > 0) {
-              console.log('[DEBUG] Processing file operations for server-side persistence:', fileOperations)
-              
-              try {
-                const { storageManager } = await import('@/lib/storage-manager')
-                await storageManager.init()
-                
-                let operationsApplied = 0
-                
-                for (const fileOp of fileOperations) {
-                  console.log('[DEBUG] Applying file operation to server storage:', fileOp)
-                  
-                  // Skip read-only operations at APPLICATION level
-                  const readOnlyOperations = ['read_file', 'list_files', 'search_files', 'get_file_info']
-                  if (readOnlyOperations.includes(fileOp.type)) {
-                    console.log(`[DEBUG] Skipped read-only operation (for metadata only): ${fileOp.type} - ${fileOp.path}`)
-                    continue
-                  }
-                  
-                  if (fileOp.type === 'write_file' && fileOp.path) {
-                    // Check if file exists
-                    const existingFile = await storageManager.getFile(projectId, fileOp.path)
-                    
-                    if (existingFile) {
-                      // Update existing file
-                      await storageManager.updateFile(projectId, fileOp.path, { 
-                        content: fileOp.content || '',
-                        updatedAt: new Date().toISOString()
-                      })
-                      console.log(`[DEBUG] Updated existing file in server storage: ${fileOp.path}`)
-                    } else {
-                      // Create new file
-                      const newFile = await storageManager.createFile({
-                        workspaceId: projectId,
-                        name: fileOp.path.split('/').pop() || fileOp.path,
-                        path: fileOp.path,
-                        content: fileOp.content || '',
-                        fileType: fileOp.path.split('.').pop() || 'text',
-                        type: fileOp.path.split('.').pop() || 'text',
-                        size: (fileOp.content || '').length,
-                        isDirectory: false
-                      })
-                      console.log(`[DEBUG] Created new file in server storage: ${fileOp.path}`, newFile)
-                    }
-                    operationsApplied++
-                  } else if (fileOp.type === 'edit_file' && fileOp.path && fileOp.content) {
-                    // Update existing file with new content
-                    await storageManager.updateFile(projectId, fileOp.path, { 
-                      content: fileOp.content,
-                      updatedAt: new Date().toISOString()
-                    })
-                    console.log(`[DEBUG] Edited file in server storage: ${fileOp.path}`)
-                    operationsApplied++
-                  } else if (fileOp.type === 'delete_file' && fileOp.path) {
-                    // Delete file
-                    await storageManager.deleteFile(projectId, fileOp.path)
-                    console.log(`[DEBUG] Deleted file from server storage: ${fileOp.path}`)
-                    operationsApplied++
-                  } else {
-                    console.warn('[DEBUG] Skipped invalid file operation:', fileOp)
-                  }
-                }
-                
-                const readOnlyOperations = ['read_file', 'list_files', 'search_files', 'get_file_info']
-                const readOnlyCount = fileOperations.filter(op => readOnlyOperations.includes(op.type)).length
-                const writeCount = fileOperations.length - readOnlyCount
-                
-                console.log(`[DEBUG] Processed ${fileOperations.length} operations: ${operationsApplied}/${writeCount} write operations applied to server storage, ${readOnlyCount} read-only operations skipped`)
-                
-              } catch (error) {
-                console.error('[ERROR] Failed to apply file operations to server storage:', error)
-              }
-            }
-            
-          } catch (error) {
-            console.error('[Chat-V2] Stream error:', error)
-          } finally {
-            controller.close()
-          }
-        }
-      }),
-      {
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Transfer-Encoding': 'chunked',
-        }
-      }
-    )
+    // Use AI SDK's built-in UI message streaming for client-side tools
+    // File operations will be executed directly on the client via onToolCall
+    return result.toUIMessageStreamResponse()
 
   } catch (error: any) {
     console.error('[Chat-V2] Error:', error)
