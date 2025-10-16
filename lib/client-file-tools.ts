@@ -59,7 +59,7 @@ export function parseSearchReplaceBlock(blockText: string) {
 
 /**
  * Efficient string replacement for large content
- * Uses array join instead of string concatenation
+ * Uses array join instead of string concatenation for better memory efficiency
  */
 function efficientReplace(
   content: string,
@@ -86,6 +86,7 @@ function efficientReplace(
 
 /**
  * Create a preview of content for tool results
+ * Shows context around the edit location
  */
 function createContentPreview(
   content: string,
@@ -286,7 +287,6 @@ export async function handleClientFileOperation(
         const { filePath, searchReplaceBlock } = toolCall.args;
         console.log(`[ClientFileTool] edit_file: ${filePath}`);
 
-        // Step 1: Validate inputs
         if (!filePath || typeof filePath !== 'string') {
           addToolResult({
             tool: 'edit_file',
@@ -307,7 +307,7 @@ export async function handleClientFileOperation(
           return;
         }
 
-        // Step 2: Read current file content
+        // Read current file content
         const existingFile = await storageManager.getFile(projectId, filePath);
 
         if (!existingFile) {
@@ -322,7 +322,7 @@ export async function handleClientFileOperation(
 
         const currentContent = existingFile.content || '';
 
-        // Step 3: Check file size limit
+        // Check file size limit (NEW: prevents browser crashes on huge files)
         if (currentContent.length > MAX_FILE_SIZE) {
           addToolResult({
             tool: 'edit_file',
@@ -333,7 +333,7 @@ export async function handleClientFileOperation(
           return;
         }
 
-        // Step 4: Parse the search/replace block
+        // Parse the search/replace block
         const editBlock = parseSearchReplaceBlock(searchReplaceBlock);
 
         if (!editBlock) {
@@ -341,12 +341,12 @@ export async function handleClientFileOperation(
             tool: 'edit_file',
             toolCallId: toolCall.toolCallId,
             state: 'output-error',
-            errorText: 'Failed to parse search/replace block. Ensure it follows the format:\n<<<<<<< SEARCH\n[old code]\n=======\n[new code]\n>>>>>>> REPLACE'
+            errorText: 'Failed to parse search/replace block. Ensure it follows the format: <<<<<<< SEARCH\\n[old code]\\n=======\\n[new code]\\n>>>>>>> REPLACE'
           });
           return;
         }
 
-        // Step 5: Validate edit size
+        // Validate edit block sizes (NEW: prevents memory issues)
         if (editBlock.search.length > MAX_EDIT_SIZE) {
           addToolResult({
             tool: 'edit_file',
@@ -367,84 +367,66 @@ export async function handleClientFileOperation(
           return;
         }
 
-        // Step 6: Find search text
-        const searchIndex = currentContent.indexOf(editBlock.search);
+        // Apply the search/replace
+        let modifiedContent = currentContent;
+        const appliedEdits = [];
+        const failedEdits = [];
 
-        if (searchIndex === -1) {
-          // Search text not found
-          addToolResult({
-            tool: 'edit_file',
-            toolCallId: toolCall.toolCallId,
-            state: 'output-error',
-            errorText: `Search text not found in file content. The exact text to search for was not found in ${filePath}.`
+        const searchIndex = currentContent.indexOf(editBlock.search);
+        
+        if (searchIndex !== -1) {
+          // OPTIMIZED: Use efficient replacement for large files
+          modifiedContent = efficientReplace(
+            currentContent,
+            editBlock.search,
+            editBlock.replace,
+            searchIndex
+          );
+          
+          appliedEdits.push({
+            search: editBlock.search,
+            replace: editBlock.replace,
+            status: 'applied'
           });
-          return;
+        } else {
+          failedEdits.push({
+            search: editBlock.search,
+            replace: editBlock.replace,
+            status: 'failed',
+            reason: 'Search text not found in file content'
+          });
         }
 
-        // Step 7: Check for multiple occurrences (warn but proceed with first)
-        const secondOccurrence = currentContent.indexOf(editBlock.search, searchIndex + 1);
-        const isMultipleOccurrences = secondOccurrence !== -1;
+        // Save the modified content
+        if (appliedEdits.length > 0) {
+          await storageManager.updateFile(projectId, filePath, { content: modifiedContent });
+          console.log(`[ClientFileTool] Edited file: ${filePath}`);
 
-        // Step 8: Apply replacement efficiently
-        const startTime = Date.now();
-        const modifiedContent = efficientReplace(
-          currentContent,
-          editBlock.search,
-          editBlock.replace,
-          searchIndex
-        );
-        const replacementTime = Date.now() - startTime;
-
-        // Step 9: Save modified content
-        try {
-          await storageManager.updateFile(projectId, filePath, { 
-            content: modifiedContent 
-          });
-          console.log(`[ClientFileTool] Edited file: ${filePath} (${replacementTime}ms)`);
-
-          // Step 10: Prepare response with appropriate detail level
-          const isLargeFile = modifiedContent.length > LARGE_FILE_THRESHOLD;
-          const sizeDelta = modifiedContent.length - currentContent.length;
-
+          // Build response object
           const response: any = {
             success: true,
             message: `✅ File ${filePath} edited successfully.`,
             path: filePath,
-            action: 'edited',
-            stats: {
-              originalSize: currentContent.length,
-              newSize: modifiedContent.length,
-              sizeDelta: sizeDelta,
-              sizeChange: sizeDelta > 0 ? `+${(sizeDelta / 1024).toFixed(2)}KB` : `${(sizeDelta / 1024).toFixed(2)}KB`,
-              searchLength: editBlock.search.length,
-              replaceLength: editBlock.replace.length,
-              position: searchIndex,
-              replacementTimeMs: replacementTime
-            },
-            appliedEdits: [{
-              search: editBlock.search.substring(0, 100) + (editBlock.search.length > 100 ? '...' : ''),
-              replace: editBlock.replace.substring(0, 100) + (editBlock.replace.length > 100 ? '...' : ''),
-              status: 'applied',
-              position: searchIndex
-            }],
-            failedEdits: []
+            appliedEdits,
+            failedEdits,
+            action: 'edited'
           };
 
-          // Include content or preview based on size
+          // OPTIMIZED: For large files, include preview instead of full content
+          const isLargeFile = modifiedContent.length > LARGE_FILE_THRESHOLD;
+          
           if (isLargeFile) {
+            // Include a preview around the edit location
             response.contentPreview = createContentPreview(
               modifiedContent,
               searchIndex,
               editBlock.replace
             );
-            response.note = `File is large (${(modifiedContent.length / 1024).toFixed(2)}KB). Showing preview around edit location. Full content saved to file.`;
+            response.fileSize = modifiedContent.length;
+            response.note = `File is large (${(modifiedContent.length / 1024).toFixed(2)}KB). Full content saved successfully. Preview shown around edit location.`;
           } else {
+            // For smaller files, include full content (backward compatible)
             response.content = modifiedContent;
-          }
-
-          // Warn about multiple occurrences
-          if (isMultipleOccurrences) {
-            response.warning = 'Search text appears multiple times in file. Only the first occurrence was replaced.';
           }
 
           addToolResult({
@@ -453,18 +435,16 @@ export async function handleClientFileOperation(
             output: response
           });
 
-          // Step 11: Trigger file refresh event
+          // Trigger file refresh event
           window.dispatchEvent(new CustomEvent('files-changed', {
             detail: { projectId, forceRefresh: true }
           }));
-
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        } else {
           addToolResult({
             tool: 'edit_file',
             toolCallId: toolCall.toolCallId,
             state: 'output-error',
-            errorText: `Failed to save edited file: ${errorMessage}`
+            errorText: `Failed to apply edit: ${failedEdits[0]?.reason || 'Unknown error'}`
           });
         }
         break;
