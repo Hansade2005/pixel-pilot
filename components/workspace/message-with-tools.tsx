@@ -496,7 +496,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
                   <div className="px-3 py-2 bg-gray-700 border-b border-gray-600 text-xs font-medium text-white">
                     {toolInvocation.result?.path || toolInvocation.args?.path || 'file'} • {(toolInvocation.result?.path || toolInvocation.args?.path || 'file').split('.').pop() || 'text'}
                   </div>
-                  <pre className="p-4 overflow-x-auto bg-[#1e1e1e] max-h-96">
+                  <pre className="p-4 bg-[#1e1e1e] max-h-96 whitespace-pre-wrap break-words">
                     <code className={`hljs language-${(toolInvocation.result?.path || toolInvocation.args?.path || 'file').split('.').pop() || 'text'} text-sm text-white`}>
                       {toolInvocation.result.content}
                     </code>
@@ -581,9 +581,9 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
                               {result.description}
                             </div>
                             {result.context && (
-                              <pre className="mt-2 text-xs text-gray-400 bg-gray-900 p-2 rounded overflow-x-auto">
-                                <code>{result.context}</code>
-                              </pre>
+                            <pre className="mt-2 text-xs text-gray-400 bg-gray-900 p-2 rounded whitespace-pre-wrap break-words max-w-full">
+                              <code>{result.context}</code>
+                            </pre>
                             )}
                           </div>
                         ))}
@@ -661,7 +661,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
                           <div className="mb-3">
                             <h5 className="text-xs font-medium text-orange-300 mb-1">STDOUT:</h5>
                             <div className="bg-gray-900 border border-gray-600 rounded p-3 max-h-48 overflow-y-auto">
-                              <pre className="text-xs text-gray-300 whitespace-pre-wrap">
+                              <pre className="text-xs text-gray-300 whitespace-pre-wrap break-words">
                                 {toolInvocation.result.stdout}
                               </pre>
                             </div>
@@ -671,7 +671,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
                           <div className="mb-3">
                             <h5 className="text-xs font-medium text-red-300 mb-1">STDERR:</h5>
                             <div className="bg-red-900/20 border border-red-700 rounded p-3 max-h-48 overflow-y-auto">
-                              <pre className="text-xs text-red-300 whitespace-pre-wrap">
+                              <pre className="text-xs text-red-300 whitespace-pre-wrap break-words">
                                 {toolInvocation.result.stderr}
                               </pre>
                             </div>
@@ -703,7 +703,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
                       <div>
                         <h4 className="text-sm font-bold text-white mb-2">Logs</h4>
                         <div className="bg-gray-900 rounded p-3 max-h-48 overflow-y-auto">
-                          <pre className="text-xs text-gray-300 whitespace-pre-wrap">
+                          <pre className="text-xs text-gray-300 whitespace-pre-wrap break-words">
                             {toolInvocation.result.logs.slice(-20).join('\n')}
                           </pre>
                         </div>

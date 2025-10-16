@@ -110,7 +110,7 @@ const ExpandableUserMessage = ({
     return (
       <div className="relative w-full">
         <div className="bg-card text-card-foreground border rounded-xl shadow-sm overflow-hidden w-full flex flex-col">
-          <div className="p-4">
+          <div className="p-4 break-words overflow-wrap-anywhere">
             <p className="text-card-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
               {content}
             </p>
@@ -137,7 +137,7 @@ const ExpandableUserMessage = ({
   return (
     <div className="relative w-full">
       <div className="bg-card text-card-foreground border rounded-xl overflow-hidden relative shadow-sm w-full flex flex-col">
-        <div className="p-4">
+        <div className="p-4 break-words overflow-wrap-anywhere">
           {/* Show truncated content when collapsed */}
           {!isExpanded ? (
             <div>
@@ -1595,7 +1595,7 @@ export function ChatPanelV2({
                   ? "bg-muted"
                   : "bg-transparent border-0"
               )}>
-                <div className="p-4">
+                <div className="p-4 break-words overflow-wrap-anywhere">
                   <MessageWithTools
                     message={message}
                     projectId={project?.id}
