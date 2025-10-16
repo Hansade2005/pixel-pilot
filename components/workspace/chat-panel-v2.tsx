@@ -1080,7 +1080,7 @@ export function ChatPanelV2({
               const toolCall = {
                 toolName: parsed.toolName,
                 toolCallId: parsed.toolCallId,
-                args: parsed.args,
+                args: parsed.input, // AI SDK sends 'input' not 'args'
                 dynamic: false // We don't use dynamic tools
               }
               
