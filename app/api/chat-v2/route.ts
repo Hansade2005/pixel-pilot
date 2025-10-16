@@ -1146,25 +1146,50 @@ ${conversationSummaryContext || ''}`
               const successfulResults = extractionResults.filter(result => result.success);
               const failedResults = extractionResults.filter(result => !result.success);
               
+              // Truncate content per URL (2000 chars limit)
+              const truncatedResults = successfulResults.map(result => {
+                const originalLength = result.cleanResults.length;
+                let truncatedContent = result.cleanResults;
+                let wasTruncated = false;
+                
+                if (originalLength > 2000) {
+                  truncatedContent = result.cleanResults.substring(0, 2000);
+                  wasTruncated = true;
+                }
+                
+                return {
+                  ...result,
+                  cleanResults: truncatedContent,
+                  wasTruncated,
+                  originalLength
+                };
+              });
+              
               // Debug logging for final result
               console.log('[DEBUG] Web extract final result:', {
                 totalUrls: urlArray.length,
                 successfulCount: successfulResults.length,
                 failedCount: failedResults.length,
-                cleanResultsLength: successfulResults.map(r => r.cleanResults?.length || 0),
-                sampleCleanResults: successfulResults[0]?.cleanResults?.substring(0, 100) || 'none'
+                cleanResultsLength: truncatedResults.map(r => r.cleanResults?.length || 0),
+                truncatedCount: truncatedResults.filter(r => r.wasTruncated).length,
+                sampleCleanResults: truncatedResults[0]?.cleanResults?.substring(0, 100) || 'none'
               });
               
               return {
                 success: successfulResults.length > 0,
                 message: successfulResults.length > 0 
-                  ? `Successfully extracted content from ${successfulResults.length} URL(s)` 
+                  ? `Successfully extracted content from ${successfulResults.length} URL(s)${truncatedResults.some(r => r.wasTruncated) ? ' (some content truncated to 2000 chars per URL)' : ''}` 
                   : 'Failed to extract content from any URLs',
-                cleanResults: successfulResults.map(result => result.cleanResults).join('\n\n'),
+                cleanResults: truncatedResults.map(result => result.cleanResults).join('\n\n'),
                 metadata: {
                   successCount: successfulResults.length,
                   failedCount: failedResults.length,
-                  urls: urlArray
+                  urls: urlArray,
+                  truncationInfo: truncatedResults.map(r => ({
+                    url: r.url,
+                    originalLength: r.originalLength,
+                    wasTruncated: r.wasTruncated
+                  }))
                 },
                 toolCallId
               };
