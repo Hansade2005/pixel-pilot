@@ -617,7 +617,7 @@ export function ChatPanelV2({
       const messageToCreate = {
         chatSessionId: chatSession.id,
         role: message?.role || 'user',
-        content: typeof message?.content === 'string' ? message.content : '',
+        content: typeof message?.metadata?.enhancedContent === 'string' ? message.metadata.enhancedContent : (typeof message?.content === 'string' ? message.content : ''),
         metadata: message?.metadata || {},
         tokensUsed: 0
       }
@@ -1201,6 +1201,38 @@ export function ChatPanelV2({
     setError(null)
 
     try {
+      // Build enhanced message content with attachments BEFORE sending
+      const enhancedContent = await buildEnhancedMessageContent(currentInput, {
+        attachedFiles: currentAttachments.attachedFiles,
+        attachedImages: currentAttachments.attachedImages,
+        attachedUploadedFiles: currentAttachments.attachedUploadedFiles,
+        attachedUrls: currentAttachments.attachedUrls,
+        project
+      })
+
+      // Create and save user message with enhanced content immediately
+      const userMessageId = Date.now().toString()
+      const userMessage = {
+        id: userMessageId,
+        role: 'user',
+        content: currentInput, // Save original input for display
+        metadata: {
+          enhancedContent: enhancedContent // Store enhanced content in metadata
+        }
+      }
+
+      // Save user message to IndexedDB immediately
+      await saveMessageToIndexedDB(userMessage)
+      console.log(`[ChatPanelV2] User message saved to database: ${userMessageId}`)
+
+      // Create checkpoint for user message
+      if (project?.id) {
+        setTimeout(async () => {
+          await createCheckpoint(project.id, userMessage.id)
+          console.log(`[Checkpoint] Created checkpoint for user message ${userMessage.id}`)
+        }, 100)
+      }
+
       // Use useChat.sendMessage() - attachments will be processed in prepareSendMessagesRequest
       await useChatSendMessage({ text: currentInput })
 
