@@ -422,12 +422,18 @@ export function ChatPanelV2({
         // Build project file tree for server context
         const fileTree = project ? await buildProjectFileTree() : []
 
+        // Replace the last user message content with enhanced content
+        const processedMessages = messages.map((msg, index) => {
+          if (msg.role === 'user' && index === messages.length - 1) {
+            // This is the last user message (the current input)
+            return { role: msg.role, content: enhancedContent }
+          }
+          return { role: msg.role, content: (msg as any).content }
+        })
+
         return {
           body: {
-            messages: messages.map(msg => ({
-              role: msg.role,
-              content: msg.role === 'user' && (msg as any).content === attachmentsToUse.input ? enhancedContent : (msg as any).content
-            })),
+            messages: processedMessages,
             projectId: project?.id,
             project,
             fileTree, // Send optimized file tree for context
