@@ -528,18 +528,11 @@ export function ChatPanelV2({
       for (const newMessage of newMessages) {
         if (!newMessage) continue
         
+        // Skip user messages - we now save them manually in handleEnhancedSubmit
+        if (newMessage.role === 'user') continue
+        
         await saveMessageToIndexedDB(newMessage)
         console.log(`[ChatPanelV2] Saved new message from useChat: ${newMessage.id}`)
-
-        // Create checkpoint for user messages too
-        if (newMessage.role === 'user') {
-          setTimeout(async () => {
-            if (project?.id) {
-              await createCheckpoint(project.id, newMessage.id)
-              console.log(`[Checkpoint] Created checkpoint for user message ${newMessage.id}`)
-            }
-          }, 100)
-        }
       }
     }
 
