@@ -596,6 +596,203 @@ export async function handleClientFileOperation(
         break;
       }
 
+      case 'semantic_code_navigator': {
+        const { query, filePath, maxResults = 10 } = toolCall.args;
+        console.log(`[ClientFileTool] semantic_code_navigator: "${query}" in ${filePath || 'all files'}`);
+
+        // Get all files in the project
+        const allFiles = await storageManager.getFiles(projectId);
+
+        // Filter files based on filePath if provided
+        let filesToSearch = allFiles;
+        if (filePath) {
+          filesToSearch = allFiles.filter((file: any) => file.path === filePath);
+          if (filesToSearch.length === 0) {
+            addToolResult({
+              tool: 'semantic_code_navigator',
+              toolCallId: toolCall.toolCallId,
+              state: 'output-error',
+              errorText: `File not found: ${filePath}`
+            });
+            return;
+          }
+        }
+
+        const results: any[] = [];
+
+        // Search through each file
+        for (const file of filesToSearch) {
+          if (!file.content || file.isDirectory) continue;
+
+          const content = file.content;
+          const lines = content.split('\n');
+          const lowerQuery = query.toLowerCase();
+
+          // Search for different types of code patterns
+          const searchPatterns = [
+            // Function/class definitions
+            {
+              type: 'function',
+              regex: /^\s*(export\s+)?(async\s+)?(function|const|let|var)\s+(\w+)\s*[=({]/gm,
+              description: 'Function or method definition'
+            },
+            {
+              type: 'class',
+              regex: /^\s*(export\s+)?(class|interface|type)\s+(\w+)/gm,
+              description: 'Class, interface, or type definition'
+            },
+            {
+              type: 'import',
+              regex: /^\s*import\s+.*from\s+['"`].*['"`]/gm,
+              description: 'Import statement'
+            },
+            {
+              type: 'export',
+              regex: /^\s*export\s+/gm,
+              description: 'Export statement'
+            },
+            // Generic text search for other queries
+            {
+              type: 'text_match',
+              regex: new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+              description: 'Text match'
+            }
+          ];
+
+          // Search for each pattern
+          for (const pattern of searchPatterns) {
+            let match;
+            while ((match = pattern.regex.exec(content)) !== null && results.length < maxResults) {
+              // Calculate line number (1-indexed)
+              const matchIndex = match.index;
+              let lineNumber = 1;
+              let charCount = 0;
+
+              for (let i = 0; i < lines.length; i++) {
+                charCount += lines[i].length + 1; // +1 for newline
+                if (charCount > matchIndex) {
+                  lineNumber = i + 1;
+                  break;
+                }
+              }
+
+              // Extract context around the match
+              const startLine = Math.max(1, lineNumber - 2);
+              const endLine = Math.min(lines.length, lineNumber + 2);
+              const contextLines = lines.slice(startLine - 1, endLine);
+              const contextWithNumbers = contextLines.map((line: string, idx: number) =>
+                `${String(startLine + idx).padStart(4, ' ')}: ${line}`
+              ).join('\n');
+
+              // Highlight the match in context
+              const highlightedContext = contextWithNumbers.replace(
+                new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+                '**$&**'
+              );
+
+              results.push({
+                file: file.path,
+                type: pattern.type,
+                description: pattern.description,
+                lineNumber,
+                match: match[0].trim(),
+                context: highlightedContext,
+                fullMatch: match[0]
+              });
+
+              // Prevent infinite loops for global regex
+              if (!pattern.regex.global) break;
+            }
+          }
+
+          if (results.length >= maxResults) break;
+        }
+
+        addToolResult({
+          tool: 'semantic_code_navigator',
+          toolCallId: toolCall.toolCallId,
+          output: {
+            success: true,
+            message: `Found ${results.length} code sections matching "${query}"`,
+            query,
+            results,
+            totalResults: results.length
+          }
+        });
+        break;
+      }
+
+      case 'list_files': {
+        const { path, recursive = false } = toolCall.args;
+        console.log(`[ClientFileTool] list_files: ${path || 'root'} (recursive: ${recursive})`);
+
+        // Get all files in the project
+        const allFiles = await storageManager.getFiles(projectId);
+
+        let filteredFiles;
+        if (path) {
+          // Filter files that start with the given path
+          const pathPrefix = path.endsWith('/') ? path : path + '/';
+          filteredFiles = allFiles.filter((file: any) => 
+            file.path.startsWith(pathPrefix) || file.path === path
+          );
+        } else {
+          // Root directory - all files
+          filteredFiles = allFiles;
+        }
+
+        // Build directory structure
+        const fileTree: any[] = [];
+        const directories = new Set<string>();
+
+        for (const file of filteredFiles) {
+          const filePath = file.path;
+          
+          // Add directories to the set
+          const pathParts = filePath.split('/');
+          for (let i = 1; i < pathParts.length; i++) {
+            directories.add(pathParts.slice(0, i).join('/'));
+          }
+
+          // Add file to tree
+          fileTree.push({
+            name: file.name,
+            path: file.path,
+            type: file.type || 'file',
+            isDirectory: false,
+            size: file.size || 0
+          });
+        }
+
+        // Add directories to tree
+        for (const dirPath of directories) {
+          const dirName = dirPath.split('/').pop() || dirPath;
+          fileTree.push({
+            name: dirName,
+            path: dirPath,
+            type: 'directory',
+            isDirectory: true,
+            size: 0
+          });
+        }
+
+        // Sort by path for consistent ordering
+        fileTree.sort((a, b) => a.path.localeCompare(b.path));
+
+        addToolResult({
+          tool: 'list_files',
+          toolCallId: toolCall.toolCallId,
+          output: {
+            success: true,
+            message: `Listed ${fileTree.length} items in ${path || 'root directory'}`,
+            path: path || '/',
+            files: fileTree,
+            totalCount: fileTree.length
+          }
+        });
+        break;
+      }
+
       default:
         console.warn(`[ClientFileTool] Unknown tool: ${toolCall.toolName}`);
     }

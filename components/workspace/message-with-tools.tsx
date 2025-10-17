@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { Task, TaskTrigger, TaskContent, TaskItem } from '@/components/ai-elements/task'
 import { Reasoning, ReasoningTrigger, ReasoningContent } from '@/components/ai-elements/reasoning'
 import { Response } from '@/components/ai-elements/response'
 import { FileText, Edit3, X, Package, PackageMinus, Loader2, CheckCircle2, XCircle, BrainIcon, FileCode, FileImage, FileJson, FileType, Settings, Package as PackageIcon, File, Globe, Eye } from 'lucide-react'
@@ -258,7 +257,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
     }
   }
 
-  const renderToolInvocation = (toolInvocation: any) => {
+  const renderToolPill = (toolInvocation: any) => {
     const Icon = getToolIcon(toolInvocation.toolName)
     const isLoading = toolInvocation.state === 'call'
     const isCompleted = toolInvocation.state === 'result'
@@ -266,11 +265,12 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
 
     // Get display text based on tool
     let displayText = ''
-    let triggerTitle = ''
+    let pillText = ''
+
     if (['write_file', 'edit_file', 'delete_file', 'read_file'].includes(toolInvocation.toolName)) {
       // Use result path for completed operations, args path for loading
       let filePath = 'file';
-      
+
       if (toolInvocation.toolName === 'edit_file') {
         // For edit_file, the path is in args.filePath
         filePath = (isCompleted ? toolInvocation.result?.path : null) || toolInvocation.args?.filePath || 'file';
@@ -278,24 +278,19 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
         // For other file operations, path is in args.path
         filePath = (isCompleted ? toolInvocation.result?.path : null) || toolInvocation.args?.path || 'file';
       }
-      
-      displayText = filePath
+
+      const fileName = filePath.split('/').pop() || 'file';
+      displayText = fileName;
+
       if (isLoading) {
-        triggerTitle = getToolLabel(toolInvocation.toolName)
+        pillText = `${getToolLabel(toolInvocation.toolName)}: ${fileName}`
       } else {
-        let operation = ''
-        if (toolInvocation.toolName === 'write_file') {
-          // Check if file was created or modified based on the action field
-          const action = toolInvocation.result?.action
-          operation = action === 'updated' ? 'Modified file' : 'Created file'
-        } else if (toolInvocation.toolName === 'edit_file') {
-          operation = 'Modified file'
-        } else if (toolInvocation.toolName === 'delete_file') {
-          operation = 'Deleted file'
-        } else if (toolInvocation.toolName === 'read_file') {
-          operation = 'Read file'
-        }
-        triggerTitle = `${operation}: ${filePath}`
+        const action = toolInvocation.toolName === 'write_file'
+          ? (toolInvocation.result?.action === 'updated' ? 'Modified' : 'Created')
+          : toolInvocation.toolName === 'edit_file' ? 'Modified'
+          : toolInvocation.toolName === 'delete_file' ? 'Deleted'
+          : 'Read';
+        pillText = `${action} ${fileName}`;
       }
     } else if (['add_package', 'remove_package'].includes(toolInvocation.toolName)) {
       const packageNames = toolInvocation.result?.packages || toolInvocation.args?.name || []
@@ -304,427 +299,85 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
       displayText = packageString
 
       if (isLoading) {
-        triggerTitle = getToolLabel(toolInvocation.toolName)
+        pillText = getToolLabel(toolInvocation.toolName)
       } else {
-        const action = toolInvocation.toolName === 'add_package' ? 'Added packages' : 'Removed packages'
-        triggerTitle = `${action}: ${packageString}`
+        const action = toolInvocation.toolName === 'add_package' ? 'Added' : 'Removed'
+        pillText = `${action} packages`
       }
     } else if (toolInvocation.toolName === 'web_search') {
       const query = toolInvocation.result?.query || toolInvocation.args?.query || 'web search'
-      const truncatedQuery = query.length > 12 ? `${query.substring(0, 12)}...` : query
+      const truncatedQuery = query.length > 20 ? `${query.substring(0, 20)}...` : query
       displayText = truncatedQuery
 
       if (isLoading) {
-        triggerTitle = getToolLabel(toolInvocation.toolName)
+        pillText = getToolLabel(toolInvocation.toolName)
       } else {
-        triggerTitle = `Web search: "${query}"`
+        pillText = `Web search completed`
       }
     } else if (toolInvocation.toolName === 'web_extract') {
       const urls = toolInvocation.result?.metadata?.urls || toolInvocation.args?.urls || []
       const urlList = Array.isArray(urls) ? urls : [urls]
-      const urlString = urlList.length > 1 ? `${urlList.length} URLs` : (urlList[0] || 'URL')
-      const truncatedUrl = urlString.length > 20 ? `${urlString.substring(0, 20)}...` : urlString
-      displayText = truncatedUrl
+      displayText = urlList.length > 1 ? `${urlList.length} URLs` : (urlList[0] || 'URL')
 
       if (isLoading) {
-        triggerTitle = getToolLabel(toolInvocation.toolName)
+        pillText = getToolLabel(toolInvocation.toolName)
       } else {
-        triggerTitle = `Web extract: ${urlString}`
+        pillText = `Web extract completed`
       }
     } else if (toolInvocation.toolName === 'semantic_code_navigator') {
       const query = toolInvocation.result?.query || toolInvocation.args?.query || 'code search'
-      const truncatedQuery = query.length > 15 ? `${query.substring(0, 15)}...` : query
+      const truncatedQuery = query.length > 20 ? `${query.substring(0, 20)}...` : query
       displayText = truncatedQuery
 
       if (isLoading) {
-        triggerTitle = getToolLabel(toolInvocation.toolName)
+        pillText = getToolLabel(toolInvocation.toolName)
       } else {
         const resultsCount = toolInvocation.result?.totalResults || 0
-        triggerTitle = `Code search: "${query}" (${resultsCount} results)`
+        pillText = `Found ${resultsCount} code matches`
       }
     } else if (toolInvocation.toolName === 'check_dev_errors') {
       const mode = toolInvocation.result?.mode || toolInvocation.args?.mode || 'dev'
       displayText = `${mode} check`
 
       if (isLoading) {
-        triggerTitle = getToolLabel(toolInvocation.toolName)
+        pillText = getToolLabel(toolInvocation.toolName)
       } else {
         const hasErrors = toolInvocation.result?.errorCount > 0
-        const modeLabel = mode === 'dev' ? 'Dev server' : 'Build'
-        triggerTitle = `${modeLabel} check: ${hasErrors ? 'Errors found' : 'No errors'}`
+        pillText = hasErrors ? 'Errors found' : 'No errors'
       }
     } else {
-      triggerTitle = isLoading ? getToolLabel(toolInvocation.toolName) : getToolCompletedLabel(toolInvocation.toolName)
+      pillText = isLoading ? getToolLabel(toolInvocation.toolName) : getToolCompletedLabel(toolInvocation.toolName)
     }
 
     return (
-      <Task key={toolInvocation.toolCallId} defaultOpen={isLoading}>
-        <TaskTrigger 
-          title={triggerTitle}
-        >
-          <div className="flex w-full cursor-pointer items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground">
-            {/* For file operations, show rich title with action + filename */}
-            {['write_file', 'edit_file', 'delete_file', 'read_file'].includes(toolInvocation.toolName) && !isLoading ? (
-              <>
-                <Icon className="size-4" />
-                <span className="flex-1 truncate text-sm">
-                  {(() => {
-                    // Use result path for completed operations, args path for loading
-                    let filePath = 'file';
-                    
-                    if (toolInvocation.toolName === 'edit_file') {
-                      // For edit_file, the path is in args.filePath
-                      filePath = toolInvocation.result?.path || toolInvocation.args?.filePath || 'file';
-                    } else {
-                      // For other file operations, path is in args.path
-                      filePath = toolInvocation.result?.path || toolInvocation.args?.path || 'file';
-                    }
-                    
-                    const fileName = filePath.split('/').pop() || 'file';
-                    const action = toolInvocation.toolName === 'write_file'
-                      ? (toolInvocation.result?.action === 'updated' ? 'Modified' : 'Created')
-                      : toolInvocation.toolName === 'edit_file' ? 'Modified'
-                      : toolInvocation.toolName === 'delete_file' ? 'Deleted'
-                      : 'Read';
-                    return `${action} file: ${fileName}`;
-                  })()}
-                </span>
-              </>
-            ) : ['add_package', 'remove_package'].includes(toolInvocation.toolName) && !isLoading ? (
-              /* For package operations, show package icon + package names + status */
-              <>
-                <PackageIcon className="size-4" />
-                <span className="flex-1 truncate text-sm">
-                  {(() => {
-                    const packages = toolInvocation.result?.packages || toolInvocation.args?.name || [];
-                    const packageList = Array.isArray(packages) ? packages : [packages];
-                    const packageNames = packageList.join(', ');
-                    const action = toolInvocation.toolName === 'add_package' ? 'Added' : 'Removed';
-                    const depType = toolInvocation.result?.dependencyType || (toolInvocation.args?.isDev ? 'devDependencies' : 'dependencies');
-                    return `${action} packages: ${packageNames}`;
-                  })()}
-                </span>
-              </>
-            ) : toolInvocation.toolName === 'web_search' && !isLoading ? (
-              /* For web search, show search icon + query + status */
-              <>
-                <Globe className="size-4" />
-                <span className="flex-1 truncate text-sm">
-                  Web search: "{(() => {
-                    const query = toolInvocation.result?.query || toolInvocation.args?.query || 'Unknown query';
-                    return query.length > 12 ? `${query.substring(0, 12)}...` : query;
-                  })()}"
-                </span>
-              </>
-            ) : toolInvocation.toolName === 'web_extract' && !isLoading ? (
-              /* For web extract, show globe icon + URLs + status */
-              <>
-                <Globe className="size-4" />
-                <span className="flex-1 truncate text-sm">
-                  Web extract: {(() => {
-                    const urls = toolInvocation.result?.metadata?.urls || toolInvocation.args?.urls || [];
-                    const urlList = Array.isArray(urls) ? urls : [urls];
-                    if (urlList.length === 1) {
-                      const url = urlList[0] || 'Unknown URL';
-                      return url.length > 20 ? `${url.substring(0, 20)}...` : url;
-                    } else {
-                      return `${urlList.length} URLs`;
-                    }
-                  })()}
-                </span>
-              </>
-            ) : toolInvocation.toolName === 'semantic_code_navigator' && !isLoading ? (
-              /* For semantic code navigator, show brain icon + query + results count */
-              <>
-                <BrainIcon className="size-4" />
-                <span className="flex-1 truncate text-sm">
-                  Code search: "{(() => {
-                    const query = toolInvocation.result?.query || toolInvocation.args?.query || 'Unknown query';
-                    const resultsCount = toolInvocation.result?.totalResults || 0;
-                    return `${query.length > 15 ? `${query.substring(0, 15)}...` : query}" (${resultsCount} results)`;
-                  })()}"
-                </span>
-              </>
-            ) : toolInvocation.toolName === 'check_dev_errors' && !isLoading ? (
-              /* For check dev errors, show settings icon + mode + status */
-              <>
-                <Settings className="size-4" />
-                <span className="flex-1 truncate text-sm">
-                  {(() => {
-                    const mode = toolInvocation.result?.mode || toolInvocation.args?.mode || 'dev';
-                    const hasErrors = toolInvocation.result?.errorCount > 0;
-                    const modeLabel = mode === 'dev' ? 'Dev server' : 'Build';
-                    const status = hasErrors ? `${toolInvocation.result.errorCount} errors` : 'No errors';
-                    return `${modeLabel} check: ${status}`;
-                  })()}
-                </span>
-              </>
-            ) : (
-              /* For other operations or loading state, show original layout */
-              <>
-                <Icon className="size-4" />
-                <p className="text-sm flex-1">
-                  {triggerTitle}
-                </p>
-              </>
-            )}
-            {isLoading && <Loader2 className="ml-auto size-4 animate-spin" />}
-            {isCompleted && !hasError && <CheckCircle2 className="ml-auto size-4 text-green-500" />}
-            {hasError && <XCircle className="ml-auto size-4 text-red-500" />}
-          </div>
-        </TaskTrigger>
-        <TaskContent>
-          <TaskItem>
-            <span className="font-medium">{displayText}</span>
-          </TaskItem>
-          {isCompleted && toolInvocation.result && (
-            <TaskItem>
-              {hasError ? (
-                <span className="text-red-500">Error: {toolInvocation.result.error}</span>
-              ) : (
-                <span className="text-green-600">
-                  {toolInvocation.result.message || 'Operation completed successfully'}
-                </span>
-              )}
-            </TaskItem>
-          )}
-          {/* Show file content with syntax highlighting for write_file and edit_file */}
-          {isCompleted && !hasError && ['write_file', 'edit_file'].includes(toolInvocation.toolName) && toolInvocation.result?.content && (
-            <TaskItem>
-              <div className="mt-3">
-                <div className="bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 bg-gray-700 border-b border-gray-600 text-xs font-medium text-white">
-                    {toolInvocation.result?.path || toolInvocation.args?.path || 'file'} • {(toolInvocation.result?.path || toolInvocation.args?.path || 'file').split('.').pop() || 'text'}
-                  </div>
-                  <pre className="p-4 bg-[#1e1e1e] max-h-96 whitespace-pre-wrap break-words">
-                    <code className={`hljs language-${(toolInvocation.result?.path || toolInvocation.args?.path || 'file').split('.').pop() || 'text'} text-sm text-white`}>
-                      {toolInvocation.result.content}
-                    </code>
-                  </pre>
-                </div>
-              </div>
-            </TaskItem>
-          )}
-          {/* Show web search results with scrollable container */}
-          {isCompleted && !hasError && toolInvocation.toolName === 'web_search' && toolInvocation.result && (
-            <TaskItem>
-              <div className="mt-3">
-                <div className="bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 bg-gray-700 border-b border-gray-600 text-xs font-medium text-white">
-                    Search Results
-                  </div>
-                  <div className="max-h-96 overflow-y-auto p-4 bg-[#1e1e1e]">
-                    {/* Query Header */}
-                    <div className="mb-4">
-                      <h3 className="text-sm font-bold text-white mb-2">Search Query</h3>
-                      <p className="text-gray-300 text-sm bg-gray-800 px-3 py-2 rounded border border-gray-600">
-                        "{(() => {
-                          const query = toolInvocation.result?.query || toolInvocation.args?.query || 'Unknown query';
-                          return query.length > 12 ? `${query.substring(0, 12)}...` : query;
-                        })()}"
-                      </p>
-                    </div>
-
-                    {/* Results Content */}
-                    {toolInvocation.result?.cleanResults || toolInvocation.result?.results ? (
-                      <div className="prose prose-sm max-w-none">
-                        <h4 className="text-sm font-bold text-white mb-3">Search Results</h4>
-                        <div className="text-gray-300 text-sm leading-relaxed">
-                          {toolInvocation.result.cleanResults || toolInvocation.result.results}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-gray-400 text-sm">
-                        No search results available to display.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </TaskItem>
-          )}
-          {/* Show semantic code navigator results */}
-          {isCompleted && !hasError && toolInvocation.toolName === 'semantic_code_navigator' && toolInvocation.result?.results && (
-            <TaskItem>
-              <div className="mt-3">
-                <div className="bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 bg-gray-700 border-b border-gray-600 text-xs font-medium text-white">
-                    Code Search Results
-                  </div>
-                  <div className="max-h-96 overflow-y-auto p-4 bg-[#1e1e1e]">
-                    {/* Query Header */}
-                    <div className="mb-4">
-                      <h3 className="text-sm font-bold text-white mb-2">Search Query</h3>
-                      <p className="text-gray-300 text-sm bg-gray-800 px-3 py-2 rounded border border-gray-600">
-                        "{toolInvocation.result.query || 'Unknown query'}"
-                      </p>
-                    </div>
-
-                    {/* Results Content */}
-                    {toolInvocation.result.results && toolInvocation.result.results.length > 0 ? (
-                      <div className="space-y-3">
-                        <h4 className="text-sm font-bold text-white">Found {toolInvocation.result.results.length} matches:</h4>
-                        {toolInvocation.result.results.map((result: any, index: number) => (
-                          <div key={index} className="bg-gray-800 rounded border border-gray-600 p-3">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="text-xs font-medium text-blue-400 bg-blue-900 px-2 py-1 rounded">
-                                {result.type}
-                              </span>
-                              <span className="text-xs text-gray-400">
-                                {result.file}:{result.lineNumber}
-                              </span>
-                            </div>
-                            <div className="text-sm font-medium text-white mb-1">
-                              {result.match}
-                            </div>
-                            <div className="text-xs text-gray-300">
-                              {result.description}
-                            </div>
-                            {result.context && (
-                            <pre className="mt-2 text-xs text-gray-400 bg-gray-900 p-2 rounded whitespace-pre-wrap break-words max-w-full">
-                              <code>{result.context}</code>
-                            </pre>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-gray-400 text-sm">
-                        No code matches found.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </TaskItem>
-          )}
-          {/* Show check dev errors results */}
-          {isCompleted && toolInvocation.toolName === 'check_dev_errors' && toolInvocation.result && (
-            <TaskItem>
-              <div className="mt-3">
-                <div className="bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 bg-gray-700 border-b border-gray-600 text-xs font-medium text-white">
-                    {toolInvocation.result.mode === 'dev' ? 'Dev Server Check' : 'Build Check'} Results
-                  </div>
-                  <div className="max-h-96 overflow-y-auto p-4 bg-[#1e1e1e]">
-                    {/* Status Header */}
-                    <div className="mb-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        {toolInvocation.result.success ? (
-                          <CheckCircle2 className="size-4 text-green-500" />
-                        ) : (
-                          <XCircle className="size-4 text-red-500" />
-                        )}
-                        <h3 className="text-sm font-bold text-white">
-                          {toolInvocation.result.success ? '✅ Success' : '❌ Failed'}
-                        </h3>
-                      </div>
-                      <p className="text-gray-300 text-sm">
-                        {toolInvocation.result.message || 'Check completed'}
-                      </p>
-                      {toolInvocation.result.serverUrl && (
-                        <p className="text-blue-400 text-sm mt-1">
-                          Server URL: {toolInvocation.result.serverUrl}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Error Summary */}
-                    {toolInvocation.result.errorCount > 0 && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-bold text-red-400 mb-2">
-                          Errors Found ({toolInvocation.result.errorCount})
-                        </h4>
-                        <div className="bg-red-900/20 border border-red-700 rounded p-3">
-                          <div className="text-red-300 text-sm whitespace-pre-wrap">
-                            {Array.isArray(toolInvocation.result.errors)
-                              ? toolInvocation.result.errors.slice(0, 5).join('\n')
-                              : toolInvocation.result.errors
-                            }
-                            {Array.isArray(toolInvocation.result.errors) && toolInvocation.result.errors.length > 5 && (
-                              <span className="text-red-400 text-xs block mt-2">
-                                ... and {toolInvocation.result.errors.length - 5} more errors
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Detailed Error Logs (stdout/stderr) */}
-                    {(toolInvocation.result.stdout || toolInvocation.result.stderr) && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-bold text-orange-400 mb-2">
-                          Detailed Error Logs
-                        </h4>
-                        {toolInvocation.result.stdout && (
-                          <div className="mb-3">
-                            <h5 className="text-xs font-medium text-orange-300 mb-1">STDOUT:</h5>
-                            <div className="bg-gray-900 border border-gray-600 rounded p-3 max-h-48 overflow-y-auto">
-                              <pre className="text-xs text-gray-300 whitespace-pre-wrap break-words">
-                                {toolInvocation.result.stdout}
-                              </pre>
-                            </div>
-                          </div>
-                        )}
-                        {toolInvocation.result.stderr && (
-                          <div className="mb-3">
-                            <h5 className="text-xs font-medium text-red-300 mb-1">STDERR:</h5>
-                            <div className="bg-red-900/20 border border-red-700 rounded p-3 max-h-48 overflow-y-auto">
-                              <pre className="text-xs text-red-300 whitespace-pre-wrap break-words">
-                                {toolInvocation.result.stderr}
-                              </pre>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Full Error Details */}
-                    {toolInvocation.result.fullErrorDetails && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-bold text-yellow-400 mb-2">
-                          Full Error Details
-                        </h4>
-                        <div className="bg-yellow-900/20 border border-yellow-700 rounded p-3">
-                          <div className="text-yellow-300 text-xs">
-                            <div><strong>Exit Code:</strong> {toolInvocation.result.fullErrorDetails.exitCode || 'N/A'}</div>
-                            <div className="mt-2"><strong>Message:</strong></div>
-                            <pre className="text-xs text-yellow-200 whitespace-pre-wrap mt-1">
-                              {toolInvocation.result.fullErrorDetails.errorMessage || 'N/A'}
-                            </pre>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Logs */}
-                    {toolInvocation.result.logs && toolInvocation.result.logs.length > 0 && (
-                      <div>
-                        <h4 className="text-sm font-bold text-white mb-2">Logs</h4>
-                        <div className="bg-gray-900 rounded p-3 max-h-48 overflow-y-auto">
-                          <pre className="text-xs text-gray-300 whitespace-pre-wrap break-words">
-                            {toolInvocation.result.logs.slice(-20).join('\n')}
-                          </pre>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </TaskItem>
-          )}
-        </TaskContent>
-      </Task>
+      <div
+        key={toolInvocation.toolCallId}
+        className={cn(
+          "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border",
+          isLoading
+            ? "bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-950 dark:border-blue-800 dark:text-blue-300"
+            : isCompleted && !hasError
+            ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-950 dark:border-green-800 dark:text-green-300"
+            : hasError
+            ? "bg-red-50 border-red-200 text-red-700 dark:bg-red-950 dark:border-red-800 dark:text-red-300"
+            : "bg-gray-50 border-gray-200 text-gray-700 dark:bg-gray-950 dark:border-gray-800 dark:text-gray-300"
+        )}
+      >
+        <Icon className="size-3" />
+        <span className="truncate max-w-48">{pillText}</span>
+        {isLoading && <Loader2 className="size-3 animate-spin" />}
+        {isCompleted && !hasError && <CheckCircle2 className="size-3" />}
+        {hasError && <XCircle className="size-3" />}
+      </div>
     )
   }
 
   return (
     <div className="space-y-3">
-      {/* Render tools if present */}
+      {/* Render tool pills if present */}
       {hasTools && (
-        <div className="space-y-2">
-          {toolInvocations?.map((toolInvocation: any) => renderToolInvocation(toolInvocation))}
+        <div className="flex flex-wrap gap-2">
+          {toolInvocations?.map((toolInvocation: any) => renderToolPill(toolInvocation))}
         </div>
       )}
 

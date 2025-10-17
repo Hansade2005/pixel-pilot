@@ -63,12 +63,10 @@ const getFileExtension = (filePath: string): string => {
   }
 }
 
-// Build optimized project context from synced files (same as chat route)
-async function buildOptimizedProjectContext(projectId: string, storageManager: any, userIntent?: any) {
+// Build optimized project context from client-sent file tree
+async function buildOptimizedProjectContext(projectId: string, fileTree: string[], storageManager: any, userIntent?: any) {
   try {
-    const files = await storageManager.getFiles(projectId)
-    
-    // Get current time and working directory for context
+    // Get current time for context
     const currentTime = new Date().toLocaleString('en-US', {
       timeZone: 'Africa/Douala',
       year: 'numeric',
@@ -80,111 +78,12 @@ async function buildOptimizedProjectContext(projectId: string, storageManager: a
       timeZoneName: 'long'
     })
 
-    // Filter out shadcn UI components and common excluded files
-    const filteredFiles = files.filter((file: any) => {
-      const path = file.path.toLowerCase()
-      // Exclude shadcn UI components
-      if (path.includes('components/ui/') && (
-        path.includes('button.tsx') ||
-        path.includes('input.tsx') ||
-        path.includes('dialog.tsx') ||
-        path.includes('card.tsx') ||
-        path.includes('badge.tsx') ||
-        path.includes('alert.tsx') ||
-        path.includes('accordion.tsx') ||
-        path.includes('avatar.tsx') ||
-        path.includes('checkbox.tsx') ||
-        path.includes('dropdown-menu.tsx') ||
-        path.includes('form.tsx') ||
-        path.includes('label.tsx') ||
-        path.includes('select.tsx') ||
-        path.includes('sheet.tsx') ||
-        path.includes('tabs.tsx') ||
-        path.includes('textarea.tsx') ||
-        path.includes('toast.tsx') ||
-        path.includes('tooltip.tsx') ||
-        path.includes('separator.tsx') ||
-        path.includes('skeleton.tsx') ||
-        path.includes('scroll-area.tsx') ||
-        path.includes('progress.tsx') ||
-        path.includes('popover.tsx') ||
-        path.includes('navigation-menu.tsx') ||
-        path.includes('menubar.tsx') ||
-        path.includes('hover-card.tsx') ||
-        path.includes('command.tsx') ||
-        path.includes('calendar.tsx') ||
-        path.includes('table.tsx') ||
-        path.includes('switch.tsx') ||
-        path.includes('slider.tsx') ||
-        path.includes('radio-group.tsx')
-      )) {
-        return false
-      }
-      
-      // Exclude node_modules, .git, build outputs
-      if (path.includes('node_modules') || 
-          path.includes('.git/') || 
-          path.includes('dist/') || 
-          path.includes('build/') ||
-          path.includes('.next/')) {
-        return false
-      }
-      
-      return true
-    })
-
-    // Detect project type (Vite or Next.js)
-    const hasNextConfig = files.some((f: any) => f.path === 'next.config.js' || f.path === 'next.config.mjs')
-    const hasViteConfig = files.some((f: any) => f.path === 'vite.config.ts' || f.path === 'vite.config.js')
+    // Detect project type from file tree
+    const hasNextConfig = fileTree.some((path: string) => path === 'next.config.js' || path === 'next.config.mjs')
+    const hasViteConfig = fileTree.some((path: string) => path === 'vite.config.ts' || path === 'vite.config.js')
     const projectType = hasNextConfig ? 'nextjs' : hasViteConfig ? 'vite-react' : 'unknown'
 
-    // Build file tree structure
-    const fileTree: string[] = []
-    const directories = new Set<string>()
-    
-    // Sort files for better organization
-    const sortedFiles = filteredFiles.sort((a: any, b: any) => {
-      return a.path.localeCompare(b.path)
-    })
-
-    // Collect all directories
-    sortedFiles.forEach((file: any) => {
-      const pathParts = file.path.split('/')
-      if (pathParts.length > 1) {
-        // Add all parent directories
-        for (let i = 1; i < pathParts.length; i++) {
-          const dirPath = pathParts.slice(0, i).join('/')
-          if (dirPath) {
-            directories.add(dirPath)
-          }
-        }
-      }
-    })
-
-    // Add root files first
-    const rootFiles = sortedFiles.filter((file: any) => !file.path.includes('/'))
-    rootFiles.forEach((file: any) => {
-      fileTree.push(file.path)
-    })
-
-    // Add directories and their files
-    const sortedDirectories = Array.from(directories).sort()
-    sortedDirectories.forEach((dir: string) => {
-      fileTree.push(`${dir}/`)
-      
-      // Add files in this directory
-      const dirFiles = sortedFiles.filter((file: any) => {
-        const filePath = file.path
-        const fileDir = filePath.substring(0, filePath.lastIndexOf('/'))
-        return fileDir === dir
-      })
-      
-      dirFiles.forEach((file: any) => {
-        fileTree.push(file.path)
-      })
-    })
-
-    // Build the context
+    // Build the context using client-sent file tree
     let context = `# Current Time
 ${currentTime}
 
@@ -193,10 +92,10 @@ ${projectType === 'nextjs' ? '**Next.js** - Full-stack React framework with App 
 
 ${projectType === 'nextjs' ? `## Next.js Project Structure
 - **src/app/** - App Router pages and layouts
-- **src/components/** - React components  
+- **src/components/** - React components
 - **src/lib/** - Utilities and helpers
 - **public/** - Static assets
-- **API Routes:** Create in src/app/api/[name]/route.ts` : 
+- **API Routes:** Create in src/app/api/[name]/route.ts` :
 `## Vite Project Structure
 - **src/** - Source code directory
 - **src/components/** - React components
@@ -209,7 +108,7 @@ ${fileTree.join('\n')}
 # Important Files Content
 ---`
 
-    console.log(`[CONTEXT] Built file tree with ${fileTree.length} files`) 
+    console.log(`[CONTEXT] Using client-sent file tree with ${fileTree.length} entries`)
     return context
 
   } catch (error) {
@@ -773,7 +672,8 @@ export async function POST(req: Request) {
       messages = [], // Default to empty array if not provided
       projectId,
       project,
-      files = [], // Default to empty array
+      fileTree = [], // Client-sent file tree structure
+      files = [], // Fallback for backward compatibility
       modelId,
       aiMode
     } = body
@@ -803,8 +703,8 @@ export async function POST(req: Request) {
     }
 
     // CRITICAL: Sync client-side files to server-side InMemoryStorage
-    // This ensures AI tools can access the files that exist in IndexedDB
-    const clientFiles = files || []
+    // This ensures server-side AI tools can access the files that exist in IndexedDB
+    const clientFiles = files || [] // For backward compatibility and server-side tools
     console.log(`[DEBUG] Syncing ${clientFiles.length} files to server-side storage for AI access`)
 
     if (clientFiles.length > 0) {
@@ -855,8 +755,8 @@ export async function POST(req: Request) {
     // Get storage manager
     const storageManager = await getStorageManager()
 
-    // Build project context from synced files (same as chat route)
-    const projectContext = await buildOptimizedProjectContext(projectId, storageManager)
+    // Build project context from client-sent file tree
+    const projectContext = await buildOptimizedProjectContext(projectId, fileTree, storageManager)
     console.log(`[PROJECT_CONTEXT] Built project context (${projectContext.length} chars):`, projectContext.substring(0, 500) + (projectContext.length > 500 ? '...' : ''))
 
     // Get conversation history for context (last 10 messages) - Same format as /api/chat/route.ts
@@ -914,10 +814,10 @@ You're not just an expert full-stack architect - you're a digital superhero with
 - **DELIVER**: 🚀 Implement with production-ready code that impresses
 
 ## 🛠️ Tools in Your Utility Belt
-- **CLIENT-SIDE TOOLS** (Execute on IndexedDB): read_file (with line numbers), write_file, edit_file, delete_file, add_package, remove_package
-- **SERVER-SIDE TOOLS**: web_search, web_extract, semantic_code_navigator (with line numbers), check_dev_errors, list_files
+- **CLIENT-SIDE TOOLS** (Execute on IndexedDB): read_file (with line numbers), write_file, edit_file, delete_file, add_package, remove_package, semantic_code_navigator (with line numbers), list_files
+- **SERVER-SIDE TOOLS**: web_search, web_extract, check_dev_errors
 
-Note: File and package operation tools (read_file, write_file, edit_file, delete_file, add_package, remove_package) execute on the client-side IndexedDB directly. You call them and the client handles the actual operations automatically.
+Note: File and package operation tools (read_file, write_file, edit_file, delete_file, add_package, remove_package, semantic_code_navigator, list_files) execute on the client-side IndexedDB directly. You call them and the client handles the actual operations automatically.
 
 Note: You may call the 'check error' tool at most 2 times during a single request  if the tool returns an error log, fix it then ask the user to switch to the preview  tab and run the app then rport any logs they see in the console tab below
 
@@ -992,17 +892,12 @@ ${conversationSummaryContext || ''}`
       messages,
       tools: {
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
-        // The execute function now returns actual results instead of forwarding messages
         write_file: tool({
           description: 'Create or update a file in the project. Use this tool to create new files or update existing ones with new content. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
             path: z.string().describe('The file path relative to project root (e.g., "src/components/Button.tsx")'),
             content: z.string().describe('The complete file content to write')
-          }),
-          execute: async ({ path, content }, { toolCallId }) => {
-            // Use the powerful constructor to get actual results
-            return await constructToolResult('write_file', { path, content }, projectId, toolCallId)
-          }
+          })
         }),
 
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
@@ -1011,11 +906,7 @@ ${conversationSummaryContext || ''}`
           inputSchema: z.object({
             path: z.string().describe('File path to read'),
             includeLineNumbers: z.boolean().optional().describe('Whether to include line numbers in the response (default: false)')
-          }),
-          execute: async ({ path, includeLineNumbers }, { toolCallId }) => {
-            // Use the powerful constructor to get actual results
-            return await constructToolResult('read_file', { path, includeLineNumbers }, projectId, toolCallId, files)
-          }
+          })
         }),
 
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
@@ -1023,11 +914,7 @@ ${conversationSummaryContext || ''}`
           description: 'Delete a file from the project. Use this tool to remove files that are no longer needed. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
             path: z.string().describe('The file path relative to project root to delete')
-          }),
-          execute: async ({ path }, { toolCallId }) => {
-            // Use the powerful constructor to get actual results
-            return await constructToolResult('delete_file', { path }, projectId, toolCallId)
-          }
+          })
         }),
 
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
@@ -1041,11 +928,7 @@ ${conversationSummaryContext || ''}`
 =======
 [new code to replace with]
 >>>>>>> REPLACE`)
-          }),
-          execute: async ({ filePath, searchReplaceBlock }, { toolCallId }) => {
-            // Use the powerful constructor to get actual results
-            return await constructToolResult('edit_file', { filePath, searchReplaceBlock }, projectId, toolCallId, files)
-          }
+          })
         }),
 
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
@@ -1058,11 +941,7 @@ ${conversationSummaryContext || ''}`
             ]).describe('Package name(s) to add'),
             version: z.string().optional().describe('The package version (e.g., "^4.17.21"). Defaults to "latest". Applied to all packages if array provided'),
             isDev: z.boolean().optional().describe('Whether to add as dev dependency (default: false)')
-          }),
-          execute: async (input: { name: string | string[]; version?: string; isDev?: boolean }, { toolCallId }) => {
-            // Use the powerful constructor to get actual results
-            return await constructToolResult('add_package', input, projectId, toolCallId)
-          }
+          })
         }),
 
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
@@ -1074,11 +953,26 @@ ${conversationSummaryContext || ''}`
               z.array(z.string()).describe('Array of package names to remove')
             ]).describe('Package name(s) to remove'),
             isDev: z.boolean().optional().describe('Whether to remove from dev dependencies (default: false)')
-          }),
-          execute: async (input: { name: string | string[]; isDev?: boolean }, { toolCallId }) => {
-            // Use the powerful constructor to get actual results
-            return await constructToolResult('remove_package', input, projectId, toolCallId)
-          }
+          })
+        }),
+
+        // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
+        semantic_code_navigator: tool({
+          description: 'Search and discover code sections, patterns, or structures in files using natural language queries. Returns results with accurate line numbers matching Monaco editor display. This tool executes on the client-side IndexedDB.',
+          inputSchema: z.object({
+            query: z.string().describe('Natural language description of what to search for (e.g., "find all React components", "show database models", "locate error handlers")'),
+            filePath: z.string().optional().describe('Optional: Specific file path to search within. If omitted, searches the entire workspace'),
+            maxResults: z.number().optional().describe('Maximum number of results to return (default: 10)')
+          })
+        }),
+
+        // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
+        list_files: tool({
+          description: 'List all files and directories in the project workspace. Returns a hierarchical view of the project structure. This tool executes on the client-side IndexedDB.',
+          inputSchema: z.object({
+            path: z.string().optional().describe('Optional: Specific directory path to list. If omitted, lists the root directory'),
+            recursive: z.boolean().optional().describe('Whether to list files recursively (default: false)')
+          })
         }),
 
         web_search: tool({
@@ -1268,152 +1162,6 @@ ${conversationSummaryContext || ''}`
                 },
                 toolCallId
               };
-            }
-          }
-        }),
-
-        semantic_code_navigator: tool({
-          description: 'Search and discover code sections, patterns, or structures in files using natural language queries. Returns results with accurate line numbers matching Monaco editor display.',
-          inputSchema: z.object({
-            query: z.string().describe('Natural language description of what to search for (e.g., "find all React components", "show database models", "locate error handlers")'),
-            filePath: z.string().optional().describe('Optional: Specific file path to search within. If omitted, searches the entire workspace'),
-            maxResults: z.number().optional().describe('Maximum number of results to return (default: 10)')
-          }),
-          execute: async ({ query, filePath, maxResults = 10 }, { abortSignal, toolCallId }) => {
-            if (abortSignal?.aborted) {
-              throw new Error('Operation cancelled')
-            }
-
-            try {
-              const { storageManager } = await import('@/lib/storage-manager')
-              await storageManager.init()
-
-              // Get all files in the project
-              const allFiles = await storageManager.getFiles(projectId)
-
-              // Filter files based on filePath if provided
-              let filesToSearch = allFiles
-              if (filePath) {
-                filesToSearch = allFiles.filter((file: any) => file.path === filePath)
-                if (filesToSearch.length === 0) {
-                  return {
-                    success: false,
-                    error: `File not found: ${filePath}`,
-                    query,
-                    toolCallId
-                  }
-                }
-              }
-
-              const results: any[] = []
-
-              // Search through each file
-              for (const file of filesToSearch) {
-                if (!file.content || file.isDirectory) continue
-
-                const content = file.content
-                const lines = content.split('\n')
-                const lowerQuery = query.toLowerCase()
-
-                // Search for different types of code patterns
-                const searchPatterns = [
-                  // Function/class definitions
-                  {
-                    type: 'function',
-                    regex: /^\s*(export\s+)?(async\s+)?(function|const|let|var)\s+(\w+)\s*[=({]/gm,
-                    description: 'Function or method definition'
-                  },
-                  {
-                    type: 'class',
-                    regex: /^\s*(export\s+)?(class|interface|type)\s+(\w+)/gm,
-                    description: 'Class, interface, or type definition'
-                  },
-                  {
-                    type: 'import',
-                    regex: /^\s*import\s+.*from\s+['"`].*['"`]/gm,
-                    description: 'Import statement'
-                  },
-                  {
-                    type: 'export',
-                    regex: /^\s*export\s+/gm,
-                    description: 'Export statement'
-                  },
-                  // Generic text search for other queries
-                  {
-                    type: 'text_match',
-                    regex: new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
-                    description: 'Text match'
-                  }
-                ]
-
-                // Search for each pattern
-                for (const pattern of searchPatterns) {
-                  let match
-                  while ((match = pattern.regex.exec(content)) !== null && results.length < maxResults) {
-                    // Calculate line number (1-indexed)
-                    const matchIndex = match.index
-                    let lineNumber = 1
-                    let charCount = 0
-
-                    for (let i = 0; i < lines.length; i++) {
-                      charCount += lines[i].length + 1 // +1 for newline
-                      if (charCount > matchIndex) {
-                        lineNumber = i + 1
-                        break
-                      }
-                    }
-
-                    // Extract context around the match
-                    const startLine = Math.max(1, lineNumber - 2)
-                    const endLine = Math.min(lines.length, lineNumber + 2)
-                    const contextLines = lines.slice(startLine - 1, endLine)
-                    const contextWithNumbers = contextLines.map((line: string, idx: number) =>
-                      `${String(startLine + idx).padStart(4, ' ')}: ${line}`
-                    ).join('\n')
-
-                    // Highlight the match in context
-                    const highlightedContext = contextWithNumbers.replace(
-                      new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
-                      '**$&**'
-                    )
-
-                    results.push({
-                      file: file.path,
-                      type: pattern.type,
-                      description: pattern.description,
-                      lineNumber,
-                      match: match[0].trim(),
-                      context: highlightedContext,
-                      fullMatch: match[0]
-                    })
-
-                    // Prevent infinite loops for global regex
-                    if (!pattern.regex.global) break
-                  }
-                }
-
-                if (results.length >= maxResults) break
-              }
-
-              return {
-                success: true,
-                message: `Found ${results.length} code sections matching "${query}"`,
-                query,
-                results,
-                totalResults: results.length,
-                toolCallId
-              }
-
-            } catch (error) {
-              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-              console.error(`[ERROR] semantic_code_navigator failed for query "${query}":`, error)
-
-              return {
-                success: false,
-                error: `Failed to search code: ${errorMessage}`,
-                query,
-                toolCallId
-              }
             }
           }
         }),
