@@ -31,6 +31,7 @@ export interface TemplateProject {
   authorAvatar: string
   remixes: number
   thumbnailUrl: string
+  externalUrl?: string
   files: Omit<File, 'id' | 'workspaceId' | 'createdAt' | 'updatedAt'>[]
   additionalPackages?: { [key: string]: string }
   createdAt?: Date
@@ -221,6 +222,24 @@ export class TemplateManager {
       additionalPackages: {
         "react-intersection-observer": "^9.16.0"
       }
+    },
+    {
+      id: 'tunevoyager',
+      title: 'TuneVoyager',
+      category: 'Consumer App',
+      description: 'AI-powered music discovery and playlist creation platform built with PiPilot',
+      author: 'PiPilot',
+      authorAvatar: '/hans.png',
+      remixes: 8500,
+      thumbnailUrl: '/tunevoyager.png',
+      externalUrl: 'https://tunevoyager.vercel.app/',
+      files: baseTemplateFiles,
+      additionalPackages: {
+        "react-spotify-web-playback": "^0.14.2",
+        "spotify-web-api-js": "^1.5.2",
+        "react-h5-audio-player": "^3.8.6"
+      },
+      createdAt: new Date('2024-10-15')
     }
   ]
 

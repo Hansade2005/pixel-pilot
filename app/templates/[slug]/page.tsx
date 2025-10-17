@@ -64,7 +64,7 @@ export default function TemplatePage() {
   }, [slug, router])
 
   const handleDownloadTemplate = async () => {
-    if (!template) return
+    if (!template || !template.id) return
 
     setIsDownloading(true)
     try {
@@ -77,6 +77,9 @@ export default function TemplatePage() {
       setIsDownloading(false)
     }
   }
+
+  // Check if this is an external project
+  const isExternalProject = template?.externalUrl
 
 
   if (isLoading) {
@@ -116,6 +119,117 @@ export default function TemplatePage() {
     )
   }
 
+  // Render external project (iframe)
+  if (isExternalProject) {
+    return (
+      <div className="min-h-screen relative overflow-hidden">
+        {/* Enhanced Gradient Background */}
+        <div className="absolute inset-0 lovable-gradient" />
+
+        {/* Noise Texture Overlay */}
+        <div className="absolute inset-0 noise-texture" />
+
+        {/* Navigation */}
+        <Navigation />
+
+        <div className="relative z-10 pt-16 pb-24">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+            {/* Back Button */}
+            <div className="mb-6">
+              <Button
+                onClick={() => router.push('/')}
+                variant="outline"
+                className="border-gray-600 text-white hover:bg-gray-700"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Home
+              </Button>
+            </div>
+
+            {/* Project Header */}
+            <div className="text-center mb-8">
+              <div className="flex items-center justify-center space-x-3 mb-4">
+                <Badge className="bg-purple-600 text-white">
+                  {template.category}
+                </Badge>
+                <Badge className="bg-green-600 text-white">
+                  Live Project
+                </Badge>
+              </div>
+
+              <h1 className="text-4xl font-bold text-white mb-4">
+                {template.title}
+              </h1>
+
+              <p className="text-xl text-gray-300 mb-6 max-w-3xl mx-auto">
+                {template.description}
+              </p>
+
+              {/* Author Info */}
+              <div className="flex items-center justify-center space-x-3 mb-8">
+                <img
+                  src={template.authorAvatar}
+                  alt={template.author}
+                  className="w-10 h-10 rounded-full"
+                  onError={(e) => {
+                    e.currentTarget.src = '/placeholder-user.jpg'
+                  }}
+                />
+                <div>
+                  <p className="text-white font-medium">Built by {template.author}</p>
+                  <p className="text-gray-400 text-sm">Using PiPilot</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Live Project Iframe */}
+            <Card className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm">
+              <CardContent className="p-0">
+                <div className="relative w-full" style={{ height: '80vh' }}>
+                  <iframe
+                    src={template.externalUrl}
+                    className="w-full h-full rounded-lg"
+                    title={`${template.title} - Live Preview`}
+                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                    loading="lazy"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Project Info */}
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm">
+                <CardContent className="p-6 text-center">
+                  <div className="text-2xl font-bold text-white mb-2">{template.remixes.toLocaleString()}</div>
+                  <div className="text-gray-400">Community Remixes</div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm">
+                <CardContent className="p-6 text-center">
+                  <div className="text-2xl font-bold text-white mb-2">Live</div>
+                  <div className="text-gray-400">Status</div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm">
+                <CardContent className="p-6 text-center">
+                  <div className="text-2xl font-bold text-white mb-2">PiPilot</div>
+                  <div className="text-gray-400">Built With</div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <Footer />
+      </div>
+    )
+  }
+
+  // Render regular template
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Enhanced Gradient Background */}
@@ -212,22 +326,24 @@ export default function TemplatePage() {
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex justify-center">
-                <Button
-                  size="lg"
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-8"
-                  onClick={handleDownloadTemplate}
-                  disabled={isDownloading}
-                >
-                  {isDownloading ? (
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  ) : (
-                    <Download className="w-5 h-5 mr-2" />
-                  )}
-                  {isDownloading ? "Downloading..." : "Download ZIP"}
-                </Button>
-              </div>
+              {/* Action Buttons - Only show for regular templates */}
+              {!isExternalProject && (
+                <div className="flex justify-center">
+                  <Button
+                    size="lg"
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-8"
+                    onClick={handleDownloadTemplate}
+                    disabled={isDownloading}
+                  >
+                    {isDownloading ? (
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    ) : (
+                      <Download className="w-5 h-5 mr-2" />
+                    )}
+                    {isDownloading ? "Downloading..." : "Download ZIP"}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
