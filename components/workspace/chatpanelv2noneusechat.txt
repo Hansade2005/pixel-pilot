@@ -1,13 +1,12 @@
-/*
- * ChatPanel V2 - useChat Implementation
+/* 
+ * ChatPanel V2 - AI SDK Real-Time Streaming Implementation
  * Uses @ai-sdk/react useChat hook with native tool support
- * Preserves ALL features from original chat-panel.tsx exactly
+ * Preserves all features from original chat-panel.tsx
  */
 
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { useChat } from '@ai-sdk/react'
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
@@ -26,7 +25,6 @@ import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown
 import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
 import { FileSearchResult } from "@/lib/file-lookup-service"
 import { createCheckpoint } from '@/lib/checkpoint-utils'
-import { handleClientFileOperation } from '@/lib/client-file-tools'
 
 // ExpandableUserMessage component for long user messages
 const ExpandableUserMessage = ({
@@ -280,24 +278,24 @@ export function ChatPanelV2({
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([])
   const [attachedUploadedFiles, setAttachedUploadedFiles] = useState<AttachedUploadedFile[]>([])
   const [attachedUrls, setAttachedUrls] = useState<AttachedUrl[]>([])
-
+  
   // @ command file attachment dropdown state
   const [showFileDropdown, setShowFileDropdown] = useState(false)
   const [fileQuery, setFileQuery] = useState("")
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 })
   const [atCommandStartIndex, setAtCommandStartIndex] = useState(-1)
-
+  
   // Checkpoint/restore state
   const [restoreMessageId, setRestoreMessageId] = useState<string | null>(null)
   const [showRevertDialog, setShowRevertDialog] = useState(false)
   const [revertMessageId, setRevertMessageId] = useState<string | null>(null)
   const [isReverting, setIsReverting] = useState(false)
-
+  
   // UI state
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
   const [showUrlDialog, setShowUrlDialog] = useState(false)
   const [urlInput, setUrlInput] = useState('')
-
+  
   // Speech-to-text state (Web Speech API real-time implementation)
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
@@ -308,156 +306,9 @@ export function ChatPanelV2({
   // Load project files for context
   const [projectFiles, setProjectFiles] = useState<any[]>([])
 
-  // Build enhanced message content with attachments (preserve exact logic)
-  const buildEnhancedMessageContent = async (inputText: string, attachments: any) => {
-    let enhancedContent = inputText.trim()
-    let displayContent = inputText.trim() // Content shown to user (without hidden contexts)
-
-    // Add image descriptions (hidden from user display)
-    if (attachments.attachedImages.length > 0) {
-      const imageDescriptions = attachments.attachedImages
-        .map((img: AttachedImage) => {
-          const description = img.description || (img.isProcessing ? '[Image processing...]' : '[Image description not available]')
-          return `\n\n--- Image: ${img.name} ---\n${description}\n--- End of Image ---`
-        })
-        .join('')
-
-      if (imageDescriptions) {
-        enhancedContent = `${enhancedContent}\n\n=== ATTACHED IMAGES CONTEXT ===${imageDescriptions}\n=== END ATTACHED IMAGES ===`
-      }
-    }
-
-    // Add URL contents (shown to user)
-    if (attachments.attachedUrls.length > 0) {
-      const urlContents = attachments.attachedUrls
-        .filter((url: AttachedUrl) => url.content)
-        .map((url: AttachedUrl) => `\n\n--- Website: ${url.title || url.url} ---\nURL: ${url.url}\n\nContent:\n${url.content}\n--- End of Website ---`)
-        .join('')
-
-      if (urlContents) {
-        enhancedContent = `${enhancedContent}\n\n=== ATTACHED WEBSITES CONTEXT ===${urlContents}\n=== END ATTACHED WEBSITES ===`
-        displayContent = `${displayContent}\n\n=== ATTACHED WEBSITES ===${urlContents}\n=== END ATTACHED WEBSITES ===`
-      }
-    }
-
-    // Add uploaded file contents (shown to user)
-    if (attachments.attachedUploadedFiles.length > 0) {
-      const uploadedFileContexts = attachments.attachedUploadedFiles
-        .map((file: AttachedUploadedFile) => `\n\n--- Uploaded File: ${file.name} ---\n${file.content}\n--- End of ${file.name} ---`)
-        .join('')
-
-      if (uploadedFileContexts) {
-        enhancedContent = `${enhancedContent}\n\n=== UPLOADED FILES CONTEXT ===${uploadedFileContexts}\n=== END UPLOADED FILES ===`
-        displayContent = `${displayContent}\n\n=== UPLOADED FILES ===${uploadedFileContexts}\n=== END UPLOADED FILES ===`
-      }
-    }
-
-    // Add project files attached via @ command (shown to user)
-    if (attachments.attachedFiles.length > 0 && project) {
-      const fileContexts: string[] = []
-
-      try {
-        const { storageManager } = await import('@/lib/storage-manager')
-        await storageManager.init()
-
-        for (const attachedFile of attachments.attachedFiles) {
-          try {
-            const fileData = await storageManager.getFile(project.id, attachedFile.path)
-            if (fileData && fileData.content) {
-              fileContexts.push(`\n\n--- Project File: ${attachedFile.path} ---\n${fileData.content}\n--- End of ${attachedFile.name} ---`)
-            }
-          } catch (error) {
-            console.error(`Error loading attached file ${attachedFile.path}:`, error)
-            fileContexts.push(`\n\n--- Project File: ${attachedFile.path} ---\n[Error loading file content]\n--- End of ${attachedFile.name} ---`)
-          }
-        }
-
-        if (fileContexts.length > 0) {
-          enhancedContent = `${enhancedContent}\n\n=== PROJECT FILES CONTEXT ===${fileContexts.join('')}\n=== END PROJECT FILES ===`
-          displayContent = `${displayContent}\n\n=== PROJECT FILES ===${fileContexts.join('')}\n=== END PROJECT FILES ===`
-        }
-      } catch (error) {
-        console.error('Error loading attached files:', error)
-      }
-    }
-
-    return enhancedContent
-  }
-
-  // useChat integration with new API
-  const {
-    messages: useChatMessages,
-    append: useChatAppend,
-    stop: useChatStop,
-    setMessages: setChatMessages,
-    addToolResult,
-    status: useChatStatus
-  } = useChat({
-    api: '/api/chat-v2',
-    // Ensure custom data is included in every request (including tool call responses)
-    experimental_prepareRequestBody: async ({ messages, requestBody }) => {
-      // Build project file tree for server context
-      const fileTree = project ? await buildProjectFileTree() : []
-
-      return {
-        ...requestBody,
-        projectId: project?.id,
-        project,
-        modelId: selectedModel,
-        aiMode,
-        fileTree, // Send optimized file tree for context
-        files: projectFiles // Keep full files for server-side tools
-      }
-    },
-    // Preserve message persistence logic
-    onFinish: async ({ message }: any) => {
-      if (!message || !project?.id) {
-        console.warn('[ChatPanelV2] onFinish called with invalid message or no project')
-        return
-      }
-      
-      // Use existing message saving logic exactly
-      await saveMessageToIndexedDB(message)
-      if (project?.id) {
-        setTimeout(async () => {
-          await createCheckpoint(project.id, message.id)
-        }, 100)
-      }
-    },
-    // Handle client-side tool execution
-    onToolCall: async ({ toolCall }) => {
-      console.log('[ChatPanelV2][ClientTool] 🔧 Tool call received via useChat:', {
-        toolName: toolCall.toolName,
-        toolCallId: toolCall.toolCallId,
-        input: toolCall.args
-      })
-
-      // Check if this is a client-side tool (file operations + package management)
-      const clientSideTools = ['write_file', 'read_file', 'edit_file', 'delete_file', 'add_package', 'remove_package', 'semantic_code_navigator', 'list_files']
-      if (clientSideTools.includes(toolCall.toolName)) {
-        console.log('[ChatPanelV2][ClientTool] ⚡ Executing client-side tool:', toolCall.toolName)
-        
-        // Execute the tool on client-side IndexedDB
-        const { handleClientFileOperation } = await import('@/lib/client-file-tools')
-        
-        // Pass the actual useChat addToolResult function
-        handleClientFileOperation({
-          toolName: toolCall.toolName,
-          toolCallId: toolCall.toolCallId,
-          args: toolCall.args,
-          dynamic: false
-        }, project?.id, addToolResult)
-          .catch(error => {
-            console.error('[ChatPanelV2][ClientTool] ❌ Tool execution error:', error)
-          })
-      } else {
-        console.log('[ChatPanelV2][DataStream] Server-side tool call, server handles:', toolCall.toolName)
-      }
-    }
-  })
-
-  // Input state for the chat textarea
+  // Local state for input (not using useChat's input)
   const [input, setInput] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
   // Auto-adjust textarea height on input change
   useEffect(() => {
@@ -466,51 +317,10 @@ export function ChatPanelV2({
     }
   }, [input, debouncedHeightAdjustment])
 
-  // Preserve existing messages state management
+  // Local state for messages (since we're not using useChat hook for complex attachment handling)
   const [messages, setMessages] = useState<any[]>([])
   const [error, setError] = useState<Error | null>(null)
-
-  // Sync useChat messages with local messages state
-  useEffect(() => {
-    if (JSON.stringify(useChatMessages) !== JSON.stringify(messages)) {
-      const sanitizedMessages = useChatMessages.map(msg => ({
-        ...msg,
-        content: typeof msg.content === 'string' ? msg.content : ''
-      }))
-      setMessages(sanitizedMessages)
-    }
-  }, [useChatMessages])
-
-  // Save new messages to IndexedDB when they're added by useChat
-  useEffect(() => {
-    const saveNewMessages = async () => {
-      if (!project?.id || useChatMessages.length === 0) return
-
-      // Find messages that are in useChatMessages but not yet saved
-      const newMessages = useChatMessages.filter(chatMsg =>
-        chatMsg && chatMsg.id && !messages.some(savedMsg => savedMsg.id === chatMsg.id)
-      )
-
-      for (const newMessage of newMessages) {
-        if (!newMessage) continue
-        
-        // Skip user messages - we now save them manually in handleEnhancedSubmit
-        if (newMessage.role === 'user') continue
-        
-        await saveMessageToIndexedDB(newMessage)
-        console.log(`[ChatPanelV2] Saved new message from useChat: ${newMessage.id}`)
-      }
-    }
-
-    saveNewMessages()
-  }, [useChatMessages, messages, project?.id])
-
-  useEffect(() => {
-    // Load existing messages from IndexedDB on mount
-    if (project?.id && messages.length === 0) {
-      loadMessages()
-    }
-  }, [project?.id])
+  const [abortController, setAbortController] = useState<AbortController | null>(null)
 
   // Message actions state
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
@@ -523,21 +333,16 @@ export function ChatPanelV2({
       return
     }
 
-    if (!message) {
-      console.warn('[ChatPanelV2] Cannot save message: message is null or undefined')
-      return
-    }
-
     try {
       console.log(`[ChatPanelV2] Saving message to project ${project.id}:`, {
-        id: message?.id,
-        role: message?.role,
-        contentLength: message?.content?.length || 0,
-        hasReasoning: !!message?.reasoning,
-        reasoningLength: message?.reasoning?.length || 0,
-        hasTools: Array.isArray(message?.toolInvocations) && message.toolInvocations.length > 0,
-        toolCount: Array.isArray(message?.toolInvocations) ? message.toolInvocations.length : 0,
-        metadataKeys: message?.metadata && typeof message.metadata === 'object' ? Object.keys(message.metadata) : []
+        id: message.id,
+        role: message.role,
+        contentLength: message.content.length,
+        hasReasoning: !!message.reasoning,
+        reasoningLength: message.reasoning?.length || 0,
+        hasTools: message.toolInvocations?.length > 0,
+        toolCount: message.toolInvocations?.length || 0,
+        metadataKeys: Object.keys(message.metadata || {})
       })
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
@@ -562,35 +367,24 @@ export function ChatPanelV2({
       }
 
       // Check if message with this ID already exists and delete it (to prevent duplicates)
-      let existingMessages = await storageManager.getMessages(chatSession.id)
+      const existingMessages = await storageManager.getMessages(chatSession.id)
       const existingMessage = existingMessages.find((m: any) => m.id === message.id)
 
       if (existingMessage) {
         console.log(`[ChatPanelV2] Deleting existing message with ID ${message.id} to prevent duplicates`)
         await storageManager.deleteMessage(chatSession.id, message.id)
-        // Refresh the list after deletion
-        existingMessages = await storageManager.getMessages(chatSession.id)
       }
 
       // Create the message (fresh or replacement)
-      const messageToCreate = {
+      await storageManager.createMessage({
         chatSessionId: chatSession.id,
-        role: message?.role || 'user',
-        content: typeof message?.metadata?.enhancedContent === 'string' ? message.metadata.enhancedContent : (typeof message?.content === 'string' ? message.content : ''),
-        metadata: message?.metadata || {},
+        role: message.role,
+        content: message.content,
+        metadata: message.metadata || {},
         tokensUsed: 0
-      }
-      
-      console.log(`[ChatPanelV2] Creating message with payload:`, {
-        role: messageToCreate.role,
-        contentLength: typeof messageToCreate.content === 'string' ? messageToCreate.content.length : 0,
-        hasMetadata: Object.keys(messageToCreate.metadata).length > 0
       })
-      
-      await storageManager.createMessage(messageToCreate)
-      
       // Update session's last message time and message count
-      const messageCount = (existingMessages?.length || 0) + 1
+      const messageCount = existingMessages.length + 1
       await storageManager.updateChatSession(chatSession.id, {
         lastMessageAt: new Date().toISOString(),
         messageCount: messageCount
@@ -851,7 +645,7 @@ export function ChatPanelV2({
   }
 
   const handleRetryMessage = async (messageId: string, content: string) => {
-    if (!project || (useChatStatus === 'streaming' || useChatStatus === 'submitted')) return
+    if (!project || isLoading) return
 
     // Find the message being retried
     const messageToRetry = messages.find(msg => msg.id === messageId)
@@ -914,9 +708,13 @@ export function ChatPanelV2({
     setInput('')
   }
 
-  // Stop function for aborting requests - now uses useChat stop
+  // Stop function for aborting requests
   const stop = () => {
-    useChatStop()
+    if (abortController) {
+      abortController.abort()
+      setAbortController(null)
+      setIsLoading(false)
+    }
   }
 
   // Load project files on mount
@@ -935,85 +733,6 @@ export function ChatPanelV2({
       setProjectFiles(files)
     } catch (error) {
       console.error('[ChatPanelV2] Error loading files:', error)
-    }
-  }
-
-  // Build optimized project file tree for server
-  async function buildProjectFileTree() {
-    if (!project) {
-      console.warn('[ChatPanelV2] Cannot build file tree: no project selected')
-      return []
-    }
-
-    try {
-      const { storageManager } = await import('@/lib/storage-manager')
-      await storageManager.init()
-      const allFiles = await storageManager.getFiles(project.id)
-
-      // Filter out shadcn UI components and common excluded files
-      const filteredFiles = allFiles.filter((file: any) => {
-        const path = file.path.toLowerCase()
-        // Exclude shadcn UI components (don't list individual files in components/ui/)
-        if (path.includes('components/ui/') && !file.isDirectory) {
-          return false
-        }
-        // Exclude node_modules, .git, build outputs
-        if (path.includes('node_modules') ||
-            path.includes('.git/') ||
-            path.includes('dist/') ||
-            path.includes('build/') ||
-            path.includes('.next/')) {
-          return false
-        }
-        return true
-      })
-
-      // Build file tree structure
-      const fileTree: string[] = []
-      const directories = new Set<string>()
-
-      // Collect all directories
-      filteredFiles.forEach((file: any) => {
-        const pathParts = file.path.split('/')
-        if (pathParts.length > 1) {
-          // Add all parent directories
-          for (let i = 1; i < pathParts.length; i++) {
-            const dirPath = pathParts.slice(0, i).join('/')
-            if (dirPath) {
-              directories.add(dirPath)
-            }
-          }
-        }
-      })
-
-      // Add root files first
-      const rootFiles = filteredFiles.filter((file: any) => !file.path.includes('/'))
-      rootFiles.forEach((file: any) => {
-        fileTree.push(file.path)
-      })
-
-      // Add directories and their files
-      const sortedDirectories = Array.from(directories).sort()
-      sortedDirectories.forEach((dir: string) => {
-        fileTree.push(`${dir}/`)
-
-        // Add files in this directory
-        const dirFiles = filteredFiles.filter((file: any) => {
-          const filePath = file.path
-          const fileDir = filePath.substring(0, filePath.lastIndexOf('/'))
-          return fileDir === dir
-        })
-
-        dirFiles.forEach((file: any) => {
-          fileTree.push(file.path)
-        })
-      })
-
-      console.log(`[ChatPanelV2] Built file tree with ${fileTree.length} entries for server`)
-      return fileTree
-    } catch (error) {
-      console.error('[ChatPanelV2] Error building file tree:', error)
-      return []
     }
   }
 
@@ -1044,7 +763,7 @@ export function ChatPanelV2({
           const uiMessage = {
             id: msg.id,
             role: msg.role,
-            content: msg.content || '',
+            content: msg.content,
             createdAt: msg.createdAt,
             // Extract reasoning and toolInvocations from metadata for UI compatibility
             reasoning: msg.metadata?.reasoning || '',
@@ -1080,10 +799,10 @@ export function ChatPanelV2({
     }
   }, [initialPrompt])
 
-  // Handle loading state based on useChat status
+  // Handle loading state based on isLoading state
   useEffect(() => {
-    // Loading is managed by useChat status
-  }, [useChatStatus])
+    // Loading is managed by isLoading state
+  }, [isLoading])
 
   // Handle errors
   useEffect(() => {
@@ -1102,7 +821,7 @@ export function ChatPanelV2({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Enhanced submit with attachments - Now uses useChat.sendMessage()
+  // Enhanced submit with attachments - AI SDK Pattern: Send last 5 messages
   const handleEnhancedSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -1130,73 +849,328 @@ export function ChatPanelV2({
       return
     }
 
-    // Store current input and attachments for processing
-    const currentInput = input.trim()
-    const currentAttachments = {
-      attachedFiles: [...attachedFiles],
-      attachedImages: [...attachedImages],
-      attachedUploadedFiles: [...attachedUploadedFiles],
-      attachedUrls: [...attachedUrls],
-      project
+    // Build enhanced message content with attachments
+    let enhancedContent = input.trim()
+    let displayContent = input.trim() // Content shown to user (without hidden contexts)
+
+    // Add image descriptions (hidden from user display)
+    if (attachedImages.length > 0) {
+      const imageDescriptions = attachedImages
+        .map((img: AttachedImage) => {
+          const description = img.description || (img.isProcessing ? '[Image processing...]' : '[Image description not available]')
+          return `\n\n--- Image: ${img.name} ---\n${description}\n--- End of Image ---`
+        })
+        .join('')
+
+      if (imageDescriptions) {
+        enhancedContent = `${enhancedContent}\n\n=== ATTACHED IMAGES CONTEXT ===${imageDescriptions}\n=== END ATTACHED IMAGES ===`
+        // Note: displayContent remains unchanged - image context is hidden from users
+      }
     }
+
+    // Add URL contents (shown to user)
+    if (attachedUrls.length > 0) {
+      const urlContents = attachedUrls
+        .filter((url: AttachedUrl) => url.content)
+        .map((url: AttachedUrl) => `\n\n--- Website: ${url.title || url.url} ---\nURL: ${url.url}\n\nContent:\n${url.content}\n--- End of Website ---`)
+        .join('')
+
+      if (urlContents) {
+        enhancedContent = `${enhancedContent}\n\n=== ATTACHED WEBSITES CONTEXT ===${urlContents}\n=== END ATTACHED WEBSITES ===`
+        displayContent = `${displayContent}\n\n=== ATTACHED WEBSITES ===${urlContents}\n=== END ATTACHED WEBSITES ===`
+      }
+    }
+
+    // Add uploaded file contents (shown to user)
+    if (attachedUploadedFiles.length > 0) {
+      const uploadedFileContexts = attachedUploadedFiles
+        .map(file => `\n\n--- Uploaded File: ${file.name} ---\n${file.content}\n--- End of ${file.name} ---`)
+        .join('')
+
+      if (uploadedFileContexts) {
+        enhancedContent = `${enhancedContent}\n\n=== UPLOADED FILES CONTEXT ===${uploadedFileContexts}\n=== END UPLOADED FILES ===`
+        displayContent = `${displayContent}\n\n=== UPLOADED FILES ===${uploadedFileContexts}\n=== END UPLOADED FILES ===`
+      }
+    }
+
+    // Add project files attached via @ command (shown to user)
+    if (attachedFiles.length > 0) {
+      const fileContexts: string[] = []
+
+      try {
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+
+        for (const attachedFile of attachedFiles) {
+          try {
+            const fileData = await storageManager.getFile(project.id, attachedFile.path)
+            if (fileData && fileData.content) {
+              fileContexts.push(`\n\n--- Project File: ${attachedFile.path} ---\n${fileData.content}\n--- End of ${attachedFile.name} ---`)
+            }
+          } catch (error) {
+            console.error(`Error loading attached file ${attachedFile.path}:`, error)
+            fileContexts.push(`\n\n--- Project File: ${attachedFile.path} ---\n[Error loading file content]\n--- End of ${attachedFile.name} ---`)
+          }
+        }
+
+        if (fileContexts.length > 0) {
+          enhancedContent = `${enhancedContent}\n\n=== PROJECT FILES CONTEXT ===${fileContexts.join('')}\n=== END PROJECT FILES ===`
+          displayContent = `${displayContent}\n\n=== PROJECT FILES ===${fileContexts.join('')}\n=== END PROJECT FILES ===`
+        }
+      } catch (error) {
+        console.error('Error loading attached files:', error)
+      }
+    }
+
+    // Clear attachments
+    setAttachedFiles([])
+    setAttachedImages([])
+    setAttachedUploadedFiles([])
+    setAttachedUrls([])
+    setInput('')
+    setIsLoading(true)
 
     // Clear any previous errors
     setError(null)
 
+    // Create user message
+    const userMessageId = Date.now().toString()
+    const userMessage = {
+      id: userMessageId,
+      role: 'user',
+      content: displayContent
+    }
+
+    // Add user message to local state immediately for better UX
+    setMessages(prev => [...prev, userMessage])
+
+    // Save user message to IndexedDB immediately
+    await saveMessageToIndexedDB(userMessage)
+    console.log(`[ChatPanelV2] User message saved to database: ${userMessageId}`)
+
+    // Create checkpoint for this message
+    if (project) {
+      try {
+        setTimeout(async () => {
+          await createCheckpoint(project.id, userMessage.id)
+          console.log(`[Checkpoint] Created checkpoint for message ${userMessage.id}`)
+        }, 100)
+      } catch (error) {
+        console.error('[Checkpoint] Error creating checkpoint:', error)
+      }
+    }
+
+    // Add placeholder assistant message
+    const assistantMessageId = (Date.now() + 1).toString()
+    const assistantMessage = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '' // Start with empty content so spinner shows immediately
+    }
+    setMessages(prev => [...prev, assistantMessage])
+
+    // Create abort controller for this request
+    const controller = new AbortController()
+    setAbortController(controller)
+
+    // AI SDK Pattern: Send only last 5 messages + new message
     try {
-      // Build enhanced message content with attachments BEFORE sending
-      const enhancedContent = await buildEnhancedMessageContent(currentInput, {
-        attachedFiles: currentAttachments.attachedFiles,
-        attachedImages: currentAttachments.attachedImages,
-        attachedUploadedFiles: currentAttachments.attachedUploadedFiles,
-        attachedUrls: currentAttachments.attachedUrls,
-        project
+      // Get last 5 messages from current conversation
+      const recentMessages = messages.slice(-10) // Last 5 messages
+      const messagesToSend = [
+        ...recentMessages.map((m: any) => ({ role: m.role, content: m.content })),
+        { role: 'user', content: enhancedContent }
+      ]
+
+      console.log(`[ChatPanelV2] Sending ${messagesToSend.length} messages to server (last 5 + new)`)
+
+      const response = await fetch('/api/chat-v2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: messagesToSend, // Send last 5 + new message
+          id: project?.id, // Chat session ID for server-side storage
+          projectId: project?.id,
+          project,
+          files: projectFiles,
+          modelId: selectedModel,
+          aiMode
+        }),
+        signal: controller.signal
       })
 
-      // Create and save user message with enhanced content immediately
-      const userMessageId = Date.now().toString()
-      const userMessage = {
-        id: userMessageId,
-        role: 'user',
-        content: currentInput, // Save original input for display
-        metadata: {
-          enhancedContent: enhancedContent // Store enhanced content in metadata
+      if (!response.ok) {
+        throw new Error('Failed to send message')
+      }
+
+      // Handle streaming response with AI SDK v5 data stream protocol
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('No response body')
+
+      const decoder = new TextDecoder()
+      let accumulatedContent = ''
+      let accumulatedReasoning = ''
+      let lineBuffer = '' // Buffer for incomplete lines across chunks
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) {
+          console.log('[ChatPanelV2][DataStream] 📊 Stream complete')
+          break
+        }
+
+        const chunk = decoder.decode(value, { stream: true })
+        
+        // Add chunk to buffer and split by newlines
+        // Important: Don't trim individual lines yet - metadata might span multiple chunks
+        lineBuffer += chunk
+        const lines = lineBuffer.split('\n')
+        
+        // Keep the last incomplete line in the buffer
+        lineBuffer = lines.pop() || ''
+        
+        // Process complete lines
+        const completeLines = lines.filter(line => line.trim())
+
+        for (const line of completeLines) {
+          try {
+            // Remove SSE "data: " prefix if present
+            const jsonString = line.startsWith('data: ') ? line.slice(6) : line
+            
+            // Skip empty lines or SSE comments
+            if (!jsonString || jsonString.startsWith(':')) {
+              continue
+            }
+            
+            // Parse AI SDK v5 stream protocol
+            // Format: {"type":"0","value":"text"} or {"type":"tool-call",...}
+            const parsed = JSON.parse(jsonString)
+            
+            // Skip server-internal chunks that shouldn't be exposed to client
+            if (parsed.type === 'start-step' || parsed.type === 'reasoning-start') {
+              console.log('[ChatPanelV2][DataStream] Skipping server-internal chunk:', parsed.type)
+              continue
+            }
+            
+            console.log('[ChatPanelV2][DataStream] Parsed stream part:', parsed)
+
+            // Handle different stream part types
+            if (parsed.type === 'text-delta') {
+              // Text delta - accumulate the text
+              if (parsed.text) {
+                accumulatedContent += parsed.text
+                setMessages(prev => prev.map(msg =>
+                  msg.id === assistantMessageId
+                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+                    : msg
+                ))
+              }
+            } else if (parsed.type === 'reasoning-delta') {
+              // Reasoning delta - accumulate reasoning separately
+              if (parsed.text) {
+                accumulatedReasoning += parsed.text
+                setMessages(prev => prev.map(msg =>
+                  msg.id === assistantMessageId
+                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+                    : msg
+                ))
+              }
+            } else if (parsed.type === 'tool-call') {
+              // CLIENT-SIDE TOOL EXECUTION: Execute file operation tools on IndexedDB
+              const toolCall = {
+                toolName: parsed.toolName,
+                toolCallId: parsed.toolCallId,
+                args: parsed.input, // AI SDK sends 'input' not 'args'
+                dynamic: false // We don't use dynamic tools
+              }
+              
+              console.log('[ChatPanelV2][ClientTool] 🔧 Tool call received:', {
+                toolName: toolCall.toolName,
+                toolCallId: toolCall.toolCallId,
+                args: toolCall.args
+              })
+
+              // Check if this is a client-side tool (file operations + package management)
+              const clientSideTools = ['write_file', 'read_file', 'edit_file', 'delete_file', 'add_package', 'remove_package']
+              if (clientSideTools.includes(toolCall.toolName)) {
+                console.log('[ChatPanelV2][ClientTool] ⚡ Executing client-side tool:', toolCall.toolName)
+                
+                // Execute the tool on client-side IndexedDB immediately
+                // This applies the file operation to IndexedDB without waiting for the stream to complete
+                const { handleClientFileOperation } = await import('@/lib/client-file-tools')
+                
+                // Define addToolResult function - this is just for logging/tracking
+                // The actual file operation happens inside handleClientFileOperation
+                const addToolResult = (result: any) => {
+                  console.log('[ChatPanelV2][ClientTool] ✅ Client-side tool completed:', {
+                    tool: result.tool,
+                    toolCallId: result.toolCallId,
+                    success: !result.errorText,
+                    output: result.output
+                  })
+                  
+                  // The tool result is returned to the AI via the server's streamText
+                  // We don't need to send it back manually - the AI SDK handles this
+                  // when tools don't have execute functions, they're treated as client-side tools
+                }
+                
+                // Execute the tool asynchronously (don't await - per AI SDK docs)
+                // The tool will update IndexedDB immediately
+                handleClientFileOperation(toolCall, project?.id, addToolResult)
+                  .catch(error => {
+                    console.error('[ChatPanelV2][ClientTool] ❌ Tool execution error:', error)
+                  })
+              } else {
+                console.log('[ChatPanelV2][DataStream] Server-side tool call, server handles:', parsed.toolName)
+              }
+            } else if (parsed.type === 'tool-result') {
+              // Tool result - these come from server-side tool executions
+              console.log('[ChatPanelV2][DataStream] Tool result received:', {
+                toolName: parsed.toolName,
+                toolCallId: parsed.toolCallId
+              })
+            }
+          } catch (e) {
+            // Log error details to help debug parsing issues
+            console.error('[ChatPanelV2][DataStream] ❌ Failed to parse chunk:', {
+              error: e instanceof Error ? e.message : String(e),
+              line: line.substring(0, 200), // Log first 200 chars of problematic line
+              lineLength: line.length
+            })
+            continue
+          }
         }
       }
 
-      // Save user message to IndexedDB immediately
-      await saveMessageToIndexedDB(userMessage)
-      console.log(`[ChatPanelV2] User message saved to database: ${userMessageId}`)
-
-      // Create checkpoint for user message
-      if (project?.id) {
-        setTimeout(async () => {
-          await createCheckpoint(project.id, userMessage.id)
-          console.log(`[Checkpoint] Created checkpoint for user message ${userMessage.id}`)
-        }, 100)
+      // Stream complete - client-side tools executed during streaming
+      console.log('[ChatPanelV2][DataStream] 📊 Stream complete:', {
+        contentLength: accumulatedContent.length,
+        hasProject: !!project
+      })
+      
+      // All file operations now execute client-side during streaming - no end-of-stream processing needed
+       
+      // Save assistant message to database after streaming completes
+      if (accumulatedContent.trim()) {
+        await saveAssistantMessageAfterStreaming(
+          assistantMessageId,
+          accumulatedContent,
+          accumulatedReasoning,
+          [] // No tool invocations tracking - tools execute during streaming
+        )
       }
-
-      // Clear attachments and input immediately for better UX
-      setAttachedFiles([])
-      setAttachedImages([])
-      setAttachedUploadedFiles([])
-      setAttachedUrls([])
-      setInput('')
-
-      // Use useChat.append() with enhanced content
-      await useChatAppend({ role: 'user', content: enhancedContent })
-
-      console.log('[ChatPanelV2] Message sent via useChat.append()')
     } catch (error: any) {
-      console.error('[ChatPanelV2] Error sending message:', error)
-      setError(error)
-
-      // Restore attachments and input on error
-      setAttachedFiles(currentAttachments.attachedFiles)
-      setAttachedImages(currentAttachments.attachedImages)
-      setAttachedUploadedFiles(currentAttachments.attachedUploadedFiles)
-      setAttachedUrls(currentAttachments.attachedUrls)
-      setInput(currentInput)
+      if (error.name === 'AbortError') {
+        // Request was aborted, remove the placeholder assistant message
+        setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
+      } else {
+        setError(error)
+        // Remove the placeholder assistant message on error
+        setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
+      }
+    } finally {
+      setIsLoading(false)
+      setAbortController(null)
     }
   }
 
@@ -1625,7 +1599,7 @@ export function ChatPanelV2({
                   <MessageWithTools
                     message={message}
                     projectId={project?.id}
-                    isStreaming={useChatStatus === 'streaming' && message.id === messages[messages.length - 1]?.id}
+                    isStreaming={isLoading && message.id === messages[messages.length - 1]?.id}
                   />
                 </div>
                 {/* AI Message Actions - Only show if message has content */}
@@ -2008,7 +1982,7 @@ export function ChatPanelV2({
 
           {/* Bottom Right: Send/Stop Button */}
           <div className="absolute bottom-2 right-2">
-            {(useChatStatus === 'streaming' || useChatStatus === 'submitted') ? (
+            {isLoading ? (
               <Button
                 type="button"
                 variant="default"
