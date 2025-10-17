@@ -617,14 +617,14 @@ export function ChatPanelV2({
       const messageToCreate = {
         chatSessionId: chatSession.id,
         role: message?.role || 'user',
-        content: message?.content || '',
+        content: typeof message?.content === 'string' ? message.content : '',
         metadata: message?.metadata || {},
         tokensUsed: 0
       }
       
       console.log(`[ChatPanelV2] Creating message with payload:`, {
         role: messageToCreate.role,
-        contentLength: messageToCreate.content.length,
+        contentLength: typeof messageToCreate.content === 'string' ? messageToCreate.content.length : 0,
         hasMetadata: Object.keys(messageToCreate.metadata).length > 0
       })
       
