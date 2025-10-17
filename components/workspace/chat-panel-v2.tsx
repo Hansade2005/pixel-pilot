@@ -571,14 +571,14 @@ export function ChatPanelV2({
 
     try {
       console.log(`[ChatPanelV2] Saving message to project ${project.id}:`, {
-        id: message.id,
-        role: message.role,
-        contentLength: message.content?.length || 0,
-        hasReasoning: !!message.reasoning,
-        reasoningLength: message.reasoning?.length || 0,
-        hasTools: Array.isArray(message.toolInvocations) && message.toolInvocations.length > 0,
-        toolCount: Array.isArray(message.toolInvocations) ? message.toolInvocations.length : 0,
-        metadataKeys: message.metadata ? Object.keys(message.metadata) : []
+        id: message?.id,
+        role: message?.role,
+        contentLength: message?.content?.length || 0,
+        hasReasoning: !!message?.reasoning,
+        reasoningLength: message?.reasoning?.length || 0,
+        hasTools: Array.isArray(message?.toolInvocations) && message.toolInvocations.length > 0,
+        toolCount: Array.isArray(message?.toolInvocations) ? message.toolInvocations.length : 0,
+        metadataKeys: message?.metadata && typeof message.metadata === 'object' ? Object.keys(message.metadata) : []
       })
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
@@ -603,24 +603,35 @@ export function ChatPanelV2({
       }
 
       // Check if message with this ID already exists and delete it (to prevent duplicates)
-      const existingMessages = await storageManager.getMessages(chatSession.id)
+      let existingMessages = await storageManager.getMessages(chatSession.id)
       const existingMessage = existingMessages.find((m: any) => m.id === message.id)
 
       if (existingMessage) {
         console.log(`[ChatPanelV2] Deleting existing message with ID ${message.id} to prevent duplicates`)
         await storageManager.deleteMessage(chatSession.id, message.id)
+        // Refresh the list after deletion
+        existingMessages = await storageManager.getMessages(chatSession.id)
       }
 
       // Create the message (fresh or replacement)
-      await storageManager.createMessage({
+      const messageToCreate = {
         chatSessionId: chatSession.id,
-        role: message.role,
-        content: message.content || '',
-        metadata: message.metadata || {},
+        role: message?.role || 'user',
+        content: message?.content || '',
+        metadata: message?.metadata || {},
         tokensUsed: 0
+      }
+      
+      console.log(`[ChatPanelV2] Creating message with payload:`, {
+        role: messageToCreate.role,
+        contentLength: messageToCreate.content.length,
+        hasMetadata: Object.keys(messageToCreate.metadata).length > 0
       })
+      
+      await storageManager.createMessage(messageToCreate)
+      
       // Update session's last message time and message count
-      const messageCount = existingMessages.length + 1
+      const messageCount = (existingMessages?.length || 0) + 1
       await storageManager.updateChatSession(chatSession.id, {
         lastMessageAt: new Date().toISOString(),
         messageCount: messageCount
