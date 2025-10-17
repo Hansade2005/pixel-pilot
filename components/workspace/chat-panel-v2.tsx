@@ -424,10 +424,10 @@ export function ChatPanelV2({
 
         return {
           body: {
-            messages: [
-              ...messages.slice(-10), // Last 10 messages for context
-              { role: 'user', content: enhancedContent }
-            ],
+            messages: messages.map(msg => ({
+              role: msg.role,
+              content: msg.role === 'user' && (msg as any).content === attachmentsToUse.input ? enhancedContent : (msg as any).content
+            })),
             projectId: project?.id,
             project,
             fileTree, // Send optimized file tree for context
