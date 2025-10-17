@@ -559,7 +559,7 @@ export function ChatPanelV2({
       console.log(`[ChatPanelV2] Saving message to project ${project.id}:`, {
         id: message.id,
         role: message.role,
-        contentLength: message.content.length,
+        contentLength: message.content?.length || 0,
         hasReasoning: !!message.reasoning,
         reasoningLength: message.reasoning?.length || 0,
         hasTools: message.toolInvocations?.length > 0,
@@ -601,7 +601,7 @@ export function ChatPanelV2({
       await storageManager.createMessage({
         chatSessionId: chatSession.id,
         role: message.role,
-        content: message.content,
+        content: message.content || '',
         metadata: message.metadata || {},
         tokensUsed: 0
       })
@@ -956,6 +956,11 @@ export function ChatPanelV2({
 
   // Build optimized project file tree for server
   const buildProjectFileTree = async () => {
+    if (!project) {
+      console.warn('[ChatPanelV2] Cannot build file tree: no project selected')
+      return []
+    }
+
     try {
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
@@ -1055,7 +1060,7 @@ export function ChatPanelV2({
           const uiMessage = {
             id: msg.id,
             role: msg.role,
-            content: msg.content,
+            content: msg.content || '',
             createdAt: msg.createdAt,
             // Extract reasoning and toolInvocations from metadata for UI compatibility
             reasoning: msg.metadata?.reasoning || '',
