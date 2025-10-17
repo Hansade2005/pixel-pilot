@@ -407,8 +407,8 @@ export function ChatPanelV2({
           input
         }
 
-        // Build enhanced message content with attachments
-        const enhancedContent = await buildEnhancedMessageContent(attachmentsToUse.input, {
+        // Use pre-built enhanced content if available, otherwise build it
+        const enhancedContent = attachmentsToUse.enhancedContent || await buildEnhancedMessageContent(attachmentsToUse.input, {
           attachedFiles: attachmentsToUse.attachedFiles,
           attachedImages: attachmentsToUse.attachedImages,
           attachedUploadedFiles: attachmentsToUse.attachedUploadedFiles,
@@ -492,6 +492,7 @@ export function ChatPanelV2({
     attachedUploadedFiles: AttachedUploadedFile[]
     attachedUrls: AttachedUrl[]
     input: string
+    enhancedContent?: string
   } | null>(null)
 
   // Input state for the chat textarea
@@ -1174,22 +1175,6 @@ export function ChatPanelV2({
       project
     }
 
-    // Store attachments for processing by prepareSendMessagesRequest
-    setPendingAttachments({
-      attachedFiles: [...attachedFiles],
-      attachedImages: [...attachedImages],
-      attachedUploadedFiles: [...attachedUploadedFiles],
-      attachedUrls: [...attachedUrls],
-      input: currentInput
-    })
-
-    // Clear attachments and input immediately for better UX
-    setAttachedFiles([])
-    setAttachedImages([])
-    setAttachedUploadedFiles([])
-    setAttachedUrls([])
-    setInput('')
-
     // Clear any previous errors
     setError(null)
 
@@ -1225,6 +1210,30 @@ export function ChatPanelV2({
           console.log(`[Checkpoint] Created checkpoint for user message ${userMessage.id}`)
         }, 100)
       }
+
+      // Store attachments and pre-built enhanced content for prepareSendMessagesRequest
+      setPendingAttachments({
+        attachedFiles: [...attachedFiles],
+        attachedImages: [...attachedImages],
+        attachedUploadedFiles: [...attachedUploadedFiles],
+        attachedUrls: [...attachedUrls],
+        input: currentInput,
+        enhancedContent: enhancedContent // Pass pre-built content to avoid rebuilding
+      } as {
+        attachedFiles: AttachedFile[]
+        attachedImages: AttachedImage[]
+        attachedUploadedFiles: AttachedUploadedFile[]
+        attachedUrls: AttachedUrl[]
+        input: string
+        enhancedContent: string
+      })
+
+      // Clear attachments and input immediately for better UX
+      setAttachedFiles([])
+      setAttachedImages([])
+      setAttachedUploadedFiles([])
+      setAttachedUrls([])
+      setInput('')
 
       // Use useChat.sendMessage() - attachments will be processed in prepareSendMessagesRequest
       await useChatSendMessage({ text: currentInput })
