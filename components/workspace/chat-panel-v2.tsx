@@ -354,7 +354,7 @@ export function ChatPanelV2({
     }
 
     // Add project files attached via @ command (shown to user)
-    if (attachments.attachedFiles.length > 0) {
+    if (attachments.attachedFiles.length > 0 && project) {
       const fileContexts: string[] = []
 
       try {
@@ -420,7 +420,7 @@ export function ChatPanelV2({
         setPendingAttachments(null)
 
         // Build project file tree for server context
-        const fileTree = await buildProjectFileTree()
+        const fileTree = project ? await buildProjectFileTree() : []
 
         return {
           body: {
@@ -440,9 +440,14 @@ export function ChatPanelV2({
     }),
     // Preserve message persistence logic
     onFinish: async ({ message }: any) => {
+      if (!message || !project?.id) {
+        console.warn('[ChatPanelV2] onFinish called with invalid message or no project')
+        return
+      }
+      
       // Use existing message saving logic exactly
       await saveMessageToIndexedDB(message)
-      if (project) {
+      if (project?.id) {
         setTimeout(async () => {
           await createCheckpoint(project.id, message.id)
         }, 100)
@@ -513,29 +518,33 @@ export function ChatPanelV2({
   // Save new messages to IndexedDB when they're added by useChat
   useEffect(() => {
     const saveNewMessages = async () => {
-      if (!project || useChatMessages.length === 0) return
+      if (!project?.id || useChatMessages.length === 0) return
 
       // Find messages that are in useChatMessages but not yet saved
       const newMessages = useChatMessages.filter(chatMsg =>
-        !messages.some(savedMsg => savedMsg.id === chatMsg.id)
+        chatMsg && chatMsg.id && !messages.some(savedMsg => savedMsg.id === chatMsg.id)
       )
 
       for (const newMessage of newMessages) {
+        if (!newMessage) continue
+        
         await saveMessageToIndexedDB(newMessage)
         console.log(`[ChatPanelV2] Saved new message from useChat: ${newMessage.id}`)
 
         // Create checkpoint for user messages too
         if (newMessage.role === 'user') {
           setTimeout(async () => {
-            await createCheckpoint(project.id, newMessage.id)
-            console.log(`[Checkpoint] Created checkpoint for user message ${newMessage.id}`)
+            if (project?.id) {
+              await createCheckpoint(project.id, newMessage.id)
+              console.log(`[Checkpoint] Created checkpoint for user message ${newMessage.id}`)
+            }
           }, 100)
         }
       }
     }
 
     saveNewMessages()
-  }, [useChatMessages, messages, project])
+  }, [useChatMessages, messages, project?.id])
 
   useEffect(() => {
     // Load existing messages from IndexedDB on mount
@@ -555,6 +564,11 @@ export function ChatPanelV2({
       return
     }
 
+    if (!message) {
+      console.warn('[ChatPanelV2] Cannot save message: message is null or undefined')
+      return
+    }
+
     try {
       console.log(`[ChatPanelV2] Saving message to project ${project.id}:`, {
         id: message.id,
@@ -562,9 +576,9 @@ export function ChatPanelV2({
         contentLength: message.content?.length || 0,
         hasReasoning: !!message.reasoning,
         reasoningLength: message.reasoning?.length || 0,
-        hasTools: message.toolInvocations?.length > 0,
-        toolCount: message.toolInvocations?.length || 0,
-        metadataKeys: Object.keys(message.metadata || {})
+        hasTools: Array.isArray(message.toolInvocations) && message.toolInvocations.length > 0,
+        toolCount: Array.isArray(message.toolInvocations) ? message.toolInvocations.length : 0,
+        metadataKeys: message.metadata ? Object.keys(message.metadata) : []
       })
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
@@ -955,7 +969,7 @@ export function ChatPanelV2({
   }
 
   // Build optimized project file tree for server
-  const buildProjectFileTree = async () => {
+  async function buildProjectFileTree() {
     if (!project) {
       console.warn('[ChatPanelV2] Cannot build file tree: no project selected')
       return []
