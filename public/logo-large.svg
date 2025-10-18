@@ -1,0 +1,87 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle with gradient -->
+  <defs>
+    <linearGradient id="logoGradientLarge" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#8b5cf6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glowLarge">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge> 
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Main background circle -->
+  <circle cx="60" cy="60" r="55" fill="url(#logoGradientLarge)" stroke="#1e293b" stroke-width="3"/>
+  
+  <!-- Letter P (Pixel) -->
+  <path d="M30 30 L30 90 L50 90 Q70 90 70 70 Q70 50 50 50 L40 50 L40 30 Z" fill="white" opacity="0.95"/>
+  <path d="M40 60 L50 60 Q60 60 60 70 Q60 80 50 80 L40 80 Z" fill="url(#logoGradientLarge)" opacity="0.8"/>
+  
+  <!-- Letter B (Builder) -->
+  <path d="M80 30 L80 90 L100 90 Q110 90 110 80 Q110 70 100 70 L90 70 L90 60 L100 60 Q110 60 110 50 Q110 40 100 40 L80 40 Z" fill="white" opacity="0.95"/>
+  <path d="M90 50 L100 50 Q105 50 105 55 Q105 60 100 60 L90 60 Z" fill="url(#logoGradientLarge)" opacity="0.8"/>
+  <path d="M90 70 L100 70 Q105 70 105 75 Q105 80 100 80 L90 80 Z" fill="url(#logoGradientLarge)" opacity="0.8"/>
+  
+  <!-- AI Sparkles -->
+  <g filter="url(#glowLarge)">
+    <!-- Top sparkle -->
+    <path d="M60 15 L62.5 20 L65 15 L62.5 10 Z" fill="#fbbf24" opacity="0.9"/>
+    <circle cx="62.5" cy="15" r="2.5" fill="#fef3c7"/>
+    
+    <!-- Bottom sparkle -->
+    <path d="M60 105 L62.5 110 L65 105 L62.5 100 Z" fill="#10b981" opacity="0.9"/>
+    <circle cx="62.5" cy="105" r="2.5" fill="#d1fae5"/>
+    
+    <!-- Left sparkle -->
+    <path d="M15 60 L20 62.5 L15 65 L10 62.5 Z" fill="#ef4444" opacity="0.9"/>
+    <circle cx="15" cy="62.5" r="2.5" fill="#fee2e2"/>
+    
+    <!-- Right sparkle -->
+    <path d="M105 60 L110 62.5 L105 65 L100 62.5 Z" fill="#8b5cf6" opacity="0.9"/>
+    <circle cx="105" cy="62.5" r="2.5" fill="#ede9fe"/>
+    
+    <!-- Diagonal sparkles -->
+    <path d="M25 25 L27.5 27.5 L25 30 L22.5 27.5 Z" fill="#06b6d4" opacity="0.8"/>
+    <path d="M95 95 L97.5 97.5 L95 100 L92.5 97.5 Z" fill="#f59e0b" opacity="0.8"/>
+    <path d="M95 25 L97.5 27.5 L95 30 L92.5 27.5 Z" fill="#ec4899" opacity="0.8"/>
+    <path d="M25 95 L27.5 97.5 L25 100 L22.5 97.5 Z" fill="#84cc16" opacity="0.8"/>
+  </g>
+  
+  <!-- Pixel grid pattern overlay -->
+  <g opacity="0.1">
+    <rect x="40" y="40" width="5" height="5" fill="white"/>
+    <rect x="50" y="40" width="5" height="5" fill="white"/>
+    <rect x="60" y="40" width="5" height="5" fill="white"/>
+    <rect x="70" y="40" width="5" height="5" fill="white"/>
+    <rect x="80" y="40" width="5" height="5" fill="white"/>
+    
+    <rect x="40" y="50" width="5" height="5" fill="white"/>
+    <rect x="50" y="50" width="5" height="5" fill="white"/>
+    <rect x="60" y="50" width="5" height="5" fill="white"/>
+    <rect x="70" y="50" width="5" height="5" fill="white"/>
+    <rect x="80" y="50" width="5" height="5" fill="white"/>
+    
+    <rect x="40" y="60" width="5" height="5" fill="white"/>
+    <rect x="50" y="60" width="5" height="5" fill="white"/>
+    <rect x="60" y="60" width="5" height="5" fill="white"/>
+    <rect x="70" y="60" width="5" height="5" fill="white"/>
+    <rect x="80" y="60" width="5" height="5" fill="white"/>
+    
+    <rect x="40" y="70" width="5" height="5" fill="white"/>
+    <rect x="50" y="70" width="5" height="5" fill="white"/>
+    <rect x="60" y="70" width="5" height="5" fill="white"/>
+    <rect x="70" y="70" width="5" height="5" fill="white"/>
+    <rect x="80" y="70" width="5" height="5" fill="white"/>
+    
+    <rect x="40" y="80" width="5" height="5" fill="white"/>
+    <rect x="50" y="80" width="5" height="5" fill="white"/>
+    <rect x="60" y="80" width="5" height="5" fill="white"/>
+    <rect x="70" y="80" width="5" height="5" fill="white"/>
+    <rect x="80" y="80" width="5" height="5" fill="white"/>
+  </g>
+</svg>

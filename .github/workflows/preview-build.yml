@@ -1,0 +1,188 @@
+name: Preview Build and Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo_name:
+        description: 'Repository name'
+        required: true
+        type: string
+      commit_sha:
+        description: 'Commit SHA'
+        required: true
+        type: string
+      project_type:
+        description: 'Project type (react-vite, next, static)'
+        required: true
+        type: string
+        default: 'react-vite'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.repository_owner }}/${{ inputs.repo_name }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        ref: ${{ inputs.commit_sha }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build project
+      run: |
+        if [ "${{ inputs.project_type }}" == "react-vite" ]; then
+          npm run build
+        elif [ "${{ inputs.project_type }}" == "next" ]; then
+          npm run build
+        else
+          echo "Static project - no build step needed"
+          mkdir -p dist
+          cp -r . dist/ || true
+        fi
+
+    - name: Upload to Supabase Storage
+      env:
+        SUPABASE_URL: https://dlunpilhklsgvkegnnlp.supabase.co
+        SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsdW5waWxoa2xzZ3ZrZWdubmxwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTA1MDQxOSwiZXhwIjoyMDcwNjI2NDE5fQ.k-2OJ4p3hr9feR4ks54OQM2HhOhaVJ3pUK-20tGJwpo
+        SUPABASE_ACCESS_TOKEN: sbp_b9d84ba60246e9e22db433a7cbc50be9669cb698
+        SUPABASE_PROJECT_REF: dlunpilhklsgvkegnnlp
+      run: |
+        # Install Supabase CLI
+        npm install -g @supabase/supabase-js
+        
+        # Create upload script
+        cat > upload.js << 'EOF'
+        const { createClient } = require('@supabase/supabase-js');
+        const fs = require('fs');
+        const path = require('path');
+        
+        const supabase = createClient(
+          process.env.SUPABASE_URL,
+          process.env.SUPABASE_SERVICE_ROLE_KEY
+        );
+        
+        async function uploadFiles() {
+          const buildDir = fs.existsSync('dist') ? 'dist' : '.';
+          const siteName = process.env.GITHUB_REPOSITORY.split('/')[1];
+          const bucket = 'sites';
+          
+          console.log(`Uploading from ${buildDir} to ${siteName}`);
+          
+          // Ensure bucket exists
+          try {
+            await supabase.storage.createBucket(bucket, { public: true });
+          } catch (e) {
+            console.log('Bucket exists or creation skipped');
+          }
+          
+          // Upload files recursively
+          async function uploadDirectory(dirPath, prefix = '') {
+            const items = fs.readdirSync(dirPath);
+            
+            for (const item of items) {
+              const fullPath = path.join(dirPath, item);
+              const relativePath = path.join(prefix, item).replace(/\\/g, '/');
+              
+              if (fs.statSync(fullPath).isDirectory()) {
+                await uploadDirectory(fullPath, relativePath);
+              } else {
+                const fileContent = fs.readFileSync(fullPath);
+                const storagePath = `${siteName}/${relativePath}`;
+                
+                console.log(`Uploading: ${storagePath}`);
+                
+                const { error } = await supabase.storage
+                  .from(bucket)
+                  .upload(storagePath, fileContent, {
+                    contentType: getContentType(item),
+                    upsert: true,
+                  });
+                
+                if (error) {
+                  console.error(`Error uploading ${storagePath}:`, error);
+                  process.exit(1);
+                }
+              }
+            }
+          }
+          
+          function getContentType(filename) {
+            const ext = path.extname(filename).toLowerCase();
+            const contentTypes = {
+              '.html': 'text/html',
+              '.css': 'text/css',
+              '.js': 'application/javascript',
+              '.json': 'application/json',
+              '.png': 'image/png',
+              '.jpg': 'image/jpeg',
+              '.jpeg': 'image/jpeg',
+              '.gif': 'image/gif',
+              '.svg': 'image/svg+xml',
+              '.ico': 'image/x-icon'
+            };
+            return contentTypes[ext] || 'text/plain';
+          }
+          
+          await uploadDirectory(buildDir);
+          console.log('✅ Upload completed successfully!');
+          console.log(`🌐 Site available at: https://pixelways.co/sites/${siteName}/index.html`);
+          
+          return `https://pixelways.co/sites/${siteName}/index.html`;
+        }
+        
+        uploadFiles().catch(console.error);
+        EOF
+        
+        # Run upload and capture the preview URL
+        PREVIEW_URL=$(node upload.js | grep "Site available at:" | cut -d' ' -f4)
+        echo "PREVIEW_URL=$PREVIEW_URL" >> $GITHUB_ENV
+
+    - name: Notify build completion
+      env:
+        BUILD_WEBHOOK_URL: https://pixelways.co/api/build-complete
+      run: |
+        # Send webhook notification to PixelAI app
+        curl -X POST "$BUILD_WEBHOOK_URL" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"status\": \"completed\",
+            \"repo_name\": \"${{ inputs.repo_name }}\",
+            \"github_user\": \"${{ github.repository_owner }}\",
+            \"cleanup_token\": \"${{ secrets.REPO_CLEANUP_TOKEN || env.REPO_CLEANUP_TOKEN }}\",
+            \"project_type\": \"${{ inputs.project_type }}\",
+            \"commit_sha\": \"${{ inputs.commit_sha }}\",
+            \"preview_url\": \"$PREVIEW_URL\",
+            \"build_time\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+            \"success\": true
+          }"
+        
+        echo "🎉 Build and deployment completed!"
+        echo "📊 Project type: ${{ inputs.project_type }}"
+        echo "📂 Repository: ${{ inputs.repo_name }}"
+        echo "🔗 Commit: ${{ inputs.commit_sha }}"
+        echo "🌐 Preview URL: $PREVIEW_URL"
+
+    - name: Cleanup repository
+      if: always()
+      env:
+        REPO_CLEANUP_TOKEN: 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
+      run: |
+        # Wait a bit to ensure webhook is processed
+        sleep 10
+        
+        # Delete the temporary repository
+        echo "🗑️ Cleaning up temporary repository: ${{ inputs.repo_name }}"
+        curl -X DELETE "https://api.github.com/repos/${{ github.repository_owner }}/${{ inputs.repo_name }}" \
+          -H "Authorization: token $REPO_CLEANUP_TOKEN"
+        
+        echo "✅ Repository cleanup completed"

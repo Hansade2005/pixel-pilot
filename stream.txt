@@ -1,0 +1,20 @@
+please lets work on my code preview panel. go therre and remove first remove all the sandpack codes  and sandpack preview button .     How to stream/get logs from background process const { pid } = await sandbox.commands.run("python -u -m http.server 8000", {
+  background: true,
+  timeoutMs: 0,
+});
+
+console.log("Background process started with PID:", pid);
+
+const process = await sandbox.commands.connect(pid, {
+  onStdout: (data) => {
+    console.log(data);
+  },
+  onStderr: (data) => {
+    console.log(data);
+  },
+  timeoutMs: 0,
+});
+
+setInterval(async () => {
+ console.log(process.stdout);
+// }, 1000);

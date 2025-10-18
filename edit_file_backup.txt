@@ -1,0 +1,93 @@
+// BACKUP EDIT_FILE TOOL INSTRUCTIONS
+// These instructions were removed from the system prompt because the AI was still using edit_file despite being disabled
+// Save this content to restore edit_file functionality in the future
+
+// **🚀 ADVANCED EDIT_FILE PARAMETERS: (TEMPORARILY DISABLED)**
+
+// Multi-operation editing with validation:
+// \`\`\`json
+// {
+//   "tool": "edit_file",
+//   "path": "src/components/Example.tsx",
+//   "searchReplaceBlocks": [
+//     {
+//       "search": "const [count, setCount] = useState(0);",
+//       "replace": "const [count, setCount] = useState(0);\\n  const [loading, setLoading] = useState(false);"
+//     },
+//     {
+//       "search": "onClick={() => setCount(count + 1)}",
+//       "replace": "onClick={() => {\\n    setLoading(true);\\n    setCount(count + 1);\\n    setLoading(false);\\n  }}",
+//       "validateAfter": "setLoading(false)"
+//     }
+//   ],
+//   "rollbackOnFailure": true
+// }
+// \`\`\`
+
+// Target specific occurrences:
+// \`\`\`json
+// {
+//   "tool": "edit_file",
+//   "path": "src/utils/helpers.ts",
+//   "search": "const result",
+//   "replace": "const processedResult",
+//   "occurrenceIndex": 2
+// }
+// \`\`\`
+
+// Replace all occurrences with validation:
+// \`\`\`json
+// {
+//   "tool": "edit_file",
+//   "path": "src/types/index.ts",
+//   "search": "UserData",
+//   "replace": "ProfileData",
+//   "replaceAll": true,
+//   "validateAfter": "interface ProfileData"
+// }
+// \`\`\`
+
+// Dry run preview (test changes without applying):
+// \`\`\`json
+// {
+//   "tool": "edit_file",
+//   "path": "src/App.tsx",
+//   "dryRun": true,
+//   "searchReplaceBlocks": [
+//     {
+//       "search": "function App()",
+//       "replace": "async function App()"
+//     }
+//   ]
+// }
+// \`\`\`
+
+// **Supported tool names**: "write_file", "edit_file", "delete_file"
+
+// **✏️ EDIT_FILE DISABLED:** (TEMPORARILY DISABLED)
+// - **Small Precise Changes**: Fixing bugs, updating single functions, or minor tweaks (DISABLED)
+// - **Targeted Fixes**: Changing specific values, parameters, or small code blocks (DISABLED)
+// - **Minor Updates**: Adding single properties, updating imports, or small adjustments (DISABLED)
+// - **Configuration Changes**: Updating settings, constants, or small config modifications (DISABLED)
+
+// **✅ EDIT_FILE EXAMPLES: (TEMPORARILY DISABLED)**
+// - Fixing a typo in a function name (DISABLED)
+// - Updating a single CSS class (DISABLED)
+// - Changing a default value (DISABLED)
+// - Adding one import statement (DISABLED)
+// - Modifying a single function parameter (DISABLED)
+// - Updating error messages (DISABLED)
+
+// Example usage in system prompt:
+// \`\`\`json
+// {
+//   "tool": "edit_file",
+//   "path": "src/components/Button.tsx",
+//   "searchReplaceBlocks": [
+//     {
+//       "search": "variant?: 'primary' | 'secondary' | 'danger';",
+//       "replace": "variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'warning';"
+//     }
+//   ]
+// }
+// \`\`\`
