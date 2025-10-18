@@ -394,13 +394,24 @@ export function ChatPanelV2({
     status: useChatStatus
   } = useChat({
     api: '/api/chat-v2',
-    // Ensure custom data is included in every request (including tool call responses)
-    experimental_prepareRequestBody: async ({ requestBody }) => {
+    // Ensure custom data is included in ALL requests (initial messages and tool calls)
+    experimental_prepareRequestBody: async ({ messages, requestBody }) => {
       // Build project file tree for server context
       const fileTree = project ? await buildProjectFileTree() : []
 
-      return {
-        ...requestBody, // This should include messages
+      console.log('[ChatPanelV2] experimental_prepareRequestBody called:', {
+        messageCount: messages?.length || 0,
+        messagesPreview: messages?.slice(0, 2).map(m => ({ role: m.role, contentLength: m.content?.length })),
+        projectId: project?.id,
+        modelId: selectedModel,
+        aiMode,
+        fileTreeLength: fileTree.length,
+        filesCount: projectFiles.length
+      })
+
+      const finalBody = {
+        ...requestBody,
+        messages, // CRITICAL: Include messages array
         projectId: project?.id,
         project,
         modelId: selectedModel,
@@ -408,6 +419,16 @@ export function ChatPanelV2({
         fileTree, // Send optimized file tree for context
         files: projectFiles // Keep full files for server-side tools
       }
+
+      console.log('[ChatPanelV2] Sending request body:', {
+        hasMessages: !!finalBody.messages,
+        messageCount: finalBody.messages?.length || 0,
+        projectId: finalBody.projectId,
+        modelId: finalBody.modelId,
+        aiMode: finalBody.aiMode
+      })
+
+      return finalBody
     },
     // Preserve message persistence logic
     onFinish: async ({ message }: any) => {
@@ -1184,6 +1205,12 @@ export function ChatPanelV2({
       setInput('')
 
       // Use useChat.append() with enhanced content
+      // experimental_prepareRequestBody will add project data and messages array
+      console.log('[ChatPanelV2] Calling useChatAppend with content:', {
+        contentLength: enhancedContent.length,
+        contentPreview: enhancedContent.substring(0, 100)
+      })
+      
       await useChatAppend({ role: 'user', content: enhancedContent })
 
       console.log('[ChatPanelV2] Message sent via useChat.append()')
