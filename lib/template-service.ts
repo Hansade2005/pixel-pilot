@@ -322,10 +322,8 @@ export default App`,
       name: 'App.css',
       path: 'src/App.css',
       content: `#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  padding: 0;
+  text-align: left;
 }
 
 .logo {

@@ -33,34 +33,35 @@ export async function POST(request: Request) {
        const result = await generateText({
          model: codestralModel,
          temperature: 0.7, // Balanced creativity and professionalism
-      prompt: `You are an expert AI prompt enhancer that creates detailed, actionable prompts for web application development. You take basic user requests and transform them into comprehensive, implementable specifications.
+      prompt: `You are an expert AI prompt enhancer that creates detailed, actionable prompts for web application development. You take basic user requests and transform them into comprehensive, implementable specifications. Do not include any framework or library details; focus only on UI/UX, functionality, interactions, and overall user experience.
 
 Here are examples of good prompt enhancements:
 
 EXAMPLE 1:
 Original: "add a login form"
-Enhanced: "Create a modern login form component with email/password fields, remember me checkbox, forgot password link, and social login buttons (Google, GitHub). Use shadcn/ui components with proper validation using react-hook-form and zod. Include loading states, error handling, and responsive design."
+Enhanced: "Create a modern login form with email/password fields, remember me checkbox, forgot password link, and social login options. Include input validation, error handling, loading states, and responsive design."
 
 EXAMPLE 2:
 Original: "make a dashboard"
-Enhanced: "Build a comprehensive dashboard with multiple chart types (bar, line, pie) using recharts, key metrics cards, recent activity feed, and data filters. Include dark mode support, responsive grid layout, and real-time data updates."
+Enhanced: "Build a comprehensive dashboard with multiple chart types, key metrics cards, recent activity feed, and data filters. Include responsive grid layout, accessibility support, and real-time data updates."
 
 EXAMPLE 3:
 Original: "add user profile"
-Enhanced: "Implement a user profile page with avatar upload, personal information form (name, email, bio), password change functionality, and account settings. Use shadcn/ui components, include form validation, image cropping, and proper error handling."
+Enhanced: "Implement a user profile page with avatar upload, personal information form, password change functionality, and account settings. Include validation, error handling, image cropping, and responsive design."
 
 User's original prompt: "${prompt}"
 
 Enhance this prompt by making it more detailed and actionable. Focus on:
-- Specific technologies and frameworks (React, Next.js, shadcn/ui, etc.)
-- UI/UX requirements and modern design patterns
-- Data validation and error handling approaches
-- Performance and accessibility considerations
-- Integration with common development patterns
 
-Create a professional, detailed prompt (60-120 words) that a developer could immediately start implementing.
+UI/UX requirements and modern design patterns
 
-Return ONLY the enhanced prompt text, without any explanations, quotations, or markdown formatting.`,
+Data validation, error handling, and accessibility considerations
+
+Interactions, states, and performance optimizations
+
+Functionality and user experience details
+
+Create a professional, detailed prompt (60-120 words) that a developer could immediately start implementing. Return ONLY the enhanced prompt text, without explanations or formatting.`,
     })
 
     const enhancedPrompt = result.text.trim()
