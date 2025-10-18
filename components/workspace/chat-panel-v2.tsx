@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils'
 import { Actions, Action } from '@/components/ai-elements/actions'
 import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown"
 import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
-import { FileSearchResult } from "@/lib/file-lookup-service"
+import { FileSearchResult, FileLookupService } from "@/lib/file-lookup-service"
 import { createCheckpoint } from '@/lib/checkpoint-utils'
 
 // ExpandableUserMessage component for long user messages
@@ -302,6 +302,7 @@ export function ChatPanelV2({
   const recognitionRef = useRef<any>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
+  const fileLookupServiceRef = useRef<FileLookupService | null>(null)
 
   // Load project files for context
   const [projectFiles, setProjectFiles] = useState<any[]>([])
@@ -717,6 +718,13 @@ export function ChatPanelV2({
     }
   }
 
+  // Initialize file lookup service
+  useEffect(() => {
+    if (!fileLookupServiceRef.current) {
+      fileLookupServiceRef.current = new FileLookupService()
+    }
+  }, [])
+
   // Load project files on mount
   useEffect(() => {
     if (project?.id) {
@@ -746,13 +754,27 @@ export function ChatPanelV2({
 
   const loadProjectFiles = async () => {
     try {
-      const { storageManager } = await import('@/lib/storage-manager')
-      await storageManager.init()
-      const files = await storageManager.getFiles(project.id)
+      if (!fileLookupServiceRef.current || !project?.id) return
+
+      await fileLookupServiceRef.current.initialize(project.id)
+      await fileLookupServiceRef.current.refreshFiles()
+      
+      // Get files from the lookup service
+      const files = fileLookupServiceRef.current['files'] || []
       setProjectFiles(files)
-      console.log(`[ChatPanelV2] Loaded ${files.length} project files for real-time sync`)
+      console.log(`[ChatPanelV2] Loaded ${files.length} project files via FileLookupService for real-time sync`)
     } catch (error) {
-      console.error('[ChatPanelV2] Error loading files:', error)
+      console.error('[ChatPanelV2] Error loading files via FileLookupService:', error)
+      // Fallback to direct storage manager
+      try {
+        const { storageManager } = await import('@/lib/storage-manager')
+        await storageManager.init()
+        const files = await storageManager.getFiles(project.id)
+        setProjectFiles(files)
+        console.log(`[ChatPanelV2] Fallback: Loaded ${files.length} project files via storageManager`)
+      } catch (fallbackError) {
+        console.error('[ChatPanelV2] Fallback also failed:', fallbackError)
+      }
     }
   }
 
