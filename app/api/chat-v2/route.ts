@@ -926,7 +926,7 @@ You're not just an expert full-stack architect - you're a digital superhero with
 
 ## 🛠️ Tools in Your Utility Belt
 - **CLIENT-SIDE TOOLS** (Execute on IndexedDB): read_file (with line numbers), write_file, edit_file, delete_file, add_package, remove_package
-- **SERVER-SIDE TOOLS**: web_search, web_extract, semantic_code_navigator (with line numbers), check_dev_errors, list_files
+- **SERVER-SIDE TOOLS**: web_search, web_extract, semantic_code_navigator (with line numbers), check_dev_errors, list_files (with client sync), read_file (with client sync)
 
 Note: File and package operation tools (read_file, write_file, edit_file, delete_file, add_package, remove_package) execute on the client-side IndexedDB directly. You call them and the client handles the actual operations automatically.
 
@@ -1058,8 +1058,61 @@ ${conversationSummaryContext || ''}`
               }
             }
 
-            // Now read with the latest synced content
-            return await constructToolResult('read_file', { path, includeLineNumbers }, projectId, toolCallId)
+            // Now read with the latest synced content directly
+            const storageManager = await getStorageManager()
+
+            // Validate path
+            if (!path || typeof path !== 'string') {
+              console.log(`[READ_FILE] Invalid file path provided - ${path}`)
+              return {
+                success: false,
+                error: `Invalid file path provided`,
+                path,
+                toolCallId
+              }
+            }
+
+            const file = await storageManager.getFile(projectId, path)
+
+            if (!file) {
+              console.log(`[READ_FILE] File not found - ${path}`)
+              return {
+                success: false,
+                error: `File not found: ${path}. Use list_files to see available files.`,
+                path,
+                toolCallId
+              }
+            }
+
+            const content = file.content || ''
+
+            console.log(`[READ_FILE] Successfully read ${path} (${content.length} chars)`)
+            let response: any = {
+              success: true,
+              message: `✅ File ${path} read successfully.`,
+              path,
+              content,
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              action: 'read',
+              toolCallId
+            }
+
+            // Add line number information if requested
+            if (includeLineNumbers) {
+              const lines = content.split('\n')
+              const lineCount = lines.length
+              const linesWithNumbers = lines.map((line, index) =>
+                `${String(index + 1).padStart(4, ' ')}: ${line}`
+              ).join('\n')
+
+              response.lineCount = lineCount
+              response.contentWithLineNumbers = linesWithNumbers
+              response.lines = lines // Array of individual lines for programmatic access
+            }
+
+            return response
           }
         }),
 
@@ -1330,10 +1383,45 @@ ${conversationSummaryContext || ''}`
             }
 
             try {
+              // CRITICAL: Sync latest client-side files before searching
+              // This ensures we search the most current files from IndexedDB
+              if (files && files.length > 0) {
+                console.log(`[SEMANTIC_SEARCH] Syncing ${files.length} client files before search operation`)
+                try {
+                  const storageManager = await getStorageManager()
+
+                  // Clear existing files for fresh sync
+                  const existingFiles = await storageManager.getFiles(projectId)
+                  for (const existingFile of existingFiles) {
+                    await storageManager.deleteFile(projectId, existingFile.path)
+                  }
+
+                  // Sync all client files with exact content
+                  for (const file of files) {
+                    if (file.path && !file.isDirectory) {
+                      const exactContent = String(file.content || '')
+                      await storageManager.createFile({
+                        workspaceId: projectId,
+                        name: file.name,
+                        path: file.path,
+                        content: exactContent,
+                        fileType: file.type || 'text',
+                        type: file.type || 'text',
+                        size: file.size || exactContent.length,
+                        isDirectory: false
+                      })
+                    }
+                  }
+                  console.log(`[SEMANTIC_SEARCH] ✅ Synced ${files.length} files for fresh search operation`)
+                } catch (syncError) {
+                  console.error('[SEMANTIC_SEARCH] ❌ Failed to sync client files:', syncError)
+                }
+              }
+
               const { storageManager } = await import('@/lib/storage-manager')
               await storageManager.init()
 
-              // Get all files in the project
+              // Get all files in the project (now synced with latest client content)
               const allFiles = await storageManager.getFiles(projectId)
 
               // Filter files based on filePath if provided
@@ -1788,6 +1876,110 @@ ${conversationSummaryContext || ''}`
                   stdout,
                   stderr
                 },
+                toolCallId
+              }
+            }
+          }
+        }),
+
+        list_files: tool({
+          description: 'List all files and directories in the project with their structure and metadata.',
+          inputSchema: z.object({
+            path: z.string().optional().describe('Optional: Specific directory path to list. If omitted, lists root directory')
+          }),
+          execute: async ({ path }, { toolCallId }) => {
+            try {
+              // CRITICAL: Sync latest client-side files before listing
+              // This ensures we list the most current files from IndexedDB
+              if (files && files.length > 0) {
+                console.log(`[LIST_FILES] Syncing ${files.length} client files before list operation`)
+                try {
+                  const storageManager = await getStorageManager()
+
+                  // Clear existing files for fresh sync
+                  const existingFiles = await storageManager.getFiles(projectId)
+                  for (const existingFile of existingFiles) {
+                    await storageManager.deleteFile(projectId, existingFile.path)
+                  }
+
+                  // Sync all client files with exact content
+                  for (const file of files) {
+                    if (file.path && !file.isDirectory) {
+                      const exactContent = String(file.content || '')
+                      await storageManager.createFile({
+                        workspaceId: projectId,
+                        name: file.name,
+                        path: file.path,
+                        content: exactContent,
+                        fileType: file.type || 'text',
+                        type: file.type || 'text',
+                        size: file.size || exactContent.length,
+                        isDirectory: false
+                      })
+                    }
+                  }
+                  console.log(`[LIST_FILES] ✅ Synced ${files.length} files for fresh list operation`)
+                } catch (syncError) {
+                  console.error('[LIST_FILES] ❌ Failed to sync client files:', syncError)
+                }
+              }
+
+              const storageManager = await getStorageManager()
+
+              let filesToList
+              if (path) {
+                // List files in specific directory
+                const allFiles = await storageManager.getFiles(projectId)
+                const pathPrefix = path.endsWith('/') ? path : `${path}/`
+                filesToList = allFiles.filter((file: any) =>
+                  file.path.startsWith(pathPrefix) &&
+                  !file.path.substring(pathPrefix.length).includes('/')
+                )
+              } else {
+                // List root directory files
+                const allFiles = await storageManager.getFiles(projectId)
+                filesToList = allFiles.filter((file: any) => !file.path.includes('/'))
+              }
+
+              // Sort: directories first, then files alphabetically
+              const sortedFiles = filesToList.sort((a: any, b: any) => {
+                // Directories come first
+                if (a.isDirectory && !b.isDirectory) return -1
+                if (!a.isDirectory && b.isDirectory) return 1
+                // Then alphabetical
+                return a.path.localeCompare(b.path)
+              })
+
+              const fileList = sortedFiles.map((file: any) => ({
+                name: file.name,
+                path: file.path,
+                type: file.type || (file.isDirectory ? 'directory' : 'file'),
+                size: file.size || 0,
+                isDirectory: file.isDirectory || false,
+                lastModified: file.updatedAt || file.createdAt
+              }))
+
+              return {
+                success: true,
+                message: path
+                  ? `✅ Listed ${fileList.length} items in directory: ${path}`
+                  : `✅ Listed ${fileList.length} items in root directory`,
+                files: fileList,
+                count: fileList.length,
+                directory: path || '/',
+                action: 'list',
+                toolCallId
+              }
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+              console.error('[ERROR] list_files failed:', error)
+              
+              return {
+                success: false,
+                error: `Failed to list files: ${errorMessage}`,
+                files: [],
+                count: 0,
+                action: 'list',
                 toolCallId
               }
             }
