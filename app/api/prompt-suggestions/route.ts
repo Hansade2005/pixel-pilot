@@ -15,7 +15,7 @@ type Suggestion = {
 
 // Input validation schema
 const generatePromptSuggestionsSchema = z.object({
-  count: z.number().min(1).max(15).default(15),
+  count: z.number().min(1).max(20).default(30),
 })
 
 export async function POST(request: Request) {
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 
     // Parse and validate request body
     const body = await request.json()
-    const { count = 15 } = generatePromptSuggestionsSchema.parse(body)
+    const { count = 30 } = generatePromptSuggestionsSchema.parse(body)
 
     console.log('🎯 Generating prompt suggestions using Codestral')
 
@@ -47,32 +47,171 @@ export async function POST(request: Request) {
     // Generate prompt suggestions using Codestral with deduplication instructions
     const result = await generateText({
       model: codestralModel,
-      prompt: `Generate ${count} diverse and creative prompt suggestions for building web applications using AI. Each suggestion should be a complete, actionable prompt that users can use to create different types of web apps.
+      prompt: `You are an expert AI prompt engineer specializing in React and Next.js web application development. Your task is to generate ${count} highly specific, creative, and immediately actionable prompt suggestions that inspire users to build innovative web applications using React (Vite) or Next.js.
 
-Requirements:
-- Each prompt should be 10-25 words long
-- Cover different categories: business, e-commerce, productivity, creative, social, utility, gaming, education, health, finance, AI projects
-- Make them specific and inspiring
-- Focus on modern web app concepts
-- Generate UNIQUE suggestions - avoid common templates like "landing page", "portfolio", "blog"
-- Include variety in technologies: React, Vue, Next.js, Svelte, etc.
-- Include different app types: dashboards, tools, platforms, marketplaces, AI assistants, chatbots, etc.
+# Core Principles
+- **Specificity Over Generality**: Each prompt must describe a concrete, well-defined application with clear purpose
+- **Actionability**: Prompts should be ready-to-use without further clarification
+- **Innovation**: Push beyond common templates—think cutting-edge, niche, or uniquely useful applications
+- **Diversity**: Cover wide range of industries, use cases, and technical approaches
+- **Inspiration**: Make users excited to build something they hadn't thought of before
+- **Stack-Appropriate**: All suggestions must be buildable with React (Vite) or Next.js
 
-Session info: ${timestamp} (seed: ${sessionSeed})
+# Supported Technology Stack
+- **Frontend Framework**: React with Vite OR Next.js
+- **When to Use React (Vite)**: SPAs, client-heavy apps, interactive tools, dashboards, games
+- **When to Use Next.js**: Full-stack apps, SSR/SSG needs, API routes, SEO-critical apps, multi-page apps
+- **Styling**: Tailwind CSS (primary), CSS Modules, styled-components
+- **State Management**: React hooks (useState, useContext, useReducer), Zustand, or similar
+- **UI Libraries**: shadcn/ui, Radix UI, Headless UI, Lucide icons
+- **Data Fetching**: Fetch API, React Query, SWR
+- **Backend (Next.js only)**: API routes, server actions, middleware
+- **Database Integration**: Supabase, Firebase, Vercel Postgres, MongoDB Atlas (via API)
+- **Real-time**: WebSockets, Supabase real-time, Pusher, Socket.io
+- **Authentication**: NextAuth, Supabase Auth, Clerk, Auth0
+- **AI Integration**: OpenAI API, Anthropic API, Hugging Face, Replicate
 
-Return a JSON array of objects, each with:
-- "display": A short title (3-5 words) for the pill button
-- "prompt": The full prompt text
+# Categories to Cover (distribute evenly across ${count} prompts)
+- **Business**: CRM, project management, invoicing, HR, inventory, analytics
+- **E-commerce**: Marketplaces, subscription platforms, product catalogs, vendor management
+- **Productivity**: Task managers, note-taking, time tracking, collaboration tools, automation
+- **Creative**: Design tools, content generators, media editors, portfolio builders
+- **Social**: Community platforms, networking apps, social feeds, collaboration spaces
+- **Utility**: Calculators, converters, generators, validators, scrapers, API tools
+- **Gaming**: Browser games, game mechanics, score trackers, gaming communities
+- **Education**: Learning platforms, quiz builders, course creators, study tools
+- **Health**: Fitness trackers, meal planners, mental health tools, wellness dashboards
+- **Finance**: Budget trackers, expense splitters, investment calculators, payment processors
+- **AI/ML**: Chatbots, recommendation engines, data analyzers, NLP tools, vision apps, AI assistants
+- **Developer Tools**: Code generators, testing platforms, documentation builders, API testers
+- **Data & Analytics**: Visualization dashboards, reporting tools, data explorers, BI platforms
+- **Communication**: Chat apps, messaging systems, collaboration tools, comment systems
+- **Entertainment**: Media players, content aggregators, streaming interfaces, discovery platforms
 
-Example format:
+# Prompt Construction Formula
+
+Each prompt should include:
+1. **Action Verb**: "Build", "Create", "Design", "Develop" (vary these)
+2. **Specific App Type**: Be precise (not "e-commerce site" but "subscription box platform for curated coffee deliveries")
+3. **Key Features**: What makes this unique or valuable (1-2 standout features)
+4. **Tech Context** (optional): "with real-time updates", "using AI", "with drag-and-drop builder", etc.
+
+# Style Guidelines
+- **Length**: 10-25 words (strictly enforce)
+- **Tone**: Professional yet inspiring, direct and clear
+- **Avoid**: Generic terms like "landing page", "portfolio site", "simple blog", "basic website", "todo app"
+- **Avoid**: Overly complex multi-clause sentences
+- **Include**: Specific industries, real-world use cases, modern React/Next.js features
+
+# Feature Variety to Include (React/Next.js Specific)
+- **Client-side interactivity**: Drag-and-drop, animations, real-time updates, canvas manipulation
+- **Server-side features** (Next.js): SSR, SSG, ISR, API routes, server actions, middleware
+- **AI integration**: OpenAI/Anthropic API, chatbots, content generation, image analysis
+- **Real-time collaboration**: WebSockets, Supabase real-time, shared state
+- **Data visualization**: Charts (Recharts, Chart.js), dashboards, interactive graphs
+- **File handling**: Upload, processing, preview, download
+- **Authentication & Authorization**: User management, protected routes, role-based access
+- **Payment integration**: Stripe, PayPal, subscription management
+- **Search & filtering**: Full-text search, faceted filters, autocomplete
+- **Markdown/Rich text**: Editors, renderers, note-taking
+- **Progressive Web App**: Offline support, push notifications, installable
+- **Internationalization**: Multi-language support
+- **Accessibility**: WCAG compliance, keyboard navigation, screen reader support
+- **Performance**: Code splitting, lazy loading, image optimization
+- **API integration**: Third-party APIs, webhooks, data aggregation
+
+# Examples of GOOD Prompts (for reference, don't copy):
+- "Build a Next.js markdown-based documentation site with AI-powered search and dark mode theming"
+- "Create a React Vite kanban board with drag-and-drop, real-time collaboration, and custom workflows"
+- "Design a Next.js meal planning app with recipe recommendations, shopping lists, and nutritional tracking"
+- "Develop a React dashboard for cryptocurrency portfolio tracking with live price updates and profit/loss charts"
+
+# Examples of BAD Prompts (avoid these):
+- "Create a landing page for a business" (too generic)
+- "Build a simple blog" (too basic, overused)
+- "Make a portfolio website" (too common)
+- "Design a todo app" (overdone, not inspiring)
+- "Build a website with Vue" (wrong tech stack)
+
+# React (Vite) vs Next.js Guidance
+
+**Use React (Vite) for prompts involving:**
+- Single-page applications (SPAs)
+- Client-heavy interactive tools
+- Real-time dashboards
+- Games and simulations
+- Drawing/design tools
+- Data visualization tools
+- Browser-based utilities
+- Apps that don't need SEO
+
+**Use Next.js for prompts involving:**
+- Multi-page applications
+- Content-heavy sites (blogs, docs, marketing)
+- E-commerce platforms
+- User authentication systems
+- Full-stack applications with backend
+- Apps requiring SSR/SSG
+- API integrations and backends
+- SEO-critical applications
+- Database-driven apps
+
+# Uniqueness Requirements
+- **NO duplicates** within the ${count} prompts generated
+- **NO clichés**: Avoid the most common tutorial apps
+- **NO vague concepts**: Every prompt should feel like a real product idea
+- Each prompt should solve a REAL problem or fulfill a REAL need
+- Think: "Would someone actually want to use this?"
+- **NO mentions of other frameworks**: Don't mention Vue, Svelte, Angular, or any non-React frameworks
+
+# Diversity Checklist (ensure variety across all ${count} prompts)
+- Mix of React (Vite) and Next.js suggestions
+- Mix of B2B and B2C applications
+- Mix of consumer and enterprise tools
+- Mix of single-user and multi-user apps
+- Mix of simple utilities and complex platforms
+- Mix of data-heavy and interaction-heavy apps
+- Mix of content-focused and tool-focused apps
+- Include at least 2-3 prompts with AI integration
+- Include at least 2-3 prompts with real-time features
+- Include at least 1-2 niche/specialized tools
+- Include variety in complexity (simple tools to full platforms)
+
+# Session Context
+- Timestamp: ${timestamp}
+- Session Seed: ${sessionSeed}
+- Use these to ensure variety across different generation sessions
+
+# Output Format
+Return ONLY a valid JSON array with ${count} objects. Each object must have:
+- "display": A compelling, concise title (3-5 words, title case)
+- "prompt": The complete actionable prompt (10-25 words)
+
+Format:
 [
   {
-    "display": "Analytics Dashboard",
-    "prompt": "Create a real-time analytics dashboard for tracking user engagement metrics"
+    "display": "AI Code Reviewer",
+    "prompt": "Build a Next.js code review platform with AI-powered suggestions and team collaboration features"
+  },
+  {
+    "display": "Expense Splitter",
+    "prompt": "Create a React app for splitting bills among friends with receipt scanning and payment tracking"
   }
 ]
 
-Generate ${count} unique suggestions:`,
+# Critical Reminders
+1. Count MUST equal ${count} suggestions
+2. Every prompt MUST be unique and specific
+3. NO generic templates or tutorial apps
+4. STRICT 10-25 word limit per prompt
+5. Output MUST be valid JSON only (no markdown, no explanations)
+6. Each "display" should be catchy and descriptive
+7. Think: "Would I be excited to build this?"
+8. **ONLY use React (Vite) or Next.js** - no other frameworks
+9. Consider which stack (React vs Next.js) is most appropriate for each prompt
+10. Focus on modern, practical applications that showcase React/Next.js strengths
+
+Generate ${count} unique, inspiring, and actionable web app prompts now:`,
     })
 
     console.log('🤖 Codestral generated suggestions:', result.text)

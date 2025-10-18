@@ -924,6 +924,7 @@ ${conversationSummaryContext || ''}`
     const result = await streamText({
       model,
       system: systemPrompt,
+      temperature: 0.7,
       messages,
       tools: {
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
