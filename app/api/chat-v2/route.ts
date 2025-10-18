@@ -884,20 +884,22 @@ Remember: You're not just coding - you're crafting digital magic! Every detail m
 
 ${projectContext}
 
-${conversationSummaryContext || ''}
-
-## 💬 CURRENT USER MESSAGE
-${userMessage || 'No message provided'}`
+${conversationSummaryContext || ''}`
 
     // Get AI model
     const model = getAIModel(modelId)
 
     console.log('[Chat-V2] Starting streamText with multi-step tooling')
 
-    // Stream with AI SDK native tools - using prompt instead of messages array
+    // Stream with AI SDK native tools - separate system and user messages like preprocessing
+    const messages = [
+      { role: 'system' as const, content: systemPrompt },
+      { role: 'user' as const, content: userMessage || 'No message provided' }
+    ]
+
     const result = await streamText({
       model,
-      prompt: systemPrompt,
+      messages,
       tools: {
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
         write_file: tool({
