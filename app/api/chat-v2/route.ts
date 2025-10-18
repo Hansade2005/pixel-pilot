@@ -669,7 +669,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
     const {
-      messages = [], // Default to empty array if not provided
+      userMessage, // Current user message to include in system prompt
       projectId,
       project,
       fileTree = [], // Client-sent file tree structure
@@ -678,20 +678,20 @@ export async function POST(req: Request) {
       aiMode
     } = body
 
-    // Validate messages is an array
-    if (!Array.isArray(messages)) {
-      console.error('[Chat-V2] Invalid messages format:', typeof messages)
+    // Validate userMessage is provided
+    if (!userMessage || typeof userMessage !== 'string') {
+      console.error('[Chat-V2] No user message provided:', { userMessage })
       return NextResponse.json({ 
-        error: 'Invalid messages format - must be an array' 
+        error: 'No user message provided' 
       }, { status: 400 })
     }
 
     console.log('[Chat-V2] Request received:', { 
       projectId, 
       modelId, 
-      aiMode, 
-      messageCount: messages?.length || 0,
-      hasMessages: !!messages
+      aiMode,
+      userMessageLength: userMessage?.length || 0,
+      hasUserMessage: !!userMessage
     })
 
     // Auth check
@@ -759,20 +759,35 @@ export async function POST(req: Request) {
     const projectContext = await buildOptimizedProjectContext(projectId, fileTree, storageManager)
     console.log(`[PROJECT_CONTEXT] Built project context (${projectContext.length} chars):`, projectContext.substring(0, 500) + (projectContext.length > 500 ? '...' : ''))
 
-    // Get conversation history for context (last 10 messages) - Same format as /api/chat/route.ts
+    // Get conversation history from storage manager
     let conversationSummaryContext = ''
     try {
-      // Ensure messages is an array before using slice
-      const recentMessages = Array.isArray(messages) ? messages.slice(-20) : []
-      
+      // Load messages from storage manager for this project
+      const chatSessions = await storageManager.getChatSessions(user.id)
+      const activeSession = chatSessions.find((session: any) =>
+        session.workspaceId === projectId && session.isActive
+      )
+
+      let recentMessages: any[] = []
+      if (activeSession) {
+        const storedMessages = await storageManager.getMessages(activeSession.id)
+        // Convert to the format expected and take last 20 messages
+        recentMessages = storedMessages
+          .slice(-20)
+          .map((msg: any) => ({
+            role: msg.role,
+            content: msg.content || '',
+            createdAt: msg.createdAt
+          }))
+      }
+
       if (recentMessages && recentMessages.length > 0) {
         // Filter out system messages and empty content
-        const filteredMessages = recentMessages.filter((msg: any) => 
+        const filteredMessages = recentMessages.filter((msg: any) =>
           msg.role !== 'system' && msg.content && msg.content.trim().length > 0
         )
 
         // Create full history from filtered messages in AI-readable format
-        // Exact same format as /api/chat/route.ts
         const fullHistory = filteredMessages
           .map((msg: any, index: number) => {
             const role = msg.role === 'user' ? 'User' : msg.role === 'assistant' ? 'You' : msg.role.toUpperCase()
@@ -784,7 +799,7 @@ export async function POST(req: Request) {
           .join('')
 
         conversationSummaryContext = `## 📜 CONVERSATION HISTORY\n\n${fullHistory.trim()}`
-        console.log('[Chat-V2][HISTORY] Formatted conversation history for AI:', {
+        console.log('[Chat-V2][HISTORY] Loaded conversation history from storage:', {
           totalMessages: recentMessages.length,
           filteredMessages: filteredMessages.length,
           historyLength: conversationSummaryContext.length
@@ -793,7 +808,7 @@ export async function POST(req: Request) {
         console.log('[Chat-V2][HISTORY] No conversation history available')
       }
     } catch (historyError) {
-      console.error('[Chat-V2][HISTORY] Error preparing conversation history:', historyError)
+      console.error('[Chat-V2][HISTORY] Error loading conversation history:', historyError)
       // Continue without history on error
     }
 
@@ -869,27 +884,20 @@ Remember: You're not just coding - you're crafting digital magic! Every detail m
 
 ${projectContext}
 
-${conversationSummaryContext || ''}`
+${conversationSummaryContext || ''}
+
+## 💬 CURRENT USER MESSAGE
+${userMessage || 'No message provided'}`
 
     // Get AI model
     const model = getAIModel(modelId)
 
-    // Validate messages
-    if (!messages || messages.length === 0) {
-      console.error('[Chat-V2] No messages provided')
-      return NextResponse.json({ 
-        error: 'No messages provided' 
-      }, { status: 400 })
-    }
-
     console.log('[Chat-V2] Starting streamText with multi-step tooling')
 
-    // Stream with AI SDK native tools
-    // Pass messages directly without conversion (same as stream.ts)
+    // Stream with AI SDK native tools - using prompt instead of messages array
     const result = await streamText({
       model,
-      system: systemPrompt,
-      messages,
+      prompt: systemPrompt,
       tools: {
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
         write_file: tool({
