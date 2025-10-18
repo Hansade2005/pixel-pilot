@@ -63,8 +63,8 @@ const getFileExtension = (filePath: string): string => {
   }
 }
 
-// Build optimized project context from synced files (same as chat route)
-async function buildOptimizedProjectContext(projectId: string, storageManager: any, userIntent?: any) {
+// Build optimized project context from client-provided file tree or synced files
+async function buildOptimizedProjectContext(projectId: string, storageManager: any, fileTree?: string[], userIntent?: any) {
   try {
     const files = await storageManager.getFiles(projectId)
     
@@ -138,51 +138,61 @@ async function buildOptimizedProjectContext(projectId: string, storageManager: a
     const hasViteConfig = files.some((f: any) => f.path === 'vite.config.ts' || f.path === 'vite.config.js')
     const projectType = hasNextConfig ? 'nextjs' : hasViteConfig ? 'vite-react' : 'unknown'
 
-    // Build file tree structure
-    const fileTree: string[] = []
-    const directories = new Set<string>()
-    
-    // Sort files for better organization
-    const sortedFiles = filteredFiles.sort((a: any, b: any) => {
-      return a.path.localeCompare(b.path)
-    })
+    // Use provided file tree or build from files
+    let finalFileTree: string[]
+    if (fileTree && Array.isArray(fileTree) && fileTree.length > 0) {
+      console.log(`[buildOptimizedProjectContext] Using client-provided file tree with ${fileTree.length} entries`)
+      finalFileTree = fileTree
+    } else {
+      console.log(`[buildOptimizedProjectContext] Building file tree from ${filteredFiles.length} files`)
+      // Build file tree structure
+      const builtFileTree: string[] = []
+      const directories = new Set<string>()
 
-    // Collect all directories
-    sortedFiles.forEach((file: any) => {
-      const pathParts = file.path.split('/')
-      if (pathParts.length > 1) {
-        // Add all parent directories
-        for (let i = 1; i < pathParts.length; i++) {
-          const dirPath = pathParts.slice(0, i).join('/')
-          if (dirPath) {
-            directories.add(dirPath)
+      // Sort files for better organization
+      const sortedFiles = filteredFiles.sort((a: any, b: any) => {
+        return a.path.localeCompare(b.path)
+      })
+
+      // Collect all directories
+      sortedFiles.forEach((file: any) => {
+        const pathParts = file.path.split('/')
+        if (pathParts.length > 1) {
+          // Add all parent directories
+          for (let i = 1; i < pathParts.length; i++) {
+            const dirPath = pathParts.slice(0, i).join('/')
+            if (dirPath) {
+              directories.add(dirPath)
+            }
           }
         }
-      }
-    })
-
-    // Add root files first
-    const rootFiles = sortedFiles.filter((file: any) => !file.path.includes('/'))
-    rootFiles.forEach((file: any) => {
-      fileTree.push(file.path)
-    })
-
-    // Add directories and their files
-    const sortedDirectories = Array.from(directories).sort()
-    sortedDirectories.forEach((dir: string) => {
-      fileTree.push(`${dir}/`)
-      
-      // Add files in this directory
-      const dirFiles = sortedFiles.filter((file: any) => {
-        const filePath = file.path
-        const fileDir = filePath.substring(0, filePath.lastIndexOf('/'))
-        return fileDir === dir
       })
-      
-      dirFiles.forEach((file: any) => {
-        fileTree.push(file.path)
+
+      // Add root files first
+      const rootFiles = sortedFiles.filter((file: any) => !file.path.includes('/'))
+      rootFiles.forEach((file: any) => {
+        builtFileTree.push(file.path)
       })
-    })
+
+      // Add directories and their files
+      const sortedDirectories = Array.from(directories).sort()
+      sortedDirectories.forEach((dir: string) => {
+        builtFileTree.push(`${dir}/`)
+
+        // Add files in this directory
+        const dirFiles = sortedFiles.filter((file: any) => {
+          const filePath = file.path
+          const fileDir = filePath.substring(0, filePath.lastIndexOf('/'))
+          return fileDir === dir
+        })
+
+        dirFiles.forEach((file: any) => {
+          builtFileTree.push(file.path)
+        })
+      })
+
+      finalFileTree = builtFileTree
+    }
 
     // Build the context
     let context = `# Current Time
@@ -205,11 +215,11 @@ ${projectType === 'nextjs' ? `## Next.js Project Structure
 - **api/** - Serverless functions (Vercel)`}
 
 # Current Project Structure
-${fileTree.join('\n')}
+${finalFileTree.join('\n')}
 # Important Files Content
 ---`
 
-    console.log(`[CONTEXT] Built file tree with ${fileTree.length} files`) 
+    console.log(`[CONTEXT] Built file tree with ${finalFileTree.length} files`) 
     return context
 
   } catch (error) {
@@ -774,6 +784,7 @@ export async function POST(req: Request) {
       projectId,
       project,
       files = [], // Default to empty array
+      fileTree, // Client-built file tree
       modelId,
       aiMode
     } = body
@@ -855,8 +866,8 @@ export async function POST(req: Request) {
     // Get storage manager
     const storageManager = await getStorageManager()
 
-    // Build project context from synced files (same as chat route)
-    const projectContext = await buildOptimizedProjectContext(projectId, storageManager)
+    // Build project context from client-provided file tree or synced files
+    const projectContext = await buildOptimizedProjectContext(projectId, storageManager, fileTree)
     console.log(`[PROJECT_CONTEXT] Built project context (${projectContext.length} chars):`, projectContext.substring(0, 500) + (projectContext.length > 500 ? '...' : ''))
 
     // Get conversation history for context (last 10 messages) - Same format as /api/chat/route.ts

@@ -736,6 +736,85 @@ export function ChatPanelV2({
     }
   }
 
+  // Build optimized project file tree for server
+  const buildProjectFileTree = async () => {
+    if (!project) {
+      console.warn('[ChatPanelV2] Cannot build file tree: no project selected')
+      return []
+    }
+
+    try {
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+      const allFiles = await storageManager.getFiles(project.id)
+
+      // Filter out shadcn UI components and common excluded files
+      const filteredFiles = allFiles.filter((file: any) => {
+        const path = file.path.toLowerCase()
+        // Exclude shadcn UI components (don't list individual files in components/ui/)
+        if (path.includes('components/ui/') && !file.isDirectory) {
+          return false
+        }
+        // Exclude node_modules, .git, build outputs
+        if (path.includes('node_modules') ||
+            path.includes('.git/') ||
+            path.includes('dist/') ||
+            path.includes('build/') ||
+            path.includes('.next/')) {
+          return false
+        }
+        return true
+      })
+
+      // Build file tree structure
+      const fileTree: string[] = []
+      const directories = new Set<string>()
+
+      // Collect all directories
+      filteredFiles.forEach((file: any) => {
+        const pathParts = file.path.split('/')
+        if (pathParts.length > 1) {
+          // Add all parent directories
+          for (let i = 1; i < pathParts.length; i++) {
+            const dirPath = pathParts.slice(0, i).join('/')
+            if (dirPath) {
+              directories.add(dirPath)
+            }
+          }
+        }
+      })
+
+      // Add root files first
+      const rootFiles = filteredFiles.filter((file: any) => !file.path.includes('/'))
+      rootFiles.forEach((file: any) => {
+        fileTree.push(file.path)
+      })
+
+      // Add directories and their files
+      const sortedDirectories = Array.from(directories).sort()
+      sortedDirectories.forEach((dir: string) => {
+        fileTree.push(`${dir}/`)
+
+        // Add files in this directory
+        const dirFiles = filteredFiles.filter((file: any) => {
+          const filePath = file.path
+          const fileDir = filePath.substring(0, filePath.lastIndexOf('/'))
+          return fileDir === dir
+        })
+
+        dirFiles.forEach((file: any) => {
+          fileTree.push(file.path)
+        })
+      })
+
+      console.log(`[ChatPanelV2] Built file tree with ${fileTree.length} entries for server`)
+      return fileTree
+    } catch (error) {
+      console.error('[ChatPanelV2] Error building file tree:', error)
+      return []
+    }
+  }
+
   const loadMessages = async () => {
     if (!project?.id) return
 
@@ -984,6 +1063,9 @@ export function ChatPanelV2({
 
       console.log(`[ChatPanelV2] Sending ${messagesToSend.length} messages to server (last 5 + new)`)
 
+      // Build project file tree on client-side
+      const fileTree = await buildProjectFileTree()
+
       const response = await fetch('/api/chat-v2', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -992,7 +1074,8 @@ export function ChatPanelV2({
           id: project?.id, // Chat session ID for server-side storage
           projectId: project?.id,
           project,
-          files: projectFiles,
+          fileTree, // Use client-built file tree instead of raw files
+          files: projectFiles, // Keep raw files for tool operations
           modelId: selectedModel,
           aiMode
         }),
