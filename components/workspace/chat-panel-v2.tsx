@@ -1169,7 +1169,8 @@ export function ChatPanelV2({
       setInput('')
 
       // Use useChat.append() with empty message and custom request data containing the user message
-      await useChatAppend({ role: 'user', content: '' }, {
+           // Use useChat.append() with enhanced content and custom request data
+      await useChatAppend({ role: 'user', content: enhancedContent }, {
         body: {
           projectId: project?.id,
           project,
