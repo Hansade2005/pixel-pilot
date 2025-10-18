@@ -1707,49 +1707,52 @@ ${conversationSummaryContext || ''}`
           }),
           execute: async ({ path }, { toolCallId }) => {
             try {
-              // Get session storage
+              let allFiles: any[] = []
+
+              // First try session storage (client-sent data)
               const sessionData = sessionProjectStorage.get(projectId)
-              if (!sessionData) {
-                return {
-                  success: false,
-                  error: `Session storage not found for project ${projectId}`,
-                  files: [],
-                  count: 0,
-                  action: 'list',
-                  toolCallId
-                }
+              if (sessionData && sessionData.files && sessionData.files.size > 0) {
+                console.log(`[list_files] Using session storage with ${sessionData.files.size} files`)
+                allFiles = Array.from(sessionData.files.values())
               }
 
-              const { files: sessionFiles, fileTree } = sessionData
+              // If session storage is empty or missing, fall back to direct storage manager query
+              if (allFiles.length === 0) {
+                console.log(`[list_files] Session storage empty, falling back to direct storage manager query`)
+                const { storageManager } = await import('@/lib/storage-manager')
+                await storageManager.init()
+                allFiles = await storageManager.getFiles(projectId)
+                console.log(`[list_files] Retrieved ${allFiles.length} files from storage manager`)
+              }
 
               let filesToList: any[] = []
               if (path) {
                 // List files in specific directory
                 const pathPrefix = path.endsWith('/') ? path : `${path}/`
-                for (const [filePath, fileData] of sessionFiles) {
-                  if (filePath.startsWith(pathPrefix) &&
-                      !filePath.substring(pathPrefix.length).includes('/')) {
+                for (const file of allFiles) {
+                  if (file.path.startsWith(pathPrefix) &&
+                      !file.path.substring(pathPrefix.length).includes('/')) {
                     filesToList.push({
-                      name: fileData.name,
-                      path: fileData.path,
-                      type: fileData.type,
-                      size: fileData.size,
-                      isDirectory: fileData.isDirectory,
-                      lastModified: new Date().toISOString()
+                      name: file.name,
+                      path: file.path,
+                      type: file.type,
+                      size: file.size,
+                      isDirectory: file.isDirectory,
+                      lastModified: file.updatedAt || file.createdAt || new Date().toISOString()
                     })
                   }
                 }
               } else {
                 // List root directory files
-                for (const [filePath, fileData] of sessionFiles) {
-                  if (!filePath.includes('/')) {
+                for (const file of allFiles) {
+                  if (!file.path.includes('/')) {
                     filesToList.push({
-                      name: fileData.name,
-                      path: fileData.path,
-                      type: fileData.type,
-                      size: fileData.size,
-                      isDirectory: fileData.isDirectory,
-                      lastModified: new Date().toISOString()
+                      name: file.name,
+                      path: file.path,
+                      type: file.type,
+                      size: file.size,
+                      isDirectory: file.isDirectory,
+                      lastModified: file.updatedAt || file.createdAt || new Date().toISOString()
                     })
                   }
                 }
