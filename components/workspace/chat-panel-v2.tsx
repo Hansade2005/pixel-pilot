@@ -1090,8 +1090,9 @@ export function ChatPanelV2({
                 args: toolCall.args
               })
 
-              // Check if this is a client-side tool (file operations + package management)
-              const clientSideTools = ['write_file', 'read_file', 'edit_file', 'delete_file', 'add_package', 'remove_package']
+              // Check if this is a client-side tool (only write operations)
+              // read_file is server-side to ensure AI sees fresh data from client-side writes
+              const clientSideTools = ['write_file', 'edit_file', 'delete_file', 'add_package', 'remove_package']
               if (clientSideTools.includes(toolCall.toolName)) {
                 console.log('[ChatPanelV2][ClientTool] ⚡ Executing client-side tool:', toolCall.toolName)
                 

@@ -992,7 +992,6 @@ ${conversationSummaryContext || ''}`
       messages,
       tools: {
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
-        // The execute function now returns actual results instead of forwarding messages
         write_file: tool({
           description: 'Create or update a file in the project. Use this tool to create new files or update existing ones with new content. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
@@ -1005,16 +1004,51 @@ ${conversationSummaryContext || ''}`
           }
         }),
 
-        // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
+        // SERVER-SIDE TOOL: Read operations need server-side execution to return fresh data
         read_file: tool({
-          description: 'Read the contents of a file with optional line number information. This tool executes on the client-side IndexedDB.',
+          description: 'Read the contents of a file with optional line number information. This tool executes on the server-side to ensure the AI sees the most current file content.',
           inputSchema: z.object({
             path: z.string().describe('File path to read'),
             includeLineNumbers: z.boolean().optional().describe('Whether to include line numbers in the response (default: false)')
           }),
           execute: async ({ path, includeLineNumbers }, { toolCallId }) => {
-            // Use the powerful constructor to get actual results
-            return await constructToolResult('read_file', { path, includeLineNumbers }, projectId, toolCallId, files)
+            // CRITICAL: Sync latest client-side files before reading
+            // This ensures we read the most current content from IndexedDB
+            if (files && files.length > 0) {
+              console.log(`[READ_FILE] Syncing ${files.length} client files before read operation`)
+              try {
+                const storageManager = await getStorageManager()
+
+                // Clear existing files for fresh sync
+                const existingFiles = await storageManager.getFiles(projectId)
+                for (const existingFile of existingFiles) {
+                  await storageManager.deleteFile(projectId, existingFile.path)
+                }
+
+                // Sync all client files with exact content
+                for (const file of files) {
+                  if (file.path && !file.isDirectory) {
+                    const exactContent = String(file.content || '')
+                    await storageManager.createFile({
+                      workspaceId: projectId,
+                      name: file.name,
+                      path: file.path,
+                      content: exactContent,
+                      fileType: file.type || 'text',
+                      type: file.type || 'text',
+                      size: file.size || exactContent.length,
+                      isDirectory: false
+                    })
+                  }
+                }
+                console.log(`[READ_FILE] ✅ Synced ${files.length} files for fresh read operation`)
+              } catch (syncError) {
+                console.error('[READ_FILE] ❌ Failed to sync client files:', syncError)
+              }
+            }
+
+            // Now read with the latest synced content
+            return await constructToolResult('read_file', { path, includeLineNumbers }, projectId, toolCallId)
           }
         }),
 
