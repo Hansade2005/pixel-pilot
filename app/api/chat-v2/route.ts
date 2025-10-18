@@ -32,6 +32,13 @@ const getStorageManager = async () => {
   return storageManager
 }
 
+// In-memory project storage for AI tool sessions
+// Key: projectId, Value: { fileTree: string[], files: Map<path, fileData> }
+const sessionProjectStorage = new Map<string, {
+  fileTree: string[]
+  files: Map<string, any>
+}>()
+
 // Helper function to get file extension for syntax highlighting
 const getFileExtension = (filePath: string): string => {
   const ext = filePath.split('.').pop()?.toLowerCase()
@@ -63,11 +70,19 @@ const getFileExtension = (filePath: string): string => {
   }
 }
 
-// Build optimized project context from client-provided file tree or synced files
-async function buildOptimizedProjectContext(projectId: string, storageManager: any, fileTree?: string[], userIntent?: any) {
+// Build optimized project context from session data
+async function buildOptimizedProjectContext(projectId: string, sessionData: any, fileTree?: string[], userIntent?: any) {
   try {
-    const files = await storageManager.getFiles(projectId)
-    
+    if (!sessionData) {
+      console.error(`[buildOptimizedProjectContext] No session data for project ${projectId}`)
+      return `# Project Context Error\nUnable to load project structure. Use list_files tool to explore the project.`
+    }
+
+    const { files: sessionFiles } = sessionData
+
+    // Convert session files to array for filtering
+    const files = Array.from(sessionFiles.values())
+
     // Get current time and working directory for context
     const currentTime = new Date().toLocaleString('en-US', {
       timeZone: 'Africa/Douala',
@@ -120,16 +135,16 @@ async function buildOptimizedProjectContext(projectId: string, storageManager: a
       )) {
         return false
       }
-      
+
       // Exclude node_modules, .git, build outputs
-      if (path.includes('node_modules') || 
-          path.includes('.git/') || 
-          path.includes('dist/') || 
+      if (path.includes('node_modules') ||
+          path.includes('.git/') ||
+          path.includes('dist/') ||
           path.includes('build/') ||
           path.includes('.next/')) {
         return false
       }
-      
+
       return true
     })
 
@@ -232,85 +247,23 @@ Unable to load project structure. Use list_files tool to explore the project.`
   }
 }
 
-// Powerful function to construct proper tool result messages
-const constructToolResult = async (toolName: string, input: any, projectId: string, toolCallId: string, clientFiles?: any[]) => {
+// Powerful function to construct proper tool result messages using in-memory storage
+const constructToolResult = async (toolName: string, input: any, projectId: string, toolCallId: string) => {
   console.log(`[CONSTRUCT_TOOL_RESULT] Starting ${toolName} operation with input:`, JSON.stringify(input, null, 2).substring(0, 200) + '...')
 
   try {
-    const storageManager = await getStorageManager()
-
-    // CRITICAL: For read_file operations, ALWAYS ensure we have the latest client-side files
-    // This guarantees the AI reads the exact current content from IndexedDB
-    if (toolName === 'read_file') {
-      if (!clientFiles || clientFiles.length === 0) {
-        console.log(`[CONSTRUCT_TOOL_RESULT] WARNING: read_file called without clientFiles - cannot guarantee latest content`)
-      } else {
-        console.log(`[CONSTRUCT_TOOL_RESULT] CRITICAL: Ensuring latest client content for read_file operation (${clientFiles.length} files)`)
+    // Get session storage
+    const sessionData = sessionProjectStorage.get(projectId)
+    if (!sessionData) {
+      console.error(`[CONSTRUCT_TOOL_RESULT] No session data found for project ${projectId}`)
+      return {
+        success: false,
+        error: `Session storage not found for project ${projectId}`,
+        toolCallId
       }
     }
 
-    // CRITICAL: Sync client-side files to server-side InMemoryStorage
-    // This ensures AI tools can access the files that exist in IndexedDB
-    const clientFilesToSync = clientFiles || []
-    console.log(`[CONSTRUCT_TOOL_RESULT] Syncing ${clientFilesToSync.length} files to server-side storage for ${toolName} operation`)
-
-    if (clientFilesToSync.length > 0) {
-      try {
-        // Clear existing files in InMemoryStorage to ensure clean state
-        const existingFiles = await storageManager.getFiles(projectId)
-        console.log(`[CONSTRUCT_TOOL_RESULT] Clearing ${existingFiles.length} existing files for fresh sync`)
-        for (const existingFile of existingFiles) {
-          await storageManager.deleteFile(projectId, existingFile.path)
-        }
-
-        // Sync ALL client files to server storage with EXACT content
-        let syncedCount = 0
-        for (const file of clientFilesToSync) {
-          if (file.path && !file.isDirectory) {
-            // Ensure content is exactly as provided (no trimming/modification)
-            const exactContent = file.content !== undefined ? String(file.content) : ''
-            
-            await storageManager.createFile({
-              workspaceId: projectId,
-              name: file.name,
-              path: file.path,
-              content: exactContent,
-              fileType: file.type || file.fileType || 'text',
-              type: file.type || file.fileType || 'text',
-              size: file.size || exactContent.length,
-              isDirectory: false
-            })
-            
-            console.log(`[CONSTRUCT_TOOL_RESULT] Synced file with exact content: ${file.path} (${exactContent.length} chars)`)
-            syncedCount++
-          }
-        }
-
-        // CRITICAL VERIFICATION: Ensure sync worked and content matches exactly
-        const syncedFiles = await storageManager.getFiles(projectId)
-        console.log(`[CONSTRUCT_TOOL_RESULT] File sync complete: ${syncedFiles.length} files now available to AI tools for ${toolName}`)
-        
-        // Verify content integrity for read_file operations
-        if (toolName === 'read_file') {
-          const totalClientFiles = clientFilesToSync.filter(f => f.path && !f.isDirectory).length
-          if (syncedFiles.length !== totalClientFiles) {
-            console.error(`[CONSTRUCT_TOOL_RESULT] CRITICAL: Sync mismatch! Expected ${totalClientFiles} files, got ${syncedFiles.length}`)
-          } else {
-            console.log(`[CONSTRUCT_TOOL_RESULT] ✅ Content integrity verified: ${syncedFiles.length} files synced successfully`)
-          }
-        }
-
-      } catch (syncError) {
-        console.error('[ERROR] Failed to sync files in constructToolResult:', syncError)
-        // For read_file operations, this is critical - log the failure prominently
-        if (toolName === 'read_file') {
-          console.error('[CRITICAL] Read operation may use outdated content due to sync failure')
-        }
-        // Continue anyway - tools may still work for write operations
-      }
-    } else if (toolName === 'read_file') {
-      console.log(`[CONSTRUCT_TOOL_RESULT] WARNING: No client files provided for read_file - using existing server-side files (may be outdated)`)
-    }
+    const { files: sessionFiles } = sessionData
 
     switch (toolName) {
       case 'write_file': {
@@ -337,12 +290,13 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           }
         }
 
-        // Check if file already exists
-        const existingFile = await storageManager.getFile(projectId, path)
+        // Check if file already exists in memory
+        const existingFile = sessionFiles.get(path)
 
         if (existingFile) {
-          // Update existing file
-          await storageManager.updateFile(projectId, path, { content })
+          // Update existing file in memory
+          existingFile.content = String(content)
+          existingFile.size = content.length
           console.log(`[CONSTRUCT_TOOL_RESULT] write_file: Updated existing file ${path} (${content.length} chars)`)
           return {
             success: true,
@@ -353,18 +307,19 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
             toolCallId
           }
         } else {
-          // Create new file
-          const newFile = await storageManager.createFile({
+          // Create new file in memory
+          const newFile = {
             workspaceId: projectId,
             name: path.split('/').pop() || path,
             path,
-            content,
+            content: String(content),
             fileType: path.split('.').pop() || 'text',
             type: path.split('.').pop() || 'text',
             size: content.length,
             isDirectory: false,
             metadata: { createdBy: 'ai' }
-          })
+          }
+          sessionFiles.set(path, newFile)
 
           console.log(`[CONSTRUCT_TOOL_RESULT] write_file: Created new file ${path} (${content.length} chars)`)
           return {
@@ -373,7 +328,6 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
             path,
             content,
             action: 'created',
-            fileId: newFile.id,
             toolCallId
           }
         }
@@ -393,7 +347,7 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           }
         }
 
-        const file = await storageManager.getFile(projectId, path)
+        const file = sessionFiles.get(path)
 
         if (!file) {
           console.log(`[CONSTRUCT_TOOL_RESULT] read_file failed: File not found - ${path}`)
@@ -406,24 +360,7 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
         }
 
         const content = file.content || ''
-        
-        // CRITICAL: Verify content matches client-side version for read_file operations
-        if (clientFiles && clientFiles.length > 0) {
-          const clientFile = clientFiles.find(f => f.path === path)
-          if (clientFile) {
-            const clientContent = String(clientFile.content || '')
-            if (content !== clientContent) {
-              console.error(`[CONSTRUCT_TOOL_RESULT] CRITICAL: Content mismatch for ${path}!`)
-              console.error(`[CONSTRUCT_TOOL_RESULT] Server content length: ${content.length}, Client content length: ${clientContent.length}`)
-              // Use client content as the source of truth
-              console.log(`[CONSTRUCT_TOOL_RESULT] Using client content as source of truth for ${path}`)
-              // Note: We don't update here as the sync should have made them match
-            } else {
-              console.log(`[CONSTRUCT_TOOL_RESULT] ✅ Content verification passed for ${path} (${content.length} chars)`)
-            }
-          }
-        }
-        
+
         console.log(`[CONSTRUCT_TOOL_RESULT] read_file: Successfully read ${path} (${content.length} chars)`)
         let response: any = {
           success: true,
@@ -441,7 +378,7 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
         if (includeLineNumbers) {
           const lines = content.split('\n')
           const lineCount = lines.length
-          const linesWithNumbers = lines.map((line, index) =>
+          const linesWithNumbers = lines.map((line: string, index: number) =>
             `${String(index + 1).padStart(4, ' ')}: ${line}`
           ).join('\n')
 
@@ -487,8 +424,8 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           }
         }
 
-        // Get the file
-        const file = await storageManager.getFile(projectId, filePath)
+        // Get the file from memory
+        const file = sessionFiles.get(filePath)
         if (!file) {
           return {
             success: false,
@@ -515,8 +452,9 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
         // Perform the replacement
         const newContent = originalContent.replace(search, replace)
 
-        // Update the file
-        await storageManager.updateFile(projectId, filePath, { content: newContent })
+        // Update the file in memory
+        file.content = newContent
+        file.size = newContent.length
 
         return {
           success: true,
@@ -544,8 +482,8 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           }
         }
 
-        // Check if file exists
-        const existingFile = await storageManager.getFile(projectId, path)
+        // Check if file exists in memory
+        const existingFile = sessionFiles.get(path)
         if (!existingFile) {
           return {
             success: false,
@@ -555,24 +493,15 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           }
         }
 
-        // Delete the file
-        const result = await storageManager.deleteFile(projectId, path)
+        // Delete the file from memory
+        sessionFiles.delete(path)
 
-        if (result) {
-          return {
-            success: true,
-            message: `✅ File ${path} deleted successfully.`,
-            path,
-            action: 'deleted',
-            toolCallId
-          }
-        } else {
-          return {
-            success: false,
-            error: `Failed to delete file ${path}`,
-            path,
-            toolCallId
-          }
+        return {
+          success: true,
+          message: `✅ File ${path} deleted successfully.`,
+          path,
+          action: 'deleted',
+          toolCallId
         }
       }
 
@@ -602,8 +531,8 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           }
         }
 
-        // Get package.json or create if it doesn't exist
-        let packageFile = await storageManager.getFile(projectId, 'package.json')
+        // Get package.json from memory or create if it doesn't exist
+        let packageFile = sessionFiles.get('package.json')
         let packageJson: any = {}
 
         if (!packageFile) {
@@ -620,8 +549,8 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
             author: "",
             license: "ISC"
           }
-          // Create the file
-          await storageManager.createFile({
+          // Create the file in memory
+          packageFile = {
             workspaceId: projectId,
             name: 'package.json',
             path: 'package.json',
@@ -630,7 +559,8 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
             type: 'json',
             size: JSON.stringify(packageJson, null, 2).length,
             isDirectory: false
-          })
+          }
+          sessionFiles.set('package.json', packageFile)
         } else {
           packageJson = JSON.parse(packageFile.content || '{}')
         }
@@ -651,10 +581,10 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           addedPackages.push(packageName)
         }
 
-        // Update package.json
-        await storageManager.updateFile(projectId, 'package.json', {
-          content: JSON.stringify(packageJson, null, 2)
-        })
+        // Update package.json in memory
+        const updatedContent = JSON.stringify(packageJson, null, 2)
+        packageFile.content = updatedContent
+        packageFile.size = updatedContent.length
 
         return {
           success: true,
@@ -663,7 +593,7 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           version,
           dependencyType: depType,
           path: 'package.json',
-          content: JSON.stringify(packageJson, null, 2),
+          content: updatedContent,
           message: `Packages ${addedPackages.join(', ')} added to ${depType} successfully`,
           toolCallId
         }
@@ -695,8 +625,8 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           }
         }
 
-        // Get package.json
-        const packageFile = await storageManager.getFile(projectId, 'package.json')
+        // Get package.json from memory
+        const packageFile = sessionFiles.get('package.json')
         if (!packageFile) {
           return {
             success: false,
@@ -738,10 +668,10 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           }
         }
 
-        // Update package.json
-        await storageManager.updateFile(projectId, 'package.json', {
-          content: JSON.stringify(packageJson, null, 2)
-        })
+        // Update package.json in memory
+        const updatedContent = JSON.stringify(packageJson, null, 2)
+        packageFile.content = updatedContent
+        packageFile.size = updatedContent.length
 
         return {
           success: true,
@@ -749,7 +679,7 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           packages: removedPackages,
           dependencyType: depType,
           path: 'package.json',
-          content: JSON.stringify(packageJson, null, 2),
+          content: updatedContent,
           message: `Packages ${removedPackages.join(', ')} removed from ${depType} successfully`,
           toolCallId
         }
@@ -813,61 +743,45 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // CRITICAL: Sync client-side files to server-side InMemoryStorage
-    // This ensures AI tools can access the files that exist in IndexedDB
+    // Initialize in-memory project storage for this session
     const clientFiles = files || []
-    console.log(`[DEBUG] Syncing ${clientFiles.length} files to server-side storage for AI access`)
+    const clientFileTree = fileTree || []
+    console.log(`[DEBUG] Initializing in-memory storage with ${clientFiles.length} files and ${clientFileTree.length} tree entries for session ${projectId}`)
 
+    // Create in-memory storage for this session
+    const sessionFiles = new Map<string, any>()
+    
     if (clientFiles.length > 0) {
-      try {
-        const { storageManager } = await import('@/lib/storage-manager')
-        await storageManager.init()
-
-        // Clear existing files in InMemoryStorage to ensure clean state
-        const existingFiles = await storageManager.getFiles(projectId)
-        console.log(`[DEBUG] Clearing ${existingFiles.length} existing files for fresh sync`)
-        for (const existingFile of existingFiles) {
-          await storageManager.deleteFile(projectId, existingFile.path)
-        }
-
-        // Sync ALL client files to server storage with EXACT content
-        let syncedCount = 0
-        for (const file of clientFiles) {
-          if (file.path && !file.isDirectory) {
-            // Ensure content is exactly as provided (no trimming/modification)
-            const exactContent = file.content !== undefined ? String(file.content) : ''
-            
-            await storageManager.createFile({
-              workspaceId: projectId,
-              name: file.name,
-              path: file.path,
-              content: exactContent,
-              fileType: file.type || file.fileType || 'text',
-              type: file.type || file.fileType || 'text',
-              size: file.size || exactContent.length,
-              isDirectory: false
-            })
-            
-            console.log(`[DEBUG] Synced file with exact content: ${file.path} (${exactContent.length} chars)`)
-            syncedCount++
+      for (const file of clientFiles) {
+        if (file.path && !file.isDirectory) {
+          // Store file data in memory with exact content
+          const fileData = {
+            workspaceId: projectId,
+            name: file.name,
+            path: file.path,
+            content: file.content !== undefined ? String(file.content) : '',
+            fileType: file.type || file.fileType || 'text',
+            type: file.type || file.fileType || 'text',
+            size: file.size || String(file.content || '').length,
+            isDirectory: false
           }
+          sessionFiles.set(file.path, fileData)
+          console.log(`[DEBUG] Stored file in memory: ${file.path} (${fileData.content.length} chars)`)
         }
-
-        // Verify sync worked
-        const syncedFiles = await storageManager.getFiles(projectId)
-        console.log(`[DEBUG] File sync complete: ${syncedFiles.length} files now available to AI tools`)
-
-      } catch (syncError) {
-        console.error('[ERROR] Failed to sync files to server storage:', syncError)
-        // Continue anyway - tools may still work for write operations
       }
     }
 
-    // Get storage manager
-    const storageManager = await getStorageManager()
+    // Store session data
+    sessionProjectStorage.set(projectId, {
+      fileTree: clientFileTree,
+      files: sessionFiles
+    })
 
-    // Build project context from client-provided file tree or synced files
-    const projectContext = await buildOptimizedProjectContext(projectId, storageManager, fileTree)
+    console.log(`[DEBUG] In-memory storage initialized: ${sessionFiles.size} files ready for AI tools`)
+
+    // Build project context from session data
+    const sessionData = sessionProjectStorage.get(projectId)
+    const projectContext = await buildOptimizedProjectContext(projectId, sessionData, fileTree)
     console.log(`[PROJECT_CONTEXT] Built project context (${projectContext.length} chars):`, projectContext.substring(0, 500) + (projectContext.length > 500 ? '...' : ''))
 
     // Get conversation history for context (last 10 messages) - Same format as /api/chat/route.ts
@@ -1023,96 +937,8 @@ ${conversationSummaryContext || ''}`
             includeLineNumbers: z.boolean().optional().describe('Whether to include line numbers in the response (default: false)')
           }),
           execute: async ({ path, includeLineNumbers }, { toolCallId }) => {
-            // CRITICAL: Sync latest client-side files before reading
-            // This ensures we read the most current content from IndexedDB
-            if (files && files.length > 0) {
-              console.log(`[READ_FILE] Syncing ${files.length} client files before read operation`)
-              try {
-                const storageManager = await getStorageManager()
-
-                // Clear existing files for fresh sync
-                const existingFiles = await storageManager.getFiles(projectId)
-                for (const existingFile of existingFiles) {
-                  await storageManager.deleteFile(projectId, existingFile.path)
-                }
-
-                // Sync all client files with exact content
-                for (const file of files) {
-                  if (file.path && !file.isDirectory) {
-                    const exactContent = String(file.content || '')
-                    await storageManager.createFile({
-                      workspaceId: projectId,
-                      name: file.name,
-                      path: file.path,
-                      content: exactContent,
-                      fileType: file.type || 'text',
-                      type: file.type || 'text',
-                      size: file.size || exactContent.length,
-                      isDirectory: false
-                    })
-                  }
-                }
-                console.log(`[READ_FILE] ✅ Synced ${files.length} files for fresh read operation`)
-              } catch (syncError) {
-                console.error('[READ_FILE] ❌ Failed to sync client files:', syncError)
-              }
-            }
-
-            // Now read with the latest synced content directly
-            const storageManager = await getStorageManager()
-
-            // Validate path
-            if (!path || typeof path !== 'string') {
-              console.log(`[READ_FILE] Invalid file path provided - ${path}`)
-              return {
-                success: false,
-                error: `Invalid file path provided`,
-                path,
-                toolCallId
-              }
-            }
-
-            const file = await storageManager.getFile(projectId, path)
-
-            if (!file) {
-              console.log(`[READ_FILE] File not found - ${path}`)
-              return {
-                success: false,
-                error: `File not found: ${path}. Use list_files to see available files.`,
-                path,
-                toolCallId
-              }
-            }
-
-            const content = file.content || ''
-
-            console.log(`[READ_FILE] Successfully read ${path} (${content.length} chars)`)
-            let response: any = {
-              success: true,
-              message: `✅ File ${path} read successfully.`,
-              path,
-              content,
-              name: file.name,
-              type: file.type,
-              size: file.size,
-              action: 'read',
-              toolCallId
-            }
-
-            // Add line number information if requested
-            if (includeLineNumbers) {
-              const lines = content.split('\n')
-              const lineCount = lines.length
-              const linesWithNumbers = lines.map((line, index) =>
-                `${String(index + 1).padStart(4, ' ')}: ${line}`
-              ).join('\n')
-
-              response.lineCount = lineCount
-              response.contentWithLineNumbers = linesWithNumbers
-              response.lines = lines // Array of individual lines for programmatic access
-            }
-
-            return response
+            // Use the powerful constructor to get actual results from in-memory store
+            return await constructToolResult('read_file', { path, includeLineNumbers }, projectId, toolCallId)
           }
         }),
 
@@ -1142,7 +968,7 @@ ${conversationSummaryContext || ''}`
           }),
           execute: async ({ filePath, searchReplaceBlock }, { toolCallId }) => {
             // Use the powerful constructor to get actual results
-            return await constructToolResult('edit_file', { filePath, searchReplaceBlock }, projectId, toolCallId, files)
+            return await constructToolResult('edit_file', { filePath, searchReplaceBlock }, projectId, toolCallId)
           }
         }),
 
@@ -1383,51 +1209,23 @@ ${conversationSummaryContext || ''}`
             }
 
             try {
-              // CRITICAL: Sync latest client-side files before searching
-              // This ensures we search the most current files from IndexedDB
-              if (files && files.length > 0) {
-                console.log(`[SEMANTIC_SEARCH] Syncing ${files.length} client files before search operation`)
-                try {
-                  const storageManager = await getStorageManager()
-
-                  // Clear existing files for fresh sync
-                  const existingFiles = await storageManager.getFiles(projectId)
-                  for (const existingFile of existingFiles) {
-                    await storageManager.deleteFile(projectId, existingFile.path)
-                  }
-
-                  // Sync all client files with exact content
-                  for (const file of files) {
-                    if (file.path && !file.isDirectory) {
-                      const exactContent = String(file.content || '')
-                      await storageManager.createFile({
-                        workspaceId: projectId,
-                        name: file.name,
-                        path: file.path,
-                        content: exactContent,
-                        fileType: file.type || 'text',
-                        type: file.type || 'text',
-                        size: file.size || exactContent.length,
-                        isDirectory: false
-                      })
-                    }
-                  }
-                  console.log(`[SEMANTIC_SEARCH] ✅ Synced ${files.length} files for fresh search operation`)
-                } catch (syncError) {
-                  console.error('[SEMANTIC_SEARCH] ❌ Failed to sync client files:', syncError)
+              // Get session storage
+              const sessionData = sessionProjectStorage.get(projectId)
+              if (!sessionData) {
+                return {
+                  success: false,
+                  error: `Session storage not found for project ${projectId}`,
+                  query,
+                  toolCallId
                 }
               }
 
-              const { storageManager } = await import('@/lib/storage-manager')
-              await storageManager.init()
+              const { files: sessionFiles } = sessionData
 
-              // Get all files in the project (now synced with latest client content)
-              const allFiles = await storageManager.getFiles(projectId)
-
-              // Filter files based on filePath if provided
-              let filesToSearch = allFiles
+              // Convert to array and filter based on filePath if provided
+              let filesToSearch = Array.from(sessionFiles.values())
               if (filePath) {
-                filesToSearch = allFiles.filter((file: any) => file.path === filePath)
+                filesToSearch = filesToSearch.filter((file: any) => file.path === filePath)
                 if (filesToSearch.length === 0) {
                   return {
                     success: false,
@@ -1889,56 +1687,52 @@ ${conversationSummaryContext || ''}`
           }),
           execute: async ({ path }, { toolCallId }) => {
             try {
-              // CRITICAL: Sync latest client-side files before listing
-              // This ensures we list the most current files from IndexedDB
-              if (files && files.length > 0) {
-                console.log(`[LIST_FILES] Syncing ${files.length} client files before list operation`)
-                try {
-                  const storageManager = await getStorageManager()
-
-                  // Clear existing files for fresh sync
-                  const existingFiles = await storageManager.getFiles(projectId)
-                  for (const existingFile of existingFiles) {
-                    await storageManager.deleteFile(projectId, existingFile.path)
-                  }
-
-                  // Sync all client files with exact content
-                  for (const file of files) {
-                    if (file.path && !file.isDirectory) {
-                      const exactContent = String(file.content || '')
-                      await storageManager.createFile({
-                        workspaceId: projectId,
-                        name: file.name,
-                        path: file.path,
-                        content: exactContent,
-                        fileType: file.type || 'text',
-                        type: file.type || 'text',
-                        size: file.size || exactContent.length,
-                        isDirectory: false
-                      })
-                    }
-                  }
-                  console.log(`[LIST_FILES] ✅ Synced ${files.length} files for fresh list operation`)
-                } catch (syncError) {
-                  console.error('[LIST_FILES] ❌ Failed to sync client files:', syncError)
+              // Get session storage
+              const sessionData = sessionProjectStorage.get(projectId)
+              if (!sessionData) {
+                return {
+                  success: false,
+                  error: `Session storage not found for project ${projectId}`,
+                  files: [],
+                  count: 0,
+                  action: 'list',
+                  toolCallId
                 }
               }
 
-              const storageManager = await getStorageManager()
+              const { files: sessionFiles, fileTree } = sessionData
 
-              let filesToList
+              let filesToList: any[] = []
               if (path) {
                 // List files in specific directory
-                const allFiles = await storageManager.getFiles(projectId)
                 const pathPrefix = path.endsWith('/') ? path : `${path}/`
-                filesToList = allFiles.filter((file: any) =>
-                  file.path.startsWith(pathPrefix) &&
-                  !file.path.substring(pathPrefix.length).includes('/')
-                )
+                for (const [filePath, fileData] of sessionFiles) {
+                  if (filePath.startsWith(pathPrefix) &&
+                      !filePath.substring(pathPrefix.length).includes('/')) {
+                    filesToList.push({
+                      name: fileData.name,
+                      path: fileData.path,
+                      type: fileData.type,
+                      size: fileData.size,
+                      isDirectory: fileData.isDirectory,
+                      lastModified: new Date().toISOString()
+                    })
+                  }
+                }
               } else {
                 // List root directory files
-                const allFiles = await storageManager.getFiles(projectId)
-                filesToList = allFiles.filter((file: any) => !file.path.includes('/'))
+                for (const [filePath, fileData] of sessionFiles) {
+                  if (!filePath.includes('/')) {
+                    filesToList.push({
+                      name: fileData.name,
+                      path: fileData.path,
+                      type: fileData.type,
+                      size: fileData.size,
+                      isDirectory: fileData.isDirectory,
+                      lastModified: new Date().toISOString()
+                    })
+                  }
+                }
               }
 
               // Sort: directories first, then files alphabetically
@@ -1950,22 +1744,13 @@ ${conversationSummaryContext || ''}`
                 return a.path.localeCompare(b.path)
               })
 
-              const fileList = sortedFiles.map((file: any) => ({
-                name: file.name,
-                path: file.path,
-                type: file.type || (file.isDirectory ? 'directory' : 'file'),
-                size: file.size || 0,
-                isDirectory: file.isDirectory || false,
-                lastModified: file.updatedAt || file.createdAt
-              }))
-
               return {
                 success: true,
                 message: path
-                  ? `✅ Listed ${fileList.length} items in directory: ${path}`
-                  : `✅ Listed ${fileList.length} items in root directory`,
-                files: fileList,
-                count: fileList.length,
+                  ? `✅ Listed ${sortedFiles.length} items in directory: ${path}`
+                  : `✅ Listed ${sortedFiles.length} items in root directory`,
+                files: sortedFiles,
+                count: sortedFiles.length,
                 directory: path || '/',
                 action: 'list',
                 toolCallId
@@ -1973,7 +1758,7 @@ ${conversationSummaryContext || ''}`
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : 'Unknown error'
               console.error('[ERROR] list_files failed:', error)
-              
+
               return {
                 success: false,
                 error: `Failed to list files: ${errorMessage}`,
