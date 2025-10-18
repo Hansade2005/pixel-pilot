@@ -725,12 +725,32 @@ export function ChatPanelV2({
     }
   }, [project?.id])
 
+  // Real-time file change listener for @ command and chat sync
+  useEffect(() => {
+    if (!project?.id || typeof window === 'undefined') return
+
+    const handleFilesChanged = (e: CustomEvent) => {
+      const detail = e.detail as { projectId: string; forceRefresh?: boolean }
+      if (detail.projectId === project.id) {
+        console.log('[ChatPanelV2] Detected real-time file changes, refreshing project files...')
+        loadProjectFiles()
+      }
+    }
+
+    window.addEventListener('files-changed', handleFilesChanged as EventListener)
+
+    return () => {
+      window.removeEventListener('files-changed', handleFilesChanged as EventListener)
+    }
+  }, [project?.id])
+
   const loadProjectFiles = async () => {
     try {
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
       const files = await storageManager.getFiles(project.id)
       setProjectFiles(files)
+      console.log(`[ChatPanelV2] Loaded ${files.length} project files for real-time sync`)
     } catch (error) {
       console.error('[ChatPanelV2] Error loading files:', error)
     }
@@ -1063,7 +1083,11 @@ export function ChatPanelV2({
 
       console.log(`[ChatPanelV2] Sending ${messagesToSend.length} messages to server (last 5 + new)`)
 
-      // Build project file tree on client-side
+      // Always refresh project files to catch latest changes made by user
+      console.log(`[ChatPanelV2] Refreshing project files for real-time sync...`)
+      await loadProjectFiles()
+
+      // Build project file tree on client-side with latest data
       const fileTree = await buildProjectFileTree()
 
       const response = await fetch('/api/chat-v2', {
@@ -1075,7 +1099,7 @@ export function ChatPanelV2({
           projectId: project?.id,
           project,
           fileTree, // Use client-built file tree instead of raw files
-          files: projectFiles, // Keep raw files for tool operations
+          files: projectFiles, // Keep raw files for tool operations (now refreshed)
           modelId: selectedModel,
           aiMode
         }),
