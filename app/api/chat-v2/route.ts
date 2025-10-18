@@ -771,6 +771,50 @@ export async function POST(req: Request) {
       }
     }
 
+    // Also store directory entries from fileTree
+    if (clientFileTree.length > 0) {
+      for (const treeItem of clientFileTree) {
+        if (treeItem.endsWith('/')) {
+          // This is a directory
+          const dirPath = treeItem.slice(0, -1) // Remove trailing slash
+          if (!sessionFiles.has(dirPath)) {
+            const dirData = {
+              workspaceId: projectId,
+              name: dirPath.split('/').pop() || dirPath,
+              path: dirPath,
+              content: '',
+              fileType: 'directory',
+              type: 'directory',
+              size: 0,
+              isDirectory: true
+            }
+            sessionFiles.set(dirPath, dirData)
+            console.log(`[DEBUG] Stored directory in memory: ${dirPath}`)
+          }
+        } else {
+          // This is a file - make sure it's in sessionFiles
+          if (!sessionFiles.has(treeItem)) {
+            // Try to find it in clientFiles or create a placeholder
+            const existingFile = clientFiles.find((f: any) => f.path === treeItem)
+            if (existingFile) {
+              const fileData = {
+                workspaceId: projectId,
+                name: existingFile.name,
+                path: existingFile.path,
+                content: existingFile.content !== undefined ? String(existingFile.content) : '',
+                fileType: existingFile.type || existingFile.fileType || 'text',
+                type: existingFile.type || existingFile.fileType || 'text',
+                size: existingFile.size || String(existingFile.content || '').length,
+                isDirectory: false
+              }
+              sessionFiles.set(treeItem, fileData)
+              console.log(`[DEBUG] Stored missing file from fileTree: ${treeItem}`)
+            }
+          }
+        }
+      }
+    }
+
     // Store session data
     sessionProjectStorage.set(projectId, {
       fileTree: clientFileTree,
