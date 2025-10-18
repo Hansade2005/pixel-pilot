@@ -308,6 +308,29 @@ export function ChatPanelV2({
   // Load project files for context
   const [projectFiles, setProjectFiles] = useState<any[]>([])
 
+  // Refs to store current values for experimental_prepareRequestBody
+  const projectRef = useRef(project)
+  const selectedModelRef = useRef(selectedModel)
+  const aiModeRef = useRef(aiMode)
+  const projectFilesRef = useRef(projectFiles)
+
+  // Update refs when values change
+  useEffect(() => {
+    projectRef.current = project
+  }, [project])
+
+  useEffect(() => {
+    selectedModelRef.current = selectedModel
+  }, [selectedModel])
+
+  useEffect(() => {
+    aiModeRef.current = aiMode
+  }, [aiMode])
+
+  useEffect(() => {
+    projectFilesRef.current = projectFiles
+  }, [projectFiles])
+
   // Build enhanced message content with attachments (preserve exact logic)
   const buildEnhancedMessageContent = async (inputText: string, attachments: any) => {
     let enhancedContent = inputText.trim()
@@ -396,28 +419,34 @@ export function ChatPanelV2({
     api: '/api/chat-v2',
     // Ensure custom data is included in ALL requests (initial messages and tool calls)
     experimental_prepareRequestBody: async ({ messages, requestBody }) => {
+      // Use refs to get current values at request time
+      const currentProject = projectRef.current
+      const currentModel = selectedModelRef.current
+      const currentAiMode = aiModeRef.current
+      const currentFiles = projectFilesRef.current
+      
       // Build project file tree for server context
-      const fileTree = project ? await buildProjectFileTree() : []
+      const fileTree = currentProject ? await buildProjectFileTree() : []
 
       console.log('[ChatPanelV2] experimental_prepareRequestBody called:', {
         messageCount: messages?.length || 0,
         messagesPreview: messages?.slice(0, 2).map(m => ({ role: m.role, contentLength: m.content?.length })),
-        projectId: project?.id,
-        modelId: selectedModel,
-        aiMode,
+        projectId: currentProject?.id,
+        modelId: currentModel,
+        aiMode: currentAiMode,
         fileTreeLength: fileTree.length,
-        filesCount: projectFiles.length
+        filesCount: currentFiles.length
       })
 
       const finalBody = {
         ...requestBody,
         messages, // CRITICAL: Include messages array
-        projectId: project?.id,
-        project,
-        modelId: selectedModel,
-        aiMode,
+        projectId: currentProject?.id,
+        project: currentProject,
+        modelId: currentModel,
+        aiMode: currentAiMode,
         fileTree, // Send optimized file tree for context
-        files: projectFiles // Keep full files for server-side tools
+        files: currentFiles // Keep full files for server-side tools
       }
 
       console.log('[ChatPanelV2] Sending request body:', {
