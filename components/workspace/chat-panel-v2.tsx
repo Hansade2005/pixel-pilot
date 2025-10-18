@@ -394,14 +394,19 @@ export function ChatPanelV2({
     status: useChatStatus
   } = useChat({
     api: '/api/chat-v2',
-    // Ensure custom data is included in tool call responses
-    experimental_prepareRequestBody: ({ requestBody }) => {
+    // Ensure custom data is included in every request (including tool call responses)
+    experimental_prepareRequestBody: async ({ requestBody }) => {
+      // Build project file tree for server context
+      const fileTree = project ? await buildProjectFileTree() : []
+
       return {
-        ...requestBody,
+        ...requestBody, // This should include messages
         projectId: project?.id,
         project,
         modelId: selectedModel,
-        aiMode
+        aiMode,
+        fileTree, // Send optimized file tree for context
+        files: projectFiles // Keep full files for server-side tools
       }
     },
     // Preserve message persistence logic
@@ -1178,19 +1183,10 @@ export function ChatPanelV2({
       setAttachedUrls([])
       setInput('')
 
-      // Use useChat.append() with enhanced content and custom request data
-      await useChatAppend({ role: 'user', content: enhancedContent }, {
-        body: {
-          projectId: project?.id,
-          project,
-          modelId: selectedModel,
-          aiMode,
-          fileTree: project ? await buildProjectFileTree() : [],
-          files: projectFiles
-        }
-      })
+      // Use useChat.append() with enhanced content
+      await useChatAppend({ role: 'user', content: enhancedContent })
 
-      console.log('[ChatPanelV2] Message sent via useChat.append() with custom body')
+      console.log('[ChatPanelV2] Message sent via useChat.append()')
     } catch (error: any) {
       console.error('[ChatPanelV2] Error sending message:', error)
       setError(error)
