@@ -1371,15 +1371,24 @@ ${conversationSummaryContext || ''}`
                 }
               }
 
-              // Get all files in the project
-              const { storageManager } = await import('@/lib/storage-manager')
-              await storageManager.init()
-              const allFiles = await storageManager.getFiles(projectId)
+              // Get all files from in-memory session store (latest state)
+              const sessionData = sessionProjectStorage.get(projectId)
+              if (!sessionData) {
+                return {
+                  success: false,
+                  error: `Session storage not found for project ${projectId}`,
+                  mode,
+                  toolCallId
+                }
+              }
+
+              const { files: sessionFiles } = sessionData
+              const allFiles = Array.from(sessionFiles.values())
 
               if (!allFiles || allFiles.length === 0) {
                 return {
                   success: false,
-                  error: 'No files found in project',
+                  error: 'No files found in project session',
                   mode,
                   toolCallId
                 }
