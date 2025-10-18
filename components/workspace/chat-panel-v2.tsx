@@ -253,15 +253,6 @@ export function ChatPanelV2({
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Debug props
-  console.log('[ChatPanelV2] Props received:', {
-    hasProject: !!project,
-    projectId: project?.id,
-    selectedModel,
-    aiMode,
-    isMobile
-  })
-
   // Debounce utility function
   const debounce = (func: Function, wait: number) => {
     let timeout: NodeJS.Timeout
@@ -316,29 +307,6 @@ export function ChatPanelV2({
 
   // Load project files for context
   const [projectFiles, setProjectFiles] = useState<any[]>([])
-
-  // Refs to store current values for experimental_prepareRequestBody
-  const projectRef = useRef(project)
-  const selectedModelRef = useRef(selectedModel)
-  const aiModeRef = useRef(aiMode)
-  const projectFilesRef = useRef(projectFiles)
-
-  // Update refs when values change
-  useEffect(() => {
-    projectRef.current = project
-  }, [project])
-
-  useEffect(() => {
-    selectedModelRef.current = selectedModel
-  }, [selectedModel])
-
-  useEffect(() => {
-    aiModeRef.current = aiMode
-  }, [aiMode])
-
-  useEffect(() => {
-    projectFilesRef.current = projectFiles
-  }, [projectFiles])
 
   // Build enhanced message content with attachments (preserve exact logic)
   const buildEnhancedMessageContent = async (inputText: string, attachments: any) => {
@@ -426,30 +394,14 @@ export function ChatPanelV2({
     status: useChatStatus
   } = useChat({
     api: '/api/chat-v2',
-    // Ensure custom data is included in every request (including tool call responses)
-    experimental_prepareRequestBody: async ({ id, messages, requestData, requestBody }) => {
-      // Build project file tree for server context
-      const currentProject = projectRef.current
-      const fileTree = currentProject ? await buildProjectFileTree() : []
-
-      console.log('[ChatPanelV2] experimental_prepareRequestBody called with:', {
-        id,
-        messageCount: messages?.length || 0,
-        hasRequestBody: !!requestBody,
-        projectId: currentProject?.id,
-        selectedModel: selectedModelRef.current,
-        aiMode: aiModeRef.current
-      })
-
+    // Ensure custom data is included in tool call responses
+    experimental_prepareRequestBody: ({ requestBody }) => {
       return {
         ...requestBody,
-        messages, // Ensure messages are included
-        projectId: currentProject?.id,
-        project: currentProject,
-        modelId: selectedModelRef.current,
-        aiMode: aiModeRef.current,
-        fileTree, // Send optimized file tree for context
-        files: projectFilesRef.current // Keep full files for server-side tools
+        projectId: project?.id,
+        project,
+        modelId: selectedModel,
+        aiMode
       }
     },
     // Preserve message persistence logic
@@ -1226,10 +1178,19 @@ export function ChatPanelV2({
       setAttachedUrls([])
       setInput('')
 
-      // Use useChat.append() with enhanced content
-      await useChatAppend({ role: 'user', content: enhancedContent })
+      // Use useChat.append() with enhanced content and custom request data
+      await useChatAppend({ role: 'user', content: enhancedContent }, {
+        body: {
+          projectId: project?.id,
+          project,
+          modelId: selectedModel,
+          aiMode,
+          fileTree: project ? await buildProjectFileTree() : [],
+          files: projectFiles
+        }
+      })
 
-      console.log('[ChatPanelV2] Message sent via useChat.append()')
+      console.log('[ChatPanelV2] Message sent via useChat.append() with custom body')
     } catch (error: any) {
       console.error('[ChatPanelV2] Error sending message:', error)
       setError(error)
