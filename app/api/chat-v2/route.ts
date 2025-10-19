@@ -189,51 +189,97 @@ async function buildOptimizedProjectContext(projectId: string, sessionData: any,
         builtFileTree.push(file.path)
       })
 
-      // Add directories and their files
+      // Add directories and their files (special handling for components/ui/)
       const sortedDirectories = Array.from(directories).sort()
       sortedDirectories.forEach((dir: string) => {
-        builtFileTree.push(`${dir}/`)
+        // Special handling for components/ui/ - show as components/ui/ ([count] UI Components)
+        if (dir === 'components/ui') {
+          const uiFiles = sortedFiles.filter((file: any) => file.path.startsWith('components/ui/'))
+          builtFileTree.push(`components/ui/ (${uiFiles.length} UI Components)`)
+        } else {
+          builtFileTree.push(`${dir}/`)
 
-        // Add files in this directory
-        const dirFiles = sortedFiles.filter((file: any) => {
-          const filePath = file.path
-          const fileDir = filePath.substring(0, filePath.lastIndexOf('/'))
-          return fileDir === dir
-        })
+          // Add files in this directory (skip components/ui/ files since we handle them above)
+          const dirFiles = sortedFiles.filter((file: any) => {
+            const filePath = file.path
+            const fileDir = filePath.substring(0, filePath.lastIndexOf('/'))
+            return fileDir === dir && !filePath.startsWith('components/ui/')
+          })
 
-        dirFiles.forEach((file: any) => {
-          builtFileTree.push(file.path)
-        })
+          dirFiles.forEach((file: any) => {
+            builtFileTree.push(file.path)
+          })
+        }
       })
 
       finalFileTree = builtFileTree
     }
 
-    // Build the context
+    // Build enhanced, well-organized project context
+    // Group files by category for better AI understanding
+    const configFiles = filteredFiles.filter((f: any) =>
+      ['package.json', 'tsconfig.json', 'tailwind.config.js', 'next.config.js', 'vite.config.ts', 'vite.config.js', 'postcss.config.js', 'eslint.config.js'].includes(f.path) ||
+      f.path.endsWith('.config.js') || f.path.endsWith('.config.ts') || f.path.endsWith('.config.json')
+    )
+
+    const sourceFiles = filteredFiles.filter((f: any) =>
+      f.path.startsWith('src/') && !f.path.includes('components/ui/')
+    )
+
+    const componentFiles = filteredFiles.filter((f: any) =>
+      f.path.includes('components/') && !f.path.includes('components/ui/')
+    )
+
+    const apiFiles = filteredFiles.filter((f: any) =>
+      f.path.includes('/api/') || f.path.includes('route.ts') || f.path.includes('route.js')
+    )
+
+    const hookFiles = filteredFiles.filter((f: any) =>
+      f.path.includes('hooks/') || f.path.includes('use')
+    )
+
+    const libFiles = filteredFiles.filter((f: any) =>
+      f.path.includes('lib/') || f.path.includes('utils')
+    )
+
+    const docFiles = filteredFiles.filter((f: any) =>
+      f.path.endsWith('.md') || f.path.endsWith('.txt') || f.path.includes('README') || f.path.includes('GUIDE')
+    )
+
+    const otherFiles = filteredFiles.filter((f: any) =>
+      !configFiles.includes(f) &&
+      !sourceFiles.includes(f) &&
+      !componentFiles.includes(f) &&
+      !apiFiles.includes(f) &&
+      !hookFiles.includes(f) &&
+      !libFiles.includes(f) &&
+      !docFiles.includes(f)
+    )
+
+    // Function to build flat file list (VSCode-style simple paths)
+    const buildTreeStructure = (files: any[], prefix = '') => {
+      // Sort files alphabetically by path
+      const sortedFiles = files.sort((a: any, b: any) => a.path.localeCompare(b.path))
+
+      // Return simple file paths, one per line
+      return sortedFiles.map((file: any) => `${prefix}${file.path}`)
+    }
+
+    // Build simple, straightforward project context with overview
     let context = `# Current Time
 ${currentTime}
 
 # Project Type
 ${projectType === 'nextjs' ? '**Next.js** - Full-stack React framework with App Router' : projectType === 'vite-react' ? '**Vite + React** - Fast build tool with React' : 'Unknown'}
 
-${projectType === 'nextjs' ? `## Next.js Project Structure
-- **src/app/** - App Router pages and layouts
-- **src/components/** - React components  
-- **src/lib/** - Utilities and helpers
-- **public/** - Static assets
-- **API Routes:** Create in src/app/api/[name]/route.ts` : 
-`## Vite Project Structure
-- **src/** - Source code directory
-- **src/components/** - React components
-- **src/lib/** - Utilities and helpers
-- **public/** - Static assets
-- **api/** - Serverless functions (Vercel)`}
+# Project Overview
+**Total Files:** ${filteredFiles.length}
 
 # Current Project Structure
 ${finalFileTree.join('\n')}
 ---`
 
-    console.log(`[CONTEXT] Built file tree with ${finalFileTree.length} files`) 
+    console.log(`[CONTEXT] Built simple project context with ${finalFileTree.length} files`)
     return context
 
   } catch (error) {
