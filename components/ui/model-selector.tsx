@@ -7,7 +7,7 @@ import { chatModels, type ChatModel, getModelById } from '@/lib/ai-models'
 import { getLimits } from '@/lib/stripe-config'
 
 interface ModelSelectorProps {
-  selectedModel: string
+  selectedModel?: string
   onModelChange: (modelId: string) => void
   userPlan?: string
   subscriptionStatus?: string
@@ -27,10 +27,22 @@ export function ModelSelector({
 }: ModelSelectorProps) {
   // Default subscription status based on plan (matches admin page behavior)
   const effectiveStatus = subscriptionStatus || (userPlan === 'free' ? 'active' : 'inactive')
-  const currentModel = getModelById(selectedModel)
+  
+  // Set default selected model based on plan
+  const defaultSelectedModel: string = userPlan === 'pro' ? 'grok-code-fast-1' : 'grok-3-mini'
+  const effectiveSelectedModel = selectedModel || defaultSelectedModel
+  
+  const currentModel = getModelById(effectiveSelectedModel)
+  
+  const displayNameMap = new Map<string, string>([
+    ['grok-code-fast-1', 'PiPilot 4.5 Pro'],
+    ['grok-3-mini', 'PiPilot 4 Flash']
+  ])
+  
+  const filteredModels = chatModels.filter(model => Object.keys(displayNameMap).includes(model.id))
   
   // Group models by provider for better organization
-  const modelsByProvider = chatModels.reduce((acc, model) => {
+  const modelsByProvider = filteredModels.reduce((acc, model) => {
     if (!acc[model.provider]) {
       acc[model.provider] = []
     }
@@ -41,11 +53,16 @@ export function ModelSelector({
   // Determine allowed models based on subscription status and plan
   const userLimits = getLimits(userPlan)
 
-  // Pro plan users need active status to access all models
-  // Free users get their configured allowed models
-  const allowedModels = (userPlan === 'pro' && effectiveStatus === 'active')
-    ? userLimits.allowedModels || []
-    : userLimits.allowedModels || ['auto']
+  // Set specific allowed models per plan
+  let allowedModels: string[]
+  if (userPlan === 'free') {
+    allowedModels = ['grok-3-mini']
+  } else if (userPlan === 'pro' && effectiveStatus === 'active') {
+    allowedModels = ['grok-code-fast-1']
+  } else {
+    // Fallback for pro inactive or other cases
+    allowedModels = userLimits.allowedModels || ['auto']
+  }
 
   // Helper function to check if model is allowed
   const isModelAllowed = (modelId: string) => allowedModels.includes(modelId)
@@ -66,12 +83,12 @@ export function ModelSelector({
   if (compact) {
     return (
       <div className={`flex items-center ${className}`}>
-        <Select value={selectedModel} onValueChange={onModelChange}>
+        <Select value={effectiveSelectedModel} onValueChange={onModelChange}>
           {/* Match AiModeSelector compact trigger: small height, tight padding, no border, rely on shared chevron */}
           <SelectTrigger className="h-6 px-2 min-w-[56px] border-0 bg-transparent text-xs shadow-none focus:ring-0 p-0">
             <div className="flex items-center justify-center w-full">
               <SelectValue>
-                <span className="font-medium text-sm leading-none text-center">{truncateModelName(currentModel?.name || selectedModel)}</span>
+                <span className="font-medium text-sm leading-none text-center">{truncateModelName(displayNameMap.get(effectiveSelectedModel) || currentModel?.name || effectiveSelectedModel)}</span>
               </SelectValue>
             </div>
           </SelectTrigger>
@@ -80,7 +97,7 @@ export function ModelSelector({
             {Object.entries(modelsByProvider).map(([provider, models]) => (
               <div key={provider} className="py-1">
                 <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  {provider}
+                  PiPilot
                 </div>
                 {models.map((model) => {
                   const allowed = isModelAllowed(model.id)
@@ -92,7 +109,7 @@ export function ModelSelector({
                       className={`text-sm px-3 py-1 ${!allowed ? 'opacity-50' : ''}`}
                     >
                       <div className="flex items-center justify-between w-full">
-                        <span>{model.name}</span>
+                        <span>{displayNameMap.get(model.id) || model.name}</span>
                         {!allowed && <Lock className="h-3 w-3 text-muted-foreground ml-2" />}
                         {allowed && (userPlan === 'pro' && effectiveStatus === 'active') && (
                           <Crown className="h-3 w-3 text-yellow-500 ml-2" />
@@ -117,11 +134,11 @@ export function ModelSelector({
         <span className="text-sm font-medium">AI Model</span>
       </div>
       
-      <Select value={selectedModel} onValueChange={onModelChange}>
+      <Select value={effectiveSelectedModel} onValueChange={onModelChange}>
         <SelectTrigger className="w-full">
           <div className="flex items-center gap-2">
             <SelectValue>
-              <span className="font-medium">{truncateModelName(currentModel?.name || selectedModel)}</span>
+              <span className="font-medium">{truncateModelName(displayNameMap.get(effectiveSelectedModel) || currentModel?.name || effectiveSelectedModel)}</span>
             </SelectValue>
           </div>
         </SelectTrigger>
@@ -130,7 +147,7 @@ export function ModelSelector({
           {Object.entries(modelsByProvider).map(([provider, models]) => (
             <div key={provider} className="py-2">
               <div className="px-3 py-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide border-b">
-                {provider}
+                PiPilot
               </div>
               {models.map((model) => {
                 const allowed = isModelAllowed(model.id)
@@ -143,7 +160,7 @@ export function ModelSelector({
                   >
                     <div className="flex items-center justify-between w-full">
                       <div>
-                        <div className="font-medium">{model.name}</div>
+                        <div className="font-medium">{displayNameMap.get(model.id) || model.name}</div>
                         <div className="text-xs text-muted-foreground">{model.description}</div>
                       </div>
                       <div className="flex items-center gap-2">

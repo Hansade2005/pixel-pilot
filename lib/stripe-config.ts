@@ -56,7 +56,7 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
       canUseNetlify: true,
       canUseGitHub: true,
       unlimitedPrompts: false,
-      allowedModels: ['auto', 'a0-dev-llm']
+      allowedModels: ['auto', 'a0-dev-llm', 'grok-3-mini']
     },
     prices: {
       monthly: {
