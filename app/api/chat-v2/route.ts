@@ -1038,18 +1038,16 @@ ${conversationSummaryContext || ''}`
         add_package: tool({
           description: 'Add one or more npm packages to package.json. Use this tool to install new dependencies. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
-            name: z.string().describe('Package name(s) to add. Can be a single package (e.g., "lodash") or comma-separated names (e.g., "lodash, axios, react-router-dom")'),
-            version: z.string().optional().describe('The package version (e.g., "^4.17.21"). Defaults to "latest". Applied to all packages'),
+            name: z.union([
+              z.string().describe('The package name (e.g., "lodash") or comma-separated names (e.g., "lodash, axios, react-router-dom")'),
+              z.array(z.string()).describe('Array of package names (e.g., ["lodash", "axios"])')
+            ]).describe('Package name(s) to add'),
+            version: z.string().optional().describe('The package version (e.g., "^4.17.21"). Defaults to "latest". Applied to all packages if array provided'),
             isDev: z.boolean().optional().describe('Whether to add as dev dependency (default: false)')
           }),
-          execute: async ({ name, version, isDev }, { toolCallId }) => {
-            // Parse name to handle comma-separated values
-            let parsedName: string | string[] = name;
-            if (typeof name === 'string' && name.includes(',')) {
-              parsedName = name.split(',').map(s => s.trim());
-            }
+          execute: async (input: { name: string | string[]; version?: string; isDev?: boolean }, { toolCallId }) => {
             // Use the powerful constructor to get actual results
-            return await constructToolResult('add_package', { name: parsedName, version, isDev }, projectId, toolCallId)
+            return await constructToolResult('add_package', input, projectId, toolCallId)
           }
         }),
 
@@ -1057,17 +1055,15 @@ ${conversationSummaryContext || ''}`
         remove_package: tool({
           description: 'Remove one or more npm packages from package.json. Use this tool to uninstall dependencies. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
-            name: z.string().describe('Package name(s) to remove. Can be a single package or comma-separated names (e.g., "lodash, axios")'),
+            name: z.union([
+              z.string().describe('The package name to remove or comma-separated names (e.g., "lodash, axios")'),
+              z.array(z.string()).describe('Array of package names to remove')
+            ]).describe('Package name(s) to remove'),
             isDev: z.boolean().optional().describe('Whether to remove from dev dependencies (default: false)')
           }),
-          execute: async ({ name, isDev }, { toolCallId }) => {
-            // Parse name to handle comma-separated values
-            let parsedName: string | string[] = name;
-            if (typeof name === 'string' && name.includes(',')) {
-              parsedName = name.split(',').map(s => s.trim());
-            }
+          execute: async (input: { name: string | string[]; isDev?: boolean }, { toolCallId }) => {
             // Use the powerful constructor to get actual results
-            return await constructToolResult('remove_package', { name: parsedName, isDev }, projectId, toolCallId)
+            return await constructToolResult('remove_package', input, projectId, toolCallId)
           }
         }),
 
@@ -1115,15 +1111,18 @@ ${conversationSummaryContext || ''}`
         web_extract: tool({
           description: 'Extract content from web pages using AnyAPI. Returns clean, structured text.',
           inputSchema: z.object({
-            urls: z.string().describe('URL or URLs to extract content from. Can be a single URL or comma-separated URLs')
+            urls: z.union([
+              z.string().url().describe('URL to extract content from'),
+              z.array(z.string().url()).describe('Array of URLs to extract content from')
+            ]).describe('URL or URLs to extract content from')
           }),
           execute: async ({ urls }, { abortSignal, toolCallId }) => {
             if (abortSignal?.aborted) {
               throw new Error('Operation cancelled')
             }
             
-            // Parse urls to handle comma-separated values
-            const urlArray = urls.includes(',') ? urls.split(',').map(s => s.trim()) : [urls];
+            // Ensure urls is always an array
+            const urlArray = Array.isArray(urls) ? urls : [urls];
             
             try {
               // Import the web scraper
