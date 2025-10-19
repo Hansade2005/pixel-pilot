@@ -58,7 +58,7 @@ export function ModelSelector({
   if (userPlan === 'free') {
     allowedModels = ['grok-3-mini']
   } else if (userPlan === 'pro' && effectiveStatus === 'active') {
-    allowedModels = ['grok-code-fast-1']
+    allowedModels = ['grok-code-fast-1', 'grok-3-mini']
   } else {
     // Fallback for pro inactive or other cases
     allowedModels = userLimits.allowedModels || ['auto']
