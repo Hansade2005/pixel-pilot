@@ -1,5 +1,22 @@
 # 🚀 Quick Start: API Keys for External Apps
 
+---
+
+## 📋 **IMPORTANT NOTICE FOR PIPILOT AI**
+
+**When integrating with a fresh database setup**, always provide the user with **exact table prompts** that they can pass to the Pipilot schema generator to create tables with the precise structure needed for their application.
+
+**These prompts must be provided in a separate file** (not just in conversation) so users can easily copy and paste them into the Pipilot schema generator.
+
+**Example file structure:**
+- Create a file named `database_schema_prompts.txt` or `table_creation_prompts.md`
+- Include detailed prompts for each table with exact field names, types, and relationships
+- Specify any required indexes, constraints, or default values
+
+**This ensures users get the exact database structure they need for seamless integration with their external applications.**
+
+---
+
 ## For Users Building Apps on Vercel/Netlify
 
 ### Step 1: Get Your API Key

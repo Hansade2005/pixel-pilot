@@ -460,23 +460,399 @@ dist-ssr
       size: 0,
       isDirectory: false
     },
-    // Add default .env file to the template
     {
-      name: '.env',
-      path: '.env',
-      content: `# Environment variables for the application
-# Add your environment variables here
-# Example:
-# VITE_API_URL=https://api.example.com
-# VITE_APP_TITLE=My App
+      name: 'EXTERNAL_APP_INTEGRATION_GUIDE.md',
+      path: 'EXTERNAL_APP_INTEGRATION_GUIDE.md',
+      content: `# 🚀 Quick Start: API Keys for External Apps
 
-# Note: For client-side variables in Vite, prefix with VITE_
-# For server-side variables, they should be set in the deployment environment
-`,
-      fileType: 'env',
-      type: 'text',
+---
+
+## 📋 **IMPORTANT NOTICE FOR PIPILOT AI**
+
+**When integrating with a fresh database setup**, always provide the user with **exact table prompts** that they can pass to the Pipilot schema generator to create tables with the precise structure needed for their application.
+
+**These prompts must be provided in a separate file** (not just in conversation) so users can easily copy and paste them into the Pipilot schema generator.
+
+**Example file structure:**
+- Create a file named \`database_schema_prompts.txt\` or \`table_creation_prompts.md\`
+- Include detailed prompts for each table with exact field names, types, and relationships
+- Specify any required indexes, constraints, or default values
+
+**This ensures users get the exact database structure they need for seamless integration with their external applications.**
+
+---
+
+## For Users Building Apps on Vercel/Netlify
+
+### Step 1: Get Your API Key
+
+1. Go to: \`https://pipilot.dev/workspace/YOUR_WORKSPACE/database\`
+2. Click **API Keys** tab
+3. Click **Create API Key**
+4. Name it (e.g., "My Vercel App")
+5. **Copy the key immediately!** (shown only once)
+
+### Step 2: Get Your Database & Table IDs
+
+In the browser URL when viewing your table:
+\`\`\`
+https://pipilot.dev/workspace/123/database/tables/456
+                                      ^^^          ^^^
+                                  Database ID   Table ID
+\`\`\`
+
+### Step 3: Use in Your App
+
+#### **Next.js App (Vercel):**
+
+Create \`lib/database.ts\`:
+
+\`\`\`typescript
+const API_KEY = process.env.PIPILOT_API_KEY!;
+const DATABASE_ID = 'YOUR_DATABASE_ID';
+const BASE_URL = 'https://pipilot.dev/api/v1';
+
+export async function getRecords(tableId: string) {
+  const response = await fetch(
+    \`\${BASE_URL}/databases/\${DATABASE_ID}/tables/\${tableId}/records\`,
+    {
+      headers: {
+        'Authorization': \`Bearer \${API_KEY}\`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch records');
+  }
+  
+  return response.json();
+}
+
+export async function createRecord(tableId: string, data: any) {
+  const response = await fetch(
+    \`\${BASE_URL}/databases/\${DATABASE_ID}/tables/\${tableId}/records\`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': \`Bearer \${API_KEY}\`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ data })
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error('Failed to create record');
+  }
+  
+  return response.json();
+}
+
+export async function updateRecord(tableId: string, recordId: string, data: any) {
+  const response = await fetch(
+    \`\${BASE_URL}/databases/\${DATABASE_ID}/tables/\${tableId}/records/\${recordId}\`,
+    {
+      method: 'PUT',
+      headers: {
+        'Authorization': \`Bearer \${API_KEY}\`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ data })
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error('Failed to update record');
+  }
+  
+  return response.json();
+}
+
+export async function deleteRecord(tableId: string, recordId: string) {
+  const response = await fetch(
+    \`\${BASE_URL}/databases/\${DATABASE_ID}/tables/\${tableId}/records/\${recordId}\`,
+    {
+      method: 'DELETE',
+      headers: {
+        'Authorization': \`Bearer \${API_KEY}\`
+      }
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error('Failed to delete record');
+  }
+  
+  return response.json();
+}
+\`\`\`
+
+#### **Use in a Server Component:**
+
+\`\`\`typescript
+// app/users/page.tsx
+import { getRecords } from '@/lib/database';
+
+export default async function UsersPage() {
+  const { records } = await getRecords('YOUR_TABLE_ID');
+  
+  return (
+    <div>
+      <h1>Users</h1>
+      {records.map((record: any) => (
+        <div key={record.id}>
+          {record.data_json.name} - {record.data_json.email}
+        </div>
+      ))}
+    </div>
+  );
+}
+\`\`\`
+
+#### **Use in an API Route:**
+
+\`\`\`typescript
+// app/api/users/route.ts
+import { NextResponse } from 'next/server';
+import { createRecord } from '@/lib/database';
+
+export async function POST(request: Request) {
+  const body = await request.json();
+  
+  try {
+    const result = await createRecord('YOUR_TABLE_ID', {
+      name: body.name,
+      email: body.email
+    });
+    
+    return NextResponse.json(result);
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Failed to create user' },
+      { status: 500 }
+    );
+  }
+}
+\`\`\`
+
+### Step 4: Set Environment Variable
+
+Add to \`.env.local\`:
+
+\`\`\`env
+PIPILOT_API_KEY=sk_live_your_actual_key_here
+\`\`\`
+
+### Step 5: Deploy!
+
+\`\`\`bash
+# Vercel
+vercel env add PIPILOT_API_KEY
+vercel deploy
+
+# Netlify
+netlify env:set PIPILOT_API_KEY sk_live_your_key_here
+netlify deploy
+\`\`\`
+
+---
+
+## React Example (Client-Side)
+
+\`\`\`typescript
+'use client';
+
+import { useState, useEffect } from 'react';
+
+export default function UsersList() {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  async function fetchUsers() {
+    try {
+      // Call your API route (not directly to pipilot.dev to keep API key secret)
+      const response = await fetch('/api/users');
+      const data = await response.json();
+      setUsers(data.records);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (loading) return <div>Loading...</div>;
+
+  return (
+    <div>
+      {users.map((user: any) => (
+        <div key={user.id}>
+          {user.data_json.name}
+        </div>
+      ))}
+    </div>
+  );
+}
+\`\`\`
+
+---
+
+## Vanilla JavaScript Example
+
+\`\`\`html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Users</title>
+</head>
+<body>
+  <h1>Users</h1>
+  <div id="users"></div>
+
+  <script>
+    const API_KEY = 'sk_live_your_key_here'; // ⚠️ Don't expose in production!
+    const DATABASE_ID = 'YOUR_DATABASE_ID';
+    const TABLE_ID = 'YOUR_TABLE_ID';
+
+    async function fetchUsers() {
+      const response = await fetch(
+        \`https://pipilot.dev/api/v1/databases/\${DATABASE_ID}/tables/\${TABLE_ID}/records\`,
+        {
+          headers: {
+            'Authorization': \`Bearer \${API_KEY}\`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      const data = await response.json();
+      const usersDiv = document.getElementById('users');
+
+      data.records.forEach(record => {
+        const div = document.createElement('div');
+        div.textContent = \`\${record.data_json.name} - \${record.data_json.email}\`;
+        usersDiv.appendChild(div);
+      });
+    }
+
+    fetchUsers();
+  </script>
+</body>
+</html>
+\`\`\`
+
+---
+
+## Python Example
+
+\`\`\`python
+import requests
+import os
+
+API_KEY = os.getenv('PIPILOT_API_KEY')
+DATABASE_ID = 'YOUR_DATABASE_ID'
+TABLE_ID = 'YOUR_TABLE_ID'
+BASE_URL = 'https://pipilot.dev/api/v1'
+
+def get_records():
+    response = requests.get(
+        f'{BASE_URL}/databases/{DATABASE_ID}/tables/{TABLE_ID}/records',
+        headers={
+            'Authorization': f'Bearer {API_KEY}',
+            'Content-Type': 'application/json'
+        }
+    )
+    return response.json()
+
+def create_record(data):
+    response = requests.post(
+        f'{BASE_URL}/databases/{DATABASE_ID}/tables/{TABLE_ID}/records',
+        headers={
+            'Authorization': f'Bearer {API_KEY}',
+            'Content-Type': 'application/json'
+        },
+        json={'data': data}
+    )
+    return response.json()
+
+# Usage
+records = get_records()
+print(records)
+
+new_user = create_record({
+    'name': 'John Doe',
+    'email': 'john@example.com'
+})
+print(new_user)
+\`\`\`
+
+---
+
+## 🔒 Security Best Practices
+
+### ✅ DO:
+- Store API keys in environment variables
+- Use server-side API routes to proxy requests
+- Rotate keys periodically
+- Revoke compromised keys immediately
+- Use different keys for dev/staging/production
+
+### ❌ DON'T:
+- Commit API keys to Git
+- Expose keys in client-side code
+- Share keys publicly
+- Use the same key across multiple apps
+
+---
+
+## 📊 Rate Limits
+
+- **Default**: 1000 requests per hour
+- **Headers**: Check \`X-RateLimit-Remaining\` header
+- **On Exceeded**: Returns \`429 Too Many Requests\`
+
+---
+
+## 🆘 Troubleshooting
+
+### Error: "Invalid API key"
+- Check key format: Must start with \`sk_live_\`
+- Verify key hasn't been revoked
+- Ensure you're using the correct database ID
+
+### Error: "Rate limit exceeded"
+- Wait 1 hour or contact support to increase limit
+- Implement caching to reduce requests
+
+### Error: "Table not found"
+- Verify database ID and table ID in URL
+- Check table exists in pipilot.dev dashboard
+
+---
+
+## 💡 Tips
+
+1. **Cache responses**: Don't fetch same data repeatedly
+2. **Batch operations**: Create multiple records in a loop efficiently
+3. **Error handling**: Always handle API errors gracefully
+4. **Monitoring**: Track your API usage in the pipilot.dev dashboard
+
+---
+
+## 🎉 You're All Set!
+
+Your external apps can now interact with your pipilot.dev databases! 🚀`,
+      fileType: 'markdown',
+      type: 'markdown',
       size: 0,
       isDirectory: false
+
     },
     // Add .env.local file for local environment variables
     {
@@ -4195,6 +4571,979 @@ export { useTheme, ThemeContext } from './useTheme'
 `,
       fileType: 'typescript',
       type: 'typescript',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'STORAGE_SYSTEM_IMPLEMENTATION.md',
+      path: 'STORAGE_SYSTEM_IMPLEMENTATION.md',
+      content: `# 📦 File Storage System - Complete Implementation
+
+## 🎯 Overview
+
+Implemented a complete file storage system similar to Supabase Storage, allowing users to store and manage files (images, documents, videos, etc.) in their databases.
+
+---
+
+## ✨ Key Features
+
+### **Storage Capabilities**
+- ✅ **500MB per database** - Each database gets 500MB of storage
+- ✅ **10MB max file size** - Individual files up to 10MB
+- ✅ **Multiple file types** - Images, PDFs, documents, videos, audio
+- ✅ **Public & private files** - Control file access
+- ✅ **Signed URLs** - Secure temporary access to private files
+- ✅ **CDN delivery** - Fast file delivery via Supabase CDN
+- ✅ **Automatic usage tracking** - Real-time storage usage monitoring
+
+### **Security Features**
+- ✅ **Row Level Security (RLS)** - Users can only access their files
+- ✅ **File type validation** - Only allowed types can be uploaded
+- ✅ **Size limits enforced** - Prevents storage abuse
+- ✅ **API key authentication** - Secure external access
+- ✅ **Rate limiting** - Prevents API abuse
+
+---
+
+## 🏗️ Architecture
+
+### **Database Schema**
+
+\`\`\`
+storage_buckets
+├── id (UUID)
+├── database_id (FK → databases.id)
+├── name (TEXT)
+├── size_limit_bytes (500MB)
+├── current_usage_bytes
+├── is_public (BOOLEAN)
+└── timestamps
+
+storage_files
+├── id (UUID)
+├── bucket_id (FK → storage_buckets.id)
+├── name (generated unique name)
+├── original_name (user's filename)
+├── path (Supabase Storage path)
+├── size_bytes
+├── mime_type
+├── is_public
+├── metadata (JSONB)
+└── timestamps
+\`\`\`
+
+### **Supabase Storage Structure**
+
+\`\`\`
+pipilot-storage (Master Bucket)
+├── db_1_myapp/
+│   ├── abc123.jpg
+│   ├── def456.pdf
+│   └── ghi789.mp4
+├── db_2_webapp/
+│   ├── xyz123.png
+│   └── mno456.docx
+└── ...
+\`\`\`
+
+---
+
+## 📡 API Endpoints
+
+### **Dashboard API (Authenticated Users)**
+
+#### **1. Get Storage Info**
+\`\`\`
+GET /api/database/{databaseId}/storage
+\`\`\`
+
+Returns bucket info, usage stats, and recent files.
+
+**Response:**
+\`\`\`json
+{
+  "bucket": {
+    "id": "uuid",
+    "name": "db_1_myapp",
+    "size_limit_bytes": 524288000,
+    "current_usage_bytes": 104857600,
+    "is_public": false
+  },
+  "stats": {
+    "file_count": 25,
+    "usage_percentage": 20,
+    "available_bytes": 419430400
+  },
+  "files": [...]
+}
+\`\`\`
+
+#### **2. Upload File**
+\`\`\`
+POST /api/database/{databaseId}/storage/upload
+Content-Type: multipart/form-data
+\`\`\`
+
+**Form Data:**
+- \`file\` - The file to upload
+- \`is_public\` - "true" or "false"
+- \`metadata\` - JSON string (optional)
+
+**Response:**
+\`\`\`json
+{
+  "success": true,
+  "file": {
+    "id": "uuid",
+    "name": "abc123.jpg",
+    "original_name": "photo.jpg",
+    "size_bytes": 1048576,
+    "mime_type": "image/jpeg",
+    "url": "https://...",
+    "is_public": true,
+    "created_at": "2025-10-07T..."
+  }
+}
+\`\`\`
+
+#### **3. List Files**
+\`\`\`
+GET /api/database/{databaseId}/storage/files
+  ?limit=50
+  &offset=0
+  &search=photo
+  &mime_type=image/jpeg
+\`\`\`
+
+#### **4. Get File Details**
+\`\`\`
+GET /api/database/{databaseId}/storage/files/{fileId}
+\`\`\`
+
+#### **5. Delete File**
+\`\`\`
+DELETE /api/database/{databaseId}/storage/files/{fileId}
+\`\`\`
+
+---
+
+### **Public API (API Key Required)**
+
+#### **Upload File (External Apps)**
+\`\`\`
+POST /api/v1/databases/{databaseId}/storage/upload
+Authorization: Bearer YOUR_API_KEY
+Content-Type: multipart/form-data
+\`\`\`
+
+---
+
+## 💻 Usage Examples
+
+### **JavaScript/TypeScript (External App)**
+
+\`\`\`typescript
+// Upload file
+async function uploadFile(file: File, isPublic: boolean = true) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('is_public', isPublic.toString());
+  formData.append('metadata', JSON.stringify({
+    uploaded_from: 'my-app',
+    tags: ['profile', 'avatar']
+  }));
+
+  const response = await fetch(
+    'https://pipilot.dev/api/v1/databases/YOUR_DB_ID/storage/upload',
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer YOUR_API_KEY',
+      },
+      body: formData,
+    }
+  );
+
+  const data = await response.json();
+  
+  if (data.success) {
+    console.log('File URL:', data.file.url);
+    return data.file;
+  } else {
+    throw new Error(data.error);
+  }
+}
+\`\`\`
+
+---
+
+## 🎨 Allowed File Types
+
+### **Images**
+- JPEG/JPG, PNG, GIF, WebP, SVG
+
+### **Documents**
+- PDF, Microsoft Word (.doc, .docx), Microsoft Excel (.xls, .xlsx), Text files (.txt), CSV
+
+### **Media**
+- Videos (.mp4, .mpeg, .mov), Audio (.mp3, .wav, .ogg)
+
+### **Other**
+- JSON files
+
+---
+
+## 🔒 Security Features
+
+### **Row Level Security (RLS)**
+\`\`\`sql
+-- Users can only access files in their databases
+CREATE POLICY "Users can manage their storage files"
+  ON storage_files
+  FOR ALL
+  USING (
+    bucket_id IN (
+      SELECT sb.id FROM storage_buckets sb
+      INNER JOIN databases d ON sb.database_id = d.id
+      WHERE d.user_id = auth.uid()::text
+    )
+  );
+\`\`\`
+
+### **File Type Validation**
+Only allowed MIME types can be uploaded. Server validates before storing.
+
+### **Size Limits**
+- **Per file**: 10MB maximum
+- **Per bucket**: 500MB total
+- Enforced before upload
+
+---
+
+## 📊 Storage Tracking
+
+### **Automatic Usage Updates**
+\`\`\`sql
+-- Trigger automatically updates bucket usage
+CREATE TRIGGER update_bucket_usage_trigger
+  AFTER INSERT OR UPDATE OR DELETE ON storage_files
+  FOR EACH ROW
+  EXECUTE FUNCTION update_bucket_usage();
+\`\`\`
+
+---
+
+## 🎯 Summary
+
+### **What Was Built**
+
+✅ **Database Schema** - Tables, triggers, RLS policies  
+✅ **Storage Library** - Reusable functions for file operations  
+✅ **Dashboard API** - 5 endpoints for file management  
+✅ **Public API** - External app integration  
+✅ **Security** - RLS, validation, rate limiting  
+✅ **Documentation** - Complete usage guide  
+
+### **What Users Get**
+
+- **500MB storage** per database
+- **Secure file uploads** from their apps
+- **Public & private files** support
+- **CDN delivery** for fast access
+- **Automatic tracking** of usage
+- **Simple API** similar to Supabase Storage
+
+---
+
+**Implemented by**: Optima AI  
+**Date**: October 7, 2025  
+**Status**: ✅ Complete & Ready for Testing`,
+      fileType: 'markdown',
+      type: 'markdown',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'USER_AUTHENTICATION_README.md',
+      path: 'USER_AUTHENTICATION_README.md',
+      content: `# 🔐 User Authentication System
+
+Complete authentication system for your app users using the auto-generated \`users\` table in your pipilot.dev database.
+
+---
+
+## 📋 Overview
+
+The authentication system provides secure user signup, login, token verification, and token refresh capabilities for applications hosted on **Vercel, Netlify, or any platform**. 
+
+### **Two-Layer Security Model**
+
+1. **API Key**: Authenticates your application (obtained from pipilot.dev dashboard)
+2. **JWT Token**: Authenticates individual users of your application
+
+---
+
+## 🏗️ Architecture
+
+\`\`\`
+Your App (Vercel/Netlify)
+    ↓ [API Key in header]
+pipilot.dev API
+    ↓ [Validates API key + Rate limiting]
+Your Database (users table)
+    ↓ [Returns JWT tokens]
+Your App's Users
+\`\`\`
+
+---
+
+## 🚀 Quick Start
+
+### **1. Get Your API Key**
+
+1. Log into your [pipilot.dev dashboard](https://pipilot.dev/dashboard)
+2. Navigate to your database
+3. Go to **API Keys** tab
+4. Click **Generate API Key**
+5. Copy and save your API key securely
+
+### **2. Store API Key Securely**
+
+**Vercel:**
+\`\`\`bash
+vercel env add PIPILOT_API_KEY
+\`\`\`
+
+**Netlify:**
+\`\`\`bash
+netlify env:set PIPILOT_API_KEY your_api_key_here
+\`\`\`
+
+**.env.local (Development):**
+\`\`\`bash
+PIPILOT_API_KEY=pk_live_your_api_key_here
+PIPILOT_DATABASE_ID=your_database_id_here
+\`\`\`
+
+---
+
+## 📡 API Endpoints
+
+Base URL: \`https://pipilot.dev/api/v1/databases/{databaseId}/auth\`
+
+### **1. User Signup**
+
+**Endpoint:** \`POST /signup\`
+
+**Headers:**
+\`\`\`http
+Authorization: Bearer YOUR_API_KEY
+Content-Type: application/json
+\`\`\`
+
+**Request Body:**
+\`\`\`json
+{
+  "email": "user@example.com",
+  "password": "SecurePass123",
+  "full_name": "John Doe",
+  "avatar_url": "https://example.com/avatar.jpg"
+}
+\`\`\`
+
+**Response (201):**
+\`\`\`json
+{
+  "message": "User registered successfully",
+  "user": {
+    "id": "uuid-here",
+    "email": "user@example.com",
+    "full_name": "John Doe",
+    "avatar_url": "https://example.com/avatar.jpg",
+    "created_at": "2025-01-15T12:00:00Z",
+    "updated_at": "2025-01-15T12:00:00Z"
+  },
+  "tokens": {
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expires_in": 86400,
+    "token_type": "Bearer"
+  }
+}
+\`\`\`
+
+**Password Requirements:**
+- Minimum 8 characters
+- At least one uppercase letter
+- At least one lowercase letter
+- At least one number
+
+---
+
+### **2. User Login**
+
+**Endpoint:** \`POST /login\`
+
+**Request Body:**
+\`\`\`json
+{
+  "email": "user@example.com",
+  "password": "SecurePass123"
+}
+\`\`\`
+
+**Response (200):**
+\`\`\`json
+{
+  "message": "Login successful",
+  "user": {
+    "id": "uuid-here",
+    "email": "user@example.com",
+    "full_name": "John Doe",
+    "avatar_url": "https://example.com/avatar.jpg",
+    "last_login": "2025-01-15T12:30:00Z"
+  },
+  "tokens": {
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expires_in": 86400,
+    "token_type": "Bearer"
+  }
+}
+\`\`\`
+
+---
+
+### **3. Verify Token**
+
+**Endpoint:** \`POST /verify\`
+
+**Request Body:**
+\`\`\`json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+\`\`\`
+
+**Response (200):**
+\`\`\`json
+{
+  "valid": true,
+  "user": {
+    "id": "uuid-here",
+    "email": "user@example.com",
+    "full_name": "John Doe",
+    "avatar_url": "https://example.com/avatar.jpg"
+  },
+  "payload": {
+    "userId": "uuid-here",
+    "email": "user@example.com",
+    "databaseId": "your-database-id",
+    "iat": 1705320000,
+    "exp": 1705406400
+  }
+}
+\`\`\`
+
+---
+
+### **4. Refresh Token**
+
+**Endpoint:** \`POST /refresh\`
+
+**Request Body:**
+\`\`\`json
+{
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+\`\`\`
+
+---
+
+## 💻 Implementation Examples
+
+### **Next.js 14 (App Router)**
+
+#### **1. Create Auth Service**
+
+\`lib/auth.ts\`:
+\`\`\`typescript
+const API_BASE = 'https://pipilot.dev/api/v1/databases';
+const DATABASE_ID = process.env.NEXT_PUBLIC_PIPILOT_DATABASE_ID!;
+const API_KEY = process.env.PIPILOT_API_KEY!;
+
+interface AuthResponse {
+  user: {
+    id: string;
+    email: string;
+    full_name: string;
+    avatar_url?: string;
+  };
+  tokens: {
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+    token_type: string;
+  };
+}
+
+export async function signup(
+  email: string,
+  password: string,
+  full_name: string
+): Promise<AuthResponse> {
+  const response = await fetch(\`\${API_BASE}/\${DATABASE_ID}/auth/signup\`, {
+    method: 'POST',
+    headers: {
+      'Authorization': \`Bearer \${API_KEY}\`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email, password, full_name }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Signup failed');
+  }
+
+  return response.json();
+}
+
+export async function login(
+  email: string,
+  password: string
+): Promise<AuthResponse> {
+  const response = await fetch(\`\${API_BASE}/\${DATABASE_ID}/auth/login\`, {
+    method: 'POST',
+    headers: {
+      'Authorization': \`Bearer \${API_KEY}\`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Login failed');
+  }
+
+  return response.json();
+}
+
+export async function verifyToken(token: string) {
+  const response = await fetch(\`\${API_BASE}/\${DATABASE_ID}/auth/verify\`, {
+    method: 'POST',
+    headers: {
+      'Authorization': \`Bearer \${API_KEY}\`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ token }),
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return response.json();
+}
+
+export async function refreshToken(refresh_token: string): Promise<AuthResponse> {
+  const response = await fetch(\`\${API_BASE}/\${DATABASE_ID}/auth/refresh\`, {
+    method: 'POST',
+    headers: {
+      'Authorization': \`Bearer \${API_KEY}\`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ refresh_token }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Token refresh failed');
+  }
+
+  return response.json();
+}
+\`\`\`
+
+#### **2. Create Auth Context**
+
+\`contexts/AuthContext.tsx\`:
+\`\`\`typescript
+'use client';
+
+import { createContext, useContext, useState, useEffect } from 'react';
+import { signup, login, verifyToken, refreshToken } from '@/lib/auth';
+
+interface User {
+  id: string;
+  email: string;
+  full_name: string;
+  avatar_url?: string;
+}
+
+interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+  signup: (email: string, password: string, full_name: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => void;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check if user is logged in on mount
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      verifyToken(token).then((data) => {
+        if (data && data.valid) {
+          setUser(data.user);
+        } else {
+          // Try to refresh token
+          const refresh = localStorage.getItem('refresh_token');
+          if (refresh) {
+            refreshToken(refresh)
+              .then((response) => {
+                localStorage.setItem('access_token', response.tokens.access_token);
+                setUser(response.user);
+              })
+              .catch(() => {
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('refresh_token');
+              });
+          }
+        }
+        setLoading(false);
+      });
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleSignup = async (email: string, password: string, full_name: string) => {
+    const response = await signup(email, password, full_name);
+    localStorage.setItem('access_token', response.tokens.access_token);
+    localStorage.setItem('refresh_token', response.tokens.refresh_token);
+    setUser(response.user);
+  };
+
+  const handleLogin = async (email: string, password: string) => {
+    const response = await login(email, password);
+    localStorage.setItem('access_token', response.tokens.access_token);
+    localStorage.setItem('refresh_token', response.tokens.refresh_token);
+    setUser(response.user);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    setUser(null);
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        signup: handleSignup,
+        login: handleLogin,
+        logout: handleLogout,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
+}
+\`\`\`
+
+---
+
+### **React (Vite) Example**
+
+#### **Auth Hook**
+
+\`hooks/useAuth.js\`:
+\`\`\`javascript
+import { useState, useEffect, createContext, useContext } from 'react';
+
+const API_BASE = 'https://pipilot.dev/api/v1/databases';
+const DATABASE_ID = import.meta.env.VITE_PIPILOT_DATABASE_ID;
+const API_KEY = import.meta.env.VITE_PIPILOT_API_KEY;
+
+const AuthContext = createContext();
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      fetch(\`\${API_BASE}/\${DATABASE_ID}/auth/verify\`, {
+        method: 'POST',
+        headers: {
+          'Authorization': \`Bearer \${API_KEY}\`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token }),
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.valid) {
+            setUser(data.user);
+          }
+          setLoading(false);
+        })
+        .catch(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  const signup = async (email, password, full_name) => {
+    const response = await fetch(\`\${API_BASE}/\${DATABASE_ID}/auth/signup\`, {
+      method: 'POST',
+      headers: {
+        'Authorization': \`Bearer \${API_KEY}\`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password, full_name }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error);
+    }
+
+    const data = await response.json();
+    localStorage.setItem('access_token', data.tokens.access_token);
+    localStorage.setItem('refresh_token', data.tokens.refresh_token);
+    setUser(data.user);
+  };
+
+  const login = async (email, password) => {
+    const response = await fetch(\`\${API_BASE}/\${DATABASE_ID}/auth/login\`, {
+      method: 'POST',
+      headers: {
+        'Authorization': \`Bearer \${API_KEY}\`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error);
+    }
+
+    const data = await response.json();
+    localStorage.setItem('access_token', data.tokens.access_token);
+    localStorage.setItem('refresh_token', data.tokens.refresh_token);
+    setUser(data.user);
+  };
+
+  const logout = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    setUser(null);
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, loading, signup, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  return useContext(AuthContext);
+}
+\`\`\`
+
+---
+
+## 🔒 Security Best Practices
+
+### **1. Store Tokens Securely**
+
+✅ **DO:**
+- Use \`localStorage\` or \`sessionStorage\` for web apps
+- Use secure storage (Keychain/Keystore) for mobile apps
+- Use \`httpOnly\` cookies if possible (requires backend proxy)
+
+❌ **DON'T:**
+- Store tokens in plain text files
+- Expose tokens in URLs or logs
+- Commit tokens to version control
+
+### **2. Handle Token Expiration**
+
+\`\`\`typescript
+async function makeAuthenticatedRequest(url: string, options: RequestInit = {}) {
+  let token = localStorage.getItem('access_token');
+  
+  // Add token to request
+  const headers = {
+    ...options.headers,
+    'Authorization': \`Bearer \${token}\`,
+  };
+
+  let response = await fetch(url, { ...options, headers });
+
+  // If token expired, try refreshing
+  if (response.status === 401) {
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (refreshToken) {
+      const refreshResponse = await refreshToken(refreshToken);
+      localStorage.setItem('access_token', refreshResponse.tokens.access_token);
+      
+      // Retry original request with new token
+      headers['Authorization'] = \`Bearer \${refreshResponse.tokens.access_token}\`;
+      response = await fetch(url, { ...options, headers });
+    }
+  }
+
+  return response;
+}
+\`\`\`
+
+---
+
+## 🛡️ Error Handling
+
+### **Common Error Responses**
+
+#### **400 Bad Request**
+\`\`\`json
+{
+  "error": "Invalid email format"
+}
+\`\`\`
+
+#### **409 Conflict**
+\`\`\`json
+{
+  "error": "User with this email already exists"
+}
+\`\`\`
+
+#### **429 Too Many Requests**
+\`\`\`json
+{
+  "error": "Rate limit exceeded",
+  "limit": 1000,
+  "usage": 1000,
+  "reset_in": "1 hour"
+}
+\`\`\`
+
+---
+
+## 📊 Token Structure
+
+### **JWT Payload**
+
+\`\`\`json
+{
+  "userId": "uuid-here",
+  "email": "user@example.com",
+  "databaseId": "your-database-id",
+  "iat": 1705320000,
+  "exp": 1705406400
+}
+\`\`\`
+
+### **Token Expiration**
+
+- **Access Token**: 24 hours
+- **Refresh Token**: 7 days
+
+---
+
+## 🧪 Testing with cURL
+
+### **Signup**
+\`\`\`bash
+curl -X POST https://pipilot.dev/api/v1/databases/YOUR_DB_ID/auth/signup \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "email": "test@example.com",
+    "password": "TestPass123",
+    "full_name": "Test User"
+  }'
+\`\`\`
+
+### **Login**
+\`\`\`bash
+curl -X POST https://pipilot.dev/api/v1/databases/YOUR_DB_ID/auth/login \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "email": "test@example.com",
+    "password": "TestPass123"
+  }'
+\`\`\`
+
+### **Verify Token**
+\`\`\`bash
+curl -X POST https://pipilot.dev/api/v1/databases/YOUR_DB_ID/auth/verify \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }'
+\`\`\`
+
+---
+
+## 🚨 Troubleshooting
+
+### **"Invalid API key format"**
+- Ensure your API key starts with \`pk_live_\` or \`pk_test_\`
+- Check that you're using the correct API key from your dashboard
+
+### **"Password does not meet requirements"**
+- Password must be at least 8 characters
+- Must contain uppercase, lowercase, and number
+
+### **"User with this email already exists"**
+- Email is already registered
+- Use login endpoint instead
+- Or implement password reset flow
+
+### **"Invalid or expired token"**
+- Access token expired after 24 hours
+- Use refresh token to get new access token
+- Re-authenticate if refresh token expired
+
+---
+
+## 💡 Next Steps
+
+1. **Test authentication flow** with cURL or Postman
+2. **Implement signup/login** in your frontend
+3. **Add token refresh logic** for seamless UX
+4. **Protect routes** using authentication middleware
+5. **Customize users table** with additional fields as needed
+
+---
+
+**Built with ❤️ by the pipilot.dev team**`,
+      fileType: 'markdown',
+      type: 'markdown',
       size: 0,
       isDirectory: false
     },
@@ -8049,7 +9398,1374 @@ export { useTheme } from './useTheme'`,
       type: 'typescript',
       size: 0,
       isDirectory: false
+    },
+    {
+      name: 'STORAGE_SYSTEM_IMPLEMENTATION.md',
+      path: 'STORAGE_SYSTEM_IMPLEMENTATION.md',
+      content: `# 📦 File Storage System - Complete Implementation
+
+## 🎯 Overview
+
+Implemented a complete file storage system similar to Supabase Storage, allowing users to store and manage files (images, documents, videos, etc.) in their databases.
+
+---
+
+## ✨ Key Features
+
+### **Storage Capabilities**
+- ✅ **500MB per database** - Each database gets 500MB of storage
+- ✅ **10MB max file size** - Individual files up to 10MB
+- ✅ **Multiple file types** - Images, PDFs, documents, videos, audio
+- ✅ **Public & private files** - Control file access
+- ✅ **Signed URLs** - Secure temporary access to private files
+- ✅ **CDN delivery** - Fast file delivery via Supabase CDN
+- ✅ **Automatic usage tracking** - Real-time storage usage monitoring
+
+### **Security Features**
+- ✅ **Row Level Security (RLS)** - Users can only access their files
+- ✅ **File type validation** - Only allowed types can be uploaded
+- ✅ **Size limits enforced** - Prevents storage abuse
+- ✅ **API key authentication** - Secure external access
+- ✅ **Rate limiting** - Prevents API abuse
+
+---
+
+## 🏗️ Architecture
+
+### **Database Schema**
+
+\`\`\`
+storage_buckets
+├── id (UUID)
+├── database_id (FK → databases.id)
+├── name (TEXT)
+├── size_limit_bytes (500MB)
+├── current_usage_bytes
+├── is_public (BOOLEAN)
+└── timestamps
+
+storage_files
+├── id (UUID)
+├── bucket_id (FK → storage_buckets.id)
+├── name (generated unique name)
+├── original_name (user's filename)
+├── path (Supabase Storage path)
+├── size_bytes
+├── mime_type
+├── is_public
+├── metadata (JSONB)
+└── timestamps
+\`\`\`
+
+### **Supabase Storage Structure**
+
+\`\`\`
+pipilot-storage (Master Bucket)
+├── db_1_myapp/
+│   ├── abc123.jpg
+│   ├── def456.pdf
+│   └── ghi789.mp4
+├── db_2_webapp/
+│   ├── xyz123.png
+│   └── mno456.docx
+└── ...
+\`\`\`
+
+---
+
+## 📡 API Endpoints
+
+### **Dashboard API (Authenticated Users)**
+
+#### **1. Get Storage Info**
+\`\`\`
+GET /api/database/{databaseId}/storage
+\`\`\`
+
+Returns bucket info, usage stats, and recent files.
+
+**Response:**
+\`\`\`json
+{
+  "bucket": {
+    "id": "uuid",
+    "name": "db_1_myapp",
+    "size_limit_bytes": 524288000,
+    "current_usage_bytes": 104857600,
+    "is_public": false
+  },
+  "stats": {
+    "file_count": 25,
+    "usage_percentage": 20,
+    "available_bytes": 419430400
+  },
+  "files": [...]
+}
+\`\`\`
+
+#### **2. Upload File**
+\`\`\`
+POST /api/database/{databaseId}/storage/upload
+Content-Type: multipart/form-data
+\`\`\`
+
+**Form Data:**
+- \`file\` - The file to upload
+- \`is_public\` - "true" or "false"
+- \`metadata\` - JSON string (optional)
+
+**Response:**
+\`\`\`json
+{
+  "success": true,
+  "file": {
+    "id": "uuid",
+    "name": "abc123.jpg",
+    "original_name": "photo.jpg",
+    "size_bytes": 1048576,
+    "mime_type": "image/jpeg",
+    "url": "https://...",
+    "is_public": true,
+    "created_at": "2025-10-07T..."
+  }
+}
+\`\`\`
+
+#### **3. List Files**
+\`\`\`
+GET /api/database/{databaseId}/storage/files
+  ?limit=50
+  &offset=0
+  &search=photo
+  &mime_type=image/jpeg
+\`\`\`
+
+#### **4. Get File Details**
+\`\`\`
+GET /api/database/{databaseId}/storage/files/{fileId}
+\`\`\`
+
+#### **5. Delete File**
+\`\`\`
+DELETE /api/database/{databaseId}/storage/files/{fileId}
+\`\`\`
+
+---
+
+### **Public API (API Key Required)**
+
+#### **Upload File (External Apps)**
+\`\`\`
+POST /api/v1/databases/{databaseId}/storage/upload
+Authorization: Bearer YOUR_API_KEY
+Content-Type: multipart/form-data
+\`\`\`
+
+---
+
+## 💻 Usage Examples
+
+### **JavaScript/TypeScript (External App)**
+
+\`\`\`typescript
+// Upload file
+async function uploadFile(file: File, isPublic: boolean = true) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('is_public', isPublic.toString());
+  formData.append('metadata', JSON.stringify({
+    uploaded_from: 'my-app',
+    tags: ['profile', 'avatar']
+  }));
+
+  const response = await fetch(
+    'https://pipilot.dev/api/v1/databases/YOUR_DB_ID/storage/upload',
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer YOUR_API_KEY',
+      },
+      body: formData,
     }
+  );
+
+  const data = await response.json();
+  
+  if (data.success) {
+    console.log('File URL:', data.file.url);
+    return data.file;
+  } else {
+    throw new Error(data.error);
+  }
+}
+\`\`\`
+
+---
+
+## 🎨 Allowed File Types
+
+### **Images**
+- JPEG/JPG, PNG, GIF, WebP, SVG
+
+### **Documents**
+- PDF, Microsoft Word (.doc, .docx), Microsoft Excel (.xls, .xlsx), Text files (.txt), CSV
+
+### **Media**
+- Videos (.mp4, .mpeg, .mov), Audio (.mp3, .wav, .ogg)
+
+### **Other**
+- JSON files
+
+---
+
+## 🔒 Security Features
+
+### **Row Level Security (RLS)**
+\`\`\`sql
+-- Users can only access files in their databases
+CREATE POLICY "Users can manage their storage files"
+  ON storage_files
+  FOR ALL
+  USING (
+    bucket_id IN (
+      SELECT sb.id FROM storage_buckets sb
+      INNER JOIN databases d ON sb.database_id = d.id
+      WHERE d.user_id = auth.uid()::text
+    )
+  );
+\`\`\`
+
+### **File Type Validation**
+Only allowed MIME types can be uploaded. Server validates before storing.
+
+### **Size Limits**
+- **Per file**: 10MB maximum
+- **Per bucket**: 500MB total
+- Enforced before upload
+
+---
+
+## 📊 Storage Tracking
+
+### **Automatic Usage Updates**
+\`\`\`sql
+-- Trigger automatically updates bucket usage
+CREATE TRIGGER update_bucket_usage_trigger
+  AFTER INSERT OR UPDATE OR DELETE ON storage_files
+  FOR EACH ROW
+  EXECUTE FUNCTION update_bucket_usage();
+\`\`\`
+
+---
+
+## 🎯 Summary
+
+### **What Was Built**
+
+✅ **Database Schema** - Tables, triggers, RLS policies  
+✅ **Storage Library** - Reusable functions for file operations  
+✅ **Dashboard API** - 5 endpoints for file management  
+✅ **Public API** - External app integration  
+✅ **Security** - RLS, validation, rate limiting  
+✅ **Documentation** - Complete usage guide  
+
+### **What Users Get**
+
+- **500MB storage** per database
+- **Secure file uploads** from their apps
+- **Public & private files** support
+- **CDN delivery** for fast access
+- **Automatic tracking** of usage
+- **Simple API** similar to Supabase Storage
+
+---
+
+**Implemented by**: Optima AI  
+**Date**: October 7, 2025  
+**Status**: ✅ Complete & Ready for Testing`,
+      fileType: 'markdown',
+      type: 'markdown',
+      size: 0,
+      isDirectory: false
+    },
+    {
+      name: 'EXTERNAL_APP_INTEGRATION_GUIDE.md',
+      path: 'EXTERNAL_APP_INTEGRATION_GUIDE.md',
+      content: `# 🚀 Quick Start: API Keys for External Apps
+
+---
+
+## 📋 **IMPORTANT NOTICE FOR PIPILOT AI**
+
+**When integrating with a fresh database setup**, always provide the user with **exact table prompts** that they can pass to the Pipilot schema generator to create tables with the precise structure needed for their application.
+
+**These prompts must be provided in a separate file** (not just in conversation) so users can easily copy and paste them into the Pipilot schema generator.
+
+**Example file structure:**
+- Create a file named \`database_schema_prompts.txt\` or \`table_creation_prompts.md\`
+- Include detailed prompts for each table with exact field names, types, and relationships
+- Specify any required indexes, constraints, or default values
+
+**This ensures users get the exact database structure they need for seamless integration with their external applications.**
+
+---
+
+## For Users Building Apps on Vercel/Netlify
+
+### Step 1: Get Your API Key
+
+1. Go to: \`https://pipilot.dev/workspace/YOUR_WORKSPACE/database\`
+2. Click **API Keys** tab
+3. Click **Create API Key**
+4. Name it (e.g., "My Vercel App")
+5. **Copy the key immediately!** (shown only once)
+
+### Step 2: Get Your Database & Table IDs
+
+In the browser URL when viewing your table:
+\`\`\`
+https://pipilot.dev/workspace/123/database/tables/456
+                                      ^^^          ^^^
+                                  Database ID   Table ID
+\`\`\`
+
+### Step 3: Use in Your App
+
+#### **Next.js App (Vercel):**
+
+Create \`lib/database.ts\`:
+
+\`\`\`typescript
+const API_KEY = process.env.PIPILOT_API_KEY!;
+const DATABASE_ID = 'YOUR_DATABASE_ID';
+const BASE_URL = 'https://pipilot.dev/api/v1';
+
+export async function getRecords(tableId: string) {
+  const response = await fetch(
+    \`\${BASE_URL}/databases/\${DATABASE_ID}/tables/\${tableId}/records\`,
+    {
+      headers: {
+        'Authorization': \`Bearer \${API_KEY}\`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch records');
+  }
+  
+  return response.json();
+}
+
+export async function createRecord(tableId: string, data: any) {
+  const response = await fetch(
+    \`\${BASE_URL}/databases/\${DATABASE_ID}/tables/\${tableId}/records\`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': \`Bearer \${API_KEY}\`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ data })
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error('Failed to create record');
+  }
+  
+  return response.json();
+}
+
+export async function updateRecord(tableId: string, recordId: string, data: any) {
+  const response = await fetch(
+    \`\${BASE_URL}/databases/\${DATABASE_ID}/tables/\${tableId}/records/\${recordId}\`,
+    {
+      method: 'PUT',
+      headers: {
+        'Authorization': \`Bearer \${API_KEY}\`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ data })
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error('Failed to update record');
+  }
+  
+  return response.json();
+}
+
+export async function deleteRecord(tableId: string, recordId: string) {
+  const response = await fetch(
+    \`\${BASE_URL}/databases/\${DATABASE_ID}/tables/\${tableId}/records/\${recordId}\`,
+    {
+      method: 'DELETE',
+      headers: {
+        'Authorization': \`Bearer \${API_KEY}\`
+      }
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error('Failed to delete record');
+  }
+  
+  return response.json();
+}
+\`\`\`
+
+#### **Use in a Server Component:**
+
+\`\`\`typescript
+// app/users/page.tsx
+import { getRecords } from '@/lib/database';
+
+export default async function UsersPage() {
+  const { records } = await getRecords('YOUR_TABLE_ID');
+  
+  return (
+    <div>
+      <h1>Users</h1>
+      {records.map((record: any) => (
+        <div key={record.id}>
+          {record.data_json.name} - {record.data_json.email}
+        </div>
+      ))}
+    </div>
+  );
+}
+\`\`\`
+
+#### **Use in an API Route:**
+
+\`\`\`typescript
+// app/api/users/route.ts
+import { NextResponse } from 'next/server';
+import { createRecord } from '@/lib/database';
+
+export async function POST(request: Request) {
+  const body = await request.json();
+  
+  try {
+    const result = await createRecord('YOUR_TABLE_ID', {
+      name: body.name,
+      email: body.email
+    });
+    
+    return NextResponse.json(result);
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Failed to create user' },
+      { status: 500 }
+    );
+  }
+}
+\`\`\`
+
+### Step 4: Set Environment Variable
+
+Add to \`.env.local\`:
+
+\`\`\`env
+PIPILOT_API_KEY=sk_live_your_actual_key_here
+\`\`\`
+
+### Step 5: Deploy!
+
+\`\`\`bash
+# Vercel
+vercel env add PIPILOT_API_KEY
+vercel deploy
+
+# Netlify
+netlify env:set PIPILOT_API_KEY sk_live_your_key_here
+netlify deploy
+\`\`\`
+
+---
+
+## React Example (Client-Side)
+
+\`\`\`typescript
+'use client';
+
+import { useState, useEffect } from 'react';
+
+export default function UsersList() {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  async function fetchUsers() {
+    try {
+      // Call your API route (not directly to pipilot.dev to keep API key secret)
+      const response = await fetch('/api/users');
+      const data = await response.json();
+      setUsers(data.records);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (loading) return <div>Loading...</div>;
+
+  return (
+    <div>
+      {users.map((user: any) => (
+        <div key={user.id}>
+          {user.data_json.name}
+        </div>
+      ))}
+    </div>
+  );
+}
+\`\`\`
+
+---
+
+## Vanilla JavaScript Example
+
+\`\`\`html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Users</title>
+</head>
+<body>
+  <h1>Users</h1>
+  <div id="users"></div>
+
+  <script>
+    const API_KEY = 'sk_live_your_key_here'; // ⚠️ Don't expose in production!
+    const DATABASE_ID = 'YOUR_DATABASE_ID';
+    const TABLE_ID = 'YOUR_TABLE_ID';
+
+    async function fetchUsers() {
+      const response = await fetch(
+        \`https://pipilot.dev/api/v1/databases/\${DATABASE_ID}/tables/\${TABLE_ID}/records\`,
+        {
+          headers: {
+            'Authorization': \`Bearer \${API_KEY}\`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      const data = await response.json();
+      const usersDiv = document.getElementById('users');
+
+      data.records.forEach(record => {
+        const div = document.createElement('div');
+        div.textContent = \`\${record.data_json.name} - \${record.data_json.email}\`;
+        usersDiv.appendChild(div);
+      });
+    }
+
+    fetchUsers();
+  </script>
+</body>
+</html>
+\`\`\`
+
+---
+
+## Python Example
+
+\`\`\`python
+import requests
+import os
+
+API_KEY = os.getenv('PIPILOT_API_KEY')
+DATABASE_ID = 'YOUR_DATABASE_ID'
+TABLE_ID = 'YOUR_TABLE_ID'
+BASE_URL = 'https://pipilot.dev/api/v1'
+
+def get_records():
+    response = requests.get(
+        f'{BASE_URL}/databases/{DATABASE_ID}/tables/{TABLE_ID}/records',
+        headers={
+            'Authorization': f'Bearer {API_KEY}',
+            'Content-Type': 'application/json'
+        }
+    )
+    return response.json()
+
+def create_record(data):
+    response = requests.post(
+        f'{BASE_URL}/databases/{DATABASE_ID}/tables/{TABLE_ID}/records',
+        headers={
+            'Authorization': f'Bearer {API_KEY}',
+            'Content-Type': 'application/json'
+        },
+        json={'data': data}
+    )
+    return response.json()
+
+# Usage
+records = get_records()
+print(records)
+
+new_user = create_record({
+    'name': 'John Doe',
+    'email': 'john@example.com'
+})
+print(new_user)
+\`\`\`
+
+---
+
+## 🔒 Security Best Practices
+
+### ✅ DO:
+- Store API keys in environment variables
+- Use server-side API routes to proxy requests
+- Rotate keys periodically
+- Revoke compromised keys immediately
+- Use different keys for dev/staging/production
+
+### ❌ DON'T:
+- Commit API keys to Git
+- Expose keys in client-side code
+- Share keys publicly
+- Use the same key across multiple apps
+
+---
+
+## 📊 Rate Limits
+
+- **Default**: 1000 requests per hour
+- **Headers**: Check \`X-RateLimit-Remaining\` header
+- **On Exceeded**: Returns \`429 Too Many Requests\`
+
+---
+
+## 🆘 Troubleshooting
+
+### Error: "Invalid API key"
+- Check key format: Must start with \`sk_live_\`
+- Verify key hasn't been revoked
+- Ensure you're using the correct database ID
+
+### Error: "Rate limit exceeded"
+- Wait 1 hour or contact support to increase limit
+- Implement caching to reduce requests
+
+### Error: "Table not found"
+- Verify database ID and table ID in URL
+- Check table exists in pipilot.dev dashboard
+
+---
+
+## 💡 Tips
+
+1. **Cache responses**: Don't fetch same data repeatedly
+2. **Batch operations**: Create multiple records in a loop efficiently
+3. **Error handling**: Always handle API errors gracefully
+4. **Monitoring**: Track your API usage in the pipilot.dev dashboard
+
+---
+
+## 🎉 You're All Set!
+
+Your external apps can now interact with your pipilot.dev databases! 🚀`,
+      fileType: 'markdown',
+      type: 'markdown',
+      size: 0,
+      isDirectory: false
+
+    },
+    {
+      name: 'USER_AUTHENTICATION_README.md',
+      path: 'USER_AUTHENTICATION_README.md',
+      content: `# 🔐 User Authentication System
+
+Complete authentication system for your app users using the auto-generated \`users\` table in your pipilot.dev database.
+
+---
+
+## 📋 Overview
+
+The authentication system provides secure user signup, login, token verification, and token refresh capabilities for applications hosted on **Vercel, Netlify, or any platform**. 
+
+### **Two-Layer Security Model**
+
+1. **API Key**: Authenticates your application (obtained from pipilot.dev dashboard)
+2. **JWT Token**: Authenticates individual users of your application
+
+---
+
+## 🏗️ Architecture
+
+\`\`\`
+Your App (Vercel/Netlify)
+    ↓ [API Key in header]
+pipilot.dev API
+    ↓ [Validates API key + Rate limiting]
+Your Database (users table)
+    ↓ [Returns JWT tokens]
+Your App's Users
+\`\`\`
+
+---
+
+## 🚀 Quick Start
+
+### **1. Get Your API Key**
+
+1. Log into your [pipilot.dev dashboard](https://pipilot.dev/dashboard)
+2. Navigate to your database
+3. Go to **API Keys** tab
+4. Click **Generate API Key**
+5. Copy and save your API key securely
+
+### **2. Store API Key Securely**
+
+**Vercel:**
+\`\`\`bash
+vercel env add PIPILOT_API_KEY
+\`\`\`
+
+**Netlify:**
+\`\`\`bash
+netlify env:set PIPILOT_API_KEY your_api_key_here
+\`\`\`
+
+**.env.local (Development):**
+\`\`\`bash
+PIPILOT_API_KEY=pk_live_your_api_key_here
+PIPILOT_DATABASE_ID=your_database_id_here
+\`\`\`
+
+---
+
+## 📡 API Endpoints
+
+Base URL: \`https://pipilot.dev/api/v1/databases/{databaseId}/auth\`
+
+### **1. User Signup**
+
+**Endpoint:** \`POST /signup\`
+
+**Headers:**
+\`\`\`http
+Authorization: Bearer YOUR_API_KEY
+Content-Type: application/json
+\`\`\`
+
+**Request Body:**
+\`\`\`json
+{
+  "email": "user@example.com",
+  "password": "SecurePass123",
+  "full_name": "John Doe",
+  "avatar_url": "https://example.com/avatar.jpg"
+}
+\`\`\`
+
+**Response (201):**
+\`\`\`json
+{
+  "message": "User registered successfully",
+  "user": {
+    "id": "uuid-here",
+    "email": "user@example.com",
+    "full_name": "John Doe",
+    "avatar_url": "https://example.com/avatar.jpg",
+    "created_at": "2025-01-15T12:00:00Z",
+    "updated_at": "2025-01-15T12:00:00Z"
+  },
+  "tokens": {
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expires_in": 86400,
+    "token_type": "Bearer"
+  }
+}
+\`\`\`
+
+**Password Requirements:**
+- Minimum 8 characters
+- At least one uppercase letter
+- At least one lowercase letter
+- At least one number
+
+---
+
+### **2. User Login**
+
+**Endpoint:** \`POST /login\`
+
+**Request Body:**
+\`\`\`json
+{
+  "email": "user@example.com",
+  "password": "SecurePass123"
+}
+\`\`\`
+
+**Response (200):**
+\`\`\`json
+{
+  "message": "Login successful",
+  "user": {
+    "id": "uuid-here",
+    "email": "user@example.com",
+    "full_name": "John Doe",
+    "avatar_url": "https://example.com/avatar.jpg",
+    "last_login": "2025-01-15T12:30:00Z"
+  },
+  "tokens": {
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expires_in": 86400,
+    "token_type": "Bearer"
+  }
+}
+\`\`\`
+
+---
+
+### **3. Verify Token**
+
+**Endpoint:** \`POST /verify\`
+
+**Request Body:**
+\`\`\`json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+\`\`\`
+
+**Response (200):**
+\`\`\`json
+{
+  "valid": true,
+  "user": {
+    "id": "uuid-here",
+    "email": "user@example.com",
+    "full_name": "John Doe",
+    "avatar_url": "https://example.com/avatar.jpg"
+  },
+  "payload": {
+    "userId": "uuid-here",
+    "email": "user@example.com",
+    "databaseId": "your-database-id",
+    "iat": 1705320000,
+    "exp": 1705406400
+  }
+}
+\`\`\`
+
+---
+
+### **4. Refresh Token**
+
+**Endpoint:** \`POST /refresh\`
+
+**Request Body:**
+\`\`\`json
+{
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+\`\`\`
+
+---
+
+## 💻 Implementation Examples
+
+### **Next.js 14 (App Router)**
+
+#### **1. Create Auth Service**
+
+\`lib/auth.ts\`:
+\`\`\`typescript
+const API_BASE = 'https://pipilot.dev/api/v1/databases';
+const DATABASE_ID = process.env.NEXT_PUBLIC_PIPILOT_DATABASE_ID!;
+const API_KEY = process.env.PIPILOT_API_KEY!;
+
+interface AuthResponse {
+  user: {
+    id: string;
+    email: string;
+    full_name: string;
+    avatar_url?: string;
+  };
+  tokens: {
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+    token_type: string;
+  };
+}
+
+export async function signup(
+  email: string,
+  password: string,
+  full_name: string
+): Promise<AuthResponse> {
+  const response = await fetch(\`\${API_BASE}/\${DATABASE_ID}/auth/signup\`, {
+    method: 'POST',
+    headers: {
+      'Authorization': \`Bearer \${API_KEY}\`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email, password, full_name }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Signup failed');
+  }
+
+  return response.json();
+}
+
+export async function login(
+  email: string,
+  password: string
+): Promise<AuthResponse> {
+  const response = await fetch(\`\${API_BASE}/\${DATABASE_ID}/auth/login\`, {
+    method: 'POST',
+    headers: {
+      'Authorization': \`Bearer \${API_KEY}\`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Login failed');
+  }
+
+  return response.json();
+}
+
+export async function verifyToken(token: string) {
+  const response = await fetch(\`\${API_BASE}/\${DATABASE_ID}/auth/verify\`, {
+    method: 'POST',
+    headers: {
+      'Authorization': \`Bearer \${API_KEY}\`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ token }),
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return response.json();
+}
+
+export async function refreshToken(refresh_token: string): Promise<AuthResponse> {
+  const response = await fetch(\`\${API_BASE}/\${DATABASE_ID}/auth/refresh\`, {
+    method: 'POST',
+    headers: {
+      'Authorization': \`Bearer \${API_KEY}\`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ refresh_token }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Token refresh failed');
+  }
+
+  return response.json();
+}
+\`\`\`
+
+#### **2. Create Auth Context**
+
+\`contexts/AuthContext.tsx\`:
+\`\`\`typescript
+'use client';
+
+import { createContext, useContext, useState, useEffect } from 'react';
+import { signup, login, verifyToken, refreshToken } from '@/lib/auth';
+
+interface User {
+  id: string;
+  email: string;
+  full_name: string;
+  avatar_url?: string;
+}
+
+interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+  signup: (email: string, password: string, full_name: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => void;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check if user is logged in on mount
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      verifyToken(token).then((data) => {
+        if (data && data.valid) {
+          setUser(data.user);
+        } else {
+          // Try to refresh token
+          const refresh = localStorage.getItem('refresh_token');
+          if (refresh) {
+            refreshToken(refresh)
+              .then((response) => {
+                localStorage.setItem('access_token', response.tokens.access_token);
+                setUser(response.user);
+              })
+              .catch(() => {
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('refresh_token');
+              });
+          }
+        }
+        setLoading(false);
+      });
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleSignup = async (email: string, password: string, full_name: string) => {
+    const response = await signup(email, password, full_name);
+    localStorage.setItem('access_token', response.tokens.access_token);
+    localStorage.setItem('refresh_token', response.tokens.refresh_token);
+    setUser(response.user);
+  };
+
+  const handleLogin = async (email: string, password: string) => {
+    const response = await login(email, password);
+    localStorage.setItem('access_token', response.tokens.access_token);
+    localStorage.setItem('refresh_token', response.tokens.refresh_token);
+    setUser(response.user);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    setUser(null);
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        signup: handleSignup,
+        login: handleLogin,
+        logout: handleLogout,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
+}
+\`\`\`
+
+---
+
+### **React (Vite) Example**
+
+#### **Auth Hook**
+
+\`hooks/useAuth.js\`:
+\`\`\`javascript
+import { useState, useEffect, createContext, useContext } from 'react';
+
+const API_BASE = 'https://pipilot.dev/api/v1/databases';
+const DATABASE_ID = import.meta.env.VITE_PIPILOT_DATABASE_ID;
+const API_KEY = import.meta.env.VITE_PIPILOT_API_KEY;
+
+const AuthContext = createContext();
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      fetch(\`\${API_BASE}/\${DATABASE_ID}/auth/verify\`, {
+        method: 'POST',
+        headers: {
+          'Authorization': \`Bearer \${API_KEY}\`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token }),
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.valid) {
+            setUser(data.user);
+          }
+          setLoading(false);
+        })
+        .catch(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  const signup = async (email, password, full_name) => {
+    const response = await fetch(\`\${API_BASE}/\${DATABASE_ID}/auth/signup\`, {
+      method: 'POST',
+      headers: {
+        'Authorization': \`Bearer \${API_KEY}\`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password, full_name }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error);
+    }
+
+    const data = await response.json();
+    localStorage.setItem('access_token', data.tokens.access_token);
+    localStorage.setItem('refresh_token', data.tokens.refresh_token);
+    setUser(data.user);
+  };
+
+  const login = async (email, password) => {
+    const response = await fetch(\`\${API_BASE}/\${DATABASE_ID}/auth/login\`, {
+      method: 'POST',
+      headers: {
+        'Authorization': \`Bearer \${API_KEY}\`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error);
+    }
+
+    const data = await response.json();
+    localStorage.setItem('access_token', data.tokens.access_token);
+    localStorage.setItem('refresh_token', data.tokens.refresh_token);
+    setUser(data.user);
+  };
+
+  const logout = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    setUser(null);
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, loading, signup, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  return useContext(AuthContext);
+}
+\`\`\`
+
+---
+
+## 🔒 Security Best Practices
+
+### **1. Store Tokens Securely**
+
+✅ **DO:**
+- Use \`localStorage\` or \`sessionStorage\` for web apps
+- Use secure storage (Keychain/Keystore) for mobile apps
+- Use \`httpOnly\` cookies if possible (requires backend proxy)
+
+❌ **DON'T:**
+- Store tokens in plain text files
+- Expose tokens in URLs or logs
+- Commit tokens to version control
+
+### **2. Handle Token Expiration**
+
+\`\`\`typescript
+async function makeAuthenticatedRequest(url: string, options: RequestInit = {}) {
+  let token = localStorage.getItem('access_token');
+  
+  // Add token to request
+  const headers = {
+    ...options.headers,
+    'Authorization': \`Bearer \${token}\`,
+  };
+
+  let response = await fetch(url, { ...options, headers });
+
+  // If token expired, try refreshing
+  if (response.status === 401) {
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (refreshToken) {
+      const refreshResponse = await refreshToken(refreshToken);
+      localStorage.setItem('access_token', refreshResponse.tokens.access_token);
+      
+      // Retry original request with new token
+      headers['Authorization'] = \`Bearer \${refreshResponse.tokens.access_token}\`;
+      response = await fetch(url, { ...options, headers });
+    }
+  }
+
+  return response;
+}
+\`\`\`
+
+---
+
+## 🛡️ Error Handling
+
+### **Common Error Responses**
+
+#### **400 Bad Request**
+\`\`\`json
+{
+  "error": "Invalid email format"
+}
+\`\`\`
+
+#### **409 Conflict**
+\`\`\`json
+{
+  "error": "User with this email already exists"
+}
+\`\`\`
+
+#### **429 Too Many Requests**
+\`\`\`json
+{
+  "error": "Rate limit exceeded",
+  "limit": 1000,
+  "usage": 1000,
+  "reset_in": "1 hour"
+}
+\`\`\`
+
+---
+
+## 📊 Token Structure
+
+### **JWT Payload**
+
+\`\`\`json
+{
+  "userId": "uuid-here",
+  "email": "user@example.com",
+  "databaseId": "your-database-id",
+  "iat": 1705320000,
+  "exp": 1705406400
+}
+\`\`\`
+
+### **Token Expiration**
+
+- **Access Token**: 24 hours
+- **Refresh Token**: 7 days
+
+---
+
+## 🧪 Testing with cURL
+
+### **Signup**
+\`\`\`bash
+curl -X POST https://pipilot.dev/api/v1/databases/YOUR_DB_ID/auth/signup \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "email": "test@example.com",
+    "password": "TestPass123",
+    "full_name": "Test User"
+  }'
+\`\`\`
+
+### **Login**
+\`\`\`bash
+curl -X POST https://pipilot.dev/api/v1/databases/YOUR_DB_ID/auth/login \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "email": "test@example.com",
+    "password": "TestPass123"
+  }'
+\`\`\`
+
+### **Verify Token**
+\`\`\`bash
+curl -X POST https://pipilot.dev/api/v1/databases/YOUR_DB_ID/auth/verify \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }'
+\`\`\`
+
+---
+
+## 🚨 Troubleshooting
+
+### **"Invalid API key format"**
+- Ensure your API key starts with \`pk_live_\` or \`pk_test_\`
+- Check that you're using the correct API key from your dashboard
+
+### **"Password does not meet requirements"**
+- Password must be at least 8 characters
+- Must contain uppercase, lowercase, and number
+
+### **"User with this email already exists"**
+- Email is already registered
+- Use login endpoint instead
+- Or implement password reset flow
+
+### **"Invalid or expired token"**
+- Access token expired after 24 hours
+- Use refresh token to get new access token
+- Re-authenticate if refresh token expired
+
+---
+
+## 💡 Next Steps
+
+1. **Test authentication flow** with cURL or Postman
+2. **Implement signup/login** in your frontend
+3. **Add token refresh logic** for seamless UX
+4. **Protect routes** using authentication middleware
+5. **Customize users table** with additional fields as needed
+
+---
+
+**Built with ❤️ by the pipilot.dev team**`,
+      fileType: 'markdown',
+      type: 'markdown',
+      size: 0,
+      isDirectory: false
+    },
   ]
 
   /**
