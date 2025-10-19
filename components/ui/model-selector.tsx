@@ -39,7 +39,7 @@ export function ModelSelector({
     ['grok-3-mini', 'PiPilot 4 Flash']
   ])
   
-  const filteredModels = chatModels.filter(model => Object.keys(displayNameMap).includes(model.id))
+  const filteredModels = chatModels.filter(model => displayNameMap.has(model.id))
   
   // Group models by provider for better organization
   const modelsByProvider = filteredModels.reduce((acc, model) => {
