@@ -813,7 +813,7 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
     }
   }, [currentUserId])
 
-  // Fetch user repositories when deployment mode changes to 'existing'
+  // Fetch user repositories when deployment mode requires them
   useEffect(() => {
     if (githubForm.deploymentMode === 'existing' && storedTokens.github && userRepos.length === 0) {
       fetchUserGitHubRepos()
@@ -1101,65 +1101,7 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
       let repoOwner: string
       let repoName: string
 
-      if (githubForm.deploymentMode === 'new') {
-        // Create new GitHub repository
-        setDeploymentState(prev => ({ ...prev, currentStep: 'connecting' }))
-
-        const repoResponse = await fetch('/api/github/create-repo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: githubForm.repoName,
-            description: githubForm.repoDescription,
-            private: githubForm.isPrivate,
-            token: storedTokens.github,
-          })
-        })
-
-        if (!repoResponse.ok) {
-          const errorData = await repoResponse.json()
-          console.error('Repository creation failed:', errorData)
-
-          // Provide specific error messages based on status code
-          if (repoResponse.status === 422) {
-            const isAlreadyExists = errorData.error?.toLowerCase().includes('already exist') || 
-                                   errorData.error?.toLowerCase().includes('name already exists')
-            
-            toast({
-              title: "Repository Creation Failed",
-              description: isAlreadyExists 
-                ? "Repository already exists. Try switching to 'Push to existing repository' mode instead."
-                : (errorData.error || "Repository name may already exist or is invalid. Try using a different name."),
-              variant: "destructive"
-            })
-          } else if (repoResponse.status === 401) {
-            toast({
-              title: "Authentication Failed",
-              description: "Invalid GitHub token. Please check your token and try again.",
-              variant: "destructive"
-            })
-          } else if (repoResponse.status === 403) {
-            toast({
-              title: "Access Forbidden",
-              description: "You don't have permission to create repositories. Check your token permissions.",
-              variant: "destructive"
-            })
-          } else {
-            toast({
-              title: "Repository Creation Failed",
-              description: errorData.error || "Failed to create repository",
-              variant: "destructive"
-            })
-          }
-
-          setDeploymentState(prev => ({ ...prev, isDeploying: false }))
-          return
-        }
-
-        repoData = await repoResponse.json()
-        repoOwner = repoData.fullName.split('/')[0]
-        repoName = repoData.name
-      } else if (githubForm.deploymentMode === 'push') {
+      if (githubForm.deploymentMode === 'push') {
         // Use connected repository for push
         const connectedRepo = selectedProject.githubRepoUrl?.split('/').slice(-2).join('/') || ''
         if (!connectedRepo) {
@@ -1179,7 +1121,7 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
         }
         repoOwner = connectedRepo.split('/')[0]
         repoName = connectedRepo.split('/')[1]
-      } else {
+      } else if (githubForm.deploymentMode === 'existing') {
         // Use existing repository
         const selectedRepo = userRepos.find(repo => repo.fullName === githubForm.selectedRepo)
         if (!selectedRepo) {
@@ -1200,6 +1142,7 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
         repoOwner = selectedRepo.fullName.split('/')[0]
         repoName = selectedRepo.name
       }
+      // For 'new' mode, repo creation is handled by /api/deploy/github
 
       setDeploymentState(prev => ({ ...prev, currentStep: 'deploying' }))
 
@@ -1213,10 +1156,10 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
         body: JSON.stringify({
           projectId: selectedProject.id,
           githubToken: storedTokens.github,
-          repoName: githubForm.deploymentMode === 'new' ? githubForm.repoName : repoName,
-          repoDescription: githubForm.deploymentMode === 'new' ? githubForm.repoDescription : '',
+          repoName: githubForm.repoName,
+          repoDescription: githubForm.repoDescription,
           files: projectFiles,
-          mode: githubForm.deploymentMode === 'new' ? 'create' : 'push',
+          mode: githubForm.deploymentMode,
           existingRepo: githubForm.deploymentMode === 'existing' ? repoData.fullName : undefined,
           commitMessage: githubForm.commitMessage || 'Update project files',
         })
