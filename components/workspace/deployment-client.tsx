@@ -317,8 +317,8 @@ export default function DeploymentClient() {
 
   const [netlifyForm, setNetlifyForm] = useState({
     siteName: '',
-    buildCommand: 'npm run build',
-    publishDir: 'out',
+    buildCommand: '', // Let the API detect the build command dynamically
+    publishDir: '', // Let the API detect the publish directory dynamically
   })
 
   // Enhanced state variables
@@ -2237,12 +2237,23 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
 
                         const deployData = await deployResponse.json()
 
-                        // Update project with initial Vercel deployment info (no URL initially)
-                        await storageManager.updateWorkspace(selectedProject.id, {
+                        // Update project with initial Vercel deployment info
+                        const updateData: any = {
                           vercelProjectId: deployData.projectId || selectedProject.vercelProjectId,
                           deploymentStatus: deployData.needsUrlUpdate ? 'in_progress' : 'deployed',
                           lastActivity: new Date().toISOString(),
-                        })
+                        };
+
+                        // Store URLs appropriately
+                        if (isRedeploy) {
+                          // For redeploys, the URL is the live deployment URL
+                          updateData.vercelDeploymentUrl = deployData.url;
+                        } else {
+                          // For new deployments, the URL is the dashboard URL
+                          updateData.vercelDashboardUrl = deployData.url;
+                        }
+
+                        await storageManager.updateWorkspace(selectedProject.id, updateData);
 
                         // Create deployment record with building status
                         await storageManager.createDeployment({
@@ -2566,6 +2577,7 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
                             token: storedTokens.netlify,
                             workspaceId: selectedProject.id,
                             githubRepo: selectedRepoForNetlify,
+                            githubToken: storedTokens.github,
                             environmentVariables: envVars,
                           })
                         })
@@ -2577,17 +2589,29 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
 
                         const deployData = await deployResponse.json()
 
-                        // Update project with initial Netlify deployment info (no URL initially)
-                        await storageManager.updateWorkspace(selectedProject.id, {
+                        // Update project with initial Netlify deployment info
+                        const updateData: any = {
                           netlifySiteId: deployData.siteId,
                           deploymentStatus: deployData.needsUrlUpdate ? 'in_progress' : 'deployed',
                           lastActivity: new Date().toISOString(),
-                        })
+                        };
+
+                        // Store dashboard URL for management access
+                        if (deployData.url) {
+                          updateData.netlifyDashboardUrl = deployData.url; // Dashboard URL
+                        }
+
+                        // Store live URL if available immediately
+                        if (deployData.siteUrl) {
+                          updateData.netlifyDeploymentUrl = deployData.siteUrl; // Live deployment URL
+                        }
+
+                        await storageManager.updateWorkspace(selectedProject.id, updateData);
 
                         // Create deployment record with building status
                         await storageManager.createDeployment({
                           workspaceId: selectedProject.id,
-                          url: deployData.siteUrl || '', // Empty string initially
+                          url: deployData.siteUrl || '', // Live site URL (may be empty initially)
                           status: deployData.needsUrlUpdate ? 'building' : 'ready',
                           commitSha: deployData.commitSha || 'initial',
                           commitMessage: deployData.commitMessage || 'Deployed to Netlify',

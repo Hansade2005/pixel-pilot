@@ -170,6 +170,14 @@ export async function POST(request: NextRequest) {
     let projectData;
     let deploymentData;
 
+    // Validate GitHub repo format
+    if (!/^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+$/.test(githubRepo)) {
+      return NextResponse.json({
+        error: 'Invalid GitHub repository format. Use format: owner/repo',
+        code: 'INVALID_GITHUB_REPO'
+      }, { status: 400 });
+    }
+
     if (mode === 'redeploy' && existingProjectId) {
       // Redeploy to existing project
       console.log(`Redeploying to existing Vercel project: ${existingProjectId}`);
@@ -340,9 +348,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // For redeployment, we already have deploymentData from the trigger above
+    // For new deployments, get the user info to construct dashboard URL
+    let dashboardUrl = null;
     if (mode !== 'redeploy') {
-      // Trigger deployment directly via Vercel API (instead of relying on GitHub webhooks)
+      try {
+        const userResponse = await fetch('https://api.vercel.com/v2/user', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          // Construct dashboard URL: https://vercel.com/username/project-name
+          dashboardUrl = `https://vercel.com/${userData.user.username}/${projectName}`;
+          console.log('Constructed dashboard URL:', dashboardUrl);
+        } else {
+          console.error('Failed to fetch user info for dashboard URL');
+        }
+      } catch (error) {
+        console.error('Error fetching user info:', error);
+      }
+    }
+
+    // Trigger deployment directly via Vercel API (instead of relying on GitHub webhooks)
+    if (mode !== 'redeploy') {
       console.log(`Triggering deployment for new project: ${projectData.name}`);
 
       const deployResponse = await fetch('https://api.vercel.com/v13/deployments', {
@@ -410,9 +440,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Return project info with GitHub integration
-    // For new deployments, don't set URL initially - it will be fetched later
+    // For new deployments, return dashboard URL immediately
     return NextResponse.json({
-      url: mode === 'redeploy' ? finalDeploymentUrl : null,
+      url: mode === 'redeploy' ? finalDeploymentUrl : dashboardUrl,
       projectId: projectData.id,
       deploymentId: deploymentData?.uid,
       commitSha: deploymentData?.meta?.githubCommitSha || `vercel_project_${Date.now()}`,

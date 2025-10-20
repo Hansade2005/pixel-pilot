@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { storageManager } from '@/lib/storage-manager';
+import { Octokit } from '@octokit/rest';
 
 /**
  * Netlify Deployment API - Git-Only Deployment
@@ -19,11 +20,11 @@ import { storageManager } from '@/lib/storage-manager';
 
 export async function POST(request: NextRequest) {
   try {
-    const { siteName, buildCommand, publishDir, token, workspaceId, githubRepo, environmentVariables } = await request.json();
+    const { siteName, buildCommand, publishDir, token, workspaceId, githubRepo, environmentVariables, githubToken } = await request.json();
 
-    if (!siteName || !token || !workspaceId || !githubRepo) {
+    if (!siteName || !token || !workspaceId || !githubRepo || !githubToken) {
       return NextResponse.json({
-        error: 'Site name, token, workspace ID, and GitHub repository are required'
+        error: 'Site name, token, workspace ID, GitHub repository, and GitHub token are required'
       }, { status: 400 });
     }
 
@@ -57,6 +58,198 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Detect framework and build configuration from GitHub repository
+    let detectedFramework = 'vite'; // Default
+    let detectedBuildCommand = buildCommand || 'npm run build';
+    let detectedPublishDir = publishDir || 'dist';
+
+    try {
+      const octokit = new Octokit({
+        auth: githubToken,
+      });
+
+      const [owner, repo] = githubRepo.split('/');
+
+      // Check for common framework indicators and their build configurations
+      const frameworkChecks = [
+        // Next.js
+        {
+          files: ['next.config.js', 'next.config.mjs', 'next.config.ts'],
+          framework: 'nextjs',
+          buildCommand: 'npm run build',
+          publishDir: '.next' // Note: Next.js usually needs SSR, but for static export
+        },
+        // Nuxt.js
+        {
+          files: ['nuxt.config.js', 'nuxt.config.ts'],
+          framework: 'nuxtjs',
+          buildCommand: 'npm run build',
+          publishDir: 'dist'
+        },
+        // Vite
+        {
+          files: ['vite.config.js', 'vite.config.ts', 'vite.config.mjs'],
+          framework: 'vite',
+          buildCommand: 'npm run build',
+          publishDir: 'dist'
+        },
+        // Create React App
+        {
+          files: ['src/index.js', 'src/App.js'],
+          checkContent: true,
+          framework: 'create-react-app',
+          buildCommand: 'npm run build',
+          publishDir: 'build'
+        },
+        // Angular
+        {
+          files: ['angular.json'],
+          framework: 'angular',
+          buildCommand: 'ng build',
+          publishDir: 'dist'
+        },
+        // Vue
+        {
+          files: ['vue.config.js'],
+          framework: 'vue',
+          buildCommand: 'npm run build',
+          publishDir: 'dist'
+        },
+        // Svelte
+        {
+          files: ['svelte.config.js'],
+          framework: 'svelte',
+          buildCommand: 'npm run build',
+          publishDir: 'public'
+        },
+        // Gatsby
+        {
+          files: ['gatsby-config.js'],
+          framework: 'gatsby',
+          buildCommand: 'npm run build',
+          publishDir: 'public'
+        },
+        // Astro
+        {
+          files: ['astro.config.mjs', 'astro.config.js'],
+          framework: 'astro',
+          buildCommand: 'npm run build',
+          publishDir: 'dist'
+        },
+      ];
+
+      for (const check of frameworkChecks) {
+        for (const file of check.files) {
+          try {
+            if (check.checkContent) {
+              // For files that need content checking (like CRA)
+              const { data: fileData } = await octokit.rest.repos.getContent({
+                owner,
+                repo,
+                path: file,
+              });
+              if (fileData && typeof fileData === 'object' && 'content' in fileData) {
+                const content = Buffer.from(fileData.content as string, 'base64').toString();
+                if (content.includes('ReactDOM.render') || content.includes('createRoot')) {
+                  detectedFramework = check.framework;
+                  detectedBuildCommand = check.buildCommand;
+                  detectedPublishDir = check.publishDir;
+                  break;
+                }
+              }
+            } else {
+              // Simple file existence check
+              await octokit.rest.repos.getContent({
+                owner,
+                repo,
+                path: file,
+              });
+              detectedFramework = check.framework;
+              detectedBuildCommand = check.buildCommand;
+              detectedPublishDir = check.publishDir;
+              break;
+            }
+          } catch (error) {
+            // File doesn't exist, continue checking
+            continue;
+          }
+        }
+        if (detectedFramework !== 'vite') break; // Break if we found a specific framework
+      }
+
+      // Fallback: check package.json for dependencies and scripts
+      if (detectedFramework === 'vite') {
+        try {
+          const { data: packageJson } = await octokit.rest.repos.getContent({
+            owner,
+            repo,
+            path: 'package.json',
+          });
+
+          if (packageJson && typeof packageJson === 'object' && 'content' in packageJson) {
+            const content = JSON.parse(Buffer.from(packageJson.content as string, 'base64').toString());
+
+            // Check dependencies
+            const allDeps = { ...content.dependencies, ...content.devDependencies };
+
+            if (allDeps['next']) {
+              detectedFramework = 'nextjs';
+              detectedBuildCommand = 'npm run build';
+              detectedPublishDir = '.next';
+            } else if (allDeps['nuxt']) {
+              detectedFramework = 'nuxtjs';
+              detectedBuildCommand = 'npm run build';
+              detectedPublishDir = 'dist';
+            } else if (allDeps['vite']) {
+              detectedFramework = 'vite';
+              detectedBuildCommand = 'npm run build';
+              detectedPublishDir = 'dist';
+            } else if (allDeps['@angular/core']) {
+              detectedFramework = 'angular';
+              detectedBuildCommand = 'ng build';
+              detectedPublishDir = 'dist';
+            } else if (allDeps['vue']) {
+              detectedFramework = 'vue';
+              detectedBuildCommand = 'npm run build';
+              detectedPublishDir = 'dist';
+            } else if (allDeps['svelte']) {
+              detectedFramework = 'svelte';
+              detectedBuildCommand = 'npm run build';
+              detectedPublishDir = 'public';
+            } else if (allDeps['gatsby']) {
+              detectedFramework = 'gatsby';
+              detectedBuildCommand = 'npm run build';
+              detectedPublishDir = 'public';
+            } else if (allDeps['astro']) {
+              detectedFramework = 'astro';
+              detectedBuildCommand = 'npm run build';
+              detectedPublishDir = 'dist';
+            } else if (allDeps['react']) {
+              // Default to CRA for React apps
+              detectedFramework = 'create-react-app';
+              detectedBuildCommand = 'npm run build';
+              detectedPublishDir = 'build';
+            }
+
+            // Check if there are custom build scripts
+            if (content.scripts && content.scripts.build) {
+              detectedBuildCommand = content.scripts.build;
+            }
+          }
+        } catch (error) {
+          console.log('Could not read package.json for framework detection');
+        }
+      }
+
+      console.log(`Detected framework: ${detectedFramework}, build command: ${detectedBuildCommand}, publish dir: ${detectedPublishDir} for repo: ${githubRepo}`);
+
+    } catch (error) {
+      console.error('Error detecting framework and build config:', error);
+      // Use provided values or defaults
+      detectedBuildCommand = buildCommand || 'npm run build';
+      detectedPublishDir = publishDir || 'dist';
+    }
+
     // Create Netlify site
     const createSiteResponse = await fetch('https://api.netlify.com/api/v1/sites', {
       method: 'POST',
@@ -67,15 +260,15 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         name: siteName,
         build_settings: {
-          cmd: buildCommand || 'npm run build',
-          dir: publishDir || 'dist',
+          cmd: detectedBuildCommand,
+          dir: detectedPublishDir,
         },
         repo: githubRepo ? {
           provider: 'github',
           repo_path: githubRepo,
           repo_branch: 'main',
-          cmd: buildCommand || 'npm run build',
-          dir: publishDir || 'dist',
+          cmd: detectedBuildCommand,
+          dir: detectedPublishDir,
         } : undefined,
       }),
     });
@@ -148,12 +341,14 @@ export async function POST(request: NextRequest) {
 
     // Return site info with GitHub integration
     return NextResponse.json({
-      url: siteData.url,
+      url: `https://app.netlify.com/sites/${siteName}`, // Dashboard URL for immediate access
+      siteUrl: siteData.url, // Live site URL (may not be ready yet)
       siteId: siteData.id,
       commitSha: `netlify_site_${Date.now()}`,
-      status: 'ready',
-      buildCommand: buildCommand || 'npm run build',
-      publishDir: publishDir || 'dist',
+      status: 'building', // Mark as building since deployment is in progress
+      buildCommand: detectedBuildCommand,
+      publishDir: detectedPublishDir,
+      needsUrlUpdate: true, // Still need to poll for the actual live URL
     });
 
   } catch (error) {

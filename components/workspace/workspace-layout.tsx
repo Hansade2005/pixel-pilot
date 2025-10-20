@@ -1307,7 +1307,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                                 variant="ghost"
                                 size="sm"
                                 className="h-6 px-2 text-xs"
-                                onClick={() => window.open(`https://vercel.com/dashboard/project/${selectedProject.vercelProjectId}`, '_blank')}
+                                onClick={() => window.open(selectedProject.vercelDashboardUrl || `https://vercel.com/dashboard/project/${selectedProject.vercelProjectId}`, '_blank')}
                                 title="Manage Vercel project"
                               >
                                 <ExternalLink className="h-3 w-3 mr-1" />
@@ -1319,7 +1319,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                                 variant="ghost"
                                 size="sm"
                                 className="h-6 px-2 text-xs"
-                                onClick={() => window.open(`https://app.netlify.com/sites/${selectedProject.netlifySiteId}`, '_blank')}
+                                onClick={() => window.open(selectedProject.netlifyDashboardUrl || `https://app.netlify.com/sites/${selectedProject.netlifySiteId}`, '_blank')}
                                 title="Manage Netlify site"
                               >
                                 <ExternalLink className="h-3 w-3 mr-1" />
