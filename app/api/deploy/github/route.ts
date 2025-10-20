@@ -51,58 +51,58 @@ export async function POST(req: Request) {
       repo = { full_name: existingRepo, name: repo_name, owner: { login: owner }, html_url: `https://github.com/${existingRepo}` };
       console.log(`Pushing ${files.length} files to existing repository: ${existingRepo}`)
     } else if (mode === 'new') {
-      // Create new repository
-      isNewRepo = true;
-      console.log(`Creating GitHub repository with ${files.length} files`)
-
-      // First check if repository already exists
+      // Check if repository already exists - if so, switch to push mode
       try {
-        const existingRepo = await octokit.rest.repos.get({
+        const existingRepoData = await octokit.rest.repos.get({
           owner: githubUser.login,
           repo: repoName,
         })
-        
-        // Repository exists
-        return Response.json({ 
-          error: `Repository "${repoName}" already exists on your GitHub account. Please choose a different name or use "Push to existing repository" mode.` 
-        }, { status: 409 })
+
+        // Repository exists - switch to push mode
+        console.log(`Repository "${repoName}" already exists, switching to push mode`)
+        repo = existingRepoData.data;
+        isNewRepo = false; // Treat as existing repo
+
       } catch (checkError: any) {
-        // If error is 404, repository doesn't exist, which is good
+        // If error is 404, repository doesn't exist, which is good for new repo creation
         if (checkError.status !== 404) {
           console.error('Error checking repository existence:', checkError)
           return Response.json({ error: 'Failed to verify repository availability' }, { status: 500 })
         }
-        // Repository doesn't exist, proceed with creation
-      }
 
-      try {
-        // Create GitHub repository
-        const { data: createdRepo } = await octokit.rest.repos.createForAuthenticatedUser({
-          name: repoName,
-          description: repoDescription || 'Created with PiPilot',
-          private: false,
-          auto_init: false,
-        })
-        repo = createdRepo;
-      } catch (error: any) {
-        console.error('GitHub repository creation error:', error)
-        
-        // Handle specific GitHub errors
-        if (error.status === 422) {
-          return Response.json({ 
-            error: 'Repository creation failed: Repository name already exists on this account. Please choose a different name.' 
-          }, { status: 422 })
+        // Repository doesn't exist, proceed with creation
+        isNewRepo = true;
+        console.log(`Creating GitHub repository with ${files.length} files`)
+
+        try {
+          // Create GitHub repository
+          const { data: createdRepo } = await octokit.rest.repos.createForAuthenticatedUser({
+            name: repoName,
+            description: repoDescription || 'Created with PiPilot',
+            private: false,
+            auto_init: false,
+          })
+          repo = createdRepo;
+        } catch (error: any) {
+          console.error('GitHub repository creation error:', error)
+
+          // Handle specific GitHub errors
+          if (error.status === 422) {
+            return Response.json({
+              error: 'Repository creation failed: Repository name already exists on this account. Please choose a different name.'
+            }, { status: 422 })
+          }
+
+          if (error.status === 401) {
+            return Response.json({ error: 'Invalid GitHub token' }, { status: 401 })
+          }
+
+          if (error.status === 403) {
+            return Response.json({ error: 'Insufficient permissions to create repository' }, { status: 403 })
+          }
+
+          return Response.json({ error: error.message || 'Failed to create repository' }, { status: error.status || 500 })
         }
-        
-        if (error.status === 401) {
-          return Response.json({ error: 'Invalid GitHub token' }, { status: 401 })
-        }
-        
-        if (error.status === 403) {
-          return Response.json({ error: 'Insufficient permissions to create repository' }, { status: 403 })
-        }
-        
-        return Response.json({ error: error.message || 'Failed to create repository' }, { status: error.status || 500 })
       }
     } else {
       return Response.json({ error: 'Invalid deployment mode or missing repository information' }, { status: 400 })
@@ -259,14 +259,16 @@ module.exports = nextConfig`,
       })
 
     } catch (error) {
-      // If there's an error after repo creation, try to delete the repo
-      try {
-        await octokit.rest.repos.delete({
-          owner: githubUser.login,
-          repo: repo.name,
-        })
-      } catch (deleteError) {
-        console.error('Failed to cleanup repo after error:', deleteError)
+      // If there's an error after repo creation, try to delete the repo (only for newly created repos)
+      if (isNewRepo && repo) {
+        try {
+          await octokit.rest.repos.delete({
+            owner: githubUser.login,
+            repo: repo.name,
+          })
+        } catch (deleteError) {
+          console.error('Failed to cleanup repo after error:', deleteError)
+        }
       }
       throw error
     }
