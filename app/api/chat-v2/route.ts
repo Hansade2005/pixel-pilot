@@ -827,11 +827,11 @@ export async function POST(req: Request) {
     const projectContext = await buildOptimizedProjectContext(projectId, sessionData, fileTree)
     console.log(`[PROJECT_CONTEXT] Built project context (${projectContext.length} chars):`, projectContext.substring(0, 500) + (projectContext.length > 500 ? '...' : ''))
 
-    // Get conversation history for context (last 20 messages) - Enhanced format for better AI context
+    // Get conversation history for context (last 5 message pairs) - Enhanced format for better AI context
     let conversationSummaryContext = ''
     try {
       // Ensure messages is an array before using slice
-      const recentMessages = Array.isArray(messages) ? messages.slice(-20) : []
+      const recentMessages = Array.isArray(messages) ? messages.slice(-10) : []
 
       if (recentMessages && recentMessages.length > 0) {
         // Filter out system messages and empty content
@@ -893,21 +893,14 @@ You are the expert full-stack architect—a digital superhero with over 15 years
 - Polish for production-readiness and virality
 Begin with a concise checklist  use check box emojis filled and unfilled. When task is completed and during the summary generation , use green check to tick what you have completed.
 
-## Response Format
-- After reasoning and tool calls, provide the final summary directly without internal monologue or self-confirmation.
-- Skip "Yes..." confirmations and jump to the boxed solution.
 ## Core Directives
 1. **Quality**: Ensure sparkling clean code ✨
 2. **Innovation**: Innovate UI/UX that's uniquely creative 🏆
 3. **Excellence**: Deliver fully complete, market-ready products
-## Workflow: Discover → Innovate → Dominate
-- **Discover 🔍**: Analyze deeply, understand user psychology, spot market gaps
-- **Innovate 🎨**: Design mobile-first masterpieces with state-of-the-art UX
-- **Dominate 🚀**: Build products users love and won't leave
+
 ## Tools
 - **Client-Side (IndexedDB)**: \`read_file\` (with line numbers), \`write_file\`, \`edit_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`
 - **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers), \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync)
-After each tool call or code edit, validate results  and self-correct if validation fails.
 
 ## PiPilot DB Integration
 For **authentication, database, or file storage**:
@@ -921,7 +914,7 @@ Image generation: \`https://api.a0.dev/assets/image?text={description}&aspect=1:
 - \`seed\`: For stable output
 - \`aspect\`: 1:1 or specify as needed
 - **Usage**: Use URL in HTML \`<img src=...>\` tags
-_Note_: Client-side file/package operations run on IndexedDB and are handled automatically. Use \`check_dev_errors\` up to 2 times per request in response to error logs. After fixing errors, have the user run the app in Preview and report console logs.
+_Note_: Client-side file/package operations run on IndexedDB and are handled automatically. Use \`check_dev_errors\` up to 2 times per request in response to error logs. After fixing errors, tell the user to switch  run the app in Preview panel and  they should report any console logs error they see.
 ## ✅ Quality Checklist
 - **Functionality**: Handle happy paths, edge cases, errors, and performance
 - **UX Innovation**: Ensure mobile-first, seamless micro-interactions, and animations 🎨
