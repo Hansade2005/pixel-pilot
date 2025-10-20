@@ -312,13 +312,13 @@ export default function DeploymentClient() {
 
   const [vercelForm, setVercelForm] = useState({
     projectName: '',
-    framework: null, // Let the API detect the framework dynamically
+    framework: 'vite',
   })
 
   const [netlifyForm, setNetlifyForm] = useState({
     siteName: '',
-    buildCommand: '', // Let the API detect the build command dynamically
-    publishDir: '', // Let the API detect the publish directory dynamically
+    buildCommand: 'npm run build',
+    publishDir: 'out',
   })
 
   // Enhanced state variables
@@ -813,7 +813,7 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
     }
   }, [currentUserId])
 
-  // Fetch user repositories when deployment mode requires them
+  // Fetch user repositories when deployment mode changes to 'existing'
   useEffect(() => {
     if (githubForm.deploymentMode === 'existing' && storedTokens.github && userRepos.length === 0) {
       fetchUserGitHubRepos()
@@ -883,156 +883,6 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
     } catch (error) {
       console.error('Error loading deployed repos:', error)
     }
-  }
-
-  // Poll for latest deployment URL from Vercel
-  const pollForDeploymentUrl = async (workspaceId: string, vercelProjectId: string, vercelToken: string) => {
-    const maxAttempts = 30 // 5 minutes with 10 second intervals
-    const pollInterval = 10000 // 10 seconds
-    let attempts = 0
-
-    const poll = async () => {
-      attempts++
-
-      try {
-        const response = await fetch(`/api/vercel/project-url?projectId=${vercelProjectId}&token=${vercelToken}`)
-
-        if (!response.ok) {
-          console.error('Failed to fetch deployment URL:', response.status)
-          return
-        }
-
-        const data = await response.json()
-
-        if (data.url && data.status === 'READY') {
-          // Update the project with the real URL
-          await storageManager.updateWorkspace(workspaceId, {
-            vercelDeploymentUrl: data.url,
-            deploymentStatus: 'deployed',
-            lastActivity: new Date().toISOString(),
-          })
-
-          // Update deployment record
-          await storageManager.updateDeployment(workspaceId, {
-            url: data.url,
-            status: 'ready',
-          })
-
-          // Trigger real-time sync
-          window.dispatchEvent(new CustomEvent('projectUpdated', {
-            detail: { projectId: workspaceId, action: 'urlUpdated', url: data.url }
-          }))
-
-          toast({
-            title: 'Deployment Complete',
-            description: `Live URL updated: ${data.url}`,
-          })
-
-          return // Stop polling
-        } else if (data.status === 'BUILDING' || data.status === 'QUEUED') {
-          // Continue polling
-          if (attempts < maxAttempts) {
-            setTimeout(poll, pollInterval)
-          } else {
-            console.log('Max polling attempts reached, deployment may still be building')
-            toast({
-              title: 'Deployment Still Building',
-              description: 'The deployment is taking longer than expected. Check back later for the live URL.',
-              variant: 'default',
-            })
-          }
-        } else {
-          console.error('Deployment failed or unknown status:', data.status)
-          // Update status to failed
-          await storageManager.updateWorkspace(workspaceId, {
-            deploymentStatus: 'failed',
-          })
-        }
-      } catch (error) {
-        console.error('Error polling for deployment URL:', error)
-        if (attempts < maxAttempts) {
-          setTimeout(poll, pollInterval)
-        }
-      }
-    }
-
-    // Start polling
-    setTimeout(poll, pollInterval)
-  }
-
-  // Poll for latest deployment URL from Netlify
-  const pollForNetlifyDeploymentUrl = async (workspaceId: string, netlifySiteId: string, netlifyToken: string) => {
-    const maxAttempts = 30 // 5 minutes with 10 second intervals
-    const pollInterval = 10000 // 10 seconds
-    let attempts = 0
-
-    const poll = async () => {
-      attempts++
-
-      try {
-        const response = await fetch(`/api/netlify/site-url?siteId=${netlifySiteId}&token=${netlifyToken}`)
-
-        if (!response.ok) {
-          console.error('Failed to fetch Netlify deployment URL:', response.status)
-          return
-        }
-
-        const data = await response.json()
-
-        if (data.url && data.status === 'ready') {
-          // Update the project with the real URL
-          await storageManager.updateWorkspace(workspaceId, {
-            netlifyDeploymentUrl: data.url,
-            deploymentStatus: 'deployed',
-            lastActivity: new Date().toISOString(),
-          })
-
-          // Update deployment record
-          await storageManager.updateDeployment(workspaceId, {
-            url: data.url,
-            status: 'ready',
-          })
-
-          // Trigger real-time sync
-          window.dispatchEvent(new CustomEvent('projectUpdated', {
-            detail: { projectId: workspaceId, action: 'urlUpdated', url: data.url }
-          }))
-
-          toast({
-            title: 'Netlify Deployment Complete',
-            description: `Live URL updated: ${data.url}`,
-          })
-
-          return // Stop polling
-        } else if (data.status === 'building' || data.status === 'processing' || data.status === 'uploading') {
-          // Continue polling
-          if (attempts < maxAttempts) {
-            setTimeout(poll, pollInterval)
-          } else {
-            console.log('Max polling attempts reached, Netlify deployment may still be building')
-            toast({
-              title: 'Netlify Deployment Still Building',
-              description: 'The deployment is taking longer than expected. Check back later for the live URL.',
-              variant: 'default',
-            })
-          }
-        } else {
-          console.error('Netlify deployment failed or unknown status:', data.status)
-          // Update status to failed
-          await storageManager.updateWorkspace(workspaceId, {
-            deploymentStatus: 'failed',
-          })
-        }
-      } catch (error) {
-        console.error('Error polling for Netlify deployment URL:', error)
-        if (attempts < maxAttempts) {
-          setTimeout(poll, pollInterval)
-        }
-      }
-    }
-
-    // Start polling
-    setTimeout(poll, pollInterval)
   }
 
   // Load available GitHub repositories
@@ -1251,7 +1101,65 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
       let repoOwner: string
       let repoName: string
 
-      if (githubForm.deploymentMode === 'push') {
+      if (githubForm.deploymentMode === 'new') {
+        // Create new GitHub repository
+        setDeploymentState(prev => ({ ...prev, currentStep: 'connecting' }))
+
+        const repoResponse = await fetch('/api/github/create-repo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: githubForm.repoName,
+            description: githubForm.repoDescription,
+            private: githubForm.isPrivate,
+            token: storedTokens.github,
+          })
+        })
+
+        if (!repoResponse.ok) {
+          const errorData = await repoResponse.json()
+          console.error('Repository creation failed:', errorData)
+
+          // Provide specific error messages based on status code
+          if (repoResponse.status === 422) {
+            const isAlreadyExists = errorData.error?.toLowerCase().includes('already exist') || 
+                                   errorData.error?.toLowerCase().includes('name already exists')
+            
+            toast({
+              title: "Repository Creation Failed",
+              description: isAlreadyExists 
+                ? "Repository already exists. Try switching to 'Push to existing repository' mode instead."
+                : (errorData.error || "Repository name may already exist or is invalid. Try using a different name."),
+              variant: "destructive"
+            })
+          } else if (repoResponse.status === 401) {
+            toast({
+              title: "Authentication Failed",
+              description: "Invalid GitHub token. Please check your token and try again.",
+              variant: "destructive"
+            })
+          } else if (repoResponse.status === 403) {
+            toast({
+              title: "Access Forbidden",
+              description: "You don't have permission to create repositories. Check your token permissions.",
+              variant: "destructive"
+            })
+          } else {
+            toast({
+              title: "Repository Creation Failed",
+              description: errorData.error || "Failed to create repository",
+              variant: "destructive"
+            })
+          }
+
+          setDeploymentState(prev => ({ ...prev, isDeploying: false }))
+          return
+        }
+
+        repoData = await repoResponse.json()
+        repoOwner = repoData.fullName.split('/')[0]
+        repoName = repoData.name
+      } else if (githubForm.deploymentMode === 'push') {
         // Use connected repository for push
         const connectedRepo = selectedProject.githubRepoUrl?.split('/').slice(-2).join('/') || ''
         if (!connectedRepo) {
@@ -1271,7 +1179,7 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
         }
         repoOwner = connectedRepo.split('/')[0]
         repoName = connectedRepo.split('/')[1]
-      } else if (githubForm.deploymentMode === 'existing') {
+      } else {
         // Use existing repository
         const selectedRepo = userRepos.find(repo => repo.fullName === githubForm.selectedRepo)
         if (!selectedRepo) {
@@ -1292,7 +1200,6 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
         repoOwner = selectedRepo.fullName.split('/')[0]
         repoName = selectedRepo.name
       }
-      // For 'new' mode, repo creation is handled by /api/deploy/github
 
       setDeploymentState(prev => ({ ...prev, currentStep: 'deploying' }))
 
@@ -1306,10 +1213,10 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
         body: JSON.stringify({
           projectId: selectedProject.id,
           githubToken: storedTokens.github,
-          repoName: githubForm.repoName,
-          repoDescription: githubForm.repoDescription,
+          repoName: githubForm.deploymentMode === 'new' ? githubForm.repoName : repoName,
+          repoDescription: githubForm.deploymentMode === 'new' ? githubForm.repoDescription : '',
           files: projectFiles,
-          mode: githubForm.deploymentMode,
+          mode: githubForm.deploymentMode === 'new' ? 'create' : 'push',
           existingRepo: githubForm.deploymentMode === 'existing' ? repoData.fullName : undefined,
           commitMessage: githubForm.commitMessage || 'Update project files',
         })
@@ -2237,40 +2144,25 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
 
                         const deployData = await deployResponse.json()
 
-                        // Update project with initial Vercel deployment info
-                        const updateData: any = {
+                        // Update project with Vercel deployment URL
+                        await storageManager.updateWorkspace(selectedProject.id, {
+                          vercelDeploymentUrl: deployData.url,
                           vercelProjectId: deployData.projectId || selectedProject.vercelProjectId,
-                          deploymentStatus: deployData.needsUrlUpdate ? 'in_progress' : 'deployed',
+                          deploymentStatus: 'deployed',
                           lastActivity: new Date().toISOString(),
-                        };
+                        })
 
-                        // Store URLs appropriately
-                        if (isRedeploy) {
-                          // For redeploys, the URL is the live deployment URL
-                          updateData.vercelDeploymentUrl = deployData.url;
-                        } else {
-                          // For new deployments, the URL is the dashboard URL
-                          updateData.vercelDashboardUrl = deployData.url;
-                        }
-
-                        await storageManager.updateWorkspace(selectedProject.id, updateData);
-
-                        // Create deployment record with building status
+                        // Create deployment record
                         await storageManager.createDeployment({
                           workspaceId: selectedProject.id,
-                          url: deployData.url || '', // Empty string initially
-                          status: deployData.needsUrlUpdate ? 'building' : 'ready',
+                          url: deployData.url,
+                          status: 'ready',
                           commitSha: deployData.commitSha || 'latest',
                           commitMessage: deployData.commitMessage || (isRedeploy ? 'Redeployed to Vercel' : 'Deployed to Vercel'),
                           branch: 'main',
                           environment: 'production',
                           provider: 'vercel'
                         })
-
-                        // If this is a new deployment that needs URL update, start polling for real URL
-                        if (deployData.needsUrlUpdate && deployData.projectId) {
-                          pollForDeploymentUrl(selectedProject.id, deployData.projectId, storedTokens.vercel)
-                        }
 
                         // Record usage for deployment tracking
                         await recordUsage('', 'deploy', 'vercel')
@@ -2280,14 +2172,12 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
 
                         // Trigger real-time sync by dispatching a custom event
                         window.dispatchEvent(new CustomEvent('projectUpdated', {
-                          detail: { projectId: selectedProject.id, action: 'deployed', needsUrlUpdate: deployData.needsUrlUpdate }
+                          detail: { projectId: selectedProject.id, action: 'deployed', url: deployData.url }
                         }))
 
                         toast({
-                          title: deployData.needsUrlUpdate ? 'Deployment Started' : (isRedeploy ? 'Redeployment Successful' : 'Deployment Successful'),
-                          description: deployData.needsUrlUpdate
-                            ? `Deployment is building... URL will be available shortly.`
-                            : `Successfully ${isRedeploy ? 're' : ''}deployed to Vercel at ${deployData.url}`
+                          title: isRedeploy ? 'Redeployment Successful' : 'Deployment Successful',
+                          description: `Successfully ${isRedeploy ? 're' : ''}deployed to Vercel at ${deployData.url}`
                         })
                         setDeploymentState(prev => ({ ...prev, isDeploying: false, currentStep: 'complete' }))
 
@@ -2577,7 +2467,6 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
                             token: storedTokens.netlify,
                             workspaceId: selectedProject.id,
                             githubRepo: selectedRepoForNetlify,
-                            githubToken: storedTokens.github,
                             environmentVariables: envVars,
                           })
                         })
@@ -2589,41 +2478,24 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
 
                         const deployData = await deployResponse.json()
 
-                        // Update project with initial Netlify deployment info
-                        const updateData: any = {
-                          netlifySiteId: deployData.siteId,
-                          deploymentStatus: deployData.needsUrlUpdate ? 'in_progress' : 'deployed',
+                        // Update project with Netlify deployment URL
+                        await storageManager.updateWorkspace(selectedProject.id, {
+                          netlifyDeploymentUrl: deployData.url,
+                          deploymentStatus: 'deployed',
                           lastActivity: new Date().toISOString(),
-                        };
+                        })
 
-                        // Store dashboard URL for management access
-                        if (deployData.url) {
-                          updateData.netlifyDashboardUrl = deployData.url; // Dashboard URL
-                        }
-
-                        // Store live URL if available immediately
-                        if (deployData.siteUrl) {
-                          updateData.netlifyDeploymentUrl = deployData.siteUrl; // Live deployment URL
-                        }
-
-                        await storageManager.updateWorkspace(selectedProject.id, updateData);
-
-                        // Create deployment record with building status
+                        // Create deployment record
                         await storageManager.createDeployment({
                           workspaceId: selectedProject.id,
-                          url: deployData.siteUrl || '', // Live site URL (may be empty initially)
-                          status: deployData.needsUrlUpdate ? 'building' : 'ready',
+                          url: deployData.url,
+                          status: 'ready',
                           commitSha: deployData.commitSha || 'initial',
                           commitMessage: deployData.commitMessage || 'Deployed to Netlify',
                           branch: 'main',
                           environment: 'production',
                           provider: 'netlify'
                         })
-
-                        // If this is a new deployment that needs URL update, start polling for real URL
-                        if (deployData.needsUrlUpdate && deployData.siteId) {
-                          pollForNetlifyDeploymentUrl(selectedProject.id, deployData.siteId, storedTokens.netlify)
-                        }
 
                         // Record usage for deployment tracking
                         await recordUsage('', 'deploy', 'netlify')
@@ -2633,14 +2505,12 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
 
                         // Trigger real-time sync by dispatching a custom event
                         window.dispatchEvent(new CustomEvent('projectUpdated', {
-                          detail: { projectId: selectedProject.id, action: 'deployed', url: deployData.siteUrl, needsUrlUpdate: deployData.needsUrlUpdate }
+                          detail: { projectId: selectedProject.id, action: 'deployed', url: deployData.url }
                         }))
 
                         toast({
-                          title: deployData.needsUrlUpdate ? 'Deployment Started' : 'Deployment Successful',
-                          description: deployData.needsUrlUpdate
-                            ? `Deployment is building... URL will be updated automatically when ready.`
-                            : `Successfully deployed to Netlify at ${deployData.siteUrl}`
+                          title: 'Deployment Successful',
+                          description: `Successfully deployed to Netlify at ${deployData.url}`
                         })
                         setDeploymentState(prev => ({ ...prev, isDeploying: false, currentStep: 'complete' }))
 

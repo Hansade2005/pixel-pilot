@@ -196,17 +196,17 @@ export async function POST(req: Request) {
         })
     }
 
-    // Note: Workspace metadata updates should be handled client-side
-    // The client should update IndexedDB with deployment info after successful deployment
+         // Note: Workspace metadata updates should be handled client-side
+     // The client should update IndexedDB with deployment info after successful deployment
 
     return Response.json({
       siteId: site.id,
-      siteUrl: null, // Don't set URL initially - it will be fetched later
+      siteUrl: site.ssl_url || site.url,
       deploymentId: deployment.id,
       adminUrl: site.admin_url,
-      needsUrlUpdate: true, // Flag to indicate URL needs to be fetched
-      status: 'building', // Mark as building initially
-    })  } catch (error) {
+    })
+
+  } catch (error) {
     console.error('Netlify deploy error:', error)
     return Response.json({ error: 'Failed to deploy to Netlify' }, { status: 500 })
   }

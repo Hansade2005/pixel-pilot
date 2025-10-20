@@ -19,10 +19,8 @@ export interface Workspace {
   githubRepoName?: string
   vercelProjectId?: string
   vercelDeploymentUrl?: string
-  vercelDashboardUrl?: string
   netlifySiteId?: string
   netlifyDeploymentUrl?: string
-  netlifyDashboardUrl?: string
   deploymentStatus: 'not_deployed' | 'in_progress' | 'deployed' | 'failed'
   createdAt: string
   updatedAt: string
