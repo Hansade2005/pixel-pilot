@@ -312,7 +312,7 @@ export default function DeploymentClient() {
 
   const [vercelForm, setVercelForm] = useState({
     projectName: '',
-    framework: 'vite',
+    framework: null, // Let the API detect the framework dynamically
   })
 
   const [netlifyForm, setNetlifyForm] = useState({
@@ -883,6 +883,156 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
     } catch (error) {
       console.error('Error loading deployed repos:', error)
     }
+  }
+
+  // Poll for latest deployment URL from Vercel
+  const pollForDeploymentUrl = async (workspaceId: string, vercelProjectId: string, vercelToken: string) => {
+    const maxAttempts = 30 // 5 minutes with 10 second intervals
+    const pollInterval = 10000 // 10 seconds
+    let attempts = 0
+
+    const poll = async () => {
+      attempts++
+
+      try {
+        const response = await fetch(`/api/vercel/project-url?projectId=${vercelProjectId}&token=${vercelToken}`)
+
+        if (!response.ok) {
+          console.error('Failed to fetch deployment URL:', response.status)
+          return
+        }
+
+        const data = await response.json()
+
+        if (data.url && data.status === 'READY') {
+          // Update the project with the real URL
+          await storageManager.updateWorkspace(workspaceId, {
+            vercelDeploymentUrl: data.url,
+            deploymentStatus: 'deployed',
+            lastActivity: new Date().toISOString(),
+          })
+
+          // Update deployment record
+          await storageManager.updateDeployment(workspaceId, {
+            url: data.url,
+            status: 'ready',
+          })
+
+          // Trigger real-time sync
+          window.dispatchEvent(new CustomEvent('projectUpdated', {
+            detail: { projectId: workspaceId, action: 'urlUpdated', url: data.url }
+          }))
+
+          toast({
+            title: 'Deployment Complete',
+            description: `Live URL updated: ${data.url}`,
+          })
+
+          return // Stop polling
+        } else if (data.status === 'BUILDING' || data.status === 'QUEUED') {
+          // Continue polling
+          if (attempts < maxAttempts) {
+            setTimeout(poll, pollInterval)
+          } else {
+            console.log('Max polling attempts reached, deployment may still be building')
+            toast({
+              title: 'Deployment Still Building',
+              description: 'The deployment is taking longer than expected. Check back later for the live URL.',
+              variant: 'default',
+            })
+          }
+        } else {
+          console.error('Deployment failed or unknown status:', data.status)
+          // Update status to failed
+          await storageManager.updateWorkspace(workspaceId, {
+            deploymentStatus: 'failed',
+          })
+        }
+      } catch (error) {
+        console.error('Error polling for deployment URL:', error)
+        if (attempts < maxAttempts) {
+          setTimeout(poll, pollInterval)
+        }
+      }
+    }
+
+    // Start polling
+    setTimeout(poll, pollInterval)
+  }
+
+  // Poll for latest deployment URL from Netlify
+  const pollForNetlifyDeploymentUrl = async (workspaceId: string, netlifySiteId: string, netlifyToken: string) => {
+    const maxAttempts = 30 // 5 minutes with 10 second intervals
+    const pollInterval = 10000 // 10 seconds
+    let attempts = 0
+
+    const poll = async () => {
+      attempts++
+
+      try {
+        const response = await fetch(`/api/netlify/site-url?siteId=${netlifySiteId}&token=${netlifyToken}`)
+
+        if (!response.ok) {
+          console.error('Failed to fetch Netlify deployment URL:', response.status)
+          return
+        }
+
+        const data = await response.json()
+
+        if (data.url && data.status === 'ready') {
+          // Update the project with the real URL
+          await storageManager.updateWorkspace(workspaceId, {
+            netlifyDeploymentUrl: data.url,
+            deploymentStatus: 'deployed',
+            lastActivity: new Date().toISOString(),
+          })
+
+          // Update deployment record
+          await storageManager.updateDeployment(workspaceId, {
+            url: data.url,
+            status: 'ready',
+          })
+
+          // Trigger real-time sync
+          window.dispatchEvent(new CustomEvent('projectUpdated', {
+            detail: { projectId: workspaceId, action: 'urlUpdated', url: data.url }
+          }))
+
+          toast({
+            title: 'Netlify Deployment Complete',
+            description: `Live URL updated: ${data.url}`,
+          })
+
+          return // Stop polling
+        } else if (data.status === 'building' || data.status === 'processing' || data.status === 'uploading') {
+          // Continue polling
+          if (attempts < maxAttempts) {
+            setTimeout(poll, pollInterval)
+          } else {
+            console.log('Max polling attempts reached, Netlify deployment may still be building')
+            toast({
+              title: 'Netlify Deployment Still Building',
+              description: 'The deployment is taking longer than expected. Check back later for the live URL.',
+              variant: 'default',
+            })
+          }
+        } else {
+          console.error('Netlify deployment failed or unknown status:', data.status)
+          // Update status to failed
+          await storageManager.updateWorkspace(workspaceId, {
+            deploymentStatus: 'failed',
+          })
+        }
+      } catch (error) {
+        console.error('Error polling for Netlify deployment URL:', error)
+        if (attempts < maxAttempts) {
+          setTimeout(poll, pollInterval)
+        }
+      }
+    }
+
+    // Start polling
+    setTimeout(poll, pollInterval)
   }
 
   // Load available GitHub repositories
@@ -2087,25 +2237,29 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
 
                         const deployData = await deployResponse.json()
 
-                        // Update project with Vercel deployment URL
+                        // Update project with initial Vercel deployment info (no URL initially)
                         await storageManager.updateWorkspace(selectedProject.id, {
-                          vercelDeploymentUrl: deployData.url,
                           vercelProjectId: deployData.projectId || selectedProject.vercelProjectId,
-                          deploymentStatus: 'deployed',
+                          deploymentStatus: deployData.needsUrlUpdate ? 'in_progress' : 'deployed',
                           lastActivity: new Date().toISOString(),
                         })
 
-                        // Create deployment record
+                        // Create deployment record with building status
                         await storageManager.createDeployment({
                           workspaceId: selectedProject.id,
-                          url: deployData.url,
-                          status: 'ready',
+                          url: deployData.url || '', // Empty string initially
+                          status: deployData.needsUrlUpdate ? 'building' : 'ready',
                           commitSha: deployData.commitSha || 'latest',
                           commitMessage: deployData.commitMessage || (isRedeploy ? 'Redeployed to Vercel' : 'Deployed to Vercel'),
                           branch: 'main',
                           environment: 'production',
                           provider: 'vercel'
                         })
+
+                        // If this is a new deployment that needs URL update, start polling for real URL
+                        if (deployData.needsUrlUpdate && deployData.projectId) {
+                          pollForDeploymentUrl(selectedProject.id, deployData.projectId, storedTokens.vercel)
+                        }
 
                         // Record usage for deployment tracking
                         await recordUsage('', 'deploy', 'vercel')
@@ -2115,12 +2269,14 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
 
                         // Trigger real-time sync by dispatching a custom event
                         window.dispatchEvent(new CustomEvent('projectUpdated', {
-                          detail: { projectId: selectedProject.id, action: 'deployed', url: deployData.url }
+                          detail: { projectId: selectedProject.id, action: 'deployed', needsUrlUpdate: deployData.needsUrlUpdate }
                         }))
 
                         toast({
-                          title: isRedeploy ? 'Redeployment Successful' : 'Deployment Successful',
-                          description: `Successfully ${isRedeploy ? 're' : ''}deployed to Vercel at ${deployData.url}`
+                          title: deployData.needsUrlUpdate ? 'Deployment Started' : (isRedeploy ? 'Redeployment Successful' : 'Deployment Successful'),
+                          description: deployData.needsUrlUpdate
+                            ? `Deployment is building... URL will be available shortly.`
+                            : `Successfully ${isRedeploy ? 're' : ''}deployed to Vercel at ${deployData.url}`
                         })
                         setDeploymentState(prev => ({ ...prev, isDeploying: false, currentStep: 'complete' }))
 
@@ -2421,24 +2577,29 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
 
                         const deployData = await deployResponse.json()
 
-                        // Update project with Netlify deployment URL
+                        // Update project with initial Netlify deployment info (no URL initially)
                         await storageManager.updateWorkspace(selectedProject.id, {
-                          netlifyDeploymentUrl: deployData.url,
-                          deploymentStatus: 'deployed',
+                          netlifySiteId: deployData.siteId,
+                          deploymentStatus: deployData.needsUrlUpdate ? 'in_progress' : 'deployed',
                           lastActivity: new Date().toISOString(),
                         })
 
-                        // Create deployment record
+                        // Create deployment record with building status
                         await storageManager.createDeployment({
                           workspaceId: selectedProject.id,
-                          url: deployData.url,
-                          status: 'ready',
+                          url: deployData.siteUrl || '', // Empty string initially
+                          status: deployData.needsUrlUpdate ? 'building' : 'ready',
                           commitSha: deployData.commitSha || 'initial',
                           commitMessage: deployData.commitMessage || 'Deployed to Netlify',
                           branch: 'main',
                           environment: 'production',
                           provider: 'netlify'
                         })
+
+                        // If this is a new deployment that needs URL update, start polling for real URL
+                        if (deployData.needsUrlUpdate && deployData.siteId) {
+                          pollForNetlifyDeploymentUrl(selectedProject.id, deployData.siteId, storedTokens.netlify)
+                        }
 
                         // Record usage for deployment tracking
                         await recordUsage('', 'deploy', 'netlify')
@@ -2448,12 +2609,14 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
 
                         // Trigger real-time sync by dispatching a custom event
                         window.dispatchEvent(new CustomEvent('projectUpdated', {
-                          detail: { projectId: selectedProject.id, action: 'deployed', url: deployData.url }
+                          detail: { projectId: selectedProject.id, action: 'deployed', url: deployData.siteUrl, needsUrlUpdate: deployData.needsUrlUpdate }
                         }))
 
                         toast({
-                          title: 'Deployment Successful',
-                          description: `Successfully deployed to Netlify at ${deployData.url}`
+                          title: deployData.needsUrlUpdate ? 'Deployment Started' : 'Deployment Successful',
+                          description: deployData.needsUrlUpdate
+                            ? `Deployment is building... URL will be updated automatically when ready.`
+                            : `Successfully deployed to Netlify at ${deployData.siteUrl}`
                         })
                         setDeploymentState(prev => ({ ...prev, isDeploying: false, currentStep: 'complete' }))
 

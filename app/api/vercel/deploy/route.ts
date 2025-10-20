@@ -49,6 +49,116 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Detect framework from GitHub repository if not provided
+    let detectedFramework = framework;
+    if (!detectedFramework) {
+      try {
+        const octokit = new Octokit({
+          auth: githubToken,
+        });
+
+        const [owner, repo] = githubRepo.split('/');
+
+        // Check for common framework indicators
+        const frameworkChecks = [
+          // Next.js
+          { files: ['next.config.js', 'next.config.mjs', 'next.config.ts'], framework: 'nextjs' },
+          // Nuxt.js
+          { files: ['nuxt.config.js', 'nuxt.config.ts'], framework: 'nuxtjs' },
+          // Vite (check for vite.config files)
+          { files: ['vite.config.js', 'vite.config.ts', 'vite.config.mjs'], framework: 'vite' },
+          // Create React App
+          { files: ['src/index.js', 'src/App.js'], checkContent: true, framework: 'create-react-app' },
+          // Angular
+          { files: ['angular.json'], framework: 'angular' },
+          // Vue
+          { files: ['vue.config.js'], framework: 'vue' },
+          // Svelte
+          { files: ['svelte.config.js'], framework: 'svelte' },
+          // Gatsby
+          { files: ['gatsby-config.js'], framework: 'gatsby' },
+          // Astro
+          { files: ['astro.config.mjs', 'astro.config.js'], framework: 'astro' },
+        ];
+
+        for (const check of frameworkChecks) {
+          for (const file of check.files) {
+            try {
+              if (check.checkContent) {
+                // For files that need content checking (like CRA)
+                const { data: fileData } = await octokit.rest.repos.getContent({
+                  owner,
+                  repo,
+                  path: file,
+                });
+                if (fileData && typeof fileData === 'object' && 'content' in fileData) {
+                  const content = Buffer.from(fileData.content as string, 'base64').toString();
+                  if (content.includes('ReactDOM.render') || content.includes('createRoot')) {
+                    detectedFramework = check.framework;
+                    break;
+                  }
+                }
+              } else {
+                // Simple file existence check
+                await octokit.rest.repos.getContent({
+                  owner,
+                  repo,
+                  path: file,
+                });
+                detectedFramework = check.framework;
+                break;
+              }
+            } catch (error) {
+              // File doesn't exist, continue checking
+              continue;
+            }
+          }
+          if (detectedFramework) break;
+        }
+
+        // Fallback: check package.json for dependencies
+        if (!detectedFramework) {
+          try {
+            const { data: packageJson } = await octokit.rest.repos.getContent({
+              owner,
+              repo,
+              path: 'package.json',
+            });
+
+            if (packageJson && typeof packageJson === 'object' && 'content' in packageJson) {
+              const content = JSON.parse(Buffer.from(packageJson.content as string, 'base64').toString());
+
+              // Check dependencies and devDependencies
+              const allDeps = { ...content.dependencies, ...content.devDependencies };
+
+              if (allDeps['next']) detectedFramework = 'nextjs';
+              else if (allDeps['nuxt']) detectedFramework = 'nuxtjs';
+              else if (allDeps['vite']) detectedFramework = 'vite';
+              else if (allDeps['@angular/core']) detectedFramework = 'angular';
+              else if (allDeps['vue']) detectedFramework = 'vue';
+              else if (allDeps['svelte']) detectedFramework = 'svelte';
+              else if (allDeps['gatsby']) detectedFramework = 'gatsby';
+              else if (allDeps['astro']) detectedFramework = 'astro';
+              else if (allDeps['react']) detectedFramework = 'create-react-app'; // Default to CRA for React apps
+            }
+          } catch (error) {
+            console.log('Could not read package.json for framework detection');
+          }
+        }
+
+        // Final fallback
+        if (!detectedFramework) {
+          detectedFramework = 'vite'; // Default fallback
+        }
+
+        console.log(`Detected framework: ${detectedFramework} for repo: ${githubRepo}`);
+
+      } catch (error) {
+        console.error('Error detecting framework:', error);
+        detectedFramework = framework || 'vite'; // Use provided framework or fallback to vite
+      }
+    }
+
     // Validate GitHub repo format
     if (!/^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+$/.test(githubRepo)) {
       return NextResponse.json({
@@ -79,7 +189,7 @@ export async function POST(request: NextRequest) {
             ref: 'main',
           },
           projectSettings: {
-            framework: framework || 'vite',
+            framework: detectedFramework,
           },
         }),
       });
@@ -147,7 +257,7 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           name: projectName,
-          framework: framework || 'vite',
+          framework: detectedFramework,
           gitRepository: githubRepo ? {
             type: 'github',
             repo: githubRepo,
@@ -232,55 +342,36 @@ export async function POST(request: NextRequest) {
 
     // For redeployment, we already have deploymentData from the trigger above
     if (mode !== 'redeploy') {
-      // Trigger deployment by pushing a dummy commit to GitHub (only for new projects)
-      try {
-        const octokit = new Octokit({
-          auth: githubToken,
-        });
+      // Trigger deployment directly via Vercel API (instead of relying on GitHub webhooks)
+      console.log(`Triggering deployment for new project: ${projectData.name}`);
 
-        const [owner, repo] = githubRepo.split('/');
+      const deployResponse = await fetch('https://api.vercel.com/v13/deployments', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: projectData.name, // Use project name for new deployments
+          gitSource: {
+            type: 'github',
+            repo: githubRepo,
+            ref: 'main',
+          },
+          projectSettings: {
+            framework: detectedFramework,
+          },
+        }),
+      });
 
-        // Get the latest commit on main branch
-        const { data: ref } = await octokit.rest.git.getRef({
-          owner,
-          repo,
-          ref: 'heads/main',
-        });
-
-        // Create a dummy commit by updating a file or creating an empty commit
-        // We'll create/update a .vercel-trigger file to trigger the webhook
-        const triggerFilePath = '.vercel-deployment-trigger';
-        const triggerContent = `Triggered at ${new Date().toISOString()}\n`;
-
-        // Check if file exists
-        let sha;
-        try {
-          const { data: existingFile } = await octokit.rest.repos.getContent({
-            owner,
-            repo,
-            path: triggerFilePath,
-          });
-          sha = (existingFile as any).sha;
-        } catch (error) {
-          // File doesn't exist, sha will be undefined
-        }
-
-        // Create or update the trigger file
-        const { data: updatedFile } = await octokit.rest.repos.createOrUpdateFileContents({
-          owner,
-          repo,
-          path: triggerFilePath,
-          message: 'Trigger Vercel deployment',
-          content: Buffer.from(triggerContent).toString('base64'),
-          sha,
-          branch: 'main',
-        });
-
-        console.log('Successfully triggered deployment by updating file:', updatedFile.commit.sha);
-
-      } catch (triggerError) {
-        console.error('Failed to trigger deployment:', triggerError);
-        // Don't fail the entire deployment if trigger fails
+      if (!deployResponse.ok) {
+        const errorData = await deployResponse.json();
+        console.error('Vercel deployment trigger error:', errorData);
+        // Don't fail the entire process if deployment trigger fails
+        // The project is created successfully, user can manually trigger deployment
+      } else {
+        deploymentData = await deployResponse.json();
+        console.log('Successfully triggered deployment:', deploymentData.uid);
       }
     }
 
@@ -319,12 +410,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Return project info with GitHub integration
+    // For new deployments, don't set URL initially - it will be fetched later
     return NextResponse.json({
-      url: finalDeploymentUrl || `https://${projectData.name}.vercel.app`,
+      url: mode === 'redeploy' ? finalDeploymentUrl : null,
       projectId: projectData.id,
       deploymentId: deploymentData?.uid,
       commitSha: deploymentData?.meta?.githubCommitSha || `vercel_project_${Date.now()}`,
-      status: mode === 'redeploy' ? 'ready' : 'ready',
+      status: mode === 'redeploy' ? 'ready' : 'building', // Mark as building for new deployments
+      needsUrlUpdate: mode !== 'redeploy', // Flag to indicate URL needs to be fetched
     });
 
   } catch (error) {

@@ -98,6 +98,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [justCreatedProject, setJustCreatedProject] = useState(false)
   const [hasAutoOpenedCreateDialog, setHasAutoOpenedCreateDialog] = useState(false)
   const [hasProcessedInitialPrompt, setHasProcessedInitialPrompt] = useState(false)
+
+  // URL editing state
+  const [isEditingUrl, setIsEditingUrl] = useState(false)
+  const [editingUrl, setEditingUrl] = useState("")
   
   // Preview-related state
   const [customUrl, setCustomUrl] = useState("")
@@ -723,6 +727,78 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     }
   }
 
+  // URL editing functions
+  const handleStartUrlEdit = () => {
+    const deploymentUrl = selectedProject?.vercelDeploymentUrl || selectedProject?.netlifyDeploymentUrl
+    if (deploymentUrl) {
+      setEditingUrl(deploymentUrl)
+      setIsEditingUrl(true)
+    }
+  }
+
+  const handleSaveUrlEdit = async () => {
+    if (!selectedProject || !editingUrl.trim()) return
+
+    try {
+      const updateData: any = {
+        lastActivity: new Date().toISOString(),
+      }
+
+      // Update the appropriate deployment URL field
+      if (selectedProject.vercelDeploymentUrl) {
+        updateData.vercelDeploymentUrl = editingUrl.trim()
+      } else if (selectedProject.netlifyDeploymentUrl) {
+        updateData.netlifyDeploymentUrl = editingUrl.trim()
+      }
+
+      await storageManager.updateWorkspace(selectedProject.id, updateData)
+
+      // Update local state
+      setSelectedProject(prev => prev ? {
+        ...prev,
+        vercelDeploymentUrl: selectedProject.vercelDeploymentUrl ? editingUrl.trim() : prev.vercelDeploymentUrl,
+        netlifyDeploymentUrl: selectedProject.netlifyDeploymentUrl ? editingUrl.trim() : prev.netlifyDeploymentUrl,
+      } : null)
+
+      // Update client projects list
+      setClientProjects(prev => prev.map(p =>
+        p.id === selectedProject.id
+          ? {
+              ...p,
+              vercelDeploymentUrl: selectedProject.vercelDeploymentUrl ? editingUrl.trim() : p.vercelDeploymentUrl,
+              netlifyDeploymentUrl: selectedProject.netlifyDeploymentUrl ? editingUrl.trim() : p.netlifyDeploymentUrl,
+            }
+          : p
+      ))
+
+      setIsEditingUrl(false)
+      setEditingUrl("")
+
+      toast({
+        title: "URL Updated",
+        description: "Live deployment URL has been updated successfully.",
+      })
+
+      // Trigger real-time sync
+      window.dispatchEvent(new CustomEvent('projectUpdated', {
+        detail: { projectId: selectedProject.id, action: 'urlUpdated', url: editingUrl.trim() }
+      }))
+
+    } catch (error) {
+      console.error('Error updating deployment URL:', error)
+      toast({
+        title: "Error",
+        description: "Failed to update deployment URL. Please try again.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleCancelUrlEdit = () => {
+    setIsEditingUrl(false)
+    setEditingUrl("")
+  }
+
   // Preview control functions
   const refreshPreview = () => {
     const currentPreview = codePreviewRef.current?.preview
@@ -861,7 +937,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               onDeploy={() => router.push(`/workspace/deployment?project=${selectedProject?.id}`)}
               onDatabase={() => {
                 if (selectedProject) {
-                  router.push(`/workspace/${selectedProject.id}/database`)
+                  window.open(`/workspace/${selectedProject.id}/database`, '_blank')
                 }
               }}
               user={user}
@@ -1179,15 +1255,97 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               </div>
 
               <div className="flex items-center space-x-2">
-                {selectedProject?.vercelDeploymentUrl && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                    onClick={() => window.open(selectedProject.vercelDeploymentUrl, '_blank')}
-                  >
-                    View Live
-                  </Button>
+                {((selectedProject?.vercelDeploymentUrl || selectedProject?.netlifyDeploymentUrl) || 
+                  (selectedProject?.deploymentStatus === 'in_progress' && (selectedProject?.vercelProjectId || selectedProject?.netlifySiteId))) && (
+                  <>
+                    {isEditingUrl ? (
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          value={editingUrl}
+                          onChange={(e) => setEditingUrl(e.target.value)}
+                          className="h-6 text-xs w-48"
+                          placeholder="Enter deployment URL"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleSaveUrlEdit()
+                            } else if (e.key === 'Escape') {
+                              handleCancelUrlEdit()
+                            }
+                          }}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-xs"
+                          onClick={handleSaveUrlEdit}
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-xs"
+                          onClick={handleCancelUrlEdit}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        {(selectedProject?.vercelDeploymentUrl || selectedProject?.netlifyDeploymentUrl) ? (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={() => window.open(selectedProject.vercelDeploymentUrl || selectedProject.netlifyDeploymentUrl, '_blank')}
+                            >
+                              View Live
+                            </Button>
+                            {selectedProject?.vercelProjectId && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                                onClick={() => window.open(`https://vercel.com/dashboard/project/${selectedProject.vercelProjectId}`, '_blank')}
+                                title="Manage Vercel project"
+                              >
+                                <ExternalLink className="h-3 w-3 mr-1" />
+                                Vercel
+                              </Button>
+                            )}
+                            {selectedProject?.netlifySiteId && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                                onClick={() => window.open(`https://app.netlify.com/sites/${selectedProject.netlifySiteId}`, '_blank')}
+                                title="Manage Netlify site"
+                              >
+                                <ExternalLink className="h-3 w-3 mr-1" />
+                                Netlify
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs"
+                              onClick={handleStartUrlEdit}
+                              title="Edit deployment URL"
+                            >
+                              <Edit3 className="h-3 w-3" />
+                            </Button>
+                          </>
+                        ) : (
+                          // Show fetching status when deployment is in progress but no URL yet
+                          <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                            <div className="animate-spin rounded-full h-3 w-3 border border-current border-t-transparent"></div>
+                            <span>Fetching URL...</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </>
                 )}
                 
                 <Button
@@ -1349,7 +1507,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 className="h-8 w-8 p-0"
                 onClick={() => {
                   if (selectedProject) {
-                    router.push(`/workspace/${selectedProject.id}/database`)
+                    window.open(`/workspace/${selectedProject.id}/database`, '_blank')
                   }
                 }}
                 disabled={!selectedProject}

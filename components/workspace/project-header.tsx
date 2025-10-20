@@ -197,7 +197,7 @@ export function ProjectHeader({
         <div className="flex items-center space-x-4">
           <Logo variant="icon" size="sm" />
           <div>
-            <h1 className="text-lg font-semibold text-card-foreground">Welcome to PixelPilot</h1>
+            <h1 className="text-lg font-semibold text-card-foreground">Welcome to PiPilot</h1>
             <p className="text-sm text-muted-foreground">Create your first project to get started</p>
           </div>
         </div>
@@ -222,7 +222,7 @@ export function ProjectHeader({
               <DialogHeader>
                 <DialogTitle>Create New Project</DialogTitle>
                 <DialogDescription>
-                  Start building your next app with AI assistance.
+                  Start building your next app with PiPilot.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
