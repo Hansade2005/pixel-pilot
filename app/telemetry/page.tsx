@@ -16,7 +16,7 @@ export default function TelemetryLogPage() {
           throw new Error(data.error || 'Failed to fetch telemetry logs');
         }
 
-        setLogs(data.records || []);
+        setLogs(Array.isArray(data.records) ? data.records : []);
       } catch (err: any) {
         setError(err.message);
       } finally {
