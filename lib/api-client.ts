@@ -22,11 +22,11 @@ export async function apiRequest<T>(
     },
   });
 
-  const data = await response.json();
+  const result = await response.json();
   
   if (!response.ok) {
-    return { data: null as T, error: data.error };
+    return { data: null as T, error: result.error || 'API request failed' };
   }
 
-  return { data, error: undefined };
+  return { data: result, error: undefined };
 }
