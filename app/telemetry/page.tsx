@@ -17,6 +17,8 @@ export default function TelemetryLogPage() {
         }
 
         setLogs(Array.isArray(data.records) ? data.records : []);
+        console.log('Fetched telemetry logs:', data.records);
+        console.log('First log structure:', data.records[0]);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -73,7 +75,17 @@ export default function TelemetryLogPage() {
               <div className="mb-4">
                 <strong>Input Data:</strong><br />
                 <pre className="text-xs bg-white p-2 rounded border overflow-x-auto max-h-40 overflow-y-auto">
-                  {JSON.stringify(log.input_data, null, 2)}
+                  {(() => {
+                    try {
+                      let inputData = log.input_data;
+                      if (typeof inputData === 'string') {
+                        inputData = JSON.parse(inputData);
+                      }
+                      return inputData ? JSON.stringify(inputData, null, 2) : 'No input data available';
+                    } catch (e) {
+                      return `Error parsing input data: ${e instanceof Error ? e.message : 'Unknown error'}`;
+                    }
+                  })()}
                 </pre>
               </div>
               

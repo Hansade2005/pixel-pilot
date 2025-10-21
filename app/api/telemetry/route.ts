@@ -4,7 +4,7 @@ import { getTelemetry_logs } from '@/app/actions/telemetry';
 export async function GET(request: NextRequest) {
   try {
     const { data, error } = await getTelemetry_logs();
-    console.log('Telemetry API response:', { data, error });
+    console.log('Raw telemetry API response from Pipilot:', { data, error });
 
     if (error) {
       return NextResponse.json({ error }, { status: 500 });
@@ -19,6 +19,9 @@ export async function GET(request: NextRequest) {
     } else if (data && typeof data === 'object') {
       records = [data]; // Single record
     }
+
+    console.log('Processed records:', records);
+    console.log('First record input_data:', records[0]?.input_data);
 
     return NextResponse.json({ records });
   } catch (error: any) {
