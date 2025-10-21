@@ -56,6 +56,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import type { Table as TableType, TableSchema, Column } from "@/lib/supabase";
 
@@ -87,6 +93,7 @@ export function DataGrid({
   const [globalFilter, setGlobalFilter] = useState("");
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [modalContent, setModalContent] = useState<{ title: string; content: string } | null>(null);
 
   const schema = table.schema_json as TableSchema;
 
@@ -126,7 +133,7 @@ export function DataGrid({
   };
 
   // Get cell renderer based on type
-  const getCellRenderer = (value: any, type: Column["type"]) => {
+  const getCellRenderer = (value: any, type: Column["type"], columnName: string) => {
     const formatted = formatCellValue(value, type);
 
     switch (type) {
@@ -160,7 +167,15 @@ export function DataGrid({
           </pre>
         );
       default:
-        return <span className="truncate block max-w-xs">{formatted}</span>;
+        return (
+          <button
+            onClick={() => setModalContent({ title: columnName, content: formatted })}
+            className="truncate block max-w-xs text-left hover:bg-muted/50 rounded px-1 py-0.5 cursor-pointer"
+            title="Click to view full content"
+          >
+            {formatted}
+          </button>
+        );
     }
   };
 
@@ -185,7 +200,7 @@ export function DataGrid({
       },
       cell: ({ row }) => {
         const value = row.original[col.name];
-        return getCellRenderer(value, col.type);
+        return getCellRenderer(value, col.type, col.name);
       },
       meta: {
         type: col.type,
@@ -598,6 +613,20 @@ export function DataGrid({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Modal for viewing full content */}
+      <Dialog open={!!modalContent} onOpenChange={() => setModalContent(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>{modalContent?.title}</DialogTitle>
+          </DialogHeader>
+          <div className="mt-4 max-h-96 overflow-y-auto">
+            <pre className="whitespace-pre-wrap break-words text-sm">
+              {modalContent?.content}
+            </pre>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
