@@ -722,13 +722,37 @@ export async function POST(req: Request) {
       aiMode
     } = body
 
+    // Validate messages is an array
+    if (!Array.isArray(messages)) {
+      console.error('[Chat-V2] Invalid messages format:', typeof messages)
+      return NextResponse.json({ 
+        error: 'Invalid messages format - must be an array' 
+      }, { status: 400 })
+    }
+
+    // Process messages: truncate long user messages and limit conversation history
+    const processedMessages = messages
+      .map(msg => {
+        // Truncate user messages to 1500 characters
+        if (msg.role === 'user' && msg.content && typeof msg.content === 'string' && msg.content.length > 1500) {
+          console.log(`[Chat-V2] Truncating user message from ${msg.content.length} to 1500 characters`)
+          return {
+            ...msg,
+            content: msg.content.substring(0, 1500) + '...'
+          }
+        }
+        return msg
+      })
+      // Keep only the last 3 pairs of messages (user + assistant exchanges = 6 messages max)
+      .slice(-6)
+
     // Telemetry logging: log every input sent to the model API
     try {
       await createTelemetry_log({
         request_id: requestId,
         model_api_id: crypto.randomUUID(), // Placeholder - should reference actual model_api.id
         input_data: {
-          messages,
+          messages: processedMessages, // Log processed messages
           projectId,
           project,
           files,
@@ -747,19 +771,12 @@ export async function POST(req: Request) {
       console.error('[Telemetry] Failed to log input:', telemetryError)
     }
 
-    // Validate messages is an array
-    if (!Array.isArray(messages)) {
-      console.error('[Chat-V2] Invalid messages format:', typeof messages)
-      return NextResponse.json({ 
-        error: 'Invalid messages format - must be an array' 
-      }, { status: 400 })
-    }
-
     console.log('[Chat-V2] Request received:', { 
       projectId, 
       modelId, 
       aiMode, 
-      messageCount: messages?.length || 0,
+      originalMessageCount: messages?.length || 0,
+      processedMessageCount: processedMessages.length,
       hasMessages: !!messages
     })
 
@@ -860,7 +877,7 @@ export async function POST(req: Request) {
     let conversationSummaryContext = ''
     try {
       // Ensure messages is an array before using slice
-      const recentMessages = Array.isArray(messages) ? messages.slice(-10) : []
+      const recentMessages = Array.isArray(processedMessages) ? processedMessages.slice(-10) : []
 
       if (recentMessages && recentMessages.length > 0) {
         // Filter out system messages and empty content
@@ -986,7 +1003,7 @@ ${conversationSummaryContext || ''}`
     const model = getAIModel(modelId)
 
     // Validate messages
-    if (!messages || messages.length === 0) {
+    if (!processedMessages || processedMessages.length === 0) {
       console.error('[Chat-V2] No messages provided')
       return NextResponse.json({ 
         error: 'No messages provided' 
@@ -1001,7 +1018,7 @@ ${conversationSummaryContext || ''}`
       model,
       system: systemPrompt,
       temperature: 0.7,
-      messages,
+      messages: processedMessages, // Use processed messages
       tools: {
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
         write_file: tool({
