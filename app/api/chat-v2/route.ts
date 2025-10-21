@@ -1,4 +1,5 @@
 import { streamText, tool, stepCountIs } from 'ai'
+import { createTelemetry_log, updateTelemetry_log } from '@/app/actions/telemetry'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { getModel } from '@/lib/ai-providers'
@@ -706,6 +707,9 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
 }
 
 export async function POST(req: Request) {
+  const requestId = crypto.randomUUID()
+  const startTime = Date.now()
+  
   try {
     const body = await req.json()
     const {
@@ -717,6 +721,31 @@ export async function POST(req: Request) {
       modelId,
       aiMode
     } = body
+
+    // Telemetry logging: log every input sent to the model API
+    try {
+      await createTelemetry_log({
+        request_id: requestId,
+        model_api_id: crypto.randomUUID(), // Placeholder - should reference actual model_api.id
+        input_data: {
+          messages,
+          projectId,
+          project,
+          files,
+          fileTree,
+          modelId,
+          aiMode
+        },
+        metadata: {
+          userAgent: req.headers.get('user-agent'),
+          ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip'),
+          timestamp: new Date().toISOString()
+        },
+        status: 'pending'
+      })
+    } catch (telemetryError) {
+      console.error('[Telemetry] Failed to log input:', telemetryError)
+    }
 
     // Validate messages is an array
     if (!Array.isArray(messages)) {
@@ -1845,6 +1874,14 @@ ${conversationSummaryContext || ''}`
       stopWhen: stepCountIs(50),
       onFinish: ({ response }) => {
         console.log(`[Chat-V2] Finished with ${response.messages.length} messages`)
+        
+        // Update telemetry with success status
+        updateTelemetry_log(requestId, {
+          status: 'success',
+          response_time_ms: Date.now() - startTime
+        }).catch(telemetryError => {
+          console.error('[Telemetry] Failed to update success status:', telemetryError)
+        })
       }
     })
 
@@ -1880,6 +1917,19 @@ ${conversationSummaryContext || ''}`
 
   } catch (error: any) {
     console.error('[Chat-V2] Error:', error)
+    
+    // Update telemetry with error status
+    try {
+      const endTime = Date.now()
+      await updateTelemetry_log(requestId, {
+        status: 'error',
+        error_message: error.message || 'Internal server error',
+        response_time_ms: endTime - startTime
+      })
+    } catch (telemetryError) {
+      console.error('[Telemetry] Failed to update error status:', telemetryError)
+    }
+    
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }
