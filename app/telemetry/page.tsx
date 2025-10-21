@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect } from "react";
-import { getTelemetry_logs } from "@/app/actions/telemetry";
 
 export default function TelemetryLogPage() {
   const [logs, setLogs] = useState<any[]>([]);
@@ -9,13 +8,20 @@ export default function TelemetryLogPage() {
 
   useEffect(() => {
     async function fetchLogs() {
-      const { data, error } = await getTelemetry_logs();
-      if (error) {
-        setError(error);
-      } else {
-        setLogs((data as any)?.records || []);
+      try {
+        const response = await fetch('/api/telemetry');
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to fetch telemetry logs');
+        }
+
+        setLogs(data.records || []);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     fetchLogs();
   }, []);
