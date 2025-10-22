@@ -143,7 +143,6 @@ export function ProjectHeader({
     if (!project) return
     
     await pushToGitHub(project, {
-      commitMessage: `Update project files - ${new Date().toLocaleString()}`,
       onSuccess: (data) => {
         // Optionally refresh or update UI state
       },

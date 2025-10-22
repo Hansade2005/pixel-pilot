@@ -12,10 +12,195 @@ interface PushState {
 }
 
 interface PushOptions {
-  commitMessage?: string
   onSuccess?: (data: any) => void
   onError?: (error: string) => void
 }
+  const fetchLastChatMessage = async (): Promise<string | null> => {
+    try {
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+
+      // Get current user ID
+      const supabaseClient = createClient()
+      const { data: { user } } = await supabaseClient.auth.getUser()
+      if (!user) return null
+
+      // Get all chat sessions for this user
+      const chatSessions = await storageManager.getChatSessions(user.id)
+
+      if (chatSessions.length === 0) {
+        return null
+      }
+
+      // Get the most recent chat session
+      const latestSession = chatSessions.sort((a, b) =>
+        new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
+      )[0]
+
+      // Get the latest messages from this session (get more for better context)
+      const messages = await storageManager.getMessages(latestSession.id)
+
+      if (messages.length === 0) {
+        return null
+      }
+
+      // Sort messages by creation time
+      const sortedMessages = messages.sort((a, b) => 
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      )
+
+      // Get the last 4 messages for better context (user request + AI implementation details)
+      const recentMessages = sortedMessages.slice(-4)
+
+      if (recentMessages.length === 0) {
+        return null
+      }
+
+      // Create enhanced context focusing on what the AI implemented
+      let context = ''
+      const userMessages = recentMessages.filter(msg => msg.role === 'user')
+      const assistantMessages = recentMessages.filter(msg => msg.role === 'assistant')
+
+      // Extract the most recent user request
+      const lastUserMessage = userMessages[userMessages.length - 1]
+      const lastAssistantMessage = assistantMessages[assistantMessages.length - 1]
+
+      if (lastUserMessage && lastAssistantMessage) {
+        // Format as user request + AI implementation
+        context = `USER REQUEST: ${lastUserMessage.content}\n\n`
+        context += `AI IMPLEMENTATION: ${lastAssistantMessage.content}\n\n`
+
+        // Look for implementation keywords in the AI response to highlight what was done
+        const implementationKeywords = ['implement', 'add', 'create', 'fix', 'update', 'refactor', 'remove', 'modify', 'build', 'develop', 'code', 'feature', 'function', 'component', 'api', 'database', 'ui', 'interface']
+        const aiContent = lastAssistantMessage.content.toLowerCase()
+
+        let implementedFeatures = []
+        for (const keyword of implementationKeywords) {
+          if (aiContent.includes(keyword)) {
+            // Extract sentences containing implementation keywords
+            const sentences = lastAssistantMessage.content.split(/[.!?]+/).filter(s => s.toLowerCase().includes(keyword))
+            implementedFeatures.push(...sentences.slice(0, 2)) // Take first 2 relevant sentences
+          }
+        }
+
+        if (implementedFeatures.length > 0) {
+          context += `KEY IMPLEMENTATIONS:\n${implementedFeatures.join('. ')}\n\n`
+        }
+
+        // Add summary if the AI response contains summary-like content
+        if (aiContent.includes('summary') || aiContent.includes('completed') || aiContent.includes('done')) {
+          const summaryMatch = lastAssistantMessage.content.match(/(?:summary|completed|done).*?([.!?]+)/i)
+          if (summaryMatch) {
+            context += `SUMMARY: ${summaryMatch[1]}\n\n`
+          }
+        }
+      } else if (lastUserMessage) {
+        // Only user message available
+        context = `USER REQUEST: ${lastUserMessage.content}`
+      } else if (lastAssistantMessage) {
+        // Only assistant message available
+        context = `AI WORK: ${lastAssistantMessage.content}`
+      }
+
+      return context
+
+    } catch (error) {
+      console.error('Error fetching last chat message:', error)
+      return null
+    }
+  }
+
+  /**
+   * Generate AI-powered commit message from chat conversation context
+   */
+  const generateCommitMessageFromChat = async (conversationContext: string): Promise<string> => {
+    try {
+      // Import AI dependencies dynamically
+      const { generateText } = await import('ai')
+      const { getModel } = await import('@/lib/ai-providers')
+
+      // Get the Pixtral model for commit message generation
+      const model = getModel('pixtral-12b-2409')
+
+      const commitMessageResult = await generateText({
+        model: model,
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert software engineer creating professional, meaningful commit messages from AI-assisted development conversations.
+
+Your task is to analyze the conversation context and extract what the AI actually implemented, focusing on features, fixes, and changes made.
+
+The context format includes:
+- USER REQUEST: What the user asked for
+- AI IMPLEMENTATION: The AI's response with implementation details
+- KEY IMPLEMENTATIONS: Specific sentences about what was implemented
+- SUMMARY: Any completion summary
+
+COMMIT MESSAGE GUIDELINES:
+- Keep it under 72 characters total
+- Start with a capital letter
+- Use imperative mood (Add, Fix, Update, Remove, etc.)
+- Be specific and meaningful about WHAT was implemented
+- Use conventional commit prefixes: feat:, fix:, chore:, docs:, style:, refactor:, test:
+- Focus on the actual implementation, not just the request
+- Look for specific features, fixes, or changes mentioned in KEY IMPLEMENTATIONS
+- Prioritize technical implementation details over general discussion
+
+EXAMPLES OF GOOD COMMIT MESSAGES:
+- "feat: Add user authentication system"
+- "fix: Resolve TypeScript compilation errors"
+- "feat: Implement responsive navigation component"
+- "refactor: Update API error handling with proper validation"
+- "feat: Add AI-powered commit message generation"
+- "fix: Fix deployment token persistence in database"
+- "feat: Create automated testing pipeline for CI/CD"
+
+Return ONLY the commit message, no quotes or additional text.`
+          },
+          {
+            role: 'user',
+            content: `Analyze this AI-assisted development conversation and create a professional commit message that captures what was actually implemented:
+
+${conversationContext}
+
+Focus on the AI IMPLEMENTATION and KEY IMPLEMENTATIONS sections to understand what features, fixes, or changes were actually made. Create a commit message that reflects the specific technical work completed, not just the user's request.
+
+Look for:
+- New features added (feat:)
+- Bugs fixed (fix:)
+- Code refactoring (refactor:)
+- Documentation updates (docs:)
+- Testing improvements (test:)
+- Styling changes (style:)
+- Configuration/setup changes (chore:)
+
+EXAMPLES:
+- If AI implemented a login system: "feat: Add user authentication system"
+- If AI fixed a bug: "fix: Resolve validation error in form submission"
+- If AI refactored code: "refactor: Update error handling in API routes"`
+          }
+        ],
+        temperature: 0.3, // Low temperature for consistent, professional output
+      })
+
+      const aiCommitMessage = commitMessageResult.text?.trim() || ''
+
+      // Validate the generated message
+      if (aiCommitMessage && aiCommitMessage.length > 0 && aiCommitMessage.length <= 72 && !aiCommitMessage.includes('User request') && !aiCommitMessage.includes('error')) {
+        return aiCommitMessage
+      }
+
+      // Fallback if AI generation fails or returns invalid content
+      return 'Update project files'
+
+    } catch (error) {
+      console.error('AI commit message generation failed:', error)
+
+      // Fallback to simple text processing if AI fails
+      return 'Update project files'
+    }
+  }
 
 export function useGitHubPush() {
   const [pushState, setPushState] = useState<PushState>({
@@ -82,7 +267,6 @@ export function useGitHubPush() {
     options: PushOptions = {}
   ): Promise<boolean> => {
     const { 
-      commitMessage = "Update project files from PixelPilot", 
       onSuccess, 
       onError 
     } = options
@@ -134,6 +318,12 @@ export function useGitHubPush() {
         throw new Error("Invalid GitHub repository URL")
       }
 
+      // Auto-generate commit message from recent chat
+      const lastMessage = await fetchLastChatMessage()
+      const commitMessage = lastMessage 
+        ? await generateCommitMessageFromChat(lastMessage)
+        : "Update project files from PixelPilot"
+
       // Push to GitHub using the deployment API
       const pushResponse = await fetch('/api/deploy/github', {
         method: 'POST',
@@ -177,7 +367,7 @@ export function useGitHubPush() {
       
       toast({
         title: "Changes Pushed Successfully",
-        description: `Pushed to ${project.githubRepoName || repoInfo}`,
+        description: `Pushed to ${project.githubRepoName || repoInfo} with commit: "${commitMessage}"`,
         variant: "default"
       })
 
