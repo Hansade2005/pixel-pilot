@@ -587,37 +587,6 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
             }
           }
 
-          // Generate diff information
-          const generateDiff = (oldContent: string, newContent: string) => {
-            const oldLines = oldContent.split('\n')
-            const newLines = newContent.split('\n')
-            const diff = []
-
-            const maxLines = Math.max(oldLines.length, newLines.length)
-            for (let i = 0; i < maxLines; i++) {
-              const oldLine = oldLines[i] || ''
-              const newLine = newLines[i] || ''
-
-              if (oldLine !== newLine) {
-                if (oldLine && !newLine) {
-                  diff.push({ line: i + 1, type: 'removed', content: oldLine })
-                } else if (!oldLine && newLine) {
-                  diff.push({ line: i + 1, type: 'added', content: newLine })
-                } else {
-                  diff.push({
-                    line: i + 1,
-                    type: 'modified',
-                    oldContent: oldLine,
-                    newContent: newLine
-                  })
-                }
-              }
-            }
-
-            return diff
-          }
-
-          const diff = generateDiff(originalContent, newContent)
           const newLines = newContent.split('\n')
           const newLineCount = newLines.length
 
@@ -634,7 +603,6 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
               newContent,
               appliedEdits,
               failedEdits,
-              diff,
               stats: {
                 originalSize: originalContent.length,
                 newSize: newContent.length,
