@@ -441,7 +441,7 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
       }
 
       case 'edit_file': {
-        const { filePath, searchReplaceBlock } = input
+        const { filePath, searchReplaceBlock, useRegex = false, replaceAll = false } = input
 
         // Validate inputs
         if (!filePath || typeof filePath !== 'string') {
@@ -486,36 +486,184 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
         }
 
         const originalContent = file.content || ''
+        const originalLines = originalContent.split('\n')
+        const originalLineCount = originalLines.length
         const { search, replace } = parsedBlock
 
-        // Check if search text exists in file
-        if (!originalContent.includes(search)) {
+        // Create backup for potential rollback
+        const backupContent = originalContent
+
+        let newContent = originalContent
+        const appliedEdits = []
+        const failedEdits = []
+        let replacementCount = 0
+
+        try {
+          if (useRegex) {
+            // Handle regex replacement
+            const regexFlags = replaceAll ? 'g' : ''
+            const regex = new RegExp(search, regexFlags)
+
+            if (regex.test(originalContent)) {
+              newContent = originalContent.replace(regex, replace)
+              replacementCount = replaceAll ? (originalContent.match(regex) || []).length : 1
+
+              appliedEdits.push({
+                type: 'regex',
+                pattern: search,
+                replacement: replace,
+                flags: regexFlags,
+                occurrences: replacementCount,
+                status: 'applied'
+              })
+            } else {
+              failedEdits.push({
+                type: 'regex',
+                pattern: search,
+                replacement: replace,
+                status: 'failed',
+                reason: 'Regex pattern not found in file content'
+              })
+            }
+          } else {
+            // Handle string replacement
+            if (replaceAll) {
+              // Replace all occurrences
+              let occurrences = 0
+              const allMatches = []
+              let searchIndex = 0
+
+              while ((searchIndex = newContent.indexOf(search, searchIndex)) !== -1) {
+                allMatches.push(searchIndex)
+                searchIndex += search.length
+                occurrences++
+              }
+
+              if (occurrences > 0) {
+                newContent = newContent.replaceAll(search, replace)
+                replacementCount = occurrences
+
+                appliedEdits.push({
+                  type: 'string',
+                  search: search,
+                  replacement: replace,
+                  occurrences: replacementCount,
+                  positions: allMatches,
+                  status: 'applied'
+                })
+              } else {
+                failedEdits.push({
+                  type: 'string',
+                  search: search,
+                  replacement: replace,
+                  status: 'failed',
+                  reason: 'Search text not found in file content'
+                })
+              }
+            } else {
+              // Replace first occurrence only
+              if (newContent.includes(search)) {
+                const searchIndex = newContent.indexOf(search)
+                newContent = newContent.replace(search, replace)
+                replacementCount = 1
+
+                appliedEdits.push({
+                  type: 'string',
+                  search: search,
+                  replacement: replace,
+                  occurrences: 1,
+                  position: searchIndex,
+                  status: 'applied'
+                })
+              } else {
+                failedEdits.push({
+                  type: 'string',
+                  search: search,
+                  replacement: replace,
+                  status: 'failed',
+                  reason: 'Search text not found in file content'
+                })
+              }
+            }
+          }
+
+          // Generate diff information
+          const generateDiff = (oldContent: string, newContent: string) => {
+            const oldLines = oldContent.split('\n')
+            const newLines = newContent.split('\n')
+            const diff = []
+
+            const maxLines = Math.max(oldLines.length, newLines.length)
+            for (let i = 0; i < maxLines; i++) {
+              const oldLine = oldLines[i] || ''
+              const newLine = newLines[i] || ''
+
+              if (oldLine !== newLine) {
+                if (oldLine && !newLine) {
+                  diff.push({ line: i + 1, type: 'removed', content: oldLine })
+                } else if (!oldLine && newLine) {
+                  diff.push({ line: i + 1, type: 'added', content: newLine })
+                } else {
+                  diff.push({
+                    line: i + 1,
+                    type: 'modified',
+                    oldContent: oldLine,
+                    newContent: newLine
+                  })
+                }
+              }
+            }
+
+            return diff
+          }
+
+          const diff = generateDiff(originalContent, newContent)
+          const newLines = newContent.split('\n')
+          const newLineCount = newLines.length
+
+          // Update the file in memory
+          if (appliedEdits.length > 0) {
+            file.content = newContent
+            file.size = newContent.length
+
+            return {
+              success: true,
+              message: `✅ File ${filePath} modified successfully (${replacementCount} replacement${replacementCount !== 1 ? 's' : ''}).`,
+              path: filePath,
+              originalContent,
+              newContent,
+              appliedEdits,
+              failedEdits,
+              diff,
+              stats: {
+                originalSize: originalContent.length,
+                newSize: newContent.length,
+                originalLines: originalLineCount,
+                newLines: newLineCount,
+                replacements: replacementCount
+              },
+              backupAvailable: true,
+              action: 'modified',
+              toolCallId
+            }
+          } else {
+            return {
+              success: false,
+              error: `Failed to apply edit: ${failedEdits[0]?.reason || 'Unknown error'}`,
+              filePath,
+              appliedEdits,
+              failedEdits,
+              toolCallId
+            }
+          }
+        } catch (editError) {
+          console.error(`[CONSTRUCT_TOOL_RESULT] Edit error:`, editError)
           return {
             success: false,
-            error: `Search text not found in file: ${filePath}`,
+            error: `Edit failed: ${editError instanceof Error ? editError.message : 'Unknown error'}`,
             filePath,
-            searchText: search,
             toolCallId
           }
-        }
-
-        // Perform the replacement
-        const newContent = originalContent.replace(search, replace)
-
-        // Update the file in memory
-        file.content = newContent
-        file.size = newContent.length
-
-        return {
-          success: true,
-          message: `✅ File ${filePath} modified successfully.`,
-          path: filePath,
-          originalContent,
-          newContent,
-          searchText: search,
-          replaceText: replace,
-          action: 'modified',
-          toolCallId
         }
       }
 
@@ -1127,7 +1275,7 @@ ${conversationSummaryContext || ''}`
 
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
         edit_file: tool({
-          description: 'Edit an existing file using search/replace blocks. This tool cannot handle very large replacements. Use it only for small changes, small additions, or modifications in files. For large changes, prioritize the write_file tool instead. This tool executes on the client-side IndexedDB.',
+          description: 'Edit an existing file using search/replace blocks with advanced options. Supports regex patterns, multiple replacements, and detailed diff reporting. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
             filePath: z.string().describe('The file path relative to project root'),
             searchReplaceBlock: z.string().describe(`Search/replace block in format:
@@ -1135,11 +1283,13 @@ ${conversationSummaryContext || ''}`
 [exact code to find]
 =======
 [new code to replace with]
->>>>>>> REPLACE`)
+>>>>>>> REPLACE`),
+            useRegex: z.boolean().optional().describe('Whether to treat search as regex pattern (default: false)'),
+            replaceAll: z.boolean().optional().describe('Whether to replace all occurrences (default: false, replaces first occurrence only)')
           }),
-          execute: async ({ filePath, searchReplaceBlock }, { toolCallId }) => {
+          execute: async ({ filePath, searchReplaceBlock, useRegex = false, replaceAll = false }, { toolCallId }) => {
             // Use the powerful constructor to get actual results
-            return await constructToolResult('edit_file', { filePath, searchReplaceBlock }, projectId, toolCallId)
+            return await constructToolResult('edit_file', { filePath, searchReplaceBlock, useRegex, replaceAll }, projectId, toolCallId)
           }
         }),
 

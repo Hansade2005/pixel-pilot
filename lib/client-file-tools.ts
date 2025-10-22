@@ -219,8 +219,8 @@ export async function handleClientFileOperation(
       }
 
       case 'edit_file': {
-        const { filePath, searchReplaceBlock } = toolCall.args;
-        console.log(`[ClientFileTool] edit_file: ${filePath}`);
+        const { filePath, searchReplaceBlock, useRegex = false, replaceAll = false } = toolCall.args;
+        console.log(`[ClientFileTool] edit_file: ${filePath} (regex: ${useRegex}, replaceAll: ${replaceAll})`);
 
         if (!filePath || typeof filePath !== 'string') {
           addToolResult({
@@ -256,6 +256,8 @@ export async function handleClientFileOperation(
         }
 
         const currentContent = existingFile.content || '';
+        const originalLines = currentContent.split('\n');
+        const originalLineCount = originalLines.length;
 
         // Parse the search/replace block
         const editBlock = parseSearchReplaceBlock(searchReplaceBlock);
@@ -270,56 +272,187 @@ export async function handleClientFileOperation(
           return;
         }
 
-        // Apply the search/replace
+        const { search, replace } = editBlock;
+
+        // Create backup for potential rollback
+        const backupContent = currentContent;
+
         let modifiedContent = currentContent;
         const appliedEdits = [];
         const failedEdits = [];
+        let replacementCount = 0;
 
-        if (modifiedContent.includes(editBlock.search)) {
-          modifiedContent = modifiedContent.replace(editBlock.search, editBlock.replace);
-          appliedEdits.push({
-            search: editBlock.search,
-            replace: editBlock.replace,
-            status: 'applied'
-          });
-        } else {
-          failedEdits.push({
-            search: editBlock.search,
-            replace: editBlock.replace,
-            status: 'failed',
-            reason: 'Search text not found in file content'
-          });
-        }
+        try {
+          if (useRegex) {
+            // Handle regex replacement
+            const regexFlags = replaceAll ? 'g' : '';
+            const regex = new RegExp(search, regexFlags);
 
-        // Save the modified content
-        if (appliedEdits.length > 0) {
-          await storageManager.updateFile(projectId, filePath, { content: modifiedContent });
-          console.log(`[ClientFileTool] Edited file: ${filePath}`);
+            if (regex.test(currentContent)) {
+              modifiedContent = currentContent.replace(regex, replace);
+              replacementCount = replaceAll ? (currentContent.match(regex) || []).length : 1;
 
-          addToolResult({
-            tool: 'edit_file',
-            toolCallId: toolCall.toolCallId,
-            output: {
-              success: true,
-              message: `✅ File ${filePath} edited successfully.`,
-              path: filePath,
-              content: modifiedContent,
-              appliedEdits,
-              failedEdits,
-              action: 'edited'
+              appliedEdits.push({
+                type: 'regex',
+                pattern: search,
+                replacement: replace,
+                flags: regexFlags,
+                occurrences: replacementCount,
+                status: 'applied'
+              });
+            } else {
+              failedEdits.push({
+                type: 'regex',
+                pattern: search,
+                replacement: replace,
+                status: 'failed',
+                reason: 'Regex pattern not found in file content'
+              });
             }
-          });
+          } else {
+            // Handle string replacement
+            if (replaceAll) {
+              // Replace all occurrences
+              let occurrences = 0;
+              const allMatches = [];
+              let searchIndex = 0;
 
-          // Trigger file refresh event
-          window.dispatchEvent(new CustomEvent('files-changed', {
-            detail: { projectId, forceRefresh: true }
-          }));
-        } else {
+              while ((searchIndex = modifiedContent.indexOf(search, searchIndex)) !== -1) {
+                allMatches.push(searchIndex);
+                searchIndex += search.length;
+                occurrences++;
+              }
+
+              if (occurrences > 0) {
+                modifiedContent = modifiedContent.replaceAll(search, replace);
+                replacementCount = occurrences;
+
+                appliedEdits.push({
+                  type: 'string',
+                  search: search,
+                  replacement: replace,
+                  occurrences: replacementCount,
+                  positions: allMatches,
+                  status: 'applied'
+                });
+              } else {
+                failedEdits.push({
+                  type: 'string',
+                  search: search,
+                  replacement: replace,
+                  status: 'failed',
+                  reason: 'Search text not found in file content'
+                });
+              }
+            } else {
+              // Replace first occurrence only
+              if (modifiedContent.includes(search)) {
+                const searchIndex = modifiedContent.indexOf(search);
+                modifiedContent = modifiedContent.replace(search, replace);
+                replacementCount = 1;
+
+                appliedEdits.push({
+                  type: 'string',
+                  search: search,
+                  replacement: replace,
+                  occurrences: 1,
+                  position: searchIndex,
+                  status: 'applied'
+                });
+              } else {
+                failedEdits.push({
+                  type: 'string',
+                  search: search,
+                  replacement: replace,
+                  status: 'failed',
+                  reason: 'Search text not found in file content'
+                });
+              }
+            }
+          }
+
+          // Generate diff information
+          const generateDiff = (oldContent: string, newContent: string) => {
+            const oldLines = oldContent.split('\n');
+            const newLines = newContent.split('\n');
+            const diff = [];
+
+            const maxLines = Math.max(oldLines.length, newLines.length);
+            for (let i = 0; i < maxLines; i++) {
+              const oldLine = oldLines[i] || '';
+              const newLine = newLines[i] || '';
+
+              if (oldLine !== newLine) {
+                if (oldLine && !newLine) {
+                  diff.push({ line: i + 1, type: 'removed', content: oldLine });
+                } else if (!oldLine && newLine) {
+                  diff.push({ line: i + 1, type: 'added', content: newLine });
+                } else {
+                  diff.push({
+                    line: i + 1,
+                    type: 'modified',
+                    oldContent: oldLine,
+                    newContent: newLine
+                  });
+                }
+              }
+            }
+
+            return diff;
+          };
+
+          const diff = generateDiff(currentContent, modifiedContent);
+          const modifiedLines = modifiedContent.split('\n');
+          const newLineCount = modifiedLines.length;
+
+          // Save the modified content
+          if (appliedEdits.length > 0) {
+            await storageManager.updateFile(projectId, filePath, { content: modifiedContent });
+            console.log(`[ClientFileTool] Edited file: ${filePath} (${replacementCount} replacements)`);
+
+            addToolResult({
+              tool: 'edit_file',
+              toolCallId: toolCall.toolCallId,
+              output: {
+                success: true,
+                message: `✅ File ${filePath} edited successfully (${replacementCount} replacement${replacementCount !== 1 ? 's' : ''}).`,
+                path: filePath,
+                originalContent: currentContent,
+                newContent: modifiedContent,
+                appliedEdits,
+                failedEdits,
+                diff,
+                stats: {
+                  originalSize: currentContent.length,
+                  newSize: modifiedContent.length,
+                  originalLines: originalLineCount,
+                  newLines: newLineCount,
+                  replacements: replacementCount
+                },
+                backupAvailable: true,
+                action: 'edited'
+              }
+            });
+
+            // Trigger file refresh event
+            window.dispatchEvent(new CustomEvent('files-changed', {
+              detail: { projectId, forceRefresh: true }
+            }));
+          } else {
+            addToolResult({
+              tool: 'edit_file',
+              toolCallId: toolCall.toolCallId,
+              state: 'output-error',
+              errorText: `Failed to apply edit: ${failedEdits[0]?.reason || 'Unknown error'}`
+            });
+          }
+        } catch (editError) {
+          console.error(`[ClientFileTool] Edit error:`, editError);
           addToolResult({
             tool: 'edit_file',
             toolCallId: toolCall.toolCallId,
             state: 'output-error',
-            errorText: `Failed to apply edit: ${failedEdits[0]?.reason || 'Unknown error'}`
+            errorText: `Edit failed: ${editError instanceof Error ? editError.message : 'Unknown error'}`
           });
         }
         break;
