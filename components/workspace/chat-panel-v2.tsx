@@ -273,6 +273,29 @@ export function ChatPanelV2({
     []
   );
 
+  // Debounced file dropdown handler to prevent lag during typing
+  const debouncedFileDropdownHandler = useCallback(
+    debounce((newValue: string, cursorPos: number, textarea: HTMLTextAreaElement) => {
+      const atCommand = detectAtCommand(newValue, cursorPos);
+
+      if (atCommand) {
+        setFileQuery(atCommand.query);
+        setAtCommandStartIndex(atCommand.startIndex);
+
+        if (!showFileDropdown) {
+          const position = calculateDropdownPosition(textarea, atCommand.startIndex);
+          setDropdownPosition(position);
+          setShowFileDropdown(true);
+        }
+      } else {
+        if (showFileDropdown) {
+          closeFileDropdown();
+        }
+      }
+    }, 150), // 150ms debounce for @ command detection
+    [] // No dependencies needed since we access state inside the function
+  );
+
   // File attachments state (preserve from original)
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([])
@@ -1819,25 +1842,9 @@ export function ChatPanelV2({
                 const newValue = e.target.value
                 setInput(newValue)
                 
-                // @ command detection
+                // Debounced @ command detection to prevent lag
                 if (textareaRef.current && project) {
-                  const cursorPos = e.target.selectionStart
-                  const atCommand = detectAtCommand(newValue, cursorPos)
-                  
-                  if (atCommand) {
-                    setFileQuery(atCommand.query)
-                    setAtCommandStartIndex(atCommand.startIndex)
-                    
-                    if (!showFileDropdown) {
-                      const position = calculateDropdownPosition(textareaRef.current, atCommand.startIndex)
-                      setDropdownPosition(position)
-                      setShowFileDropdown(true)
-                    }
-                  } else {
-                    if (showFileDropdown) {
-                      closeFileDropdown()
-                    }
-                  }
+                  debouncedFileDropdownHandler(newValue, e.target.selectionStart, textareaRef.current);
                 }
                 
                 // Trigger height adjustment
