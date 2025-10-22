@@ -452,7 +452,7 @@ export default function DeploymentClient() {
     }
   }
 
-  // Fetch the last chat message from IndexedDB
+  // Fetch the last chat message from IndexedDB with enhanced context for commit messages
   const fetchLastChatMessage = async (): Promise<string | null> => {
     try {
       const { storageManager } = await import('@/lib/storage-manager')
@@ -475,42 +475,69 @@ export default function DeploymentClient() {
         new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
       )[0]
 
-      // Get the latest message from this session
+      // Get the latest messages from this session (get more for better context)
       const messages = await storageManager.getMessages(latestSession.id)
 
       if (messages.length === 0) {
         return null
       }
 
-      // Get the last two messages (user + assistant) for better context
+      // Sort messages by creation time
       const sortedMessages = messages.sort((a, b) => 
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       )
-      
-      const lastTwoMessages = sortedMessages.slice(-2)
-      
-      if (lastTwoMessages.length === 0) {
+
+      // Get the last 4 messages for better context (user request + AI implementation details)
+      const recentMessages = sortedMessages.slice(-4)
+
+      if (recentMessages.length === 0) {
         return null
       }
 
-      // Create context from the last two messages
+      // Create enhanced context focusing on what the AI implemented
       let context = ''
-      
-      if (lastTwoMessages.length === 1) {
-        // Only one message available
-        context = `User: ${lastTwoMessages[0].content}`
-      } else {
-        // Two messages available - format as conversation
-        const [secondLast, last] = lastTwoMessages
-        if (secondLast.role === 'user' && last.role === 'assistant') {
-          context = `User request: ${secondLast.content}\n\nAI response: ${last.content.substring(0, 300)}...`
-        } else if (secondLast.role === 'assistant' && last.role === 'user') {
-          context = `Previous AI response: ${secondLast.content.substring(0, 200)}...\n\nUser request: ${last.content}`
-        } else {
-          // Both same role, just use the last user message
-          const userMessages = lastTwoMessages.filter(msg => msg.role === 'user')
-          context = userMessages.length > 0 ? `User: ${userMessages[userMessages.length - 1].content}` : lastTwoMessages[lastTwoMessages.length - 1].content
+      const userMessages = recentMessages.filter(msg => msg.role === 'user')
+      const assistantMessages = recentMessages.filter(msg => msg.role === 'assistant')
+
+      // Extract the most recent user request
+      const lastUserMessage = userMessages[userMessages.length - 1]
+      const lastAssistantMessage = assistantMessages[assistantMessages.length - 1]
+
+      if (lastUserMessage && lastAssistantMessage) {
+        // Format as user request + AI implementation
+        context = `USER REQUEST: ${lastUserMessage.content}\n\n`
+        context += `AI IMPLEMENTATION: ${lastAssistantMessage.content}\n\n`
+
+        // Look for implementation keywords in the AI response to highlight what was done
+        const implementationKeywords = ['implement', 'add', 'create', 'fix', 'update', 'refactor', 'remove', 'modify', 'build', 'develop', 'code', 'feature', 'function', 'component', 'api', 'database', 'ui', 'interface']
+        const aiContent = lastAssistantMessage.content.toLowerCase()
+
+        let implementedFeatures = []
+        for (const keyword of implementationKeywords) {
+          if (aiContent.includes(keyword)) {
+            // Extract sentences containing implementation keywords
+            const sentences = lastAssistantMessage.content.split(/[.!?]+/).filter(s => s.toLowerCase().includes(keyword))
+            implementedFeatures.push(...sentences.slice(0, 2)) // Take first 2 relevant sentences
+          }
         }
+
+        if (implementedFeatures.length > 0) {
+          context += `KEY IMPLEMENTATIONS:\n${implementedFeatures.join('. ')}\n\n`
+        }
+
+        // Add summary if the AI response contains summary-like content
+        if (aiContent.includes('summary') || aiContent.includes('completed') || aiContent.includes('done')) {
+          const summaryMatch = lastAssistantMessage.content.match(/(?:summary|completed|done).*?([.!?]+)/i)
+          if (summaryMatch) {
+            context += `SUMMARY: ${summaryMatch[1]}\n\n`
+          }
+        }
+      } else if (lastUserMessage) {
+        // Only user message available
+        context = `USER REQUEST: ${lastUserMessage.content}`
+      } else if (lastAssistantMessage) {
+        // Only assistant message available
+        context = `AI WORK: ${lastAssistantMessage.content}`
       }
 
       return context
@@ -528,90 +555,86 @@ export default function DeploymentClient() {
       const { generateText } = await import('ai')
       const { getModel } = await import('@/lib/ai-providers')
 
-      // Get the auto model (Codestral by default)
-      const model = getModel('auto')
+      // Get the Pixtral model for commit message generation
+      const model = getModel('pixtral-12b-2409')
 
       const commitMessageResult = await generateText({
         model: model,
         messages: [
           {
             role: 'system',
-            content: `You are an expert software engineer creating professional, meaningful commit messages.
+            content: `You are an expert software engineer creating professional, meaningful commit messages from AI-assisted development conversations.
 
-Your task is to analyze a conversation between a user and an AI assistant about development work, and create a concise, professional commit message that follows conventional commit standards.
+Your task is to analyze the conversation context and extract what the AI actually implemented, focusing on features, fixes, and changes made.
 
-You will receive the recent conversation context which may include:
-- User's request/question about what they want to implement
-- AI's response with implementation details or code suggestions
-- Description of changes that were made or will be made
+The context format includes:
+- USER REQUEST: What the user asked for
+- AI IMPLEMENTATION: The AI's response with implementation details
+- KEY IMPLEMENTATIONS: Specific sentences about what was implemented
+- SUMMARY: Any completion summary
 
 COMMIT MESSAGE GUIDELINES:
 - Keep it under 72 characters total
 - Start with a capital letter
 - Use imperative mood (Add, Fix, Update, Remove, etc.)
-- Be specific and meaningful
-- Focus on WHAT was changed, not HOW
+- Be specific and meaningful about WHAT was implemented
 - Use conventional commit prefixes: feat:, fix:, chore:, docs:, style:, refactor:, test:
-- Extract the core development task from the conversation
-- Prioritize the actual implementation over just discussion
+- Focus on the actual implementation, not just the request
+- Look for specific features, fixes, or changes mentioned in KEY IMPLEMENTATIONS
+- Prioritize technical implementation details over general discussion
 
 EXAMPLES OF GOOD COMMIT MESSAGES:
-- "feat: Add user authentication system"
-- "fix: Resolve login validation error"
-- "feat: Implement dark mode toggle"
-- "refactor: Update API error handling"
-- "feat: Add responsive header component"
-- "fix: Fix deployment token persistence"
-- "feat: Add AI commit message generator"
+- "feat: Add user authentication with JWT tokens"
+- "fix: Resolve TypeScript compilation errors in route handlers"
+- "feat: Implement responsive navigation component"
+- "refactor: Update API error handling with proper validation"
+- "feat: Add AI-powered commit message generation"
+- "fix: Fix deployment token persistence in database"
+- "feat: Create automated testing pipeline for CI/CD"
 
 Return ONLY the commit message, no quotes or additional text.`
           },
           {
             role: 'user',
-            content: `Analyze this development conversation and create a professional commit message:
+            content: `Analyze this AI-assisted development conversation and create a professional commit message that captures what was actually implemented:
 
 ${conversationContext}
 
-Create a commit message that captures the main development task or change discussed.    ensure to focus on what the ai implementedd and avoid saying the user requested for    instead focus n thee implementation the ai  didi by look at the end of each ai message  it contains a summarry of changes the ai gave to the user , use that as a good reference to craft a good technicall commmit message 
+Focus on the AI IMPLEMENTATION and KEY IMPLEMENTATIONS sections to understand what features, fixes, or changes were actually made. Create a commit message that reflects the specific technical work completed, not just the user's request.
 
-EXAMPLES OF GOOD COMMIT MESSAGES:
-- "feat: Add user authentication system"
-- "fix: Resolve login validation error"
-- "feat: Implement dark mode toggle"
-- "refactor: Update API error handling"
-- "feat: Add responsive header component"
-- "fix: Fix deployment token persistence"
-- "feat: Add AI commit message generator"`
+Look for:
+- New features added (feat:)
+- Bugs fixed (fix:)
+- Code refactoring (refactor:)
+- Documentation updates (docs:)
+- Testing improvements (test:)
+- Styling changes (style:)
+- Configuration/setup changes (chore:)
+
+EXAMPLES:
+- If AI implemented a login system: "feat: Add user authentication system"
+- If AI fixed a bug: "fix: Resolve validation error in form submission"
+- If AI refactored code: "refactor: Update error handling in API routes"`
           }
         ],
         temperature: 0.3, // Low temperature for consistent, professional output
       })
 
-      const aiCommitMessage = commitMessageResult.text.trim()
+      const aiCommitMessage = commitMessageResult.text?.trim() || ''
 
       // Validate the generated message
-      if (aiCommitMessage.length > 0 && aiCommitMessage.length <= 72) {
+      if (aiCommitMessage && aiCommitMessage.length > 0 && aiCommitMessage.length <= 72 && !aiCommitMessage.includes('User request') && !aiCommitMessage.includes('error')) {
         return aiCommitMessage
       }
 
-      // Fallback if AI generation fails
+      // Fallback if AI generation fails or returns invalid content
       return 'Update project files'
 
     } catch (error) {
       console.error('AI commit message generation failed:', error)
 
       // Fallback to simple text processing if AI fails
-      let cleaned = conversationContext
-        .replace(/[^\w\s-]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .substring(0, 50)
-
-      if (cleaned.length === 0) {
-        return 'Update project files'
-      }
-
-      return cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
+      return 'Update project files'
     }
   }
 
