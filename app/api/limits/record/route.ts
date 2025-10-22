@@ -31,11 +31,20 @@ export async function POST(request: NextRequest) {
     // Update deployment count if this is a deployment
     if (operation === 'deploy') {
       if (platform === 'github') {
+        // Get current count and increment
+        const { data: currentSettings } = await supabase
+          .from('user_settings')
+          .select('github_pushes_this_month')
+          .eq('user_id', user.id)
+          .single()
+
+        const currentCount = currentSettings?.github_pushes_this_month || 0
+
         // Update GitHub push count
         const { error: updateError } = await supabase
           .from('user_settings')
           .update({
-            github_pushes_this_month: supabase.raw('COALESCE(github_pushes_this_month, 0) + 1'),
+            github_pushes_this_month: currentCount + 1,
             updated_at: new Date().toISOString()
           })
           .eq('user_id', user.id)
@@ -44,11 +53,20 @@ export async function POST(request: NextRequest) {
           console.error('Error updating GitHub push count:', updateError)
         }
       } else {
+        // Get current count and increment
+        const { data: currentSettings } = await supabase
+          .from('user_settings')
+          .select('deployments_this_month')
+          .eq('user_id', user.id)
+          .single()
+
+        const currentCount = currentSettings?.deployments_this_month || 0
+
         // Update general deployment count
         const { error: updateError } = await supabase
           .from('user_settings')
           .update({
-            deployments_this_month: supabase.raw('COALESCE(deployments_this_month, 0) + 1'),
+            deployments_this_month: currentCount + 1,
             updated_at: new Date().toISOString()
           })
           .eq('user_id', user.id)
