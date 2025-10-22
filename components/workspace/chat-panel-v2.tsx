@@ -292,7 +292,7 @@ export function ChatPanelV2({
           closeFileDropdown();
         }
       }
-    }, 150), // 150ms debounce for @ command detection
+    }, 50), // 50ms debounce for @ command detection (matches height adjustment for consistency)
     [] // No dependencies needed since we access state inside the function
   );
 
@@ -1842,9 +1842,12 @@ export function ChatPanelV2({
                 const newValue = e.target.value
                 setInput(newValue)
                 
-                // Debounced @ command detection to prevent lag
-                if (textareaRef.current && project) {
+                // Debounced @ command detection to prevent lag (only if @ is present)
+                if (textareaRef.current && project && newValue.includes('@')) {
                   debouncedFileDropdownHandler(newValue, e.target.selectionStart, textareaRef.current);
+                } else if (showFileDropdown) {
+                  // Close dropdown if no @ in text
+                  closeFileDropdown();
                 }
                 
                 // Trigger height adjustment
