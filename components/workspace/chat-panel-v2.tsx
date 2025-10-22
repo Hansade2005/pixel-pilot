@@ -273,28 +273,10 @@ export function ChatPanelV2({
     []
   );
 
-  // Debounced file dropdown handler to prevent lag during typing
-  const debouncedFileDropdownHandler = useCallback(
-    debounce((newValue: string, cursorPos: number, textarea: HTMLTextAreaElement) => {
-      const atCommand = detectAtCommand(newValue, cursorPos);
-
-      if (atCommand) {
-        setFileQuery(atCommand.query);
-        setAtCommandStartIndex(atCommand.startIndex);
-
-        if (!showFileDropdown) {
-          const position = calculateDropdownPosition(textarea, atCommand.startIndex);
-          setDropdownPosition(position);
-          setShowFileDropdown(true);
-        }
-      } else {
-        if (showFileDropdown) {
-          closeFileDropdown();
-        }
-      }
-    }, 50), // 50ms debounce for @ command detection (matches height adjustment for consistency)
-    [] // No dependencies needed since we access state inside the function
-  );
+  // Removed debounced file dropdown handler in favor of a tiny, synchronous regex-based detection
+  // The heavy-path debouncing created extra scheduling overhead and state churn on desktop.
+  // We'll do a minimal regex check in the onChange handler and only update state when the
+  // detected query or visibility actually changes.
 
   // File attachments state (preserve from original)
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
@@ -454,28 +436,24 @@ export function ChatPanelV2({
     }
   }
 
-  // @ Command file attachment detection
+  // Lightweight regex-based @ command detection
+  // This uses a small RegExp to find an `@` that is at line start or preceded by whitespace
+  // and captures the following token (up to whitespace). It's synchronous and cheap.
   const detectAtCommand = (text: string, cursorPosition: number) => {
-    const beforeCursor = text.substring(0, cursorPosition);
-    const atIndex = beforeCursor.lastIndexOf('@');
-    
-    if (atIndex === -1) return null;
-    
-    // Check if @ is at start of line or preceded by whitespace
-    const charBeforeAt = atIndex > 0 ? beforeCursor[atIndex - 1] : ' ';
-    if (charBeforeAt !== ' ' && charBeforeAt !== '\n' && atIndex !== 0) {
-      return null;
-    }
-    
-    // Find the end of the command (space, newline, or end of string)
-    const afterAt = text.substring(atIndex + 1);
-    const spaceIndex = afterAt.search(/[\s\n]/);
-    const endIndex = spaceIndex === -1 ? text.length : atIndex + 1 + spaceIndex;
-    
+    // Only search up to cursorPosition to avoid scanning the whole string repeatedly
+    const snippet = text.substring(0, cursorPosition);
+    // Regex: match last occurrence of '@' that is start-of-line or preceded by whitespace
+    // and capture following non-whitespace token
+    const re = /(?:^|\s)@([\S]*)$/;
+    const match = snippet.match(re);
+    if (!match) return null;
+
+    const query = match[1] || '';
+    const atIndex = snippet.lastIndexOf('@');
     return {
       startIndex: atIndex,
-      endIndex,
-      query: text.substring(atIndex + 1, endIndex)
+      endIndex: atIndex + 1 + query.length,
+      query
     };
   };
 
@@ -1842,9 +1820,21 @@ export function ChatPanelV2({
                 const newValue = e.target.value
                 setInput(newValue)
                 
-                // Debounced @ command detection to prevent lag (only if @ is present)
+                // Lightweight synchronous @ command detection (only if @ is present)
                 if (textareaRef.current && project && newValue.includes('@')) {
-                  debouncedFileDropdownHandler(newValue, e.target.selectionStart, textareaRef.current);
+                  const atCommand = detectAtCommand(newValue, e.target.selectionStart)
+                  if (atCommand) {
+                    // Update state only when query or visibility changes to avoid re-renders
+                    if (!showFileDropdown || fileQuery !== atCommand.query || atCommandStartIndex !== atCommand.startIndex) {
+                      setFileQuery(atCommand.query)
+                      setAtCommandStartIndex(atCommand.startIndex)
+                      const position = calculateDropdownPosition(textareaRef.current, atCommand.startIndex)
+                      setDropdownPosition(position)
+                      setShowFileDropdown(true)
+                    }
+                  } else if (showFileDropdown) {
+                    closeFileDropdown()
+                  }
                 } else if (showFileDropdown) {
                   // Close dropdown if no @ in text
                   closeFileDropdown();
