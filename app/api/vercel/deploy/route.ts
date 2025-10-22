@@ -3,6 +3,97 @@ import { storageManager } from '@/lib/storage-manager';
 import { Octokit } from '@octokit/rest';
 
 /**
+ * Detects the framework used in a GitHub repository
+ */
+async function detectFramework(githubRepo: string, githubToken: string): Promise<string | null> {
+  try {
+    const octokit = new Octokit({ auth: githubToken });
+    const [owner, repo] = githubRepo.split('/');
+
+    // Try to get package.json first
+    try {
+      const { data: packageJsonContent } = await octokit.rest.repos.getContent({
+        owner,
+        repo,
+        path: 'package.json',
+      });
+
+      if ('content' in packageJsonContent) {
+        const packageJson = JSON.parse(Buffer.from(packageJsonContent.content, 'base64').toString());
+
+        const deps = { ...packageJson.dependencies, ...packageJson.devDependencies };
+
+        // Check for specific frameworks in order of specificity
+        if (deps['next']) return 'nextjs';
+        if (deps['nuxt']) return 'nuxtjs';
+        if (deps['@angular/core']) return 'angular';
+        if (deps['vue']) return 'vue';
+        if (deps['svelte']) return 'svelte';
+        if (deps['solid-js']) return 'solidstart';
+        if (deps['astro']) return 'astro';
+        if (deps['qwik']) return 'qwik';
+        if (deps['remix']) return 'remix';
+        if (deps['blitz']) return 'blitzjs';
+        if (deps['redwoodjs']) return 'redwoodjs';
+        if (deps['vite']) return 'vite';
+        if (deps['parcel']) return 'parcel';
+        if (deps['webpack']) return 'webpack';
+        if (deps['react-scripts']) return 'create-react-app';
+        if (deps['@vue/cli-service']) return 'vue';
+        if (deps['@sveltejs/kit']) return 'sveltekit';
+        if (deps['gatsby']) return 'gatsby';
+        if (deps['gridsome']) return 'gridsome';
+        if (deps['umijs']) return 'umijs';
+        if (deps['sapper']) return 'sapper';
+        if (deps['analog']) return 'analog';
+        if (deps['hugo']) return 'hugo';
+        if (deps['eleventy']) return 'eleventy';
+        if (deps['docusaurus']) return 'docusaurus';
+        if (deps['polymer-cli']) return 'polymer';
+
+        // Check for React (generic fallback)
+        if (deps['react']) return 'create-react-app';
+      }
+    } catch (error) {
+      console.log('Could not read package.json:', error);
+    }
+
+    // Check for config files as fallback
+    const configFiles = [
+      { path: 'next.config.js', framework: 'nextjs' },
+      { path: 'next.config.mjs', framework: 'nextjs' },
+      { path: 'next.config.ts', framework: 'nextjs' },
+      { path: 'nuxt.config.js', framework: 'nuxtjs' },
+      { path: 'nuxt.config.ts', framework: 'nuxtjs' },
+      { path: 'angular.json', framework: 'angular' },
+      { path: 'vue.config.js', framework: 'vue' },
+      { path: 'vite.config.js', framework: 'vite' },
+      { path: 'vite.config.ts', framework: 'vite' },
+      { path: 'astro.config.mjs', framework: 'astro' },
+      { path: 'astro.config.js', framework: 'astro' },
+      { path: 'svelte.config.js', framework: 'svelte' },
+      { path: 'remix.config.js', framework: 'remix' },
+      { path: 'redwood.toml', framework: 'redwoodjs' },
+    ];
+
+    for (const { path, framework } of configFiles) {
+      try {
+        await octokit.rest.repos.getContent({ owner, repo, path });
+        return framework;
+      } catch (error) {
+        // File doesn't exist, continue
+      }
+    }
+
+    // Default fallback
+    return null;
+  } catch (error) {
+    console.error('Error detecting framework:', error);
+    return null;
+  }
+}
+
+/**
  * Vercel Deployment API - Git-Only Deployment
  *
  * This endpoint creates Vercel projects with GitHub repository integration.
@@ -25,6 +116,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         error: 'Token, workspace ID, GitHub repository, and GitHub token are required'
       }, { status: 400 });
+    }
+
+    // Auto-detect framework if not provided
+    let detectedFramework = framework;
+    if (!detectedFramework) {
+      console.log(`Auto-detecting framework for repository: ${githubRepo}`);
+      detectedFramework = await detectFramework(githubRepo, githubToken);
+      console.log(`Detected framework: ${detectedFramework || 'none'}`);
     }
 
     // Validate project name format
@@ -79,7 +178,7 @@ export async function POST(request: NextRequest) {
             ref: 'main',
           },
           projectSettings: {
-            framework: framework || 'vite',
+            ...(detectedFramework && { framework: detectedFramework }),
           },
         }),
       });
@@ -147,7 +246,7 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           name: projectName,
-          framework: framework || 'vite',
+          ...(detectedFramework && { framework: detectedFramework }),
           gitRepository: githubRepo ? {
             type: 'github',
             repo: githubRepo,
