@@ -1272,7 +1272,9 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
           repoName: githubForm.deploymentMode === 'new' ? githubForm.repoName : repoName,
           repoDescription: githubForm.deploymentMode === 'new' ? githubForm.repoDescription : '',
           files: projectFiles,
-          mode: githubForm.deploymentMode === 'new' && !repoData.existing ? 'create' : 'push',
+          mode: githubForm.deploymentMode === 'new' && !repoData.existing ? 'create' : 
+                (githubForm.deploymentMode === 'new' && repoData.existing ? 'existing' : 
+                 githubForm.deploymentMode === 'existing' ? 'existing' : 'push'),
           existingRepo: (githubForm.deploymentMode === 'existing' || (githubForm.deploymentMode === 'new' && repoData.existing)) ? repoData.fullName : undefined,
           commitMessage: githubForm.commitMessage || 'Update project files',
         })
