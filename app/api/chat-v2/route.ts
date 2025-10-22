@@ -334,7 +334,7 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
       }
 
       case 'read_file': {
-        const { path, includeLineNumbers = false } = input
+        const { path, includeLineNumbers = false, startLine, endLine, lineRange } = input
 
         // Validate path
         if (!path || typeof path !== 'string') {
@@ -359,9 +359,49 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           }
         }
 
-        const content = file.content || ''
+        const fullContent = file.content || ''
+        let content = fullContent
+        let actualStartLine = startLine
+        let actualEndLine = endLine
 
-        console.log(`[CONSTRUCT_TOOL_RESULT] read_file: Successfully read ${path} (${content.length} chars)`)
+        // Parse line range if provided (e.g., "654-661")
+        if (lineRange && typeof lineRange === 'string') {
+          const rangeMatch = lineRange.match(/^(\d+)-(\d+)$/)
+          if (rangeMatch) {
+            actualStartLine = parseInt(rangeMatch[1], 10)
+            actualEndLine = parseInt(rangeMatch[2], 10)
+          } else {
+            return {
+              success: false,
+              error: `Invalid line range format: ${lineRange}. Use format like "654-661"`,
+              path,
+              lineRange,
+              toolCallId
+            }
+          }
+        }
+
+        // Extract specific line range if requested
+        if (actualStartLine !== undefined && actualStartLine > 0) {
+          const lines = fullContent.split('\n')
+          const startIndex = actualStartLine - 1 // Convert to 0-indexed
+          const endIndex = actualEndLine ? Math.min(actualEndLine - 1, lines.length - 1) : lines.length - 1
+
+          if (startIndex >= lines.length) {
+            return {
+              success: false,
+              error: `Start line ${actualStartLine} is beyond file length (${lines.length} lines)`,
+              path,
+              startLine: actualStartLine,
+              totalLines: lines.length,
+              toolCallId
+            }
+          }
+
+          content = lines.slice(startIndex, endIndex + 1).join('\n')
+        }
+
+        console.log(`[CONSTRUCT_TOOL_RESULT] read_file: Successfully read ${path} (${content.length} chars, lines ${actualStartLine || 1}-${actualEndLine || 'end'})`)
         let response: any = {
           success: true,
           message: `✅ File ${path} read successfully.`,
@@ -378,13 +418,23 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
         if (includeLineNumbers) {
           const lines = content.split('\n')
           const lineCount = lines.length
-          const linesWithNumbers = lines.map((line: string, index: number) =>
-            `${String(index + 1).padStart(4, ' ')}: ${line}`
-          ).join('\n')
+          const linesWithNumbers = lines.map((line: string, index: number) => {
+            const lineNumber = actualStartLine ? actualStartLine + index : index + 1
+            return `${String(lineNumber).padStart(4, ' ')}: ${line}`
+          }).join('\n')
 
           response.lineCount = lineCount
           response.contentWithLineNumbers = linesWithNumbers
           response.lines = lines // Array of individual lines for programmatic access
+        }
+
+        // Add range information if specific lines were requested
+        if (actualStartLine !== undefined) {
+          response.requestedRange = {
+            startLine: actualStartLine,
+            endLine: actualEndLine || 'end',
+            totalLinesInFile: fullContent.split('\n').length
+          }
         }
 
         return response
@@ -1034,14 +1084,17 @@ ${conversationSummaryContext || ''}`
 
         // SERVER-SIDE TOOL: Read operations need server-side execution to return fresh data
         read_file: tool({
-          description: 'Read the contents of a file with optional line number information. This tool executes on the server-side to ensure the AI sees the most current file content.',
+          description: 'Read the contents of a file with optional line number information or specific line ranges. This tool executes on the server-side to ensure the AI sees the most current file content.',
           inputSchema: z.object({
             path: z.string().describe('File path to read'),
-            includeLineNumbers: z.boolean().optional().describe('Whether to include line numbers in the response (default: false)')
+            includeLineNumbers: z.boolean().optional().describe('Whether to include line numbers in the response (default: false)'),
+            startLine: z.number().optional().describe('Starting line number (1-indexed) to read from'),
+            endLine: z.number().optional().describe('Ending line number (1-indexed) to read to. If not provided, reads from startLine to end of file'),
+            lineRange: z.string().optional().describe('Line range in format "start-end" (e.g., "654-661"). Overrides startLine and endLine if provided')
           }),
-          execute: async ({ path, includeLineNumbers }, { toolCallId }) => {
+          execute: async ({ path, includeLineNumbers, startLine, endLine, lineRange }, { toolCallId }) => {
             // Use the powerful constructor to get actual results from in-memory store
-            return await constructToolResult('read_file', { path, includeLineNumbers }, projectId, toolCallId)
+            return await constructToolResult('read_file', { path, includeLineNumbers, startLine, endLine, lineRange }, projectId, toolCallId)
           }
         }),
 
@@ -1300,13 +1353,16 @@ ${conversationSummaryContext || ''}`
         }),
 
         semantic_code_navigator: tool({
-          description: 'Search and discover code sections, patterns, or structures in files using natural language queries. Returns results with accurate line numbers matching Monaco editor display.',
+          description: 'Advanced semantic code search and analysis tool. Finds code patterns, structures, and relationships with high accuracy. Supports natural language queries, framework-specific patterns, and detailed code analysis.',
           inputSchema: z.object({
-            query: z.string().describe('Natural language description of what to search for (e.g., "find all React components", "show database models", "locate error handlers")'),
+            query: z.string().describe('Natural language description of what to search for (e.g., "find React components with useState", "show API endpoints", "locate error handling", "find database models")'),
             filePath: z.string().optional().describe('Optional: Specific file path to search within. If omitted, searches the entire workspace'),
-            maxResults: z.number().optional().describe('Maximum number of results to return (default: 10)')
+            fileType: z.string().optional().describe('Optional: Filter by file type (e.g., "tsx", "ts", "js", "py", "md")'),
+            maxResults: z.number().optional().describe('Maximum number of results to return (default: 20)'),
+            analysisDepth: z.enum(['basic', 'detailed', 'comprehensive']).optional().describe('Analysis depth: basic (fast), detailed (balanced), comprehensive (thorough but slower)'),
+            includeDependencies: z.boolean().optional().describe('Include related code dependencies and relationships (default: false)')
           }),
-          execute: async ({ query, filePath, maxResults = 10 }, { abortSignal, toolCallId }) => {
+          execute: async ({ query, filePath, fileType, maxResults = 20, analysisDepth = 'detailed', includeDependencies = false }, { abortSignal, toolCallId }) => {
             if (abortSignal?.aborted) {
               throw new Error('Operation cancelled')
             }
@@ -1325,8 +1381,10 @@ ${conversationSummaryContext || ''}`
 
               const { files: sessionFiles } = sessionData
 
-              // Convert to array and filter based on filePath if provided
+              // Convert to array and filter based on criteria
               let filesToSearch = Array.from(sessionFiles.values())
+
+              // Filter by file path if specified
               if (filePath) {
                 filesToSearch = filesToSearch.filter((file: any) => file.path === filePath)
                 if (filesToSearch.length === 0) {
@@ -1339,6 +1397,15 @@ ${conversationSummaryContext || ''}`
                 }
               }
 
+              // Filter by file type if specified
+              if (fileType) {
+                const extensions = fileType.split(',').map(ext => ext.trim().toLowerCase())
+                filesToSearch = filesToSearch.filter((file: any) => {
+                  const fileExt = file.path.split('.').pop()?.toLowerCase()
+                  return extensions.includes(fileExt || '')
+                })
+              }
+
               const results: any[] = []
 
               // Search through each file
@@ -1349,12 +1416,73 @@ ${conversationSummaryContext || ''}`
                 const lines = content.split('\n')
                 const lowerQuery = query.toLowerCase()
 
-                // Search for different types of code patterns
+                // Enhanced semantic code analysis with framework-specific patterns
                 const searchPatterns = [
-                  // Function/class definitions
+                  // React/TypeScript specific patterns
+                  {
+                    type: 'react_component',
+                    regex: /^\s*(export\s+)?(const|function)\s+(\w+)\s*[=:]\s*(React\.)?(memo\()?(\([^)]*\)\s*=>|function)/gm,
+                    description: 'React component definition'
+                  },
+                  {
+                    type: 'typescript_interface',
+                    regex: /^\s*(export\s+)?interface\s+(\w+)/gm,
+                    description: 'TypeScript interface definition'
+                  },
+                  {
+                    type: 'typescript_type',
+                    regex: /^\s*(export\s+)?type\s+(\w+)\s*=/gm,
+                    description: 'TypeScript type definition'
+                  },
+                  {
+                    type: 'api_route',
+                    regex: /^\s*export\s+(async\s+)?function\s+(GET|POST|PUT|DELETE|PATCH)/gm,
+                    description: 'Next.js API route handler'
+                  },
+                  {
+                    type: 'database_query',
+                    regex: /\b(SELECT|INSERT|UPDATE|DELETE)\b.*\bFROM\b|\bCREATE\s+TABLE\b|\bALTER\s+TABLE\b/gi,
+                    description: 'Database query or schema definition'
+                  },
+                  {
+                    type: 'async_function',
+                    regex: /^\s*(export\s+)?async\s+(function|const)\s+(\w+)/gm,
+                    description: 'Async function definition'
+                  },
+                  {
+                    type: 'hook_definition',
+                    regex: /^\s*(export\s+)?function\s+use\w+/gm,
+                    description: 'React hook definition'
+                  },
+                  {
+                    type: 'error_handling',
+                    regex: /\btry\s*\{|\bcatch\s*\(|\bthrow\s+new\b|\bError\s*\(/gi,
+                    description: 'Error handling code'
+                  },
+                  {
+                    type: 'validation_schema',
+                    regex: /\b(z\.)?(object|array|string|number|boolean)\(\)|\.refine\(|schema\.parse\b/gi,
+                    description: 'Zod validation schema'
+                  },
+                  {
+                    type: 'test_case',
+                    regex: /^\s*(it|test|describe)\s*\(/gm,
+                    description: 'Test case definition'
+                  },
+                  {
+                    type: 'configuration',
+                    regex: /\b(process\.env|NEXT_PUBLIC_|REACT_APP_)\b|\bconfig\b.*=|\bsettings\b.*=/gi,
+                    description: 'Configuration or environment variables'
+                  },
+                  {
+                    type: 'styling',
+                    regex: /\bclassName\s*=|\bstyle\s*=|\btailwind\b|\bcss\b|\bsass\b/gi,
+                    description: 'Styling and CSS classes'
+                  },
+                  // Generic patterns for broader coverage
                   {
                     type: 'function',
-                    regex: /^\s*(export\s+)?(async\s+)?(function|const|let|var)\s+(\w+)\s*[=({]/gm,
+                    regex: /^\s*(export\s+)?(function|const|let|var)\s+(\w+)\s*[=({]/gm,
                     description: 'Function or method definition'
                   },
                   {
@@ -1372,11 +1500,11 @@ ${conversationSummaryContext || ''}`
                     regex: /^\s*export\s+/gm,
                     description: 'Export statement'
                   },
-                  // Generic text search for other queries
+                  // Semantic text search with context awareness
                   {
-                    type: 'text_match',
-                    regex: new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
-                    description: 'Text match'
+                    type: 'semantic_match',
+                    regex: new RegExp(`\\b${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi'),
+                    description: 'Semantic code match'
                   }
                 ]
 
@@ -1397,6 +1525,49 @@ ${conversationSummaryContext || ''}`
                       }
                     }
 
+                    // Calculate relevance score based on pattern type and context
+                    let relevanceScore = 1
+                    switch (pattern.type) {
+                      case 'react_component':
+                      case 'api_route':
+                      case 'async_function':
+                        relevanceScore = 10
+                        break
+                      case 'typescript_interface':
+                      case 'typescript_type':
+                      case 'hook_definition':
+                        relevanceScore = 8
+                        break
+                      case 'database_query':
+                      case 'validation_schema':
+                      case 'error_handling':
+                        relevanceScore = 7
+                        break
+                      case 'test_case':
+                      case 'configuration':
+                        relevanceScore = 6
+                        break
+                      case 'function':
+                      case 'class':
+                        relevanceScore = 5
+                        break
+                      case 'styling':
+                      case 'import':
+                      case 'export':
+                        relevanceScore = 3
+                        break
+                      default:
+                        relevanceScore = 2
+                    }
+
+                    // Boost score for exact matches and word boundaries
+                    if (match[0].toLowerCase() === query.toLowerCase()) {
+                      relevanceScore += 5
+                    }
+                    if (new RegExp(`\\b${query}\\b`, 'i').test(match[0])) {
+                      relevanceScore += 3
+                    }
+
                     // Extract context around the match
                     const startLine = Math.max(1, lineNumber - 2)
                     const endLine = Math.min(lines.length, lineNumber + 2)
@@ -1411,6 +1582,15 @@ ${conversationSummaryContext || ''}`
                       '**$&**'
                     )
 
+                    // Check for dependencies if requested
+                    let dependencies: string[] = []
+                    if (includeDependencies && pattern.type === 'import') {
+                      const importMatch = match[0].match(/from\s+['"`]([^'"`]+)['"`]/)
+                      if (importMatch) {
+                        dependencies.push(importMatch[1])
+                      }
+                    }
+
                     results.push({
                       file: file.path,
                       type: pattern.type,
@@ -1418,7 +1598,9 @@ ${conversationSummaryContext || ''}`
                       lineNumber,
                       match: match[0].trim(),
                       context: highlightedContext,
-                      fullMatch: match[0]
+                      fullMatch: match[0],
+                      relevanceScore,
+                      dependencies: dependencies.length > 0 ? dependencies : undefined
                     })
 
                     // Prevent infinite loops for global regex
@@ -1429,12 +1611,67 @@ ${conversationSummaryContext || ''}`
                 if (results.length >= maxResults) break
               }
 
+              // Sort results by relevance score and deduplicate
+              const uniqueResults = results
+                .sort((a, b) => b.relevanceScore - a.relevanceScore)
+                .filter((result, index, arr) =>
+                  index === 0 || !(arr[index - 1].file === result.file &&
+                                   arr[index - 1].lineNumber === result.lineNumber &&
+                                   arr[index - 1].match === result.match)
+                )
+                .slice(0, maxResults)
+
+              // Perform dependency analysis if requested
+              let dependencyAnalysis: any = null
+              if (includeDependencies && uniqueResults.length > 0) {
+                const allDependencies = new Set<string>()
+                const dependencyMap = new Map<string, string[]>()
+
+                // Collect all dependencies from results
+                uniqueResults.forEach(result => {
+                  if (result.dependencies) {
+                    result.dependencies.forEach((dep: string) => allDependencies.add(dep))
+                  }
+                })
+
+                // Analyze dependency relationships
+                filesToSearch.forEach((file: any) => {
+                  if (!file.content || file.isDirectory) return
+
+                  const content = file.content
+                  const imports = content.match(/^\s*import\s+.*from\s+['"`]([^'"`]+)['"`]/gm) || []
+
+                  imports.forEach((importStmt: string) => {
+                    const match = importStmt.match(/from\s+['"`]([^'"`]+)['"`]/)
+                    if (match) {
+                      const dep = match[1]
+                      if (allDependencies.has(dep)) {
+                        if (!dependencyMap.has(file.path)) {
+                          dependencyMap.set(file.path, [])
+                        }
+                        dependencyMap.get(file.path)!.push(dep)
+                      }
+                    }
+                  })
+                })
+
+                dependencyAnalysis = {
+                  totalDependencies: allDependencies.size,
+                  dependencyFiles: Array.from(dependencyMap.entries()).map(([file, deps]) => ({
+                    file,
+                    imports: deps
+                  })),
+                  uniqueDependencies: Array.from(allDependencies)
+                }
+              }
+
               return {
                 success: true,
-                message: `Found ${results.length} code sections matching "${query}"`,
+                message: `Found ${uniqueResults.length} code sections matching "${query}" (sorted by relevance)`,
                 query,
-                results,
-                totalResults: results.length,
+                results: uniqueResults,
+                totalResults: uniqueResults.length,
+                dependencyAnalysis,
                 toolCallId
               }
 
