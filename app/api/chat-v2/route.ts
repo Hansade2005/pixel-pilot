@@ -1518,16 +1518,18 @@ ${conversationSummaryContext || ''}`
         }),
 
         semantic_code_navigator: tool({
-          description: 'Advanced semantic code search and analysis tool. Finds code patterns, structures, and relationships with high accuracy. Supports natural language queries, framework-specific patterns, and detailed code analysis.',
+          description: 'Advanced semantic code search and analysis tool with cross-reference tracking and result grouping. Finds code patterns, structures, and relationships with high accuracy. Supports natural language queries, framework-specific patterns, and detailed code analysis.',
           inputSchema: z.object({
             query: z.string().describe('Natural language description of what to search for (e.g., "find React components with useState", "show API endpoints", "locate error handling", "find database models")'),
             filePath: z.string().optional().describe('Optional: Specific file path to search within. If omitted, searches the entire workspace'),
             fileType: z.string().optional().describe('Optional: Filter by file type (e.g., "tsx", "ts", "js", "py", "md")'),
             maxResults: z.number().optional().describe('Maximum number of results to return (default: 20)'),
             analysisDepth: z.enum(['basic', 'detailed', 'comprehensive']).optional().describe('Analysis depth: basic (fast), detailed (balanced), comprehensive (thorough but slower)'),
-            includeDependencies: z.boolean().optional().describe('Include related code dependencies and relationships (default: false)')
+            includeDependencies: z.boolean().optional().describe('Include related code dependencies and relationships (default: false)'),
+            enableCrossReferences: z.boolean().optional().describe('Enable cross-reference tracking to find all usages of functions/variables (default: false)'),
+            groupByFunctionality: z.boolean().optional().describe('Group results by functionality (components, APIs, utilities, etc.) (default: false)')
           }),
-          execute: async ({ query, filePath, fileType, maxResults = 20, analysisDepth = 'detailed', includeDependencies = false }, { abortSignal, toolCallId }) => {
+          execute: async ({ query, filePath, fileType, maxResults = 20, analysisDepth = 'detailed', includeDependencies = false, enableCrossReferences = false, groupByFunctionality = false }, { abortSignal, toolCallId }) => {
             if (abortSignal?.aborted) {
               throw new Error('Operation cancelled')
             }
@@ -1830,6 +1832,148 @@ ${conversationSummaryContext || ''}`
                 }
               }
 
+              // Perform cross-reference tracking if requested
+              let crossReferences: any[] = []
+              if (enableCrossReferences && uniqueResults.length > 0) {
+                // Find all function/variable/class definitions from the results
+                const definitions = uniqueResults.filter(result =>
+                  ['function', 'async_function', 'react_component', 'hook_definition', 'class', 'typescript_interface', 'typescript_type'].includes(result.type)
+                )
+
+                // Extract identifiers from definitions
+                const identifiers = definitions.map(def => {
+                  // Extract the identifier name from the match
+                  const match = def.match
+                  if (def.type === 'react_component') {
+                    const componentMatch = match.match(/(?:const|function)\s+(\w+)/)
+                    return componentMatch ? componentMatch[1] : null
+                  } else if (def.type === 'typescript_interface' || def.type === 'typescript_type') {
+                    const typeMatch = match.match(/(?:interface|type)\s+(\w+)/)
+                    return typeMatch ? typeMatch[1] : null
+                  } else if (def.type === 'hook_definition') {
+                    const hookMatch = match.match(/function\s+(use\w+)/)
+                    return hookMatch ? hookMatch[1] : null
+                  } else if (def.type === 'function' || def.type === 'async_function') {
+                    const funcMatch = match.match(/(?:function|const|let|var)\s+(\w+)/)
+                    return funcMatch ? funcMatch[1] : null
+                  } else if (def.type === 'class') {
+                    const classMatch = match.match(/(?:class|interface|type)\s+(\w+)/)
+                    return classMatch ? classMatch[1] : null
+                  }
+                  return null
+                }).filter(Boolean)
+
+                // Search for usages of these identifiers across all files
+                const usageResults: any[] = []
+                for (const file of filesToSearch) {
+                  if (!file.content || file.isDirectory) continue
+
+                  const content = file.content
+                  const fileLines = content.split('\n')
+
+                  identifiers.forEach(identifier => {
+                    // Create regex to find usages (word boundaries, property access, function calls)
+                    const usageRegex = new RegExp(`\\b${identifier}\\b`, 'g')
+                    let match: RegExpExecArray | null
+                    while ((match = usageRegex.exec(content)) !== null) {
+                      // Ensure match is not null (TypeScript guard)
+                      if (!match) continue
+
+                      const matchIndex = match.index
+
+                      // Skip the definition itself
+                      const isDefinition = definitions.some(def =>
+                        def.file === file.path &&
+                        Math.abs(def.lineNumber - (content.substring(0, matchIndex).split('\n').length)) <= 2
+                      )
+                      if (isDefinition) continue
+                      let lineNumber = 1
+                      let charCount = 0
+                      for (let i = 0; i < fileLines.length; i++) {
+                        charCount += fileLines[i].length + 1
+                        if (charCount > matchIndex) {
+                          lineNumber = i + 1
+                          break
+                        }
+                      }
+
+                      // Extract context
+                      const startLine = Math.max(1, lineNumber - 1)
+                      const endLine = Math.min(fileLines.length, lineNumber + 1)
+                      const contextLines = fileLines.slice(startLine - 1, endLine)
+                      const contextWithNumbers = contextLines.map((line: string, idx: number) =>
+                        `${String(startLine + idx).padStart(4, ' ')}: ${line}`
+                      ).join('\n')
+
+                      usageResults.push({
+                        identifier,
+                        file: file.path,
+                        lineNumber,
+                        context: contextWithNumbers,
+                        usage: match[0]
+                      })
+                    }
+                  })
+                }
+
+                crossReferences = usageResults
+              }
+
+              // Group results by functionality if requested
+              let groupedResults: any = null
+              if (groupByFunctionality && uniqueResults.length > 0) {
+                const groups: { [key: string]: any[] } = {
+                  components: [],
+                  apis: [],
+                  utilities: [],
+                  types: [],
+                  configuration: [],
+                  tests: [],
+                  styling: [],
+                  other: []
+                }
+
+                uniqueResults.forEach(result => {
+                  switch (result.type) {
+                    case 'react_component':
+                      groups.components.push(result)
+                      break
+                    case 'api_route':
+                    case 'async_function':
+                      groups.apis.push(result)
+                      break
+                    case 'hook_definition':
+                    case 'function':
+                      groups.utilities.push(result)
+                      break
+                    case 'typescript_interface':
+                    case 'typescript_type':
+                      groups.types.push(result)
+                      break
+                    case 'configuration':
+                      groups.configuration.push(result)
+                      break
+                    case 'test_case':
+                      groups.tests.push(result)
+                      break
+                    case 'styling':
+                      groups.styling.push(result)
+                      break
+                    default:
+                      groups.other.push(result)
+                  }
+                })
+
+                // Remove empty groups
+                Object.keys(groups).forEach(key => {
+                  if (groups[key].length === 0) {
+                    delete groups[key]
+                  }
+                })
+
+                groupedResults = groups
+              }
+
               return {
                 success: true,
                 message: `Found ${uniqueResults.length} code sections matching "${query}" (sorted by relevance)`,
@@ -1837,6 +1981,8 @@ ${conversationSummaryContext || ''}`
                 results: uniqueResults,
                 totalResults: uniqueResults.length,
                 dependencyAnalysis,
+                crossReferences: crossReferences.length > 0 ? crossReferences : undefined,
+                groupedResults,
                 toolCallId
               }
 
