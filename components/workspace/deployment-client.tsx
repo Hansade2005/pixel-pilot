@@ -133,6 +133,7 @@ import { useToast } from "@/hooks/use-toast"
 import { storageManager, type Workspace as Project, type Deployment, type EnvironmentVariable } from "@/lib/storage-manager"
 import { createClient } from "@/lib/supabase/client"
 import { getDeploymentTokens } from "@/lib/cloud-sync"
+import { useGitHubPush } from "@/hooks/use-github-push"
 // Plan limit checking functions
 async function checkPlanLimits(userId: string, operation: string, platform: string) {
   try {
@@ -283,6 +284,7 @@ const generateValidRepoName = (input: string): string => {
 
 export default function DeploymentClient() {
   const { toast } = useToast()
+  const { pushToGitHub, isPushing } = useGitHubPush()
   const router = useRouter()
   const searchParams = useSearchParams()
   const projectId = searchParams.get('project')
@@ -1172,25 +1174,42 @@ EXAMPLES:
         repoOwner = githubUser.login
         repoName = githubForm.repoName
       } else if (githubForm.deploymentMode === 'push') {
-        // Use connected repository for push
-        const connectedRepo = selectedProject.githubRepoUrl?.split('/').slice(-2).join('/') || ''
-        if (!connectedRepo) {
-          toast({
-            title: "No Connected Repository",
-            description: "No GitHub repository is connected to this project",
-            variant: "destructive"
-          })
-          setDeploymentState(prev => ({ ...prev, isDeploying: false }))
+        // Use the push hook for connected repositories
+        setDeploymentState(prev => ({ ...prev, currentStep: 'deploying' }))
+
+        const success = await pushToGitHub(selectedProject, {
+          onSuccess: async (pushData) => {
+            // Update project last activity
+            await storageManager.updateWorkspace(selectedProject.id, {
+              lastActivity: new Date().toISOString(),
+            })
+
+            // Reload deployed repos to update dropdowns
+            await loadDeployedRepos()
+
+            toast({
+              title: 'Push Successful',
+              description: `Successfully pushed changes to ${selectedProject.githubRepoName || selectedProject.githubRepoUrl?.split('/').slice(-1)[0]}`
+            })
+            setDeploymentState(prev => ({ ...prev, isDeploying: false, currentStep: 'complete' }))
+          },
+          onError: (error) => {
+            console.error('Push failed:', error)
+            toast({
+              title: 'Push Failed',
+              description: error,
+              variant: 'destructive'
+            })
+            setDeploymentState(prev => ({ ...prev, isDeploying: false }))
+          }
+        })
+
+        if (!success) {
+          // Error already handled in onError callback
           return
         }
 
-        repoData = {
-          url: selectedProject.githubRepoUrl,
-          fullName: connectedRepo,
-          name: connectedRepo.split('/')[1]
-        }
-        repoOwner = connectedRepo.split('/')[0]
-        repoName = connectedRepo.split('/')[1]
+        return // Exit early since push is handled by the hook
       } else {
         // Use existing repository
         const selectedRepo = userRepos.find(repo => repo.fullName === githubForm.selectedRepo)
@@ -1910,7 +1929,7 @@ EXAMPLES:
                 <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 pt-4 border-t border-gray-700">
                   <Button
                     onClick={handleGitHubDeploy}
-                    disabled={deploymentState.isDeploying || !githubForm.repoName || !selectedProject || !storedTokens.github}
+                    disabled={deploymentState.isDeploying || isPushing || !githubForm.repoName || !selectedProject || !storedTokens.github}
                     className="sm:ml-auto bg-blue-600 hover:bg-blue-700"
                   >
                     {deploymentState.isDeploying ? (
