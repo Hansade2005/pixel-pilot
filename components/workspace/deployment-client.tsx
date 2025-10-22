@@ -1102,119 +1102,52 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
       let repoName: string
 
       if (githubForm.deploymentMode === 'new') {
-        // Create new GitHub repository
+        // Skip repository creation - let the deploy API handle it
         setDeploymentState(prev => ({ ...prev, currentStep: 'connecting' }))
 
-        const repoResponse = await fetch('/api/github/create-repo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: githubForm.repoName,
-            description: githubForm.repoDescription,
-            private: githubForm.isPrivate,
-            token: storedTokens.github,
+        // Get current user to construct repo owner
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (!user) {
+          toast({
+            title: "Authentication Error",
+            description: "Unable to get user information",
+            variant: "destructive"
           })
+          setDeploymentState(prev => ({ ...prev, isDeploying: false }))
+          return
+        }
+
+        // Fetch GitHub user info to get the username
+        const userResponse = await fetch('https://api.github.com/user', {
+          headers: {
+            'Authorization': `Bearer ${storedTokens.github}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
         })
 
-        if (!repoResponse.ok) {
-          const errorData = await repoResponse.json()
-          console.error('Repository creation failed:', errorData)
-
-          // Check if repository already exists - if so, switch to push mode
-          if (repoResponse.status === 422) {
-            const isAlreadyExists = errorData.error?.toLowerCase().includes('already exist') || 
-                                   errorData.error?.toLowerCase().includes('name already exists')
-            
-            if (isAlreadyExists) {
-              console.log('Repository already exists, switching to push mode')
-              
-              // Get current user to construct repo owner
-              const supabase = createClient()
-              const { data: { user } } = await supabase.auth.getUser()
-              
-              if (!user) {
-                toast({
-                  title: "Authentication Error",
-                  description: "Unable to get user information",
-                  variant: "destructive"
-                })
-                setDeploymentState(prev => ({ ...prev, isDeploying: false }))
-                return
-              }
-
-              // Fetch GitHub user info to get the username
-              const userResponse = await fetch('https://api.github.com/user', {
-                headers: {
-                  'Authorization': `Bearer ${storedTokens.github}`,
-                  'Accept': 'application/vnd.github.v3+json'
-                }
-              })
-
-              if (!userResponse.ok) {
-                toast({
-                  title: "GitHub API Error",
-                  description: "Failed to get GitHub user information",
-                  variant: "destructive"
-                })
-                setDeploymentState(prev => ({ ...prev, isDeploying: false }))
-                return
-              }
-
-              const githubUser = await userResponse.json()
-              
-              // Set repo data for existing repository
-              repoData = {
-                url: `https://github.com/${githubUser.login}/${githubForm.repoName}`,
-                fullName: `${githubUser.login}/${githubForm.repoName}`,
-                name: githubForm.repoName,
-                existing: true // Flag to indicate this is an existing repo
-              }
-              repoOwner = githubUser.login
-              repoName = githubForm.repoName
-              
-              // Skip to deployment step
-              setDeploymentState(prev => ({ ...prev, currentStep: 'deploying' }))
-              
-              // Continue to deployment logic below
-            } else {
-              toast({
-                title: "Repository Creation Failed",
-                description: errorData.error || "Repository name may be invalid. Try using a different name.",
-                variant: "destructive"
-              })
-              setDeploymentState(prev => ({ ...prev, isDeploying: false }))
-              return
-            }
-          } else if (repoResponse.status === 401) {
-            toast({
-              title: "Authentication Failed",
-              description: "Invalid GitHub token. Please check your token and try again.",
-              variant: "destructive"
-            })
-            setDeploymentState(prev => ({ ...prev, isDeploying: false }))
-            return
-          } else if (repoResponse.status === 403) {
-            toast({
-              title: "Access Forbidden",
-              description: "You don't have permission to create repositories. Check your token permissions.",
-              variant: "destructive"
-            })
-            setDeploymentState(prev => ({ ...prev, isDeploying: false }))
-            return
-          } else {
-            toast({
-              title: "Repository Creation Failed",
-              description: errorData.error || "Failed to create repository",
-              variant: "destructive"
-            })
-            setDeploymentState(prev => ({ ...prev, isDeploying: false }))
-            return
-          }
-        } else {
-          repoData = await repoResponse.json()
-          repoOwner = repoData.fullName.split('/')[0]
-          repoName = repoData.name
+        if (!userResponse.ok) {
+          toast({
+            title: "GitHub API Error",
+            description: "Failed to get GitHub user information",
+            variant: "destructive"
+          })
+          setDeploymentState(prev => ({ ...prev, isDeploying: false }))
+          return
         }
+
+        const githubUser = await userResponse.json()
+
+        // Set repo data for new repository (will be created by deploy API)
+        repoData = {
+          url: `https://github.com/${githubUser.login}/${githubForm.repoName}`,
+          fullName: `${githubUser.login}/${githubForm.repoName}`,
+          name: githubForm.repoName,
+          existing: false // Flag to indicate this is a new repo to be created
+        }
+        repoOwner = githubUser.login
+        repoName = githubForm.repoName
       } else if (githubForm.deploymentMode === 'push') {
         // Use connected repository for push
         const connectedRepo = selectedProject.githubRepoUrl?.split('/').slice(-2).join('/') || ''
@@ -1272,10 +1205,9 @@ EXAMPLES OF GOOD COMMIT MESSAGES:
           repoName: githubForm.deploymentMode === 'new' ? githubForm.repoName : repoName,
           repoDescription: githubForm.deploymentMode === 'new' ? githubForm.repoDescription : '',
           files: projectFiles,
-          mode: githubForm.deploymentMode === 'new' && !repoData.existing ? 'create' : 
-                (githubForm.deploymentMode === 'new' && repoData.existing ? 'existing' : 
-                 githubForm.deploymentMode === 'existing' ? 'existing' : 'push'),
-          existingRepo: (githubForm.deploymentMode === 'existing' || (githubForm.deploymentMode === 'new' && repoData.existing)) ? repoData.fullName : undefined,
+          mode: githubForm.deploymentMode === 'new' ? 'create' : 
+                githubForm.deploymentMode === 'existing' ? 'existing' : 'push',
+          existingRepo: githubForm.deploymentMode === 'existing' ? repoData.fullName : undefined,
           commitMessage: githubForm.commitMessage || 'Update project files',
         })
       })
