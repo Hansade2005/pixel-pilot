@@ -60,9 +60,10 @@ export async function POST(req: Request) {
         name: repoName,
         description: repoDescription || 'Created with PiPilot',
         private: false,
-        auto_init: false,
+        auto_init: true, // Initialize with README to avoid empty repo issues
       })
       repo = createdRepo;
+      console.log(`Repository created successfully: ${repo.full_name}`)
     } else {
       return Response.json({
         error: 'Invalid deployment mode or missing repository information',
@@ -72,15 +73,40 @@ export async function POST(req: Request) {
 
     try {
       if (isNewRepo) {
-        // Create initial commit with all files for new repo
+        // For new repositories initialized with auto_init: true, we need to get the existing commit
+        const { data: ref } = await octokit.rest.git.getRef({
+          owner: githubUser.login,
+          repo: repo.name,
+          ref: 'heads/main',
+        });
+
+        const { data: latestCommit } = await octokit.rest.git.getCommit({
+          owner: githubUser.login,
+          repo: repo.name,
+          commit_sha: ref.object.sha,
+        });
+
+        // Create tree with all files for new repo
         const tree = await Promise.all(
-          files.map(async (file) => ({
-            path: file.path.startsWith('/') ? file.path.slice(1) : file.path,
+          files
+            .filter(file => file.content && file.content.trim().length > 0) // Filter out empty files
+            .map(async (file) => ({
+              path: file.path.startsWith('/') ? file.path.slice(1) : file.path,
+              mode: '100644' as const,
+              type: 'blob' as const,
+              content: file.content || '',
+            }))
+        )
+
+        // Ensure we have at least one file
+        if (tree.length === 0) {
+          tree.push({
+            path: 'README.md',
             mode: '100644' as const,
             type: 'blob' as const,
-            content: file.content || '',
-          }))
-        )
+            content: `# ${repoName}\n\nCreated with PiPilot`,
+          })
+        }
 
         // Add essential config files if not present
         const hasPackageJson = files.some(f => f.path === '/package.json' || f.path === 'package.json')
@@ -132,11 +158,12 @@ module.exports = nextConfig`,
           })
         }
 
-        // Create tree
+        // Create tree based on the existing commit
         const { data: createdTree } = await octokit.rest.git.createTree({
           owner: githubUser.login,
           repo: repo.name,
           tree,
+          base_tree: latestCommit.tree.sha, // Use the existing tree as base
         })
 
         // Create commit
@@ -145,13 +172,14 @@ module.exports = nextConfig`,
           repo: repo.name,
           message: commitMessage || 'Initial commit from PiPilot',
           tree: createdTree.sha,
+          parents: [ref.object.sha], // Reference the existing commit
         })
 
-        // Update main branch
-        await octokit.rest.git.createRef({
+        // Update main branch to point to our new commit
+        await octokit.rest.git.updateRef({
           owner: githubUser.login,
           repo: repo.name,
-          ref: 'refs/heads/main',
+          ref: 'heads/main',
           sha: commit.sha,
         })
       } else {
