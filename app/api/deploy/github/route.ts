@@ -45,12 +45,12 @@ export async function POST(req: Request) {
     let repo;
     let isNewRepo = false;
 
-    if (mode === 'push' && existingRepo) {
+    if ((mode === 'push' || mode === 'existing') && existingRepo) {
       // Push to existing repository
       const [owner, repo_name] = existingRepo.split('/');
       repo = { full_name: existingRepo, name: repo_name, owner: { login: owner }, html_url: `https://github.com/${existingRepo}` };
-      console.log(`Pushing ${files.length} files to existing repository: ${existingRepo}`)
-    } else {
+      console.log(`Pushing ${files.length} files to existing repository: ${existingRepo} (mode: ${mode})`)
+    } else if (mode === 'create') {
       // Create new repository
       isNewRepo = true;
       console.log(`Creating GitHub repository with ${files.length} files`)
@@ -63,6 +63,11 @@ export async function POST(req: Request) {
         auto_init: false,
       })
       repo = createdRepo;
+    } else {
+      return Response.json({
+        error: 'Invalid deployment mode or missing repository information',
+        details: `Mode: ${mode}, existingRepo: ${existingRepo}`
+      }, { status: 400 })
     }
 
     try {
