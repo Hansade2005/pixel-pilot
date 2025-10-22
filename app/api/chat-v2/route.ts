@@ -624,11 +624,25 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
 
         // Add all packages
         const addedPackages: string[] = []
+        const packageVersions: Record<string, string> = {}
+
         for (const packageName of names) {
-          // Use appropriate version - for 'latest', use a reasonable default
-          const packageVersion = version === 'latest' ? `^1.0.0` : version
-          packageJson[depType][packageName] = packageVersion
-          addedPackages.push(packageName)
+          let packageVersion: string;
+
+          if (version === 'latest') {
+            // Keep 'latest' as-is for npm/yarn to resolve
+            packageVersion = 'latest';
+          } else if (version && typeof version === 'string') {
+            // Use the exact version passed by AI (could be "1.2.3", "^1.2.3", "~1.2.3", etc.)
+            packageVersion = version;
+          } else {
+            // Fallback to latest if version is invalid
+            packageVersion = 'latest';
+          }
+
+          packageJson[depType][packageName] = packageVersion;
+          addedPackages.push(packageName);
+          packageVersions[packageName] = packageVersion;
         }
 
         // Update package.json in memory
@@ -640,7 +654,8 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           success: true,
           action: 'packages_added',
           packages: addedPackages,
-          version,
+          packageVersions,
+          requestedVersion: version,
           dependencyType: depType,
           path: 'package.json',
           content: updatedContent,
