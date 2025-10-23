@@ -962,7 +962,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             {!isLoadingProjects && clientProjects.length > 0 && (
               <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
                 {/* Left Panel - Chat (Resizable) */}
-                <ResizablePanel defaultSize={35} minSize={20} maxSize={40}>
+                <ResizablePanel defaultSize={40} minSize={20} maxSize={40}>
                   <div className="h-full flex flex-col border-r border-border">
                     <ChatPanelV2 
                       project={selectedProject}
@@ -991,7 +991,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 <ResizableHandle withHandle />
 
                 {/* Right Panel - Code Editor / Preview (Resizable) */}
-                <ResizablePanel defaultSize={55} minSize={30}>
+                <ResizablePanel defaultSize={50} minSize={30}>
                   <div className="h-full flex flex-col">
                     {/* Tab Switcher with Preview Controls */}
                     <div className="border-b border-border bg-card p-2 flex-shrink-0">
