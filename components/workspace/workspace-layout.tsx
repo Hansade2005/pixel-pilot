@@ -27,6 +27,7 @@ import { restoreBackupFromCloud, isCloudSyncEnabled } from '@/lib/cloud-sync'
 import { ModelSelector } from "@/components/ui/model-selector"
 import { AiModeSelector, type AIMode } from "@/components/ui/ai-mode-selector"
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai-models"
+import { useGitHubPush } from "@/hooks/use-github-push"
 import {
   Dialog,
   DialogContent,
@@ -82,6 +83,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     silent: true, // Don't show backup notifications for saves (to avoid spam)
     instantForCritical: true // Enable instant backup for critical operations
   })
+
+  // GitHub push functionality
+  const { pushToGitHub, isPushing } = useGitHubPush()
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newProjectName, setNewProjectName] = useState("")
   const [newProjectDescription, setNewProjectDescription] = useState("")
@@ -718,6 +722,26 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       toast({
         title: "Error",
         description: "Failed to clear chat history. Please try again.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  // GitHub push handler for mobile header
+  const handlePushToGitHub = async () => {
+    if (!selectedProject) return
+
+    try {
+      await pushToGitHub(selectedProject)
+      toast({
+        title: "Success",
+        description: "Changes pushed to GitHub successfully!",
+      })
+    } catch (error) {
+      console.error('Error pushing to GitHub:', error)
+      toast({
+        title: "Error",
+        description: "Failed to push changes to GitHub. Please try again.",
         variant: "destructive"
       })
     }
@@ -1377,15 +1401,20 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               >
                 <Rocket className="h-4 w-4" />
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0"
-                onClick={() => window.open('/workspace/management', '_blank')}
-                title="Settings"
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
+              
+              {/* GitHub Push Button - only show when connected */}
+              {githubConnected && selectedProject?.githubRepoUrl && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={handlePushToGitHub}
+                  disabled={!selectedProject || isPushing}
+                  title={isPushing ? "Pushing to GitHub..." : "Push to GitHub"}
+                >
+                  <Github className={`h-4 w-4 ${isPushing ? 'animate-pulse' : ''}`} />
+                </Button>
+              )}
             </div>
           </div>
 
