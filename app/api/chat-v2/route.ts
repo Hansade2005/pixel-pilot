@@ -1126,7 +1126,7 @@ Begin with a concise checklist  use check box emojis filled and unfilled.
 
 ## Tools
 - **Client-Side (IndexedDB)**: \`read_file\` (with line numbers), \`write_file\`, \`edit_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`
-- **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers), \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync)
+- **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers),\`grep_search\`, \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync)
 
 ## PiPilot DB Integration
 For **authentication, database, or file storage**:
