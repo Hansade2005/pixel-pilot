@@ -22,6 +22,7 @@ export interface CodePreviewPanelRef {
   createPreview: () => void
   cleanupSandbox: () => void
   openStackBlitz: () => void
+  refreshPreview: () => void
   preview: PreviewState
   isStackBlitzLoading: boolean
 }
@@ -80,6 +81,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     createPreview,
     cleanupSandbox,
     openStackBlitz,
+    refreshPreview,
     preview,
     isStackBlitzLoading: isStackBlitzOpen
   }), [preview, isStackBlitzOpen])

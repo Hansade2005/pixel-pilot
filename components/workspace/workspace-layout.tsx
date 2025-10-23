@@ -749,9 +749,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
   // Preview control functions
   const refreshPreview = () => {
-    const currentPreview = codePreviewRef.current?.preview
-    if (currentPreview?.url) {
-      window.open(currentPreview.url, '_blank')
+    if (codePreviewRef.current) {
+      codePreviewRef.current.refreshPreview()
     }
   }
 
