@@ -173,6 +173,10 @@ module.exports = nextConfig`,
           message: commitMessage || 'Initial commit from PiPilot',
           tree: createdTree.sha,
           parents: [ref.object.sha], // Reference the existing commit
+          author: {
+            name: 'PiPilot Bot',
+            email: 'bot@pipilot.dev'
+          }
         })
 
         // Update main branch to point to our new commit
@@ -225,6 +229,10 @@ module.exports = nextConfig`,
           message: commitMessage || 'Update from PiPilot',
           tree: createdTree.sha,
           parents: [ref.object.sha],
+          author: {
+            name: 'PiPilot Bot',
+            email: 'bot@pipilot.dev'
+          }
         });
 
         // Update main branch
