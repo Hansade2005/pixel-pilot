@@ -431,6 +431,19 @@ export function ChatPanelV2({
 
       await saveMessageToIndexedDB(finalAssistantMessage)
       console.log(`[ChatPanelV2] Complete assistant message saved to database: ${assistantMessageId}`)
+
+      // Dispatch event to switch to preview tab and trigger auto-preview creation
+      // This creates the illusion of "hot reload" after AI code generation
+      if (typeof window !== 'undefined') {
+        console.log('[ChatPanelV2] Dispatching auto-preview event after streaming completion')
+        window.dispatchEvent(new CustomEvent('ai-stream-complete', {
+          detail: {
+            projectId: project.id,
+            shouldSwitchToPreview: true,
+            shouldCreatePreview: true
+          }
+        }))
+      }
     } catch (error) {
       console.error(`[ChatPanelV2] Error saving complete assistant message ${assistantMessageId}:`, error)
     }

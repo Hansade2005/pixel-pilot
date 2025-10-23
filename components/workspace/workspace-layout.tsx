@@ -154,12 +154,34 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       setSyncedPreview(preview)
       setCustomUrl('')
     }
+
+    const handleAiStreamComplete = (event: CustomEvent) => {
+      const { shouldSwitchToPreview, shouldCreatePreview } = event.detail
+      console.log('[WorkspaceLayout] AI stream complete event received:', { shouldSwitchToPreview, shouldCreatePreview })
+
+      if (shouldSwitchToPreview) {
+        // Switch to preview tab
+        setActiveTab('preview')
+        console.log('[WorkspaceLayout] Switched to preview tab after AI streaming')
+      }
+
+      if (shouldCreatePreview) {
+        // Trigger preview creation with a small delay to ensure tab switch is complete
+        setTimeout(() => {
+          console.log('[WorkspaceLayout] Auto-creating preview after AI streaming')
+          if (codePreviewRef.current) {
+            codePreviewRef.current.createPreview()
+          }
+        }, 100)
+      }
+    }
     
     window.addEventListener('preview-state-changed', handlePreviewStateChange as EventListener)
     window.addEventListener('preview-url-changed', handlePreviewUrlChange as EventListener)
     window.addEventListener('preview-ready', handlePreviewReady as EventListener)
     window.addEventListener('preview-starting', handlePreviewStarting as EventListener)
     window.addEventListener('preview-stopped', handlePreviewStopped as EventListener)
+    window.addEventListener('ai-stream-complete', handleAiStreamComplete as EventListener)
     
     return () => {
       window.removeEventListener('preview-state-changed', handlePreviewStateChange as EventListener)
@@ -167,6 +189,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       window.removeEventListener('preview-ready', handlePreviewReady as EventListener)
       window.removeEventListener('preview-starting', handlePreviewStarting as EventListener)
       window.removeEventListener('preview-stopped', handlePreviewStopped as EventListener)
+      window.removeEventListener('ai-stream-complete', handleAiStreamComplete as EventListener)
     }
   }, [])
 
