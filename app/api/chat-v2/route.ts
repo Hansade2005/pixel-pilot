@@ -1307,16 +1307,29 @@ ${conversationSummaryContext || ''}`
             try {
               const searchResults = await searchWeb(query)
               
+              // More generous truncation for 256k context models (50k total limit)
+              const MAX_SEARCH_CHARS = 50000;
+              let cleanResults = searchResults.cleanedResults;
+              let wasTruncated = false;
+              
+              if (cleanResults.length > MAX_SEARCH_CHARS) {
+                cleanResults = cleanResults.substring(0, MAX_SEARCH_CHARS);
+                wasTruncated = true;
+              }
+              
               return {
                 success: true,
-                message: `Web search completed successfully for query: "${query}"`,
+                message: `Web search completed successfully for query: "${query}"${wasTruncated ? ` (truncated to ${MAX_SEARCH_CHARS} chars)` : ''}`,
                 // Send clean, structured text instead of raw JSON
-                cleanResults: searchResults.cleanedResults,
+                cleanResults,
                 // Keep minimal metadata for reference
                 metadata: {
                   query: searchResults.query,
                   resultCount: searchResults.resultCount,
-                  totalLength: searchResults.cleanedResults.length
+                  originalLength: searchResults.cleanedResults.length,
+                  finalLength: cleanResults.length,
+                  wasTruncated,
+                  maxChars: MAX_SEARCH_CHARS
                 },
                 query,
                 toolCallId
@@ -1422,22 +1435,46 @@ ${conversationSummaryContext || ''}`
               const successfulResults = extractionResults.filter(result => result.success);
               const failedResults = extractionResults.filter(result => !result.success);
               
-              // Truncate content per URL (2000 chars limit)
+              // More generous truncation for 256k context models (15k per URL, 75k total)
+              const MAX_CHARS_PER_URL = 15000;
+              const MAX_TOTAL_CHARS = 75000;
+              
+              let totalCharsUsed = 0;
               const truncatedResults = successfulResults.map(result => {
                 const originalLength = result.cleanResults.length;
                 let truncatedContent = result.cleanResults;
                 let wasTruncated = false;
+                let truncationReason = '';
                 
-                if (originalLength > 2000) {
-                  truncatedContent = result.cleanResults.substring(0, 2000);
+                // Check per-URL limit
+                if (originalLength > MAX_CHARS_PER_URL) {
+                  truncatedContent = result.cleanResults.substring(0, MAX_CHARS_PER_URL);
                   wasTruncated = true;
+                  truncationReason = `per-URL limit (${MAX_CHARS_PER_URL} chars)`;
                 }
+                
+                // Check total limit (but don't truncate if we're the first result)
+                if (totalCharsUsed + truncatedContent.length > MAX_TOTAL_CHARS && successfulResults.indexOf(result) > 0) {
+                  const remainingChars = MAX_TOTAL_CHARS - totalCharsUsed;
+                  if (remainingChars > 1000) { // Only include if we can fit meaningful content
+                    truncatedContent = truncatedContent.substring(0, remainingChars);
+                    wasTruncated = true;
+                    truncationReason = `total limit (${MAX_TOTAL_CHARS} chars)`;
+                  } else {
+                    truncatedContent = ''; // Skip this result entirely
+                    wasTruncated = true;
+                    truncationReason = 'total limit exceeded';
+                  }
+                }
+                
+                totalCharsUsed += truncatedContent.length;
                 
                 return {
                   ...result,
                   cleanResults: truncatedContent,
                   wasTruncated,
-                  originalLength
+                  originalLength,
+                  truncationReason: wasTruncated ? truncationReason : undefined
                 };
               });
               
@@ -1446,25 +1483,33 @@ ${conversationSummaryContext || ''}`
                 totalUrls: urlArray.length,
                 successfulCount: successfulResults.length,
                 failedCount: failedResults.length,
+                totalCharsUsed,
+                maxTotalChars: MAX_TOTAL_CHARS,
+                maxPerUrlChars: MAX_CHARS_PER_URL,
                 cleanResultsLength: truncatedResults.map(r => r.cleanResults?.length || 0),
                 truncatedCount: truncatedResults.filter(r => r.wasTruncated).length,
-                sampleCleanResults: truncatedResults[0]?.cleanResults?.substring(0, 100) || 'none'
+                sampleCleanResults: truncatedResults[0]?.cleanResults?.substring(0, 200) || 'none'
               });
               
               return {
                 success: successfulResults.length > 0,
                 message: successfulResults.length > 0 
-                  ? `Successfully extracted content from ${successfulResults.length} URL(s)${truncatedResults.some(r => r.wasTruncated) ? ' (some content truncated to 2000 chars per URL)' : ''}` 
+                  ? `Successfully extracted content from ${successfulResults.length} URL(s)${truncatedResults.some(r => r.wasTruncated) ? ` (truncated to fit ${MAX_TOTAL_CHARS} char limit)` : ''}` 
                   : 'Failed to extract content from any URLs',
                 cleanResults: truncatedResults.map(result => result.cleanResults).join('\n\n'),
                 metadata: {
                   successCount: successfulResults.length,
                   failedCount: failedResults.length,
                   urls: urlArray,
+                  totalCharsUsed,
+                  maxTotalChars: MAX_TOTAL_CHARS,
+                  maxPerUrlChars: MAX_CHARS_PER_URL,
                   truncationInfo: truncatedResults.map(r => ({
                     url: r.url,
                     originalLength: r.originalLength,
-                    wasTruncated: r.wasTruncated
+                    finalLength: r.cleanResults.length,
+                    wasTruncated: r.wasTruncated,
+                    truncationReason: r.truncationReason
                   }))
                 },
                 toolCallId
