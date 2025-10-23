@@ -964,11 +964,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 {/* Left Panel - Chat (Resizable) */}
                 <ResizablePanel defaultSize={40} minSize={20} maxSize={40}>
                   <div className="h-full flex flex-col border-r border-border">
-                    <ChatPanelV2 
+                    <ChatPanelV2
                       project={selectedProject}
                       selectedModel={selectedModel}
                       aiMode={aiMode}
-      
+
                       initialPrompt={initialChatPrompt}
                     />
                   </div>
@@ -976,22 +976,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
                 <ResizableHandle withHandle />
 
-                {/* Center Panel - File Explorer */}
-                <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
-                  <div className="h-full flex flex-col border-r border-border">
-                    <FileExplorer 
-                      key={fileExplorerKey}
-                      project={selectedProject} 
-                      onFileSelect={setSelectedFile} 
-                      selectedFile={selectedFile} 
-                    />
-                  </div>
-                </ResizablePanel>
-
-                <ResizableHandle withHandle />
-
-                {/* Right Panel - Code Editor / Preview (Resizable) */}
-                <ResizablePanel defaultSize={50} minSize={30}>
+                {/* Right Panel - Code/Preview Area */}
+                <ResizablePanel defaultSize={60} minSize={30}>
                   <div className="h-full flex flex-col">
                     {/* Tab Switcher with Preview Controls */}
                     <div className="border-b border-border bg-card p-2 flex-shrink-0">
@@ -1014,7 +1000,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                             <Eye className="h-4 w-4" />
                           </Button>
                         </div>
-                        
+
                         {/* Preview Controls - Only show in Preview tab */}
                         {activeTab === "preview" && (
                           <div className="flex items-center space-x-2">
@@ -1039,7 +1025,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                                 <Smartphone className="h-3 w-3" />
                               </Button>
                             </div>
-                            
+
                             <div className="relative">
                               <Input
                                 id="preview-url"
@@ -1103,33 +1089,57 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       </div>
                     </div>
 
+                    {/* Content Area */}
                     {activeTab === "code" ? (
-                      <CodeEditor
-                        file={selectedFile}
-                        projectFiles={projectFiles}
-                        onSave={(file, content) => {
-                          // Update the file content in state if needed
-                          console.log("File saved:", file.name, content.length, "characters")
-                          
-                          // Refresh project files to update Monaco's extra libraries
-                          if (selectedProject) {
-                            storageManager.getFiles(selectedProject.id).then(files => {
-                              setProjectFiles(files || [])
-                              console.log("Refreshed project files after save:", files?.length || 0, "files")
-                            }).catch(error => {
-                              console.error("Error refreshing project files:", error)
-                            })
-                          }
-                          
-                          // Trigger instant cloud backup after file save
-                          triggerInstantBackup(`Saved file: ${file.name}`)
-                          
-                          // Force file explorer refresh to show updated content
-                          setFileExplorerKey(prev => prev + 1)
-                          console.log("File saved successfully, triggering file explorer refresh")
-                        }}
-                      />
+                      /* Code Tab: File Explorer + Code Editor */
+                      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
+                        {/* File Explorer Panel */}
+                        <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
+                          <div className="h-full flex flex-col border-r border-border">
+                            <FileExplorer
+                              key={fileExplorerKey}
+                              project={selectedProject}
+                              onFileSelect={setSelectedFile}
+                              selectedFile={selectedFile}
+                            />
+                          </div>
+                        </ResizablePanel>
+
+                        <ResizableHandle withHandle />
+
+                        {/* Code Editor Panel */}
+                        <ResizablePanel defaultSize={75} minSize={40}>
+                          <div className="h-full flex flex-col">
+                            <CodeEditor
+                              file={selectedFile}
+                              projectFiles={projectFiles}
+                              onSave={(file, content) => {
+                                // Update the file content in state if needed
+                                console.log("File saved:", file.name, content.length, "characters")
+
+                                // Refresh project files to update Monaco's extra libraries
+                                if (selectedProject) {
+                                  storageManager.getFiles(selectedProject.id).then(files => {
+                                    setProjectFiles(files || [])
+                                    console.log("Refreshed project files after save:", files?.length || 0, "files")
+                                  }).catch(error => {
+                                    console.error("Error refreshing project files:", error)
+                                  })
+                                }
+
+                                // Trigger instant cloud backup after file save
+                                triggerInstantBackup(`Saved file: ${file.name}`)
+
+                                // Force file explorer refresh to show updated content
+                                setFileExplorerKey(prev => prev + 1)
+                                console.log("File saved successfully, triggering file explorer refresh")
+                              }}
+                            />
+                          </div>
+                        </ResizablePanel>
+                      </ResizablePanelGroup>
                     ) : (
+                      /* Preview Tab: Full-width Preview */
                       <CodePreviewPanel ref={codePreviewRef} project={selectedProject} activeTab={activeTab} onTabChange={setActiveTab} previewViewMode={previewViewMode} />
                     )}
                   </div>
