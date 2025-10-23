@@ -111,6 +111,28 @@ interface PushOptions {
   }
 
   /**
+   * Clean up markdown formatting from AI-generated commit messages
+   */
+  const cleanupCommitMessage = (message: string): string => {
+    if (!message) return message
+
+    return message
+      // Remove markdown code blocks (```language content ```)
+      .replace(/```[\s\S]*?```/g, '')
+      // Remove inline code backticks
+      .replace(/`([^`]+)`/g, '$1')
+      // Remove markdown links [text](url)
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      // Remove markdown bold/italic (* ** ___)
+      .replace(/(\*\*\*|___)(.*?)\1/g, '$2')
+      .replace(/(\*\*|__)(.*?)\1/g, '$2')
+      .replace(/(\*|_)(.*?)\1/g, '$2')
+      // Remove extra whitespace and trim
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
+  /**
    * Generate AI-powered commit message from chat conversation context
    */
   const generateCommitMessageFromChat = async (conversationContext: string): Promise<string> => {
@@ -186,9 +208,12 @@ EXAMPLES:
 
       const aiCommitMessage = commitMessageResult.text?.trim() || ''
 
+      // Clean up markdown formatting from AI response
+      const cleanedMessage = cleanupCommitMessage(aiCommitMessage)
+
       // Validate the generated message
-      if (aiCommitMessage && aiCommitMessage.length > 0 && aiCommitMessage.length <= 72 && !aiCommitMessage.includes('User request') && !aiCommitMessage.includes('error')) {
-        return aiCommitMessage
+      if (cleanedMessage && cleanedMessage.length > 0 && cleanedMessage.length <= 72 && !cleanedMessage.includes('User request') && !cleanedMessage.includes('error')) {
+        return cleanedMessage
       }
 
       // Fallback if AI generation fails or returns invalid content
