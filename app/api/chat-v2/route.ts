@@ -1968,6 +1968,182 @@ ${conversationSummaryContext || ''}`
           }
         }),
 
+        grep_search: tool({
+          description: 'Powerful text and regex search tool that searches through the entire codebase. Supports both literal text search and regular expressions with advanced filtering options. Returns matches with file paths, line numbers, and context.',
+          inputSchema: z.object({
+            query: z.string().describe('The search query - either literal text or regex pattern'),
+            includePattern: z.string().optional().describe('Optional glob pattern to filter files (e.g., "*.ts,*.tsx" or "src/**")'),
+            isRegexp: z.boolean().optional().describe('Whether the query is a regex pattern (default: false for literal text search)'),
+            maxResults: z.number().optional().describe('Maximum number of results to return (default: 100)'),
+            caseSensitive: z.boolean().optional().describe('Whether the search is case sensitive (default: false)')
+          }),
+          execute: async ({ query, includePattern, isRegexp = false, maxResults = 100, caseSensitive = false }, { toolCallId }) => {
+            try {
+              // Get session storage
+              const sessionData = sessionProjectStorage.get(projectId)
+              if (!sessionData) {
+                return {
+                  success: false,
+                  error: `Session storage not found for project ${projectId}`,
+                  query,
+                  toolCallId
+                }
+              }
+
+              const { files: sessionFiles } = sessionData
+
+              // Convert session files to array and filter if needed
+              let filesToSearch = Array.from(sessionFiles.values())
+
+              // Filter by include pattern if specified
+              if (includePattern) {
+                const patterns = includePattern.split(',').map((p: string) => p.trim())
+                filesToSearch = filesToSearch.filter((file: any) => {
+                  const filePath = file.path.toLowerCase()
+                  return patterns.some((pattern: string) => {
+                    const lowerPattern = pattern.toLowerCase()
+                    // Support glob patterns
+                    if (lowerPattern.includes('*')) {
+                      // Simple glob matching
+                      const regexPattern = lowerPattern
+                        .replace(/\*/g, '.*')
+                        .replace(/\?/g, '.')
+                      return new RegExp(regexPattern).test(filePath)
+                    }
+                    return filePath.includes(lowerPattern)
+                  })
+                })
+              }
+
+              // Filter out directories and files without content
+              filesToSearch = filesToSearch.filter((file: any) => !file.isDirectory && file.content)
+
+              const results: any[] = []
+              let totalMatches = 0
+
+              // Prepare search regex
+              let searchRegex: RegExp
+              try {
+                if (isRegexp) {
+                  // Use provided regex pattern
+                  searchRegex = new RegExp(query, caseSensitive ? 'g' : 'gi')
+                } else {
+                  // Escape special regex characters for literal text search
+                  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                  searchRegex = new RegExp(escapedQuery, caseSensitive ? 'g' : 'gi')
+                }
+              } catch (regexError) {
+                return {
+                  success: false,
+                  error: `Invalid regex pattern: ${regexError instanceof Error ? regexError.message : 'Unknown error'}`,
+                  query,
+                  toolCallId
+                }
+              }
+
+              // Search through each file
+              for (const file of filesToSearch) {
+                if (results.length >= maxResults) break
+
+                const content = file.content
+                const lines = content.split('\n')
+                let lineNumber = 0
+                let matchCount = 0
+
+                // Search line by line for better context
+                for (let i = 0; i < lines.length; i++) {
+                  lineNumber = i + 1 // 1-indexed
+                  const line = lines[i]
+
+                  // Find all matches in this line
+                  const lineMatches = []
+                  let match
+                  searchRegex.lastIndex = 0 // Reset regex state
+
+                  while ((match = searchRegex.exec(line)) !== null) {
+                    lineMatches.push({
+                      match: match[0],
+                      index: match.index,
+                      lineNumber,
+                      line: line
+                    })
+
+                    // Prevent infinite loops
+                    if (!searchRegex.global) break
+                  }
+
+                  // Process matches for this line
+                  for (const lineMatch of lineMatches) {
+                    if (results.length >= maxResults) break
+
+                    // Extract context (3 lines before and after)
+                    const startLine = Math.max(1, lineNumber - 3)
+                    const endLine = Math.min(lines.length, lineNumber + 3)
+                    const contextLines = lines.slice(startLine - 1, endLine)
+
+                    // Create context with line numbers
+                    const contextWithNumbers = contextLines.map((ctxLine: string, idx: number) => {
+                      const ctxLineNumber = startLine + idx
+                      const marker = ctxLineNumber === lineNumber ? '>' : ' '
+                      return `${marker}${String(ctxLineNumber).padStart(4, ' ')}: ${ctxLine}`
+                    }).join('\n')
+
+                    results.push({
+                      file: file.path,
+                      lineNumber: lineMatch.lineNumber,
+                      column: lineMatch.index + 1, // 1-indexed
+                      match: lineMatch.match,
+                      line: lineMatch.line.trim(),
+                      context: contextWithNumbers,
+                      beforeContext: lineNumber > 1 ? lines.slice(Math.max(0, lineNumber - 4), lineNumber - 1) : [],
+                      afterContext: lineNumber < lines.length ? lines.slice(lineNumber, Math.min(lines.length, lineNumber + 3)) : []
+                    })
+
+                    matchCount++
+                    totalMatches++
+                  }
+
+                  if (results.length >= maxResults) break
+                }
+
+                console.log(`[grep_search] Found ${matchCount} matches in ${file.path}`)
+              }
+
+              // Sort results by file path and line number
+              results.sort((a, b) => {
+                const fileCompare = a.file.localeCompare(b.file)
+                if (fileCompare !== 0) return fileCompare
+                return a.lineNumber - b.lineNumber
+              })
+
+              return {
+                success: true,
+                message: `Found ${totalMatches} matches for "${query}" across ${filesToSearch.length} files`,
+                query,
+                isRegexp,
+                caseSensitive,
+                includePattern,
+                results,
+                totalMatches,
+                filesSearched: filesToSearch.length,
+                maxResults,
+                toolCallId
+              }
+
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+              console.error(`[ERROR] grep_search failed for query "${query}":`, error)
+
+              return {
+                success: false,
+                error: `Failed to search code: ${errorMessage}`,
+                query,
+                toolCallId
+              }
+            }
+          }
+        }),
+
         check_dev_errors: tool({
           description: 'Run development server or build process and check for runtime/build errors. Monitors console logs to detect any errors and reports success/failure status.',
           inputSchema: z.object({
