@@ -26,6 +26,36 @@ const getAIModel = (modelId?: string) => {
   }
 }
 
+// Add timeout utility function at the top level
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  operationName: string
+): Promise<T> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    // For fetch requests, we need to handle AbortController differently
+    if (promise instanceof Promise && 'abort' in (promise as any)) {
+      // This is likely a fetch request, pass the signal
+      const result = await promise;
+      clearTimeout(timeoutId);
+      return result;
+    } else {
+      const result = await promise;
+      clearTimeout(timeoutId);
+      return result;
+    }
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`${operationName} timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  }
+}
+
 // Import dynamic IndexedDB storage manager
 const getStorageManager = async () => {
   const { storageManager } = await import('@/lib/storage-manager')
@@ -891,6 +921,33 @@ export async function POST(req: Request) {
   const requestId = crypto.randomUUID()
   const startTime = Date.now()
   
+  // Add overall request timeout to stay under Vercel's 300s limit
+  const REQUEST_TIMEOUT_MS = 290000; // 290 seconds (10s buffer under 300s limit)
+  const WARNING_TIME_MS = 240000; // Warn at 240 seconds (50 seconds remaining)
+  const controller = new AbortController();
+  const requestTimeoutId = setTimeout(() => {
+    controller.abort();
+  }, REQUEST_TIMEOUT_MS);
+
+  // Track tool execution times
+  const toolExecutionTimes: Record<string, number> = {};
+
+  // Helper function to check remaining time and create timeout warnings
+  const getTimeStatus = () => {
+    const elapsed = Date.now() - startTime;
+    const remaining = REQUEST_TIMEOUT_MS - elapsed;
+    const isApproachingTimeout = elapsed >= WARNING_TIME_MS;
+
+    return {
+      elapsed,
+      remaining,
+      isApproachingTimeout,
+      warningMessage: isApproachingTimeout
+        ? `⚠️ TIME WARNING: ${Math.round(remaining / 1000)} seconds remaining. Please provide final summary and avoid additional tool calls.`
+        : null
+    };
+  };
+
   try {
     const body = await req.json()
     const {
@@ -1299,13 +1356,36 @@ ${conversationSummaryContext || ''}`
           inputSchema: z.object({
             query: z.string().describe('Search query to find relevant web content')
           }),
-          execute: async ({ query }, { abortSignal, toolCallId }) => {    
+          execute: async ({ query }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
             if (abortSignal?.aborted) {
               throw new Error('Operation cancelled')
             }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Web search cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                query,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
             
             try {
-              const searchResults = await searchWeb(query)
+              // Add strict 20-second timeout to prevent hanging
+              const searchResults = await withTimeout(
+                searchWeb(query),
+                20000, // Reduced from 30000 (30s) to 20000 (20s) - stricter timeout
+                'Web search'
+              )
+
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['web_search'] = (toolExecutionTimes['web_search'] || 0) + executionTime;
               
               // More generous truncation for 256k context models (50k total limit)
               const MAX_SEARCH_CHARS = 50000;
@@ -1332,7 +1412,9 @@ ${conversationSummaryContext || ''}`
                   maxChars: MAX_SEARCH_CHARS
                 },
                 query,
-                toolCallId
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
               }
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : 'Unknown error'
@@ -1342,7 +1424,9 @@ ${conversationSummaryContext || ''}`
                 success: false, 
                 error: `Web search failed: ${errorMessage}`,
                 query,
-                toolCallId
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
               }
             }
           }
@@ -1357,8 +1441,23 @@ ${conversationSummaryContext || ''}`
             ]).describe('URL or URLs to extract content from')
           }),
           execute: async ({ urls }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
             if (abortSignal?.aborted) {
               throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Web extraction cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                urls: Array.isArray(urls) ? urls : [urls],
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
             }
             
             // Ensure urls is always an array
@@ -1368,8 +1467,8 @@ ${conversationSummaryContext || ''}`
               // Import the web scraper
               const { webScraper } = await import('@/lib/web-scraper');
               
-              // Process URLs sequentially to manage API key usage
-              const extractionResults = await Promise.all(
+              // Process URLs sequentially to manage API key usage, but with strict 30s total timeout
+              const extractPromise = Promise.all(
                 urlArray.map(async (url) => {
                   try {
                     const scraperResult = await webScraper.execute({ url });
@@ -1430,6 +1529,37 @@ ${conversationSummaryContext || ''}`
                   }
                 })
               );
+
+              // Add strict 30-second timeout but return partial results if available
+              let extractionResults: any[];
+              try {
+                extractionResults = await withTimeout(
+                  extractPromise,
+                  30000, // Reduced from 45000 (45s) to 30000 (30s) - stricter timeout
+                  'Web content extraction'
+                );
+              } catch (timeoutError) {
+                // If we timeout, try to get partial results from any completed extractions
+                console.warn('[WEB_EXTRACT] Timeout occurred, attempting to return partial results');
+                try {
+                  // Race the original promise against a very short timeout to get any completed results
+                  extractionResults = await Promise.race([
+                    extractPromise,
+                    new Promise<any[]>((_, reject) => setTimeout(() => reject(new Error('Partial timeout')), 1000))
+                  ]);
+                } catch (partialError) {
+                  // If even partial results aren't available quickly, return empty results
+                  extractionResults = urlArray.map(url => ({
+                    success: false,
+                    url,
+                    error: 'Extraction timed out - no partial results available',
+                    cleanResults: ''
+                  }));
+                }
+              }
+
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['web_extract'] = (toolExecutionTimes['web_extract'] || 0) + executionTime;
               
               // Separate successful and failed extractions
               const successfulResults = extractionResults.filter(result => result.success);
@@ -1512,9 +1642,14 @@ ${conversationSummaryContext || ''}`
                     truncationReason: r.truncationReason
                   }))
                 },
-                toolCallId
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
               };
             } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['web_extract'] = (toolExecutionTimes['web_extract'] || 0) + executionTime;
+              
               console.error('[ERROR] Web extract failed:', error);
               
               return { 
@@ -1524,7 +1659,9 @@ ${conversationSummaryContext || ''}`
                 metadata: {
                   urls: urlArray
                 },
-                toolCallId
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
               };
             }
           }
@@ -2196,29 +2333,54 @@ ${conversationSummaryContext || ''}`
             timeoutSeconds: z.number().optional().describe('How long to monitor for errors after startup (default: 5 seconds for dev, 0 for build)')
           }),
           execute: async ({ mode, timeoutSeconds = mode === 'dev' ? 5 : 0 }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
             if (abortSignal?.aborted) {
               throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Dev/build check cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                mode,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
             }
 
             try {
               const e2bApiKey = process.env.E2B_API_KEY
               if (!e2bApiKey) {
+                const executionTime = Date.now() - toolStartTime;
+                toolExecutionTimes['check_dev_errors'] = (toolExecutionTimes['check_dev_errors'] || 0) + executionTime;
+                
                 return {
                   success: false,
                   error: 'E2B API key not configured',
                   mode,
-                  toolCallId
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
                 }
               }
 
               // Get all files from in-memory session store (latest state)
               const sessionData = sessionProjectStorage.get(projectId)
               if (!sessionData) {
+                const executionTime = Date.now() - toolStartTime;
+                toolExecutionTimes['check_dev_errors'] = (toolExecutionTimes['check_dev_errors'] || 0) + executionTime;
+                
                 return {
                   success: false,
                   error: `Session storage not found for project ${projectId}`,
                   mode,
-                  toolCallId
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
                 }
               }
 
@@ -2226,11 +2388,16 @@ ${conversationSummaryContext || ''}`
               const allFiles = Array.from(sessionFiles.values())
 
               if (!allFiles || allFiles.length === 0) {
+                const executionTime = Date.now() - toolStartTime;
+                toolExecutionTimes['check_dev_errors'] = (toolExecutionTimes['check_dev_errors'] || 0) + executionTime;
+                
                 return {
                   success: false,
                   error: 'No files found in project session',
                   mode,
-                  toolCallId
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
                 }
               }
 
@@ -2245,10 +2412,10 @@ ${conversationSummaryContext || ''}`
               let serverStarted = false
               let buildCompleted = false
 
-              // Create sandbox
+              // Create sandbox with reasonable timeout for error detection
               const sandbox = await createEnhancedSandbox({
                 template: "pipilot",
-                timeoutMs: 300000, // 5 minutes timeout
+                timeoutMs: mode === 'dev' ? 120000 : 90000, // 120s for dev, 90s for build (increased for proper error checking)
                 env: {}
               })
 
@@ -2303,10 +2470,9 @@ ${conversationSummaryContext || ''}`
               await sandbox.writeFiles(sandboxFiles)
               logs.push('Project files written to sandbox')
 
-              // Install dependencies
-              logs.push('Installing dependencies...')
+              // Install dependencies with reasonable timeout for error detection
               const installResult = await sandbox.installDependenciesRobust("/project", {
-                timeoutMs: 120000, // 2 minutes
+                timeoutMs: 90000, // Increased from 60000 (1min) to 90000 (1.5min) for proper error checking
                 envVars: {},
                 onStdout: (data) => logs.push(`[INSTALL] ${data.trim()}`),
                 onStderr: (data) => {
@@ -2316,6 +2482,9 @@ ${conversationSummaryContext || ''}`
               })
 
               if (installResult.exitCode !== 0) {
+                const executionTime = Date.now() - toolStartTime;
+                toolExecutionTimes['check_dev_errors'] = (toolExecutionTimes['check_dev_errors'] || 0) + executionTime;
+                
                 return {
                   success: false,
                   error: 'Dependency installation failed',
@@ -2331,7 +2500,9 @@ ${conversationSummaryContext || ''}`
                     stdout: installResult.stdout || '',
                     stderr: installResult.stderr || ''
                   },
-                  toolCallId
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
                 }
               }
 
@@ -2376,6 +2547,9 @@ ${conversationSummaryContext || ''}`
                 await Promise.race([serverReadyPromise, timeoutPromise])
 
                 if (!serverStarted) {
+                  const executionTime = Date.now() - toolStartTime;
+                  toolExecutionTimes['check_dev_errors'] = (toolExecutionTimes['check_dev_errors'] || 0) + executionTime;
+                  
                   return {
                     success: false,
                     error: 'Dev server failed to start within timeout',
@@ -2388,7 +2562,9 @@ ${conversationSummaryContext || ''}`
                       stdout: '',
                       stderr: ''
                     },
-                    toolCallId
+                    toolCallId,
+                    executionTimeMs: executionTime,
+                    timeWarning: timeStatus.warningMessage
                   }
                 }
 
@@ -2418,15 +2594,16 @@ ${conversationSummaryContext || ''}`
                   logs,
                   errors: runtimeErrors,
                   errorCount: runtimeErrors.length,
-                  toolCallId
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
                 }
 
               } else if (mode === 'build') {
-                // Run build process
-                logs.push('Starting build process...')
+                // Run build process with reasonable timeout for error detection
                 const buildResult = await sandbox.executeCommand("npm run build", {
                   workingDirectory: "/project",
-                  timeoutMs: 120000, // 2 minutes
+                  timeoutMs: 90000, // Increased from 60000 (1min) to 90000 (1.5min) for proper error checking
                   envVars: {},
                   onStdout: (data: string) => logs.push(`[BUILD] ${data.trim()}`),
                   onStderr: (data: string) => {
@@ -2439,6 +2616,9 @@ ${conversationSummaryContext || ''}`
                 buildCompleted = buildResult.exitCode === 0
 
                 if (!buildCompleted) {
+                  const executionTime = Date.now() - toolStartTime;
+                  toolExecutionTimes['check_dev_errors'] = (toolExecutionTimes['check_dev_errors'] || 0) + executionTime;
+                  
                   return {
                     success: false,
                     error: 'Build failed',
@@ -2454,7 +2634,9 @@ ${conversationSummaryContext || ''}`
                       stdout: buildResult.stdout || '',
                       stderr: buildResult.stderr || ''
                     },
-                    toolCallId
+                    toolCallId,
+                    executionTimeMs: executionTime,
+                    timeWarning: timeStatus.warningMessage
                   }
                 }
 
@@ -2474,11 +2656,16 @@ ${conversationSummaryContext || ''}`
                   logs,
                   errors: buildErrors,
                   errorCount: buildErrors.length,
-                  toolCallId
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
                 }
               }
 
             } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['check_dev_errors'] = (toolExecutionTimes['check_dev_errors'] || 0) + executionTime;
+              
               const errorMessage = error instanceof Error ? error.message : 'Unknown error'
               console.error(`[ERROR] check_dev_errors failed for mode ${mode}:`, error)
 
@@ -2523,7 +2710,9 @@ ${conversationSummaryContext || ''}`
                   stdout,
                   stderr
                 },
-                toolCallId
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
               }
             }
           }
@@ -2669,6 +2858,9 @@ ${conversationSummaryContext || ''}`
     )
 
   } catch (error: any) {
+    // Clean up request timeout
+    clearTimeout(requestTimeoutId);
+    
     console.error('[Chat-V2] Error:', error)
     
     // Update telemetry with error status
