@@ -431,10 +431,19 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           content = lines.slice(startIndex, endIndex + 1).join('\n')
         }
 
-        console.log(`[CONSTRUCT_TOOL_RESULT] read_file: Successfully read ${path} (${content.length} chars, lines ${actualStartLine || 1}-${actualEndLine || 'end'})`)
+        // Check for large files and truncate if necessary to prevent response size issues
+        const MAX_CONTENT_SIZE = 500000 // 500KB limit for content in response
+        let wasTruncated = false
+        if (content.length > MAX_CONTENT_SIZE) {
+          content = content.substring(0, MAX_CONTENT_SIZE)
+          wasTruncated = true
+          console.log(`[CONSTRUCT_TOOL_RESULT] read_file: Content truncated to ${MAX_CONTENT_SIZE} chars for ${path}`)
+        }
+
+        console.log(`[CONSTRUCT_TOOL_RESULT] read_file: Successfully read ${path} (${content.length} chars${wasTruncated ? ' - TRUNCATED' : ''}, lines ${actualStartLine || 1}-${actualEndLine || 'end'})`)
         let response: any = {
           success: true,
-          message: `✅ File ${path} read successfully.`,
+          message: `✅ File ${path} read successfully${wasTruncated ? ` (content truncated to ${MAX_CONTENT_SIZE} characters)` : ''}.`,
           path,
           content,
           name: file.name,
@@ -442,6 +451,13 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           size: file.size,
           action: 'read',
           toolCallId
+        }
+
+        // Add truncation warning
+        if (wasTruncated) {
+          response.truncated = true
+          response.maxContentSize = MAX_CONTENT_SIZE
+          response.fullSize = fullContent.length
         }
 
         // Add line number information if requested
@@ -1272,7 +1288,7 @@ ${conversationSummaryContext || ''}`
 
         // SERVER-SIDE TOOL: Read operations need server-side execution to return fresh data
         read_file: tool({
-          description: 'Read the contents of a file with optional line number information or specific line ranges. This tool executes on the server-side to ensure the AI sees the most current file content.',
+          description: 'Read the contents of a file with optional line number information or specific line ranges. Large files (>500KB) will be truncated to prevent response size issues. This tool executes on the server-side to ensure the AI sees the most current file content.',
           inputSchema: z.object({
             path: z.string().describe('File path to read'),
             includeLineNumbers: z.boolean().optional().describe('Whether to include line numbers in the response (default: false)'),

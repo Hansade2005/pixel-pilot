@@ -185,20 +185,38 @@ export async function handleClientFileOperation(
         }
 
         const content = file.content || '';
+        
+        // Check for large files and truncate if necessary to prevent response size issues
+        const MAX_CONTENT_SIZE = 500000; // 500KB limit for content in response
+        let wasTruncated = false;
+        let finalContent = content;
+        if (content.length > MAX_CONTENT_SIZE) {
+          finalContent = content.substring(0, MAX_CONTENT_SIZE);
+          wasTruncated = true;
+          console.log(`[ClientFileTool] read_file: Content truncated to ${MAX_CONTENT_SIZE} chars for ${path}`);
+        }
+        
         let response: any = {
           success: true,
-          message: `✅ File ${path} read successfully.`,
+          message: `✅ File ${path} read successfully${wasTruncated ? ` (content truncated to ${MAX_CONTENT_SIZE} characters)` : ''}.`,
           path,
-          content,
+          content: finalContent,
           name: file.name,
           type: file.type,
           size: file.size,
           action: 'read'
         };
 
+        // Add truncation warning
+        if (wasTruncated) {
+          response.truncated = true;
+          response.maxContentSize = MAX_CONTENT_SIZE;
+          response.fullSize = content.length;
+        }
+
         // Add line number information if requested
         if (includeLineNumbers) {
-          const lines = content.split('\n');
+          const lines = finalContent.split('\n');
           const lineCount = lines.length;
           const linesWithNumbers = lines.map((line, index) =>
             `${String(index + 1).padStart(4, ' ')}: ${line}`
