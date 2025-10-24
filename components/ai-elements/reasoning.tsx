@@ -172,7 +172,7 @@ export const ReasoningContent = memo(
       {...props}
     >
             <div className="p-4 break-words overflow-wrap-anywhere">
-        <p className="text-card-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
+        <p className="text-muted-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
           {children}
         </p>
       </div>
