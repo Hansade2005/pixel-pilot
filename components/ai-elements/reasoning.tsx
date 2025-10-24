@@ -165,7 +165,7 @@ export const ReasoningContent = memo(
   ({ className, children, ...props }: ReasoningContentProps) => (
     <CollapsibleContent
       className={cn(
-        "mt-4 text-sm p-4 break-words overflow-wrap-anywhere",
+        "w-full mt-4 text-sm p-4 break-words overflow-wrap-anywhere",
         // Enhanced spacing and readability for reasoning content
         "leading-relaxed", // Relaxed line height for better readability
         "[&>p]:mb-4 [&>p]:last:mb-0", // Paragraph spacing
