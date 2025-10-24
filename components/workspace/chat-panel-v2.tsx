@@ -2143,7 +2143,7 @@ export function ChatPanelV2({
                 disabled={!input.trim() && attachedFiles.length === 0}
                 onClick={handleEnhancedSubmit}
               >
-                <Send className="size-4" />
+                <ArrowUp className="size-4" />
               </Button>
             )}
           </div>
