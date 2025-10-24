@@ -3101,14 +3101,13 @@ function parseSearchReplaceBlock(blockText: string) {
     }
   }
 
-  // Remove empty lines from start and end
-  while (searchLines.length > 0 && searchLines[0].trim() === '') searchLines.shift();
-  while (searchLines.length > 0 && searchLines[searchLines.length - 1].trim() === '') searchLines.pop();
-  while (replaceLines.length > 0 && replaceLines[0].trim() === '') replaceLines.shift();
-  while (replaceLines.length > 0 && replaceLines[replaceLines.length - 1].trim() === '') replaceLines.pop();
+  // Don't trim empty lines to preserve exact whitespace for matching
+  // Only check if we have any content at all
+  const hasSearchContent = searchLines.some(line => line.trim() !== '');
+  const hasReplaceContent = replaceLines.some(line => line.trim() !== '');
 
-  if (searchLines.length === 0) {
-    return null; // Invalid block
+  if (!hasSearchContent && !hasReplaceContent) {
+    return null; // Completely empty block
   }
 
   return {
