@@ -2357,7 +2357,11 @@ export function ChatPanelV2({
                 className="h-8 w-8"
                 onClick={stop}
               >
-                <StopCircle className="size-4" />
+                {isContinuationInProgress ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <StopCircle className="size-4" />
+                )}
               </Button>
             ) : (
               <Button
