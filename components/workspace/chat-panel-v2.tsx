@@ -315,6 +315,7 @@ export function ChatPanelV2({
   // Local state for input (not using useChat's input)
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [continuingMessageId, setContinuingMessageId] = useState<string | null>(null)
 
   // Auto-adjust textarea height on input change
   useEffect(() => {
@@ -723,12 +724,209 @@ export function ChatPanelV2({
     setInput('')
   }
 
-  // Stop function for aborting requests
-  const stop = () => {
-    if (abortController) {
-      abortController.abort()
-      setAbortController(null)
+  // Handle stream continuation - automatically create new request with continuation state
+  const handleStreamContinuation = async (
+    continuationState: any,
+    originalAssistantMessageId: string,
+    accumulatedContent: string,
+    accumulatedReasoning: string
+  ) => {
+    if (!continuationState || !project) {
+      console.error('[ChatPanelV2][Continuation] Invalid continuation state or no project')
+      return
+    }
+
+    console.log('[ChatPanelV2][Continuation] 🚀 Starting automatic continuation request')
+
+    // Set the message as continuing to show streaming indicator
+    setContinuingMessageId(originalAssistantMessageId)
+
+    try {
+      // During continuation, the message will continue streaming seamlessly
+      // No need to modify the message content - the existing streaming indicator will show
+
+      // Continue appending to the original assistant message instead of creating new one
+      // Remove the thinking indicator and continue with content
+      setMessages(prev => prev.map(msg =>
+        msg.id === originalAssistantMessageId
+          ? {
+              ...msg,
+              content: accumulatedContent, // Remove thinking indicator
+              reasoning: accumulatedReasoning
+            }
+          : msg
+      ))
+
+      // Create abort controller for continuation request
+      const continuationController = new AbortController()
+      setAbortController(continuationController)
+
+      // Prepare continuation request payload
+      const continuationPayload = {
+        messages: [], // Don't send messages - full history is in continuationState
+        projectId: project.id,
+        project,
+        files: projectFiles, // Use current project files
+        fileTree: await buildProjectFileTree(), // Rebuild file tree
+        modelId: selectedModel,
+        aiMode,
+        continuationState // Include the continuation state
+      }
+
+      console.log('[ChatPanelV2][Continuation] 📤 Sending continuation request with token:', continuationState.continuationToken)
+
+      const response = await fetch('/api/chat-v2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(continuationPayload),
+        signal: continuationController.signal
+      })
+
+      if (!response.ok) {
+        throw new Error('Continuation request failed')
+      }
+
+      // Handle continuation streaming response
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('No continuation response body')
+
+      const decoder = new TextDecoder()
+      let continuationAccumulatedContent = ''
+      let continuationAccumulatedReasoning = ''
+      let lineBuffer = ''
+
+      console.log('[ChatPanelV2][Continuation] 📥 Processing continuation stream')
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) {
+          console.log('[ChatPanelV2][Continuation] ✅ Continuation stream complete')
+          break
+        }
+
+        const chunk = decoder.decode(value, { stream: true })
+        lineBuffer += chunk
+        const lines = lineBuffer.split('\n')
+        lineBuffer = lines.pop() || ''
+
+        const completeLines = lines.filter(line => line.trim())
+
+        for (const line of completeLines) {
+          try {
+            const jsonString = line.startsWith('data: ') ? line.slice(6) : line
+            if (!jsonString || jsonString.startsWith(':')) continue
+
+            const parsed = JSON.parse(jsonString)
+
+            // Skip server-internal chunks
+            if (parsed.type === 'start-step' || parsed.type === 'reasoning-start') {
+              continue
+            }
+
+            console.log('[ChatPanelV2][Continuation] Parsed continuation part:', parsed.type)
+
+            // Handle continuation stream parts - append to original message
+            if (parsed.type === 'text-delta') {
+              if (parsed.text) {
+                continuationAccumulatedContent += parsed.text
+                setMessages(prev => prev.map(msg =>
+                  msg.id === originalAssistantMessageId
+                    ? { ...msg, content: accumulatedContent + continuationAccumulatedContent, reasoning: accumulatedReasoning + continuationAccumulatedReasoning }
+                    : msg
+                ))
+              }
+            } else if (parsed.type === 'reasoning-delta') {
+              if (parsed.text) {
+                continuationAccumulatedReasoning += parsed.text
+                setMessages(prev => prev.map(msg =>
+                  msg.id === originalAssistantMessageId
+                    ? { ...msg, content: accumulatedContent + continuationAccumulatedContent, reasoning: accumulatedReasoning + continuationAccumulatedReasoning }
+                    : msg
+                ))
+              }
+            } else if (parsed.type === 'tool-call') {
+              // Handle tool calls in continuation (same logic as main stream)
+              const toolCall = {
+                toolName: parsed.toolName,
+                toolCallId: parsed.toolCallId,
+                args: parsed.input,
+                dynamic: false
+              }
+
+              console.log('[ChatPanelV2][Continuation][ClientTool] 🔧 Continuation tool call:', toolCall.toolName)
+
+              const clientSideTools = ['write_file', 'edit_file', 'delete_file', 'add_package', 'remove_package']
+              if (clientSideTools.includes(toolCall.toolName)) {
+                const { handleClientFileOperation } = await import('@/lib/client-file-tools')
+
+                const addToolResult = (result: any) => {
+                  console.log('[ChatPanelV2][Continuation][ClientTool] ✅ Continuation tool completed:', result.tool)
+                }
+
+                handleClientFileOperation(toolCall, project.id, addToolResult)
+                  .catch(error => {
+                    console.error('[ChatPanelV2][Continuation][ClientTool] ❌ Tool execution error:', error)
+                  })
+              }
+            } else if (parsed.type === 'tool-result') {
+              console.log('[ChatPanelV2][Continuation][DataStream] Tool result received:', parsed.toolName)
+            }
+          } catch (e) {
+            console.error('[ChatPanelV2][Continuation] ❌ Failed to parse continuation chunk:', e)
+            continue
+          }
+        }
+      }
+
+      // Continuation complete - update the original message with combined content
+      const finalContent = accumulatedContent + continuationAccumulatedContent
+      const finalReasoning = accumulatedReasoning + continuationAccumulatedReasoning
+
+      if (finalContent.trim()) {
+        // Update the original message with the complete content
+        setMessages(prev => prev.map(msg =>
+          msg.id === originalAssistantMessageId
+            ? { ...msg, content: finalContent, reasoning: finalReasoning }
+            : msg
+        ))
+
+        // Save the updated message
+        await saveAssistantMessageAfterStreaming(
+          originalAssistantMessageId,
+          finalContent,
+          finalReasoning,
+          []
+        )
+      }
+
+      console.log('[ChatPanelV2][Continuation] 🎉 Continuation completed successfully')
+
+    } catch (error: any) {
+      console.error('[ChatPanelV2][Continuation] ❌ Continuation failed:', error)
+
+      // Clear the continuing state on error
+      setContinuingMessageId(null)
+
+      // Remove the thinking indicator from the original message on error
+      setMessages(prev => prev.map(msg =>
+        msg.id === originalAssistantMessageId
+          ? {
+              ...msg,
+              content: accumulatedContent, // Remove thinking indicator
+              reasoning: accumulatedReasoning
+            }
+          : msg
+      ))
+
+      toast({
+        title: "Continuation failed",
+        description: "Failed to continue the conversation. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
       setIsLoading(false)
+      setAbortController(null)
+      setContinuingMessageId(null) // Clear continuing state
     }
   }
 
@@ -1218,6 +1416,24 @@ export function ChatPanelV2({
                     : msg
                 ))
               }
+            } else if (parsed.type === 'continuation_signal') {
+              // STREAM CONTINUATION: Handle automatic continuation request
+              console.log('[ChatPanelV2][Continuation] 🔄 Received continuation signal:', parsed.continuationState?.continuationToken)
+
+              // Show continuation message to user
+              toast({
+                title: "Continuing conversation...",
+                description: "Stream will continue seamlessly due to time constraints.",
+                duration: 3000
+              })
+
+              // Automatically trigger continuation after a brief delay
+              setTimeout(async () => {
+                await handleStreamContinuation(parsed.continuationState, assistantMessageId, accumulatedContent, accumulatedReasoning)
+              }, 1000)
+
+              // Don't process any more chunks after continuation signal
+              break
             } else if (parsed.type === 'tool-call') {
               // CLIENT-SIDE TOOL EXECUTION: Execute file operation tools on IndexedDB
               const toolCall = {
@@ -1743,7 +1959,7 @@ export function ChatPanelV2({
                   <MessageWithTools
                     message={message}
                     projectId={project?.id}
-                    isStreaming={isLoading && message.id === messages[messages.length - 1]?.id}
+                    isStreaming={(isLoading && message.id === messages[messages.length - 1]?.id) || message.id === continuingMessageId}
                   />
                 </div>
                 {/* AI Message Actions - Only show if message has content */}

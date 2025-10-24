@@ -938,8 +938,9 @@ export async function POST(req: Request) {
   const startTime = Date.now()
   
   // Add overall request timeout to stay under Vercel's 300s limit
-  const REQUEST_TIMEOUT_MS = 290000; // 290 seconds (10s buffer under 300s limit)
-  const WARNING_TIME_MS = 240000; // Warn at 240 seconds (50 seconds remaining)
+  const REQUEST_TIMEOUT_MS = 290000; // 290 seconds (5s buffer under 300s limit)
+  const STREAM_CONTINUE_THRESHOLD_MS = 260000; // 260 seconds - trigger continuation earlier for smoother UX
+  const WARNING_TIME_MS = 220000; // Warn at 220 seconds (70 seconds remaining)
   const controller = new AbortController();
   const requestTimeoutId = setTimeout(() => {
     controller.abort();
@@ -952,11 +953,13 @@ export async function POST(req: Request) {
   const getTimeStatus = () => {
     const elapsed = Date.now() - startTime;
     const remaining = REQUEST_TIMEOUT_MS - elapsed;
+    const shouldContinue = elapsed >= STREAM_CONTINUE_THRESHOLD_MS;
     const isApproachingTimeout = elapsed >= WARNING_TIME_MS;
 
     return {
       elapsed,
       remaining,
+      shouldContinue,
       isApproachingTimeout,
       warningMessage: isApproachingTimeout
         ? `⚠️ TIME WARNING: ${Math.round(remaining / 1000)} seconds remaining. Please provide final summary and avoid additional tool calls.`
@@ -966,39 +969,93 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json()
-    const {
+    let {
       messages = [], // Default to empty array if not provided
       projectId,
       project,
       files = [], // Default to empty array
       fileTree, // Client-built file tree
       modelId,
-      aiMode
+      aiMode,
+      continuationState // New field for stream continuation
     } = body
+
+    // Handle stream continuation
+    let isContinuation = false
+    let previousMessages: any[] = []
+    let previousToolResults: any[] = []
+    let processedMessages: any[] = []
+
+    if (continuationState) {
+      isContinuation = true
+      console.log('[Chat-V2] Processing stream continuation:', continuationState.continuationToken)
+
+      // Restore previous state
+      previousMessages = continuationState.messages || []
+      previousToolResults = continuationState.toolResults || []
+
+      // Override session data with continuation state
+      if (continuationState.sessionData) {
+        projectId = continuationState.sessionData.projectId || projectId
+        modelId = continuationState.sessionData.modelId || modelId
+        aiMode = continuationState.sessionData.aiMode || aiMode
+        fileTree = continuationState.sessionData.fileTree || fileTree
+        files = continuationState.sessionData.files || files
+      }
+
+      // Merge previous messages with current messages
+      const combinedMessages = [...previousMessages]
+      messages.forEach((msg: any) => {
+        // Avoid duplicates
+        if (!combinedMessages.some(existing => existing.timestamp === msg.timestamp)) {
+          combinedMessages.push(msg)
+        }
+      })
+
+      // Update processedMessages to include continuation context
+      processedMessages = combinedMessages
+        .map(msg => {
+          // Truncate user messages to 1500 characters
+          if (msg.role === 'user' && msg.content && typeof msg.content === 'string' && msg.content.length > 1500) {
+            console.log(`[Chat-V2] Truncating user message from ${msg.content.length} to 1500 characters`)
+            return {
+              ...msg,
+              content: msg.content.substring(0, 1500) + '...'
+            }
+          }
+          return msg
+        })
+        // Keep more history for continuations (last 10 pairs = 20 messages max)
+        .slice(-20)
+
+      console.log(`[Chat-V2] Continuation: Restored ${previousMessages.length} messages, ${previousToolResults.length} tool results`)
+    }
 
     // Validate messages is an array
     if (!Array.isArray(messages)) {
       console.error('[Chat-V2] Invalid messages format:', typeof messages)
-      return NextResponse.json({ 
-        error: 'Invalid messages format - must be an array' 
+      return NextResponse.json({
+        error: 'Invalid messages format - must be an array'
       }, { status: 400 })
     }
 
-    // Process messages: truncate long user messages and limit conversation history
-    const processedMessages = messages
-      .map(msg => {
-        // Truncate user messages to 1500 characters
-        if (msg.role === 'user' && msg.content && typeof msg.content === 'string' && msg.content.length > 1500) {
-          console.log(`[Chat-V2] Truncating user message from ${msg.content.length} to 1500 characters`)
-          return {
-            ...msg,
-            content: msg.content.substring(0, 1500) + '...'
+    // Process messages for non-continuation requests
+    if (!isContinuation) {
+      processedMessages = messages
+        .map(msg => {
+          // Truncate user messages to 1500 characters
+          if (msg.role === 'user' && msg.content && typeof msg.content === 'string' && msg.content.length > 1500) {
+            console.log(`[Chat-V2] Truncating user message from ${msg.content.length} to 1500 characters`)
+            return {
+              ...msg,
+              content: msg.content.substring(0, 1500) + '...'
+            }
           }
-        }
-        return msg
-      })
-      // Keep only the last 3 pairs of messages (user + assistant exchanges = 6 messages max)
-      .slice(-6)
+          return msg
+        })
+        // Keep only the last 3 pairs of messages (user + assistant exchanges = 6 messages max)
+        .slice(-6)
+    }
 
     // Telemetry logging: log every input sent to the model API
     try {
@@ -1043,71 +1100,102 @@ export async function POST(req: Request) {
     }
 
     // Initialize in-memory project storage for this session
-    const clientFiles = files || []
-    const clientFileTree = fileTree || []
+    let clientFiles = files || []
+    let clientFileTree = fileTree || []
     console.log(`[DEBUG] Initializing in-memory storage with ${clientFiles.length} files and ${clientFileTree.length} tree entries for session ${projectId}`)
 
     // Create in-memory storage for this session
     const sessionFiles = new Map<string, any>()
-    
-    if (clientFiles.length > 0) {
-      for (const file of clientFiles) {
-        if (file.path && !file.isDirectory) {
-          // Store file data in memory with exact content
+
+    // Restore session storage from continuation state if available
+    if (isContinuation && continuationState.sessionStorage) {
+      console.log('[Chat-V2] Restoring session storage from continuation state')
+
+      // Restore file tree
+      if (continuationState.sessionStorage.fileTree) {
+        clientFileTree = continuationState.sessionStorage.fileTree
+      }
+
+      // Restore files
+      if (continuationState.sessionStorage.files) {
+        continuationState.sessionStorage.files.forEach((fileEntry: any) => {
           const fileData = {
-            workspaceId: projectId,
-            name: file.name,
-            path: file.path,
-            content: file.content !== undefined ? String(file.content) : '',
-            fileType: file.type || file.fileType || 'text',
-            type: file.type || file.fileType || 'text',
-            size: file.size || String(file.content || '').length,
-            isDirectory: false
+            workspaceId: fileEntry.data.workspaceId,
+            name: fileEntry.data.name,
+            path: fileEntry.path,
+            content: fileEntry.data.content,
+            fileType: fileEntry.data.fileType,
+            type: fileEntry.data.type,
+            size: fileEntry.data.size,
+            isDirectory: fileEntry.data.isDirectory
           }
-          sessionFiles.set(file.path, fileData)
-          console.log(`[DEBUG] Stored file in memory: ${file.path} (${fileData.content.length} chars)`)
+          sessionFiles.set(fileEntry.path, fileData)
+          console.log(`[DEBUG] Restored file from continuation: ${fileEntry.path}`)
+        })
+      }
+
+      console.log(`[DEBUG] Restored ${sessionFiles.size} files from continuation state`)
+    } else {
+      // Normal initialization
+      if (clientFiles.length > 0) {
+        for (const file of clientFiles) {
+          if (file.path && !file.isDirectory) {
+            // Store file data in memory with exact content
+            const fileData = {
+              workspaceId: projectId,
+              name: file.name,
+              path: file.path,
+              content: file.content !== undefined ? String(file.content) : '',
+              fileType: file.type || file.fileType || 'text',
+              type: file.type || file.fileType || 'text',
+              size: file.size || String(file.content || '').length,
+              isDirectory: false
+            }
+            sessionFiles.set(file.path, fileData)
+            console.log(`[DEBUG] Stored file in memory: ${file.path} (${fileData.content.length} chars)`)
+          }
         }
       }
-    }
 
-    // Also store directory entries from fileTree
-    if (clientFileTree.length > 0) {
-      for (const treeItem of clientFileTree) {
-        if (treeItem.endsWith('/')) {
-          // This is a directory
-          const dirPath = treeItem.slice(0, -1) // Remove trailing slash
-          if (!sessionFiles.has(dirPath)) {
-            const dirData = {
-              workspaceId: projectId,
-              name: dirPath.split('/').pop() || dirPath,
-              path: dirPath,
-              content: '',
-              fileType: 'directory',
-              type: 'directory',
-              size: 0,
-              isDirectory: true
-            }
-            sessionFiles.set(dirPath, dirData)
-            console.log(`[DEBUG] Stored directory in memory: ${dirPath}`)
-          }
-        } else {
-          // This is a file - make sure it's in sessionFiles
-          if (!sessionFiles.has(treeItem)) {
-            // Try to find it in clientFiles or create a placeholder
-            const existingFile = clientFiles.find((f: any) => f.path === treeItem)
-            if (existingFile) {
-              const fileData = {
+      // Also store directory entries from fileTree
+      if (clientFileTree.length > 0) {
+        for (const treeItem of clientFileTree) {
+          if (treeItem.endsWith('/')) {
+            // This is a directory
+            const dirPath = treeItem.slice(0, -1) // Remove trailing slash
+            if (!sessionFiles.has(dirPath)) {
+              const dirData = {
                 workspaceId: projectId,
-                name: existingFile.name,
-                path: existingFile.path,
-                content: existingFile.content !== undefined ? String(existingFile.content) : '',
-                fileType: existingFile.type || existingFile.fileType || 'text',
-                type: existingFile.type || existingFile.fileType || 'text',
-                size: existingFile.size || String(existingFile.content || '').length,
-                isDirectory: false
+                name: dirPath.split('/').pop() || dirPath,
+                path: dirPath,
+                content: '',
+                fileType: 'directory',
+                type: 'directory',
+                size: 0,
+                isDirectory: true
               }
-              sessionFiles.set(treeItem, fileData)
-              console.log(`[DEBUG] Stored missing file from fileTree: ${treeItem}`)
+              sessionFiles.set(dirPath, dirData)
+              console.log(`[DEBUG] Stored directory in memory: ${dirPath}`)
+            }
+          } else {
+            // This is a file - make sure it's in sessionFiles
+            if (!sessionFiles.has(treeItem)) {
+              // Try to find it in clientFiles or create a placeholder
+              const existingFile = clientFiles.find((f: any) => f.path === treeItem)
+              if (existingFile) {
+                const fileData = {
+                  workspaceId: projectId,
+                  name: existingFile.name,
+                  path: existingFile.path,
+                  content: existingFile.content !== undefined ? String(existingFile.content) : '',
+                  fileType: existingFile.type || existingFile.fileType || 'text',
+                  type: existingFile.type || existingFile.fileType || 'text',
+                  size: existingFile.size || String(existingFile.content || '').length,
+                  isDirectory: false
+                }
+                sessionFiles.set(treeItem, fileData)
+                console.log(`[DEBUG] Stored missing file from fileTree: ${treeItem}`)
+              }
             }
           }
         }
@@ -1179,7 +1267,7 @@ export async function POST(req: Request) {
 
     // Build system prompt from pixel_forge_system_prompt.ts
     const isNextJS = true // We're using Next.js
-    const systemPrompt = `
+    let systemPrompt = `
 # 🚀 PiPilot AI: Elite Web Architect & Bug Hunter
 ## Role
 You are the expert full-stack architect—a digital superhero with over 15 years of deep, professional experience. Your mission: deliver clean, innovative, market-dominating products with elite code quality, delightful UX, and thorough error handling.
@@ -1251,6 +1339,29 @@ _Remember: You’re not just coding—you’re creating digital magic! Every fea
 ${projectContext}
 
 ${conversationSummaryContext || ''}`
+
+    // Add continuation instructions if this is a continuation request
+    if (isContinuation) {
+      systemPrompt += `
+
+## 🔄 STREAM CONTINUATION MODE
+**IMPORTANT**: This is a continuation of a previous conversation that was interrupted due to time constraints. You must continue exactly where you left off without repeating previous content or restarting your response.
+
+**Continuation Context:**
+- Previous response was interrupted after ${Math.round((continuationState.elapsedTimeMs || 0) / 1000)} seconds
+- ${previousToolResults.length} tool operations were completed
+- Continue your response seamlessly as if the interruption never happened
+- Do not repeat any content you already provided
+- Pick up exactly where your previous response ended
+
+**Instructions:**
+✅ Continue your response naturally
+✅ Reference any completed tool results
+✅ Maintain the same tone and style
+❌ Do not repeat previous content
+❌ Do not apologize for the interruption
+❌ Do not mention being a "continuation"`
+    }
 
     // Get AI model
     const model = getAIModel(modelId)
@@ -2845,21 +2956,133 @@ ${conversationSummaryContext || ''}`
 
     console.log('[Chat-V2] Streaming with newline-delimited JSON (same as stream.ts)')
 
+    // Helper function to capture streaming state for continuation
+    const captureStreamingState = (currentMessages: any[], toolResults: any[] = []) => {
+      const timeStatus = getTimeStatus();
+
+      // Capture current session storage state
+      const currentSessionData = sessionProjectStorage.get(projectId);
+
+      return {
+        continuationToken: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        elapsedTimeMs: timeStatus.elapsed,
+        messages: currentMessages,
+        toolResults,
+        sessionData: {
+          projectId,
+          modelId,
+          aiMode,
+          fileTree: clientFileTree,
+          files: clientFiles
+        },
+        sessionStorage: currentSessionData ? {
+          fileTree: currentSessionData.fileTree,
+          files: Array.from(currentSessionData.files.entries()).map(([path, fileData]) => ({
+            path,
+            data: {
+              workspaceId: fileData.workspaceId,
+              name: fileData.name,
+              content: fileData.content,
+              fileType: fileData.fileType,
+              type: fileData.type,
+              size: fileData.size,
+              isDirectory: fileData.isDirectory
+            }
+          }))
+        } : null,
+        systemPrompt,
+        conversationSummaryContext
+      };
+    };
+
     // Stream the response using newline-delimited JSON format (not SSE)
     // This matches the format used in stream.ts and expected by chatparse.tsx
     return new Response(
       new ReadableStream({
         async start(controller) {
           const encoder = new TextEncoder()
-          
+          let currentMessages = [...processedMessages]
+          let toolResults: any[] = []
+          let shouldContinue = false
+          let accumulatedContent = ''
+          let accumulatedReasoning = ''
+
           try {
-            // Stream the text and tool calls
+            // Stream the text and tool calls with continuation monitoring
             for await (const part of result.fullStream) {
+              // Check if we should trigger continuation
+              const timeStatus = getTimeStatus();
+              if (timeStatus.shouldContinue && !shouldContinue) {
+                shouldContinue = true;
+                console.log('[Chat-V2] Triggering stream continuation due to timeout approach');
+
+                // Update currentMessages with accumulated content before capturing state
+                if (currentMessages.length > 0 && currentMessages[currentMessages.length - 1].role === 'assistant') {
+                  currentMessages[currentMessages.length - 1] = {
+                    ...currentMessages[currentMessages.length - 1],
+                    content: accumulatedContent,
+                    reasoning: accumulatedReasoning
+                  }
+                }
+
+                // Send continuation signal to frontend
+                const continuationState = captureStreamingState(currentMessages, toolResults);
+                controller.enqueue(encoder.encode(JSON.stringify({
+                  type: 'continuation_signal',
+                  continuationState,
+                  message: 'Stream will continue in new request'
+                }) + '\n'));
+
+                // Don't send more content after continuation signal
+                break;
+              }
+
+              // Update current state for continuation tracking
+              if (part.type === 'text-delta') {
+                if (part.text) {
+                  accumulatedContent += part.text
+                }
+              } else if (part.type === 'reasoning-delta') {
+                if (part.text) {
+                  accumulatedReasoning += part.text
+                }
+              } else if (part.type === 'tool-call') {
+                toolResults.push(part);
+              } else if (part.type === 'tool-result') {
+                toolResults.push(part);
+              }
+
               // Send each part as newline-delimited JSON (no SSE "data:" prefix)
               controller.enqueue(encoder.encode(JSON.stringify(part) + '\n'))
             }
           } catch (error) {
             console.error('[Chat-V2] Stream error:', error)
+
+            // If we error out near timeout, still try to send continuation signal
+            const timeStatus = getTimeStatus();
+            if (timeStatus.elapsed > STREAM_CONTINUE_THRESHOLD_MS - 10000) { // Within 10s of threshold
+              try {
+                // Update currentMessages with accumulated content before capturing state
+                if (currentMessages.length > 0 && currentMessages[currentMessages.length - 1].role === 'assistant') {
+                  currentMessages[currentMessages.length - 1] = {
+                    ...currentMessages[currentMessages.length - 1],
+                    content: accumulatedContent,
+                    reasoning: accumulatedReasoning
+                  }
+                }
+
+                const continuationState = captureStreamingState(currentMessages, toolResults);
+                controller.enqueue(encoder.encode(JSON.stringify({
+                  type: 'continuation_signal',
+                  continuationState,
+                  message: 'Stream interrupted, continuing in new request',
+                  error: error instanceof Error ? error.message : 'Unknown streaming error'
+                }) + '\n'));
+              } catch (continuationError) {
+                console.error('[Chat-V2] Failed to send continuation signal:', continuationError);
+              }
+            }
           } finally {
             controller.close()
           }
