@@ -171,10 +171,10 @@ export const ReasoningContent = memo(
       )}
       {...props}
     >
-            <div className="p-4 break-words overflow-wrap-anywhere">
-        <p className="text-muted-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
+      <div className="p-4 break-words overflow-wrap-anywhere">
+        <Response className="text-muted-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
           {children}
-        </p>
+        </Response>
       </div>
     </CollapsibleContent>
   )
