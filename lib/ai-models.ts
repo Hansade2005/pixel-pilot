@@ -64,6 +64,20 @@ export const chatModels: Array<ChatModel> = [
     provider: 'a0dev',
   },
 
+  // PiPilot Premium Models (Claude via OpenRouter - Premium Only)
+  {
+    id: 'pipilot-pro',
+    name: 'PiPilot Pro',
+    description: 'Advanced PiPilot model with superior reasoning and coding capabilities',
+    provider: 'pipilot',
+  },
+  {
+    id: 'pipilot-ultra',
+    name: 'PiPilot Ultra',
+    description: 'PiPilot\'s most powerful model for complex tasks and deep analysis',
+    provider: 'pipilot',
+  },
+
   // OpenAI Models
   {
     id: 'gpt-4o',
@@ -164,6 +178,20 @@ export const chatModels: Array<ChatModel> = [
     name: 'Grok 4 Fast',
     description: 'xAI Grok 4 fast model optimized for speed without reasoning',
     provider: 'xai',
+  },
+
+  // OpenRouter Claude Models
+  {
+    id: 'claude-sonnet-4.5',
+    name: 'Claude Sonnet 4.5',
+    description: 'Anthropic Claude Sonnet 4.5 via OpenRouter - best coding model with extended thinking',
+    provider: 'openrouter',
+  },
+  {
+    id: 'claude-sonnet-4',
+    name: 'Claude Sonnet 4',
+    description: 'Anthropic Claude Sonnet 4 via OpenRouter - advanced coding and reasoning model',
+    provider: 'openrouter',
   },
 ];
 

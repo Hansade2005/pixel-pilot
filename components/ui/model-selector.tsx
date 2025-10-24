@@ -36,7 +36,9 @@ export function ModelSelector({
   
   const displayNameMap = new Map<string, string>([
     ['grok-code-fast-1', 'PiPilot 4.5 Pro'],
-    ['grok-3-mini', 'PiPilot 4 Flash']
+    ['grok-3-mini', 'PiPilot 4 Flash'],
+    ['pipilot-pro', 'PiPilot Pro'],
+    ['pipilot-ultra', 'PiPilot Ultra']
   ])
   
   const filteredModels = chatModels.filter(model => displayNameMap.has(model.id))
@@ -58,7 +60,7 @@ export function ModelSelector({
   if (userPlan === 'free') {
     allowedModels = ['grok-3-mini']
   } else if (userPlan === 'pro' && effectiveStatus === 'active') {
-    allowedModels = ['grok-code-fast-1', 'grok-3-mini']
+    allowedModels = ['grok-code-fast-1', 'grok-3-mini', 'pipilot-pro', 'pipilot-ultra']
   } else {
     // Fallback for pro inactive or other cases
     allowedModels = userLimits.allowedModels || ['auto']

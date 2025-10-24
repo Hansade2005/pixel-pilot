@@ -150,6 +150,12 @@ const xaiProvider = createXai({
   apiKey: process.env.XAI_API_KEY || 'xai-your-api-key-here',
 });
 
+const openrouterProvider = createOpenAICompatible({
+  name: 'openrouter',
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY || 'sk-or-v1-your-openrouter-api-key',
+});
+
 // Debug function to check environment variables
 function checkProviderKeys() {
   const keys = {
@@ -201,6 +207,10 @@ const modelProviders: Record<string, any> = {
   // a0.dev Models
   'a0-dev-llm': a0devProvider.languageModel('a0-dev-llm'),
   
+  // PiPilot Premium Models (Claude via OpenRouter)
+  'pipilot-pro': openrouterProvider('anthropic/claude-sonnet-4'),
+  'pipilot-ultra': openrouterProvider('anthropic/claude-sonnet-4.5'),
+  
   // Mistral Models - Default uses Codestral endpoint
   'open-codestral-mamba': mistralProvider('open-codestral-mamba'),
   'pixtral-12b-2409': mistralProvider('pixtral-12b-2409'),
@@ -229,6 +239,10 @@ const modelProviders: Record<string, any> = {
   'grok-3-mini-fast': xaiProvider('grok-3-mini-fast'),
   'grok-3-latest': xaiProvider('grok-3-latest'),
   'grok-4-fast-non-reasoning': xaiProvider('grok-4-fast-non-reasoning'),
+
+  // OpenRouter Claude Models
+  'claude-sonnet-4.5': openrouterProvider('anthropic/claude-sonnet-4.5'),
+  'claude-sonnet-4': openrouterProvider('anthropic/claude-sonnet-4'),
 };
 
 // Helper function to get a model by ID
@@ -247,6 +261,7 @@ export {
   mistralProvider as mistral,
   cohereProvider as cohere,
   xaiProvider as xai,
+  openrouterProvider as openrouter,
   codestral,
   createOpenAICompatible,
 };
