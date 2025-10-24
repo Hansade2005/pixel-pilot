@@ -172,7 +172,7 @@ export const ReasoningContent = memo(
       {...props}
     >
       <div className="p-4 break-words overflow-wrap-anywhere">
-        <Response className="text-muted-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
+        <Response className="text-muted-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left [&>*]:whitespace-pre-wrap [&_pre]:whitespace-pre-wrap [&_code]:whitespace-pre-wrap">
           {children}
         </Response>
       </div>
