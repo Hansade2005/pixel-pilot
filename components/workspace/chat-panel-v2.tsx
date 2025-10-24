@@ -316,6 +316,7 @@ export function ChatPanelV2({
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [continuingMessageId, setContinuingMessageId] = useState<string | null>(null)
+  const [isContinuationInProgress, setIsContinuationInProgress] = useState(false)
 
   // Auto-adjust textarea height on input change
   useEffect(() => {
@@ -927,6 +928,7 @@ export function ChatPanelV2({
       setIsLoading(false)
       setAbortController(null)
       setContinuingMessageId(null) // Clear continuing state
+      setIsContinuationInProgress(false) // Clear continuation flag
     }
   }
 
@@ -1420,6 +1422,9 @@ export function ChatPanelV2({
               // STREAM CONTINUATION: Handle automatic continuation request
               console.log('[ChatPanelV2][Continuation] 🔄 Received continuation signal:', parsed.continuationState?.continuationToken)
 
+              // Mark that continuation is in progress to keep loading active
+              setIsContinuationInProgress(true)
+
               // Show continuation message to user
               toast({
                 title: "Continuing conversation...",
@@ -1529,7 +1534,10 @@ export function ChatPanelV2({
         setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
       }
     } finally {
-      setIsLoading(false)
+      // Only turn off loading if continuation is not in progress
+      if (!isContinuationInProgress) {
+        setIsLoading(false)
+      }
       setAbortController(null)
     }
   }
