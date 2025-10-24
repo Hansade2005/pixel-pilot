@@ -172,12 +172,9 @@ export const ReasoningContent = memo(
       {...props}
     >
             <div className="p-4 break-words overflow-wrap-anywhere">
-        <Response className={cn(
-          'prose prose-sm dark:prose-invert max-w-none',
-          'prose-pre:bg-muted prose-pre:text-foreground',
-          'prose-code:text-foreground prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded',
-          'grid gap-2'
-        )}>{children}</Response>
+        <p className="text-card-foreground text-sm leading-[1.5] whitespace-pre-wrap text-left">
+          {children}
+        </p>
       </div>
     </CollapsibleContent>
   )
