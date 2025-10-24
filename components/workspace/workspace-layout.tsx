@@ -61,7 +61,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true) // Changed from false to true
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const { toast } = useToast()
-  const [githubConnected, setGithubConnected] = useState<boolean | null>(null)
+  const [gitHubConnected, setGitHubConnected] = useState(false)
   const [clientProjects, setClientProjects] = useState<Workspace[]>(projects)
   const [isLoadingProjects, setIsLoadingProjects] = useState(false)
   const [fileExplorerKey, setFileExplorerKey] = useState<number>(0) // Force file explorer refresh
@@ -85,7 +85,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   })
 
   // GitHub push functionality
-  const { pushToGitHub, isPushing } = useGitHubPush()
+  const { pushToGitHub, checkGitHubConnection, isPushing } = useGitHubPush()
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newProjectName, setNewProjectName] = useState("")
   const [newProjectDescription, setNewProjectDescription] = useState("")
@@ -687,10 +687,20 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     }
   }, [clientProjects.length])
 
-  // Check GitHub connection status on mount
+  // Check GitHub connection status when project changes
   React.useEffect(() => {
-    checkGitHubConnection()
-  }, [])
+    const checkConnection = async () => {
+      if (!selectedProject) {
+        setGitHubConnected(false)
+        return
+      }
+
+      const connectionStatus = await checkGitHubConnection(selectedProject)
+      setGitHubConnected(connectionStatus.connected)
+    }
+
+    checkConnection()
+  }, [selectedProject, checkGitHubConnection])
 
   // Auto-switch to editor tab when file is selected on mobile
   React.useEffect(() => {
@@ -698,17 +708,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       setMobileTab("editor")
     }
   }, [selectedFile, isMobile])
-
-  const checkGitHubConnection = async () => {
-    try {
-      await storageManager.init()
-      const token = await storageManager.getToken(user.id, 'github')
-      setGithubConnected(!!token)
-    } catch (error) {
-      console.error('Error checking GitHub connection from storageManager:', error)
-      setGithubConnected(false)
-    }
-  }
 
   // Clear chat function for mobile header
   const handleClearChat = async () => {
@@ -1200,13 +1199,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                   <Github className="h-3 w-3" />
                   <span>
                     GitHub: {(() => {
-                      if (githubConnected === null) {
-                        return <span className="text-muted-foreground">Checking...</span>
+                      if (selectedProject?.githubRepoUrl && gitHubConnected) {
+                        return <span className="text-green-600 dark:text-green-400">Connected</span>
                       }
-                      if (selectedProject?.githubRepoUrl) {
-                        return <span className="text-green-600 dark:text-green-400">Repository Created</span>
-                      }
-                      if (githubConnected) {
+                      if (gitHubConnected) {
                         return <span className="text-blue-600 dark:text-blue-400">Account Connected</span>
                       }
                       return <span className="text-muted-foreground">Not Connected</span>
@@ -1435,7 +1431,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               </Button>
               
               {/* GitHub Push Button - only show when connected */}
-              {githubConnected && selectedProject?.githubRepoUrl && (
+              {gitHubConnected && (
                 <Button
                   variant="ghost"
                   size="sm"
