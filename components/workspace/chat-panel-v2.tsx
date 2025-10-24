@@ -1734,7 +1734,7 @@ export function ChatPanelV2({
                 />
               </div>
             ) : (
-              <Card className={cn("w-full",
+           <Card className={cn("w-full",
                 message.reasoning || message.content || (message.toolInvocations && message.toolInvocations.length > 0)
                   ? "bg-muted"
                   : "bg-transparent border-0"
