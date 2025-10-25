@@ -28,3 +28,7 @@ next-env.d.ts# Add test files to gitignore to keep them out of the repo
 test-*.js
 test-*.html
 *.test.tmp
+
+# IDE and editor settings
+.vscode/settings.json
+.gemini/settings.json

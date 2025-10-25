@@ -179,34 +179,25 @@ export default function TeamsPage() {
     try {
       const supabase = createClient()
 
-      // Use the view that joins with auth.users
+      // Use the RPC function that securely joins with auth.users
       const { data, error } = await supabase
-        .from('team_members_with_users')
-        .select(`
-          id,
-          user_id,
-          role,
-          status,
-          created_at,
-          email,
-          raw_user_meta_data
-        `)
-        .eq('organization_id', selectedOrg.id)
-        .eq('status', 'active')
-        .order('created_at', { ascending: true })
+        .rpc('get_team_members_with_users', { p_org_id: selectedOrg.id })
 
       if (error) throw error
 
-      const members: TeamMember[] = (data || []).map((m: any) => ({
-        id: m.id,
-        user_id: m.user_id,
-        role: m.role,
-        status: m.status,
-        joined_at: m.created_at,
-        email: m.email,
-        name: m.raw_user_meta_data?.full_name || m.email?.split('@')[0],
-        avatar_url: m.raw_user_meta_data?.avatar_url
-      }))
+      // Filter for active members and map the data
+      const members: TeamMember[] = (data || [])
+        .filter((m: any) => m.status === 'active')
+        .map((m: any) => ({
+          id: m.id,
+          user_id: m.user_id,
+          role: m.role,
+          status: m.status,
+          joined_at: m.created_at,
+          email: m.email,
+          name: m.raw_user_meta_data?.full_name || m.email?.split('@')[0],
+          avatar_url: m.raw_user_meta_data?.avatar_url
+        }))
 
       setTeamMembers(members)
     } catch (error) {
