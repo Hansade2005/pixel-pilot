@@ -179,18 +179,17 @@ export default function TeamsPage() {
     try {
       const supabase = createClient()
 
+      // Use the view that joins with auth.users
       const { data, error } = await supabase
-        .from('team_members')
+        .from('team_members_with_users')
         .select(`
           id,
           user_id,
           role,
           status,
           created_at,
-          users:user_id (
-            email,
-            raw_user_meta_data
-          )
+          email,
+          raw_user_meta_data
         `)
         .eq('organization_id', selectedOrg.id)
         .eq('status', 'active')
@@ -204,9 +203,9 @@ export default function TeamsPage() {
         role: m.role,
         status: m.status,
         joined_at: m.created_at,
-        email: m.users?.email,
-        name: m.users?.raw_user_meta_data?.full_name || m.users?.email?.split('@')[0],
-        avatar_url: m.users?.raw_user_meta_data?.avatar_url
+        email: m.email,
+        name: m.raw_user_meta_data?.full_name || m.email?.split('@')[0],
+        avatar_url: m.raw_user_meta_data?.avatar_url
       }))
 
       setTeamMembers(members)
