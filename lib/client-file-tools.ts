@@ -103,11 +103,11 @@ export async function handleClientFileOperation(
         }
 
         // Check if file exists
-        const existingFile = await storageManager.getFile(projectId, path);
+        const existingFile = await storageManager.getFileTeamAware(projectId, path);
 
         if (existingFile) {
           // Update existing file
-          await storageManager.updateFile(projectId, path, { content });
+          await storageManager.updateFileTeamAware(projectId, path, { content });
           console.log(`[ClientFileTool] Updated file: ${path}`);
           
           addToolResult({
@@ -123,7 +123,7 @@ export async function handleClientFileOperation(
           });
         } else {
           // Create new file
-          const newFile = await storageManager.createFile({
+          const newFile = await storageManager.createFileTeamAware({
             workspaceId: projectId,
             name: path.split('/').pop() || path,
             path,
@@ -172,7 +172,7 @@ export async function handleClientFileOperation(
           return;
         }
 
-        const file = await storageManager.getFile(projectId, path);
+        const file = await storageManager.getFileTeamAware(projectId, path);
 
         if (!file) {
           addToolResult({
@@ -260,7 +260,7 @@ export async function handleClientFileOperation(
         }
 
         // Read current file content
-        const existingFile = await storageManager.getFile(projectId, filePath);
+        const existingFile = await storageManager.getFileTeamAware(projectId, filePath);
 
         if (!existingFile) {
           addToolResult({
@@ -424,7 +424,7 @@ export async function handleClientFileOperation(
 
           // Save the modified content
           if (appliedEdits.length > 0) {
-            await storageManager.updateFile(projectId, filePath, { content: modifiedContent });
+            await storageManager.updateFileTeamAware(projectId, filePath, { content: modifiedContent });
             console.log(`[ClientFileTool] Edited file: ${filePath} (${replacementCount} replacements)`);
 
             addToolResult({
@@ -491,7 +491,7 @@ export async function handleClientFileOperation(
         }
 
         // Check if file exists
-        const existingFile = await storageManager.getFile(projectId, path);
+        const existingFile = await storageManager.getFileTeamAware(projectId, path);
 
         if (!existingFile) {
           addToolResult({
@@ -504,7 +504,7 @@ export async function handleClientFileOperation(
         }
 
         // Delete the file
-        const result = await storageManager.deleteFile(projectId, path);
+        const result = await storageManager.deleteFileTeamAware(projectId, path);
 
         if (result) {
           console.log(`[ClientFileTool] Deleted file: ${path}`);
@@ -561,7 +561,7 @@ export async function handleClientFileOperation(
 
         try {
           // Get package.json or create if it doesn't exist
-          let packageFile = await storageManager.getFile(projectId, 'package.json');
+          let packageFile = await storageManager.getFileTeamAware(projectId, 'package.json');
           let packageJson: any = {};
 
           if (!packageFile) {
@@ -578,8 +578,8 @@ export async function handleClientFileOperation(
               author: '',
               license: 'ISC'
             };
-            
-            await storageManager.createFile({
+
+            await storageManager.createFileTeamAware({
               workspaceId: projectId,
               name: 'package.json',
               path: 'package.json',
@@ -624,7 +624,7 @@ export async function handleClientFileOperation(
           }
 
           // Update package.json
-          await storageManager.updateFile(projectId, 'package.json', {
+          await storageManager.updateFileTeamAware(projectId, 'package.json', {
             content: JSON.stringify(packageJson, null, 2)
           });
 
@@ -687,7 +687,7 @@ export async function handleClientFileOperation(
 
         try {
           // Get package.json
-          const packageFile = await storageManager.getFile(projectId, 'package.json');
+          const packageFile = await storageManager.getFileTeamAware(projectId, 'package.json');
           if (!packageFile) {
             addToolResult({
               tool: 'remove_package',
@@ -727,7 +727,7 @@ export async function handleClientFileOperation(
           }
 
           // Update package.json
-          await storageManager.updateFile(projectId, 'package.json', {
+          await storageManager.updateFileTeamAware(projectId, 'package.json', {
             content: JSON.stringify(packageJson, null, 2)
           });
 

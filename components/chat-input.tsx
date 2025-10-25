@@ -18,7 +18,7 @@ import {
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-import { useSubscription } from "@/hooks/use-subscription"
+import { useSubscriptionCache } from "@/hooks/use-subscription-cache"
 import {
   Select,
   SelectContent,
@@ -61,8 +61,22 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   // URL attachment state
   const [attachedUrl, setAttachedUrl] = useState("")
 
-  // Subscription status hook
-  const { subscription, loading: subscriptionLoading } = useSubscription()
+  // User state for subscription cache
+  const [userId, setUserId] = useState<string | undefined>(undefined)
+
+  // Subscription status hook with cache
+  const { subscription, loading: subscriptionLoading } = useSubscriptionCache(userId)
+
+  // Get user ID on mount
+  useEffect(() => {
+    const getUserId = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setUserId(user.id)
+      }
+    }
+    getUserId()
+  }, [])
 
   // Check if Web Speech API is supported
   const isWebSpeechSupported = typeof window !== 'undefined' && 
@@ -620,7 +634,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                 <div className="mt-2 p-2 bg-blue-900/20 border border-blue-700/30 rounded text-sm text-blue-300">
                       <div className="flex items-center gap-2">
                         <AlertTriangle className="h-4 w-4" />
-                    <span>Free plan: Limited prompts and GitHub pushes. Upgrade for unlimited access!</span>
+                    <span>Free plan: Limited</span>
                         <Button
                           size="sm"
                           variant="outline"

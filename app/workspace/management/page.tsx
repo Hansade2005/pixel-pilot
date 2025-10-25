@@ -49,7 +49,7 @@ export default function ManagementPage() {
   const [activeTab, setActiveTab] = useState("overview")
   const [isLoading, setIsLoading] = useState(true)
   const [projects, setProjects] = useState<ProjectDisplay[]>([])
-  const [currentUserId, setCurrentUserId] = useState<string>("sample-user") // Default fallback
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null) // Start with null
   const [newEnvVar, setNewEnvVar] = useState({
     key: "",
     value: "",
@@ -65,7 +65,9 @@ export default function ManagementPage() {
   }, [])
 
   useEffect(() => {
-    if (currentUserId) {
+    // Only load data when we have a real user ID (not null, not "sample-user")
+    if (currentUserId && currentUserId !== "sample-user") {
+      console.log('[ManagementPage] Loading data for user:', currentUserId)
       loadData()
     }
   }, [currentUserId])
@@ -99,11 +101,16 @@ export default function ManagementPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
+        console.log('[ManagementPage] User loaded:', user.id)
         setCurrentUserId(user.id)
+      } else {
+        // No user logged in, redirect to login
+        console.log('[ManagementPage] No user, redirecting to login')
+        router.push('/auth/login')
       }
     } catch (error) {
-      console.error('Error getting current user:', error)
-      // Keep default "sample-user" fallback
+      console.error('[ManagementPage] Error getting current user:', error)
+      router.push('/auth/login')
     }
   }
 

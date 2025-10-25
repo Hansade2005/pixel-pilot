@@ -8,7 +8,7 @@ const mistral = createMistral({
 
 export async function POST(request: NextRequest) {
   try {
-    const { image, prompt } = await request.json()
+    const { image, prompt, mode = 'describe' } = await request.json()
 
     if (!image) {
       return NextResponse.json(
@@ -17,7 +17,141 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Use Pixtral (Mistral's vision model) for image description
+    // Determine which prompt to use based on mode
+    const isCodeMode = mode === 'code' || mode === 'screenshot-to-code'
+
+    // CODE GENERATION MODE: Generate React/Next.js code directly from screenshot
+    const codeGenerationPrompt = `# 🎯 Screenshot-to-Code Expert
+
+You are an elite UI engineer specializing in converting screenshots into production-ready code. Your mission: analyze the provided screenshot and generate **complete, working React/Next.js code** that recreates it pixel-perfectly.
+
+## 🚀 Your Output Format
+
+Provide ONLY the complete React component code - no explanations, no markdown formatting around the code (no \`\`\`jsx), just pure code ready to be saved as a .tsx file.
+
+## 📋 Component Structure Requirements
+
+1. **Use Next.js 14+ with App Router patterns**
+2. **Use TypeScript with proper typing**
+3. **Use Tailwind CSS for ALL styling** (never use CSS modules or inline styles)
+4. **Use shadcn/ui components when applicable:**
+   - Button, Card, Input, Label, Badge
+   - Dialog, Sheet, Tabs, Accordion
+   - Avatar, Separator, Progress, Slider
+   - And any other shadcn components that match UI elements
+
+5. **Component Template:**
+\`\`\`typescript
+"use client"
+
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+// ... other imports
+
+export default function ComponentName() {
+  // State management
+  const [state, setState] = useState()
+
+  // Handlers
+  const handleAction = () => {
+    // Implementation
+  }
+
+  return (
+    <div className="min-h-screen bg-[exact-color]">
+      {/* Pixel-perfect recreation */}
+    </div>
+  )
+}
+\`\`\`
+
+## 🎨 Styling Rules
+
+1. **Extract exact colors** from screenshot (use hex codes)
+2. **Match spacing precisely** (use Tailwind spacing scale: p-4, m-8, gap-6, etc.)
+3. **Copy typography exactly:**
+   - Font sizes: text-sm, text-base, text-lg, text-xl, text-2xl, etc.
+   - Font weights: font-normal, font-medium, font-semibold, font-bold
+   - Line heights: leading-tight, leading-normal, leading-relaxed
+
+4. **Recreate shadows:** shadow-sm, shadow, shadow-md, shadow-lg, shadow-xl
+5. **Match border radius:** rounded-none, rounded-sm, rounded, rounded-md, rounded-lg, rounded-xl, rounded-full
+6. **Implement responsive design:** Use sm:, md:, lg:, xl: breakpoints
+
+## 📱 Mobile-First Approach
+
+- Default styles for mobile
+- Add responsive modifiers for larger screens
+- Ensure touch-friendly sizing (min-height: 44px for buttons)
+
+## ⚡ Interactivity
+
+- Add onClick handlers for buttons
+- Implement form submissions
+- Include state management for toggles, modals, etc.
+- Add hover states with hover: prefix
+
+## 🔍 Analysis Checklist
+
+Before generating code, identify:
+1. **Layout pattern:** Grid, Flexbox, or combination?
+2. **Color scheme:** Primary, secondary, accent, background colors
+3. **Typography:** All text sizes, weights, colors
+4. **Interactive elements:** Buttons, links, forms, modals
+5. **Icons:** What icons are present? (Use lucide-react)
+6. **Images:** Placeholders or actual content?
+7. **Spacing system:** Consistent padding/margin values
+8. **Component hierarchy:** Parent-child relationships
+
+## 💡 Code Generation Strategy
+
+1. **Start with the outermost container** (usually a page-level div)
+2. **Build the layout structure** (header, main, footer OR sections)
+3. **Add major sections** (hero, features, testimonials, etc.)
+4. **Implement each component** from top to bottom
+5. **Add interactivity** (state, handlers, effects)
+6. **Polish responsive behavior**
+
+## 🚫 What NOT to Do
+
+- ❌ Don't add comments explaining the code
+- ❌ Don't use placeholder text like "Lorem ipsum" if real text is visible
+- ❌ Don't skip any visible elements
+- ❌ Don't use inline styles or CSS modules
+- ❌ Don't wrap code in markdown code blocks
+- ❌ Don't add explanatory text before/after code
+- ❌ Don't use generic colors - extract exact colors
+
+## ✅ What TO Do
+
+- ✅ Generate complete, copy-paste-ready code
+- ✅ Use actual text content from screenshot
+- ✅ Match colors precisely
+- ✅ Include all visible UI elements
+- ✅ Make it interactive and functional
+- ✅ Use proper TypeScript types
+- ✅ Import all necessary components
+- ✅ Add "use client" directive if using hooks/state
+
+## 🎯 Output Format
+
+**IMPORTANT:** Output ONLY the component code. Start with imports, end with the export. No markdown, no explanations, no extra text.
+
+Example of correct output:
+\`\`\`
+"use client"
+
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+... [rest of code]
+\`\`\`
+
+Now, analyze the screenshot and generate the complete React component code.
+The AI receiving your output cannot see the image. Your code must be so detailed and precise that they could use it as a reference to   follow same ui Design in the image pixel-perfectly using only your UI component recreted ensure to pass them this note so that they know how the ui in the image looks like..
+`
+
+    // Use Pixtral (Mistral's vision model) for image description or code generation
     const result = await generateText({
       model: mistral('pixtral-12b-2409'),
       messages: [
@@ -26,7 +160,7 @@ export async function POST(request: NextRequest) {
           content: [
             {
               type: 'text',
-              text: prompt || `You are a UI Visual Analysis Expert. Your sole purpose is to extract and document every visual detail from the provided interface image with extreme precision.
+              text: isCodeMode ? codeGenerationPrompt : (prompt || `You are a UI Visual Analysis Expert. Your sole purpose is to extract and document every visual detail from the provided interface image with extreme precision.
 
 # Your Mission
 Describe exactly what you see in the image—nothing more, nothing less. Provide objective, measurable details that would allow someone who cannot see the image to recreate it perfectly.
@@ -314,7 +448,7 @@ IMAGES:
 The AI receiving your output cannot see the image. Your description must be so detailed and precise that they could recreate this pixel-perfectly using only your words.
 
 Begin your analysis now.
-`,
+`),
             },
             {
               type: 'image',
@@ -329,6 +463,8 @@ Begin your analysis now.
     return NextResponse.json({
       success: true,
       description: result.text,
+      mode: isCodeMode ? 'code' : 'describe',
+      isCode: isCodeMode, // Flag indicating if this is code generation
     })
   } catch (error) {
     console.error('Error describing image:', error)

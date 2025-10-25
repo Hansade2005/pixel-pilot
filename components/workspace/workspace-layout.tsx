@@ -22,7 +22,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useCloudSync } from '@/hooks/use-cloud-sync'
 import { useAutoCloudBackup } from '@/hooks/use-auto-cloud-backup'
-import { useCredits as useSubscription } from '@/hooks/use-credits'
+import { useSubscriptionCache } from '@/hooks/use-subscription-cache'
 import { restoreBackupFromCloud, isCloudSyncEnabled } from '@/lib/cloud-sync'
 import { ModelSelector } from "@/components/ui/model-selector"
 import { AiModeSelector, type AIMode } from "@/components/ui/ai-mode-selector"
@@ -40,6 +40,9 @@ import {
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { createClient } from '@/lib/supabase/client'
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface WorkspaceLayoutProps {
   user: User
@@ -53,8 +56,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const searchParams = useSearchParams()
   const [selectedProject, setSelectedProject] = useState<Workspace | null>(null)
 
-  // Get user subscription information
-  const { subscription } = useSubscription(user?.id)
+  // Get user subscription information (cached with Realtime)
+  const { subscription } = useSubscriptionCache(user?.id)
   const userPlan = subscription?.plan || 'free'
   const subscriptionStatus = subscription?.status || 'inactive'
   const [activeTab, setActiveTab] = useState<"code" | "preview">("code")
@@ -90,6 +93,10 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [newProjectName, setNewProjectName] = useState("")
   const [newProjectDescription, setNewProjectDescription] = useState("")
   const [isCreating, setIsCreating] = useState(false)
+  const [workspaceType, setWorkspaceType] = useState<'personal' | 'team'>('personal')
+  const [selectedOrgId, setSelectedOrgId] = useState<string>("")
+  const [userOrganizations, setUserOrganizations] = useState<any[]>([])
+  const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs'>('vite-react')
   const [openProjectHeaderDialog, setOpenProjectHeaderDialog] = useState(false)
   const [projectHeaderInitialName, setProjectHeaderInitialName] = useState("")
   const [projectHeaderInitialDescription, setProjectHeaderInitialDescription] = useState("")
@@ -556,33 +563,127 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       // Reset form when closing
       setNewProjectName("")
       setNewProjectDescription("")
+      setWorkspaceType('personal')
+      setSelectedOrgId("")
+      setSelectedTemplate('vite-react')
       setHasProcessedInitialPrompt(false) // Allow re-processing if user re-enters prompt
     }
   }
 
+  // Fetch user's organizations when dialog opens
+  useEffect(() => {
+    if (isCreateDialogOpen) {
+      const fetchOrganizations = async () => {
+        try {
+          const supabase = createClient()
+
+          const { data, error } = await supabase
+            .from('team_members')
+            .select(`
+              organization_id,
+              role,
+              organization:organization_id (
+                id,
+                name,
+                slug
+              )
+            `)
+            .eq('user_id', user.id)
+            .eq('status', 'active')
+            .in('role', ['owner', 'admin', 'editor'])
+
+          if (error) {
+            console.error('Error fetching organizations:', error)
+            return
+          }
+
+          const orgs = (data || [])
+            .filter((m: any) => m.organization)
+            .map((m: any) => m.organization)
+
+          setUserOrganizations(orgs)
+        } catch (error) {
+          console.error('Error fetching organizations:', error)
+        }
+      }
+
+      fetchOrganizations()
+    }
+  }, [isCreateDialogOpen, user.id])
+
   const handleCreateProject = async () => {
     if (!newProjectName.trim()) return
+    if (workspaceType === 'team' && !selectedOrgId) {
+      toast({
+        title: "Organization required",
+        description: "Please select an organization for team workspace",
+        variant: "destructive"
+      })
+      return
+    }
 
     setIsCreating(true)
 
     try {
-      console.log('Creating new project:', newProjectName)
+      console.log('Creating new project:', newProjectName, 'Type:', workspaceType)
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
       const slug = newProjectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-      const workspace = await storageManager.createWorkspace({
-        name: newProjectName,
-        description: newProjectDescription || undefined,
-        userId: user.id,
-        isPublic: false,
-        isTemplate: false,
-        lastActivity: new Date().toISOString(),
-        deploymentStatus: 'not_deployed',
-        slug
-      })
-      // Apply template files
+
+      let workspace
+
+      if (workspaceType === 'team' && selectedOrgId) {
+        // Create team workspace in Supabase
+        const supabase = await createClient()
+        const { data: teamWorkspace, error } = await supabase
+          .from('team_workspaces')
+          .insert({
+            organization_id: selectedOrgId,
+            name: newProjectName,
+            created_by: user.id,
+            visibility: 'team',
+            files: []
+          })
+          .select()
+          .single()
+
+        if (error) throw error
+
+        // Create local workspace linked to team workspace
+        workspace = await storageManager.createWorkspace({
+          name: newProjectName,
+          description: newProjectDescription || undefined,
+          userId: user.id,
+          isPublic: false,
+          isTemplate: false,
+          lastActivity: new Date().toISOString(),
+          deploymentStatus: 'not_deployed',
+          slug,
+          organizationId: selectedOrgId,
+          isTeamWorkspace: true,
+          teamWorkspaceId: teamWorkspace.id
+        })
+      } else {
+        // Create personal workspace
+        workspace = await storageManager.createWorkspace({
+          name: newProjectName,
+          description: newProjectDescription || undefined,
+          userId: user.id,
+          isPublic: false,
+          isTemplate: false,
+          lastActivity: new Date().toISOString(),
+          deploymentStatus: 'not_deployed',
+          slug
+        })
+      }
+
+      // Apply template files based on selection
       const { TemplateService } = await import('@/lib/template-service')
-      await TemplateService.applyViteReactTemplate(workspace.id)
+      if (selectedTemplate === 'nextjs') {
+        await TemplateService.applyNextJSTemplate(workspace.id)
+      } else {
+        await TemplateService.applyViteReactTemplate(workspace.id)
+      }
       // Close dialog and reset form
       setIsCreateDialogOpen(false)
       setNewProjectName("")
@@ -805,15 +906,19 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
             projects={clientProjects}
             selectedProject={selectedProject}
             onSelectProject={(project) => {
+              console.log('WorkspaceLayout: Project selection started:', project.name, project.id)
+
+              // IMMEDIATE state updates for instant UI response
               setSelectedProject(project)
-              setSelectedFile(null) // Clear selected file when switching projects
-              
-              // Update URL to reflect selected project
-              const params = new URLSearchParams(searchParams.toString())
-              params.set('projectId', project.id)
-              router.push(`/workspace?${params.toString()}`)
-              
-              console.log('WorkspaceLayout: Project selected, URL updated:', project.name, project.id)
+              setSelectedFile(null)
+
+              // Update URL async (non-blocking) using replace for smoother experience
+              Promise.resolve().then(() => {
+                const params = new URLSearchParams(searchParams.toString())
+                params.set('projectId', project.id)
+                router.replace(`/workspace?${params.toString()}`, { scroll: false })
+                console.log('WorkspaceLayout: Project selected, URL updated:', project.name, project.id)
+              })
             }}
             onProjectCreated={async (newProject) => {
               // Refresh projects when a new one is created
@@ -1576,7 +1681,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
       {/* Create Project Dialog - available for both desktop and mobile */}
       <Dialog open={isCreateDialogOpen} onOpenChange={handleModalClose}>
-        <DialogContent className="z-50">
+        <DialogContent className="z-50 sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Create New Project</DialogTitle>
             <DialogDescription>Start building your next app with AI assistance.</DialogDescription>
@@ -1600,9 +1705,89 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 onChange={(e) => setNewProjectDescription(e.target.value)}
               />
             </div>
+            <div>
+              <Label>Workspace Type</Label>
+              <RadioGroup value={workspaceType} onValueChange={(value: 'personal' | 'team') => setWorkspaceType(value)}>
+                <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer hover:bg-accent/50" onClick={() => setWorkspaceType('personal')}>
+                  <RadioGroupItem value="personal" id="personal" />
+                  <Label htmlFor="personal" className="flex-1 cursor-pointer">
+                    <div className="font-medium">Personal Workspace</div>
+                    <div className="text-xs text-muted-foreground">Private, stored locally with cloud backup</div>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer hover:bg-accent/50" onClick={() => setWorkspaceType('team')}>
+                  <RadioGroupItem value="team" id="team" />
+                  <Label htmlFor="team" className="flex-1 cursor-pointer">
+                    <div className="font-medium flex items-center gap-2">
+                      Team Workspace
+                      <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded">Collaborative</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">Real-time collaboration, cloud-only</div>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+            {workspaceType === 'team' && (
+              <div>
+                <Label htmlFor="organization">Organization</Label>
+                {userOrganizations.length > 0 ? (
+                  <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
+                    <SelectTrigger id="organization">
+                      <SelectValue placeholder="Select an organization..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {userOrganizations.map((org: any) => (
+                        <SelectItem key={org.id} value={org.id}>
+                          {org.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="text-sm text-muted-foreground border rounded-lg p-3">
+                    <p>No organizations found.</p>
+                    <Button
+                      variant="link"
+                      className="h-auto p-0 text-blue-500"
+                      onClick={() => router.push('/workspace/teams')}
+                    >
+                      Create an organization first →
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+            <div>
+              <Label htmlFor="template">Template</Label>
+              <Select value={selectedTemplate} onValueChange={(value: 'vite-react' | 'nextjs') => setSelectedTemplate(value)}>
+                <SelectTrigger id="template">
+                  <SelectValue placeholder="Select a template..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="vite-react">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-purple-500" />
+                      <div>
+                        <div className="font-medium">Vite + React</div>
+                        <div className="text-xs text-muted-foreground">Fast, modern build tool (Recommended)</div>
+                      </div>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="nextjs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">▲</span>
+                      <div>
+                        <div className="font-medium">Next.js</div>
+                        <div className="text-xs text-muted-foreground">React framework with SSR</div>
+                      </div>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
-            <Button onClick={handleCreateProject} disabled={!newProjectName.trim() || isCreating}>
+            <Button onClick={handleCreateProject} disabled={!newProjectName.trim() || isCreating || (workspaceType === 'team' && !selectedOrgId)}>
               {isCreating ? "Creating..." : "Create Project"}
             </Button>
           </DialogFooter>

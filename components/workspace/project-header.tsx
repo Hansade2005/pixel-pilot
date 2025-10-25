@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Play, GitBranch, Share, Settings, Plus, Rocket, Upload, Database } from "lucide-react"
+import { Play, GitBranch, Share, Settings, Plus, Rocket, Upload, Database, Users, ChevronRight } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import React, { useState, useEffect } from 'react'
@@ -66,9 +66,39 @@ export function ProjectHeader({
   const [newProjectDescription, setNewProjectDescription] = useState("")
   const [isCreating, setIsCreating] = useState(false)
   const [gitHubConnected, setGitHubConnected] = useState(false)
+  const [organizationName, setOrganizationName] = useState<string | null>(null)
 
   // GitHub push functionality
   const { pushToGitHub, checkGitHubConnection, isPushing } = useGitHubPush()
+
+  // Fetch organization name if it's a team workspace
+  useEffect(() => {
+    const fetchOrgName = async () => {
+      if (!project?.organizationId) {
+        setOrganizationName(null)
+        return
+      }
+
+      try {
+        const { createClient } = await import('@/lib/supabase/client')
+        const supabase = createClient()
+
+        const { data, error } = await supabase
+          .from('organizations')
+          .select('name')
+          .eq('id', project.organizationId)
+          .single()
+
+        if (!error && data) {
+          setOrganizationName(data.name)
+        }
+      } catch (error) {
+        console.error('Error fetching organization name:', error)
+      }
+    }
+
+    fetchOrgName()
+  }, [project?.organizationId])
 
   React.useEffect(() => {
     setNameInput(project?.name || "")
@@ -275,13 +305,27 @@ export function ProjectHeader({
               }}
             />
           ) : (
-            <h1
-              className="text-lg font-semibold text-card-foreground cursor-pointer hover:underline"
-              title="Click to edit project name"
-              onClick={() => setEditing(true)}
-            >
-              {project.name}
-            </h1>
+            <div className="flex items-center gap-2">
+              {project.organizationId && organizationName && (
+                <>
+                  <span className="text-sm text-muted-foreground">{organizationName}</span>
+                  <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                </>
+              )}
+              <h1
+                className="text-lg font-semibold text-card-foreground cursor-pointer hover:underline"
+                title="Click to edit project name"
+                onClick={() => setEditing(true)}
+              >
+                {project.name}
+              </h1>
+              {project.organizationId && (
+                <Badge variant="secondary" className="h-5 px-2 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-0">
+                  <Users className="h-3 w-3 mr-1" />
+                  Team
+                </Badge>
+              )}
+            </div>
           )}
           {project.description && <p className="text-sm text-muted-foreground">{project.description.length > 12 ? `${project.description.substring(0, 12)}...` : project.description}</p>}
         </div>

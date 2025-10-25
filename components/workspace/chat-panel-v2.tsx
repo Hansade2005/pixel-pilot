@@ -17,7 +17,7 @@ import { MessageWithTools } from './message-with-tools'
 import {
   Send, Paperclip, Mic, MicOff, X, FileText, Image as ImageIcon,
   Link as LinkIcon, Loader2, ChevronDown, ChevronUp, StopCircle, Trash2, Plus,
-  Copy, ArrowUp, Undo2, Redo2, Check, AlertTriangle, Zap
+  Copy, ArrowUp, Undo2, Redo2, Check, AlertTriangle, Zap, Code2, Sparkles
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Actions, Action } from '@/components/ai-elements/actions'
@@ -25,6 +25,7 @@ import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown
 import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
 import { FileSearchResult, FileLookupService } from "@/lib/file-lookup-service"
 import { createCheckpoint } from '@/lib/checkpoint-utils'
+import { useTeamWorkspaceSync } from '@/hooks/use-team-workspace-sync'
 
 // ExpandableUserMessage component for long user messages
 const ExpandableUserMessage = ({
@@ -283,7 +284,14 @@ export function ChatPanelV2({
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([])
   const [attachedUploadedFiles, setAttachedUploadedFiles] = useState<AttachedUploadedFile[]>([])
   const [attachedUrls, setAttachedUrls] = useState<AttachedUrl[]>([])
-  
+
+  // Screenshot-to-Code mode (NEW FEATURE!)
+  const [screenshotToCodeMode, setScreenshotToCodeMode] = useState(false)
+
+  // Team Workspace state (NEW - Team Collaboration!)
+  const [isTeamWorkspace, setIsTeamWorkspace] = useState(false)
+  const [workspaceType, setWorkspaceType] = useState<'personal' | 'team'>('personal')
+
   // @ command file attachment dropdown state
   const [showFileDropdown, setShowFileDropdown] = useState(false)
   const [fileQuery, setFileQuery] = useState("")
@@ -309,6 +317,13 @@ export function ChatPanelV2({
   const audioChunksRef = useRef<Blob[]>([])
   const fileLookupServiceRef = useRef<FileLookupService | null>(null)
 
+  // Team Workspace Realtime Sync Hook (NEW!)
+  const { refresh: refreshTeamWorkspace, isConnected: teamSyncConnected } = useTeamWorkspaceSync({
+    workspaceId: project?.id || null,
+    isTeamWorkspace,
+    enabled: true
+  })
+
   // Load project files for context
   const [projectFiles, setProjectFiles] = useState<any[]>([])
 
@@ -324,6 +339,51 @@ export function ChatPanelV2({
       debouncedHeightAdjustment(textareaRef.current)
     }
   }, [input, debouncedHeightAdjustment])
+
+  // Detect workspace type when project changes (Team vs Personal)
+  useEffect(() => {
+    if (!project?.id) return
+
+    const detectWorkspaceType = async () => {
+      try {
+        const { storageManager } = await import('@/lib/storage-manager')
+        const type = await storageManager.getWorkspaceType(project.id)
+        setWorkspaceType(type)
+        setIsTeamWorkspace(type === 'team')
+        console.log(`[ChatPanelV2] Workspace type detected: ${type}`)
+      } catch (error) {
+        console.error('[ChatPanelV2] Error detecting workspace type:', error)
+        // Default to personal workspace on error
+        setWorkspaceType('personal')
+        setIsTeamWorkspace(false)
+      }
+    }
+
+    detectWorkspaceType()
+  }, [project?.id])
+
+  // Listen for team workspace updates from realtime sync
+  useEffect(() => {
+    if (!isTeamWorkspace) return
+
+    const handleTeamWorkspaceUpdate = async (event: Event) => {
+      const customEvent = event as CustomEvent
+      console.log('[ChatPanelV2] Team workspace updated by another user:', customEvent.detail)
+
+      // Refresh team workspace data
+      if (refreshTeamWorkspace) {
+        await refreshTeamWorkspace()
+      }
+
+      // Note: File explorer listens to the same event and refreshes its own file list
+    }
+
+    window.addEventListener('team-workspace-updated', handleTeamWorkspaceUpdate as EventListener)
+
+    return () => {
+      window.removeEventListener('team-workspace-updated', handleTeamWorkspaceUpdate as EventListener)
+    }
+  }, [isTeamWorkspace, refreshTeamWorkspace])
 
   // Local state for messages (since we're not using useChat hook for complex attachment handling)
   const [messages, setMessages] = useState<any[]>([])
@@ -1828,7 +1888,7 @@ export function ChatPanelV2({
           isProcessing: true
         }])
 
-        // Get description using vision API
+        // Get description or code using vision API
         try {
           const response = await fetch('/api/describe-image', {
             method: 'POST',
@@ -1837,7 +1897,10 @@ export function ChatPanelV2({
             },
             body: JSON.stringify({
               image: base64,
-              prompt: "Describe this image in detail, including layout, colors, text, UI elements, and any other relevant information that would help recreate or understand this design."
+              mode: screenshotToCodeMode ? 'code' : 'describe',
+              prompt: screenshotToCodeMode
+                ? undefined // Use default code generation prompt
+                : "Describe this image in detail, including layout, colors, text, UI elements, and any other relevant information that would help recreate or understand this design."
             }),
           })
 
@@ -2008,6 +2071,17 @@ export function ChatPanelV2({
           ? 'fixed bottom-12 left-0 right-0 p-4 z-[60] border-b'
           : 'p-4'
       }`}>
+        {/* Screenshot-to-Code Mode Indicator */}
+        {screenshotToCodeMode && (
+          <div className="mb-2">
+            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20 px-3 py-1.5 rounded-md text-xs">
+              <Sparkles className="size-3 text-purple-500 animate-pulse" />
+              <span className="font-medium text-purple-700 dark:text-purple-300">Screenshot → Code Mode Active</span>
+              <span className="text-purple-600 dark:text-purple-400 text-[10px]">Images will generate code directly</span>
+            </div>
+          </div>
+        )}
+
         {/* Attachments Display */}
         {(attachedFiles.length > 0 || attachedImages.length > 0 || attachedUploadedFiles.length > 0 || attachedUrls.length > 0) && (
           <div className="mb-2 flex flex-wrap gap-2">
@@ -2230,14 +2304,17 @@ export function ChatPanelV2({
                         isProcessing: true
                       }])
 
-                      // Send to Pixtral for description
+                      // Send to Pixtral for description or code generation
                       try {
                         const response = await fetch('/api/describe-image', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
                             image: base64,
-                            prompt: "Describe this image in detail, including layout, colors, text, UI elements, and any other relevant information."
+                            mode: screenshotToCodeMode ? 'code' : 'describe',
+                            prompt: screenshotToCodeMode
+                              ? undefined // Use default code generation prompt
+                              : "Describe this image in detail, including layout, colors, text, UI elements, and any other relevant information."
                           })
                         })
 
@@ -2334,6 +2411,21 @@ export function ChatPanelV2({
                   >
                     <LinkIcon className="size-4 mr-2" /> URL
                   </Button>
+
+                  {/* Screenshot-to-Code Mode Toggle */}
+                  <div className="border-t pt-2 mt-2">
+                    <Button
+                      type="button"
+                      variant={screenshotToCodeMode ? "default" : "ghost"}
+                      size="sm"
+                      className="w-full justify-start"
+                      onClick={() => setScreenshotToCodeMode(!screenshotToCodeMode)}
+                    >
+                      <Sparkles className={cn("size-4 mr-2", screenshotToCodeMode && "animate-pulse")} />
+                      Screenshot → Code
+                      {screenshotToCodeMode && <Check className="size-3 ml-auto" />}
+                    </Button>
+                  </div>
                 </div>
               </PopoverContent>
             </Popover>

@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "WebSearch"
+      "WebSearch",
+      "Bash(node scripts/list-supabase-tables.js:*)",
+      "Bash(node scripts/check-supabase-tables.js:*)",
+      "Bash(npm install:*)",
+      "Bash(pnpm add:*)",
+      "mcp__supabase__execute_sql",
+      "mcp__supabase__apply_migration",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
