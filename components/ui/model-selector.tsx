@@ -29,7 +29,7 @@ export function ModelSelector({
   const effectiveStatus = subscriptionStatus || (userPlan === 'free' ? 'active' : 'inactive')
   
   // Set default selected model based on plan
-  const defaultSelectedModel: string = userPlan === 'pro' ? 'grok-4-fast-reasoning' : 'qwen3-coder-free'
+  const defaultSelectedModel: string = userPlan === 'pro' ? 'grok-code-fast-1' : 'qwen3-coder-free'
   const effectiveSelectedModel = selectedModel || defaultSelectedModel
   
   const currentModel = getModelById(effectiveSelectedModel)

@@ -742,6 +742,10 @@ export function ChatPanelV2({
     // Set the message as continuing to show streaming indicator
     setContinuingMessageId(originalAssistantMessageId)
 
+    // Set loading state to keep the spinner visible during continuation
+    setIsLoading(true)
+    setIsContinuationInProgress(true)
+
     try {
       // During continuation, the message will continue streaming seamlessly
       // No need to modify the message content - the existing streaming indicator will show
