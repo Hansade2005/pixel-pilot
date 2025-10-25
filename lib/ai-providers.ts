@@ -156,6 +156,58 @@ const openrouterProvider = createOpenAICompatible({
   apiKey: process.env.OPENROUTER_API_KEY || 'sk-or-v1-your-openrouter-api-key',
 });
 
+// Custom OpenRouter provider with reasoning support for specific models
+function openrouterProviderWithReasoning(modelId: string) {
+  const baseProvider = openrouterProvider(modelId);
+
+  // Models that support reasoning
+  const reasoningModels = [
+    'deepseek/deepseek-v3.2-exp',
+    'x-ai/grok-4-fast',
+    'qwen/qwen3-30b-a3b-thinking-2507',
+    'qwen/qwen3-next-80b-a3b-thinking',
+    'tngtech/deepseek-r1t2-chimera:free',
+    'deepseek/deepseek-chat-v3.1:free',
+    'deepseek/deepseek-chat-v3.1'
+  ];
+
+  if (reasoningModels.includes(modelId)) {
+    // Return a wrapped provider that enables reasoning
+    return {
+      ...baseProvider,
+      // Override the doGenerate and doStream methods to include reasoning options
+      async doGenerate(options: any) {
+        const reasoningOptions = {
+          ...options,
+          providerOptions: {
+            ...options.providerOptions,
+            openrouter: {
+              ...options.providerOptions?.openrouter,
+              reasoningEffort: 'high' // Enable high reasoning effort
+            }
+          }
+        };
+        return baseProvider.doGenerate(reasoningOptions);
+      },
+      async doStream(options: any) {
+        const reasoningOptions = {
+          ...options,
+          providerOptions: {
+            ...options.providerOptions,
+            openrouter: {
+              ...options.providerOptions?.openrouter,
+              reasoningEffort: 'high' // Enable high reasoning effort
+            }
+          }
+        };
+        return baseProvider.doStream(reasoningOptions);
+      }
+    };
+  }
+
+  return baseProvider;
+}
+
 // Debug function to check environment variables
 function checkProviderKeys() {
   const keys = {
@@ -208,8 +260,8 @@ const modelProviders: Record<string, any> = {
   'a0-dev-llm': a0devProvider.languageModel('a0-dev-llm'),
   
   // PiPilot Premium Models (Claude via OpenRouter)
-  'pipilot-pro': openrouterProvider('anthropic/claude-sonnet-4'),
-  'pipilot-ultra': openrouterProvider('anthropic/claude-sonnet-4.5'),
+  'pipilot-pro': openrouterProviderWithReasoning('anthropic/claude-sonnet-4'),
+  'pipilot-ultra': openrouterProviderWithReasoning('anthropic/claude-sonnet-4.5'),
   
   // Mistral Models - Default uses Codestral endpoint
   'open-codestral-mamba': mistralProvider('open-codestral-mamba'),
@@ -241,8 +293,21 @@ const modelProviders: Record<string, any> = {
   'grok-4-fast-non-reasoning': xaiProvider('grok-4-fast-non-reasoning'),
 
   // OpenRouter Claude Models
-  'claude-sonnet-4.5': openrouterProvider('anthropic/claude-sonnet-4.5'),
-  'claude-sonnet-4': openrouterProvider('anthropic/claude-sonnet-4'),
+  'claude-sonnet-4.5': openrouterProviderWithReasoning('anthropic/claude-sonnet-4.5'),
+  'claude-sonnet-4': openrouterProviderWithReasoning('anthropic/claude-sonnet-4'),
+
+  // OpenRouter Advanced Models (with reasoning support)
+  'deepseek-v3.2-exp': openrouterProviderWithReasoning('deepseek/deepseek-v3.2-exp'),
+  'grok-4-fast-reasoning': openrouterProviderWithReasoning('x-ai/grok-4-fast'),
+  'qwen3-30b-thinking': openrouterProviderWithReasoning('qwen/qwen3-30b-a3b-thinking-2507'),
+  'deepseek-chat-v3.1-free': openrouterProviderWithReasoning('deepseek/deepseek-chat-v3.1:free'),
+  'qwen3-coder': openrouterProviderWithReasoning('qwen/qwen3-coder'),
+  'qwen3-coder-free': openrouterProviderWithReasoning('qwen/qwen3-coder:free'),
+  'qwen3-coder-30b-instruct': openrouterProviderWithReasoning('qwen/qwen3-coder-30b-a3b-instruct'),
+  'deepseek-r1t2-chimera-free': openrouterProviderWithReasoning('tngtech/deepseek-r1t2-chimera:free'),
+  'qwen3-next-80b-thinking': openrouterProviderWithReasoning('qwen/qwen3-next-80b-a3b-thinking'),
+  'phi-4-multimodal': openrouterProviderWithReasoning('microsoft/phi-4-multimodal-instruct'),
+  'deepseek-chat-v3.1': openrouterProviderWithReasoning('deepseek/deepseek-chat-v3.1'),
 };
 
 // Helper function to get a model by ID

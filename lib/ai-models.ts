@@ -193,6 +193,74 @@ export const chatModels: Array<ChatModel> = [
     description: 'Anthropic Claude Sonnet 4 via OpenRouter - advanced coding and reasoning model',
     provider: 'openrouter',
   },
+
+  // OpenRouter Advanced Models (with reasoning support)
+  {
+    id: 'deepseek-v3.2-exp',
+    name: 'DeepSeek V3.2 Experimental',
+    description: 'DeepSeek V3.2 Experimental via OpenRouter - advanced reasoning and coding capabilities',
+    provider: 'openrouter',
+  },
+  {
+    id: 'grok-4-fast-reasoning',
+    name: 'Grok 4 Fast Reasoning',
+    description: 'xAI Grok 4 Fast via OpenRouter - fast reasoning and analysis',
+    provider: 'openrouter',
+  },
+  {
+    id: 'qwen3-30b-thinking',
+    name: 'Qwen3 30B Thinking',
+    description: 'Qwen3 30B A3B Thinking via OpenRouter - advanced reasoning model',
+    provider: 'openrouter',
+  },
+  {
+    id: 'deepseek-chat-v3.1-free',
+    name: 'DeepSeek Chat V3.1 Free',
+    description: 'DeepSeek Chat V3.1 Free tier via OpenRouter - cost-effective AI assistance',
+    provider: 'openrouter',
+  },
+  {
+    id: 'qwen3-coder',
+    name: 'Qwen3 Coder',
+    description: 'Qwen3 Coder via OpenRouter - specialized coding and development model',
+    provider: 'openrouter',
+  },
+  {
+    id: 'qwen3-coder-free',
+    name: 'Qwen3 Coder Free',
+    description: 'Qwen3 Coder Free tier via OpenRouter - cost-effective coding assistance',
+    provider: 'openrouter',
+  },
+  {
+    id: 'qwen3-coder-30b-instruct',
+    name: 'Qwen3 Coder 30B Instruct',
+    description: 'Qwen3 Coder 30B A3B Instruct via OpenRouter - powerful coding model with instructions',
+    provider: 'openrouter',
+  },
+  {
+    id: 'deepseek-r1t2-chimera-free',
+    name: 'DeepSeek R1T2 Chimera Free',
+    description: 'DeepSeek R1T2 Chimera Free via OpenRouter - hybrid reasoning model',
+    provider: 'openrouter',
+  },
+  {
+    id: 'qwen3-next-80b-thinking',
+    name: 'Qwen3 Next 80B Thinking',
+    description: 'Qwen3 Next 80B A3B Thinking via OpenRouter - powerful reasoning capabilities',
+    provider: 'openrouter',
+  },
+  {
+    id: 'phi-4-multimodal',
+    name: 'Phi-4 Multimodal',
+    description: 'Microsoft Phi-4 Multimodal Instruct via OpenRouter - multimodal AI with reasoning',
+    provider: 'openrouter',
+  },
+  {
+    id: 'deepseek-chat-v3.1',
+    name: 'DeepSeek Chat V3.1',
+    description: 'DeepSeek Chat V3.1 via OpenRouter - advanced conversational AI',
+    provider: 'openrouter',
+  },
 ];
 
 export function getModelById(modelId: string): ChatModel | undefined {

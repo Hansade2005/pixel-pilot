@@ -29,7 +29,7 @@ export function ModelSelector({
   const effectiveStatus = subscriptionStatus || (userPlan === 'free' ? 'active' : 'inactive')
   
   // Set default selected model based on plan
-  const defaultSelectedModel: string = userPlan === 'pro' ? 'grok-code-fast-1' : 'grok-3-mini'
+  const defaultSelectedModel: string = userPlan === 'pro' ? 'grok-4-fast-reasoning' : 'qwen3-coder-free'
   const effectiveSelectedModel = selectedModel || defaultSelectedModel
   
   const currentModel = getModelById(effectiveSelectedModel)
@@ -38,7 +38,22 @@ export function ModelSelector({
     ['grok-code-fast-1', 'PiPilot 4.5 Pro'],
     ['grok-3-mini', 'PiPilot 4 Flash'],
     ['pipilot-pro', 'PiPilot Pro'],
-    ['pipilot-ultra', 'PiPilot Ultra']
+    ['pipilot-ultra', 'PiPilot Ultra'],
+    // OpenRouter Advanced Models
+    ['deepseek-v3.2-exp', 'PiPilot DeepSeek V3.2 Exp'],
+    ['grok-4-fast-reasoning', 'PiPilot Grok 4 Fast'],
+    ['qwen3-30b-thinking', 'PiPilot Qwen3 30B Think'],
+    ['deepseek-chat-v3.1-free', 'PiPilot DeepSeek V3.1 Free'],
+    ['qwen3-coder', 'PiPilot Qwen3 Coder'],
+    ['qwen3-coder-free', 'PiPilot Qwen3 Coder Free'],
+    ['qwen3-coder-30b-instruct', 'PiPilot Qwen3 Coder 30B'],
+    ['deepseek-r1t2-chimera-free', 'PiPilot DeepSeek Chimera Free'],
+    ['qwen3-next-80b-thinking', 'PiPilot Qwen3 80B Think'],
+    ['phi-4-multimodal', 'PiPilot Phi-4 Multimodal'],
+    ['deepseek-chat-v3.1', 'PiPilot DeepSeek V3.1'],
+    // Claude models
+    ['claude-sonnet-4.5', 'PiPilot Claude Sonnet 4.5'],
+    ['claude-sonnet-4', 'PiPilot Claude Sonnet 4'],
   ])
   
   const filteredModels = chatModels.filter(model => displayNameMap.has(model.id))
@@ -58,9 +73,35 @@ export function ModelSelector({
   // Set specific allowed models per plan
   let allowedModels: string[]
   if (userPlan === 'free') {
-    allowedModels = ['grok-3-mini']
+    allowedModels = [
+      'grok-3-mini',
+      // Free tier OpenRouter models
+      'deepseek-chat-v3.1-free',
+      'qwen3-coder-free',
+      'deepseek-r1t2-chimera-free'
+    ];
   } else if (userPlan === 'pro' && effectiveStatus === 'active') {
-    allowedModels = ['grok-code-fast-1', 'grok-3-mini', 'pipilot-pro', 'pipilot-ultra']
+    allowedModels = [
+      'grok-code-fast-1', 
+      'grok-3-mini', 
+      'pipilot-pro', 
+      'pipilot-ultra',
+      // OpenRouter Advanced Models
+      'deepseek-v3.2-exp',
+      'grok-4-fast-reasoning',
+      'qwen3-30b-thinking',
+      'deepseek-chat-v3.1-free',
+      'qwen3-coder',
+      'qwen3-coder-free',
+      'qwen3-coder-30b-instruct',
+      'deepseek-r1t2-chimera-free',
+      'qwen3-next-80b-thinking',
+      'phi-4-multimodal',
+      'deepseek-chat-v3.1',
+      // Claude models
+      'claude-sonnet-4.5',
+      'claude-sonnet-4'
+    ];
   } else {
     // Fallback for pro inactive or other cases
     allowedModels = userLimits.allowedModels || ['auto']
