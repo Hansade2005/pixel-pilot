@@ -85,6 +85,8 @@ CREATE POLICY "Users can view team members in their orgs" ON team_members
   );
 
 -- Team Members: Admins and owners can add members
+-- NOTE: This policy was later updated in 20250125_fix_team_member_insert_policy.sql
+-- to allow org owners to add themselves as the first member
 CREATE POLICY "Admins can add team members" ON team_members
   FOR INSERT WITH CHECK (
     is_org_admin_or_owner(organization_id, auth.uid())
