@@ -306,14 +306,20 @@ export default function TeamsPage() {
     try {
       const supabase = createClient()
 
-      // Create invitation
+      // Generate a secure token for the invitation
+      const token = crypto.randomUUID()
+
+      // Create invitation with all required fields
       const { data, error } = await supabase
         .from('team_invitations')
         .insert({
           organization_id: selectedOrg.id,
           email: inviteEmail.trim(),
           role: inviteRole,
-          status: 'pending'
+          status: 'pending',
+          token: token,
+          invited_by: (await supabase.auth.getUser()).data.user?.id,
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days from now
         })
         .select()
         .single()
