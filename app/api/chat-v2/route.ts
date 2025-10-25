@@ -101,6 +101,58 @@ const getFileExtension = (filePath: string): string => {
   }
 }
 
+// Filter function to remove reasoning/thinking patterns from model output
+// This prevents models like Grok from exposing internal reasoning to users
+function filterReasoningPatterns(text: string): string {
+  if (!text) return text;
+
+  // Patterns to remove (case-insensitive)
+  const reasoningPatterns = [
+    // Repetitive affirmations
+    /^\s*Yes\.\s*$/gim,
+    /^\s*Perfect\.\s*$/gim,
+    /^\s*Great\.\s*$/gim,
+    /^\s*Done\.\s*$/gim,
+    /^\s*This is it\.\s*$/gim,
+    /^\s*This is the (answer|solution|final|response)\.\s*$/gim,
+    /^\s*The (answer|solution|response) is( ready| complete)?\.\s*$/gim,
+    /^\s*The task is (complete|done)\.\s*$/gim,
+    /^\s*The (end|final)\.\s*$/gim,
+    /^\s*I think (this is|that's) (it|the answer|correct|good)\.\s*$/gim,
+
+    // LaTeX/Math formatting (common in reasoning models)
+    /\\boxed\{[^}]*\}/g,
+    /Final Answer\s*:\s*/gi,
+    /^\s*Final Answer\s*$/gim,
+
+    // Internal monologue phrases
+    /^\s*To (confirm|verify|check),/gim,
+    /^\s*Let me (think|confirm|verify|check)/gim,
+    /^\s*So,? the (answer|solution|response) is/gim,
+
+    // Metacommentary about the response itself
+    /^\s*The boxed (is|text|content|response)/gim,
+    /^\s*The (response|answer|content) (is|will be)/gim,
+  ];
+
+  let filtered = text;
+
+  // Apply all pattern filters
+  for (const pattern of reasoningPatterns) {
+    filtered = filtered.replace(pattern, '');
+  }
+
+  // Remove excessive newlines created by filtering
+  filtered = filtered.replace(/\n{3,}/g, '\n\n');
+
+  // If the entire text was reasoning noise, return empty string
+  if (filtered.trim().length < 10 && /^(yes|no|perfect|great|done|ok)[\s.!]*$/i.test(filtered.trim())) {
+    return '';
+  }
+
+  return filtered;
+}
+
 // Build optimized project context from session data
 async function buildOptimizedProjectContext(projectId: string, sessionData: any, fileTree?: string[], userIntent?: any) {
   try {
@@ -1327,6 +1379,10 @@ Always use generous, relevant emojis! 🎉💥🔥 Make every interaction engagi
 - 📚 Always study existing code before making changes
 - 🎯 Follow user instructions exactly; deviate creatively.
 - 🐛 Be thorough and efficient with bug fixing—focus on actual solutions
+- ⛔ NEVER output internal reasoning, thinking, or step-by-step thought processes
+- ⛔ NEVER use phrases like "Yes.", "Perfect.", "This is it.", "The answer is", "Final Answer", or similar internal monologue
+- ⛔ NEVER use LaTeX math formatting like \boxed{} or similar academic response patterns
+- ✅ Always respond directly and professionally without exposing your thinking process
 ## 🏅 Success Metrics
 - ✨ Flawless operation across all devices
 - 🎨 UI so beautiful, users share screenshots
@@ -3041,7 +3097,16 @@ ${conversationSummaryContext || ''}`
               // Update current state for continuation tracking
               if (part.type === 'text-delta') {
                 if (part.text) {
-                  accumulatedContent += part.text
+                  // Filter reasoning patterns from text before accumulating
+                  const filteredText = filterReasoningPatterns(part.text)
+                  if (filteredText) {
+                    accumulatedContent += filteredText
+                    // Update part with filtered text
+                    part.text = filteredText
+                  } else {
+                    // Skip this part entirely if it was pure reasoning noise
+                    continue
+                  }
                 }
               } else if (part.type === 'reasoning-delta') {
                 if (part.text) {
