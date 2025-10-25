@@ -214,15 +214,15 @@ export const chatModels: Array<ChatModel> = [
     provider: 'openrouter',
   },
   {
-    id: 'deepseek-chat-v3.1-free',
-    name: 'DeepSeek Chat V3.1 Free',
-    description: 'DeepSeek Chat V3.1 Free tier via OpenRouter - cost-effective AI assistance',
-    provider: 'openrouter',
-  },
-  {
     id: 'qwen3-coder',
     name: 'Qwen3 Coder',
     description: 'Qwen3 Coder via OpenRouter - specialized coding and development model',
+    provider: 'openrouter',
+  },
+  {
+    id: 'deepseek-chat-v3.1-free',
+    name: 'DeepSeek Chat V3.1 Free',
+    description: 'DeepSeek Chat V3.1 Free tier via OpenRouter - cost-effective AI assistance',
     provider: 'openrouter',
   },
   {

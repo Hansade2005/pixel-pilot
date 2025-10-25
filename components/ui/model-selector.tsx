@@ -43,7 +43,6 @@ export function ModelSelector({
     ['deepseek-v3.2-exp', 'PiPilot DeepSeek V3.2 Exp'],
     ['grok-4-fast-reasoning', 'PiPilot Grok 4 Fast'],
     ['qwen3-30b-thinking', 'PiPilot Qwen3 30B Think'],
-    ['deepseek-chat-v3.1-free', 'PiPilot DeepSeek V3.1 Free'],
     ['qwen3-coder', 'PiPilot Qwen3 Coder'],
     ['qwen3-coder-free', 'PiPilot Qwen3 Coder Free'],
     ['qwen3-coder-30b-instruct', 'PiPilot Qwen3 Coder 30B'],
@@ -76,7 +75,6 @@ export function ModelSelector({
     allowedModels = [
       'grok-3-mini',
       // Free tier OpenRouter models
-      'deepseek-chat-v3.1-free',
       'qwen3-coder-free',
       'deepseek-r1t2-chimera-free'
     ];
@@ -90,7 +88,6 @@ export function ModelSelector({
       'deepseek-v3.2-exp',
       'grok-4-fast-reasoning',
       'qwen3-30b-thinking',
-      'deepseek-chat-v3.1-free',
       'qwen3-coder',
       'qwen3-coder-free',
       'qwen3-coder-30b-instruct',

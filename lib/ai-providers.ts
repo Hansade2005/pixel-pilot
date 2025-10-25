@@ -183,7 +183,7 @@ function openrouterProviderWithReasoning(modelId: string) {
             ...options.providerOptions,
             openrouter: {
               ...options.providerOptions?.openrouter,
-              reasoningEffort: 'high' // Enable high reasoning effort
+              reasoningEffort: 'medium' // Enable medium reasoning effort
             }
           }
         };
@@ -196,7 +196,7 @@ function openrouterProviderWithReasoning(modelId: string) {
             ...options.providerOptions,
             openrouter: {
               ...options.providerOptions?.openrouter,
-              reasoningEffort: 'high' // Enable high reasoning effort
+              reasoningEffort: 'medium' // Enable medium reasoning effort
             }
           }
         };
@@ -300,7 +300,6 @@ const modelProviders: Record<string, any> = {
   'deepseek-v3.2-exp': openrouterProviderWithReasoning('deepseek/deepseek-v3.2-exp'),
   'grok-4-fast-reasoning': openrouterProviderWithReasoning('x-ai/grok-4-fast'),
   'qwen3-30b-thinking': openrouterProviderWithReasoning('qwen/qwen3-30b-a3b-thinking-2507'),
-  'deepseek-chat-v3.1-free': openrouterProviderWithReasoning('deepseek/deepseek-chat-v3.1:free'),
   'qwen3-coder': openrouterProviderWithReasoning('qwen/qwen3-coder'),
   'qwen3-coder-free': openrouterProviderWithReasoning('qwen/qwen3-coder:free'),
   'qwen3-coder-30b-instruct': openrouterProviderWithReasoning('qwen/qwen3-coder-30b-a3b-instruct'),
