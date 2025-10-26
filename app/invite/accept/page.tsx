@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,7 +24,7 @@ interface InvitationData {
   }
 }
 
-export default function AcceptInvitationPage() {
+function AcceptInvitationContent() {
   const [loading, setLoading] = useState(true)
   const [accepting, setAccepting] = useState(false)
   const [invitationData, setInvitationData] = useState<InvitationData | null>(null)
@@ -354,5 +354,20 @@ export default function AcceptInvitationPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function AcceptInvitationPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading invitation...</p>
+        </div>
+      </div>
+    }>
+      <AcceptInvitationContent />
+    </Suspense>
   )
 }
