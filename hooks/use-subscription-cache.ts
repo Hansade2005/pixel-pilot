@@ -90,8 +90,21 @@ export function useSubscriptionCache(userId?: string) {
         const supabase = createClient()
 
         const { data, error } = await supabase
-          .from('subscriptions')
-          .select('*')
+          .from('user_settings')
+          .select(`
+            id,
+            user_id,
+            subscription_plan,
+            subscription_status,
+            subscription_end_date,
+            stripe_customer_id,
+            stripe_subscription_id,
+            cancel_at_period_end,
+            github_pushes_this_month,
+            deployments_this_month,
+            created_at,
+            updated_at
+          `)
           .eq('user_id', userId)
           .single()
 
@@ -102,7 +115,20 @@ export function useSubscriptionCache(userId?: string) {
           return
         }
 
-        const subscriptionData = data || {
+        const subscriptionData = data ? {
+          id: data.id,
+          user_id: data.user_id,
+          plan: data.subscription_plan || 'free',
+          status: data.subscription_status || 'active',
+          current_period_end: data.subscription_end_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          stripe_customer_id: data.stripe_customer_id,
+          stripe_subscription_id: data.stripe_subscription_id,
+          cancel_at_period_end: data.cancel_at_period_end || false,
+          githubPushesThisMonth: data.github_pushes_this_month || 0,
+          deploymentsThisMonth: data.deployments_this_month || 0,
+          created_at: data.created_at,
+          updated_at: data.updated_at
+        } : {
           id: '',
           user_id: userId,
           plan: 'free',
@@ -110,6 +136,7 @@ export function useSubscriptionCache(userId?: string) {
           current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           cancel_at_period_end: false,
           githubPushesThisMonth: 0,
+          deploymentsThisMonth: 0,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }
@@ -139,27 +166,42 @@ export function useSubscriptionCache(userId?: string) {
               {
                 event: '*',
                 schema: 'public',
-                table: 'subscriptions',
+                table: 'user_settings',
                 filter: `user_id=eq.${userId}`
               },
               (payload) => {
                 console.log('[SubscriptionCache] Realtime update received:', payload)
 
-                const updatedData = payload.new as SubscriptionData
+                const updatedData = payload.new ? {
+                  id: (payload.new as any).id,
+                  user_id: (payload.new as any).user_id,
+                  plan: (payload.new as any).subscription_plan || 'free',
+                  status: (payload.new as any).subscription_status || 'active',
+                  current_period_end: (payload.new as any).subscription_end_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+                  stripe_customer_id: (payload.new as any).stripe_customer_id,
+                  stripe_subscription_id: (payload.new as any).stripe_subscription_id,
+                  cancel_at_period_end: (payload.new as any).cancel_at_period_end || false,
+                  githubPushesThisMonth: (payload.new as any).github_pushes_this_month || 0,
+                  deploymentsThisMonth: (payload.new as any).deployments_this_month || 0,
+                  created_at: (payload.new as any).created_at,
+                  updated_at: (payload.new as any).updated_at
+                } : null
 
-                // Update cache
-                subscriptionCache = updatedData
-                cacheTimestamp = Date.now()
+                if (updatedData) {
+                  // Update cache
+                  subscriptionCache = updatedData
+                  cacheTimestamp = Date.now()
 
-                // Save to session storage
-                try {
-                  sessionStorage.setItem(CACHE_KEY, JSON.stringify(updatedData))
-                  sessionStorage.setItem(CACHE_TIMESTAMP_KEY, cacheTimestamp.toString())
-                } catch (error) {
-                  console.error('[SubscriptionCache] Error saving to session storage:', error)
+                  // Save to session storage
+                  try {
+                    sessionStorage.setItem(CACHE_KEY, JSON.stringify(updatedData))
+                    sessionStorage.setItem(CACHE_TIMESTAMP_KEY, cacheTimestamp.toString())
+                  } catch (error) {
+                    console.error('[SubscriptionCache] Error saving to session storage:', error)
+                  }
+
+                  setSubscription(updatedData)
                 }
-
-                setSubscription(updatedData)
               }
             )
             .subscribe((status) => {

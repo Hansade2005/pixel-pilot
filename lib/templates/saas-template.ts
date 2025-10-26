@@ -112,8 +112,21 @@ export const updateUserProfile = async (userId: string, updates: any) => {
 
 export const getUserSubscription = async (userId: string) => {
   const { data, error } = await supabase
-    .from('subscriptions')
-    .select('*')
+    .from('user_settings')
+    .select(\`
+      id,
+      user_id,
+      subscription_plan,
+      subscription_status,
+      subscription_end_date,
+      stripe_customer_id,
+      stripe_subscription_id,
+      cancel_at_period_end,
+      github_pushes_this_month,
+      deployments_this_month,
+      created_at,
+      updated_at
+    \`)
     .eq('user_id', userId)
     .single()
   return { data, error }
