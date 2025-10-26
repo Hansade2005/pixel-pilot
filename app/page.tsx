@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Plus,
   Image as ImageIcon,
@@ -32,17 +33,40 @@ export default function LandingPage() {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [templates, setTemplates] = useState<any[]>([])
+  const [users, setUsers] = useState<any[]>([])
+  const [usersLoading, setUsersLoading] = useState(false)
   const [sortBy, setSortBy] = useState<string>('popular')
   const [filterBy, setFilterBy] = useState<string>('all')
 
   useEffect(() => {
     checkUser()
     loadTemplates()
+    loadUsers()
   }, [])
 
   const loadTemplates = () => {
     const templateData = TemplateManager.getAllTemplates()
     setTemplates(templateData)
+  }
+
+  const loadUsers = async () => {
+    try {
+      setUsersLoading(true)
+      const response = await fetch('/api/public/users?limit=50')
+
+      if (response.ok) {
+        const data = await response.json()
+        setUsers(data.users || [])
+      } else {
+        console.error('Failed to load users:', response.status)
+        setUsers([])
+      }
+    } catch (error) {
+      console.error('Error loading users:', error)
+      setUsers([])
+    } finally {
+      setUsersLoading(false)
+    }
   }
 
   const handleDownloadTemplate = async (templateId: string) => {
@@ -394,6 +418,108 @@ export default function LandingPage() {
             ))}
           </div>
 
+        </div>
+      </section>
+
+      {/* Community Users Section */}
+      <section className="relative z-10 py-24 bg-gray-900/30">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Section Header */}
+          <div className="text-center mb-12">
+            <div className="flex items-center justify-center space-x-3 mb-6">
+              <div className="w-8 h-8 rounded-full bg-purple-600/20 flex items-center justify-center">
+                <Users className="w-4 h-4 text-purple-400" />
+              </div>
+              <h2 className="text-3xl md:text-4xl font-bold text-white">
+                Join Our Community
+              </h2>
+            </div>
+            <p className="text-xl text-white/80 max-w-2xl mx-auto">
+              See what our amazing community members are building
+            </p>
+          </div>
+
+          {/* Users Grid */}
+          {usersLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {[...Array(8)].map((_, index) => (
+                <Card key={index} className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm">
+                  <CardContent className="p-6">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <div className="w-10 h-10 rounded-full bg-gray-700 animate-pulse"></div>
+                      <div className="flex-1">
+                        <div className="h-4 bg-gray-700 rounded animate-pulse mb-2"></div>
+                        <div className="h-3 bg-gray-700 rounded animate-pulse w-2/3"></div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-3 bg-gray-700 rounded animate-pulse"></div>
+                      <div className="h-3 bg-gray-700 rounded animate-pulse w-3/4"></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : users.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {users.map((user, index) => (
+                <Card
+                  key={user.id}
+                  className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-all duration-300 hover:scale-105 group"
+                >
+                  <CardContent className="p-6">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <Avatar className="w-10 h-10">
+                        <AvatarImage
+                          src={user.avatarUrl || '/placeholder-user.jpg'}
+                          alt={user.fullName || user.email}
+                        />
+                        <AvatarFallback>
+                          {(user.fullName || user.email).charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-white font-semibold text-sm truncate">
+                          {user.fullName || user.email.split('@')[0]}
+                        </h3>
+                        <p className="text-gray-400 text-xs truncate">
+                          {user.email}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-400">Plan:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {user.subscriptionPlan}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-400">Deployments:</span>
+                        <span className="text-white">{user.deploymentsThisMonth}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-400">GitHub Pushes:</span>
+                        <span className="text-white">{user.githubPushesThisMonth}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-gray-700">
+                      <p className="text-gray-400 text-xs">
+                        Joined {new Date(user.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <Users className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+              <p className="text-gray-400">Community members will appear here soon!</p>
+            </div>
+          )}
         </div>
       </section>
 

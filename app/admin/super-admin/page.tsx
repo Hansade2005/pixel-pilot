@@ -268,12 +268,12 @@ export default function SuperAdminPage() {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
             <Button
               variant="outline"
               onClick={() => router.push('/admin')}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 w-fit"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to Admin
@@ -368,6 +368,65 @@ export default function SuperAdminPage() {
             <CardTitle>All Users ({filteredUsers.length})</CardTitle>
           </CardHeader>
           <CardContent>
+            {/* Mobile Card Layout */}
+            <div className="block md:hidden space-y-4">
+              {filteredUsers.map((userData) => (
+                <Card key={userData.id} className="p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage src={userData.user_metadata?.avatar_url} />
+                          <AvatarFallback>
+                            {userData.user_metadata?.full_name?.charAt(0) || userData.email.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium truncate">
+                            {userData.user_metadata?.full_name || 'No name'}
+                          </h3>
+                          <p className="text-sm text-muted-foreground truncate">{userData.email}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="outline" className="text-xs">
+                              {userData.databaseCount} DBs
+                            </Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              {userData.totalDbSize}MB
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => viewUserProfile(userData)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View Profile
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem>
+                            <Mail className="mr-2 h-4 w-4" />
+                            Send Email
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      <div>Status: {userData.email_confirmed_at ? 'Verified' : 'Unverified'}</div>
+                      <div>Created: {new Date(userData.created_at).toLocaleDateString()}</div>
+                      <div>Last sign-in: {userData.last_sign_in_at ? new Date(userData.last_sign_in_at).toLocaleDateString() : 'Never'}</div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+
+            {/* Desktop Table Layout */}
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -444,6 +503,7 @@ export default function SuperAdminPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
 

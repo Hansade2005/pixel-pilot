@@ -449,7 +449,7 @@ export default function AdminUsersPage() {
       {/* Admin Header */}
       <div className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3">
               <Button
                 variant="ghost"
@@ -468,7 +468,7 @@ export default function AdminUsersPage() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <Badge variant="secondary" className="bg-green-100 text-green-800">
+              <Badge variant="secondary" className="bg-green-100 text-green-800 w-fit">
                 <CheckCircle className="h-3 w-3 mr-1" />
                 Admin Access
               </Badge>
@@ -479,7 +479,7 @@ export default function AdminUsersPage() {
 
       <div className="container mx-auto px-4 py-8">
         {/* Search and Filters */}
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -489,14 +489,16 @@ export default function AdminUsersPage() {
               className="pl-9"
             />
           </div>
-          <Button variant="outline">
-            <Filter className="h-4 w-4 mr-2" />
-            Filter
-          </Button>
-          <Button>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Add User
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm">
+              <Filter className="h-4 w-4 mr-2" />
+              Filter
+            </Button>
+            <Button size="sm">
+              <UserPlus className="h-4 w-4 mr-2" />
+              Add User
+            </Button>
+          </div>
         </div>
 
         {/* Statistics Cards */}
@@ -725,6 +727,202 @@ export default function AdminUsersPage() {
             </div>
           </CardHeader>
           <CardContent>
+            {/* Mobile Card Layout */}
+            <div className="block md:hidden space-y-4">
+              {filteredUsers.map((userData) => (
+                <Card key={userData.id} className="p-4">
+                  <div className="flex items-start gap-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSelectUser(userData.id)}
+                      className="p-0 h-auto mt-1"
+                    >
+                      {selectedUsers.has(userData.id) ? (
+                        <CheckSquare className="h-4 w-4" />
+                      ) : (
+                        <Square className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src={userData.avatarUrl || undefined} />
+                      <AvatarFallback>
+                        {userData.email.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-medium truncate">{userData.fullName || 'No name set'}</h3>
+                        {userData.isAdmin && (
+                          <Badge variant="secondary" className="text-xs">Admin</Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate mb-2">{userData.email}</p>
+                      <div className="flex flex-wrap items-center gap-2 mb-3">
+                        {getPlanBadge(userData.subscriptionPlan)}
+                        {getStatusBadge(userData.subscriptionStatus)}
+                        {!userData.emailConfirmed && (
+                          <Badge variant="outline" className="text-xs">Unconfirmed</Badge>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <div>Deployments: {userData.deploymentsThisMonth}/{userData.subscriptionPlan === 'pro' ? 10 : 5}</div>
+                        <div>GitHub: {userData.githubPushesThisMonth}/2</div>
+                        <div>Joined: {new Date(userData.createdAt).toLocaleDateString()}</div>
+                      </div>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => {
+                          setSelectedUser(userData)
+                          setShowUserDialog(true)
+                        }}>
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openEmailDialog([userData])}>
+                          <Mail className="h-4 w-4 mr-2" />
+                          Send Email
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {/* Subscription Management */}
+                        {userData.subscriptionPlan !== 'pro' && (
+                          <DropdownMenuItem
+                            onClick={async () => {
+                              if (confirm(`Upgrade ${userData.email} to Pro plan?`)) {
+                                try {
+                                  const response = await fetch('/api/admin/users', {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      userId: userData.id,
+                                      action: 'upgrade_to_pro'
+                                    })
+                                  })
+                                  if (response.ok) {
+                                    alert('User upgraded to Pro successfully!')
+                                    await loadUsers()
+                                  } else {
+                                    const err = await response.json()
+                                    alert(err.error || 'Failed to upgrade user')
+                                  }
+                                } catch (error) {
+                                  console.error('Error upgrading user:', error)
+                                  alert('Error upgrading user')
+                                }
+                              }
+                            }}
+                            className="text-green-600"
+                          >
+                            <TrendingUp className="h-4 w-4 mr-2" />
+                            Upgrade to Pro
+                          </DropdownMenuItem>
+                        )}
+                        {userData.subscriptionPlan === 'pro' && (
+                          <DropdownMenuItem
+                            onClick={async () => {
+                              if (confirm(`Downgrade ${userData.email} to Free plan?`)) {
+                                try {
+                                  const response = await fetch('/api/admin/users', {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      userId: userData.id,
+                                      action: 'downgrade_to_free'
+                                    })
+                                  })
+                                  if (response.ok) {
+                                    alert('User downgraded to Free successfully!')
+                                    await loadUsers()
+                                  } else {
+                                    const err = await response.json()
+                                    alert(err.error || 'Failed to downgrade user')
+                                  }
+                                } catch (error) {
+                                  console.error('Error downgrading user:', error)
+                                  alert('Error downgrading user')
+                                }
+                              }
+                            }}
+                            className="text-orange-600"
+                          >
+                            <TrendingDown className="h-4 w-4 mr-2" />
+                            Downgrade to Free
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={async () => {
+                            if (confirm(`Reset password for ${userData.email}?`)) {
+                              try {
+                                const response = await fetch('/api/admin/users', {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    userId: userData.id,
+                                    action: 'reset_password'
+                                  })
+                                })
+                                if (response.ok) {
+                                  alert('Password reset email sent successfully!')
+                                } else {
+                                  const err = await response.json()
+                                  alert(err.error || 'Failed to reset password')
+                                }
+                              } catch (error) {
+                                console.error('Error resetting password:', error)
+                                alert('Error resetting password')
+                              }
+                            }
+                          }}
+                          className="text-blue-600"
+                        >
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                          Reset Password
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={async () => {
+                            if (confirm(`Suspend ${userData.email}?`)) {
+                              try {
+                                const response = await fetch('/api/admin/users', {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    userId: userData.id,
+                                    action: 'suspend'
+                                  })
+                                })
+                                if (response.ok) {
+                                  alert('User suspended successfully!')
+                                  await loadUsers()
+                                } else {
+                                  const err = await response.json()
+                                  alert(err.error || 'Failed to suspend user')
+                                }
+                              } catch (error) {
+                                console.error('Error suspending user:', error)
+                                alert('Error suspending user')
+                              }
+                            }
+                          }}
+                          className="text-red-600"
+                        >
+                          <Ban className="h-4 w-4 mr-2" />
+                          Suspend User
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </Card>
+              ))}
+            </div>
+
+            {/* Desktop Table Layout */}
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1107,6 +1305,7 @@ export default function AdminUsersPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
 

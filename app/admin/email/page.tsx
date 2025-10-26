@@ -36,6 +36,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import {
   Mail,
   Send,
@@ -73,6 +74,8 @@ interface UserData {
   subscriptionStatus: string
   createdAt: string
   emailConfirmed: boolean
+  avatarUrl: string | null
+  isAdmin: boolean
 }
 
 interface EmailTemplate {
@@ -243,34 +246,26 @@ export default function AdminEmailPage() {
 
   const fetchUsers = async () => {
     try {
-      const supabase = createClient()
+      // Fetch all users from admin API (same as admin/users page)
+      const response = await fetch('/api/admin/users')
 
-      // Get all users with their profile and settings data
-      const { data, error } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          email,
-          full_name,
-          created_at,
-          email_confirmed_at,
-          user_settings!inner (
-            subscription_plan,
-            subscription_status
-          )
-        `)
-        .order('created_at', { ascending: false })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `Failed to fetch users: ${response.status}`)
+      }
 
-      if (error) throw error
+      const data = await response.json()
+      const usersData = data.users || []
 
-      const formattedUsers: UserData[] = (data || []).map((user: any) => ({
+      // Format users for email page (simplified version)
+      const formattedUsers: UserData[] = usersData.map((user: any) => ({
         id: user.id,
         email: user.email,
-        fullName: user.full_name,
-        subscriptionPlan: user.user_settings?.[0]?.subscription_plan || 'free',
-        subscriptionStatus: user.user_settings?.[0]?.subscription_status || 'inactive',
-        createdAt: user.created_at,
-        emailConfirmed: !!user.email_confirmed_at
+        fullName: user.fullName || user.full_name || null,
+        subscriptionPlan: user.subscriptionPlan || user.subscription_plan || 'free',
+        subscriptionStatus: user.subscriptionStatus || user.subscription_status || 'inactive',
+        createdAt: user.createdAt || user.created_at,
+        emailConfirmed: user.emailConfirmed !== undefined ? user.emailConfirmed : !!user.email_confirmed_at
       }))
 
       setUsers(formattedUsers)
@@ -495,12 +490,12 @@ export default function AdminEmailPage() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Email Management</h1>
           <p className="text-muted-foreground">Send bulk emails and manage communications</p>
         </div>
-        <Button onClick={() => setShowComposeDialog(true)}>
+        <Button onClick={() => setShowComposeDialog(true)} className="w-fit">
           <Plus className="h-4 w-4 mr-2" />
           Compose Email
         </Button>
@@ -680,6 +675,42 @@ export default function AdminEmailPage() {
               </div>
 
               <div className="border rounded-lg">
+                {/* Mobile Card Layout */}
+                <div className="block md:hidden divide-y">
+                  {filteredUsers.map((user) => (
+                    <div key={user.id} className="p-4 flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedUsers.has(user.id)}
+                        onChange={() => handleSelectUser(user.id)}
+                        className="rounded"
+                      />
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={user.avatarUrl || undefined} />
+                        <AvatarFallback>
+                          {user.email.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-medium truncate">{user.fullName || 'No name'}</h3>
+                          {user.isAdmin && <Badge variant="secondary" className="text-xs">Admin</Badge>}
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate mb-2">{user.email}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" className="text-xs">{user.subscriptionPlan}</Badge>
+                          <Badge variant="secondary" className="text-xs capitalize">{user.subscriptionStatus}</Badge>
+                          <span className="text-xs text-muted-foreground">
+                            Joined {new Date(user.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop Table Layout */}
+                <div className="hidden md:block">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -732,6 +763,7 @@ export default function AdminEmailPage() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </div>
             </CardContent>
           </Card>

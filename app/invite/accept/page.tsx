@@ -73,10 +73,6 @@ function AcceptInvitationContent() {
             id,
             name,
             slug
-          ),
-          invited_by_user:invited_by (
-            email,
-            raw_user_meta_data
           )
         `)
         .eq('token', token)
@@ -118,9 +114,8 @@ function AcceptInvitationContent() {
         return
       }
 
-      // Extract organization and inviter data properly
+      // Extract organization data
       const organization = invitation.organization as any
-      const invitedByUser = invitation.invited_by_user as any
 
       setInvitationData({
         id: invitation.id,
@@ -132,8 +127,8 @@ function AcceptInvitationContent() {
           slug: organization?.slug || ''
         },
         inviter: {
-          name: invitedByUser?.raw_user_meta_data?.full_name || invitedByUser?.email?.split('@')[0] || 'Team Admin',
-          email: invitedByUser?.email || ''
+          name: 'Team Admin',
+          email: ''
         }
       })
 
