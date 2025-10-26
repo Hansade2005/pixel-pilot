@@ -10,7 +10,7 @@ interface EmailData {
   from?: string;
   cc?: string;
   bcc?: string;
-  type?: 'general' | 'invitation' | 'welcome' | 'notification';
+  type?: 'general' | 'invitation' | 'welcome' | 'notification' | 'marketing' | 'security' | 'newsletter' | 'feature' | 'billing' | 'support';
   // Additional data for specific email types
   invitee_name?: string;
   organization_name?: string;
@@ -20,6 +20,13 @@ interface EmailData {
   user_name?: string;
   title?: string;
   content?: string;
+  feature_name?: string;
+  try_url?: string;
+  action_url?: string;
+  amount?: string;
+  ticket_id?: string;
+  support_url?: string;
+  unsubscribe_url?: string;
 }
 
 interface EmailResponse {
@@ -34,7 +41,7 @@ interface EmailResponse {
  */
 export async function sendEmail(
   emailData: EmailData,
-  apiUrl: string = process.env.NEXT_PUBLIC_EMAIL_API_URL || 'https://your-php-server.com/email-api.php'
+  apiUrl: string = process.env.NEXT_PUBLIC_EMAIL_API_URL || 'http://humanityatheartintl.org/email-api.php'
 ): Promise<EmailResponse> {
   try {
     const response = await fetch(apiUrl, {
@@ -70,7 +77,7 @@ export async function sendTeamInvitation(
   inviterName: string,
   role: string,
   invitationToken: string,
-  baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || 'https://your-app.com'
+  baseUrl: string = process.env.NEXT_PUBLIC_APP_URL || 'https://pipilot.dev'
 ): Promise<EmailResponse> {
   const acceptUrl = `${baseUrl}/invite/accept?token=${invitationToken}`;
 
@@ -101,6 +108,28 @@ export async function sendWelcomeEmail(
     user_name: userName,
     organization_name: organizationName,
   });
+}
+
+/**
+ * Send notification to team members when someone joins
+ */
+export async function sendTeamMemberJoinedNotification(
+  teamMemberEmails: string[],
+  newMemberName: string,
+  organizationName: string,
+  inviterName: string
+): Promise<EmailResponse[]> {
+  const promises = teamMemberEmails.map(email =>
+    sendEmail({
+      to: email,
+      subject: `${newMemberName} joined ${organizationName}`,
+      type: 'notification',
+      title: `New Team Member`,
+      content: `<p><strong>${newMemberName}</strong> has joined <strong>${organizationName}</strong> as a new team member.</p><p>Invited by: ${inviterName}</p>`
+    })
+  );
+
+  return Promise.all(promises);
 }
 
 /**

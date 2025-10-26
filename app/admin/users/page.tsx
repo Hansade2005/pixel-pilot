@@ -4,9 +4,11 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { checkAdminAccess } from "@/lib/admin-utils"
+import { sendEmail, sendNotificationEmail } from "@/lib/email"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -33,6 +35,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Search,
   Filter,
@@ -84,6 +93,17 @@ interface UserData {
   hasSettings: boolean
 }
 
+const EMAIL_TYPES = [
+  { value: 'notification', label: 'General Notification', description: 'Send general announcements or updates' },
+  { value: 'marketing', label: 'Marketing Campaign', description: 'Promotional content and feature announcements' },
+  { value: 'newsletter', label: 'Newsletter', description: 'Regular updates and company news' },
+  { value: 'security', label: 'Security Alert', description: 'Important security notifications' },
+  { value: 'feature', label: 'Feature Announcement', description: 'New feature releases and updates' },
+  { value: 'billing', label: 'Billing Notification', description: 'Payment and billing related communications' },
+  { value: 'support', label: 'Support Response', description: 'Customer support communications' },
+  { value: 'welcome', label: 'Welcome Message', description: 'Welcome new users or team members' }
+]
+
 export default function AdminUsersPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -95,6 +115,14 @@ export default function AdminUsersPage() {
   // Bulk selection state
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
   const [bulkActionLoading, setBulkActionLoading] = useState(false)
+
+  // Email functionality state
+  const [showEmailDialog, setShowEmailDialog] = useState(false)
+  const [emailRecipients, setEmailRecipients] = useState<UserData[]>([])
+  const [emailSubject, setEmailSubject] = useState('')
+  const [emailContent, setEmailContent] = useState('')
+  const [emailType, setEmailType] = useState('notification')
+  const [sendingEmail, setSendingEmail] = useState(false)
 
   // Filter states
   const [planFilter, setPlanFilter] = useState<string>("all")
@@ -230,6 +258,135 @@ export default function AdminUsersPage() {
       alert('Error performing bulk action')
     } finally {
       setBulkActionLoading(false)
+    }
+  }
+
+  // Email functionality
+  const openEmailDialog = (recipients: UserData[]) => {
+    setEmailRecipients(recipients)
+    setEmailSubject('')
+    setEmailContent('')
+    setEmailType('notification')
+    setShowEmailDialog(true)
+  }
+
+  const sendEmailToUsers = async () => {
+    if (!emailSubject.trim() || !emailContent.trim()) {
+      alert('Please provide both subject and content for the email')
+      return
+    }
+
+    setSendingEmail(true)
+
+    try {
+      let successCount = 0
+      let failedCount = 0
+
+      for (const recipient of emailRecipients) {
+        try {
+          let result
+          switch (emailType) {
+            case 'notification':
+              result = await sendNotificationEmail(recipient.email, emailSubject, emailContent)
+              break
+            case 'marketing':
+              result = await sendEmail({
+                to: recipient.email,
+                subject: emailSubject,
+                type: 'marketing',
+                message: emailContent
+              })
+              break
+            case 'newsletter':
+              result = await sendEmail({
+                to: recipient.email,
+                subject: emailSubject,
+                type: 'newsletter',
+                title: emailSubject,
+                content: emailContent,
+                unsubscribe_url: 'https://pipilot.dev/unsubscribe'
+              })
+              break
+            case 'security':
+              result = await sendEmail({
+                to: recipient.email,
+                subject: emailSubject,
+                type: 'security',
+                title: emailSubject,
+                content: emailContent,
+                action_url: 'https://pipilot.dev/security'
+              })
+              break
+            case 'feature':
+              result = await sendEmail({
+                to: recipient.email,
+                subject: emailSubject,
+                type: 'feature',
+                title: emailSubject,
+                feature_name: 'New Feature',
+                content: emailContent,
+                try_url: 'https://pipilot.dev/features'
+              })
+              break
+            case 'billing':
+              result = await sendEmail({
+                to: recipient.email,
+                subject: emailSubject,
+                type: 'billing',
+                title: emailSubject,
+                content: emailContent,
+                amount: '$0.00',
+                action_url: 'https://pipilot.dev/billing'
+              })
+              break
+            case 'support':
+              result = await sendEmail({
+                to: recipient.email,
+                subject: emailSubject,
+                type: 'support',
+                title: emailSubject,
+                content: emailContent,
+                ticket_id: 'N/A',
+                support_url: 'https://pipilot.dev/support'
+              })
+              break
+            case 'welcome':
+              result = await sendEmail({
+                to: recipient.email,
+                subject: emailSubject,
+                type: 'welcome',
+                user_name: recipient.fullName || recipient.email.split('@')[0],
+                organization_name: 'Pixel Pilot'
+              })
+              break
+            default:
+              result = await sendNotificationEmail(recipient.email, emailSubject, emailContent)
+          }
+
+          if (result.success) {
+            successCount++
+          } else {
+            failedCount++
+            console.error(`Failed to send email to ${recipient.email}:`, result.error)
+          }
+        } catch (error) {
+          failedCount++
+          console.error(`Error sending email to ${recipient.email}:`, error)
+        }
+      }
+
+      alert(`Email campaign completed!\n✅ Successfully sent: ${successCount}\n❌ Failed: ${failedCount}`)
+
+      setShowEmailDialog(false)
+      setEmailRecipients([])
+      setEmailSubject('')
+      setEmailContent('')
+
+    } catch (error) {
+      console.error('Error in email sending:', error)
+      alert('An error occurred while sending emails')
+    } finally {
+      setSendingEmail(false)
     }
   }
 
@@ -512,6 +669,20 @@ export default function AdminUsersPage() {
                     <RotateCcw className="h-4 w-4 mr-2" />
                     {bulkActionLoading ? 'Resetting...' : 'Reset Usage'}
                   </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const selectedUserData = users.filter(u => selectedUsers.has(u.id))
+                      openEmailDialog(selectedUserData)
+                    }}
+                    disabled={bulkActionLoading}
+                    className="text-purple-700 border-purple-300 hover:bg-purple-50"
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    Send Email
+                  </Button>
                 </div>
               </div>
             )}
@@ -671,7 +842,7 @@ export default function AdminUsersPage() {
                           }}>
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openEmailDialog([userData])}>
                             <Mail className="h-4 w-4 mr-2" />
                             Send Email
                           </DropdownMenuItem>
@@ -1101,6 +1272,95 @@ export default function AdminUsersPage() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowUserDialog(false)}>
                 Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Email Composition Dialog */}
+        <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Send Email</DialogTitle>
+              <DialogDescription>
+                Compose and send an email to {emailRecipients.length} recipient{emailRecipients.length !== 1 ? 's' : ''}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              {/* Recipients Preview */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Recipients</label>
+                <div className="flex flex-wrap gap-2 max-h-20 overflow-y-auto">
+                  {emailRecipients.map((recipient) => (
+                    <Badge key={recipient.id} variant="secondary" className="text-xs">
+                      {recipient.email}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* Email Type */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Email Type</label>
+                <Select value={emailType} onValueChange={setEmailType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select email type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EMAIL_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        <div>
+                          <div className="font-medium">{type.label}</div>
+                          <div className="text-xs text-muted-foreground">{type.description}</div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Subject */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Subject</label>
+                <Input
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  placeholder="Enter email subject..."
+                />
+              </div>
+
+              {/* Content */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Message</label>
+                <Textarea
+                  value={emailContent}
+                  onChange={(e) => setEmailContent(e.target.value)}
+                  placeholder="Enter your message..."
+                  rows={8}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowEmailDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={sendEmailToUsers}
+                disabled={sendingEmail || !emailSubject.trim() || !emailContent.trim()}
+              >
+                {sendingEmail ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="h-4 w-4 mr-2" />
+                    Send Email{emailRecipients.length > 1 ? ` (${emailRecipients.length})` : ''}
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
