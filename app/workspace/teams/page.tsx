@@ -44,6 +44,7 @@ import {
   Activity
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { sendTeamInvitation } from "@/lib/email"
 import { formatDistanceToNow } from "date-fns"
 
 interface Organization {
@@ -309,6 +310,10 @@ export default function TeamsPage() {
       // Generate a secure token for the invitation
       const token = crypto.randomUUID()
 
+      // Get current user info for the invitation
+      const { data: userData } = await supabase.auth.getUser()
+      const currentUser = userData.user
+
       // Create invitation with all required fields
       const { data, error } = await supabase
         .from('team_invitations')
@@ -318,7 +323,7 @@ export default function TeamsPage() {
           role: inviteRole,
           status: 'pending',
           token: token,
-          invited_by: (await supabase.auth.getUser()).data.user?.id,
+          invited_by: currentUser?.id,
           expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days from now
         })
         .select()
@@ -326,10 +331,36 @@ export default function TeamsPage() {
 
       if (error) throw error
 
-      toast({
-        title: "Invitation sent",
-        description: `Invitation sent to ${inviteEmail}`
-      })
+      // Send invitation email
+      try {
+        const emailResult = await sendTeamInvitation(
+          inviteEmail.trim(),
+          selectedOrg.name,
+          currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || 'Team Admin',
+          inviteRole,
+          token
+        )
+
+        if (emailResult.success) {
+          toast({
+            title: "Invitation sent",
+            description: `Invitation email sent to ${inviteEmail}`
+          })
+        } else {
+          console.warn('Database invitation created but email failed:', emailResult.error)
+          toast({
+            title: "Invitation created",
+            description: `Invitation saved but email failed to send: ${emailResult.error}`,
+            variant: "destructive"
+          })
+        }
+      } catch (emailError) {
+        console.warn('Email sending failed:', emailError)
+        toast({
+          title: "Invitation created",
+          description: `Invitation saved but email failed to send. User can still accept via direct link.`,
+        })
+      }
 
       setShowInviteDialog(false)
       setInviteEmail("")
