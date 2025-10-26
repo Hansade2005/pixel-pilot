@@ -1811,7 +1811,22 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
           {/* Mobile Content with top padding for fixed header and bottom padding for fixed tabs */}
           <div className="flex-1 min-h-0 pt-14 pb-12">
-            {clientProjects.length === 0 ? (
+            {isLoadingProjects ? (
+              /* Loading State for Mobile */
+              <div className="flex items-center justify-center p-8 h-full">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">
+                    {isAutoRestoring ? 'Restoring latest data from cloud...' : 'Loading projects from storage...'}
+                  </p>
+                  {isAutoRestoring && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      This may take a moment depending on your data size
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : clientProjects.length === 0 ? (
               /* Empty State - No Projects */
               <div className="flex-1 flex items-center justify-center p-8">
                 <div className="text-center max-w-md mx-auto">
