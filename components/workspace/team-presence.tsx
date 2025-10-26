@@ -52,12 +52,7 @@ export function TeamPresence({ workspaceId, organizationId, className }: TeamPre
           .from('team_members')
           .select(`
             user_id,
-            role,
-            users:user_id (
-              id,
-              email,
-              raw_user_meta_data
-            )
+            role
           `)
           .eq('organization_id', organizationId)
           .eq('status', 'active')
@@ -68,22 +63,53 @@ export function TeamPresence({ workspaceId, organizationId, className }: TeamPre
           return
         }
 
-        // Transform data
-        const transformedMembers: TeamMember[] = (members || []).map((member: any) => ({
-          id: member.users?.id || '',
-          email: member.users?.email || '',
-          name: member.users?.raw_user_meta_data?.full_name || member.users?.email?.split('@')[0],
-          avatar_url: member.users?.raw_user_meta_data?.avatar_url,
-          isOnline: false, // Will be updated by presence system
-          lastSeen: new Date().toISOString()
-        })).filter(m => m.id) // Filter out any invalid members
+        // If we have members, fetch user data separately
+        let transformedMembers: TeamMember[] = []
+        if (members && members.length > 0) {
+          // Get unique user IDs
+          const userIds = members.map((member: any) => member.user_id)
 
-        setTeamMembers(transformedMembers)
-        setLoading(false)
+          // Fetch user data for all members
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('id, email, raw_user_meta_data')
+            .in('id', userIds)
 
-        // TODO: Implement real-time presence tracking
-        // For now, mark all as potentially online (mock data)
-        // In production, use Supabase Realtime presence
+          if (userError) {
+            console.error('[TeamPresence] Error fetching user data:', userError)
+          }
+
+          // Create a map of user data
+          const userMap = new Map()
+          if (userData) {
+            userData.forEach((user: any) => {
+              userMap.set(user.id, user)
+            })
+          }
+
+          // Transform members with user data
+          transformedMembers = members.map((member: any) => {
+            const user = userMap.get(member.user_id)
+            return {
+              id: user?.id || '',
+              email: user?.email || '',
+              name: user?.raw_user_meta_data?.full_name || user?.email?.split('@')[0],
+              avatar_url: user?.raw_user_meta_data?.avatar_url,
+              isOnline: false, // Will be updated by presence system
+              lastSeen: new Date().toISOString()
+            }
+          }).filter(m => m.id) // Filter out any invalid members
+
+          setTeamMembers(transformedMembers)
+          setLoading(false)
+
+          // TODO: Implement real-time presence tracking
+          // For now, mark all as potentially online (mock data)
+          // In production, use Supabase Realtime presence
+        } else {
+          setTeamMembers([])
+          setLoading(false)
+        }
       } catch (error) {
         console.error('[TeamPresence] Error:', error)
         setTeamMembers([])

@@ -66,11 +66,7 @@ export function TeamActivityFeed({ workspaceId, organizationId }: TeamActivityFe
             action,
             actor_id,
             metadata,
-            created_at,
-            users:actor_id (
-              email,
-              raw_user_meta_data
-            )
+            created_at
           `)
           .eq('workspace_id', workspaceId)
           .order('created_at', { ascending: false })
@@ -82,17 +78,45 @@ export function TeamActivityFeed({ workspaceId, organizationId }: TeamActivityFe
           return
         }
 
-        // Transform data
-        const transformedActivities: TeamActivity[] = (data || []).map((activity: any) => ({
-          id: activity.id,
-          action: activity.action,
-          actor_id: activity.actor_id,
-          actor_email: activity.users?.email,
-          actor_name: activity.users?.raw_user_meta_data?.full_name || activity.users?.email?.split('@')[0],
-          actor_avatar: activity.users?.raw_user_meta_data?.avatar_url,
-          metadata: activity.metadata || {},
-          created_at: activity.created_at
-        }))
+        // If we have activities, fetch user data separately
+        let transformedActivities: TeamActivity[] = []
+        if (data && data.length > 0) {
+          // Get unique actor IDs
+          const actorIds = [...new Set(data.map((activity: any) => activity.actor_id))]
+
+          // Fetch user data for all actors
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('id, email, raw_user_meta_data')
+            .in('id', actorIds)
+
+          if (userError) {
+            console.error('[TeamActivityFeed] Error fetching user data:', userError)
+          }
+
+          // Create a map of user data
+          const userMap = new Map()
+          if (userData) {
+            userData.forEach((user: any) => {
+              userMap.set(user.id, user)
+            })
+          }
+
+          // Transform activities with user data
+          transformedActivities = data.map((activity: any) => {
+            const user = userMap.get(activity.actor_id)
+            return {
+              id: activity.id,
+              action: activity.action,
+              actor_id: activity.actor_id,
+              actor_email: user?.email,
+              actor_name: user?.raw_user_meta_data?.full_name || user?.email?.split('@')[0],
+              actor_avatar: user?.raw_user_meta_data?.avatar_url,
+              metadata: activity.metadata || {},
+              created_at: activity.created_at
+            }
+          })
+        }
 
         setActivities(transformedActivities)
         setLoading(false)
