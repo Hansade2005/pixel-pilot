@@ -220,9 +220,9 @@ function AcceptInvitationContent() {
         description: `You've successfully joined ${invitationData.organization.name}`
       })
 
-      // Redirect to teams page after a short delay
+      // Redirect to workspace page after a short delay
       setTimeout(() => {
-        router.push('/workspace/teams')
+        router.push('/workspace')
       }, 2000)
 
     } catch (error: any) {

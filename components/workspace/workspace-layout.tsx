@@ -266,7 +266,67 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         console.log('WorkspaceLayout: Loaded workspaces from IndexedDB:', workspaces?.length || 0)
         console.log('WorkspaceLayout: Workspace details:', workspaces?.map(w => ({ id: w.id, name: w.name, slug: w.slug })))
 
-        setClientProjects((prevProjects) => [...(prevProjects || []), ...(workspaces || [])])
+        // Load team workspaces from database
+        console.log('WorkspaceLayout: Loading team workspaces from database...')
+        const supabase = createClient()
+        const { data: teamMemberships, error: membershipsError } = await supabase
+          .from('team_members')
+          .select(`
+            organization_id,
+            role,
+            organization:organization_id (
+              id,
+              name,
+              slug
+            )
+          `)
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+
+        let teamWorkspaces: Workspace[] = []
+        if (!membershipsError && teamMemberships) {
+          // Get all organization IDs the user is a member of
+          const orgIds = teamMemberships
+            .filter((m: any) => m.organization)
+            .map((m: any) => m.organization.id)
+
+          if (orgIds.length > 0) {
+            // Fetch team workspaces for all organizations
+            const { data: teamWorkspaceData, error: workspacesError } = await supabase
+              .from('team_workspaces')
+              .select('*')
+              .in('organization_id', orgIds)
+              .order('created_at', { ascending: false })
+
+            if (!workspacesError && teamWorkspaceData) {
+              teamWorkspaces = teamWorkspaceData.map((tw: any) => ({
+                id: tw.id,
+                name: tw.name,
+                description: tw.description || '',
+                slug: tw.slug || tw.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                userId: user.id, // Team workspaces are accessible by team members
+                isPublic: tw.visibility === 'public',
+                isTemplate: false,
+                isPinned: false, // Team workspaces can be pinned later if needed
+                lastActivity: tw.last_edited_at || tw.created_at,
+                deploymentStatus: 'not_deployed' as const,
+                createdAt: tw.created_at,
+                updatedAt: tw.last_edited_at || tw.created_at,
+                // Team workspace specific fields
+                organizationId: tw.organization_id,
+                isTeamWorkspace: true,
+                teamWorkspaceId: tw.id
+              }))
+              console.log('WorkspaceLayout: Loaded team workspaces:', teamWorkspaces.length)
+            }
+          }
+        }
+
+        // Merge personal and team workspaces
+        const allWorkspaces = [...(workspaces || []), ...teamWorkspaces]
+        console.log('WorkspaceLayout: Total workspaces loaded:', allWorkspaces.length, '(Personal:', workspaces?.length || 0, 'Team:', teamWorkspaces.length, ')')
+
+        setClientProjects(allWorkspaces)
       } catch (error) {
         console.error('Error loading client projects:', error)
         // Don't fall back to empty server-side projects
@@ -282,6 +342,204 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       loadClientProjects()
     }
   }, [user.id]) // Only depend on user.id, not projects
+
+  // Real-time subscription for team workspace changes
+  useEffect(() => {
+    if (!user?.id) return
+
+    console.log('WorkspaceLayout: Setting up real-time subscription for team workspaces')
+
+    const supabase = createClient()
+    
+    // Subscribe to team workspace changes
+    const teamWorkspaceChannel = supabase
+      .channel('team_workspaces_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'team_workspaces'
+        },
+        async (payload) => {
+          console.log('WorkspaceLayout: Team workspace change detected:', payload)
+
+          // Get user's organizations to check if this workspace belongs to them
+          const { data: memberships } = await supabase
+            .from('team_members')
+            .select('organization_id')
+            .eq('user_id', user.id)
+            .eq('status', 'active')
+
+          const userOrgIds = memberships?.map(m => m.organization_id) || []
+
+          if (payload.eventType === 'INSERT' && payload.new && userOrgIds.includes((payload.new as any).organization_id)) {
+            // New team workspace created in user's organization
+            const newWorkspace: Workspace = {
+              id: payload.new.id,
+              name: payload.new.name,
+              description: payload.new.description || '',
+              slug: payload.new.slug || payload.new.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+              userId: user.id,
+              isPublic: payload.new.visibility === 'public',
+              isTemplate: false,
+              isPinned: false,
+              lastActivity: payload.new.created_at,
+              deploymentStatus: 'not_deployed' as const,
+              createdAt: payload.new.created_at,
+              updatedAt: payload.new.created_at,
+              organizationId: (payload.new as any).organization_id,
+              isTeamWorkspace: true,
+              teamWorkspaceId: payload.new.id
+            }
+
+            setClientProjects(prev => {
+              // Check if workspace already exists (avoid duplicates)
+              if (prev.some(p => p.id === newWorkspace.id)) return prev
+              return [...prev, newWorkspace]
+            })
+
+            toast({
+              title: "New team workspace",
+              description: `${payload.new.name} workspace has been added to your team`
+            })
+
+          } else if (payload.eventType === 'UPDATE' && payload.new && userOrgIds.includes((payload.new as any).organization_id)) {
+            // Team workspace updated
+            setClientProjects(prev => prev.map(project => 
+              project.id === payload.new.id 
+                ? {
+                    ...project,
+                    name: payload.new.name,
+                    description: payload.new.description || '',
+                    slug: payload.new.slug || payload.new.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                    isPublic: payload.new.visibility === 'public',
+                    lastActivity: payload.new.last_edited_at || payload.new.created_at,
+                    updatedAt: payload.new.last_edited_at || payload.new.created_at
+                  }
+                : project
+            ))
+
+          } else if (payload.eventType === 'DELETE' && payload.old && userOrgIds.includes((payload.old as any).organization_id)) {
+            // Team workspace deleted
+            setClientProjects(prev => prev.filter(project => project.id !== payload.old.id))
+
+            toast({
+              title: "Team workspace removed",
+              description: `A team workspace has been removed`
+            })
+          }
+        }
+      )
+      .subscribe()
+
+    // Also subscribe to team membership changes (user might be added/removed from teams)
+    const teamMembershipChannel = supabase
+      .channel('team_membership_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'team_members',
+          filter: `user_id=eq.${user.id}`
+        },
+        async (payload) => {
+          console.log('WorkspaceLayout: Team membership change detected:', payload)
+          
+          if (payload.eventType === 'INSERT' && (payload.new as any)?.status === 'active') {
+            // User was added to a team - reload all workspaces
+            console.log('WorkspaceLayout: User added to team, reloading workspaces')
+            // Trigger a reload by calling the load function again
+            const loadClientProjects = async () => {
+              try {
+                setIsLoadingProjects(true)
+                await storageManager.init()
+                const workspaces = await storageManager.getWorkspaces(user.id)
+                
+                // Reload team workspaces
+                const { data: teamMemberships } = await supabase
+                  .from('team_members')
+                  .select(`
+                    organization_id,
+                    role,
+                    organization:organization_id (
+                      id,
+                      name,
+                      slug
+                    )
+                  `)
+                  .eq('user_id', user.id)
+                  .eq('status', 'active')
+
+                let teamWorkspaces: Workspace[] = []
+                if (teamMemberships) {
+                  const orgIds = teamMemberships
+                    .filter((m: any) => m.organization)
+                    .map((m: any) => m.organization.id)
+
+                  if (orgIds.length > 0) {
+                    const { data: teamWorkspaceData } = await supabase
+                      .from('team_workspaces')
+                      .select('*')
+                      .in('organization_id', orgIds)
+                      .order('created_at', { ascending: false })
+
+                    if (teamWorkspaceData) {
+                      teamWorkspaces = teamWorkspaceData.map((tw: any) => ({
+                        id: tw.id,
+                        name: tw.name,
+                        description: tw.description || '',
+                        slug: tw.slug || tw.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                        userId: user.id,
+                        isPublic: tw.visibility === 'public',
+                        isTemplate: false,
+                        isPinned: false,
+                        lastActivity: tw.last_edited_at || tw.created_at,
+                        deploymentStatus: 'not_deployed' as const,
+                        createdAt: tw.created_at,
+                        updatedAt: tw.last_edited_at || tw.created_at,
+                        organizationId: tw.organization_id,
+                        isTeamWorkspace: true,
+                        teamWorkspaceId: tw.id
+                      }))
+                    }
+                  }
+                }
+
+                const allWorkspaces = [...(workspaces || []), ...teamWorkspaces]
+                setClientProjects(allWorkspaces)
+                
+                toast({
+                  title: "Team access updated",
+                  description: "Your team workspaces have been updated"
+                })
+              } catch (error) {
+                console.error('Error reloading workspaces after team change:', error)
+              } finally {
+                setIsLoadingProjects(false)
+              }
+            }
+            
+            loadClientProjects()
+            
+          } else if (payload.eventType === 'UPDATE' && (payload.new as any)?.status !== 'active') {
+            // User was removed from a team - remove those workspaces
+            console.log('WorkspaceLayout: User removed from team, updating workspaces')
+            setClientProjects(prev => prev.filter(project => 
+              !project.organizationId || project.organizationId !== (payload.new as any)?.organization_id
+            ))
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      console.log('WorkspaceLayout: Cleaning up real-time subscriptions')
+      supabase.removeChannel(teamWorkspaceChannel)
+      supabase.removeChannel(teamMembershipChannel)
+    }
+  }, [user?.id])
 
   // Handle project selection from URL params (both newProject and projectId)
   useEffect(() => {

@@ -104,6 +104,64 @@ export default function TeamsPage() {
     }
   }, [selectedOrg])
 
+  // Real-time subscriptions for live updates
+  useEffect(() => {
+    if (!currentUserId) return
+
+    const supabase = createClient()
+
+    // Subscribe to team member changes to update member counts
+    const memberChannel = supabase
+      .channel('team_members_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'team_members'
+        },
+        async (payload) => {
+          console.log('Teams page: Team member change detected:', payload)
+          // Refresh organization data to update counts
+          await fetchOrganizations()
+          
+          // If the selected org was affected, refresh its data
+          if (selectedOrg && (payload.new as any)?.organization_id === selectedOrg.id) {
+            fetchTeamMembers()
+          }
+        }
+      )
+      .subscribe()
+
+    // Subscribe to team workspace changes to update workspace counts
+    const workspaceChannel = supabase
+      .channel('team_workspaces_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'team_workspaces'
+        },
+        async (payload) => {
+          console.log('Teams page: Team workspace change detected:', payload)
+          // Refresh organization data to update counts
+          await fetchOrganizations()
+          
+          // If the selected org was affected, refresh its workspace data
+          if (selectedOrg && (payload.new as any)?.organization_id === selectedOrg.id) {
+            fetchTeamWorkspaces()
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(memberChannel)
+      supabase.removeChannel(workspaceChannel)
+    }
+  }, [currentUserId, selectedOrg])
+
   const fetchOrganizations = async () => {
     try {
       const supabase = createClient()
