@@ -46,6 +46,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   const [isGenerating, setIsGenerating] = useState(false)
   const [isEnhancing, setIsEnhancing] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -661,112 +662,143 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
             </div>
           )}
 
+          {/* URL Attachment Input/Display - Outside the main input box */}
+          {showUrlInput && !attachedUrl && (
+            <div className="relative">
+              {/* Blinking NEW Badge */}
+              <div className="absolute -top-2 left-2 z-10">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 text-white shadow-lg new-badge-blink new-badge-shine">
+                  <Sparkles className="w-2.5 h-2.5 sparkle-rotate" />
+                  NEW
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700/50 hover:border-blue-500/50 transition-colors">
+                <svg className="w-4 h-4 text-blue-400 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+                <textarea
+                  placeholder="🌐 Clone any website - paste URL here (e.g., https://bbc.com)"
+                  value={attachedUrl}
+                  onChange={(e) => {
+                    const newValue = e.target.value;
+                    setAttachedUrl(newValue);
+                    const textarea = e.target as HTMLTextAreaElement;
+
+                    // Auto-resize behavior like chat-panel.tsx
+                    textarea.style.height = '48px';
+                    const newHeight = Math.min(textarea.scrollHeight, 140);
+                    textarea.style.height = newHeight + 'px';
+                    textarea.style.overflowY = textarea.scrollHeight > 140 ? 'auto' : 'hidden';
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleUrlAttachment();
+                    }
+                  }}
+                  className="flex-1 bg-transparent outline-none text-sm text-gray-300 placeholder-gray-500 resize-none min-h-[48px] max-h-[140px] leading-[1.5] py-1"
+                  disabled={isGenerating}
+                  rows={1}
+                  style={{
+                    height: '48px',
+                    minHeight: '48px',
+                    maxHeight: '140px',
+                    overflowY: 'hidden',
+                    resize: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowUrlInput(false)}
+                  className="text-gray-400 hover:text-white transition-colors mt-1"
+                  title="Close URL input"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* URL Attachment Display */}
+          {attachedUrl && (
+            <div className="relative">
+              {/* Blinking NEW Badge */}
+              <div className="absolute -top-2 left-2 z-10">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 text-white shadow-lg new-badge-blink new-badge-shine">
+                  <Sparkles className="w-2.5 h-2.5 sparkle-rotate" />
+                  NEW
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+                <span className="flex-1 text-sm text-gray-300 truncate">{attachedUrl}</span>
+                <button
+                  type="button"
+                  onClick={() => setAttachedUrl("")}
+                  className="text-gray-400 hover:text-white transition-colors"
+                  title="Remove URL"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Input Field */}
             <div className="relative">
-              <input
-                type="text"
-                ref={inputRef}
-                placeholder={isGenerating ? "PiPilot is working..." : "Describe your app idea..."}
+              <textarea
+                ref={textareaRef}
                 value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="w-full bg-transparent outline-none text-lg text-white placeholder-gray-400 py-3 px-4"
+                onChange={(e) => {
+                  const newValue = e.target.value;
+                  setPrompt(newValue);
+                  const textarea = e.target as HTMLTextAreaElement;
+
+                  // Reset to baseline then expand up to the max (140px)
+                  textarea.style.height = '64px';
+                  const newHeight = Math.min(textarea.scrollHeight, 140)
+                  textarea.style.height = newHeight + 'px';
+                  // Only show a vertical scrollbar when content exceeds the max height
+                  textarea.style.overflowY = textarea.scrollHeight > 140 ? 'auto' : 'hidden'
+                }}
+                onInput={(e) => {
+                  const textarea = e.target as HTMLTextAreaElement;
+                  textarea.style.height = '54px';
+                  const newHeight = Math.min(textarea.scrollHeight, 140)
+                  textarea.style.height = newHeight + 'px';
+                  textarea.style.overflowY = textarea.scrollHeight > 140 ? 'auto' : 'hidden'
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSubmit(e)
+                  }
+                }}
+                placeholder={isGenerating ? "PiPilot is working..." : "Describe your app idea..."}
+                className="flex-1 bg-transparent border-none outline-none text-white placeholder-gray-400 text-[15px] resize-none rounded-md px-2 py-2 leading-[1.5] min-h-[48px] max-h-[140px]"
                 disabled={isGenerating}
+                rows={1}
+                style={{
+                  height: '77px',
+                  minHeight: '48px',
+                  maxHeight: '140px',
+                  overflowY: 'hidden', // hide scrollbar until content exceeds maxHeight
+                  resize: 'none',
+                  boxSizing: 'border-box'
+                }}
               />
             </div>
-
-            {/* URL Attachment Input/Display */}
-            {showUrlInput && !attachedUrl && (
-              <div className="relative">
-                {/* Blinking NEW Badge */}
-                <div className="absolute -top-2 left-2 z-10">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 text-white shadow-lg new-badge-blink new-badge-shine">
-                    <Sparkles className="w-2.5 h-2.5 sparkle-rotate" />
-                    NEW
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700/50 hover:border-blue-500/50 transition-colors">
-                  <svg className="w-4 h-4 text-blue-400 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                  </svg>
-                  <textarea
-                    placeholder="🌐 Clone any website - paste URL here (e.g., https://bbc.com)"
-                    value={attachedUrl}
-                    onChange={(e) => {
-                      const newValue = e.target.value;
-                      setAttachedUrl(newValue);
-                      const textarea = e.target as HTMLTextAreaElement;
-                      
-                      // Auto-resize behavior like chat-panel.tsx
-                      textarea.style.height = '48px';
-                      const newHeight = Math.min(textarea.scrollHeight, 140);
-                      textarea.style.height = newHeight + 'px';
-                      textarea.style.overflowY = textarea.scrollHeight > 140 ? 'auto' : 'hidden';
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleUrlAttachment();
-                      }
-                    }}
-                    className="flex-1 bg-transparent outline-none text-sm text-gray-300 placeholder-gray-500 resize-none min-h-[48px] max-h-[140px] leading-[1.5] py-1"
-                    disabled={isGenerating}
-                    rows={1}
-                    style={{
-                      height: '48px',
-                      minHeight: '48px',
-                      maxHeight: '140px',
-                      overflowY: 'hidden',
-                      resize: 'none',
-                      boxSizing: 'border-box'
-                    }}
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowUrlInput(false)}
-                    className="text-gray-400 hover:text-white transition-colors mt-1"
-                    title="Close URL input"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* URL Attachment Display */}
-            {attachedUrl && (
-              <div className="relative">
-                {/* Blinking NEW Badge */}
-                <div className="absolute -top-2 left-2 z-10">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 text-white shadow-lg new-badge-blink new-badge-shine">
-                    <Sparkles className="w-2.5 h-2.5 sparkle-rotate" />
-                    NEW
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700/50">
-                  <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                  </svg>
-                  <span className="flex-1 text-sm text-gray-300 truncate">{attachedUrl}</span>
-                  <button
-                    type="button"
-                    onClick={() => setAttachedUrl("")}
-                    className="text-gray-400 hover:text-white transition-colors"
-                    title="Remove URL"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Bottom Bar with Buttons */}
             <div className="flex items-center justify-between pt-2 border-t border-gray-700/50">
