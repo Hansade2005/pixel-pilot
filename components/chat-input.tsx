@@ -788,8 +788,8 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   value={selectedTemplate}
                   onValueChange={(value: 'vite-react' | 'nextjs') => setSelectedTemplate(value)}
                   disabled={isGenerating}
-                >
-                  <SelectTrigger className="w-[80px] h-8 bg-gray-700/50 border-gray-600/50 text-gray-300 text-sm">
+                
+                  <SelectTrigger className="w-[100px] h-8 bg-gray-700/50 border-gray-600/50 text-gray-300 text-sm">
                     <SelectValue placeholder="Template" />
                   </SelectTrigger>
                   <SelectContent className="bg-gray-800 border-gray-700">
