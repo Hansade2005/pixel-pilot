@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import {
   ArrowUp,
   Plus,
@@ -687,28 +688,46 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                 </div>
 
                 <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700/50 hover:border-blue-500/50 transition-colors">
-                  <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-blue-400 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                   </svg>
-                  <input
-                    type="url"
+                  <textarea
                     placeholder="🌐 Clone any website - paste URL here (e.g., https://bbc.com)"
                     value={attachedUrl}
-                    onChange={(e) => setAttachedUrl(e.target.value)}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      setAttachedUrl(newValue);
+                      const textarea = e.target as HTMLTextAreaElement;
+                      
+                      // Auto-resize behavior like chat-panel.tsx
+                      textarea.style.height = '48px';
+                      const newHeight = Math.min(textarea.scrollHeight, 140);
+                      textarea.style.height = newHeight + 'px';
+                      textarea.style.overflowY = textarea.scrollHeight > 140 ? 'auto' : 'hidden';
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
-                        e.preventDefault()
-                        handleUrlAttachment()
+                        e.preventDefault();
+                        handleUrlAttachment();
                       }
                     }}
-                    className="flex-1 bg-transparent outline-none text-sm text-gray-300 placeholder-gray-500"
+                    className="flex-1 bg-transparent outline-none text-sm text-gray-300 placeholder-gray-500 resize-none min-h-[48px] max-h-[140px] leading-[1.5] py-1"
                     disabled={isGenerating}
+                    rows={1}
+                    style={{
+                      height: '48px',
+                      minHeight: '48px',
+                      maxHeight: '140px',
+                      overflowY: 'hidden',
+                      resize: 'none',
+                      boxSizing: 'border-box'
+                    }}
                     autoFocus
                   />
                   <button
                     type="button"
                     onClick={() => setShowUrlInput(false)}
-                    className="text-gray-400 hover:text-white transition-colors"
+                    className="text-gray-400 hover:text-white transition-colors mt-1"
                     title="Close URL input"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
