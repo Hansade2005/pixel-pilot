@@ -28,7 +28,7 @@ export function Button({ children, onClick }) {
       title: "Create Component",
       result: "✓ Component created successfully",
       file: "components/Button.tsx",
-      preview: `<button class="px-4 py-2 bg-blue-500 text-white rounded">Click me</button>`,
+      preview: `<button style="padding: 1rem; background-color: rgb(59 130 246); color: white; border-radius: 0.25rem;">Click me</button>`,
       message: "AI: Generated a new Button component with click handler."
     },
     {
@@ -48,8 +48,8 @@ export function Button({ children, variant = 'primary', onClick }) {
       title: "Enhance Component",
       result: "✓ Component enhanced with variants",
       file: "components/Button.tsx",
-      preview: `<button class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded">Primary</button>
-<button class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded">Secondary</button>`,
+      preview: `<button style="padding: 1rem; background-color: rgb(59 130 246); color: white; border-radius: 0.25rem; margin-right: 0.5rem;">Primary</button>
+<button style="padding: 1rem; background-color: rgb(107 114 128); color: white; border-radius: 0.25rem;">Secondary</button>`,
       message: "AI: Added variant props and hover effects."
     },
     {
@@ -66,10 +66,10 @@ export function Form({ onSubmit }) {
       title: "Build Form",
       result: "✓ Form component created",
       file: "components/Form.tsx",
-      preview: `<form class="space-y-4">
-  <input type="text" placeholder="Name" class="w-full px-3 py-2 border rounded" />
-  <input type="email" placeholder="Email" class="w-full px-3 py-2 border rounded" />
-  <button class="px-4 py-2 bg-blue-500 text-white rounded">Submit</button>
+      preview: `<form style="display: flex; flex-direction: column; gap: 1rem;">
+  <input type="text" placeholder="Name" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 0.25rem;" />
+  <input type="email" placeholder="Email" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 0.25rem;" />
+  <button style="padding: 1rem; background-color: rgb(59 130 246); color: white; border-radius: 0.25rem;">Submit</button>
 </form>`,
       message: "AI: Created a Form component with inputs and submit button."
     },
@@ -86,12 +86,12 @@ export default function App() {
       title: "Integrate UI",
       result: "✓ UI integrated successfully",
       file: "App.tsx",
-      preview: `<div class="p-8">
-  <h1 class="text-2xl mb-4">My App</h1>
-  <form class="space-y-4">
-    <input type="text" placeholder="Name" class="w-full px-3 py-2 border rounded" />
-    <input type="email" placeholder="Email" class="w-full px-3 py-2 border rounded" />
-    <button class="px-4 py-2 bg-blue-500 text-white rounded">Submit</button>
+      preview: `<div style="padding: 2rem;">
+  <h1 style="font-size: 1.5rem; margin-bottom: 1rem;">My App</h1>
+  <form style="display: flex; flex-direction: column; gap: 1rem;">
+    <input type="text" placeholder="Name" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 0.25rem;" />
+    <input type="email" placeholder="Email" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 0.25rem;" />
+    <button style="padding: 1rem; background-color: rgb(59 130 246); color: white; border-radius: 0.25rem;">Submit</button>
   </form>
 </div>`,
       message: "AI: Integrated all components into the main App."
@@ -208,7 +208,7 @@ export default function App() {
     <div className="w-full max-w-7xl mx-auto px-4">
       <Card className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-slate-700 shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 bg-slate-800/50 border-b border-slate-700">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 bg-slate-800/50 border-b border-slate-700 gap-2 sm:gap-0">
           <div className="flex items-center gap-2">
             <div className="flex gap-1.5">
               <div className="w-3 h-3 rounded-full bg-red-500/80" />
@@ -233,9 +233,9 @@ export default function App() {
         </div>
 
         {/* Main Layout */}
-        <div className="grid grid-cols-12 gap-4 p-4 min-h-[500px]">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 min-h-[500px]">
           {/* File Explorer Sidebar */}
-          <div className="col-span-3 bg-slate-950/50 border border-slate-700 rounded-lg p-3">
+          <div className="col-span-12 md:col-span-3 bg-slate-950/50 border border-slate-700 rounded-lg p-3">
             <div className="flex items-center gap-2 mb-3">
               <FolderOpen className="h-4 w-4 text-slate-400" />
               <span className="text-xs text-slate-300 font-mono">Files</span>
@@ -254,56 +254,20 @@ export default function App() {
           </div>
 
           {/* Code Editor */}
-          <div className="col-span-5 bg-slate-950/50 border border-slate-700 rounded-lg p-4">
+          <div className="col-span-12 md:col-span-5 bg-slate-950/50 border border-slate-700 rounded-lg p-4">
             <div className="mb-2 flex items-center gap-2">
               <span className="text-xs text-slate-500 font-mono">TypeScript</span>
               <span className="text-xs text-slate-600">•</span>
               <span className="text-xs text-slate-500">Line {displayedCode.split('\n').length}</span>
             </div>
-            <pre className="font-mono text-sm leading-relaxed">
+            <pre className="font-mono text-sm leading-relaxed overflow-x-auto">
               <code>
                 {displayedCode.split('\n').map((line, i) => (
                   <div key={i} className="flex">
                     <span className="text-slate-600 mr-4 select-none w-4 text-right">{i + 1}</span>
-                    <span className="text-slate-200">
-                      {line.includes('//') ? (
-                        <>
-                          <span className="text-emerald-400">{line.split('//')[0]}</span>
-                          <span className="text-slate-500 italic">//{line.split('//')[1]}</span>
-                        </>
-                      ) : line.includes('export') ? (
-                        <>
-                          <span className="text-purple-400">export </span>
-                          <span className="text-blue-300">{line.replace('export ', '')}</span>
-                        </>
-                      ) : line.includes('import') ? (
-                        <>
-                          <span className="text-purple-400">import </span>
-                          <span className="text-blue-300">{line.replace('import ', '')}</span>
-                        </>
-                      ) : line.includes('function') ? (
-                        <>
-                          <span className="text-purple-400">function </span>
-                          <span className="text-yellow-300">{line.split(' ')[1]}</span>
-                          <span className="text-slate-300">{line.replace(`function ${line.split(' ')[1]}`, '')}</span>
-                        </>
-                      ) : line.includes('return') ? (
-                        <>
-                          <span className="text-purple-400">return </span>
-                          <span className="text-slate-300">{line.replace('return ', '')}</span>
-                        </>
-                      ) : line.includes('<') ? (
-                        <span className="text-green-400">{line}</span>
-                      ) : line.includes("'") ? (
-                        <>
-                          <span className="text-slate-300">{line.split("'")[0]}</span>
-                          <span className="text-green-400">'{line.split("'")[1]}'</span>
-                          <span className="text-slate-300">{line.split("'")[2]}</span>
-                        </>
-                      ) : (
-                        <span className="text-slate-300">{line}</span>
-                      )}
-                    </span>
+          <span className="text-slate-200">
+            {highlightLine(line)}
+          </span>
                   </div>
                 ))}
                 {displayedCode.length > 0 && !showResult && (
@@ -314,16 +278,16 @@ export default function App() {
           </div>
 
           {/* Preview and Messaging */}
-          <div className="col-span-4 space-y-4">
+          <div className="col-span-12 md:col-span-4 space-y-4">
             {/* Preview */}
             <div className="bg-slate-950/50 border border-slate-700 rounded-lg p-3">
               <div className="flex items-center gap-2 mb-3">
                 <Eye className="h-4 w-4 text-slate-400" />
                 <span className="text-xs text-slate-300 font-mono">Preview</span>
               </div>
-              <div className="bg-white p-4 rounded border text-xs overflow-auto max-h-40">
+              <div className="bg-white p-4 rounded border text-xs overflow-auto overflow-x-auto max-h-40">
                 {preview ? (
-                  <div dangerouslySetInnerHTML={{ __html: preview.replace(/class=/g, 'className=') }} />
+                  <div dangerouslySetInnerHTML={{ __html: preview }} />
                 ) : (
                   <div className="text-slate-500">No preview yet...</div>
                 )}
