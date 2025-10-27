@@ -796,7 +796,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                     <SelectItem value="vite-react" className="text-gray-300 focus:bg-gray-700 focus:text-white">
                       <div className="flex items-center gap-2">
                         <Zap className="w-3 h-3 text-purple-400" />
-                        <span>Vite (Default)</span>
+                        <span>Vite</span>
                       </div>
                     </SelectItem>
                     <SelectItem value="nextjs" className="text-gray-300 focus:bg-gray-700 focus:text-white">
