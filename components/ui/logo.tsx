@@ -10,7 +10,7 @@ interface LogoProps {
 export function Logo({ size = 'md', variant = 'icon', className }: LogoProps) {
   const sizeClasses = {
     sm: 'h-6 w-6',
-    md: 'h-[22px] w-[22px]',
+    md: 'h-[50px] w-[50px]',
     lg: 'h-12 w-12',
     xl: 'h-16 w-16'
   }
