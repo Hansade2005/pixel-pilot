@@ -1613,25 +1613,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 <SelectTrigger id="template">
                   <SelectValue placeholder="Select a template..." />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="vite-react">
-                    <div className="flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-purple-500" />
-                      <div>
-                        <div className="font-medium">Vite + React</div>
-                        <div className="text-xs text-muted-foreground">Fast, modern build tool (Recommended)</div>
-                      </div>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="nextjs">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">▲</span>
-                      <div>
-                        <div className="font-medium">Next.js</div>
-                        <div className="text-xs text-muted-foreground">React framework with SSR</div>
-                      </div>
-                    </div>
-                  </SelectItem>
+                <SelectContent className="z-[110]">
+                  <SelectItem value="vite-react">Vite</SelectItem>
+                  <SelectItem value="nextjs">Next.js</SelectItem>
                 </SelectContent>
               </Select>
             </div>

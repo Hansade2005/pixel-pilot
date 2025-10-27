@@ -260,25 +260,9 @@ export function ProjectHeader({
                     <SelectTrigger id="template">
                       <SelectValue placeholder="Select a template..." />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="vite-react">
-                        <div className="flex items-center gap-2">
-                          <Zap className="w-4 h-4 text-purple-500" />
-                          <div>
-                            <div className="font-medium">Vite + React</div>
-                            <div className="text-xs text-muted-foreground">Fast, modern build tool (Recommended)</div>
-                          </div>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="nextjs">
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">▲</span>
-                          <div>
-                            <div className="font-medium">Next.js</div>
-                            <div className="text-xs text-muted-foreground">React framework with SSR</div>
-                          </div>
-                        </div>
-                      </SelectItem>
+                    <SelectContent className="z-[110]">
+                      <SelectItem value="vite-react">Vite</SelectItem>
+                      <SelectItem value="nextjs">Next.js</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -391,7 +375,19 @@ export function ProjectHeader({
                   onChange={(e) => setNewProjectDescription(e.target.value)}
                 />
               </div>
-            </div>
+              <div>
+                <Label htmlFor="template">Template</Label>
+                <Select value={selectedTemplate} onValueChange={(value: 'vite-react' | 'nextjs') => setSelectedTemplate(value)}>
+                  <SelectTrigger id="template">
+                    <SelectValue placeholder="Select a template..." />
+                  </SelectTrigger>
+                  <SelectContent className="z-[110]">
+                    <SelectItem value="vite-react">Vite</SelectItem>
+                    <SelectItem value="nextjs">Next.js</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             <DialogFooter>
               <Button onClick={handleCreateProject} disabled={!newProjectName.trim() || isCreating}>
                 {isCreating ? "Creating..." : "Create Project"}

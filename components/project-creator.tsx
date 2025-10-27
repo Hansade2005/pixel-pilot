@@ -8,8 +8,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
-import { Loader2, Plus, Sparkles } from 'lucide-react'
+import { Loader2, Plus, Sparkles, Zap } from 'lucide-react'
 import { dbManager } from '@/lib/indexeddb'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface ProjectCreatorProps {
   onProjectCreated?: (project: any) => void
@@ -18,6 +19,7 @@ interface ProjectCreatorProps {
 
 export default function ProjectCreator({ onProjectCreated, onCancel }: ProjectCreatorProps) {
   const [isCreating, setIsCreating] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs'>('vite-react')
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -54,9 +56,13 @@ export default function ProjectCreator({ onProjectCreated, onCancel }: ProjectCr
         deploymentStatus: 'not_deployed',
         slug
       })
-      // Apply template files
+      // Apply template files based on selection
       const { TemplateService } = await import('@/lib/template-service')
-      await TemplateService.applyViteReactTemplate(workspace.id)
+      if (selectedTemplate === 'nextjs') {
+        await TemplateService.applyNextJSTemplate(workspace.id)
+      } else {
+        await TemplateService.applyViteReactTemplate(workspace.id)
+      }
       toast({
         title: "Success!",
         description: "Project created and persisted successfully.",
@@ -92,7 +98,7 @@ export default function ProjectCreator({ onProjectCreated, onCancel }: ProjectCr
           Create New Project
         </CardTitle>
         <CardDescription>
-          Create a new project with the Vite React + TypeScript + Tailwind CSS template
+          Create a new project with your chosen framework template
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -120,6 +126,19 @@ export default function ProjectCreator({ onProjectCreated, onCancel }: ProjectCr
             />
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="template">Template</Label>
+            <Select value={selectedTemplate} onValueChange={(value: 'vite-react' | 'nextjs') => setSelectedTemplate(value)} disabled={isCreating}>
+              <SelectTrigger id="template">
+                <SelectValue placeholder="Select a template..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="vite-react">Vite</SelectItem>
+                <SelectItem value="nextjs">Next.js</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="flex items-center space-x-2">
             <Checkbox
               id="isPublic"
@@ -135,10 +154,13 @@ export default function ProjectCreator({ onProjectCreated, onCancel }: ProjectCr
           <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-lg">
             <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
               <Sparkles className="h-4 w-4" />
-              <span className="font-medium">Template Included:</span>
+              <span className="font-medium">What's Included:</span>
             </div>
             <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-              Vite React + TypeScript + Tailwind CSS with AI development guidelines
+              {selectedTemplate === 'nextjs' 
+                ? 'Next.js + TypeScript + Tailwind CSS with AI development guidelines'
+                : 'Vite React + TypeScript + Tailwind CSS with AI development guidelines'
+              }
             </p>
           </div>
 
