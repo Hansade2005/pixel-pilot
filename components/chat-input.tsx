@@ -657,7 +657,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                 <div className="mt-2 p-2 bg-blue-900/20 border border-blue-700/30 rounded text-sm text-blue-300">
                       <div className="flex items-center gap-2">
                         <AlertTriangle className="h-4 w-4" />
-                    <span>Free plan: Limited prompts and GitHub pushes. Upgrade for unlimited access!</span>
+                    <span>Free plan: Limited!</span>
                         <Button
                           size="sm"
                           variant="outline"
@@ -723,7 +723,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                       className="w-8 h-8 rounded-full flex items-center justify-center transition-all bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Attach website URL"
                     >
-                      <Plus className="w-4 h-4" />
+                      <LinkIcon className="w-4 h-4" />
                     </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-80 p-4 z-[70]" side="top" align="start">
