@@ -20,11 +20,6 @@ import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { useSubscriptionCache } from "@/hooks/use-subscription-cache"
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -49,7 +44,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   const [suggestions, setSuggestions] = useState<PromptSuggestion[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [isEnhancing, setIsEnhancing] = useState(false)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -68,8 +63,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
   // URL attachment state
   const [attachedUrl, setAttachedUrl] = useState("")
-  const [showUrlDialog, setShowUrlDialog] = useState(false)
-  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
+  const [showUrlInput, setShowUrlInput] = useState(false)
 
   // Fetch user on mount
   useEffect(() => {
@@ -152,6 +146,13 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       console.error('Failed to enhance prompt:', error)
     } finally {
       setIsEnhancing(false)
+    }
+  }
+
+  // URL attachment handler
+  const handleUrlAttachment = () => {
+    if (attachedUrl.trim()) {
+      setShowUrlInput(false)
     }
   }
 
@@ -590,214 +591,265 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      {/* Main Chat Input - Lovable Style */}
+      {/* Main Chat Input */}
       <div className="relative">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-2 flex items-start">
-          {/* Left side - Enhance button at extreme top left */}
-          <div className="absolute -top-1 -left-1 z-10">
-            <button 
-              type="button"
-              onClick={handlePromptEnhancement}
-              disabled={!prompt.trim() || isEnhancing || isGenerating}
-              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                isEnhancing
-                  ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
-                  : 'bg-gray-200 dark:bg-gray-700 hover:bg-gradient-to-r hover:from-purple-600/80 hover:to-blue-600/80 text-gray-600 dark:text-gray-400 hover:text-white'
-              }`}
-              title="Enhance prompt with AI"
-            >
-              {isEnhancing ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Sparkles className="w-4 h-4" />
-              )}
-            </button>
-          </div>
+        <div className="bg-gray-800/80 chat-input-container border border-gray-700/50 rounded-2xl p-4 shadow-2xl">
+          {/* Loading Overlay */}
+          {isGenerating && (
+            <div className="absolute inset-0 bg-gray-800/96 backdrop-blur-sm rounded-2xl flex items-center justify-center z-20 border border-gray-700/50">
+              <div className="flex items-center gap-3 text-white">
+                <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-lg font-medium">PiPilot is working...</span>
+              </div>
+            </div>
+          )}
 
-          {/* Plan badge spanning after enhance */}
+          {/* Subscription Status Display */}
           {!subscriptionLoading && subscription && (
-            <div className="absolute -top-1 left-10 z-10 flex items-center gap-2">
-              {subscription.plan === 'pro' ? (
-                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 text-xs font-medium">
-                  <Crown className="h-3 w-3" />
-                  <span>Pro</span>
+            <div className="mb-4 p-3 rounded-lg bg-gray-700/30 border border-gray-600/30">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Crown className="h-4 w-4 text-purple-400" />
+                  <span className="text-sm text-gray-300">
+                    {subscription.plan === 'pro' ? 'Unlimited prompts (Pro)' :
+                     subscription.plan === 'enterprise' ? 'Unlimited prompts (Enterprise)' :
+                     'Limited prompts (Free)'}
+                  </span>
                 </div>
-              ) : subscription.plan === 'enterprise' ? (
-                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-medium">
-                  <Crown className="h-3 w-3" />
-                  <span>Enterprise</span>
+
+                <div className="flex items-center gap-2">
+                  {subscription.plan === 'pro' ? (
+                    <div className="flex items-center gap-1 text-purple-400">
+                      <Crown className="h-3 w-3" />
+                      <span className="text-xs">Pro</span>
+                    </div>
+                  ) : subscription.plan === 'enterprise' ? (
+                    <div className="flex items-center gap-1 text-blue-400">
+                      <Crown className="h-3 w-3" />
+                      <span className="text-xs">Enterprise</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 text-gray-400">
+                      <Crown className="h-3 w-3" />
+                      <span className="text-xs">Free</span>
+                        </div>
+                  )}
+                  <span className="text-xs text-gray-500 capitalize">
+                    {subscription.plan} plan
+                  </span>
                 </div>
-              ) : (
-                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-medium">
-                  <Crown className="h-3 w-3" />
-                  <span>Free</span>
-                </div>
+              </div>
+
+              {/* Free plan limitations warning */}
+              {subscription.plan === 'free' && (
+                <div className="mt-2 p-2 bg-blue-900/20 border border-blue-700/30 rounded text-sm text-blue-300">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4" />
+                    <span>Free plan: Limited prompts and GitHub pushes. Upgrade for unlimited access!</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                      className="ml-auto text-blue-300 border-blue-700/50 hover:bg-blue-900/30"
+                          onClick={() => router.push('/pricing')}
+                        >
+                          Upgrade
+                        </Button>
+                      </div>
+                    </div>
               )}
             </div>
           )}
 
-          <textarea
-            ref={inputRef}
-            placeholder={isGenerating ? "PiPilot is working..." : "Ask PiPilot to create an app..."}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="flex-grow bg-transparent border-none focus:ring-0 resize-none text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-500 p-3 pt-4"
-            rows={3}
-            disabled={isGenerating}
-          />
-
-          <div className="flex flex-col justify-between items-center h-full ml-2">
-            {/* Attachment Popover */}
-            <Popover open={showAttachmentMenu} onOpenChange={setShowAttachmentMenu}>
-              <PopoverTrigger asChild>
-                <button className="bg-gray-200 dark:bg-gray-700 rounded-full w-8 h-8 flex items-center justify-center text-gray-600 dark:text-gray-400 mb-auto hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
-                  <Plus className="w-4 h-4" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-48 p-2 z-[70]" side="top" align="end">
-                <div className="flex flex-col gap-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start"
-                    onClick={() => {
-                      setShowUrlDialog(true)
-                      setShowAttachmentMenu(false)
-                    }}
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                    </svg>
-                    URL
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-
-            {/* Send Button */}
-            <button 
-              type="submit" 
-              disabled={!prompt.trim() || isGenerating}
-              className="bg-gray-800 dark:bg-gray-200 rounded-full w-8 h-8 flex items-center justify-center text-white dark:text-gray-800 mt-2 hover:bg-gray-700 dark:hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={handleSubmit}
-            >
-              {isGenerating ? (
-                <Square className="w-4 h-4" />
-              ) : (
-                <ArrowUp className="w-4 h-4" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* URL Dialog */}
-        {showUrlDialog && (
-          <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-              </svg>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Input Field */}
+            <div className="relative">
               <input
-                type="url"
-                placeholder="Paste website URL here (e.g., https://example.com)"
-                value={attachedUrl}
-                onChange={(e) => setAttachedUrl(e.target.value)}
-                className="flex-1 bg-transparent outline-none text-sm text-gray-700 dark:text-gray-300 placeholder-gray-500"
-                autoFocus
+                type="text"
+                ref={inputRef}
+                placeholder={isGenerating ? "PiPilot is working..." : "Describe your app idea..."}
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="w-full bg-transparent outline-none text-lg text-white placeholder-gray-400 py-3 px-4"
+                disabled={isGenerating}
               />
-              <button
-                type="button"
-                onClick={() => {
-                  setShowUrlDialog(false)
-                  setAttachedUrl("")
-                }}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                title="Cancel"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
             </div>
-            {attachedUrl && (
-              <div className="mt-2 text-xs text-green-600 dark:text-green-400">
-                URL attached: {attachedUrl}
+
+            {/* URL Attachment Input/Display */}
+            {showUrlInput && !attachedUrl && (
+              <div className="relative">
+                {/* Blinking NEW Badge */}
+                <div className="absolute -top-2 left-2 z-10">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 text-white shadow-lg new-badge-blink new-badge-shine">
+                    <Sparkles className="w-2.5 h-2.5 sparkle-rotate" />
+                    NEW
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700/50 hover:border-blue-500/50 transition-colors">
+                  <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                  <input
+                    type="url"
+                    placeholder="🌐 Clone any website - paste URL here (e.g., https://bbc.com)"
+                    value={attachedUrl}
+                    onChange={(e) => setAttachedUrl(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleUrlAttachment()
+                      }
+                    }}
+                    className="flex-1 bg-transparent outline-none text-sm text-gray-300 placeholder-gray-500"
+                    disabled={isGenerating}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowUrlInput(false)}
+                    className="text-gray-400 hover:text-white transition-colors"
+                    title="Close URL input"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             )}
-          </div>
-        )}
 
-        {/* Loading Overlay */}
-        {isGenerating && (
-          <div className="absolute inset-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-2xl flex items-center justify-center z-20">
-            <div className="flex items-center gap-3 text-gray-900 dark:text-white">
-              <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-lg font-medium">PiPilot is working...</span>
-            </div>
-          </div>
-        )}
-      </div>
+            {/* URL Attachment Display */}
+            {attachedUrl && (
+              <div className="relative">
+                {/* Blinking NEW Badge */}
+                <div className="absolute -top-2 left-2 z-10">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 text-white shadow-lg new-badge-blink new-badge-shine">
+                    <Sparkles className="w-2.5 h-2.5 sparkle-rotate" />
+                    NEW
+                  </span>
+                </div>
 
-      {/* Framework Template Selector and Mic - positioned below */}
-      <div className="flex items-center justify-between mt-3 px-2">
-        <div className="flex items-center space-x-3">
-          {/* Mic Button */}
-          <button 
-            type="button"
-            onClick={handleMicrophoneClick}
-            disabled={isTranscribing || isGenerating}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-              isRecording 
-                ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse' 
-                : isTranscribing
-                ? 'bg-gray-600/50 cursor-wait'
-                : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
-            title={isRecording ? "Stop recording" : isTranscribing ? "Transcribing..." : "Start voice input"}
-          >
-            {isTranscribing ? (
-              <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-            ) : isRecording ? (
-              <MicOff className="w-4 h-4" />
-            ) : (
-              <Mic className="w-4 h-4" />
+                <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                  <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                  <span className="flex-1 text-sm text-gray-300 truncate">{attachedUrl}</span>
+                  <button
+                    type="button"
+                    onClick={() => setAttachedUrl("")}
+                    className="text-gray-400 hover:text-white transition-colors"
+                    title="Remove URL"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
             )}
-          </button>
 
-          {/* Template Selector */}
-          <Select
-            value={selectedTemplate}
-            onValueChange={(value: 'vite-react' | 'nextjs') => setSelectedTemplate(value)}
-            disabled={isGenerating}
-          >
-            <SelectTrigger className="w-[140px] h-8 bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm">
-              <SelectValue placeholder="Template" />
-            </SelectTrigger>
-            <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600">
-              <SelectItem value="vite-react" className="text-gray-700 dark:text-gray-300 focus:bg-gray-100 dark:focus:bg-gray-700 focus:text-gray-900 dark:focus:text-white">
-                <div className="flex items-center gap-2">
-                  <Zap className="w-3 h-3 text-purple-500" />
-                  <span>Vite</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="nextjs" className="text-gray-700 dark:text-gray-300 focus:bg-gray-100 dark:focus:bg-gray-700 focus:text-gray-900 dark:focus:text-white">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">▲</span>
-                  <span>Next.js</span>
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
+            {/* Bottom Bar with Buttons */}
+            <div className="flex items-center justify-between pt-2 border-t border-gray-700/50">
+              {/* Left Side - Attachment, Mic and Template Selector */}
+              <div className="flex items-center space-x-3">
+                {/* URL Attachment Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setShowUrlInput(!showUrlInput)}
+                  disabled={isGenerating}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                    showUrlInput
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                      : 'bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-white'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  title="Attach website URL"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleMicrophoneClick}
+                  disabled={isTranscribing || isGenerating}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                    isRecording
+                      ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse'
+                      : isTranscribing
+                      ? 'bg-gray-600/50 cursor-wait'
+                      : 'bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-white'
+                  }`}
+                  title={isRecording ? "Stop recording" : isTranscribing ? "Transcribing..." : "Start voice input"}
+                >
+                  {isTranscribing ? (
+                    <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  ) : isRecording ? (
+                    <MicOff className="w-4 h-4" />
+                  ) : (
+                    <Mic className="w-4 h-4" />
+                  )}
+                </button>
+
+                {/* Template Selector */}
+                <Select
+                  value={selectedTemplate}
+                  onValueChange={(value: 'vite-react' | 'nextjs') => setSelectedTemplate(value)}
+                  disabled={isGenerating}
+                >
+                  <SelectTrigger className="w-[140px] h-8 bg-gray-700/50 border-gray-600/50 text-gray-300 text-sm">
+                    <SelectValue placeholder="Template" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-700">
+                    <SelectItem value="vite-react" className="text-gray-300 focus:bg-gray-700 focus:text-white">
+                      <div className="flex items-center gap-2">
+                        <Zap className="w-3 h-3 text-purple-400" />
+                        <span>Vite (Default)</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="nextjs" className="text-gray-300 focus:bg-gray-700 focus:text-white">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">▲</span>
+                        <span>Next.js</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Right Side - Enhance and Send Buttons */}
+              <div className="flex items-center space-x-3">
+                <button 
+                  type="button"
+                  onClick={handlePromptEnhancement}
+                  disabled={!prompt.trim() || isEnhancing || isGenerating}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isEnhancing
+                      ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
+                      : 'bg-gray-700/50 hover:bg-gradient-to-r hover:from-purple-600/80 hover:to-blue-600/80 text-gray-400 hover:text-white'
+                  }`}
+                  title="Enhance prompt with AI"
+                >
+                  {isEnhancing ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4" />
+                  )}
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={!prompt.trim() || isGenerating}
+                  className="w-8 h-8 rounded-full bg-gray-700/50 hover:bg-gray-600/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                >
+                  {isGenerating ? (
+                    <Square className="w-4 h-4" />
+                  ) : (
+                    <ArrowUp className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+          </form>
         </div>
-
-        {/* Free plan limitations warning */}
-        {!subscriptionLoading && subscription && subscription.plan === 'free' && (
-          <div className="text-xs text-gray-500 dark:text-gray-400 max-w-xs">
-            Free plan: Limited prompts. <button onClick={() => router.push('/pricing')} className="text-blue-500 hover:underline">Upgrade</button>
-          </div>
-        )}
       </div>
 
       {/* Suggestion Pills */}
