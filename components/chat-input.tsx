@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import {
   ArrowUp,
   Plus,
@@ -13,7 +14,9 @@ import {
   Mic,
   MicOff,
   Square,
-  Sparkles
+  Sparkles,
+  Link as LinkIcon,
+  X
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -26,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Suggestions, Suggestion } from "@/components/ai-elements/suggestion"
 
 interface ChatInputProps {
@@ -44,7 +48,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   const [suggestions, setSuggestions] = useState<PromptSuggestion[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [isEnhancing, setIsEnhancing] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const router = useRouter()
   const supabase = createClient()
 
@@ -63,6 +67,8 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
   // URL attachment state
   const [attachedUrl, setAttachedUrl] = useState("")
+  const [showUrlPopover, setShowUrlPopover] = useState(false)
+  const [urlInput, setUrlInput] = useState("")
 
   // Fetch user on mount
   useEffect(() => {
@@ -574,7 +580,21 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleUrlAttachment = () => {
+    if (urlInput.trim()) {
+      setAttachedUrl(urlInput.trim())
+      setUrlInput("")
+      setShowUrlPopover(false)
+      toast.success("URL attached successfully!")
+    }
+  }
+
+  const handleRemoveUrl = () => {
+    setAttachedUrl("")
+    toast.success("URL removed")
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSubmit(e as any)
@@ -653,61 +673,94 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Input Field */}
+            {/* Input Field - Auto-expanding textarea */}
             <div className="relative">
-              <input
-                type="text"
+              <textarea
                 ref={inputRef}
                 placeholder={isGenerating ? "PiPilot is working..." : "Describe your app idea..."}
                 value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
+                onChange={(e) => {
+                  setPrompt(e.target.value)
+                  // Auto-resize textarea
+                  const textarea = e.target as HTMLTextAreaElement
+                  textarea.style.height = 'auto'
+                  textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px'
+                }}
                 onKeyDown={handleKeyDown}
-                className="w-full bg-transparent outline-none text-lg text-white placeholder-gray-400 py-3 px-4"
+                className="w-full bg-transparent outline-none text-lg text-white placeholder-gray-400 py-3 px-4 resize-none overflow-y-auto min-h-[60px] max-h-[200px]"
                 disabled={isGenerating}
+                rows={1}
               />
             </div>
 
-            {/* URL Attachment Field */}
-            <div className="relative">
-              {/* Blinking NEW Badge */}
-              <div className="absolute -top-2 left-2 z-10">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 text-white shadow-lg new-badge-blink new-badge-shine">
-                  <Sparkles className="w-2.5 h-2.5 sparkle-rotate" />
-                  NEW
-                </span>
-              </div>
-              
-              <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700/50 hover:border-blue-500/50 transition-colors">
-                <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                </svg>
-                <input
-                  type="url"
-                  placeholder="🌐 Clone any website - paste URL here (e.g., https://bbc.com)"
-                  value={attachedUrl}
-                  onChange={(e) => setAttachedUrl(e.target.value)}
-                  className="flex-1 bg-transparent outline-none text-sm text-gray-300 placeholder-gray-500"
-                  disabled={isGenerating}
-                />
-                {attachedUrl && (
+            {/* URL Attachment Pills */}
+            {attachedUrl && (
+              <div className="flex items-center gap-2 px-4">
+                <div className="flex items-center gap-1 bg-blue-900/20 border border-blue-700/30 px-3 py-1.5 rounded-full text-sm text-blue-300">
+                  <LinkIcon className="w-3 h-3" />
+                  <span className="truncate max-w-[200px]">{attachedUrl}</span>
                   <button
-                    type="button"
-                    onClick={() => setAttachedUrl("")}
-                    className="text-gray-400 hover:text-white transition-colors"
-                    title="Clear URL"
+                    onClick={handleRemoveUrl}
+                    className="ml-1 text-blue-400 hover:text-blue-200 transition-colors"
+                    title="Remove URL"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                    <X className="w-3 h-3" />
                   </button>
-                )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Bottom Bar with Buttons */}
             <div className="flex items-center justify-between pt-2 border-t border-gray-700/50">
-              {/* Left Side - Mic and Template Selector */}
+              {/* Left Side - URL Attachment, Mic and Template Selector */}
               <div className="flex items-center space-x-3">
+                {/* URL Attachment Popover */}
+                <Popover open={showUrlPopover} onOpenChange={setShowUrlPopover}>
+                  <PopoverTrigger asChild>
+                    <button 
+                      type="button"
+                      disabled={isGenerating}
+                      className="w-8 h-8 rounded-full flex items-center justify-center transition-all bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Attach website URL"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-4 z-[70]" side="top" align="start">
+                    <div className="space-y-3">
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-200">Attach Website URL</h4>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Enter a website URL to include its content in your prompt.
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          placeholder="https://example.com"
+                          value={urlInput}
+                          onChange={(e) => setUrlInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              handleUrlAttachment()
+                            }
+                          }}
+                          className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                          autoFocus
+                        />
+                        <button
+                          onClick={handleUrlAttachment}
+                          disabled={!urlInput.trim()}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                        >
+                          Attach
+                        </button>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
                 <button 
                   type="button"
                   onClick={handleMicrophoneClick}
