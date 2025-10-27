@@ -707,7 +707,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                     disabled={isGenerating}
                     rows={2}
                     style={{
-                      height: '64px',
                       minHeight: '64px',
                       maxHeight: '140px',
                       overflowY: 'hidden',
