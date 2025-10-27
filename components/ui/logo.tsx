@@ -66,7 +66,7 @@ export function Logo({ size = 'md', variant = 'icon', className }: LogoProps) {
       <LogoImage className={size === 'sm' ? 'h-8 w-8' : size === 'md' ? 'h-12 w-12' : size === 'lg' ? 'h-16 w-16' : 'h-20 w-20'} />
       <div className="flex flex-col">
         <span className={cn('font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 bg-clip-text text-transparent', textSizes[size])}>
-          Pipilot
+          PiPilot
         </span>
         <span className={cn('text-gray-300 font-medium', size === 'sm' ? 'text-xs' : size === 'md' ? 'text-sm' : size === 'lg' ? 'text-base' : 'text-lg')}>
           AI-Powered App Development
