@@ -34,7 +34,6 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Workspace as Project } from "@/lib/storage-manager"
 import { AuthModal } from "@/components/auth-modal"
-import { ChatDiagnostics } from "./chat-diagnostics"
 import { AiModeSelector, type AIMode } from "@/components/ui/ai-mode-selector"
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai-models"
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
@@ -2929,7 +2928,7 @@ export function ChatPanel({
       {/* Diagnostics Panel */}
       {showDiagnostics && !isMobile && (
         <div className="border-b border-border">
-          <ChatDiagnostics project={project} />
+         
         </div>
       )}
       

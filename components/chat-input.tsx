@@ -687,10 +687,10 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                     placeholder="🌐 Clone any website - paste URL here (e.g., https://bbc.com)"
                     value={attachedUrl}
                     onChange={(e) => {
-                      const newValue = e.target.value;
-                      setAttachedUrl(newValue);
+                      setAttachedUrl(e.target.value);
+                    }}
+                    onInput={(e) => {
                       const textarea = e.target as HTMLTextAreaElement;
-                      
                       // Auto-resize behavior like chat-panel.tsx
                       textarea.style.height = '64px';
                       const newHeight = Math.min(textarea.scrollHeight, 140);
@@ -705,7 +705,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                     }}
                     className="flex-1 bg-transparent outline-none text-sm text-gray-300 placeholder-gray-500 resize-none leading-[1.5] py-2"
                     disabled={isGenerating}
-                    rows={1}
+                    rows={2}
                     style={{
                       height: '64px',
                       minHeight: '64px',
