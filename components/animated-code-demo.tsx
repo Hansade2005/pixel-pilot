@@ -372,7 +372,7 @@ npm run dev`,
             </div>
             <div className="flex items-center gap-2 ml-4">
               <Code className="h-4 w-4 text-slate-400" />
-              <span className="text-sm text-slate-300 font-mono">Vibe Coding Demo</span>
+              <span className="text-sm text-slate-300 font-mono">PiPilot Demo</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -382,7 +382,7 @@ npm run dev`,
             </Badge>
             <Badge variant="outline" className="bg-green-500/10 border-green-500/30 text-green-300 text-xs">
               <Play className="h-3 w-3 mr-1" />
-              Running
+              Working
             </Badge>
           </div>
         </div>
@@ -390,7 +390,7 @@ npm run dev`,
         {/* Main Layout */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 min-h-[500px]">
           {/* File Explorer Sidebar */}
-          <div className="col-span-12 md:col-span-3 bg-slate-950/50 border border-slate-700 rounded-lg p-3">
+          <div className="col-span-12 md:col-span-2 bg-slate-950/50 border border-slate-700 rounded-lg p-3">
             <div className="flex items-center gap-2 mb-3">
               <FolderOpen className="h-4 w-4 text-slate-400" />
               <span className="text-xs text-slate-300 font-mono">Files</span>
@@ -409,7 +409,7 @@ npm run dev`,
           </div>
 
           {/* Code Editor */}
-          <div className="col-span-12 md:col-span-5 bg-slate-950/50 border border-slate-700 rounded-lg p-4">
+          <div className="col-span-12 md:col-span-4 bg-slate-950/50 border border-slate-700 rounded-lg p-4">
             <div className="mb-2 flex items-center gap-2">
               <span className="text-xs text-slate-500 font-mono">TypeScript</span>
               <span className="text-xs text-slate-600">•</span>
@@ -433,7 +433,7 @@ npm run dev`,
           </div>
 
           {/* Preview */}
-          <div className="col-span-12 md:col-span-4 bg-slate-950/50 border border-slate-700 rounded-lg p-3">
+          <div className="col-span-12 md:col-span-6 bg-slate-950/50 border border-slate-700 rounded-lg p-3">
             <div className="flex items-center gap-2 mb-3">
               <Eye className="h-4 w-4 text-slate-400" />
               <span className="text-xs text-slate-300 font-mono">Preview</span>
