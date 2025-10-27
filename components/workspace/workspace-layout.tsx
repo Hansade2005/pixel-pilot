@@ -40,6 +40,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface WorkspaceLayoutProps {
   user: User
@@ -89,6 +90,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newProjectName, setNewProjectName] = useState("")
   const [newProjectDescription, setNewProjectDescription] = useState("")
+  const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs'>('vite-react')
   const [isCreating, setIsCreating] = useState(false)
   const [openProjectHeaderDialog, setOpenProjectHeaderDialog] = useState(false)
   const [projectHeaderInitialName, setProjectHeaderInitialName] = useState("")
@@ -556,6 +558,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       // Reset form when closing
       setNewProjectName("")
       setNewProjectDescription("")
+      setSelectedTemplate('vite-react')
       setHasProcessedInitialPrompt(false) // Allow re-processing if user re-enters prompt
     }
   }
@@ -580,9 +583,13 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         deploymentStatus: 'not_deployed',
         slug
       })
-      // Apply template files
+      // Apply template files based on selection
       const { TemplateService } = await import('@/lib/template-service')
-      await TemplateService.applyViteReactTemplate(workspace.id)
+      if (selectedTemplate === 'nextjs') {
+        await TemplateService.applyNextJSTemplate(workspace.id)
+      } else {
+        await TemplateService.applyViteReactTemplate(workspace.id)
+      }
       // Close dialog and reset form
       setIsCreateDialogOpen(false)
       setNewProjectName("")
@@ -1576,7 +1583,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
 
       {/* Create Project Dialog - available for both desktop and mobile */}
       <Dialog open={isCreateDialogOpen} onOpenChange={handleModalClose}>
-        <DialogContent className="z-50">
+        <DialogContent className="z-[100]">
           <DialogHeader>
             <DialogTitle>Create New Project</DialogTitle>
             <DialogDescription>Start building your next app with AI assistance.</DialogDescription>
@@ -1599,6 +1606,34 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 value={newProjectDescription}
                 onChange={(e) => setNewProjectDescription(e.target.value)}
               />
+            </div>
+            <div>
+              <Label htmlFor="template">Template</Label>
+              <Select value={selectedTemplate} onValueChange={(value: 'vite-react' | 'nextjs') => setSelectedTemplate(value)}>
+                <SelectTrigger id="template">
+                  <SelectValue placeholder="Select a template..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="vite-react">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-purple-500" />
+                      <div>
+                        <div className="font-medium">Vite + React</div>
+                        <div className="text-xs text-muted-foreground">Fast, modern build tool (Recommended)</div>
+                      </div>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="nextjs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">▲</span>
+                      <div>
+                        <div className="font-medium">Next.js</div>
+                        <div className="text-xs text-muted-foreground">React framework with SSR</div>
+                      </div>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

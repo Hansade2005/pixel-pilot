@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Play, GitBranch, Share, Settings, Plus, Rocket, Upload, Database } from "lucide-react"
+import { Play, GitBranch, Share, Settings, Plus, Rocket, Upload, Database, Zap } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import React, { useState, useEffect } from 'react'
@@ -21,6 +21,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface ProjectHeaderProps {
   project: Project | null
@@ -64,6 +65,7 @@ export function ProjectHeader({
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newProjectName, setNewProjectName] = useState("")
   const [newProjectDescription, setNewProjectDescription] = useState("")
+  const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs'>('vite-react')
   const [isCreating, setIsCreating] = useState(false)
   const [gitHubConnected, setGitHubConnected] = useState(false)
 
@@ -105,6 +107,11 @@ export function ProjectHeader({
       if (initialDescription) {
         setNewProjectDescription(initialDescription)
       }
+    } else {
+      // Reset form when dialog closes
+      setNewProjectName("")
+      setNewProjectDescription("")
+      setSelectedTemplate('vite-react')
     }
   }, [initialName, initialDescription, openDialog])
 
@@ -172,9 +179,13 @@ export function ProjectHeader({
         deploymentStatus: 'not_deployed',
         slug
       })
-      // Apply template files
+      // Apply template files based on selection
       const { TemplateService } = await import('@/lib/template-service')
-      await TemplateService.applyViteReactTemplate(workspace.id)
+      if (selectedTemplate === 'nextjs') {
+        await TemplateService.applyNextJSTemplate(workspace.id)
+      } else {
+        await TemplateService.applyViteReactTemplate(workspace.id)
+      }
       // Close dialog and reset form
       setIsCreateDialogOpen(false)
       onDialogOpenChange?.(false)
@@ -242,6 +253,34 @@ export function ProjectHeader({
                     value={newProjectDescription}
                     onChange={(e) => setNewProjectDescription(e.target.value)}
                   />
+                </div>
+                <div>
+                  <Label htmlFor="template">Template</Label>
+                  <Select value={selectedTemplate} onValueChange={(value: 'vite-react' | 'nextjs') => setSelectedTemplate(value)}>
+                    <SelectTrigger id="template">
+                      <SelectValue placeholder="Select a template..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="vite-react">
+                        <div className="flex items-center gap-2">
+                          <Zap className="w-4 h-4 text-purple-500" />
+                          <div>
+                            <div className="font-medium">Vite + React</div>
+                            <div className="text-xs text-muted-foreground">Fast, modern build tool (Recommended)</div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="nextjs">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">▲</span>
+                          <div>
+                            <div className="font-medium">Next.js</div>
+                            <div className="text-xs text-muted-foreground">React framework with SSR</div>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <DialogFooter>
