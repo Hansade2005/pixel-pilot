@@ -2,99 +2,256 @@
 
 import { useEffect, useState } from "react"
 import { Card } from "@/components/ui/card"
-import { CheckCircle, Play, Code, MessageSquare, FileText, Eye, FolderOpen, Plus } from "lucide-react"
+import { CheckCircle, Play, Code, FileText, Eye, FolderOpen, Plus } from "lucide-react"
 
 export function AnimatedCodeDemo() {
   const [step, setStep] = useState(0)
   const [displayedCode, setDisplayedCode] = useState("")
   const [showResult, setShowResult] = useState(false)
   const [cursorBlink, setCursorBlink] = useState(true)
-  const [messages, setMessages] = useState<string[]>([])
   const [fileExplorer, setFileExplorer] = useState<string[]>([])
   const [preview, setPreview] = useState<string>("")
 
   const codeSteps = [
     {
-      code: `// Create a new React component
-import React from 'react';
+      code: `// Initialize Vite project
+npm create vite@latest landing-page -- --template react
+cd landing-page
+npm install`,
+      title: "Setup Project",
+      result: "✓ Vite project created successfully",
+      file: "package.json",
+      preview: `<div style="padding: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 0.5rem;">
+  <h1 style="font-size: 2rem; margin-bottom: 1rem;">🚀 Project Initialized</h1>
+  <p>Landing page project created with Vite + React</p>
+</div>`,
+      message: "AI: Created new Vite React project for stunning landing page."
+    },
+    {
+      code: `// Create Hero component
+export function Hero() {
+  return (
+    <section className="py-20 px-6 text-center bg-gradient-to-br from-purple-600 to-blue-600">
+      <h1 className="text-5xl font-bold mb-6">Build Amazing Apps</h1>
+      <p className="text-xl mb-8">Create stunning user experiences with modern tools</p>
+      <button className="px-8 py-4 bg-white text-purple-600 rounded-full font-semibold">
+        Get Started
+      </button>
+    </section>
+  );
+}`,
+      title: "Create Hero",
+      result: "✓ Hero component created",
+      file: "components/Hero.tsx",
+      preview: `<section style="padding: 5rem 1.5rem; text-align: center; background: linear-gradient(135deg, rgb(147 51 234) 0%, rgb(37 99 235) 100%); color: white; border-radius: 0.5rem;">
+  <h1 style="font-size: 3rem; font-weight: bold; margin-bottom: 1.5rem;">Build Amazing Apps</h1>
+  <p style="font-size: 1.25rem; margin-bottom: 2rem;">Create stunning user experiences with modern tools</p>
+  <button style="padding: 1rem 2rem; background-color: white; color: rgb(147 51 234); border-radius: 9999px; font-weight: 600;">Get Started</button>
+</section>`,
+      message: "AI: Created stunning Hero section with gradient background."
+    },
+    {
+      code: `// Create Navigation component
+export function Navigation() {
+  return (
+    <nav className="flex justify-between items-center p-6 bg-white shadow-lg">
+      <div className="text-2xl font-bold text-purple-600">AppName</div>
+      <div className="space-x-6">
+        <a href="#" className="text-gray-600 hover:text-purple-600">Home</a>
+        <a href="#" className="text-gray-600 hover:text-purple-600">Features</a>
+        <a href="#" className="text-gray-600 hover:text-purple-600">Contact</a>
+      </div>
+    </nav>
+  );
+}`,
+      title: "Create Navigation",
+      result: "✓ Navigation component created",
+      file: "components/Navigation.tsx",
+      preview: `<nav style="display: flex; justify-content: space-between; align-items: center; padding: 1.5rem; background-color: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-radius: 0.5rem;">
+  <div style="font-size: 1.5rem; font-weight: bold; color: rgb(147 51 234);">AppName</div>
+  <div style="display: flex; gap: 1.5rem;">
+    <a href="#" style="color: rgb(75 85 99); text-decoration: none;">Home</a>
+    <a href="#" style="color: rgb(75 85 99); text-decoration: none;">Features</a>
+    <a href="#" style="color: rgb(75 85 99); text-decoration: none;">Contact</a>
+  </div>
+</nav>`,
+      message: "AI: Created responsive navigation with hover effects."
+    },
+    {
+      code: `// Create Features component
+export function Features() {
+  const features = [
+    { title: 'Fast Performance', desc: 'Lightning fast loading times' },
+    { title: 'Modern Design', desc: 'Beautiful and responsive UI' },
+    { title: 'Easy Integration', desc: 'Simple setup and deployment' }
+  ];
 
-export function Button({ children, onClick }) {
   return (
-    <button onClick={onClick} className="px-4 py-2 bg-blue-500 text-white rounded">
-      {children}
-    </button>
+    <section className="py-16 px-6">
+      <div className="grid md:grid-cols-3 gap-8">
+        {features.map((feature, index) => (
+          <div key={index} className="text-center p-6 bg-gray-50 rounded-lg">
+            <h3 className="text-xl font-semibold mb-3">{feature.title}</h3>
+            <p className="text-gray-600">{feature.desc}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }`,
-      title: "Create Component",
-      result: "✓ Component created successfully",
-      file: "components/Button.tsx",
-      preview: `<button style="padding: 1rem; background-color: rgb(59 130 246); color: white; border-radius: 0.25rem;">Click me</button>`,
-      message: "AI: Generated a new Button component with click handler."
+      title: "Create Features",
+      result: "✓ Features component created",
+      file: "components/Features.tsx",
+      preview: `<section style="padding: 4rem 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem;">
+    <div style="text-align: center; padding: 1.5rem; background-color: rgb(249 250 251); border-radius: 0.5rem;">
+      <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem;">Fast Performance</h3>
+      <p style="color: rgb(75 85 99);">Lightning fast loading times</p>
+    </div>
+    <div style="text-align: center; padding: 1.5rem; background-color: rgb(249 250 251); border-radius: 0.5rem;">
+      <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem;">Modern Design</h3>
+      <p style="color: rgb(75 85 99);">Beautiful and responsive UI</p>
+    </div>
+    <div style="text-align: center; padding: 1.5rem; background-color: rgb(249 250 251); border-radius: 0.5rem;">
+      <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem;">Easy Integration</h3>
+      <p style="color: rgb(75 85 99);">Simple setup and deployment</p>
+    </div>
+  </div>
+</section>`,
+      message: "AI: Created Features section with responsive grid layout."
     },
     {
-      code: `// Add props and styling
-export function Button({ children, variant = 'primary', onClick }) {
-  const styles = {
-    primary: 'bg-blue-500 hover:bg-blue-600',
-    secondary: 'bg-gray-500 hover:bg-gray-600'
-  };
+      code: `// Create Footer component
+export function Footer() {
+  return (
+    <footer className="bg-gray-900 text-white py-12 px-6">
+      <div className="text-center">
+        <h3 className="text-2xl font-bold mb-4">Stay Connected</h3>
+        <div className="flex justify-center space-x-6 mb-6">
+          <a href="#" className="text-gray-300 hover:text-white">Twitter</a>
+          <a href="#" className="text-gray-300 hover:text-white">GitHub</a>
+          <a href="#" className="text-gray-300 hover:text-white">LinkedIn</a>
+        </div>
+        <p className="text-gray-400">&copy; 2024 AppName. All rights reserved.</p>
+      </div>
+    </footer>
+  );
+}`,
+      title: "Create Footer",
+      result: "✓ Footer component created",
+      file: "components/Footer.tsx",
+      preview: `<footer style="background-color: rgb(17 24 39); color: white; padding: 3rem 1.5rem;">
+  <div style="text-align: center;">
+    <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem;">Stay Connected</h3>
+    <div style="display: flex; justify-content: center; gap: 1.5rem; margin-bottom: 1.5rem;">
+      <a href="#" style="color: rgb(209 213 219); text-decoration: none;">Twitter</a>
+      <a href="#" style="color: rgb(209 213 219); text-decoration: none;">GitHub</a>
+      <a href="#" style="color: rgb(209 213 219); text-decoration: none;">LinkedIn</a>
+    </div>
+    <p style="color: rgb(156 163 175);">&copy; 2024 AppName. All rights reserved.</p>
+  </div>
+</footer>`,
+      message: "AI: Created Footer with social links and branding."
+    },
+    {
+      code: `// Create main App component
+import { Navigation } from './components/Navigation';
+import { Hero } from './components/Hero';
+import { Features } from './components/Features';
+import { Footer } from './components/Footer';
 
-  return (
-    <button onClick={onClick} className={\`px-4 py-2 text-white rounded \${styles[variant]}\`}>
-      {children}
-    </button>
-  );
-}`,
-      title: "Enhance Component",
-      result: "✓ Component enhanced with variants",
-      file: "components/Button.tsx",
-      preview: `<button style="padding: 1rem; background-color: rgb(59 130 246); color: white; border-radius: 0.25rem; margin-right: 0.5rem;">Primary</button>
-<button style="padding: 1rem; background-color: rgb(107 114 128); color: white; border-radius: 0.25rem;">Secondary</button>`,
-      message: "AI: Added variant props and hover effects."
-    },
-    {
-      code: `// Create a form component
-export function Form({ onSubmit }) {
-  return (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <input type="text" placeholder="Name" className="w-full px-3 py-2 border rounded" />
-      <input type="email" placeholder="Email" className="w-full px-3 py-2 border rounded" />
-      <Button type="submit">Submit</Button>
-    </form>
-  );
-}`,
-      title: "Build Form",
-      result: "✓ Form component created",
-      file: "components/Form.tsx",
-      preview: `<form style="display: flex; flex-direction: column; gap: 1rem;">
-  <input type="text" placeholder="Name" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 0.25rem;" />
-  <input type="email" placeholder="Email" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 0.25rem;" />
-  <button style="padding: 1rem; background-color: rgb(59 130 246); color: white; border-radius: 0.25rem;">Submit</button>
-</form>`,
-      message: "AI: Created a Form component with inputs and submit button."
-    },
-    {
-      code: `// Integrate components
 export default function App() {
   return (
-    <div className="p-8">
-      <h1 className="text-2xl mb-4">My App</h1>
-      <Form onSubmit={(e) => console.log('Submitted')} />
+    <div className="min-h-screen">
+      <Navigation />
+      <Hero />
+      <Features />
+      <Footer />
     </div>
   );
 }`,
-      title: "Integrate UI",
-      result: "✓ UI integrated successfully",
+      title: "Integrate Landing Page",
+      result: "✓ Complete landing page created",
       file: "App.tsx",
-      preview: `<div style="padding: 2rem;">
-  <h1 style="font-size: 1.5rem; margin-bottom: 1rem;">My App</h1>
-  <form style="display: flex; flex-direction: column; gap: 1rem;">
-    <input type="text" placeholder="Name" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 0.25rem;" />
-    <input type="email" placeholder="Email" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 0.25rem;" />
-    <button style="padding: 1rem; background-color: rgb(59 130 246); color: white; border-radius: 0.25rem;">Submit</button>
-  </form>
+      preview: `<div style="min-height: 100vh;">
+  <nav style="display: flex; justify-content: space-between; align-items: center; padding: 1.5rem; background-color: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border-radius: 0.5rem; margin-bottom: 1rem;">
+    <div style="font-size: 1.5rem; font-weight: bold; color: rgb(147 51 234);">AppName</div>
+    <div style="display: flex; gap: 1.5rem;">
+      <a href="#" style="color: rgb(75 85 99); text-decoration: none;">Home</a>
+      <a href="#" style="color: rgb(75 85 99); text-decoration: none;">Features</a>
+      <a href="#" style="color: rgb(75 85 99); text-decoration: none;">Contact</a>
+    </div>
+  </nav>
+  <section style="padding: 5rem 1.5rem; text-align: center; background: linear-gradient(135deg, rgb(147 51 234) 0%, rgb(37 99 235) 100%); color: white; border-radius: 0.5rem; margin-bottom: 1rem;">
+    <h1 style="font-size: 3rem; font-weight: bold; margin-bottom: 1.5rem;">Build Amazing Apps</h1>
+    <p style="font-size: 1.25rem; margin-bottom: 2rem;">Create stunning user experiences with modern tools</p>
+    <button style="padding: 1rem 2rem; background-color: white; color: rgb(147 51 234); border-radius: 9999px; font-weight: 600;">Get Started</button>
+  </section>
+  <section style="padding: 4rem 1.5rem; margin-bottom: 1rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem;">
+      <div style="text-align: center; padding: 1.5rem; background-color: rgb(249 250 251); border-radius: 0.5rem;">
+        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem;">Fast Performance</h3>
+        <p style="color: rgb(75 85 99);">Lightning fast loading times</p>
+      </div>
+      <div style="text-align: center; padding: 1.5rem; background-color: rgb(249 250 251); border-radius: 0.5rem;">
+        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem;">Modern Design</h3>
+        <p style="color: rgb(75 85 99);">Beautiful and responsive UI</p>
+      </div>
+      <div style="text-align: center; padding: 1.5rem; background-color: rgb(249 250 251); border-radius: 0.5rem;">
+        <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem;">Easy Integration</h3>
+        <p style="color: rgb(75 85 99);">Simple setup and deployment</p>
+      </div>
+    </div>
+  </section>
+  <footer style="background-color: rgb(17 24 39); color: white; padding: 3rem 1.5rem; border-radius: 0.5rem;">
+    <div style="text-align: center;">
+      <h3 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem;">Stay Connected</h3>
+      <div style="display: flex; justify-content: center; gap: 1.5rem; margin-bottom: 1.5rem;">
+        <a href="#" style="color: rgb(209 213 219); text-decoration: none;">Twitter</a>
+        <a href="#" style="color: rgb(209 213 219); text-decoration: none;">GitHub</a>
+        <a href="#" style="color: rgb(209 213 219); text-decoration: none;">LinkedIn</a>
+      </div>
+      <p style="color: rgb(156 163 175);">&copy; 2024 AppName. All rights reserved.</p>
+    </div>
+  </footer>
 </div>`,
-      message: "AI: Integrated all components into the main App."
+      message: "AI: Integrated all components into stunning landing page."
+    },
+    {
+      code: `// Add global styles
+import './index.css';
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}`,
+      title: "Add Styling",
+      result: "✓ Global styles added",
+      file: "src/index.css",
+      preview: `<div style="padding: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 0.5rem;">
+  <h1 style="font-size: 2rem; margin-bottom: 1rem;">✨ Styling Complete</h1>
+  <p>Added global CSS for consistent typography and layout</p>
+</div>`,
+      message: "AI: Added global styles and CSS reset for professional look."
+    },
+    {
+      code: `// Start development server
+npm run dev`,
+      title: "Launch App",
+      result: "✓ Development server started",
+      file: "terminal",
+      preview: `<div style="padding: 2rem; background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); color: white; border-radius: 0.5rem;">
+  <h1 style="font-size: 2rem; margin-bottom: 1rem;">🚀 Server Running</h1>
+  <p>Landing page is live at http://localhost:5173</p>
+  <p style="font-size: 0.9rem; margin-top: 1rem;">Hot reload enabled for instant updates</p>
+</div>`,
+      message: "AI: Started Vite dev server with hot reload enabled."
     }
   ]
 
@@ -115,8 +272,6 @@ export default function App() {
           setShowResult(true)
           // Simulate file creation
           setFileExplorer(prev => [...new Set([...prev, currentStep.file])])
-          // Add message
-          setMessages(prev => [...prev, currentStep.message])
           // Update preview
           setPreview(currentStep.preview)
           setTimeout(() => {
@@ -124,7 +279,7 @@ export default function App() {
           }, 2500)
         }, 500)
       }
-    }, 30)
+    }, 15)
 
     return () => clearInterval(typingInterval)
   }, [step])
@@ -205,7 +360,7 @@ export default function App() {
   const currentStep = codeSteps[step % codeSteps.length]
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4">
+    <div className="w-full max-w-7xl mx-auto px-2 sm:px-4">
       <Card className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-slate-700 shadow-2xl">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 bg-slate-800/50 border-b border-slate-700 gap-2 sm:gap-0">
@@ -277,39 +432,18 @@ export default function App() {
             </pre>
           </div>
 
-          {/* Preview and Messaging */}
-          <div className="col-span-12 md:col-span-4 space-y-4">
-            {/* Preview */}
-            <div className="bg-slate-950/50 border border-slate-700 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-3">
-                <Eye className="h-4 w-4 text-slate-400" />
-                <span className="text-xs text-slate-300 font-mono">Preview</span>
-              </div>
-              <div className="bg-white p-4 rounded border text-xs overflow-auto overflow-x-auto max-h-40">
-                {preview ? (
-                  <div dangerouslySetInnerHTML={{ __html: preview }} />
-                ) : (
-                  <div className="text-slate-500">No preview yet...</div>
-                )}
-              </div>
+          {/* Preview */}
+          <div className="col-span-12 md:col-span-4 bg-slate-950/50 border border-slate-700 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-3">
+              <Eye className="h-4 w-4 text-slate-400" />
+              <span className="text-xs text-slate-300 font-mono">Preview</span>
             </div>
-
-            {/* Messaging Sidebar */}
-            <div className="bg-slate-950/50 border border-slate-700 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-3">
-                <MessageSquare className="h-4 w-4 text-slate-400" />
-                <span className="text-xs text-slate-300 font-mono">Messages</span>
-              </div>
-              <div className="space-y-2 max-h-40 overflow-auto">
-                {messages.map((msg, index) => (
-                  <div key={index} className="text-xs text-slate-300 p-2 bg-slate-800/50 rounded">
-                    {msg}
-                  </div>
-                ))}
-                {messages.length === 0 && (
-                  <div className="text-xs text-slate-500">No messages yet...</div>
-                )}
-              </div>
+            <div className="bg-white p-4 rounded border text-xs overflow-auto overflow-x-auto min-h-[400px]">
+              {preview ? (
+                <div dangerouslySetInnerHTML={{ __html: preview }} />
+              ) : (
+                <div className="text-slate-500">No preview yet...</div>
+              )}
             </div>
           </div>
         </div>
@@ -335,7 +469,7 @@ export default function App() {
       </Card>
 
       {/* Features Strip */}
-      <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-3">
         <div className="flex items-center gap-2 px-3 py-2 bg-slate-900/50 border border-slate-800 rounded-lg">
           <CheckCircle className="h-4 w-4 text-green-400" />
           <span className="text-xs text-slate-300">Live Preview</span>
@@ -343,10 +477,6 @@ export default function App() {
         <div className="flex items-center gap-2 px-3 py-2 bg-slate-900/50 border border-slate-800 rounded-lg">
           <CheckCircle className="h-4 w-4 text-green-400" />
           <span className="text-xs text-slate-300">File Sync</span>
-        </div>
-        <div className="flex items-center gap-2 px-3 py-2 bg-slate-900/50 border border-slate-800 rounded-lg">
-          <CheckCircle className="h-4 w-4 text-green-400" />
-          <span className="text-xs text-slate-300">AI Chat</span>
         </div>
         <div className="flex items-center gap-2 px-3 py-2 bg-slate-900/50 border border-slate-800 rounded-lg">
           <CheckCircle className="h-4 w-4 text-green-400" />
