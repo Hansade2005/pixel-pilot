@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import {
   ArrowUp,
   Plus,
@@ -64,7 +63,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
   // URL attachment state
   const [attachedUrl, setAttachedUrl] = useState("")
-  const [showUrlInput, setShowUrlInput] = useState(false)
 
   // Fetch user on mount
   useEffect(() => {
@@ -147,13 +145,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       console.error('Failed to enhance prompt:', error)
     } finally {
       setIsEnhancing(false)
-    }
-  }
-
-  // URL attachment handler
-  const handleUrlAttachment = () => {
-    if (attachedUrl.trim()) {
-      setShowUrlInput(false)
     }
   }
 
@@ -676,107 +667,54 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
               />
             </div>
 
-            {/* URL Attachment Input/Display */}
-            {showUrlInput && !attachedUrl && (
-              <div className="mb-3">
-                <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700/50 hover:border-blue-500/50 transition-colors">
-                  <svg className="w-4 h-4 text-blue-4 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                  </svg>
-                  <textarea
-                    placeholder="🌐 Clone any website - paste URL here (e.g., https://bbc.com)"
-                    value={attachedUrl}
-                    onChange={(e) => {
-                      setAttachedUrl(e.target.value);
-                    }}
-                    onInput={(e) => {
-                      const textarea = e.target as HTMLTextAreaElement;
-                      // Auto-resize behavior like chat-panel.tsx
-                      textarea.style.height = '64px';
-                      const newHeight = Math.min(textarea.scrollHeight, 140);
-                      textarea.style.height = newHeight + 'px';
-                      textarea.style.overflowY = textarea.scrollHeight > 140 ? 'auto' : 'hidden';
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleUrlAttachment();
-                      }
-                    }}
-                    className="flex-1 bg-transparent outline-none text-sm text-gray-300 placeholder-gray-500 resize-none leading-[1.5] py-2"
-                    disabled={isGenerating}
-                    rows={2}
-                    style={{
-                      minHeight: '64px',
-                      maxHeight: '140px',
-                      overflowY: 'hidden',
-                      resize: 'none',
-                      boxSizing: 'border-box'
-                    }}
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowUrlInput(false)}
-                    className="text-gray-400 hover:text-white transition-colors mt-1"
-                    title="Close URL input"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
+            {/* URL Attachment Field */}
+            <div className="relative">
+              {/* Blinking NEW Badge */}
+              <div className="absolute -top-2 left-2 z-10">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 text-white shadow-lg new-badge-blink new-badge-shine">
+                  <Sparkles className="w-2.5 h-2.5 sparkle-rotate" />
+                  NEW
+                </span>
               </div>
-            )}
-
-            {/* URL Attachment Display */}
-            {attachedUrl && (
-              <div className="mb-3">
-                <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700/50">
-                  <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                  </svg>
-                  <span className="flex-1 text-sm text-gray-300 truncate">{attachedUrl}</span>
+              
+              <div className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-lg border border-gray-700/50 hover:border-blue-500/50 transition-colors">
+                <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+                <input
+                  type="url"
+                  placeholder="🌐 Clone any website - paste URL here (e.g., https://bbc.com)"
+                  value={attachedUrl}
+                  onChange={(e) => setAttachedUrl(e.target.value)}
+                  className="flex-1 bg-transparent outline-none text-sm text-gray-300 placeholder-gray-500"
+                  disabled={isGenerating}
+                />
+                {attachedUrl && (
                   <button
                     type="button"
                     onClick={() => setAttachedUrl("")}
                     className="text-gray-400 hover:text-white transition-colors"
-                    title="Remove URL"
+                    title="Clear URL"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
-                </div>
+                )}
               </div>
-            )}
+            </div>
 
             {/* Bottom Bar with Buttons */}
             <div className="flex items-center justify-between pt-2 border-t border-gray-700/50">
-              {/* Left Side - Attachment, Mic and Template Selector */}
+              {/* Left Side - Mic and Template Selector */}
               <div className="flex items-center space-x-3">
-                {/* URL Attachment Toggle */}
-                <button
-                  type="button"
-                  onClick={() => setShowUrlInput(!showUrlInput)}
-                  disabled={isGenerating}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                    showUrlInput
-                      ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                      : 'bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-white'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  title="Attach website URL"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-
-                <button
+                <button 
                   type="button"
                   onClick={handleMicrophoneClick}
                   disabled={isTranscribing || isGenerating}
                   className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                    isRecording
-                      ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse'
+                    isRecording 
+                      ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse' 
                       : isTranscribing
                       ? 'bg-gray-600/50 cursor-wait'
                       : 'bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-white'
