@@ -10,7 +10,7 @@ interface LogoProps {
 export function Logo({ size = 'md', variant = 'icon', className }: LogoProps) {
   const sizeClasses = {
     sm: 'h-6 w-6',
-    md: 'h-[50px] w-[50px]',
+    md: 'h-8 w-8',
     lg: 'h-12 w-12',
     xl: 'h-16 w-16'
   }
@@ -28,8 +28,8 @@ export function Logo({ size = 'md', variant = 'icon', className }: LogoProps) {
       <Image
         src="/logo.png"
         alt="PiPilot Logo"
-        width={size === 'sm' ? 24 : size === 'md' ? 22 : size === 'lg' ? 48 : 64}
-        height={size === 'sm' ? 24 : size === 'md' ? 22 : size === 'lg' ? 48 : 64}
+        width={size === 'sm' ? 24 : size === 'md' ? 32 : size === 'lg' ? 48 : 64}
+        height={size === 'sm' ? 24 : size === 'md' ? 32 : size === 'lg' ? 48 : 64}
         className="w-full h-full object-contain rounded-lg"
         priority
       />
@@ -47,7 +47,7 @@ export function Logo({ size = 'md', variant = 'icon', className }: LogoProps) {
   if (variant === 'text') {
     return (
       <div className={cn('flex items-center space-x-3', className)}>
-        <LogoImage className="h-6 w-6" />
+        <LogoImage className={sizeClasses[size]} />
         <div className="flex flex-col">
           <span className={cn('font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 bg-clip-text text-transparent', textSizes[size])}>
             PiPilot
@@ -63,7 +63,7 @@ export function Logo({ size = 'md', variant = 'icon', className }: LogoProps) {
   // Full variant with larger logo and text
   return (
     <div className={cn('flex items-center space-x-4', className)}>
-      <LogoImage className={size === 'sm' ? 'h-8 w-8' : size === 'md' ? 'h-12 w-12' : size === 'lg' ? 'h-16 w-16' : 'h-20 w-20'} />
+      <LogoImage className={sizeClasses[size]} />
       <div className="flex flex-col">
         <span className={cn('font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 bg-clip-text text-transparent', textSizes[size])}>
           PiPilot
