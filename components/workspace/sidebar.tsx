@@ -64,7 +64,7 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import { useSubscription } from "@/hooks/use-subscription"
+import { useSubscriptionCache } from "@/hooks/use-subscription-cache"
 import { Crown, TrendingUp, AlertTriangle, Shield, CheckCircle, Globe, Github } from "lucide-react"
 
 interface SidebarProps {
@@ -106,7 +106,7 @@ export function Sidebar({
   const router = useRouter()
 
   // Subscription status hook
-  const { subscription, loading: subscriptionLoading } = useSubscription()
+  const { subscription, loading: subscriptionLoading } = useSubscriptionCache(user?.id)
 
   // Advanced filter and sort projects
   const filteredAndSortedProjects = React.useMemo(() => {

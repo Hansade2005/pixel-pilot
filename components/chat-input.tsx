@@ -18,7 +18,7 @@ import {
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-import { useSubscription } from "@/hooks/use-subscription"
+import { useSubscriptionCache } from "@/hooks/use-subscription-cache"
 import {
   Select,
   SelectContent,
@@ -48,6 +48,9 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   const router = useRouter()
   const supabase = createClient()
 
+  // User state
+  const [user, setUser] = useState<any>(null)
+
   // Speech-to-text state
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
@@ -61,8 +64,22 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   // URL attachment state
   const [attachedUrl, setAttachedUrl] = useState("")
 
+  // Fetch user on mount
+  useEffect(() => {
+    const checkUser = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        setUser(user)
+      } catch (error) {
+        console.error("Error checking user:", error)
+        setUser(null)
+      }
+    }
+    checkUser()
+  }, [supabase.auth])
+
   // Subscription status hook
-  const { subscription, loading: subscriptionLoading } = useSubscription()
+  const { subscription, loading: subscriptionLoading } = useSubscriptionCache(user?.id)
 
   // Check if Web Speech API is supported
   const isWebSpeechSupported = typeof window !== 'undefined' && 

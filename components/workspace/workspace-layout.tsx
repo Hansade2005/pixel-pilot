@@ -22,7 +22,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useCloudSync } from '@/hooks/use-cloud-sync'
 import { useAutoCloudBackup } from '@/hooks/use-auto-cloud-backup'
-import { useCredits as useSubscription } from '@/hooks/use-credits'
+import { useSubscriptionCache } from '@/hooks/use-subscription-cache'
 import { restoreBackupFromCloud, isCloudSyncEnabled } from '@/lib/cloud-sync'
 import { ModelSelector } from "@/components/ui/model-selector"
 import { AiModeSelector, type AIMode } from "@/components/ui/ai-mode-selector"
@@ -54,8 +54,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const searchParams = useSearchParams()
   const [selectedProject, setSelectedProject] = useState<Workspace | null>(null)
 
-  // Get user subscription information
-  const { subscription } = useSubscription(user?.id)
+  // Get user subscription information (cached with Realtime)
+  const { subscription } = useSubscriptionCache(user?.id)
   const userPlan = subscription?.plan || 'free'
   const subscriptionStatus = subscription?.status || 'inactive'
   const [activeTab, setActiveTab] = useState<"code" | "preview">("code")
