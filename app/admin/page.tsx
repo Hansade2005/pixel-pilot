@@ -212,7 +212,7 @@ export default function AdminPanel() {
       {/* Admin Header */}
       <div className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-primary/10 rounded-lg">
                 <Shield className="h-6 w-6 text-primary" />
@@ -222,12 +222,12 @@ export default function AdminPanel() {
                 <p className="text-sm text-muted-foreground">System management and analytics</p>
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-              <Badge variant="secondary" className="bg-green-100 text-green-800 w-fit">
+            <div className="flex items-center gap-4">
+              <Badge variant="secondary" className="bg-green-100 text-green-800">
                 <CheckCircle className="h-3 w-3 mr-1" />
                 Admin Access
               </Badge>
-              <span className="text-sm text-muted-foreground truncate">
+              <span className="text-sm text-muted-foreground">
                 Welcome, {user.email}
               </span>
             </div>
@@ -237,7 +237,7 @@ export default function AdminPanel() {
 
       <div className="container mx-auto px-4 py-8">
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
           {ADMIN_MENU_ITEMS.filter(item => hasAdminPermission(user, item.permission)).map((item) => (
             <Card
               key={item.id}
@@ -258,12 +258,12 @@ export default function AdminPanel() {
             >
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary/10 rounded-lg flex-shrink-0">
+                  <div className="p-2 bg-primary/10 rounded-lg">
                     {/* Icon would be rendered based on item.icon */}
                     <BarChart3 className="h-4 w-4 text-primary" />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-sm break-words">{item.label}</p>
+                  <div>
+                    <p className="font-medium text-sm">{item.label}</p>
                     <p className="text-xs text-muted-foreground">Manage system</p>
                   </div>
                 </div>
@@ -276,8 +276,8 @@ export default function AdminPanel() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium min-w-0 break-words">Total Users</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats?.totalUsers || 0}</div>
@@ -289,8 +289,8 @@ export default function AdminPanel() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium min-w-0 break-words">Total Revenue</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
@@ -307,8 +307,8 @@ export default function AdminPanel() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium min-w-0 break-words">Active Subscriptions</CardTitle>
-              <CreditCard className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <CardTitle className="text-sm font-medium">Active Subscriptions</CardTitle>
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
@@ -325,8 +325,8 @@ export default function AdminPanel() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium min-w-0 break-words">System Health</CardTitle>
-              <Activity className={`h-4 w-4 flex-shrink-0 ${
+              <CardTitle className="text-sm font-medium">System Health</CardTitle>
+              <Activity className={`h-4 w-4 ${
                 stats?.systemHealth === 'healthy' ? 'text-green-500' :
                 stats?.systemHealth === 'warning' ? 'text-yellow-500' : 'text-red-500'
               }`} />
@@ -341,7 +341,7 @@ export default function AdminPanel() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium min-w-0 break-words">Webhook Status</CardTitle>
+              <CardTitle className="text-sm font-medium">Webhook Status</CardTitle>
               <div className="flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${
                   webhookStatus?.health?.status === 'healthy' ? 'bg-green-500' :

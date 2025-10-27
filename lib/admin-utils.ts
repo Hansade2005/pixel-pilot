@@ -59,13 +59,6 @@ export const ADMIN_MENU_ITEMS = [
     permission: ADMIN_PERMISSIONS.VIEW_USERS
   },
   {
-    id: 'email',
-    label: 'Email Management',
-    icon: 'Mail',
-    href: '/admin/email',
-    permission: ADMIN_PERMISSIONS.MANAGE_USERS
-  },
-  {
     id: 'billing',
     label: 'Billing & Subscriptions',
     icon: 'CreditCard',

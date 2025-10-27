@@ -27,7 +27,7 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
-import { useSubscriptionCache } from "@/hooks/use-subscription-cache"
+import { useSubscription } from "@/hooks/use-subscription"
 import { checkAdminAccess } from "@/lib/admin-utils"
 import { Shield, Crown } from "lucide-react"
 
@@ -39,8 +39,8 @@ export function Navigation() {
   const [isMobileProfileOpen, setIsMobileProfileOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
 
-  // Subscription status hook with cache
-  const { subscription, loading: subscriptionLoading } = useSubscriptionCache(user?.id)
+  // Subscription status hook
+  const { subscription, loading: subscriptionLoading } = useSubscription()
 
   useEffect(() => {
     checkUser()

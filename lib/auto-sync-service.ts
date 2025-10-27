@@ -1,7 +1,7 @@
 // Auto-sync service that listens to storage events and syncs to cloud automatically
 
 import { storageEventManager, StorageEventData } from './storage-events'
-import { uploadBackupToCloud, isCloudSyncEnabled } from './cloud-sync'
+import { smartBackupToCloud, isCloudSyncEnabled } from './cloud-sync'
 import { storageManager } from './storage-manager'
 
 /**
@@ -141,7 +141,7 @@ class AutoSyncService {
       const eventCount = events?.length || 0
       console.log(`Auto-sync service: Syncing ${eventCount} changes to cloud...`)
 
-      const success = await uploadBackupToCloud(this.userId)
+      const success = await smartBackupToCloud(this.userId)
 
       if (success) {
         console.log('Auto-sync service: Sync completed successfully')

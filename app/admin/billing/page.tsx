@@ -208,7 +208,7 @@ export default function AdminBillingPage() {
       {/* Admin Header */}
       <div className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Button
                 variant="ghost"
@@ -227,7 +227,7 @@ export default function AdminBillingPage() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <Badge variant="secondary" className="bg-green-100 text-green-800 w-fit">
+              <Badge variant="secondary" className="bg-green-100 text-green-800">
                 <CheckCircle className="h-3 w-3 mr-1" />
                 Admin Access
               </Badge>
@@ -330,82 +330,6 @@ export default function AdminBillingPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Mobile Card Layout */}
-            <div className="block md:hidden space-y-4">
-              {filteredSubscriptions.map((subscription) => (
-                <Card key={subscription.id} className="p-4">
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium truncate">{subscription.user_name || 'No name'}</h3>
-                        <p className="text-sm text-muted-foreground truncate">{subscription.user_email}</p>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => {
-                            setSelectedSubscription(subscription)
-                            setShowSubscriptionDialog(true)
-                          }}>
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          {subscription.subscription_status === 'active' && (
-                            <DropdownMenuItem
-                              onClick={async () => {
-                                if (confirm(`Cancel subscription for ${subscription.user_email}?`)) {
-                                  try {
-                                    const response = await fetch('/api/admin/billing', {
-                                      method: 'PATCH',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({
-                                        subscriptionId: subscription.id,
-                                        action: 'cancel'
-                                      })
-                                    })
-                                    if (response.ok) {
-                                      alert('Subscription cancelled successfully!')
-                                      await loadSubscriptions()
-                                    } else {
-                                      const err = await response.json()
-                                      alert(err.error || 'Failed to cancel subscription')
-                                    }
-                                  } catch (error) {
-                                    console.error('Error cancelling subscription:', error)
-                                    alert('Error cancelling subscription')
-                                  }
-                                }
-                              }}
-                              className="text-red-600"
-                            >
-                              <XCircle className="h-4 w-4 mr-2" />
-                              Cancel Subscription
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {getPlanBadge(subscription.subscription_plan)}
-                      {getStatusBadge(subscription.subscription_status)}
-                    </div>
-                    <div className="text-xs text-muted-foreground space-y-1">
-                      <div>Deployments: {subscription.deployments_this_month}/∞</div>
-                      <div>GitHub: {subscription.github_pushes_this_month}/∞</div>
-                      <div>Next billing: {subscription.subscription_end_date ? new Date(subscription.subscription_end_date).toLocaleDateString() : 'N/A'}</div>
-                      <div>Started: {new Date(subscription.created_at).toLocaleDateString()}</div>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-
-            {/* Desktop Table Layout */}
-            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -492,7 +416,6 @@ export default function AdminBillingPage() {
                 ))}
               </TableBody>
             </Table>
-            </div>
 
             {filteredSubscriptions.length === 0 && (
               <div className="text-center py-8">

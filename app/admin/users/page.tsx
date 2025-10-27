@@ -4,11 +4,9 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { checkAdminAccess } from "@/lib/admin-utils"
-import { sendEmail, sendNotificationEmail } from "@/lib/email"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -35,13 +33,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import {
   Search,
   Filter,
@@ -93,17 +84,6 @@ interface UserData {
   hasSettings: boolean
 }
 
-const EMAIL_TYPES = [
-  { value: 'notification', label: 'General Notification', description: 'Send general announcements or updates' },
-  { value: 'marketing', label: 'Marketing Campaign', description: 'Promotional content and feature announcements' },
-  { value: 'newsletter', label: 'Newsletter', description: 'Regular updates and company news' },
-  { value: 'security', label: 'Security Alert', description: 'Important security notifications' },
-  { value: 'feature', label: 'Feature Announcement', description: 'New feature releases and updates' },
-  { value: 'billing', label: 'Billing Notification', description: 'Payment and billing related communications' },
-  { value: 'support', label: 'Support Response', description: 'Customer support communications' },
-  { value: 'welcome', label: 'Welcome Message', description: 'Welcome new users or team members' }
-]
-
 export default function AdminUsersPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -115,14 +95,6 @@ export default function AdminUsersPage() {
   // Bulk selection state
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set())
   const [bulkActionLoading, setBulkActionLoading] = useState(false)
-
-  // Email functionality state
-  const [showEmailDialog, setShowEmailDialog] = useState(false)
-  const [emailRecipients, setEmailRecipients] = useState<UserData[]>([])
-  const [emailSubject, setEmailSubject] = useState('')
-  const [emailContent, setEmailContent] = useState('')
-  const [emailType, setEmailType] = useState('notification')
-  const [sendingEmail, setSendingEmail] = useState(false)
 
   // Filter states
   const [planFilter, setPlanFilter] = useState<string>("all")
@@ -261,135 +233,6 @@ export default function AdminUsersPage() {
     }
   }
 
-  // Email functionality
-  const openEmailDialog = (recipients: UserData[]) => {
-    setEmailRecipients(recipients)
-    setEmailSubject('')
-    setEmailContent('')
-    setEmailType('notification')
-    setShowEmailDialog(true)
-  }
-
-  const sendEmailToUsers = async () => {
-    if (!emailSubject.trim() || !emailContent.trim()) {
-      alert('Please provide both subject and content for the email')
-      return
-    }
-
-    setSendingEmail(true)
-
-    try {
-      let successCount = 0
-      let failedCount = 0
-
-      for (const recipient of emailRecipients) {
-        try {
-          let result
-          switch (emailType) {
-            case 'notification':
-              result = await sendNotificationEmail(recipient.email, emailSubject, emailContent)
-              break
-            case 'marketing':
-              result = await sendEmail({
-                to: recipient.email,
-                subject: emailSubject,
-                type: 'marketing',
-                message: emailContent
-              })
-              break
-            case 'newsletter':
-              result = await sendEmail({
-                to: recipient.email,
-                subject: emailSubject,
-                type: 'newsletter',
-                title: emailSubject,
-                content: emailContent,
-                unsubscribe_url: 'https://pipilot.dev/unsubscribe'
-              })
-              break
-            case 'security':
-              result = await sendEmail({
-                to: recipient.email,
-                subject: emailSubject,
-                type: 'security',
-                title: emailSubject,
-                content: emailContent,
-                action_url: 'https://pipilot.dev/security'
-              })
-              break
-            case 'feature':
-              result = await sendEmail({
-                to: recipient.email,
-                subject: emailSubject,
-                type: 'feature',
-                title: emailSubject,
-                feature_name: 'New Feature',
-                content: emailContent,
-                try_url: 'https://pipilot.dev/features'
-              })
-              break
-            case 'billing':
-              result = await sendEmail({
-                to: recipient.email,
-                subject: emailSubject,
-                type: 'billing',
-                title: emailSubject,
-                content: emailContent,
-                amount: '$0.00',
-                action_url: 'https://pipilot.dev/billing'
-              })
-              break
-            case 'support':
-              result = await sendEmail({
-                to: recipient.email,
-                subject: emailSubject,
-                type: 'support',
-                title: emailSubject,
-                content: emailContent,
-                ticket_id: 'N/A',
-                support_url: 'https://pipilot.dev/support'
-              })
-              break
-            case 'welcome':
-              result = await sendEmail({
-                to: recipient.email,
-                subject: emailSubject,
-                type: 'welcome',
-                user_name: recipient.fullName || recipient.email.split('@')[0],
-                organization_name: 'Pixel Pilot'
-              })
-              break
-            default:
-              result = await sendNotificationEmail(recipient.email, emailSubject, emailContent)
-          }
-
-          if (result.success) {
-            successCount++
-          } else {
-            failedCount++
-            console.error(`Failed to send email to ${recipient.email}:`, result.error)
-          }
-        } catch (error) {
-          failedCount++
-          console.error(`Error sending email to ${recipient.email}:`, error)
-        }
-      }
-
-      alert(`Email campaign completed!\n✅ Successfully sent: ${successCount}\n❌ Failed: ${failedCount}`)
-
-      setShowEmailDialog(false)
-      setEmailRecipients([])
-      setEmailSubject('')
-      setEmailContent('')
-
-    } catch (error) {
-      console.error('Error in email sending:', error)
-      alert('An error occurred while sending emails')
-    } finally {
-      setSendingEmail(false)
-    }
-  }
-
   // Enhanced filtering
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -449,7 +292,7 @@ export default function AdminUsersPage() {
       {/* Admin Header */}
       <div className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Button
                 variant="ghost"
@@ -468,7 +311,7 @@ export default function AdminUsersPage() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <Badge variant="secondary" className="bg-green-100 text-green-800 w-fit">
+              <Badge variant="secondary" className="bg-green-100 text-green-800">
                 <CheckCircle className="h-3 w-3 mr-1" />
                 Admin Access
               </Badge>
@@ -479,7 +322,7 @@ export default function AdminUsersPage() {
 
       <div className="container mx-auto px-4 py-8">
         {/* Search and Filters */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
+        <div className="flex items-center gap-4 mb-6">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -489,16 +332,14 @@ export default function AdminUsersPage() {
               className="pl-9"
             />
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Filter className="h-4 w-4 mr-2" />
-              Filter
-            </Button>
-            <Button size="sm">
-              <UserPlus className="h-4 w-4 mr-2" />
-              Add User
-            </Button>
-          </div>
+          <Button variant="outline">
+            <Filter className="h-4 w-4 mr-2" />
+            Filter
+          </Button>
+          <Button>
+            <UserPlus className="h-4 w-4 mr-2" />
+            Add User
+          </Button>
         </div>
 
         {/* Statistics Cards */}
@@ -671,20 +512,6 @@ export default function AdminUsersPage() {
                     <RotateCcw className="h-4 w-4 mr-2" />
                     {bulkActionLoading ? 'Resetting...' : 'Reset Usage'}
                   </Button>
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      const selectedUserData = users.filter(u => selectedUsers.has(u.id))
-                      openEmailDialog(selectedUserData)
-                    }}
-                    disabled={bulkActionLoading}
-                    className="text-purple-700 border-purple-300 hover:bg-purple-50"
-                  >
-                    <Mail className="h-4 w-4 mr-2" />
-                    Send Email
-                  </Button>
                 </div>
               </div>
             )}
@@ -727,202 +554,6 @@ export default function AdminUsersPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {/* Mobile Card Layout */}
-            <div className="block md:hidden space-y-4">
-              {filteredUsers.map((userData) => (
-                <Card key={userData.id} className="p-4">
-                  <div className="flex items-start gap-3">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleSelectUser(userData.id)}
-                      className="p-0 h-auto mt-1"
-                    >
-                      {selectedUsers.has(userData.id) ? (
-                        <CheckSquare className="h-4 w-4" />
-                      ) : (
-                        <Square className="h-4 w-4" />
-                      )}
-                    </Button>
-                    <Avatar className="h-12 w-12">
-                      <AvatarImage src={userData.avatarUrl || undefined} />
-                      <AvatarFallback>
-                        {userData.email.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-medium truncate">{userData.fullName || 'No name set'}</h3>
-                        {userData.isAdmin && (
-                          <Badge variant="secondary" className="text-xs">Admin</Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground truncate mb-2">{userData.email}</p>
-                      <div className="flex flex-wrap items-center gap-2 mb-3">
-                        {getPlanBadge(userData.subscriptionPlan)}
-                        {getStatusBadge(userData.subscriptionStatus)}
-                        {!userData.emailConfirmed && (
-                          <Badge variant="outline" className="text-xs">Unconfirmed</Badge>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground space-y-1">
-                        <div>Deployments: {userData.deploymentsThisMonth}/{userData.subscriptionPlan === 'pro' ? 10 : 5}</div>
-                        <div>GitHub: {userData.githubPushesThisMonth}/2</div>
-                        <div>Joined: {new Date(userData.createdAt).toLocaleDateString()}</div>
-                      </div>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => {
-                          setSelectedUser(userData)
-                          setShowUserDialog(true)
-                        }}>
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => openEmailDialog([userData])}>
-                          <Mail className="h-4 w-4 mr-2" />
-                          Send Email
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        {/* Subscription Management */}
-                        {userData.subscriptionPlan !== 'pro' && (
-                          <DropdownMenuItem
-                            onClick={async () => {
-                              if (confirm(`Upgrade ${userData.email} to Pro plan?`)) {
-                                try {
-                                  const response = await fetch('/api/admin/users', {
-                                    method: 'PATCH',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                      userId: userData.id,
-                                      action: 'upgrade_to_pro'
-                                    })
-                                  })
-                                  if (response.ok) {
-                                    alert('User upgraded to Pro successfully!')
-                                    await loadUsers()
-                                  } else {
-                                    const err = await response.json()
-                                    alert(err.error || 'Failed to upgrade user')
-                                  }
-                                } catch (error) {
-                                  console.error('Error upgrading user:', error)
-                                  alert('Error upgrading user')
-                                }
-                              }
-                            }}
-                            className="text-green-600"
-                          >
-                            <TrendingUp className="h-4 w-4 mr-2" />
-                            Upgrade to Pro
-                          </DropdownMenuItem>
-                        )}
-                        {userData.subscriptionPlan === 'pro' && (
-                          <DropdownMenuItem
-                            onClick={async () => {
-                              if (confirm(`Downgrade ${userData.email} to Free plan?`)) {
-                                try {
-                                  const response = await fetch('/api/admin/users', {
-                                    method: 'PATCH',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                      userId: userData.id,
-                                      action: 'downgrade_to_free'
-                                    })
-                                  })
-                                  if (response.ok) {
-                                    alert('User downgraded to Free successfully!')
-                                    await loadUsers()
-                                  } else {
-                                    const err = await response.json()
-                                    alert(err.error || 'Failed to downgrade user')
-                                  }
-                                } catch (error) {
-                                  console.error('Error downgrading user:', error)
-                                  alert('Error downgrading user')
-                                }
-                              }
-                            }}
-                            className="text-orange-600"
-                          >
-                            <TrendingDown className="h-4 w-4 mr-2" />
-                            Downgrade to Free
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={async () => {
-                            if (confirm(`Reset password for ${userData.email}?`)) {
-                              try {
-                                const response = await fetch('/api/admin/users', {
-                                  method: 'PATCH',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    userId: userData.id,
-                                    action: 'reset_password'
-                                  })
-                                })
-                                if (response.ok) {
-                                  alert('Password reset email sent successfully!')
-                                } else {
-                                  const err = await response.json()
-                                  alert(err.error || 'Failed to reset password')
-                                }
-                              } catch (error) {
-                                console.error('Error resetting password:', error)
-                                alert('Error resetting password')
-                              }
-                            }
-                          }}
-                          className="text-blue-600"
-                        >
-                          <RotateCcw className="h-4 w-4 mr-2" />
-                          Reset Password
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={async () => {
-                            if (confirm(`Suspend ${userData.email}?`)) {
-                              try {
-                                const response = await fetch('/api/admin/users', {
-                                  method: 'PATCH',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    userId: userData.id,
-                                    action: 'suspend'
-                                  })
-                                })
-                                if (response.ok) {
-                                  alert('User suspended successfully!')
-                                  await loadUsers()
-                                } else {
-                                  const err = await response.json()
-                                  alert(err.error || 'Failed to suspend user')
-                                }
-                              } catch (error) {
-                                console.error('Error suspending user:', error)
-                                alert('Error suspending user')
-                              }
-                            }
-                          }}
-                          className="text-red-600"
-                        >
-                          <Ban className="h-4 w-4 mr-2" />
-                          Suspend User
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </Card>
-              ))}
-            </div>
-
-            {/* Desktop Table Layout */}
-            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1040,7 +671,7 @@ export default function AdminUsersPage() {
                           }}>
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openEmailDialog([userData])}>
+                          <DropdownMenuItem>
                             <Mail className="h-4 w-4 mr-2" />
                             Send Email
                           </DropdownMenuItem>
@@ -1305,7 +936,6 @@ export default function AdminUsersPage() {
                 ))}
               </TableBody>
             </Table>
-            </div>
           </CardContent>
         </Card>
 
@@ -1471,95 +1101,6 @@ export default function AdminUsersPage() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowUserDialog(false)}>
                 Close
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Email Composition Dialog */}
-        <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Send Email</DialogTitle>
-              <DialogDescription>
-                Compose and send an email to {emailRecipients.length} recipient{emailRecipients.length !== 1 ? 's' : ''}
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4">
-              {/* Recipients Preview */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Recipients</label>
-                <div className="flex flex-wrap gap-2 max-h-20 overflow-y-auto">
-                  {emailRecipients.map((recipient) => (
-                    <Badge key={recipient.id} variant="secondary" className="text-xs">
-                      {recipient.email}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              {/* Email Type */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Email Type</label>
-                <Select value={emailType} onValueChange={setEmailType}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select email type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {EMAIL_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        <div>
-                          <div className="font-medium">{type.label}</div>
-                          <div className="text-xs text-muted-foreground">{type.description}</div>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Subject */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Subject</label>
-                <Input
-                  value={emailSubject}
-                  onChange={(e) => setEmailSubject(e.target.value)}
-                  placeholder="Enter email subject..."
-                />
-              </div>
-
-              {/* Content */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Message</label>
-                <Textarea
-                  value={emailContent}
-                  onChange={(e) => setEmailContent(e.target.value)}
-                  placeholder="Enter your message..."
-                  rows={8}
-                />
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowEmailDialog(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={sendEmailToUsers}
-                disabled={sendingEmail || !emailSubject.trim() || !emailContent.trim()}
-              >
-                {sendingEmail ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <Mail className="h-4 w-4 mr-2" />
-                    Send Email{emailRecipients.length > 1 ? ` (${emailRecipients.length})` : ''}
-                  </>
-                )}
               </Button>
             </DialogFooter>
           </DialogContent>

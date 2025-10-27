@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "http-server": {
+      "httpUrl": "https://mcp.supabase.com/mcp?project_ref=lzuknbfbvpuscpammwzg"
+    }
+  },
+  "mcpOAuth": {
+    "supabase|d5e0f454d6d2ff13": {
+      "serverName": "supabase",
+      "serverUrl": "https://mcp.supabase.com/mcp?project_ref=lzuknbfbvpuscpammwzg",
+      "clientId": "638bc67a-a9d3-4cd2-b3bf-e1fea1bce957",
+      "clientSecret": "sba_4e56c30527d40e68024bbe04496c05e9d41ecbf3",
+      "accessToken": "sbp_oauth_be354ef14396ed1920c6d7b920a077459486aadf",
+      "expiresAt": 1761471521022,
+      "refreshToken": "QglTDQywmdNvEvsjlB"
+    }
+  }
+}

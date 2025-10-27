@@ -1,17 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "WebSearch",
-      "Bash(node scripts/list-supabase-tables.js:*)",
-      "Bash(node scripts/check-supabase-tables.js:*)",
-      "Bash(npm install:*)",
-      "Bash(pnpm add:*)",
-      "mcp__supabase__execute_sql",
-      "mcp__supabase__apply_migration",
-      "Bash(git add:*)",
-      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: team workspaces, performance fixes, and template selection\n\n## Major Features Added:\n\n### 🤝 Team Workspaces (Complete Implementation)\n- Full team collaboration system with organizations\n- Team management dashboard at /workspace/teams\n- Member management with role-based access (owner/admin/editor/viewer)\n- Invite members via email with Supabase invitations\n- Team workspace creation with organization selector\n- Convert personal workspaces to team workspaces\n- Real-time team presence and activity feed\n- Supabase migrations for team_workspaces tables\n- API routes for team workspace file operations\n\n### ⚡ Performance Fixes (10-100x faster)\n- Global subscription cache with Supabase Realtime\n- Session storage persistence for subscription data\n- Fixed project selection lag (instant vs 2-3 tries)\n- Fixed project deletion lag (instant UI updates)\n- Fixed management page loading sample projects bug\n- Optimistic UI updates throughout\n- Non-blocking router navigation\n\n### 🎨 Screenshot-to-Code Feature\n- Enhanced image description with multi-model support\n- Updated chat panel for image uploads\n- Marketing documentation\n\n### 📊 Competitive Analysis\n- Lovable.dev benchmark comparison\n- Feature parity documentation\n\n### 🎯 UX Improvements\n- Template selection in project creation modal (Vite/Next.js)\n- Enhanced workspace header with organization breadcrumbs\n- Team badges and indicators\n- Improved file explorer for team workspaces\n\n## Technical Changes:\n\n### New Files:\n- hooks/use-subscription-cache.ts - Global subscription caching\n- hooks/use-team-workspace-sync.ts - Team workspace sync\n- app/workspace/teams/page.tsx - Team management dashboard\n- components/workspace/team-*.tsx - Team components\n- supabase/migrations/20250125_create_team_workspaces.sql\n- API routes for team workspace operations\n- Comprehensive documentation files\n\n### Modified Files:\n- workspace-layout.tsx - Template selection, team workspace support\n- sidebar.tsx - Optimistic deletion, subscription cache\n- chat-input.tsx - Subscription cache integration\n- navigation.tsx - Subscription cache integration\n- management/page.tsx - Fixed sample projects bug\n- Various bug fixes and improvements\n\n## Bug Fixes:\n- ✅ Deleted corrupt ''nul'' file\n- ✅ Fixed project selection requiring multiple clicks\n- ✅ Fixed project deletion requiring multiple tries\n- ✅ Fixed management page showing sample projects\n- ✅ Fixed slow subscription checks causing reloads\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(git push)",
-      "Bash(git commit:*)"
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

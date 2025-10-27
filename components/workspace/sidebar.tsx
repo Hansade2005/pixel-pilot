@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,15 +41,15 @@ import {
 } from "@/components/ui/accordion"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  Search,
-  Folder,
-  Settings,
-  LogOut,
-  Sparkles,
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  Plus, 
+  Search, 
+  Folder, 
+  Settings, 
+  LogOut, 
+  Sparkles, 
   PanelLeft,
   Trash2,
   Pin,
@@ -61,16 +60,11 @@ import {
   ArrowUpDown,
   Calendar,
   Star,
-  Home,
-  Users,
-  User as UserIcon,
-  Filter,
-  UserPlus
+  Home
 } from "lucide-react"
-import { ConvertToTeamDialog } from "./convert-to-team-dialog"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import { useSubscriptionCache } from "@/hooks/use-subscription-cache"
+import { useSubscription } from "@/hooks/use-subscription"
 import { Crown, TrendingUp, AlertTriangle, Shield, CheckCircle, Globe, Github } from "lucide-react"
 
 interface SidebarProps {
@@ -104,33 +98,22 @@ export function Sidebar({
   const [searchQuery, setSearchQuery] = useState("")
   const [sortBy, setSortBy] = useState<'name' | 'lastActivity' | 'created'>('lastActivity')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [workspaceFilter, setWorkspaceFilter] = useState<'all' | 'personal' | 'team'>('all')
   const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null)
   const [renameProject, setRenameProject] = useState<Project | null>(null)
   const [renameValue, setRenameValue] = useState("")
   const [cloneProject, setCloneProject] = useState<Project | null>(null)
   const [cloneName, setCloneName] = useState("")
-  const [convertProject, setConvertProject] = useState<Project | null>(null)
   const router = useRouter()
 
-  // Subscription status hook (cached with Realtime)
-  const { subscription, loading: subscriptionLoading } = useSubscriptionCache(user.id)
+  // Subscription status hook
+  const { subscription, loading: subscriptionLoading } = useSubscription()
 
   // Advanced filter and sort projects
   const filteredAndSortedProjects = React.useMemo(() => {
-    let filtered = projects.filter((project) => {
-      // Search filter
-      const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (project.description && project.description.toLowerCase().includes(searchQuery.toLowerCase()))
-
-      // Workspace type filter
-      const matchesType =
-        workspaceFilter === 'all' ||
-        (workspaceFilter === 'team' && project.organizationId) ||
-        (workspaceFilter === 'personal' && !project.organizationId)
-
-      return matchesSearch && matchesType
-    })
+    let filtered = projects.filter((project) => 
+      project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (project.description && project.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    )
 
     // Sort projects
     filtered.sort((a, b) => {
@@ -158,7 +141,7 @@ export function Sidebar({
     })
 
     return filtered
-  }, [projects, searchQuery, sortBy, sortOrder, workspaceFilter])
+  }, [projects, searchQuery, sortBy, sortOrder])
 
   const handleSignOut = async () => {
     const supabase = createClient()
@@ -191,55 +174,40 @@ export function Sidebar({
 
   // Delete project
   const handleDeleteProject = async (projectId: string) => {
-    console.log('[Sidebar] Delete project started:', projectId)
-
     try {
-      // IMMEDIATE: Close dialog and update UI optimistically
-      setDeleteProjectId(null)
-
-      // IMMEDIATE: If this was the selected project, switch to another
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+      
+      // Delete all files first
+      const files = await storageManager.getFiles(projectId)
+      for (const file of files) {
+        await storageManager.deleteFile(projectId, file.path)
+      }
+      
+      // Delete project
+      await storageManager.deleteWorkspace(projectId)
+      
+      // If this was the selected project, clear selection
       if (selectedProject?.id === projectId) {
         const remainingProjects = projects.filter(p => p.id !== projectId)
         if (remainingProjects.length > 0) {
           onSelectProject(remainingProjects[0])
         }
       }
-
-      // IMMEDIATE: Call parent callback to update UI
+      
+      // Trigger backup before updating UI to save the updated state
+      if (onTriggerBackup) {
+        await onTriggerBackup()
+      }
+      
+      // Call the callback to update the parent component's state
       if (onProjectDeleted) {
         await onProjectDeleted(projectId)
       }
-
-      // BACKGROUND: Do the actual deletion async (non-blocking)
-      Promise.resolve().then(async () => {
-        try {
-          const { storageManager } = await import('@/lib/storage-manager')
-          await storageManager.init()
-
-          console.log('[Sidebar] Starting background deletion:', projectId)
-
-          // Delete all files
-          const files = await storageManager.getFiles(projectId)
-          for (const file of files) {
-            await storageManager.deleteFile(projectId, file.path)
-          }
-
-          // Delete project
-          await storageManager.deleteWorkspace(projectId)
-
-          // Trigger backup
-          if (onTriggerBackup) {
-            await onTriggerBackup()
-          }
-
-          console.log('[Sidebar] Background deletion completed:', projectId)
-        } catch (error) {
-          console.error('[Sidebar] Background deletion error:', error)
-        }
-      })
-
+      
+      setDeleteProjectId(null)
     } catch (error) {
-      console.error('[Sidebar] Error in delete handler:', error)
+      console.error('Error deleting project:', error)
     }
   }
 
@@ -518,40 +486,7 @@ export function Sidebar({
             className="pl-9 bg-sidebar-accent"
           />
         </div>
-
-        {/* Workspace Type Filter */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1 flex-1">
-            <Button
-              variant={workspaceFilter === 'all' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-7 flex-1 text-xs"
-              onClick={() => setWorkspaceFilter('all')}
-            >
-              <Filter className="h-3 w-3 mr-1" />
-              All
-            </Button>
-            <Button
-              variant={workspaceFilter === 'personal' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-7 flex-1 text-xs"
-              onClick={() => setWorkspaceFilter('personal')}
-            >
-              <UserIcon className="h-3 w-3 mr-1" />
-              Personal
-            </Button>
-            <Button
-              variant={workspaceFilter === 'team' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-7 flex-1 text-xs"
-              onClick={() => setWorkspaceFilter('team')}
-            >
-              <Users className="h-3 w-3 mr-1" />
-              Team
-            </Button>
-          </div>
-        </div>
-
+        
         {/* Sort Controls */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -640,16 +575,8 @@ export function Sidebar({
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <div className="font-medium text-sm truncate">
-                            {project.name.length > 12 ? `${project.name.substring(0, 12)}...` : project.name}
-                          </div>
-                          {project.organizationId && (
-                            <Badge variant="secondary" className="h-4 px-1.5 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-0 flex-shrink-0">
-                              <Users className="h-2.5 w-2.5 mr-0.5" />
-                              Team
-                            </Badge>
-                          )}
+                        <div className="font-medium text-sm truncate">
+                          {project.name.length > 12 ? `${project.name.substring(0, 12)}...` : project.name}
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {new Date(project.lastActivity).toLocaleDateString()}
@@ -687,17 +614,8 @@ export function Sidebar({
                           <Copy className="mr-2 h-4 w-4" />
                           Clone
                         </DropdownMenuItem>
-                        {!project.organizationId && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => setConvertProject(project)}>
-                              <UserPlus className="mr-2 h-4 w-4 text-blue-500" />
-                              Convert to Team
-                            </DropdownMenuItem>
-                          </>
-                        )}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem
+                        <DropdownMenuItem 
                           onClick={() => setDeleteProjectId(project.id)}
                           className="text-destructive focus:text-destructive"
                         >
@@ -740,16 +658,8 @@ export function Sidebar({
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <div className="font-medium text-sm truncate">
-                            {project.name.length > 12 ? `${project.name.substring(0, 12)}...` : project.name}
-                          </div>
-                          {project.organizationId && (
-                            <Badge variant="secondary" className="h-4 px-1.5 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-0 flex-shrink-0">
-                              <Users className="h-2.5 w-2.5 mr-0.5" />
-                              Team
-                            </Badge>
-                          )}
+                        <div className="font-medium text-sm truncate">
+                          {project.name.length > 12 ? `${project.name.substring(0, 12)}...` : project.name}
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {new Date(project.lastActivity).toLocaleDateString()}
@@ -787,17 +697,8 @@ export function Sidebar({
                           <Copy className="mr-2 h-4 w-4" />
                           Clone
                         </DropdownMenuItem>
-                        {!project.organizationId && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => setConvertProject(project)}>
-                              <UserPlus className="mr-2 h-4 w-4 text-blue-500" />
-                              Convert to Team
-                            </DropdownMenuItem>
-                          </>
-                        )}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem
+                        <DropdownMenuItem 
                           onClick={() => setDeleteProjectId(project.id)}
                           className="text-destructive focus:text-destructive"
                         >
@@ -992,29 +893,6 @@ export function Sidebar({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Convert to Team Workspace Dialog */}
-      {convertProject && (
-        <ConvertToTeamDialog
-          open={!!convertProject}
-          onOpenChange={(open) => {
-            if (!open) setConvertProject(null)
-          }}
-          workspaceId={convertProject.id}
-          workspaceName={convertProject.name}
-          onConversionComplete={async () => {
-            setConvertProject(null)
-            // Refresh projects list
-            if (onProjectUpdated) {
-              await onProjectUpdated()
-            }
-            // Trigger backup to save updated state
-            if (onTriggerBackup) {
-              await onTriggerBackup()
-            }
-          }}
-        />
-      )}
     </div>
   )
 }

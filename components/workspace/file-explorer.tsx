@@ -21,7 +21,6 @@ if (typeof window !== 'undefined' && !window.JSZip) {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Badge } from "@/components/ui/badge"
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@/components/ui/context-menu"
 import {
   Dialog,
@@ -53,13 +52,10 @@ import {
   File,
   Upload,
   Download,
-  Archive,
-  Users
+  Archive
 } from "lucide-react"
 import type { Workspace as Project, File as FileItem } from "@/lib/storage-manager"
 import { dbManager } from '@/lib/indexeddb';
-import { TeamPresence } from './team-presence'
-import { TeamActivityFeed } from './team-activity-feed'
 
 interface FileExplorerProps {
   project: Project | null
@@ -79,7 +75,6 @@ interface FileNode {
 export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplorerProps) {
   const [files, setFiles] = useState<FileItem[]>([])
   const [fileTree, setFileTree] = useState<FileNode[]>([])
-  const [isTeamWorkspace, setIsTeamWorkspace] = useState(false)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newFileName, setNewFileName] = useState("")
   const [newFileType, setNewFileType] = useState("tsx")
@@ -130,7 +125,7 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
       const file = files.find(f => f.path === filePath)
       if (!file) return
       const newPath = `${folderNode.path}/${file.name}`
-      await storageManager.updateFileTeamAware(project.id, filePath, { path: newPath })
+      await storageManager.updateFile(project.id, filePath, { path: newPath })
       await fetchFiles()
       
       // Trigger auto cloud backup after file move
@@ -150,7 +145,7 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
       const file = files.find(f => f.path === renamingFile)
       if (!file) return
       const newPath = renamingFile.split('/').slice(0, -1).concat(renameValue).join('/')
-      await storageManager.updateFileTeamAware(project.id, renamingFile, { name: renameValue, path: newPath })
+      await storageManager.updateFile(project.id, renamingFile, { name: renameValue, path: newPath })
       setRenamingFile(null)
       setRenameValue("")
       await fetchFiles()
@@ -169,12 +164,9 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
     if (project) {
       console.log('🔄 FileExplorer: Fetching files for project:', project.id, '- useEffect triggered by project prop change')
       fetchFiles()
-      // Detect workspace type
-      setIsTeamWorkspace(!!project.organizationId)
     } else {
       console.log('🔄 FileExplorer: No project selected, clearing files')
       setFiles([])
-      setIsTeamWorkspace(false)
     }
   }, [project])
 
@@ -235,7 +227,7 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
       await storageManager.init();
 
       // Get files directly from IndexedDB
-      const projectFiles = await storageManager.getFilesTeamAware(project.id);
+      const projectFiles = await storageManager.getFiles(project.id);
       console.log(`✅ FileExplorer: Found ${projectFiles.length} files for project: ${project.id}`);
 
       // Verify all files belong to correct workspace
@@ -518,7 +510,7 @@ export function FileExplorer({ project, onFileSelect, selectedFile }: FileExplor
       await storageManager.init()
       
       // Create file directly in IndexedDB
-      const newFile = await storageManager.createFileTeamAware({
+      const newFile = await storageManager.createFile({
         workspaceId: project.id,
         name: fileName,
         path: filePath,
@@ -1075,7 +1067,7 @@ enabled = false`
       await storageManager.init()
       
       // Delete file directly from IndexedDB
-      await storageManager.deleteFileTeamAware(project.id, file.path);
+      await storageManager.deleteFile(project.id, file.path);
       console.log('File deleted successfully:', file.name)
       
       await fetchFiles()
@@ -1101,18 +1093,18 @@ enabled = false`
       await storageManager.init()
       
       // Get all files in the folder and delete them
-      const projectFiles = await storageManager.getFilesTeamAware(project.id)
+      const projectFiles = await storageManager.getFiles(project.id)
       const filesInFolder = projectFiles.filter(file => file.path.startsWith(folderPath + '/'))
       
       // Delete all files in the folder
       for (const file of filesInFolder) {
-        await storageManager.deleteFileTeamAware(project.id, file.path)
+        await storageManager.deleteFile(project.id, file.path)
       }
       
       // Also delete the folder itself if it exists as a directory record
       const folderFile = projectFiles.find(file => file.path === folderPath && file.isDirectory)
       if (folderFile) {
-        await storageManager.deleteFileTeamAware(project.id, folderPath)
+        await storageManager.deleteFile(project.id, folderPath)
         console.log('Deleted folder record:', folderPath)
       }
       
@@ -1180,7 +1172,7 @@ enabled = false`
         const fileType = getFileTypeFromExtension(extension)
 
         // Create file record
-        const newFile = await storageManager.createFileTeamAware({
+        const newFile = await storageManager.createFile({
           workspaceId: project.id,
           name: file.name,
           path: filePath,
@@ -1721,27 +1713,10 @@ enabled = false`
     <div className="flex flex-col h-full border-r border-border">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border bg-card">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold flex items-center">
-              <Folder className="w-4 h-4 mr-2" />
-              Files
-            </h3>
-            {isTeamWorkspace && (
-              <Badge variant="secondary" className="h-5 px-2 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-0">
-                <Users className="h-3 w-3 mr-1" />
-                Team
-              </Badge>
-            )}
-          </div>
-          {isTeamWorkspace && project && (
-            <TeamPresence
-              workspaceId={project.id}
-              organizationId={project.organizationId}
-              className="border-l border-border pl-3"
-            />
-          )}
-        </div>
+        <h3 className="text-sm font-semibold flex items-center">
+          <Folder className="w-4 h-4 mr-2" />
+          Files
+        </h3>
         <div className="flex items-center space-x-1">
           <Button
             variant="ghost"
@@ -1775,12 +1750,6 @@ enabled = false`
               <Download className="h-4 w-4" />
             )}
           </Button>
-          {isTeamWorkspace && project && (
-            <TeamActivityFeed
-              workspaceId={project.id}
-              organizationId={project.organizationId}
-            />
-          )}
         </div>
       </div>
 

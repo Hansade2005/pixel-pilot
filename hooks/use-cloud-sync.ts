@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { uploadBackupToCloud } from '@/lib/cloud-sync'
+import { smartBackupToCloud } from '@/lib/cloud-sync'
 import { storageManager } from '@/lib/storage-manager'
 import { initAutoSync, setAutoSyncEnabled, updateAutoSyncUser, getAutoSyncStatus } from '@/lib/auto-sync-service'
 
@@ -71,7 +71,7 @@ export function useCloudSync(userId: string | null) {
         isSyncing.current = true
 
         // Upload backup to cloud (fallback periodic backup)
-        const success = await uploadBackupToCloud(userId)
+        const success = await smartBackupToCloud(userId)
 
         if (success) {
           lastBackupTime.current = Date.now()
@@ -98,7 +98,7 @@ export function useCloudSync(userId: string | null) {
 
     try {
       isSyncing.current = true
-      const success = await uploadBackupToCloud(userId)
+      const success = await smartBackupToCloud(userId)
 
       if (success) {
         lastBackupTime.current = Date.now()

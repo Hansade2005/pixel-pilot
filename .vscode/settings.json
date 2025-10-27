@@ -2,9 +2,17 @@
     "python-envs.defaultEnvManager": "ms-python.python:system",
     "python-envs.pythonProjects": [],
     "mcpServers": {
-        "supabase": {
-            "type": "http",
-            "url": "https://mcp.supabase.com/mcp?project_ref=lzuknbfbvpuscpammwzg"
-        }
+      "supabase": {
+			"type": "http",
+			"url": "https://mcp.supabase.com/mcp?project_ref=lzuknbfbvpuscpammwzg"
+		},
+		"Vercel": {
+			"url": "https://mcp.vercel.com",
+			"type": "http"
+		},
+		"github-mcp": {
+			"url": "https://api.githubcopilot.com/mcp/",
+			"type": "http"
+		}
     }
 }

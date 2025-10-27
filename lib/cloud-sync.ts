@@ -11,10 +11,44 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
   try {
     // Initialize storage manager
     await storageManager.init()
-    
+
     // Export all data from IndexedDB
     const data = await storageManager.exportData()
-    
+
+    // PROTECTION AGAINST EMPTY DATA OVERWRITING CLOUD BACKUP
+    // Check if local data appears to be cleared (all arrays empty or nearly empty)
+    const isLocalDataEmpty = Object.values(data).every((tableData: any) =>
+      Array.isArray(tableData) && tableData.length === 0
+    )
+
+    if (isLocalDataEmpty) {
+      console.log('uploadBackupToCloud: Local data appears empty, checking cloud backup...')
+
+      // Check if there's existing cloud backup
+      const { data: existingBackup, error: fetchError } = await supabase
+        .from('user_backups')
+        .select('backup_data, created_at')
+        .eq('user_id', userId)
+        .single()
+
+      if (!fetchError && existingBackup?.backup_data) {
+        const cloudData = existingBackup.backup_data
+        const hasCloudData = Object.values(cloudData).some((tableData: any) =>
+          Array.isArray(tableData) && tableData.length > 0
+        )
+
+        if (hasCloudData) {
+          console.log('uploadBackupToCloud: Cloud has data but local is empty - likely storage was cleared. Skipping backup to prevent data loss.')
+          console.log('uploadBackupToCloud: Consider restoring from cloud instead.')
+
+          // Optionally, we could automatically restore here, but let's be conservative and just skip
+          return false
+        }
+      }
+
+      console.log('uploadBackupToCloud: Both local and cloud data appear empty, proceeding with backup')
+    }
+
     // Save to Supabase
     const { error } = await supabase
       .from('user_backups')
@@ -48,6 +82,78 @@ export async function uploadBackupToCloud(userId: string): Promise<boolean> {
 }
 
 /**
+ * Smart backup function that handles empty data scenarios
+ * If local data is empty but cloud has data, it will restore from cloud instead of backing up
+ */
+export async function smartBackupToCloud(userId: string): Promise<boolean> {
+  try {
+    console.log('smartBackupToCloud: Starting smart backup for user:', userId)
+
+    // Initialize storage manager
+    await storageManager.init()
+
+    // Export all data from IndexedDB
+    const data = await storageManager.exportData()
+    console.log('smartBackupToCloud: Exported local data, checking emptiness...')
+
+    // Check if local data appears to be cleared
+    const tableCounts = Object.entries(data).map(([table, items]) => ({
+      table,
+      count: Array.isArray(items) ? items.length : 0
+    }))
+    console.log('smartBackupToCloud: Local data table counts:', tableCounts)
+
+    const isLocalDataEmpty = Object.values(data).every((tableData: any) =>
+      Array.isArray(tableData) && tableData.length === 0
+    )
+
+    if (isLocalDataEmpty) {
+      console.log('smartBackupToCloud: Local data appears empty, checking for cloud backup to restore...')
+
+      // Check if there's existing cloud backup
+      const { data: existingBackup, error: fetchError } = await supabase
+        .from('user_backups')
+        .select('backup_data, created_at')
+        .eq('user_id', userId)
+        .single()
+
+      if (fetchError) {
+        console.log('smartBackupToCloud: Error fetching cloud backup:', fetchError)
+      } else if (existingBackup?.backup_data) {
+        const cloudData = existingBackup.backup_data
+        const cloudTableCounts = Object.entries(cloudData).map(([table, items]) => ({
+          table,
+          count: Array.isArray(items) ? items.length : 0
+        }))
+        console.log('smartBackupToCloud: Cloud data table counts:', cloudTableCounts)
+
+        const hasCloudData = Object.values(cloudData).some((tableData: any) =>
+          Array.isArray(tableData) && tableData.length > 0
+        )
+
+        if (hasCloudData) {
+          console.log('smartBackupToCloud: Found cloud data, automatically restoring instead of backing up empty local data')
+          console.log('smartBackupToCloud: This prevents data loss when browser storage is cleared')
+          // Automatically restore from cloud
+          return await restoreBackupFromCloud(userId)
+        } else {
+          console.log('smartBackupToCloud: Cloud data is also empty, proceeding with empty backup')
+        }
+      } else {
+        console.log('smartBackupToCloud: No cloud backup found, proceeding with empty backup')
+      }
+    } else {
+      console.log('smartBackupToCloud: Local data is not empty, proceeding with normal backup')
+    }
+
+    // Normal backup process
+    console.log('smartBackupToCloud: Executing normal backup process')
+    return await uploadBackupToCloud(userId)
+  } catch (error) {
+    console.error("Error in smart backup:", error)
+    return false
+  }
+}/**
  * Download the latest backup from Supabase and restore it to IndexedDB
  */
 export async function restoreBackupFromCloud(userId: string): Promise<boolean> {
