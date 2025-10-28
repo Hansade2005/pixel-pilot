@@ -22,6 +22,7 @@ import { ChatInput } from "@/components/chat-input"
 import { AuthModal } from "@/components/auth-modal"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
+import { FeatureShowcase } from "@/components/FeatureShowcase"
 
 import { createClient } from "@/lib/supabase/client"
 import { TemplateManager } from "@/lib/template-manager"
@@ -163,7 +164,7 @@ export default function LandingPage() {
       <main className="relative z-10 flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] px-4 pt-16">
         {/* Dynamic Badge */}
         <div className="mb-6 animate-fade-in">
-          <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 px-6 py-3 text-sm font-semibold shadow-lg relative overflow-hidden">
+          <Badge className="bg-transparent backdrop-blur-[32px] text-white border border-white/20 px-6 py-3 text-sm font-semibold rounded-full shadow-lg relative overflow-hidden hover:bg-white/10 transition-all duration-300">
             <span
               className="inline-block transition-opacity duration-500 ease-in-out opacity-100"
               key={currentBadgeIndex}
@@ -204,6 +205,9 @@ export default function LandingPage() {
           </Link>
         </div>
       </main>
+
+      {/* Feature Showcase Section */}
+      <FeatureShowcase />
 
       {/* From Pixel Community Section */}
       <section className="relative z-10 py-24 bg-gray-900/30">

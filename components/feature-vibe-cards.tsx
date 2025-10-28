@@ -27,7 +27,14 @@ const features = [
     emoji: "🗄️",
     gradient: "from-blue-500 to-cyan-600",
     badges: ["AI-Powered", "New"],
-    details: "Advanced database with natural language queries and smart indexing"
+    details: "Advanced database with natural language queries and smart indexing. Ask questions in plain English and get instant results.",
+    features: [
+      "Natural language queries",
+      "Smart auto-indexing",
+      "Real-time analytics",
+      "AI-powered insights"
+    ],
+    cta: "Explore Database"
   },
   {
     id: "pipilot-enterprise",
@@ -37,7 +44,14 @@ const features = [
     emoji: "🏢",
     gradient: "from-purple-500 to-pink-600",
     badges: ["Enterprise", "Secure"],
-    details: "Built for teams with SSO, advanced permissions, and compliance"
+    details: "Built for teams with SSO, advanced permissions, and compliance. Deploy with confidence at enterprise scale.",
+    features: [
+      "Single Sign-On (SSO)",
+      "Advanced permissions",
+      "Compliance ready",
+      "Enterprise support"
+    ],
+    cta: "Start Enterprise Trial"
   },
   {
     id: "pipilot-teams",
@@ -47,7 +61,14 @@ const features = [
     emoji: "👥",
     gradient: "from-green-500 to-teal-600",
     badges: ["Collaboration", "Real-time"],
-    details: "Work together seamlessly with shared projects and live collaboration"
+    details: "Work together seamlessly with shared projects and live collaboration. Perfect for distributed teams.",
+    features: [
+      "Live collaboration",
+      "Shared workspaces",
+      "Team permissions",
+      "Real-time sync"
+    ],
+    cta: "Create Team Workspace"
   },
   {
     id: "mcp-server",
@@ -57,7 +78,14 @@ const features = [
     emoji: "🤖",
     gradient: "from-orange-500 to-red-600",
     badges: ["Coming Soon", "AI Agents"],
-    details: "Connect AI agents directly to your database with MCP protocol"
+    details: "Connect AI agents directly to your database with MCP protocol. The future of AI-agent-database integration.",
+    features: [
+      "MCP protocol support",
+      "AI agent integration",
+      "Secure connections",
+      "Real-time data access"
+    ],
+    cta: "Join Waitlist"
   },
   {
     id: "teams-workspace",
@@ -67,7 +95,14 @@ const features = [
     emoji: "🔄",
     gradient: "from-indigo-500 to-blue-600",
     badges: ["Workspace", "Management"],
-    details: "Organize projects, manage permissions, and track team progress"
+    details: "Organize projects, manage permissions, and track team progress with advanced workspace management tools.",
+    features: [
+      "Project organization",
+      "Permission management",
+      "Progress tracking",
+      "Team analytics"
+    ],
+    cta: "Manage Workspaces"
   },
   {
     id: "figma-import",
@@ -77,13 +112,32 @@ const features = [
     emoji: "🎨",
     gradient: "from-pink-500 to-rose-600",
     badges: ["Design", "Import"],
-    details: "Convert Figma designs into functional code instantly"
+    details: "Convert Figma designs into functional code instantly. Bridge the gap between design and development.",
+    features: [
+      "One-click import",
+      "Design-to-code conversion",
+      "Component extraction",
+      "Style preservation"
+    ],
+    cta: "Import from Figma"
   }
 ]
 
 export function FeatureVibeCards() {
   const [activeIndex, setActiveIndex] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -92,7 +146,7 @@ export function FeatureVibeCards() {
         setActiveIndex((prev) => (prev + 1) % features.length)
         setIsAnimating(false)
       }, 300)
-    }, 3000)
+    }, 4000)
 
     return () => clearInterval(interval)
   }, [])
@@ -101,7 +155,10 @@ export function FeatureVibeCards() {
     const cards = []
     const totalCards = features.length
     
-    for (let i = 0; i < 3; i++) {
+    // On mobile, show only 1 card, on larger screens show 3
+    const cardsToShow = isMobile ? 1 : 3
+    
+    for (let i = 0; i < cardsToShow; i++) {
       const index = (activeIndex + i) % totalCards
       cards.push({
         ...features[index],
@@ -128,23 +185,25 @@ export function FeatureVibeCards() {
           const scale = card.isActive ? 1 : 0.85
           const opacity = card.isActive ? 1 : 0.7
           const zIndex = 3 - index
-          const translateX = index === 0 ? 0 : index === 1 ? 120 : -120
+          const translateX = isMobile ? 0 : (index === 0 ? 0 : index === 1 ? 120 : -120)
           
           return (
             <Card
               key={`${card.id}-${index}`}
               className={`
                 relative transition-all duration-500 ease-out cursor-pointer
+                bg-[#758AFF1A] backdrop-blur-[32px] border border-[#758AFF4D] rounded-2xl
                 ${card.isActive ? 'ring-2 ring-white/20 ring-offset-2 ring-offset-transparent vibe-card-active' : ''}
                 ${isAnimating ? 'scale-95 opacity-50' : ''}
                 ${index === 1 ? 'animate-slide-in-right' : index === 2 ? 'animate-slide-in-left' : ''}
+                hover:bg-[#758AFF26] hover:border-[#758AFF60] hover:shadow-xl
               `}
               style={{
                 transform: `translateX(${translateX}px) scale(${scale})`,
                 opacity,
                 zIndex,
-                minWidth: card.isActive ? '320px' : '280px',
-                maxWidth: card.isActive ? '320px' : '280px'
+                minWidth: card.isActive ? '340px' : '300px',
+                maxWidth: card.isActive ? '340px' : '300px'
               }}
               onClick={() => setActiveIndex(features.findIndex(f => f.id === card.id))}
             >
@@ -167,13 +226,13 @@ export function FeatureVibeCards() {
                 </div>
 
                 {/* Badges */}
-                <div className="flex flex-wrap gap-2 mb-3">
+                <div className="flex flex-wrap gap-2 mb-4">
                   {card.badges.map((badge, badgeIndex) => (
                     <Badge 
                       key={badgeIndex}
                       variant="secondary" 
                       className={`
-                        text-xs px-2 py-1
+                        text-xs px-3 py-1 rounded-full border
                         ${badge === "Coming Soon" ? "bg-yellow-500/20 text-yellow-300 border-yellow-500/30" : 
                           badge === "New" ? "bg-green-500/20 text-green-300 border-green-500/30" :
                           "bg-purple-500/20 text-purple-300 border-purple-500/30"
@@ -193,17 +252,35 @@ export function FeatureVibeCards() {
                 </div>
 
                 {/* Content */}
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <p className="text-white/90 text-sm leading-relaxed">
                     {card.description}
                   </p>
                   
                   {card.isActive && (
-                    <div className="animate-fade-in">
-                      <div className="h-px bg-white/20 my-3" />
+                    <div className="animate-fade-in space-y-4">
+                      <div className="h-px bg-white/20" />
                       <p className="text-white/70 text-xs leading-relaxed">
                         {card.details}
                       </p>
+                      
+                      {/* Features List */}
+                      <div className="space-y-2">
+                        <h4 className="text-white/90 text-sm font-semibold">Key Features:</h4>
+                        <ul className="space-y-1">
+                          {card.features.map((feature, featureIndex) => (
+                            <li key={featureIndex} className="text-white/70 text-xs flex items-center">
+                              <span className="w-1.5 h-1.5 bg-white/50 rounded-full mr-2 flex-shrink-0"></span>
+                              {feature}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      
+                      {/* CTA Button */}
+                      <button className="w-full mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm font-medium rounded-lg border border-white/20 transition-all duration-200 hover:border-white/30">
+                        {card.cta}
+                      </button>
                     </div>
                   )}
                 </div>
