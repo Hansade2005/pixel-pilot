@@ -27,7 +27,7 @@ import { ChatInput } from "@/components/chat-input"
 import { AuthModal } from "@/components/auth-modal"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
-import { FeatureShowcase } from "@/components/FeatureShowcase"
+import FeatureShowcase from "@/components/FeatureShowcase"
 
 import { createClient } from "@/lib/supabase/client"
 import { TemplateManager } from "@/lib/template-manager"

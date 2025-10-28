@@ -106,16 +106,37 @@ export default function PiPilotFeaturesSlider() {
   const [direction, setDirection] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
+  const [cardsPerSlide, setCardsPerSlide] = useState(1);
+
+  // Responsive cards per slide
+  useEffect(() => {
+    const updateCardsPerSlide = () => {
+      const width = window.innerWidth;
+      if (width >= 1024) {
+        setCardsPerSlide(3); // lg: 3 cards
+      } else if (width >= 768) {
+        setCardsPerSlide(2); // md: 2 cards
+      } else {
+        setCardsPerSlide(1); // sm: 1 card
+      }
+    };
+
+    updateCardsPerSlide();
+    window.addEventListener('resize', updateCardsPerSlide);
+    return () => window.removeEventListener('resize', updateCardsPerSlide);
+  }, []);
+
+  const totalSlides = Math.ceil(features.length / cardsPerSlide);
 
   const nextSlide = useCallback(() => {
     setDirection(1);
-    setCurrentIndex((prev) => (prev + 1) % features.length);
-  }, []);
+    setCurrentIndex((prev) => (prev + 1) % totalSlides);
+  }, [totalSlides]);
 
   const prevSlide = useCallback(() => {
     setDirection(-1);
-    setCurrentIndex((prev) => (prev - 1 + features.length) % features.length);
-  }, []);
+    setCurrentIndex((prev) => (prev - 1 + totalSlides) % totalSlides);
+  }, [totalSlides]);
 
   const goToSlide = useCallback((index: number) => {
     setDirection(index > currentIndex ? 1 : -1);
@@ -126,7 +147,7 @@ export default function PiPilotFeaturesSlider() {
   useEffect(() => {
     if (!isAutoPlaying || isHovered) return;
 
-    const interval = setInterval(nextSlide, 5000);
+    const interval = setInterval(nextSlide, 6000);
     return () => clearInterval(interval);
   }, [isAutoPlaying, isHovered, nextSlide]);
 
@@ -145,7 +166,13 @@ export default function PiPilotFeaturesSlider() {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [nextSlide, prevSlide, isAutoPlaying]);
 
-  const currentFeature = features[currentIndex];
+  // Get current slide features
+  const getCurrentSlideFeatures = () => {
+    const startIndex = currentIndex * cardsPerSlide;
+    return features.slice(startIndex, startIndex + cardsPerSlide);
+  };
+
+  const currentSlideFeatures = getCurrentSlideFeatures();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
@@ -219,7 +246,7 @@ export default function PiPilotFeaturesSlider() {
             </Button>
           </motion.div>
 
-          {/* Feature Card */}
+          {/* Feature Cards Grid */}
           <AnimatePresence initial={false} custom={direction}>
             <motion.div
               key={currentIndex}
@@ -246,136 +273,154 @@ export default function PiPilotFeaturesSlider() {
               }}
               className="cursor-grab active:cursor-grabbing"
             >
-              <Card className="border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl overflow-hidden transition-all duration-500 hover:shadow-3xl hover:shadow-blue-500/20 group">
-                <CardHeader className="space-y-6 pb-6">
-                  <div className="flex items-start justify-between flex-wrap gap-4">
-                    <motion.div
-                      className="flex items-center gap-4"
-                      initial={{ opacity: 0, x: -50 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.2, duration: 0.6 }}
-                    >
-                      <div className="relative">
-                        <motion.div
-                          whileHover={{ rotate: 360 }}
-                          transition={{ duration: 0.6 }}
-                          className="relative"
-                        >
-                          {currentFeature.icon}
+              <div className={`grid gap-6 ${
+                cardsPerSlide === 1 ? 'grid-cols-1' :
+                cardsPerSlide === 2 ? 'grid-cols-1 md:grid-cols-2' :
+                'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+              }`}>
+                {currentSlideFeatures.map((feature, featureIndex) => (
+                  <motion.div
+                    key={feature.id}
+                    initial={{ opacity: 0, y: 50 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: featureIndex * 0.1, duration: 0.6 }}
+                    whileHover={{ y: -8, transition: { duration: 0.3 } }}
+                    className="group"
+                  >
+                    <Card className="border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl overflow-hidden transition-all duration-500 hover:shadow-3xl hover:shadow-blue-500/20 h-full">
+                      <CardHeader className="space-y-4 pb-4">
+                        <div className="flex items-start justify-between flex-wrap gap-3">
                           <motion.div
-                            className="absolute -bottom-1 -right-1"
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ delay: 0.4, type: "spring", stiffness: 500 }}
+                            className="flex items-center gap-3"
+                            initial={{ opacity: 0, x: -30 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.2 + featureIndex * 0.1, duration: 0.5 }}
                           >
-                            {currentFeature.secondaryIcon}
+                            <div className="relative">
+                              <motion.div
+                                whileHover={{ rotate: 360 }}
+                                transition={{ duration: 0.6 }}
+                                className="relative"
+                              >
+                                {feature.icon}
+                                <motion.div
+                                  className="absolute -bottom-1 -right-1"
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  transition={{ delay: 0.4 + featureIndex * 0.1, type: "spring", stiffness: 500 }}
+                                >
+                                  {feature.secondaryIcon}
+                                </motion.div>
+                              </motion.div>
+                            </div>
+                            <div>
+                              <CardTitle className="text-xl md:text-2xl text-white font-bold">
+                                {feature.title}
+                              </CardTitle>
+                            </div>
                           </motion.div>
-                        </motion.div>
-                      </div>
-                      <div>
-                        <CardTitle className="text-3xl md:text-4xl text-white font-bold">
-                          {currentFeature.title}
-                        </CardTitle>
-                      </div>
-                    </motion.div>
-                    <motion.div
-                      className="flex gap-2 flex-wrap"
-                      initial={{ opacity: 0, y: -20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3, duration: 0.5 }}
-                    >
-                      {currentFeature.badges.map((badge, idx) => (
-                        <Badge
-                          key={idx}
-                          variant="secondary"
-                          className="bg-white/10 text-white border-white/20 hover:bg-white/20 backdrop-blur-sm px-3 py-1 text-sm font-medium"
-                        >
-                          {badge}
-                        </Badge>
-                      ))}
-                    </motion.div>
-                  </div>
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4, duration: 0.6 }}
-                  >
-                    <CardDescription className="text-slate-300 text-lg md:text-xl leading-relaxed">
-                      {currentFeature.description}
-                    </CardDescription>
-                  </motion.div>
-                </CardHeader>
-
-                <CardContent className="space-y-6">
-                  <motion.div
-                    className="grid grid-cols-1 md:grid-cols-2 gap-4"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.5, duration: 0.6 }}
-                  >
-                    {currentFeature.highlights.map((highlight, idx) => (
-                      <motion.div
-                        key={idx}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.6 + idx * 0.1, duration: 0.4 }}
-                        whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,0.1)" }}
-                        className="flex items-center gap-3 p-4 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 transition-all duration-300 cursor-pointer group/item"
-                      >
+                          <motion.div
+                            className="flex gap-2 flex-wrap"
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 + featureIndex * 0.1, duration: 0.4 }}
+                          >
+                            {feature.badges.map((badge, idx) => (
+                              <Badge
+                                key={idx}
+                                variant="secondary"
+                                className="bg-white/10 text-white border-white/20 hover:bg-white/20 backdrop-blur-sm px-2 py-1 text-xs font-medium"
+                              >
+                                {badge}
+                              </Badge>
+                            ))}
+                          </motion.div>
+                        </div>
                         <motion.div
-                          className={`w-3 h-3 rounded-full bg-gradient-to-r ${currentFeature.gradient}`}
-                          whileHover={{ scale: 1.2 }}
-                          transition={{ type: "spring", stiffness: 400 }}
-                        ></motion.div>
-                        <span className="text-slate-200 text-base md:text-lg group-hover/item:text-white transition-colors">
-                          {highlight}
-                        </span>
-                      </motion.div>
-                    ))}
-                  </motion.div>
-                </CardContent>
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.4 + featureIndex * 0.1, duration: 0.5 }}
+                        >
+                          <CardDescription className="text-slate-300 text-sm md:text-base leading-relaxed">
+                            {feature.description}
+                          </CardDescription>
+                        </motion.div>
+                      </CardHeader>
 
-                <CardFooter className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-6 pt-8">
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.8, duration: 0.5 }}
-                  >
-                    <Button
-                      className={`w-full sm:w-auto bg-gradient-to-r ${currentFeature.gradient} hover:opacity-90 text-white shadow-lg shadow-blue-500/20 font-semibold px-8 py-3 text-lg transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/30`}
-                    >
-                      {currentFeature.cta}
-                    </Button>
-                  </motion.div>
+                      <CardContent className="space-y-4 flex-grow">
+                        <motion.div
+                          className="grid grid-cols-1 gap-2"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: 0.5 + featureIndex * 0.1, duration: 0.5 }}
+                        >
+                          {feature.highlights.map((highlight, idx) => (
+                            <motion.div
+                              key={idx}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 0.6 + featureIndex * 0.1 + idx * 0.05, duration: 0.3 }}
+                              whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,0.1)" }}
+                              className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 hover:border-white/20 transition-all duration-300 cursor-pointer group/item"
+                            >
+                              <motion.div
+                                className={`w-2 h-2 rounded-full bg-gradient-to-r ${feature.gradient}`}
+                                whileHover={{ scale: 1.3 }}
+                                transition={{ type: "spring", stiffness: 400 }}
+                              ></motion.div>
+                              <span className="text-slate-200 text-xs md:text-sm group-hover/item:text-white transition-colors">
+                                {highlight}
+                              </span>
+                            </motion.div>
+                          ))}
+                        </motion.div>
+                      </CardContent>
 
-                  {/* Progress Indicators */}
-                  <motion.div
-                    className="flex gap-3 justify-center"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.9, duration: 0.5 }}
-                  >
-                    {features.map((_, idx) => (
-                      <motion.button
-                        key={idx}
-                        onClick={() => goToSlide(idx)}
-                        className={`h-3 rounded-full transition-all duration-300 ${
-                          idx === currentIndex
-                            ? `w-12 bg-gradient-to-r ${currentFeature.gradient} shadow-lg`
-                            : 'w-3 bg-white/20 hover:bg-white/40'
-                        }`}
-                        whileHover={{ scale: 1.2 }}
-                        whileTap={{ scale: 0.9 }}
-                        animate={idx === currentIndex ? { scale: 1.1 } : { scale: 1 }}
-                      />
-                    ))}
+                      <CardFooter className="pt-4">
+                        <motion.div
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.8 + featureIndex * 0.1, duration: 0.4 }}
+                          className="w-full"
+                        >
+                          <Button
+                            className={`w-full bg-gradient-to-r ${feature.gradient} hover:opacity-90 text-white shadow-lg shadow-blue-500/20 font-semibold px-4 py-2 text-sm md:text-base transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/30`}
+                          >
+                            {feature.cta}
+                          </Button>
+                        </motion.div>
+                      </CardFooter>
+                    </Card>
                   </motion.div>
-                </CardFooter>
-              </Card>
+                ))}
+              </div>
             </motion.div>
           </AnimatePresence>
+
+          {/* Progress Indicators */}
+          <motion.div
+            className="flex gap-3 justify-center mt-8"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.9, duration: 0.5 }}
+          >
+            {Array.from({ length: totalSlides }, (_, idx) => (
+              <motion.button
+                key={idx}
+                onClick={() => goToSlide(idx)}
+                className={`h-3 rounded-full transition-all duration-300 ${
+                  idx === currentIndex
+                    ? 'w-12 bg-gradient-to-r from-blue-500 to-purple-500 shadow-lg'
+                    : 'w-3 bg-white/20 hover:bg-white/40'
+                }`}
+                whileHover={{ scale: 1.2 }}
+                whileTap={{ scale: 0.9 }}
+                animate={idx === currentIndex ? { scale: 1.1 } : { scale: 1 }}
+              />
+            ))}
+          </motion.div>
         </div>
 
         {/* Counter */}
@@ -386,7 +431,7 @@ export default function PiPilotFeaturesSlider() {
           transition={{ delay: 1, duration: 0.5 }}
         >
           <span className="text-xl font-medium bg-white/5 px-4 py-2 rounded-full backdrop-blur-sm border border-white/10">
-            {currentIndex + 1} / {features.length}
+            {currentIndex + 1} / {totalSlides}
           </span>
         </motion.div>
 
