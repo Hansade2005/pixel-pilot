@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 // import { Poppins } from 'next/font/google'
 import './globals.css'
+import '../styles/vibe-cards.css'
 import { Toaster } from "@/components/ui/toaster"
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
