@@ -192,7 +192,7 @@ export default function LandingPage() {
                 <Heart className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 text-white fill-current" />
               </div>
             </div>
-            <span> Amazing</span>
+            <span className="pt-0.5 tracking-tight md:pt-0"> Amazing</span>
           </h1>
           <p className="mb-6 text-center text-lg leading-tight text-white/65 md:text-xl">
             Create apps and websites by chatting with AI
