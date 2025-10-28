@@ -16,7 +16,8 @@ import {
   Square,
   Sparkles,
   Link as LinkIcon,
-  X
+  X,
+  Github
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -31,6 +32,21 @@ import {
 } from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Suggestions, Suggestion } from "@/components/ai-elements/suggestion"
+
+// Load JSZip from CDN (same as file explorer)
+if (typeof window !== 'undefined' && !window.JSZip) {
+  const script = document.createElement('script')
+  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
+  script.async = true
+  document.head.appendChild(script)
+}
+
+// Type declaration for JSZip
+declare global {
+  interface Window {
+    JSZip?: any
+  }
+}
 
 interface ChatInputProps {
   onAuthRequired: () => void
@@ -69,6 +85,12 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   const [attachedUrl, setAttachedUrl] = useState("")
   const [showUrlPopover, setShowUrlPopover] = useState(false)
   const [urlInput, setUrlInput] = useState("")
+
+  // GitHub import state
+  const [githubRepoUrl, setGithubRepoUrl] = useState("")
+  const [showGithubPopover, setShowGithubPopover] = useState(false)
+  const [githubInput, setGithubInput] = useState("")
+  const [isImportingGithub, setIsImportingGithub] = useState(false)
 
   // Fetch user on mount
   useEffect(() => {
@@ -396,10 +418,197 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     }
   }
 
+  const applyGithubFiles = async (workspaceId: string, zipData: string, repoName: string) => {
+    try {
+      console.log('📦 Extracting GitHub repository files...')
+
+      // Convert base64 to blob
+      const zipBlob = new Blob([Uint8Array.from(atob(zipData), c => c.charCodeAt(0))], {
+        type: 'application/zip'
+      })
+
+      // Wait for JSZip to load if it's not ready yet (same as file explorer)
+      if (typeof window !== 'undefined' && !window.JSZip) {
+        await new Promise((resolve) => {
+          const checkJSZip = () => {
+            if (window.JSZip) {
+              resolve(void 0)
+            } else {
+              setTimeout(checkJSZip, 100)
+            }
+          }
+          checkJSZip()
+        })
+      }
+
+      if (!window.JSZip) {
+        throw new Error('JSZip library not loaded')
+      }
+
+      // Load ZIP using window.JSZip (same as file explorer)
+      const zip = await window.JSZip.loadAsync(zipBlob)
+
+      const { storageManager } = await import('@/lib/storage-manager')
+      const filesToCreate: Array<{ path: string; content: string }> = []
+
+      // Process each file in the zip
+      for (const [path, zipEntry] of Object.entries(zip.files)) {
+        const entry = zipEntry as any
+        if (entry.dir) continue // Skip directories
+
+        // Remove the repo name prefix from path (e.g., "repo-name-main/" -> "")
+        const cleanPath = path.replace(`${repoName}-main/`, '').replace(`${repoName}-master/`, '')
+
+        if (!cleanPath || cleanPath.startsWith('.') || cleanPath.includes('/.git/')) continue
+
+        try {
+          const content = await entry.async('text')
+          filesToCreate.push({
+            path: cleanPath,
+            content: content
+          })
+        } catch (error) {
+          console.warn(`⚠️ Could not extract text content for ${cleanPath}:`, error)
+        }
+      }
+
+      console.log(`📝 Creating ${filesToCreate.length} files in workspace ${workspaceId}`)
+
+      // Create files in storage manager
+      for (const file of filesToCreate) {
+        await storageManager.createFile({
+          workspaceId,
+          name: file.path.split('/').pop() || file.path,
+          path: file.path,
+          content: file.content,
+          fileType: file.path.split('.').pop() || 'text',
+          type: file.path.split('.').pop() || 'text',
+          size: file.content.length,
+          isDirectory: false,
+          folderId: undefined,
+          metadata: {}
+        })
+      }
+
+      console.log('✅ GitHub files applied successfully')
+
+    } catch (error) {
+      console.error('❌ Error applying GitHub files:', error)
+      throw new Error('Failed to extract repository files')
+    }
+  }
+
+  const handleGithubImport = async (user: any) => {
+    try {
+      setIsImportingGithub(true)
+      toast.loading('Importing GitHub repository...', { id: 'github-import' })
+
+      // Import the repository
+      const response = await fetch('/api/github/import-repo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          repoUrl: githubRepoUrl.trim(),
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to import repository')
+      }
+
+      const data = await response.json()
+      console.log('✅ GitHub repo imported:', data)
+
+      // Extract repo info
+      const repoName = data.repoName
+      const repoOwner = data.owner
+      const zipData = data.zipData
+
+      // Create project with repo details
+      const projectName = repoName
+      const projectDescription = `Imported from GitHub: ${repoOwner}/${repoName}`
+
+      // Generate unique slug
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+
+      const baseSlug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+      let slug = baseSlug
+      let counter = 1
+
+      // Check if slug exists and append number if needed
+      while (await storageManager.getWorkspaceBySlug(user.id, slug)) {
+        slug = `${baseSlug}-${counter}`
+        counter++
+
+        // Prevent infinite loop
+        if (counter > 100) {
+          // Fallback to timestamp-based slug
+          slug = `${baseSlug}-${Date.now()}`
+          break
+        }
+      }
+
+      console.log('📝 Creating project with name:', projectName, 'and slug:', slug)
+      const workspace = await storageManager.createWorkspace({
+        name: projectName,
+        description: projectDescription,
+        userId: user.id,
+        isPublic: false,
+        isTemplate: false,
+        lastActivity: new Date().toISOString(),
+        deploymentStatus: 'not_deployed',
+        slug
+      })
+
+      // Extract and apply GitHub files
+      await applyGithubFiles(workspace.id, zipData, repoName)
+
+      // Create initial checkpoint
+      try {
+        const { createCheckpoint } = await import('@/lib/checkpoint-utils')
+        const initialCheckpointMessageId = `github-import-${workspace.id}`
+        await createCheckpoint(workspace.id, initialCheckpointMessageId)
+        console.log(`✅ Created initial GitHub import checkpoint for workspace ${workspace.id}`)
+
+        // Store the checkpoint message ID
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem(`initial-checkpoint-${workspace.id}`, initialCheckpointMessageId)
+        }
+      } catch (checkpointError) {
+        console.error('Failed to create initial checkpoint:', checkpointError)
+      }
+
+      // Store import info in sessionStorage
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(`initial-prompt-${workspace.id}`, `Imported from GitHub: ${githubRepoUrl}`)
+        sessionStorage.removeItem('lastSelectedProject')
+        sessionStorage.removeItem('cachedFiles')
+      }
+
+      toast.success('GitHub repository imported successfully!', { id: 'github-import' })
+
+      // Clear the input and redirect
+      setPrompt("")
+      setGithubRepoUrl("")
+      router.push(`/workspace?newProject=${workspace.id}`)
+
+    } catch (error) {
+      console.error('❌ Error importing GitHub repo:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to import repository', { id: 'github-import' })
+    } finally {
+      setIsImportingGithub(false)
+      setIsGenerating(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!prompt.trim()) return
+    if (!prompt.trim() && !githubRepoUrl.trim()) return
 
     // Check if user is authenticated
     const { data: { user } } = await supabase.auth.getUser()
@@ -411,6 +620,13 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     setIsGenerating(true)
 
     try {
+      // Handle GitHub import
+      if (githubRepoUrl.trim()) {
+        console.log('🚀 ChatInput: Importing GitHub repository:', githubRepoUrl)
+        await handleGithubImport(user)
+        return
+      }
+
       console.log('🚀 ChatInput: Generating project details with Pixtral for prompt:', prompt)
       
       // Generate project name and description using Pixtral
@@ -472,12 +688,44 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
           slug
         })
         
-        // Apply template files based on selection
-        const { TemplateService } = await import('@/lib/template-service')
-        if (selectedTemplate === 'nextjs') {
-          await TemplateService.applyNextJSTemplate(workspace.id)
+        // Apply files based on GitHub import or template selection
+        if (githubRepoUrl.trim()) {
+          // Import from GitHub repository
+          console.log('🚀 Importing from GitHub:', githubRepoUrl)
+          toast.loading('Importing GitHub repository...', { id: 'github-import' })
+
+          try {
+            const importResponse = await fetch('/api/github/import-repo', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ repoUrl: githubRepoUrl.trim() })
+            })
+
+            if (!importResponse.ok) {
+              throw new Error('Failed to import GitHub repository')
+            }
+
+            const importData = await importResponse.json()
+
+            if (importData.success) {
+              await applyGithubFiles(workspace.id, importData.zipData, importData.repoName)
+              toast.success('GitHub repository imported!', { id: 'github-import' })
+            } else {
+              throw new Error(importData.error || 'Failed to import repository')
+            }
+          } catch (githubError) {
+            console.error('GitHub import error:', githubError)
+            toast.error('Failed to import GitHub repository', { id: 'github-import' })
+            throw githubError
+          }
         } else {
-          await TemplateService.applyViteReactTemplate(workspace.id)
+          // Apply template files based on selection
+          const { TemplateService } = await import('@/lib/template-service')
+          if (selectedTemplate === 'nextjs') {
+            await TemplateService.applyNextJSTemplate(workspace.id)
+          } else {
+            await TemplateService.applyViteReactTemplate(workspace.id)
+          }
         }
         
         // CRITICAL FIX: Wait for IndexedDB transactions to complete
@@ -594,6 +842,20 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     toast.success("URL removed")
   }
 
+  const handleGithubAttachment = () => {
+    if (githubInput.trim()) {
+      setGithubRepoUrl(githubInput.trim())
+      setGithubInput("")
+      setShowGithubPopover(false)
+      toast.success("GitHub repository attached successfully!")
+    }
+  }
+
+  const handleRemoveGithub = () => {
+    setGithubRepoUrl("")
+    toast.success("GitHub repository removed")
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -703,6 +965,23 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                     onClick={handleRemoveUrl}
                     className="ml-1 text-blue-400 hover:text-blue-200 transition-colors"
                     title="Remove URL"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* GitHub Repository Attachment Pills */}
+            {githubRepoUrl && (
+              <div className="flex items-center gap-2 px-4">
+                <div className="flex items-center gap-1 bg-gray-900/20 border border-gray-700/30 px-3 py-1.5 rounded-full text-sm text-gray-300">
+                  <Github className="w-3 h-3" />
+                  <span className="truncate max-w-[200px]">{githubRepoUrl}</span>
+                  <button
+                    onClick={handleRemoveGithub}
+                    className="ml-1 text-gray-400 hover:text-gray-200 transition-colors"
+                    title="Remove GitHub repository"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -843,6 +1122,56 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
             </div>
           </form>
         </div>
+      </div>
+
+      {/* GitHub Import Badge Button */}
+      <div className="flex justify-center mt-4">
+        <Popover open={showGithubPopover} onOpenChange={setShowGithubPopover}>
+          <PopoverTrigger asChild>
+            <button 
+              type="button"
+              disabled={isGenerating || isImportingGithub}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-800/60 hover:bg-gray-700/60 border border-gray-600/50 rounded-full text-gray-300 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg backdrop-blur-sm"
+              title="Import from GitHub"
+            >
+              <Github className="w-4 h-4" />
+              <span className="text-sm font-medium">Import from GitHub</span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 p-4 z-[70]" side="top" align="center">
+            <div className="space-y-3">
+              <div>
+                <h4 className="text-sm font-medium text-gray-200">Import from GitHub</h4>
+                <p className="text-xs text-gray-400 mt-1">
+                  Enter a GitHub repository URL to import and start building from it.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  placeholder="https://github.com/owner/repo"
+                  value={githubInput}
+                  onChange={(e) => setGithubInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleGithubAttachment()
+                    }
+                  }}
+                  className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  autoFocus
+                />
+                <button
+                  onClick={handleGithubAttachment}
+                  disabled={!githubInput.trim()}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                >
+                  Import
+                </button>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Suggestion Pills */}
