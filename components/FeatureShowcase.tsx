@@ -78,21 +78,15 @@ const features = [
 
 const slideVariants = {
   enter: (direction: number) => ({
-    x: direction > 0 ? 1000 : -1000,
-    opacity: 0,
-    scale: 0.8,
+    x: direction > 0 ? '100%' : '-100%',
   }),
   center: {
     zIndex: 1,
     x: 0,
-    opacity: 1,
-    scale: 1,
   },
   exit: (direction: number) => ({
     zIndex: 0,
-    x: direction < 0 ? 1000 : -1000,
-    opacity: 0,
-    scale: 0.8,
+    x: direction < 0 ? '100%' : '-100%',
   }),
 };
 
@@ -202,49 +196,33 @@ export default function PiPilotFeaturesSlider() {
         {/* Slider Container */}
         <div className="relative" onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
           {/* Navigation Buttons */}
-          <motion.div
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
+          <Button
+            onClick={prevSlide}
+            variant="outline"
+            size="icon"
+            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-6 z-30 rounded-full bg-white/10 backdrop-blur-xl border-white/20 hover:bg-white/20 shadow-2xl shadow-black/50 transition-all duration-300 hover:shadow-blue-500/30 md:-translate-x-16 hover:scale-110 active:scale-95"
           >
-            <Button
-              onClick={prevSlide}
-              variant="outline"
-              size="icon"
-              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-6 z-20 rounded-full bg-white/10 backdrop-blur-xl border-white/20 hover:bg-white/20 shadow-2xl shadow-black/50 transition-all duration-300 hover:shadow-blue-500/30 md:-translate-x-16"
-            >
-              <ChevronLeft className="w-6 h-6 text-white" />
-            </Button>
-          </motion.div>
+            <ChevronLeft className="w-6 h-6 text-white" />
+          </Button>
 
-          <motion.div
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
+          <Button
+            onClick={nextSlide}
+            variant="outline"
+            size="icon"
+            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-6 z-30 rounded-full bg-white/10 backdrop-blur-xl border-white/20 hover:bg-white/20 shadow-2xl shadow-black/50 transition-all duration-300 hover:shadow-blue-500/30 md:translate-x-16 hover:scale-110 active:scale-95"
           >
-            <Button
-              onClick={nextSlide}
-              variant="outline"
-              size="icon"
-              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-6 z-20 rounded-full bg-white/10 backdrop-blur-xl border-white/20 hover:bg-white/20 shadow-2xl shadow-black/50 transition-all duration-300 hover:shadow-blue-500/30 md:translate-x-16"
-            >
-              <ChevronRight className="w-6 h-6 text-white" />
-            </Button>
-          </motion.div>
+            <ChevronRight className="w-6 h-6 text-white" />
+          </Button>
 
           {/* Auto-play toggle */}
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="absolute top-4 right-4 z-20"
+          <Button
+            onClick={() => setIsAutoPlaying(!isAutoPlaying)}
+            variant="outline"
+            size="icon"
+            className="absolute top-4 right-4 z-30 rounded-full bg-white/10 backdrop-blur-xl border-white/20 hover:bg-white/20 shadow-lg hover:scale-105 active:scale-95 transition-all duration-200"
           >
-            <Button
-              onClick={() => setIsAutoPlaying(!isAutoPlaying)}
-              variant="outline"
-              size="icon"
-              className="rounded-full bg-white/10 backdrop-blur-xl border-white/20 hover:bg-white/20 shadow-lg"
-            >
-              {isAutoPlaying ? <Pause className="w-4 h-4 text-white" /> : <Play className="w-4 h-4 text-white" />}
-            </Button>
-          </motion.div>
+            {isAutoPlaying ? <Pause className="w-4 h-4 text-white" /> : <Play className="w-4 h-4 text-white" />}
+          </Button>
 
           {/* Feature Cards Grid */}
           <AnimatePresence initial={false} custom={direction}>
@@ -256,9 +234,7 @@ export default function PiPilotFeaturesSlider() {
               animate="center"
               exit="exit"
               transition={{
-                x: { type: "spring", stiffness: 300, damping: 30 },
-                opacity: { duration: 0.3 },
-                scale: { duration: 0.3 }
+                x: { type: "tween", duration: 0.4, ease: "easeInOut" },
               }}
               drag="x"
               dragConstraints={{ left: 0, right: 0 }}
