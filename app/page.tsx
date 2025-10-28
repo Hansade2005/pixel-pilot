@@ -10,6 +10,7 @@ import {
   Image as ImageIcon,
   Gift,
   Bell,
+  Eye,
   Heart,
   ChevronDown,
   ExternalLink,
@@ -21,7 +22,7 @@ import { ChatInput } from "@/components/chat-input"
 import { AuthModal } from "@/components/auth-modal"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
-import { AnimatedCodeDemo } from "@/components/animated-code-demo"
+
 import { createClient } from "@/lib/supabase/client"
 import { TemplateManager } from "@/lib/template-manager"
 import { toast } from "sonner"
@@ -164,9 +165,14 @@ export default function LandingPage() {
           <ChatInput onAuthRequired={handleAuthRequired} />
         </div>
 
-        {/* Animated Code Demo Section */}
-        <div className="mt-24 mb-12 w-full">
-          <AnimatedCodeDemo />
+        {/* CTA Button Section */}
+        <div className="mt-24 mb-12 w-full text-center">
+          <Link href="/demo">
+            <Button className="px-8 py-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-lg rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+              <Eye className="w-5 h-5 mr-2" />
+              See Live Demo
+            </Button>
+          </Link>
         </div>
       </main>
 
