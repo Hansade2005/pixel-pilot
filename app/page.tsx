@@ -22,7 +22,6 @@ import { ChatInput } from "@/components/chat-input"
 import { AuthModal } from "@/components/auth-modal"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
-import { FeatureVibeCards } from "@/components/feature-vibe-cards"
 
 import { createClient } from "@/lib/supabase/client"
 import { TemplateManager } from "@/lib/template-manager"
@@ -36,10 +35,27 @@ export default function LandingPage() {
   const [templates, setTemplates] = useState<any[]>([])
   const [sortBy, setSortBy] = useState<string>('popular')
   const [filterBy, setFilterBy] = useState<string>('all')
+  const [currentBadgeIndex, setCurrentBadgeIndex] = useState(0)
+
+  const badgeTexts = [
+    "🎉 PiPilot DB",
+    "🚀 PiPilot Enterprise",
+    "👥 PiPilot Teams",
+    "⏳ Coming Soon: PiPilot DB MCP Server",
+    "🏢 Teams Workspace",
+    "🎨 Figma Import"
+  ]
 
   useEffect(() => {
     checkUser()
     loadTemplates()
+
+    // Badge rotation effect
+    const badgeInterval = setInterval(() => {
+      setCurrentBadgeIndex((prev) => (prev + 1) % badgeTexts.length)
+    }, 3000) // Change every 3 seconds
+
+    return () => clearInterval(badgeInterval)
   }, [])
 
   const loadTemplates = () => {
@@ -145,13 +161,20 @@ export default function LandingPage() {
 
       {/* Main Content */}
       <main className="relative z-10 flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] px-4 pt-16">
+        {/* Dynamic Badge */}
+        <div className="mb-6 animate-fade-in">
+          <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 px-6 py-3 text-sm font-semibold shadow-lg relative overflow-hidden">
+            <span
+              className="inline-block transition-opacity duration-500 ease-in-out opacity-100"
+              key={currentBadgeIndex}
+            >
+              {badgeTexts[currentBadgeIndex]}
+            </span>
+          </Badge>
+        </div>
+
         {/* Hero Section */}
-        <div className="text-center mb-8">
-          <div className="mb-4">
-            <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 px-4 py-2 text-sm font-semibold mb-4">
-              🎉 New Features Launched
-            </Badge>
-          </div>
+        <div className="text-center mb-16">
           <h2 className="text-2xl sm:text-4xl md:text-7xl lg:text-8xl font-bold text-white mb-4 md:mb-6 leading-tight">
             Build something{" "}
             <span className="inline-flex items-center">
@@ -161,21 +184,18 @@ export default function LandingPage() {
               Amazing
             </span>
           </h2>
-          <p className="text-xl md:text-2xl text-white/80 max-w-2xl mx-auto mb-8">
-            Create webapps by chatting with AI. Now with powerful new features for teams and enterprises.
+          <p className="text-xl md:text-2xl text-white/80 max-w-2xl mx-auto">
+            Create webapps by chatting with AI.
           </p>
         </div>
 
-        {/* Feature Vibe Cards */}
-        <FeatureVibeCards />
-
         {/* Chat Input Section */}
-        <div className="w-full max-w-4xl mx-auto mt-8">
+        <div className="w-full max-w-4xl mx-auto">
           <ChatInput onAuthRequired={handleAuthRequired} />
         </div>
 
         {/* CTA Button Section */}
-        <div className="mt-12 mb-8 w-full text-center">
+        <div className="mt-24 mb-12 w-full text-center">
           <Link href="/demo">
             <Button className="px-8 py-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-lg rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
               <Eye className="w-5 h-5 mr-2" />
@@ -195,7 +215,7 @@ export default function LandingPage() {
                 <Users className="w-4 h-4 text-purple-400" />
               </div>
               <h2 className="text-3xl md:text-4xl font-bold text-white">
-                From PiPilot Community
+                From Pixel Community
               </h2>
             </div>
             
