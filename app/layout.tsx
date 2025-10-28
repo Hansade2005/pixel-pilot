@@ -15,10 +15,10 @@ import { ThemeProvider } from "@/components/theme-provider"
 // })
 
 export const metadata: Metadata = {
-  title: 'PiPilot - Plan, build & ship faster with AI',
-  description: 'Plan, build & ship faster with PiPilot. Create webapps by chatting with AI.',
-  keywords: ['AI', 'app development',"mobile development","Canadian Vibe Coding Agent", 'web development', 'chat to code', 'pipilot'],
-  authors: [{ name: 'PiPilot' }],
+  title: 'PiPilot - Canada\'s First Agentic Vibe Coding Platform | AI App Builder',
+  description: 'Discover PiPilot, Canada\'s pioneering Agentic Vibe Coding Platform. Build apps faster with AI - the ultimate alternative to Lovable.dev, Bolt.new, v0, and Replit. Chat to code, deploy instantly.',
+  keywords: ['PiPilot', 'AI coding platform Canada', 'agentic vibe coding', 'AI app builder 2025', 'vibe coding tools', 'chat to code', 'Canadian AI development', 'first agentic coding platform', 'Lovable alternative', 'Bolt.new competitor', 'v0 replacement', 'Replit better', 'AI-powered app development', 'no-code AI builder', 'Canadian tech innovation'],
+  authors: [{ name: 'PiPilot Team' }],
   creator: 'PiPilot',
   publisher: 'Anye Happiness Ade',
   formatDetection: {
@@ -28,17 +28,17 @@ export const metadata: Metadata = {
   },
   metadataBase: new URL('https://pipilot.dev'),
   openGraph: {
-    title: 'PiPilot - AI-Powered App Development',
-    description: 'Plan, build & ship faster with AI-powered app development. Create webapps by chatting with AI.',
+    title: 'PiPilot - Canada\'s First Agentic Vibe Coding Platform',
+    description: 'Build apps 10x faster with Canada\'s leading AI coding platform. Agentic Vibe Coding - the future of development. Superior to Lovable, Bolt, v0, and Replit.',
     url: 'https://pipilot.dev',
     siteName: 'PiPilot',
     type: 'website',
-    locale: 'en_US',
+    locale: 'en_CA',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'PiPilot - AI-Powered App Development',
-    description: 'Plan, build & ship faster with AI-powered app development. Create webapps by chatting with AI.',
+    title: 'PiPilot - Canada\'s #1 Agentic Vibe Coding Platform',
+    description: 'Experience the power of agentic AI coding. Canada\'s first and best alternative to global platforms like Lovable.dev, Bolt.new, v0, and Replit.',
     creator: '@anyehappinessade',
   },
   robots: {
@@ -52,6 +52,10 @@ export const metadata: Metadata = {
       'max-snippet': -1,
     },
   },
+  alternates: {
+    canonical: 'https://pipilot.dev',
+  },
+  category: 'Technology',
   icons: {
     icon: '/logo.png',
     shortcut: '/logo.png',

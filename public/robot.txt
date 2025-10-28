@@ -1,7 +1,15 @@
-# robots.txt for pipilot.dev
-# Allow all major search engines to crawl the site
+# robots.txt for pipilot.dev - Canada's First Agentic Vibe Coding Platform
+# Allow all major search engines to crawl the site for maximum visibility
 User-agent: *
 Allow: /
+
+# Specific allowances for key pages
+Allow: /community
+Allow: /pricing
+Allow: /enterprise
+Allow: /blog
+Allow: /docs
+Allow: /showcase
 
 # Disallow sensitive or unnecessary files/folders
 Disallow: /admin/
@@ -9,9 +17,14 @@ Disallow: /api/
 Disallow: /private/
 Disallow: /node_modules/
 Disallow: /assets/temp/
+Disallow: /_next/
+Disallow: /.next/
 
 # Sitemap location
 Sitemap: https://pipilot.dev/sitemap.xml
 
 # Crawl-delay (optional, only for certain bots like Bing)
-Crawl-delay: 10
+Crawl-delay: 1
+
+# Host directive for canonical domain
+Host: https://pipilot.dev
