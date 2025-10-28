@@ -154,7 +154,7 @@ requests.post(
         <section className="pt-32 pb-20 px-4">
           <div className="container mx-auto max-w-6xl text-center">
             <Badge className="mb-4 bg-purple-500/20 text-purple-300 border-purple-500/30">
-              Database as a Service
+             🎉 Database as a Service
             </Badge>
             <h1 className="text-5xl md:text-7xl font-bold text-white mb-6">
               PostgreSQL databases
