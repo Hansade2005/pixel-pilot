@@ -70,19 +70,21 @@ const features = [
 
 export function FeatureShowcase() {
   const [active, setActive] = useState(0)
-  const [cardsPerSlide, setCardsPerSlide] = useState(1)
+  const [isDesktop, setIsDesktop] = useState(false)
 
-  // Update cards per slide based on screen size
+  // Detect screen size
   useEffect(() => {
-    const updateCardsPerSlide = () => {
-      setCardsPerSlide(window.innerWidth >= 768 ? 2 : 1)
+    const checkIsDesktop = () => {
+      setIsDesktop(window.innerWidth >= 768) // md breakpoint
     }
 
-    updateCardsPerSlide()
-    window.addEventListener('resize', updateCardsPerSlide)
-    return () => window.removeEventListener('resize', updateCardsPerSlide)
+    checkIsDesktop()
+    window.addEventListener('resize', checkIsDesktop)
+    return () => window.removeEventListener('resize', checkIsDesktop)
   }, [])
 
+  // Calculate slides based on screen size
+  const cardsPerSlide = isDesktop ? 2 : 1
   const totalSlides = Math.ceil(features.length / cardsPerSlide)
 
   const nextSlide = () => {
@@ -97,16 +99,22 @@ export function FeatureShowcase() {
     setActive(index)
   }
 
+  // Get features for current slide
+  const getCurrentSlideFeatures = () => {
+    const startIndex = active * cardsPerSlide
+    return features.slice(startIndex, startIndex + cardsPerSlide)
+  }
+
   return (
     <section className="w-full py-16 px-2 md:px-0 bg-transparent">
       <h2 className="text-center text-3xl md:text-5xl font-extrabold mb-8 text-white drop-shadow-lg">Platform Features</h2>
-      <div className="relative w-full max-w-6xl mx-auto">
+      <div className="relative w-full max-w-7xl mx-auto">
         {/* Navigation Buttons */}
         <button
           onClick={prevSlide}
           className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={active === 0}
-          aria-label="Previous feature"
+          aria-label="Previous slide"
         >
           <ChevronLeft className="w-6 h-6" />
         </button>
@@ -115,7 +123,7 @@ export function FeatureShowcase() {
           onClick={nextSlide}
           className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={active === totalSlides - 1}
-          aria-label="Next feature"
+          aria-label="Next slide"
         >
           <ChevronRight className="w-6 h-6" />
         </button>
@@ -126,49 +134,48 @@ export function FeatureShowcase() {
             className="flex transition-transform duration-500 ease-in-out"
             style={{ transform: `translateX(-${active * 100}%)` }}
           >
+            {/* Create slides based on screen size */}
             {Array.from({ length: totalSlides }, (_, slideIndex) => (
               <div
                 key={slideIndex}
                 className="min-w-full flex-shrink-0 px-4"
               >
-                <div className={`grid gap-6 ${cardsPerSlide === 1 ? 'grid-cols-1' : 'md:grid-cols-2'}`}>
-                  {features
-                    .slice(slideIndex * cardsPerSlide, (slideIndex + 1) * cardsPerSlide)
-                    .map((feature, idx) => (
-                      <div
-                        key={feature.id}
-                        className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl p-8 flex flex-col justify-between transition-all duration-300 hover:scale-105 hover:border-white/40 hover:bg-white/10"
-                      >
-                        <div className="flex items-center gap-4 mb-6">
-                          <div className="w-16 h-16 rounded-full flex items-center justify-center bg-gradient-to-br from-white/10 to-white/20 shadow-lg">
-                            {feature.icon}
-                          </div>
-                          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-white/5 to-white/10 border border-white/20">
-                            {feature.secondaryIcon}
-                          </div>
+                <div className={`grid gap-6 ${isDesktop ? 'grid-cols-2' : 'grid-cols-1'} max-w-5xl mx-auto`}>
+                  {features.slice(slideIndex * cardsPerSlide, (slideIndex + 1) * cardsPerSlide).map((feature, idx) => (
+                    <div
+                      key={feature.id}
+                      className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl p-6 md:p-8 flex flex-col justify-between transition-all duration-300 hover:scale-105 hover:border-white/40 hover:bg-white/10 h-full"
+                    >
+                      <div className="flex items-center gap-4 mb-6">
+                        <div className="w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center bg-gradient-to-br from-white/10 to-white/20 shadow-lg">
+                          {feature.icon}
                         </div>
-                        <h3 className="text-2xl font-bold text-white mb-3">{feature.title}</h3>
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          {feature.badges.map((badge, i) => (
-                            <Badge key={i} className="bg-white/10 text-white/80 border border-white/20 rounded-full px-3 py-1 text-xs font-semibold backdrop-blur-md">
-                              {badge}
-                            </Badge>
-                          ))}
+                        <div className="flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-white/5 to-white/10 border border-white/20">
+                          {feature.secondaryIcon}
                         </div>
-                        <p className="text-white/80 text-base mb-6 leading-relaxed">{feature.description}</p>
-                        <ul className="mb-6 space-y-3">
-                          {feature.highlights.map((h, i) => (
-                            <li key={i} className="flex items-center text-white/70 text-sm">
-                              <span className="w-2 h-2 bg-purple-400 rounded-full mr-3 flex-shrink-0"></span>
-                              {h}
-                            </li>
-                          ))}
-                        </ul>
-                        <Button className="w-full mt-auto bg-purple-600/80 hover:bg-purple-700 text-white font-semibold rounded-xl shadow-md transition-all duration-200 py-3">
-                          {feature.cta}
-                        </Button>
                       </div>
-                    ))}
+                      <h3 className="text-xl md:text-2xl font-bold text-white mb-3">{feature.title}</h3>
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {feature.badges.map((badge, i) => (
+                          <Badge key={i} className="bg-white/10 text-white/80 border border-white/20 rounded-full px-3 py-1 text-xs font-semibold backdrop-blur-md">
+                            {badge}
+                          </Badge>
+                        ))}
+                      </div>
+                      <p className="text-white/80 text-sm md:text-base mb-6 leading-relaxed flex-grow">{feature.description}</p>
+                      <ul className="mb-6 space-y-2 md:space-y-3">
+                        {feature.highlights.map((h, i) => (
+                          <li key={i} className="flex items-center text-white/70 text-xs md:text-sm">
+                            <span className="w-2 h-2 bg-purple-400 rounded-full mr-2 md:mr-3 flex-shrink-0"></span>
+                            {h}
+                          </li>
+                        ))}
+                      </ul>
+                      <Button className="w-full mt-auto bg-purple-600/80 hover:bg-purple-700 text-white font-semibold rounded-xl shadow-md transition-all duration-200 py-2 md:py-3">
+                        {feature.cta}
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
