@@ -17,7 +17,8 @@ import {
   Sparkles,
   Link as LinkIcon,
   X,
-  Github
+  Github,
+  Gitlab
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -91,6 +92,12 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   const [showGithubPopover, setShowGithubPopover] = useState(false)
   const [githubInput, setGithubInput] = useState("")
   const [isImportingGithub, setIsImportingGithub] = useState(false)
+
+  // GitLab import state
+  const [gitlabRepoUrl, setGitlabRepoUrl] = useState("")
+  const [showGitlabPopover, setShowGitlabPopover] = useState(false)
+  const [gitlabInput, setGitlabInput] = useState("")
+  const [isImportingGitlab, setIsImportingGitlab] = useState(false)
 
   // Fetch user on mount
   useEffect(() => {
@@ -605,10 +612,118 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     }
   }
 
+  const handleGitlabImport = async (user: any) => {
+    try {
+      setIsImportingGitlab(true)
+      toast.loading('Importing GitLab repository...', { id: 'gitlab-import' })
+
+      // Import the repository
+      const response = await fetch('/api/gitlab/import-repo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          repoUrl: gitlabRepoUrl.trim(),
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to import repository')
+      }
+
+      const data = await response.json()
+      console.log('✅ GitLab repo imported:', data)
+
+      // Extract repo info
+      const repoName = data.repoName
+      const repoOwner = data.owner
+      const domain = data.domain
+      const zipData = data.zipData
+
+      // Create project with repo details
+      const projectName = repoName
+      const projectDescription = `Imported from GitLab: ${domain}/${repoOwner}/${repoName}`
+
+      // Generate unique slug
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+
+      const baseSlug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+      let slug = baseSlug
+      let counter = 1
+
+      // Check if slug exists and append number if needed
+      while (await storageManager.getWorkspaceBySlug(user.id, slug)) {
+        slug = `${baseSlug}-${counter}`
+        counter++
+
+        // Prevent infinite loop
+        if (counter > 100) {
+          // Fallback to timestamp-based slug
+          slug = `${baseSlug}-${Date.now()}`
+          break
+        }
+      }
+
+      console.log('📝 Creating project with name:', projectName, 'and slug:', slug)
+      const workspace = await storageManager.createWorkspace({
+        name: projectName,
+        description: projectDescription,
+        userId: user.id,
+        isPublic: false,
+        isTemplate: false,
+        lastActivity: new Date().toISOString(),
+        deploymentStatus: 'not_deployed',
+        slug
+      })
+
+      // Extract and apply GitLab files
+      await applyGithubFiles(workspace.id, zipData, repoName)
+
+      // Create initial checkpoint
+      try {
+        const { createCheckpoint } = await import('@/lib/checkpoint-utils')
+        const initialCheckpointMessageId = `gitlab-import-${workspace.id}`
+        await createCheckpoint(workspace.id, initialCheckpointMessageId)
+        console.log(`✅ Created initial GitLab import checkpoint for workspace ${workspace.id}`)
+
+        // Store the checkpoint message ID
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem(`initial-checkpoint-${workspace.id}`, initialCheckpointMessageId)
+        }
+      } catch (checkpointError) {
+        console.error('Failed to create initial checkpoint:', checkpointError)
+      }
+
+      // Store import info in sessionStorage
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(`initial-prompt-${workspace.id}`, `Imported from GitLab: ${gitlabRepoUrl}`)
+        sessionStorage.removeItem('lastSelectedProject')
+        sessionStorage.removeItem('cachedFiles')
+      }
+
+      toast.success('GitLab repository imported successfully!', { id: 'gitlab-import' })
+
+      // Clear the input and redirect
+      setPrompt("")
+      setGitlabRepoUrl("")
+      router.push(`/workspace?newProject=${workspace.id}`)
+
+    } catch (error) {
+      console.error('❌ Error importing GitLab repo:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to import repository', { id: 'gitlab-import' })
+    } finally {
+      setIsImportingGitlab(false)
+      setIsGenerating(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!prompt.trim() && !githubRepoUrl.trim()) return
+    if (!prompt.trim() && !githubRepoUrl.trim() && !gitlabRepoUrl.trim()) return
 
     // Check if user is authenticated
     const { data: { user } } = await supabase.auth.getUser()
@@ -624,6 +739,13 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       if (githubRepoUrl.trim()) {
         console.log('🚀 ChatInput: Importing GitHub repository:', githubRepoUrl)
         await handleGithubImport(user)
+        return
+      }
+
+      // Handle GitLab import
+      if (gitlabRepoUrl.trim()) {
+        console.log('🚀 ChatInput: Importing GitLab repository:', gitlabRepoUrl)
+        await handleGitlabImport(user)
         return
       }
 
@@ -856,6 +978,20 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     toast.success("GitHub repository removed")
   }
 
+  const handleGitlabAttachment = () => {
+    if (gitlabInput.trim()) {
+      setGitlabRepoUrl(gitlabInput.trim())
+      setGitlabInput("")
+      setShowGitlabPopover(false)
+      toast.success("GitLab repository attached successfully!")
+    }
+  }
+
+  const handleRemoveGitlab = () => {
+    setGitlabRepoUrl("")
+    toast.success("GitLab repository removed")
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -982,6 +1118,23 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                     onClick={handleRemoveGithub}
                     className="ml-1 text-gray-400 hover:text-gray-200 transition-colors"
                     title="Remove GitHub repository"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* GitLab Repository Attachment Pills */}
+            {gitlabRepoUrl && (
+              <div className="flex items-center gap-2 px-4">
+                <div className="flex items-center gap-1 bg-orange-900/20 border border-orange-700/30 px-3 py-1.5 rounded-full text-sm text-orange-300">
+                  <Gitlab className="w-3 h-3" />
+                  <span className="truncate max-w-[200px]">{gitlabRepoUrl}</span>
+                  <button
+                    onClick={handleRemoveGitlab}
+                    className="ml-1 text-orange-400 hover:text-orange-200 transition-colors"
+                    title="Remove GitLab repository"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -1124,8 +1277,8 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         </div>
       </div>
 
-      {/* GitHub Import Badge Button */}
-      <div className="flex justify-center mt-4">
+      {/* Import Badge Buttons */}
+      <div className="flex justify-center gap-4 mt-4">
         <Popover open={showGithubPopover} onOpenChange={setShowGithubPopover}>
           <PopoverTrigger asChild>
             <button 
@@ -1165,6 +1318,53 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   onClick={handleGithubAttachment}
                   disabled={!githubInput.trim()}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                >
+                  Import
+                </button>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        <Popover open={showGitlabPopover} onOpenChange={setShowGitlabPopover}>
+          <PopoverTrigger asChild>
+            <button 
+              type="button"
+              disabled={isGenerating || isImportingGitlab}
+              className="flex items-center gap-2 px-4 py-2 bg-orange-800/60 hover:bg-orange-700/60 border border-orange-600/50 rounded-full text-orange-300 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg backdrop-blur-sm"
+              title="Import from GitLab"
+            >
+              <Gitlab className="w-4 h-4" />
+              <span className="text-sm font-medium">Import from GitLab</span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 p-4 z-[70]" side="top" align="center">
+            <div className="space-y-3">
+              <div>
+                <h4 className="text-sm font-medium text-orange-200">Import from GitLab</h4>
+                <p className="text-xs text-orange-400 mt-1">
+                  Enter a GitLab repository URL to import and start building from it.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  placeholder="https://gitlab.com/owner/repo"
+                  value={gitlabInput}
+                  onChange={(e) => setGitlabInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleGitlabAttachment()
+                    }
+                  }}
+                  className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+                  autoFocus
+                />
+                <button
+                  onClick={handleGitlabAttachment}
+                  disabled={!gitlabInput.trim()}
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                 >
                   Import
                 </button>
