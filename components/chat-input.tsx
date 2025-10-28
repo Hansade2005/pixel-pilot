@@ -1278,17 +1278,17 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       </div>
 
       {/* Import Badge Buttons */}
-      <div className="flex justify-center gap-4 mt-4">
+      <div className="flex justify-center gap-2 mt-4">
         <Popover open={showGithubPopover} onOpenChange={setShowGithubPopover}>
           <PopoverTrigger asChild>
-            <button 
+            <button
               type="button"
               disabled={isGenerating || isImportingGithub}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-800/60 hover:bg-gray-700/60 border border-gray-600/50 rounded-full text-gray-300 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg backdrop-blur-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-transparent hover:bg-gray-700/50 border border-gray-600/50 rounded-full text-gray-400 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
               title="Import from GitHub"
-            >
-              <Github className="w-4 h-4" />
-              <span className="text-sm font-medium">Import from GitHub</span>
+            >Import from
+              <Github className="w-3.5 h-3.5" />
+              <span className="font-medium">GitHub</span>
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-80 p-4 z-[70]" side="top" align="center">
@@ -1328,14 +1328,14 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
 
         <Popover open={showGitlabPopover} onOpenChange={setShowGitlabPopover}>
           <PopoverTrigger asChild>
-            <button 
+            <button
               type="button"
               disabled={isGenerating || isImportingGitlab}
-              className="flex items-center gap-2 px-4 py-2 bg-orange-800/60 hover:bg-orange-700/60 border border-orange-600/50 rounded-full text-orange-300 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg backdrop-blur-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-transparent hover:bg-orange-700/50 border border-orange-600/50 rounded-full text-orange-400 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
               title="Import from GitLab"
-            >
-              <Gitlab className="w-4 h-4" />
-              <span className="text-sm font-medium">Import from GitLab</span>
+            >Import from
+              <Gitlab className="w-3.5 h-3.5" />
+              <span className="font-medium">GitLab</span>
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-80 p-4 z-[70]" side="top" align="center">
