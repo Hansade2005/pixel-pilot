@@ -1262,7 +1262,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                 </button>
                 <button 
                   type="submit" 
-                  disabled={!prompt.trim() || isGenerating}
+                  disabled={!prompt.trim() && !githubRepoUrl.trim() && !gitlabRepoUrl.trim() || isGenerating}
                   className="w-8 h-8 rounded-full bg-gray-700/50 hover:bg-gray-600/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-gray-400 hover:text-white transition-colors"
                 >
                   {isGenerating ? (
