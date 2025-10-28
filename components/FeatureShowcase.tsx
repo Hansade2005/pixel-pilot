@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Slider } from "@/components/ui/slider"
 import { Database, Building2, Users, Server, Workflow, Figma, Cpu, Shield, Bot, FolderOpen, Import, ChevronLeft, ChevronRight } from "lucide-react"
 
 const features = [
@@ -182,16 +183,25 @@ export function FeatureShowcase() {
           </div>
         </div>
 
-        {/* Navigation dots */}
-        <div className="flex justify-center gap-3 mt-8">
-          {Array.from({ length: totalSlides }, (_, idx) => (
-            <button
-              key={idx}
-              className={`w-3 h-3 rounded-full transition-all duration-300 ${active === idx ? "bg-purple-400 scale-125" : "bg-white/30 hover:bg-white/60"}`}
-              onClick={() => goToSlide(idx)}
-              aria-label={`Go to slide ${idx + 1}`}
+        {/* Slider Navigation */}
+        <div className="flex flex-col items-center gap-4 mt-8">
+          {/* Progress Slider */}
+          <div className="w-full max-w-xs">
+            <Slider
+              value={[active]}
+              onValueChange={(value) => goToSlide(value[0])}
+              max={totalSlides - 1}
+              step={1}
+              className="w-full"
             />
-          ))}
+          </div>
+          
+          {/* Slide Counter */}
+          <div className="flex items-center gap-2 text-white/60 text-sm">
+            <span className="font-medium text-white">{active + 1}</span>
+            <span>of</span>
+            <span className="font-medium text-white">{totalSlides}</span>
+          </div>
         </div>
       </div>
     </section>
