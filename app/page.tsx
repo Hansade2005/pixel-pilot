@@ -167,7 +167,11 @@ export default function LandingPage() {
 
       {/* Main Content */}
       <main className="relative z-10 flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] px-4 pt-16">
-        {/* Dynamic Badge */}
+       
+
+        {/* Hero Section */}
+        <div className="text-center mb-16">
+           {/* Dynamic Badge */}
         <div className="mb-6 animate-fade-in">
           <Badge className="bg-transparent backdrop-blur-[32px] text-white border border-white/20 px-6 py-3 text-sm font-semibold rounded-full shadow-lg relative overflow-hidden hover:bg-white/10 transition-all duration-300">
             <div className="flex items-center gap-2">
@@ -181,9 +185,6 @@ export default function LandingPage() {
             </div>
           </Badge>
         </div>
-
-        {/* Hero Section */}
-        <div className="text-center mb-16">
           <h2 className="text-2xl sm:text-4xl md:text-7xl lg:text-8xl font-bold text-white mb-4 md:mb-6 leading-tight">
             Build something{" "}
             <span className="inline-flex items-center">
