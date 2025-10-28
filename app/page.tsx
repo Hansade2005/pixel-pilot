@@ -187,7 +187,7 @@ export default function LandingPage() {
         </div>
           <h1 className="mb-2 flex items-center gap-1 text-3xl font-medium leading-none text-white sm:text-3xl md:mb-2.5 md:gap-0 md:text-5xl">
             <span className="pt-0.5 tracking-tight md:pt-0">Build something</span>
-            <div className="flex flex-col gap-1.5 ml-2 sm:ml-3 md:ml-4">
+            <div className="flex flex-col gap-1.5 ml-2 sm:ml-3 md:ml-4 mr-2 sm:mr-3 md:mr-4">
               <div className="w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 rounded-full heart-gradient flex items-center justify-center">
                 <Heart className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 text-white fill-current" />
               </div>
