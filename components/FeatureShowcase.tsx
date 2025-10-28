@@ -130,7 +130,7 @@ export function FeatureShowcase() {
         </button>
 
         {/* Feature Cards Container */}
-        <div className="relative overflow-hidden rounded-3xl">
+        <div className="relative overflow-hidden rounded-3xl px-4">
           <div
             className="flex transition-transform duration-500 ease-in-out"
             style={{ transform: `translateX(-${active * 100}%)` }}
@@ -139,7 +139,7 @@ export function FeatureShowcase() {
             {Array.from({ length: totalSlides }, (_, slideIndex) => (
               <div
                 key={slideIndex}
-                className="min-w-full flex-shrink-0 px-4"
+                className="min-w-full flex-shrink-0"
               >
                 <div className={`grid gap-6 ${isDesktop ? 'grid-cols-2' : 'grid-cols-1'} max-w-5xl mx-auto`}>
                   {features.slice(slideIndex * cardsPerSlide, (slideIndex + 1) * cardsPerSlide).map((feature, idx) => (
