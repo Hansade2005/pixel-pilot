@@ -261,10 +261,9 @@ export default function PiPilotFeaturesSlider() {
                 {currentSlideFeatures.map((feature, featureIndex) => (
                   <motion.div
                     key={feature.id}
-                    initial={{ opacity: 0, y: 50 }}
-                    animate={{ opacity: 1, y: 0 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
                     transition={{ delay: featureIndex * 0.1, duration: 0.6 }}
-                    whileHover={{ y: -8, transition: { duration: 0.3 } }}
                     className="group"
                   >
                     <Card className="border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl overflow-hidden transition-all duration-500 hover:shadow-3xl hover:shadow-blue-500/20 h-full">
@@ -301,8 +300,8 @@ export default function PiPilotFeaturesSlider() {
                           </motion.div>
                           <motion.div
                             className="flex gap-2 flex-wrap"
-                            initial={{ opacity: 0, y: -20 }}
-                            animate={{ opacity: 1, y: 0 }}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
                             transition={{ delay: 0.3 + featureIndex * 0.1, duration: 0.4 }}
                           >
                             {feature.badges.map((badge, idx) => (
@@ -317,8 +316,8 @@ export default function PiPilotFeaturesSlider() {
                           </motion.div>
                         </div>
                         <motion.div
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
                           transition={{ delay: 0.4 + featureIndex * 0.1, duration: 0.5 }}
                         >
                           <CardDescription className="text-slate-300 text-sm md:text-base leading-relaxed">
@@ -360,8 +359,8 @@ export default function PiPilotFeaturesSlider() {
                         <motion.div
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
                           transition={{ delay: 0.8 + featureIndex * 0.1, duration: 0.4 }}
                           className="w-full"
                         >
