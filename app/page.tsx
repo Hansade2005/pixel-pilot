@@ -194,7 +194,7 @@ export default function LandingPage() {
             </div>
             <span>Amazing</span>
           </h1>
-          <p className="mb-6 max-w-[25ch] text-center text-lg leading-tight text-white/65 md:max-w-full md:text-xl">
+          <p className="mb-6 text-center text-lg leading-tight text-white/65 md:text-xl">
             Create apps and websites by chatting with AI
           </p>
         </div>
