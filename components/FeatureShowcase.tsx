@@ -188,8 +188,8 @@ export default function PiPilotFeaturesSlider() {
           transition={{ duration: 0.8 }}
           className="text-center mb-12"
         >
-          <h1 className="text-5xl md:text-7xl font-bold text-white mb-4 bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent">
-            PiPilot Features
+          <h1 className="mb-2 flex items-center justify-center gap-1 text-xl font-medium leading-none text-white sm:text-2xl md:mb-2.5 md:gap-0 md:text-5xl">
+            <span className="pt-0.5 tracking-tight md:pt-0">PiPilot Features</span>
           </h1>
           <p className="text-slate-400 text-xl md:text-2xl font-light">
             Explore our powerful suite of tools
