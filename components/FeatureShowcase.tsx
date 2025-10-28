@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Database, Building2, Users, Server, Workflow, Figma } from "lucide-react"
+import { Database, Building2, Users, Server, Workflow, Figma, Cpu, Shield, Bot, FolderOpen, Import } from "lucide-react"
 
 const features = [
   {
@@ -11,7 +11,7 @@ const features = [
     title: "PiPilot DB",
     description: "Deep AI integration database with intelligent query processing. Ask questions in plain English and get instant results.",
     icon: <Database className="w-8 h-8 text-blue-500" />,
-    emoji: "🎉",
+    secondaryIcon: <Cpu className="w-6 h-6 text-blue-400" />,
     badges: ["AI-Powered", "New"],
     highlights: ["Natural language queries", "Smart auto-indexing", "Real-time analytics", "AI-powered insights"],
     cta: "Explore Database"
@@ -21,7 +21,7 @@ const features = [
     title: "PiPilot Enterprise",
     description: "Enterprise-grade solutions with advanced security and scalability. Deploy with confidence at enterprise scale.",
     icon: <Building2 className="w-8 h-8 text-purple-500" />,
-    emoji: "🎉",
+    secondaryIcon: <Shield className="w-6 h-6 text-purple-400" />,
     badges: ["Enterprise", "Secure"],
     highlights: ["Single Sign-On (SSO)", "Advanced permissions", "Compliance ready", "Enterprise support"],
     cta: "Start Enterprise Trial"
@@ -31,7 +31,7 @@ const features = [
     title: "PiPilot Teams",
     description: "Collaborative workspace for team development and sharing. Perfect for distributed teams.",
     icon: <Users className="w-8 h-8 text-green-500" />,
-    emoji: "🎉",
+    secondaryIcon: <Users className="w-6 h-6 text-green-400" />,
     badges: ["Collaboration", "Real-time"],
     highlights: ["Live collaboration", "Shared workspaces", "Team permissions", "Real-time sync"],
     cta: "Create Team Workspace"
@@ -41,7 +41,7 @@ const features = [
     title: "PiPilot DB MCP Server",
     description: "Connect AI agents directly to your database with MCP protocol. The future of AI-agent-database integration.",
     icon: <Server className="w-8 h-8 text-orange-500" />,
-    emoji: "🎉",
+    secondaryIcon: <Bot className="w-6 h-6 text-orange-400" />,
     badges: ["Coming Soon", "AI Agents"],
     highlights: ["MCP protocol support", "AI agent integration", "Secure connections", "Real-time data access"],
     cta: "Join Waitlist"
@@ -51,7 +51,7 @@ const features = [
     title: "Teams Workspace",
     description: "Organize projects, manage permissions, and track team progress with advanced workspace management tools.",
     icon: <Workflow className="w-8 h-8 text-indigo-500" />,
-    emoji: "🎉",
+    secondaryIcon: <FolderOpen className="w-6 h-6 text-indigo-400" />,
     badges: ["Workspace", "Management"],
     highlights: ["Project organization", "Permission management", "Progress tracking", "Team analytics"],
     cta: "Manage Workspaces"
@@ -61,7 +61,7 @@ const features = [
     title: "Figma Import",
     description: "Convert Figma designs into functional code instantly. Bridge the gap between design and development.",
     icon: <Figma className="w-8 h-8 text-pink-500" />,
-    emoji: "🎉",
+    secondaryIcon: <Import className="w-6 h-6 text-pink-400" />,
     badges: ["Design", "Import"],
     highlights: ["One-click import", "Design-to-code conversion", "Component extraction", "Style preservation"],
     cta: "Import from Figma"
@@ -103,7 +103,9 @@ export function FeatureShowcase() {
                 <div className="w-14 h-14 rounded-full flex items-center justify-center bg-gradient-to-br from-white/10 to-white/20 shadow-lg">
                   {feature.icon}
                 </div>
-                <span className="text-3xl" aria-label="emoji">{feature.emoji}</span>
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-white/5 to-white/10 border border-white/20">
+                  {feature.secondaryIcon}
+                </div>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">{feature.title}</h3>
               <div className="flex flex-wrap gap-2 mb-3">

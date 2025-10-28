@@ -15,7 +15,12 @@ import {
   ChevronDown,
   ExternalLink,
   Users,
-  Download
+  Download,
+  Database,
+  Building2,
+  Server,
+  Workflow,
+  Figma
 } from "lucide-react"
 import Link from "next/link"
 import { ChatInput } from "@/components/chat-input"
@@ -38,13 +43,13 @@ export default function LandingPage() {
   const [filterBy, setFilterBy] = useState<string>('all')
   const [currentBadgeIndex, setCurrentBadgeIndex] = useState(0)
 
-  const badgeTexts = [
-    "🎉 PiPilot DB",
-    "🚀 PiPilot Enterprise",
-    "👥 PiPilot Teams",
-    "⏳ Coming Soon: PiPilot DB MCP Server",
-    "🏢 Teams Workspace",
-    "🎨 Figma Import"
+  const badgeItems = [
+    { icon: <Database className="w-4 h-4 text-blue-400" />, text: "PiPilot DB 🎉" },
+    { icon: <Building2 className="w-4 h-4 text-purple-400" />, text: "PiPilot Enterprise 🚀" },
+    { icon: <Users className="w-4 h-4 text-green-400" />, text: "PiPilot Teams 🎉" },
+    { icon: <Server className="w-4 h-4 text-orange-400" />, text: "PiPilot DB MCP Server 🚀" },
+    { icon: <Workflow className="w-4 h-4 text-indigo-400" />, text: "Teams Workspace 🎉" },
+    { icon: <Figma className="w-4 h-4 text-pink-400" />, text: "Figma Import 🚀" }
   ]
 
   useEffect(() => {
@@ -53,8 +58,8 @@ export default function LandingPage() {
 
     // Badge rotation effect
     const badgeInterval = setInterval(() => {
-      setCurrentBadgeIndex((prev) => (prev + 1) % badgeTexts.length)
-    }, 3000) // Change every 3 seconds
+      setCurrentBadgeIndex((prev) => (prev + 1) % badgeItems.length)
+    }, 5000) // Change every 3 seconds
 
     return () => clearInterval(badgeInterval)
   }, [])
@@ -165,12 +170,15 @@ export default function LandingPage() {
         {/* Dynamic Badge */}
         <div className="mb-6 animate-fade-in">
           <Badge className="bg-transparent backdrop-blur-[32px] text-white border border-white/20 px-6 py-3 text-sm font-semibold rounded-full shadow-lg relative overflow-hidden hover:bg-white/10 transition-all duration-300">
-            <span
-              className="inline-block transition-opacity duration-500 ease-in-out opacity-100"
-              key={currentBadgeIndex}
-            >
-              {badgeTexts[currentBadgeIndex]}
-            </span>
+            <div className="flex items-center gap-2">
+              {badgeItems[currentBadgeIndex].icon}
+              <span
+                className="inline-block transition-opacity duration-500 ease-in-out opacity-100"
+                key={currentBadgeIndex}
+              >
+                {badgeItems[currentBadgeIndex].text}
+              </span>
+            </div>
           </Badge>
         </div>
 
