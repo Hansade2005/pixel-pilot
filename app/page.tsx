@@ -185,7 +185,7 @@ export default function LandingPage() {
             </div>
           </Badge>
         </div>
-          <h1 className="mb-2 flex items-center gap-1 text-xl font-medium leading-none text-white sm:text-2xl md:mb-2.5 md:gap-0 md:text-5xl text-center">
+          <h1 className="mb-2 flex items-center justify-center gap-1 text-xl font-medium leading-none text-white sm:text-2xl md:mb-2.5 md:gap-0 md:text-5xl">
             <span className="pt-0.5 tracking-tight md:pt-0">Build something</span>
             <div className="flex flex-col gap-1 ml-1.5 sm:ml-2 md:ml-4 mr-1.5 sm:mr-2 md:mr-4">
               <div className="w-5 h-5 sm:w-6 sm:h-6 md:w-10 md:h-10 rounded-full heart-gradient flex items-center justify-center">
