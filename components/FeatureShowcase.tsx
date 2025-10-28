@@ -107,7 +107,7 @@ export function FeatureShowcase() {
 
   return (
     <section className="w-full py-16 px-2 md:px-0 bg-transparent">
-      <h2 className="text-center text-3xl md:text-5xl font-extrabold mb-8 text-white drop-shadow-lg">Platform Features</h2>
+      <h2 className="text-center text-3xl md:text-5xl font-extrabold mb-8 text-white drop-shadow-lg">Our Platform Features</h2>
       <div className="relative w-full max-w-7xl mx-auto">
         {/* Navigation Buttons */}
         <button
