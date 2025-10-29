@@ -158,7 +158,7 @@ export async function handleClientFileOperation(
       }
 
       case 'read_file': {
-        const { path, includeLineNumbers = false } = toolCall.args;
+        const { path, includeLineNumbers = false, startLine, endLine, lineRange } = toolCall.args;
         console.log(`[ClientFileTool] read_file: ${path}`);
 
         // Validate path
@@ -184,23 +184,62 @@ export async function handleClientFileOperation(
           return;
         }
 
-        const content = file.content || '';
-        
+        const fullContent = file.content || '';
+        let content = fullContent;
+        let actualStartLine = startLine;
+        let actualEndLine = endLine;
+
+        // Parse line range if provided (e.g., "654-661")
+        if (lineRange && typeof lineRange === 'string') {
+          const rangeMatch = lineRange.match(/^(\d+)-(\d+)$/);
+          if (rangeMatch) {
+            actualStartLine = parseInt(rangeMatch[1], 10);
+            actualEndLine = parseInt(rangeMatch[2], 10);
+          } else {
+            addToolResult({
+              tool: 'read_file',
+              toolCallId: toolCall.toolCallId,
+              state: 'output-error',
+              errorText: `Invalid line range format: ${lineRange}. Use format like "654-661"`
+            });
+            return;
+          }
+        }
+
+        // Extract specific line range if requested
+        if (actualStartLine !== undefined && actualStartLine > 0) {
+          const lines = fullContent.split('\n');
+          const startIndex = actualStartLine - 1; // Convert to 0-indexed
+          const endIndex = actualEndLine ? Math.min(actualEndLine - 1, lines.length - 1) : lines.length - 1;
+
+          if (startIndex >= lines.length) {
+            addToolResult({
+              tool: 'read_file',
+              toolCallId: toolCall.toolCallId,
+              state: 'output-error',
+              errorText: `Start line ${actualStartLine} is beyond file length (${lines.length} lines)`
+            });
+            return;
+          }
+
+          content = lines.slice(startIndex, endIndex + 1).join('\n');
+        }
+
         // Check for large files and truncate if necessary to prevent response size issues
         const MAX_CONTENT_SIZE = 500000; // 500KB limit for content in response
         let wasTruncated = false;
-        let finalContent = content;
         if (content.length > MAX_CONTENT_SIZE) {
-          finalContent = content.substring(0, MAX_CONTENT_SIZE);
+          content = content.substring(0, MAX_CONTENT_SIZE);
           wasTruncated = true;
           console.log(`[ClientFileTool] read_file: Content truncated to ${MAX_CONTENT_SIZE} chars for ${path}`);
         }
-        
+
+        console.log(`[ClientFileTool] read_file: Successfully read ${path} (${content.length} chars${wasTruncated ? ' - TRUNCATED' : ''}, lines ${actualStartLine || 1}-${actualEndLine || 'end'})`);
         let response: any = {
           success: true,
           message: `✅ File ${path} read successfully${wasTruncated ? ` (content truncated to ${MAX_CONTENT_SIZE} characters)` : ''}.`,
           path,
-          content: finalContent,
+          content,
           name: file.name,
           type: file.type,
           size: file.size,
@@ -211,15 +250,15 @@ export async function handleClientFileOperation(
         if (wasTruncated) {
           response.truncated = true;
           response.maxContentSize = MAX_CONTENT_SIZE;
-          response.fullSize = content.length;
+          response.fullSize = fullContent.length;
         }
 
         // Add line number information if requested
         if (includeLineNumbers) {
-          const lines = finalContent.split('\n');
+          const lines = content.split('\n');
           const lineCount = lines.length;
           const linesWithNumbers = lines.map((line, index) =>
-            `${String(index + 1).padStart(4, ' ')}: ${line}`
+            `${String((actualStartLine || 1) + index).padStart(4, ' ')}: ${line}`
           ).join('\n');
 
           response.lineCount = lineCount;
@@ -757,6 +796,387 @@ export async function handleClientFileOperation(
             toolCallId: toolCall.toolCallId,
             state: 'output-error',
             errorText: `Failed to remove packages: ${errorMessage}`
+          });
+        }
+        break;
+      }
+
+      case 'list_files': {
+        const { path } = toolCall.args;
+        console.log(`[ClientFileTool] list_files: ${path || 'root'}`);
+
+        try {
+          // Get all files for the project
+          const allFiles = await storageManager.getFiles(projectId);
+          
+          // Filter files based on path if provided
+          let filteredFiles = allFiles;
+          if (path && path !== '/' && path !== '') {
+            const normalizedPath = path.replace(/^\/+/, '').replace(/\/+$/, '');
+            filteredFiles = allFiles.filter((file: any) => {
+              const filePath = file.path.replace(/^\/+/, '').replace(/\/+$/, '');
+              return filePath.startsWith(normalizedPath + '/') || filePath === normalizedPath;
+            });
+          }
+
+          // Build directory structure
+          const directories = new Set<string>();
+          const files = [];
+
+          for (const file of filteredFiles) {
+            const filePath = file.path.replace(/^\/+/, '');
+            
+            // Add parent directories
+            const parts = filePath.split('/');
+            for (let i = 1; i < parts.length; i++) {
+              directories.add(parts.slice(0, i).join('/'));
+            }
+            
+            // Add file
+            files.push({
+              name: file.name,
+              path: file.path,
+              type: file.type,
+              size: file.size,
+              isDirectory: false
+            });
+          }
+
+          // Convert directories to file objects
+          const directoryObjects = Array.from(directories).map(dirPath => ({
+            name: dirPath.split('/').pop() || dirPath,
+            path: dirPath,
+            type: 'directory',
+            size: 0,
+            isDirectory: true
+          }));
+
+          // Combine and sort
+          const allItems = [...directoryObjects, ...files].sort((a, b) => {
+            // Directories first, then files
+            if (a.isDirectory && !b.isDirectory) return -1;
+            if (!a.isDirectory && b.isDirectory) return 1;
+            return a.path.localeCompare(b.path);
+          });
+
+          addToolResult({
+            tool: 'list_files',
+            toolCallId: toolCall.toolCallId,
+            output: {
+              success: true,
+              message: `✅ Listed ${allItems.length} items${path ? ` in ${path}` : ''}.`,
+              path: path || '/',
+              items: allItems,
+              totalCount: allItems.length,
+              action: 'listed'
+            }
+          });
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          addToolResult({
+            tool: 'list_files',
+            toolCallId: toolCall.toolCallId,
+            state: 'output-error',
+            errorText: `Failed to list files: ${errorMessage}`
+          });
+        }
+        break;
+      }
+
+      case 'grep_search': {
+        const { query, includePattern, isRegexp = false, maxResults = 100, caseSensitive = false } = toolCall.args;
+        console.log(`[ClientFileTool] grep_search: "${query}" (regex: ${isRegexp}, maxResults: ${maxResults})`);
+
+        if (!query || typeof query !== 'string') {
+          addToolResult({
+            tool: 'grep_search',
+            toolCallId: toolCall.toolCallId,
+            state: 'output-error',
+            errorText: 'Invalid search query provided'
+          });
+          return;
+        }
+
+        try {
+          const allFiles = await storageManager.getFiles(projectId);
+          const results = [];
+          let totalMatches = 0;
+
+          // Filter files by pattern if provided
+          let filesToSearch = allFiles;
+          if (includePattern) {
+            const pattern = includePattern.replace(/\*/g, '.*');
+            const regex = new RegExp(pattern, 'i');
+            filesToSearch = allFiles.filter((file: any) => regex.test(file.path));
+          }
+
+          // Search through files
+          for (const file of filesToSearch) {
+            if (results.length >= maxResults) break;
+
+            const content = file.content || '';
+            const lines = content.split('\n');
+            const fileMatches = [];
+
+            // Create search regex
+            let searchRegex: RegExp;
+            if (isRegexp) {
+              searchRegex = new RegExp(query, caseSensitive ? 'g' : 'gi');
+            } else {
+              const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              searchRegex = new RegExp(escapedQuery, caseSensitive ? 'g' : 'gi');
+            }
+
+            // Search each line
+            for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+              const line = lines[lineIndex];
+              const matches = [...line.matchAll(searchRegex)];
+              
+              if (matches.length > 0) {
+                fileMatches.push({
+                  line: lineIndex + 1,
+                  content: line,
+                  matches: matches.map(match => ({
+                    text: match[0],
+                    start: match.index,
+                    end: match.index! + match[0].length
+                  }))
+                });
+              }
+            }
+
+            if (fileMatches.length > 0) {
+              results.push({
+                file: file.path,
+                matches: fileMatches,
+                totalMatches: fileMatches.length
+              });
+              totalMatches += fileMatches.length;
+            }
+          }
+
+          addToolResult({
+            tool: 'grep_search',
+            toolCallId: toolCall.toolCallId,
+            output: {
+              success: true,
+              message: `✅ Found ${totalMatches} matches in ${results.length} files.`,
+              query,
+              results,
+              totalMatches,
+              filesSearched: filesToSearch.length,
+              action: 'searched'
+            }
+          });
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          addToolResult({
+            tool: 'grep_search',
+            toolCallId: toolCall.toolCallId,
+            state: 'output-error',
+            errorText: `Failed to search: ${errorMessage}`
+          });
+        }
+        break;
+      }
+
+      case 'semantic_code_navigator': {
+        const { 
+          query, 
+          filePath, 
+          fileType, 
+          maxResults = 20, 
+          analysisDepth = 'detailed',
+          includeDependencies = false,
+          enableCrossReferences = false,
+          groupByFunctionality = false 
+        } = toolCall.args;
+        
+        console.log(`[ClientFileTool] semantic_code_navigator: "${query}" (depth: ${analysisDepth})`);
+
+        if (!query || typeof query !== 'string') {
+          addToolResult({
+            tool: 'semantic_code_navigator',
+            toolCallId: toolCall.toolCallId,
+            state: 'output-error',
+            errorText: 'Invalid search query provided'
+          });
+          return;
+        }
+
+        try {
+          const allFiles = await storageManager.getFiles(projectId);
+          let filesToAnalyze = allFiles;
+
+          // Filter by file path if provided
+          if (filePath) {
+            filesToAnalyze = allFiles.filter((file: any) => file.path.includes(filePath));
+          }
+
+          // Filter by file type if provided
+          if (fileType) {
+            filesToAnalyze = filesToAnalyze.filter((file: any) => 
+              file.type === fileType || file.path.endsWith(`.${fileType}`)
+            );
+          }
+
+          const results = [];
+          const analysisResults = [];
+
+          // Simple semantic analysis based on content patterns
+          for (const file of filesToAnalyze) {
+            if (results.length >= maxResults) break;
+
+            const content = file.content || '';
+            const lines = content.split('\n');
+            const fileResults = [];
+
+            // Analyze based on query type
+            const queryLower = query.toLowerCase();
+
+            if (queryLower.includes('component') || queryLower.includes('react')) {
+              // React component analysis
+              if (file.type === 'tsx' || file.type === 'jsx') {
+                const componentMatches = [];
+                
+                for (let i = 0; i < lines.length; i++) {
+                  const line = lines[i];
+                  
+                  // Look for component definitions
+                  if (line.includes('function ') && line.includes('(') && 
+                      (line.includes('Props') || line.includes('Component'))) {
+                    componentMatches.push({
+                      type: 'component',
+                      name: line.match(/function\s+(\w+)/)?.[1] || 'Unknown',
+                      line: i + 1,
+                      content: line.trim()
+                    });
+                  }
+                  
+                  // Look for export default
+                  if (line.includes('export default')) {
+                    componentMatches.push({
+                      type: 'export',
+                      name: 'default export',
+                      line: i + 1,
+                      content: line.trim()
+                    });
+                  }
+                }
+                
+                if (componentMatches.length > 0) {
+                  fileResults.push(...componentMatches);
+                }
+              }
+            } else if (queryLower.includes('function') || queryLower.includes('method')) {
+              // Function/method analysis
+              for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                
+                if (line.includes('function ') || line.includes('const ') && line.includes('=>') ||
+                    line.includes('async function') || /^\s*\w+\s*\(/.test(line)) {
+                  fileResults.push({
+                    type: 'function',
+                    name: line.match(/(?:function|const)\s+(\w+)/)?.[1] || 'anonymous',
+                    line: i + 1,
+                    content: line.trim()
+                  });
+                }
+              }
+            } else if (queryLower.includes('api') || queryLower.includes('endpoint')) {
+              // API endpoint analysis
+              for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                
+                if (line.includes('/api/') || line.includes('router.') || 
+                    line.includes('app.') && (line.includes('get') || line.includes('post'))) {
+                  fileResults.push({
+                    type: 'api',
+                    name: line.match(/['"`](\/[^'"`]*)/)?.[1] || 'endpoint',
+                    line: i + 1,
+                    content: line.trim()
+                  });
+                }
+              }
+            } else {
+              // General text search with context
+              const queryWords = queryLower.split(' ');
+              for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const lineLower = line.toLowerCase();
+                
+                if (queryWords.some(word => lineLower.includes(word))) {
+                  fileResults.push({
+                    type: 'match',
+                    name: query,
+                    line: i + 1,
+                    content: line.trim(),
+                    context: [
+                      i > 0 ? lines[i-1] : '',
+                      line,
+                      i < lines.length - 1 ? lines[i+1] : ''
+                    ].filter(l => l).join('\n')
+                  });
+                }
+              }
+            }
+
+            if (fileResults.length > 0) {
+              results.push({
+                file: file.path,
+                type: file.type,
+                results: fileResults,
+                totalMatches: fileResults.length
+              });
+            }
+          }
+
+          // Group by functionality if requested
+          let finalResults: any = results;
+          if (groupByFunctionality) {
+            const grouped = new Map();
+            
+            for (const result of results) {
+              for (const item of result.results) {
+                const key = item.type;
+                if (!grouped.has(key)) {
+                  grouped.set(key, []);
+                }
+                grouped.get(key)!.push({
+                  ...result,
+                  results: [item]
+                });
+              }
+            }
+            
+            finalResults = Array.from(grouped.entries()).map(([type, items]) => ({
+              functionality: type,
+              items,
+              totalItems: items.length
+            }));
+          }
+
+          addToolResult({
+            tool: 'semantic_code_navigator',
+            toolCallId: toolCall.toolCallId,
+            output: {
+              success: true,
+              message: `✅ Found ${results.reduce((sum, r) => sum + r.totalMatches, 0)} semantic matches.`,
+              query,
+              results: finalResults,
+              totalMatches: results.reduce((sum, r) => sum + r.totalMatches, 0),
+              analysisDepth,
+              groupedByFunctionality: groupByFunctionality,
+              action: 'analyzed'
+            }
+          });
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          addToolResult({
+            tool: 'semantic_code_navigator',
+            toolCallId: toolCall.toolCallId,
+            state: 'output-error',
+            errorText: `Failed to analyze code: ${errorMessage}`
           });
         }
         break;

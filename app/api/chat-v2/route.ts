@@ -1029,8 +1029,27 @@ export async function POST(req: Request) {
       fileTree, // Client-built file tree
       modelId,
       aiMode,
-      continuationState // New field for stream continuation
+      continuationState, // New field for stream continuation
+      toolResult // New field for client-side tool results
     } = body
+
+    // Handle client-side tool results
+    if (toolResult) {
+      console.log('[Chat-V2] Processing client-side tool result:', toolResult.toolName);
+      
+      // Create a tool result message to continue the conversation
+      const toolResultMessage = {
+        role: 'tool',
+        content: JSON.stringify(toolResult.result),
+        name: toolResult.toolName,
+        tool_call_id: `client-tool-${Date.now()}` // Generate a unique tool call ID
+      };
+
+      // Add the tool result to messages
+      messages = [...messages, toolResultMessage];
+      
+      // Continue with normal processing but with the tool result included
+    }
 
     // Handle stream continuation
     let isContinuation = false
@@ -1140,7 +1159,8 @@ export async function POST(req: Request) {
       aiMode, 
       originalMessageCount: messages?.length || 0,
       processedMessageCount: processedMessages.length,
-      hasMessages: !!messages
+      hasMessages: !!messages,
+      hasToolResult: !!toolResult
     })
 
     // Auth check
@@ -1448,14 +1468,18 @@ ${conversationSummaryContext || ''}`
             content: z.string().describe('The complete file content to write')
           }),
           execute: async ({ path, content }, { toolCallId }) => {
-            // Use the powerful constructor to get actual results
-            return await constructToolResult('write_file', { path, content }, projectId, toolCallId)
+            // This should not execute server-side anymore - client handles it
+            return {
+              success: false,
+              error: 'write_file tool should execute client-side',
+              toolCallId
+            }
           }
         }),
 
-        // SERVER-SIDE TOOL: Read operations need server-side execution to return fresh data
+        // CLIENT-SIDE TOOL: Read operations execute on IndexedDB for better performance with large codebases
         read_file: tool({
-          description: 'Read the contents of a file with optional line number information or specific line ranges. Large files (>500KB) will be truncated to prevent response size issues. This tool executes on the server-side to ensure the AI sees the most current file content.',
+          description: 'Read the contents of a file with optional line number information or specific line ranges. Large files (>500KB) will be truncated to prevent response size issues. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
             path: z.string().describe('File path to read'),
             includeLineNumbers: z.boolean().optional().describe('Whether to include line numbers in the response (default: false)'),
@@ -1464,8 +1488,12 @@ ${conversationSummaryContext || ''}`
             lineRange: z.string().optional().describe('Line range in format "start-end" (e.g., "654-661"). Overrides startLine and endLine if provided')
           }),
           execute: async ({ path, includeLineNumbers, startLine, endLine, lineRange }, { toolCallId }) => {
-            // Use the powerful constructor to get actual results from in-memory store
-            return await constructToolResult('read_file', { path, includeLineNumbers, startLine, endLine, lineRange }, projectId, toolCallId)
+            // This should not execute server-side anymore - client handles it
+            return {
+              success: false,
+              error: 'read_file tool should execute client-side',
+              toolCallId
+            }
           }
         }),
 
@@ -1476,8 +1504,12 @@ ${conversationSummaryContext || ''}`
             path: z.string().describe('The file path relative to project root to delete')
           }),
           execute: async ({ path }, { toolCallId }) => {
-            // Use the powerful constructor to get actual results
-            return await constructToolResult('delete_file', { path }, projectId, toolCallId)
+            // This should not execute server-side anymore - client handles it
+            return {
+              success: false,
+              error: 'delete_file tool should execute client-side',
+              toolCallId
+            }
           }
         }),
 
@@ -1496,8 +1528,12 @@ ${conversationSummaryContext || ''}`
             replaceAll: z.boolean().optional().describe('Whether to replace all occurrences (default: false, replaces first occurrence only)')
           }),
           execute: async ({ filePath, searchReplaceBlock, useRegex = false, replaceAll = false }, { toolCallId }) => {
-            // Use the powerful constructor to get actual results
-            return await constructToolResult('edit_file', { filePath, searchReplaceBlock, useRegex, replaceAll }, projectId, toolCallId)
+            // This should not execute server-side anymore - client handles it
+            return {
+              success: false,
+              error: 'edit_file tool should execute client-side',
+              toolCallId
+            }
           }
         }),
 
@@ -1513,8 +1549,12 @@ ${conversationSummaryContext || ''}`
             isDev: z.boolean().optional().describe('Whether to add as dev dependency (default: false)')
           }),
           execute: async (input: { name: string | string[]; version?: string; isDev?: boolean }, { toolCallId }) => {
-            // Use the powerful constructor to get actual results
-            return await constructToolResult('add_package', input, projectId, toolCallId)
+            // This should not execute server-side anymore - client handles it
+            return {
+              success: false,
+              error: 'add_package tool should execute client-side',
+              toolCallId
+            }
           }
         }),
 
@@ -1529,8 +1569,12 @@ ${conversationSummaryContext || ''}`
             isDev: z.boolean().optional().describe('Whether to remove from dev dependencies (default: false)')
           }),
           execute: async (input: { name: string | string[]; isDev?: boolean }, { toolCallId }) => {
-            // Use the powerful constructor to get actual results
-            return await constructToolResult('remove_package', input, projectId, toolCallId)
+            // This should not execute server-side anymore - client handles it
+            return {
+              success: false,
+              error: 'remove_package tool should execute client-side',
+              toolCallId
+            }
           }
         }),
 
@@ -1851,7 +1895,7 @@ ${conversationSummaryContext || ''}`
         }),
 
         semantic_code_navigator: tool({
-          description: 'Advanced semantic code search and analysis tool with cross-reference tracking and result grouping. Finds code patterns, structures, and relationships with high accuracy. Supports natural language queries, framework-specific patterns, and detailed code analysis.',
+          description: 'Advanced semantic code search and analysis tool with cross-reference tracking and result grouping. Finds code patterns, structures, and relationships with high accuracy. Supports natural language queries, framework-specific patterns, and detailed code analysis. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
             query: z.string().describe('Natural language description of what to search for (e.g., "find React components with useState", "show API endpoints", "locate error handling", "find database models")'),
             filePath: z.string().optional().describe('Optional: Specific file path to search within. If omitted, searches the entire workspace'),
@@ -2334,7 +2378,7 @@ ${conversationSummaryContext || ''}`
         }),
 
         grep_search: tool({
-          description: 'Powerful text and regex search tool that searches through the entire codebase. Supports both literal text search and regular expressions with advanced filtering options. Returns matches with file paths, line numbers, and context.',
+          description: 'Powerful text and regex search tool that searches through the entire codebase. Supports both literal text search and regular expressions with advanced filtering options. Returns matches with file paths, line numbers, and context. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
             query: z.string().describe('The search query - either literal text or regex pattern'),
             includePattern: z.string().optional().describe('Optional glob pattern to filter files (e.g., "*.ts,*.tsx" or "src/**")'),
@@ -2343,168 +2387,11 @@ ${conversationSummaryContext || ''}`
             caseSensitive: z.boolean().optional().describe('Whether the search is case sensitive (default: false)')
           }),
           execute: async ({ query, includePattern, isRegexp = false, maxResults = 100, caseSensitive = false }, { toolCallId }) => {
-            try {
-              // Get session storage
-              const sessionData = sessionProjectStorage.get(projectId)
-              if (!sessionData) {
-                return {
-                  success: false,
-                  error: `Session storage not found for project ${projectId}`,
-                  query,
-                  toolCallId
-                }
-              }
-
-              const { files: sessionFiles } = sessionData
-
-              // Convert session files to array and filter if needed
-              let filesToSearch = Array.from(sessionFiles.values())
-
-              // Filter by include pattern if specified
-              if (includePattern) {
-                const patterns = includePattern.split(',').map((p: string) => p.trim())
-                filesToSearch = filesToSearch.filter((file: any) => {
-                  const filePath = file.path.toLowerCase()
-                  return patterns.some((pattern: string) => {
-                    const lowerPattern = pattern.toLowerCase()
-                    // Support glob patterns
-                    if (lowerPattern.includes('*')) {
-                      // Simple glob matching
-                      const regexPattern = lowerPattern
-                        .replace(/\*/g, '.*')
-                        .replace(/\?/g, '.')
-                      return new RegExp(regexPattern).test(filePath)
-                    }
-                    return filePath.includes(lowerPattern)
-                  })
-                })
-              }
-
-              // Filter out directories and files without content
-              filesToSearch = filesToSearch.filter((file: any) => !file.isDirectory && file.content)
-
-              const results: any[] = []
-              let totalMatches = 0
-
-              // Prepare search regex
-              let searchRegex: RegExp
-              try {
-                if (isRegexp) {
-                  // Use provided regex pattern
-                  searchRegex = new RegExp(query, caseSensitive ? 'g' : 'gi')
-                } else {
-                  // Escape special regex characters for literal text search
-                  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-                  searchRegex = new RegExp(escapedQuery, caseSensitive ? 'g' : 'gi')
-                }
-              } catch (regexError) {
-                return {
-                  success: false,
-                  error: `Invalid regex pattern: ${regexError instanceof Error ? regexError.message : 'Unknown error'}`,
-                  query,
-                  toolCallId
-                }
-              }
-
-              // Search through each file
-              for (const file of filesToSearch) {
-                if (results.length >= maxResults) break
-
-                const content = file.content
-                const lines = content.split('\n')
-                let lineNumber = 0
-                let matchCount = 0
-
-                // Search line by line for better context
-                for (let i = 0; i < lines.length; i++) {
-                  lineNumber = i + 1 // 1-indexed
-                  const line = lines[i]
-
-                  // Find all matches in this line
-                  const lineMatches = []
-                  let match
-                  searchRegex.lastIndex = 0 // Reset regex state
-
-                  while ((match = searchRegex.exec(line)) !== null) {
-                    lineMatches.push({
-                      match: match[0],
-                      index: match.index,
-                      lineNumber,
-                      line: line
-                    })
-
-                    // Prevent infinite loops
-                    if (!searchRegex.global) break
-                  }
-
-                  // Process matches for this line
-                  for (const lineMatch of lineMatches) {
-                    if (results.length >= maxResults) break
-
-                    // Extract context (3 lines before and after)
-                    const startLine = Math.max(1, lineNumber - 3)
-                    const endLine = Math.min(lines.length, lineNumber + 3)
-                    const contextLines = lines.slice(startLine - 1, endLine)
-
-                    // Create context with line numbers
-                    const contextWithNumbers = contextLines.map((ctxLine: string, idx: number) => {
-                      const ctxLineNumber = startLine + idx
-                      const marker = ctxLineNumber === lineNumber ? '>' : ' '
-                      return `${marker}${String(ctxLineNumber).padStart(4, ' ')}: ${ctxLine}`
-                    }).join('\n')
-
-                    results.push({
-                      file: file.path,
-                      lineNumber: lineMatch.lineNumber,
-                      column: lineMatch.index + 1, // 1-indexed
-                      match: lineMatch.match,
-                      line: lineMatch.line.trim(),
-                      context: contextWithNumbers,
-                      beforeContext: lineNumber > 1 ? lines.slice(Math.max(0, lineNumber - 4), lineNumber - 1) : [],
-                      afterContext: lineNumber < lines.length ? lines.slice(lineNumber, Math.min(lines.length, lineNumber + 3)) : []
-                    })
-
-                    matchCount++
-                    totalMatches++
-                  }
-
-                  if (results.length >= maxResults) break
-                }
-
-                console.log(`[grep_search] Found ${matchCount} matches in ${file.path}`)
-              }
-
-              // Sort results by file path and line number
-              results.sort((a, b) => {
-                const fileCompare = a.file.localeCompare(b.file)
-                if (fileCompare !== 0) return fileCompare
-                return a.lineNumber - b.lineNumber
-              })
-
-              return {
-                success: true,
-                message: `Found ${totalMatches} matches for "${query}" across ${filesToSearch.length} files`,
-                query,
-                isRegexp,
-                caseSensitive,
-                includePattern,
-                results,
-                totalMatches,
-                filesSearched: filesToSearch.length,
-                maxResults,
-                toolCallId
-              }
-
-            } catch (error) {
-              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-              console.error(`[ERROR] grep_search failed for query "${query}":`, error)
-
-              return {
-                success: false,
-                error: `Failed to search code: ${errorMessage}`,
-                query,
-                toolCallId
-              }
+            // This should not execute server-side anymore - client handles it
+            return {
+              success: false,
+              error: 'grep_search tool should execute client-side',
+              toolCallId
             }
           }
         }),
@@ -2902,98 +2789,19 @@ ${conversationSummaryContext || ''}`
         }),
 
         list_files: tool({
-          description: 'List all files and directories in the project with their structure and metadata.',
+          description: 'List all files and directories in the project with their structure and metadata. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
             path: z.string().optional().describe('Optional: Specific directory path to list. If omitted, lists root directory')
           }),
           execute: async ({ path }, { toolCallId }) => {
-            try {
-              let allFiles: any[] = []
-
-              // First try session storage (client-sent data)
-              const sessionData = sessionProjectStorage.get(projectId)
-              if (sessionData && sessionData.files && sessionData.files.size > 0) {
-                console.log(`[list_files] Using session storage with ${sessionData.files.size} files`)
-                allFiles = Array.from(sessionData.files.values())
-              }
-
-              // If session storage is empty or missing, fall back to direct storage manager query
-              if (allFiles.length === 0) {
-                console.log(`[list_files] Session storage empty, falling back to direct storage manager query`)
-                const { storageManager } = await import('@/lib/storage-manager')
-                await storageManager.init()
-                allFiles = await storageManager.getFiles(projectId)
-                console.log(`[list_files] Retrieved ${allFiles.length} files from storage manager`)
-              }
-
-              let filesToList: any[] = []
-              if (path) {
-                // List files in specific directory
-                const pathPrefix = path.endsWith('/') ? path : `${path}/`
-                for (const file of allFiles) {
-                  if (file.path.startsWith(pathPrefix) &&
-                      !file.path.substring(pathPrefix.length).includes('/')) {
-                    filesToList.push({
-                      name: file.name,
-                      path: file.path,
-                      type: file.type,
-                      size: file.size,
-                      isDirectory: file.isDirectory,
-                      lastModified: file.updatedAt || file.createdAt || new Date().toISOString()
-                    })
-                  }
-                }
-              } else {
-                // List root directory files
-                for (const file of allFiles) {
-                  if (!file.path.includes('/')) {
-                    filesToList.push({
-                      name: file.name,
-                      path: file.path,
-                      type: file.type,
-                      size: file.size,
-                      isDirectory: file.isDirectory,
-                      lastModified: file.updatedAt || file.createdAt || new Date().toISOString()
-                    })
-                  }
-                }
-              }
-
-              // Sort: directories first, then files alphabetically
-              const sortedFiles = filesToList.sort((a: any, b: any) => {
-                // Directories come first
-                if (a.isDirectory && !b.isDirectory) return -1
-                if (!a.isDirectory && b.isDirectory) return 1
-                // Then alphabetical
-                return a.path.localeCompare(b.path)
-              })
-
-              return {
-                success: true,
-                message: path
-                  ? `✅ Listed ${sortedFiles.length} items in directory: ${path}`
-                  : `✅ Listed ${sortedFiles.length} items in root directory`,
-                files: sortedFiles,
-                count: sortedFiles.length,
-                directory: path || '/',
-                action: 'list',
-                toolCallId
-              }
-            } catch (error) {
-              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-              console.error('[ERROR] list_files failed:', error)
-
-              return {
-                success: false,
-                error: `Failed to list files: ${errorMessage}`,
-                files: [],
-                count: 0,
-                action: 'list',
-                toolCallId
-              }
+            // This should not execute server-side anymore - client handles it
+            return {
+              success: false,
+              error: 'list_files tool should execute client-side',
+              toolCallId
             }
           }
-        })
+        }),
 
       },
       stopWhen: stepCountIs(50),

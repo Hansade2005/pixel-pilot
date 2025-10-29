@@ -860,7 +860,7 @@ export function ChatPanelV2({
 
               console.log('[ChatPanelV2][Continuation][ClientTool] 🔧 Continuation tool call:', toolCall.toolName)
 
-              const clientSideTools = ['write_file', 'edit_file', 'delete_file', 'add_package', 'remove_package']
+              const clientSideTools = ['write_file', 'edit_file', 'delete_file', 'add_package', 'remove_package', 'read_file', 'list_files', 'grep_search', 'semantic_code_navigator']
               if (clientSideTools.includes(toolCall.toolName)) {
                 const { handleClientFileOperation } = await import('@/lib/client-file-tools')
 
@@ -1160,6 +1160,204 @@ export function ChatPanelV2({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Handle client-side tool results by sending continuation request
+  const handleClientToolResult = async (
+    toolName: string,
+    result: any,
+    projectId: string | undefined,
+    assistantMessageId: string
+  ) => {
+    if (!projectId) {
+      console.error('[ChatPanelV2][ClientTool] Cannot send tool result: no project ID')
+      return
+    }
+
+    console.log('[ChatPanelV2][ClientTool] Sending client tool result for continuation:', {
+      toolName,
+      hasOutput: !!result.output,
+      hasError: !!result.errorText,
+      projectId
+    })
+
+    // Set continuation state (similar to regular continuation)
+    setContinuingMessageId(assistantMessageId)
+    setIsContinuationInProgress(true)
+
+    try {
+      // Create continuation request with tool result
+      const continuationPayload = {
+        messages: [], // Empty - we're continuing with tool result
+        projectId,
+        project: { id: projectId }, // Minimal project info
+        files: projectFiles, // Current project files
+        fileTree: await buildProjectFileTree(), // Current file tree
+        modelId: selectedModel,
+        aiMode,
+        toolResult: {
+          toolName,
+          result: result.output || { error: result.errorText }
+        }
+      }
+
+      console.log('[ChatPanelV2][ClientTool] 📤 Sending tool result continuation request')
+
+      const response = await fetch('/api/chat-v2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(continuationPayload)
+      })
+
+      if (!response.ok) {
+        throw new Error('Tool result continuation request failed')
+      }
+
+      // Handle the response stream just like a regular chat response
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('No continuation response body')
+
+      const decoder = new TextDecoder()
+      let accumulatedContent = ''
+      let accumulatedReasoning = ''
+      let lineBuffer = ''
+
+      console.log('[ChatPanelV2][ClientTool] 📥 Processing tool result continuation stream')
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) {
+          console.log('[ChatPanelV2][ClientTool] ✅ Tool result continuation stream complete')
+          break
+        }
+
+        const chunk = decoder.decode(value, { stream: true })
+        lineBuffer += chunk
+        const lines = lineBuffer.split('\n')
+        lineBuffer = lines.pop() || ''
+
+        const completeLines = lines.filter(line => line.trim())
+
+        for (const line of completeLines) {
+          try {
+            const jsonString = line.startsWith('data: ') ? line.slice(6) : line
+            if (!jsonString || jsonString.startsWith(':')) continue
+
+            const parsed = JSON.parse(jsonString)
+
+            // Skip server-internal chunks
+            if (parsed.type === 'start-step' || parsed.type === 'reasoning-start') {
+              continue
+            }
+
+            console.log('[ChatPanelV2][ClientTool] Parsed continuation part:', parsed.type)
+
+            // Handle continuation stream parts - append to original message
+            if (parsed.type === 'text-delta') {
+              if (parsed.text) {
+                accumulatedContent += parsed.text
+                setMessages(prev => prev.map(msg =>
+                  msg.id === assistantMessageId
+                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+                    : msg
+                ))
+              }
+            } else if (parsed.type === 'reasoning-delta') {
+              if (parsed.text) {
+                accumulatedReasoning += parsed.text
+                setMessages(prev => prev.map(msg =>
+                  msg.id === assistantMessageId
+                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+                    : msg
+                ))
+              }
+            } else if (parsed.type === 'tool-call') {
+              // Handle additional tool calls in continuation
+              const toolCall = {
+                toolName: parsed.toolName,
+                toolCallId: parsed.toolCallId,
+                args: parsed.input,
+                dynamic: false
+              }
+
+              console.log('[ChatPanelV2][ClientTool][Continuation] 🔧 Continuation tool call:', toolCall.toolName)
+
+              const clientSideTools = [
+                'write_file', 
+                'edit_file', 
+                'delete_file', 
+                'add_package', 
+                'remove_package',
+                'read_file',
+                'list_files',
+                'grep_search',
+                'semantic_code_navigator'
+              ]
+              
+              if (clientSideTools.includes(toolCall.toolName)) {
+                const { handleClientFileOperation } = await import('@/lib/client-file-tools')
+
+                const addToolResult = (result: any) => {
+                  console.log('[ChatPanelV2][ClientTool][Continuation] ✅ Continuation tool completed:', result.tool)
+                  // Send this result back too
+                  handleClientToolResult(toolCall.toolName, result, projectId, assistantMessageId)
+                }
+
+                handleClientFileOperation(toolCall, projectId, addToolResult)
+                  .catch(error => {
+                    console.error('[ChatPanelV2][ClientTool][Continuation] ❌ Tool execution error:', error)
+                    const errorResult = {
+                      tool: toolCall.toolName,
+                      toolCallId: toolCall.toolCallId,
+                      state: 'output-error',
+                      errorText: error instanceof Error ? error.message : 'Unknown error'
+                    }
+                    handleClientToolResult(toolCall.toolName, errorResult, projectId, assistantMessageId)
+                  })
+              }
+            } else if (parsed.type === 'tool-result') {
+              console.log('[ChatPanelV2][ClientTool][Continuation] Tool result received:', parsed.toolName)
+            }
+          } catch (e) {
+            console.error('[ChatPanelV2][ClientTool] ❌ Failed to parse continuation chunk:', e)
+            continue
+          }
+        }
+      }
+
+      // Continuation complete - update the original message with combined content
+      if (accumulatedContent.trim()) {
+        setMessages(prev => prev.map(msg =>
+          msg.id === assistantMessageId
+            ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+            : msg
+        ))
+
+        // Save the updated message
+        await saveAssistantMessageAfterStreaming(
+          assistantMessageId,
+          accumulatedContent,
+          accumulatedReasoning,
+          []
+        )
+      }
+
+      console.log('[ChatPanelV2][ClientTool] 🎉 Tool result continuation completed successfully')
+
+    } catch (error: any) {
+      console.error('[ChatPanelV2][ClientTool] ❌ Tool result continuation failed:', error)
+
+      toast({
+        title: "Tool continuation failed",
+        description: "Failed to continue with tool result. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      // Clear continuation-specific state but keep loading active (streaming continues)
+      setContinuingMessageId(null)
+      setIsContinuationInProgress(false)
+      // Note: Don't set setIsLoading(false) - main streaming continues
+    }
+  }
+
   // Enhanced submit with attachments - AI SDK Pattern: Send last 5 messages
   const handleEnhancedSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -1458,18 +1656,26 @@ export function ChatPanelV2({
                 args: toolCall.args
               })
 
-              // Check if this is a client-side tool (only write operations)
-              // read_file is server-side to ensure AI sees fresh data from client-side writes
-              const clientSideTools = ['write_file', 'edit_file', 'delete_file', 'add_package', 'remove_package']
+              // Check if this is a client-side tool (both read and write operations)
+              const clientSideTools = [
+                'write_file', 
+                'edit_file', 
+                'delete_file', 
+                'add_package', 
+                'remove_package',
+                'read_file',
+                'list_files',
+                'grep_search',
+                'semantic_code_navigator'
+              ]
+              
               if (clientSideTools.includes(toolCall.toolName)) {
                 console.log('[ChatPanelV2][ClientTool] ⚡ Executing client-side tool:', toolCall.toolName)
                 
                 // Execute the tool on client-side IndexedDB immediately
-                // This applies the file operation to IndexedDB without waiting for the stream to complete
                 const { handleClientFileOperation } = await import('@/lib/client-file-tools')
                 
-                // Define addToolResult function - this is just for logging/tracking
-                // The actual file operation happens inside handleClientFileOperation
+                // Define addToolResult function - this sends the result back to the AI
                 const addToolResult = (result: any) => {
                   console.log('[ChatPanelV2][ClientTool] ✅ Client-side tool completed:', {
                     tool: result.tool,
@@ -1478,16 +1684,23 @@ export function ChatPanelV2({
                     output: result.output
                   })
                   
-                  // The tool result is returned to the AI via the server's streamText
-                  // We don't need to send it back manually - the AI SDK handles this
-                  // when tools don't have execute functions, they're treated as client-side tools
+                  // For client-side tools, we need to send the result back to continue the conversation
+                  // Create a continuation request with the tool result
+                  handleClientToolResult(toolCall.toolName, result, project?.id, assistantMessageId)
                 }
                 
                 // Execute the tool asynchronously (don't await - per AI SDK docs)
-                // The tool will update IndexedDB immediately
                 handleClientFileOperation(toolCall, project?.id, addToolResult)
                   .catch(error => {
                     console.error('[ChatPanelV2][ClientTool] ❌ Tool execution error:', error)
+                    // Send error result back
+                    const errorResult = {
+                      tool: toolCall.toolName,
+                      toolCallId: toolCall.toolCallId,
+                      state: 'output-error',
+                      errorText: error instanceof Error ? error.message : 'Unknown error'
+                    }
+                    handleClientToolResult(toolCall.toolName, errorResult, project?.id, assistantMessageId)
                   })
               } else {
                 console.log('[ChatPanelV2][DataStream] Server-side tool call, server handles:', parsed.toolName)
