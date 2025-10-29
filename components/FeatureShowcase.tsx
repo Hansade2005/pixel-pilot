@@ -151,7 +151,7 @@ export default function PiPilotFeaturesSlider() {
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-pink-500/5 rounded-full blur-3xl animate-pulse delay-2000"></div>
       </div>
 
-      <div className="w-full max-w-5xl relative z-10">
+      <div className="w-full max-w-7xl relative z-10 px-4 md:px-8 lg:px-12">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -50 }}
@@ -200,16 +200,24 @@ export default function PiPilotFeaturesSlider() {
 
           {/* Feature Cards Grid */}
           <motion.div
-            animate={{ x: `${-currentIndex * (100 / cardsPerSlide)}%` }}
+            animate={{ x: `${-currentIndex * 100}%` }}
             transition={{
               type: "tween",
               duration: 0.4,
               ease: "easeInOut",
             }}
-            className="flex gap-6"
+            className="flex"
           >
             {features.map((feature, featureIndex) => (
-              <div key={feature.id} style={{ flex: `0 0 ${100 / cardsPerSlide}%` }} className="">
+              <div 
+                key={feature.id} 
+                style={{ 
+                  flex: `0 0 ${100 / cardsPerSlide}%`, 
+                  paddingLeft: featureIndex % cardsPerSlide === 0 ? '0' : '12px', 
+                  paddingRight: (featureIndex + 1) % cardsPerSlide === 0 ? '0' : '12px' 
+                }} 
+                className="box-border"
+              >
                 <Card className="border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl overflow-hidden transition-all duration-500 hover:shadow-3xl hover:shadow-blue-500/20 h-full">
                   <CardHeader className="space-y-4 pb-4">
                     <div className="flex items-start justify-between flex-wrap gap-3">
