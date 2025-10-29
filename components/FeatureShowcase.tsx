@@ -168,7 +168,7 @@ export default function PiPilotFeaturesSlider() {
         </motion.div>
 
         {/* Slider Container */}
-        <div className="relative overflow-hidden" onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
+        <div className="relative" onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
           {/* Navigation Buttons */}
           <Button
             onClick={prevSlide}
@@ -188,6 +188,9 @@ export default function PiPilotFeaturesSlider() {
             <ChevronRight className="w-6 h-6 text-white" />
           </Button>
 
+          {/* Cards wrapper with overflow hidden */}
+          <div className="overflow-hidden">
+
           {/* Auto-play toggle */}
           <Button
             onClick={() => setIsAutoPlaying(!isAutoPlaying)}
@@ -198,6 +201,8 @@ export default function PiPilotFeaturesSlider() {
             {isAutoPlaying ? <Pause className="w-4 h-4 text-white" /> : <Play className="w-4 h-4 text-white" />}
           </Button>
 
+          {/* Cards wrapper with overflow hidden */}
+          <div className="overflow-hidden">
           {/* Feature Cards Grid */}
           <motion.div
             animate={{ x: `${-currentIndex * 100}%` }}
@@ -300,6 +305,9 @@ export default function PiPilotFeaturesSlider() {
               </div>
             ))}
           </motion.div>
+          </div>
+
+          </div>
 
           {/* Progress Indicators */}
           <motion.div
