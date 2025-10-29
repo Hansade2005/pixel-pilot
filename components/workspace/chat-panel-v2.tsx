@@ -1189,8 +1189,7 @@ export function ChatPanelV2({
         messages: [], // Empty - we're continuing with tool result
         projectId,
         project: { id: projectId }, // Minimal project info
-        files: projectFiles, // Current project files
-        fileTree: await buildProjectFileTree(), // Current file tree
+        fileTree: await buildProjectFileTree(), // Current file tree for context
         modelId: selectedModel,
         aiMode,
         toolResult: {
@@ -1536,8 +1535,7 @@ export function ChatPanelV2({
           id: project?.id, // Chat session ID for server-side storage
           projectId: project?.id,
           project,
-          fileTree, // Use client-built file tree instead of raw files
-          files: projectFiles, // Keep raw files for tool operations (now refreshed)
+          fileTree, // Use client-built file tree for context (all file operations are client-side now)
           modelId: selectedModel,
           aiMode
         }),
