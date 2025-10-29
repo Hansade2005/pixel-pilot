@@ -36,7 +36,6 @@ export function Navigation() {
   const [isLoading, setIsLoading] = useState(true)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false)
-  const [isMobileProfileOpen, setIsMobileProfileOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
 
   // Subscription status hook
@@ -83,7 +82,6 @@ export function Navigation() {
 
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false)
-    setIsMobileProfileOpen(false)
   }
 
   return (
@@ -290,203 +288,196 @@ export function Navigation() {
         {isMobileMenuOpen && (
           <div className="md:hidden">
             <div className="px-2 pt-2 pb-3 space-y-1 bg-gray-800/50 backdrop-blur-sm rounded-lg mt-2 border border-gray-700/50 max-h-[calc(100vh-80px)] overflow-y-auto">
-              {/* Mobile Navigation Links */}
-              <div className="border-b border-gray-700 pb-2 mb-2">
-                <div className="px-3 py-2 text-gray-400 text-xs uppercase tracking-wider">
-                  Products
-                </div>
-                <Link
-                  href="/"
-                  className="flex items-center gap-3 px-3 py-2 text-white hover:text-gray-300 transition-colors"
-                  onClick={closeMobileMenu}
-                >
-                  <Zap className="w-4 h-4" />
-                  <div>
-                    <div className="font-medium">PiPilot</div>
-                    <div className="text-xs text-gray-400">Build apps with chat</div>
+              {/* Mobile Navigation Links - Only show for non-logged-in users */}
+              {!user && (
+                <>
+                  <div className="border-b border-gray-700 pb-2 mb-2">
+                    <div className="px-3 py-2 text-gray-400 text-xs uppercase tracking-wider">
+                      Products
+                    </div>
+                    <Link
+                      href="/"
+                      className="flex items-center gap-3 px-3 py-2 text-white hover:text-gray-300 transition-colors"
+                      onClick={closeMobileMenu}
+                    >
+                      <Zap className="w-4 h-4" />
+                      <div>
+                        <div className="font-medium">PiPilot</div>
+                        <div className="text-xs text-gray-400">Build apps with chat</div>
+                      </div>
+                    </Link>
+                    <Link
+                      href="/products/database"
+                      className="flex items-center gap-3 px-3 py-2 text-white hover:text-gray-300 transition-colors"
+                      onClick={closeMobileMenu}
+                    >
+                      <Database className="w-4 h-4" />
+                      <div>
+                        <div className="font-medium">Database</div>
+                        <div className="text-xs text-gray-400">PostgreSQL as a service</div>
+                      </div>
+                    </Link>
                   </div>
-                </Link>
-                <Link
-                  href="/products/database"
-                  className="flex items-center gap-3 px-3 py-2 text-white hover:text-gray-300 transition-colors"
-                  onClick={closeMobileMenu}
-                >
-                  <Database className="w-4 h-4" />
-                  <div>
-                    <div className="font-medium">Database</div>
-                    <div className="text-xs text-gray-400">PostgreSQL as a service</div>
-                  </div>
-                </Link>
-              </div>
-              
-              <Link
-                href="/community"
-                className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
-                onClick={closeMobileMenu}
-              >
-                Community
-              </Link>
-              <Link
-                href="/pricing"
-                className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
-                onClick={closeMobileMenu}
-              >
-                Plans
-              </Link>
-              <Link
-                href="/enterprise"
-                className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
-                onClick={closeMobileMenu}
-              >
-                Business
-              </Link>
-              <Link
-                href="/blog"
-                className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
-                onClick={closeMobileMenu}
-              >
-                Blog
-              </Link>
-              <Link
-                href="/docs"
-                className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
-                onClick={closeMobileMenu}
-              >
-                Docs
-              </Link>
-              <Link
-                href="/showcase"
-                className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
-                onClick={closeMobileMenu}
-              >
-                Showcase
-              </Link>
+                  
+                  <Link
+                    href="/community"
+                    className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
+                    onClick={closeMobileMenu}
+                  >
+                    Community
+                  </Link>
+                  <Link
+                    href="/pricing"
+                    className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
+                    onClick={closeMobileMenu}
+                  >
+                    Plans
+                  </Link>
+                  <Link
+                    href="/enterprise"
+                    className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
+                    onClick={closeMobileMenu}
+                  >
+                    Business
+                  </Link>
+                  <Link
+                    href="/blog"
+                    className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
+                    onClick={closeMobileMenu}
+                  >
+                    Blog
+                  </Link>
+                  <Link
+                    href="/docs"
+                    className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
+                    onClick={closeMobileMenu}
+                  >
+                    Docs
+                  </Link>
+                  <Link
+                    href="/showcase"
+                    className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
+                    onClick={closeMobileMenu}
+                  >
+                    Showcase
+                  </Link>
+                </>
+              )}
 
               {/* Mobile Auth Section */}
-              <div className="border-t border-gray-700 pt-4 mt-4">
-                {/* Mobile Subscription Status */}
-                {!isLoading && user && !subscriptionLoading && subscription && (
-                  <div className="mb-4 p-3 bg-gray-800/50 rounded-lg border border-gray-700/50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <Crown className="w-4 h-4 text-purple-400" />
-                        <span className="text-sm font-medium text-white">
-                          {subscription.plan === 'pro' ? 'Pro Plan' :
-                           subscription.plan === 'enterprise' ? 'Enterprise Plan' :
-                           'Free Plan'}
-                        </span>
-                      </div>
-                      {subscription.plan === 'free' && (subscription.githubPushesThisMonth || 0) >= 2 && (
-                        <span className="text-xs text-orange-400 bg-orange-400/10 px-2 py-1 rounded">
-                          Limit Reached
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-2 text-xs text-gray-400">
-                      {subscription.plan === 'pro'
-                        ? `${subscription.deploymentsThisMonth || 0}/10 deployments • Pro plan`
-                        : subscription.plan === 'enterprise'
-                        ? 'Unlimited usage • Enterprise plan'
-                        : `${subscription.deploymentsThisMonth || 0}/5 deployments • ${subscription.githubPushesThisMonth || 0}/2 GitHub pushes • Free plan`
-                      }
-                    </div>
-                  </div>
-                )}
-
+              <div className={`${!user ? 'border-t border-gray-700 pt-4 mt-4' : ''}`}>
                 {!isLoading && (
                   <>
                     {user ? (
-                      <div className="space-y-2">
-                        {/* Profile Dropdown Trigger */}
-                        <button
-                          onClick={() => setIsMobileProfileOpen(!isMobileProfileOpen)}
-                          className="flex items-center justify-between w-full px-3 py-2 text-white hover:text-gray-300 transition-colors"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
-                              <span className="text-white text-sm font-medium">
-                                {user.email?.charAt(0).toUpperCase() || 'U'}
-                              </span>
-                            </div>
-                            <span className="text-white text-sm">
-                              {user.email?.split('@')[0] || 'User'}
-                            </span>
-                          </div>
-                          <ChevronDown 
-                            className={`w-4 h-4 transition-transform duration-200 ${
-                              isMobileProfileOpen ? 'rotate-180' : ''
-                            }`} 
-                          />
-                        </button>
-                        
-                                                 {/* Profile Dropdown Content */}
-                         {isMobileProfileOpen && (
-                           <div className="ml-4 space-y-1 border-l border-gray-700 pl-4">
-                             <Link
-                               href="/workspace/account"
-                               className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
-                               onClick={closeMobileMenu}
-                             >
-                               <User className="w-4 h-4 inline mr-2" />
-                               Account
-                             </Link>
-                             <Link
-                               href="/workspace"
-                               className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
-                               onClick={closeMobileMenu}
-                             >
-                               <Briefcase className="w-4 h-4 inline mr-2" />
-                               Dashboard
-                             </Link>
-                             {user && checkAdminAccess(user) && (
-                               <>
-                                 <div className="border-t border-gray-700 my-2"></div>
-                                 <Link
-                                   href="/admin"
-                                   className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
-                                   onClick={closeMobileMenu}
-                                 >
-                                   <Shield className="w-4 h-4 inline mr-2" />
-                                   Admin Panel
-                                 </Link>
-                               </>
-                             )}
-                             <Link
-                               href="/workspace/management"
-                               className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
-                               onClick={closeMobileMenu}
-                             >
-                               <Settings className="w-4 h-4 inline mr-2" />
-                               Projects
-                             </Link>
-                             <Link
-                               href="/database"
-                               className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
-                               onClick={closeMobileMenu}
-                             >
-                               <Database className="w-4 h-4 inline mr-2" />
-                               Database
-                             </Link>
-                             <Link
-                               href="/workspace/deployment"
-                               className="block px-3 py-2 text-white hover:text-gray-300 transition-colors"
-                               onClick={closeMobileMenu}
-                             >
-                               <Rocket className="w-4 h-4 inline mr-2" />
-                               Deploy
-                             </Link>
-                             <button
-                               onClick={() => {
-                                 handleLogout()
-                                 closeMobileMenu()
-                               }}
-                               className="block w-full text-left px-3 py-2 text-white hover:text-gray-300 transition-colors"
-                             >
-                               <LogOut className="w-4 h-4 inline mr-2" />
-                               Logout
-                             </button>
-                           </div>
-                         )}
+                      /* Mobile Logged-in Header */
+                      <div className="flex items-center justify-between px-3 py-4">
+                        {/* Left - Logo */}
+                        <div className="flex items-center">
+                          <Link href="/" onClick={closeMobileMenu}>
+                            <Logo variant="text" size="sm" />
+                          </Link>
+                        </div>
+
+                        {/* Right - Bell + Profile Icons */}
+                        <div className="flex items-center space-x-2">
+                          {/* Bell Icon */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="text-white hover:text-gray-300 transition-colors p-2">
+                                <Bell className="w-5 h-5" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-64 bg-gray-800 border-gray-700">
+                              <div className="px-3 py-2 text-sm text-gray-400 border-b border-gray-700">
+                                Notifications
+                              </div>
+                              <div className="py-2">
+                                <div className="px-3 py-4 text-center text-gray-500">
+                                  <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                  <div className="text-sm">No new notifications</div>
+                                </div>
+                              </div>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+
+                          {/* Profile Icon Trigger */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="text-white hover:text-gray-300 transition-colors p-2">
+                                <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
+                                  <span className="text-white text-sm font-medium">
+                                    {user.email?.charAt(0).toUpperCase() || 'U'}
+                                  </span>
+                                </div>
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-64 bg-gray-800 border-gray-700">
+                              {/* Subscription Status in Dropdown */}
+                              {!subscriptionLoading && subscription && (
+                                <div className="px-3 py-3 border-b border-gray-700">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center space-x-2">
+                                      <Crown className="w-4 h-4 text-purple-400" />
+                                      <span className="text-sm font-medium text-white">
+                                        {subscription.plan === 'pro' ? 'Pro Plan' :
+                                         subscription.plan === 'enterprise' ? 'Enterprise Plan' :
+                                         'Free Plan'}
+                                      </span>
+                                    </div>
+                                    {subscription.plan === 'free' && (subscription.githubPushesThisMonth || 0) >= 2 && (
+                                      <span className="text-xs text-orange-400 bg-orange-400/10 px-2 py-1 rounded">
+                                        Limit
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-gray-400">
+                                    {subscription.plan === 'pro'
+                                      ? `${subscription.deploymentsThisMonth || 0}/10 deployments`
+                                      : subscription.plan === 'enterprise'
+                                      ? 'Unlimited usage'
+                                      : `${subscription.deploymentsThisMonth || 0}/5 deployments • ${subscription.githubPushesThisMonth || 0}/2 pushes`
+                                    }
+                                  </div>
+                                </div>
+                              )}
+
+                              <Link href="/workspace/account">
+                                <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
+                                  <User className="w-4 h-4 mr-2" />
+                                  Account
+                                </DropdownMenuItem>
+                              </Link>
+                              <Link href="/workspace">
+                                <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
+                                  <Briefcase className="w-4 h-4 mr-2" />
+                                  Dashboard
+                                </DropdownMenuItem>
+                              </Link>
+                              {user && checkAdminAccess(user) && (
+                                <>
+                                  <DropdownMenuSeparator className="bg-gray-700" />
+                                  <Link href="/admin">
+                                    <DropdownMenuItem className="text-white hover:bg-gray-700 cursor-pointer">
+                                      <Shield className="w-4 h-4 mr-2" />
+                                      Admin Panel
+                                    </DropdownMenuItem>
+                                  </Link>
+                                </>
+                              )}
+                              <DropdownMenuSeparator className="bg-gray-700" />
+                              <DropdownMenuItem
+                                className="text-white hover:bg-gray-700"
+                                onClick={() => {
+                                  handleLogout()
+                                  closeMobileMenu()
+                                }}
+                              >
+                                <LogOut className="w-4 h-4 mr-2" />
+                                Logout
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
                     ) : (
                       <div className="space-y-2">

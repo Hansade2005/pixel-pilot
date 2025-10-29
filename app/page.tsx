@@ -228,16 +228,6 @@ export default function LandingPage() {
         <div className="w-full max-w-4xl mx-auto">
           <ChatInput onAuthRequired={handleAuthRequired} />
         </div>
-
-        {/* CTA Button Section */}
-        <div className="mt-24 mb-12 w-full text-center">
-          <Link href="/demo">
-            <Button className="px-8 py-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-lg rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
-              <Eye className="w-5 h-5 mr-2" />
-              See Live Demo
-            </Button>
-          </Link>
-        </div>
       </main>
 
       {/* Feature Showcase Section */}
