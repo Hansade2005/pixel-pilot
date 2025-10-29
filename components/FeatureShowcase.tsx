@@ -174,7 +174,7 @@ export default function PiPilotFeaturesSlider() {
             onClick={prevSlide}
             variant="outline"
             size="icon"
-            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-6 z-30 rounded-full bg-white/10 backdrop-blur-xl border-white/20 hover:bg-white/20 shadow-2xl shadow-black/50 transition-all duration-300 hover:shadow-blue-500/30 md:-translate-x-16 hover:scale-110 active:scale-95"
+            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-30 rounded-full bg-white/10 backdrop-blur-xl border-white/20 hover:bg-white/20 shadow-2xl shadow-black/50 transition-all duration-300 hover:shadow-blue-500/30 md:-translate-x-6 lg:-translate-x-16 hover:scale-110 active:scale-95"
           >
             <ChevronLeft className="w-6 h-6 text-white" />
           </Button>
@@ -183,7 +183,7 @@ export default function PiPilotFeaturesSlider() {
             onClick={nextSlide}
             variant="outline"
             size="icon"
-            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-6 z-30 rounded-full bg-white/10 backdrop-blur-xl border-white/20 hover:bg-white/20 shadow-2xl shadow-black/50 transition-all duration-300 hover:shadow-blue-500/30 md:translate-x-16 hover:scale-110 active:scale-95"
+            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-30 rounded-full bg-white/10 backdrop-blur-xl border-white/20 hover:bg-white/20 shadow-2xl shadow-black/50 transition-all duration-300 hover:shadow-blue-500/30 md:translate-x-6 lg:translate-x-16 hover:scale-110 active:scale-95"
           >
             <ChevronRight className="w-6 h-6 text-white" />
           </Button>
