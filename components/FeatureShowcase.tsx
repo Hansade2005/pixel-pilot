@@ -259,120 +259,85 @@ export default function PiPilotFeaturesSlider() {
                 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
               }`}>
                 {currentSlideFeatures.map((feature, featureIndex) => (
-                  <motion.div
-                    key={feature.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: featureIndex * 0.1, duration: 0.6 }}
-                    className="group"
-                  >
-                    <Card className="border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl overflow-hidden transition-all duration-500 hover:shadow-3xl hover:shadow-blue-500/20 h-full">
-                      <CardHeader className="space-y-4 pb-4">
-                        <div className="flex items-start justify-between flex-wrap gap-3">
-                          <motion.div
-                            className="flex items-center gap-3"
-                            initial={{ opacity: 0, x: -30 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.2 + featureIndex * 0.1, duration: 0.5 }}
-                          >
-                            <div className="relative">
-                              <motion.div
-                                whileHover={{ rotate: 360 }}
-                                transition={{ duration: 0.6 }}
-                                className="relative"
-                              >
-                                {feature.icon}
-                                <motion.div
-                                  className="absolute -bottom-1 -right-1"
-                                  initial={{ scale: 0 }}
-                                  animate={{ scale: 1 }}
-                                  transition={{ delay: 0.4 + featureIndex * 0.1, type: "spring", stiffness: 500 }}
-                                >
-                                  {feature.secondaryIcon}
-                                </motion.div>
-                              </motion.div>
-                            </div>
-                            <div>
-                              <CardTitle className="text-xl md:text-2xl text-white font-bold">
-                                {feature.title}
-                              </CardTitle>
-                            </div>
-                          </motion.div>
-                          <motion.div
-                            className="flex gap-2 flex-wrap"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 0.3 + featureIndex * 0.1, duration: 0.4 }}
-                          >
-                            {feature.badges.map((badge, idx) => (
-                              <Badge
-                                key={idx}
-                                variant="secondary"
-                                className="bg-white/10 text-white border-white/20 hover:bg-white/20 backdrop-blur-sm px-2 py-1 text-xs font-medium"
-                              >
-                                {badge}
-                              </Badge>
-                            ))}
-                          </motion.div>
-                        </div>
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ delay: 0.4 + featureIndex * 0.1, duration: 0.5 }}
-                        >
-                          <CardDescription className="text-slate-300 text-sm md:text-base leading-relaxed">
-                            {feature.description}
-                          </CardDescription>
-                        </motion.div>
-                      </CardHeader>
-
-                      <CardContent className="space-y-4 flex-grow">
-                        <motion.div
-                          className="grid grid-cols-1 gap-2"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ delay: 0.5 + featureIndex * 0.1, duration: 0.5 }}
-                        >
-                          {feature.highlights.map((highlight, idx) => (
+                  <Card key={feature.id} className="border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl overflow-hidden transition-all duration-500 hover:shadow-3xl hover:shadow-blue-500/20 h-full">
+                    <CardHeader className="space-y-4 pb-4">
+                      <div className="flex items-start justify-between flex-wrap gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
                             <motion.div
-                              key={idx}
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.6 + featureIndex * 0.1 + idx * 0.05, duration: 0.3 }}
-                              whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,0.1)" }}
-                              className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 hover:border-white/20 transition-all duration-300 cursor-pointer group/item"
+                              whileHover={{ rotate: 360 }}
+                              transition={{ duration: 0.6 }}
+                              className="relative"
                             >
+                              {feature.icon}
                               <motion.div
-                                className={`w-2 h-2 rounded-full bg-gradient-to-r ${feature.gradient}`}
-                                whileHover={{ scale: 1.3 }}
-                                transition={{ type: "spring", stiffness: 400 }}
-                              ></motion.div>
-                              <span className="text-slate-200 text-xs md:text-sm group-hover/item:text-white transition-colors">
-                                {highlight}
-                              </span>
+                                className="absolute -bottom-1 -right-1"
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ delay: 0.4 + featureIndex * 0.1, type: "spring", stiffness: 500 }}
+                              >
+                                {feature.secondaryIcon}
+                              </motion.div>
                             </motion.div>
+                          </div>
+                          <div>
+                            <CardTitle className="text-xl md:text-2xl text-white font-bold">
+                              {feature.title}
+                            </CardTitle>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 flex-wrap">
+                          {feature.badges.map((badge, idx) => (
+                            <Badge
+                              key={idx}
+                              variant="secondary"
+                              className="bg-white/10 text-white border-white/20 hover:bg-white/20 backdrop-blur-sm px-2 py-1 text-xs font-medium"
+                            >
+                              {badge}
+                            </Badge>
                           ))}
-                        </motion.div>
-                      </CardContent>
+                        </div>
+                      </div>
+                      <CardDescription className="text-slate-300 text-sm md:text-base leading-relaxed">
+                        {feature.description}
+                      </CardDescription>
+                    </CardHeader>
 
-                      <CardFooter className="pt-4">
-                        <motion.div
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ delay: 0.8 + featureIndex * 0.1, duration: 0.4 }}
-                          className="w-full"
-                        >
-                          <Button
-                            className={`w-full bg-gradient-to-r ${feature.gradient} hover:opacity-90 text-white shadow-lg shadow-blue-500/20 font-semibold px-4 py-2 text-sm md:text-base transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/30`}
+                    <CardContent className="space-y-4 flex-grow">
+                      <div className="grid grid-cols-1 gap-2">
+                        {feature.highlights.map((highlight, idx) => (
+                          <motion.div
+                            key={idx}
+                            whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,0.1)" }}
+                            className="flex items-center gap-2 p-2 rounded-lg bg-white/5 border border-white/10 hover:border-white/20 transition-all duration-300 cursor-pointer group/item"
                           >
-                            {feature.cta}
-                          </Button>
-                        </motion.div>
-                      </CardFooter>
-                    </Card>
-                  </motion.div>
+                            <motion.div
+                              className={`w-2 h-2 rounded-full bg-gradient-to-r ${feature.gradient}`}
+                              whileHover={{ scale: 1.3 }}
+                              transition={{ type: "spring", stiffness: 400 }}
+                            ></motion.div>
+                            <span className="text-slate-200 text-xs md:text-sm group-hover/item:text-white transition-colors">
+                              {highlight}
+                            </span>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </CardContent>
+
+                    <CardFooter className="pt-4">
+                      <motion.div
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="w-full"
+                      >
+                        <Button
+                          className={`w-full bg-gradient-to-r ${feature.gradient} hover:opacity-90 text-white shadow-lg shadow-blue-500/20 font-semibold px-4 py-2 text-sm md:text-base transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/30`}
+                        >
+                          {feature.cta}
+                        </Button>
+                      </motion.div>
+                    </CardFooter>
+                  </Card>
                 ))}
               </div>
             </motion.div>
