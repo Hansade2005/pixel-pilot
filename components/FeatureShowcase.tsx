@@ -168,7 +168,7 @@ export default function PiPilotFeaturesSlider() {
         </motion.div>
 
         {/* Slider Container */}
-        <div className="relative" onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
+        <div className="relative overflow-hidden" onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
           {/* Navigation Buttons */}
           <Button
             onClick={prevSlide}
@@ -206,10 +206,10 @@ export default function PiPilotFeaturesSlider() {
               duration: 0.4,
               ease: "easeInOut",
             }}
-            className="flex"
+            className="flex gap-6"
           >
             {features.map((feature, featureIndex) => (
-              <div key={feature.id} style={{ flex: `0 0 ${100 / cardsPerSlide}%` }} className="pr-6">
+              <div key={feature.id} style={{ flex: `0 0 ${100 / cardsPerSlide}%` }} className="">
                 <Card className="border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl overflow-hidden transition-all duration-500 hover:shadow-3xl hover:shadow-blue-500/20 h-full">
                   <CardHeader className="space-y-4 pb-4">
                     <div className="flex items-start justify-between flex-wrap gap-3">
