@@ -1466,15 +1466,8 @@ ${conversationSummaryContext || ''}`
           inputSchema: z.object({
             path: z.string().describe('The file path relative to project root (e.g., "src/components/Button.tsx")'),
             content: z.string().describe('The complete file content to write')
-          }),
-          execute: async ({ path, content }, { toolCallId }) => {
-            // This should not execute server-side anymore - client handles it
-            return {
-              success: false,
-              error: 'write_file tool should execute client-side',
-              toolCallId
-            }
-          }
+          })
+          // No execute function - this is a client-side tool
         }),
 
         // CLIENT-SIDE TOOL: Read operations execute on IndexedDB for better performance with large codebases
@@ -1486,15 +1479,8 @@ ${conversationSummaryContext || ''}`
             startLine: z.number().optional().describe('Starting line number (1-indexed) to read from'),
             endLine: z.number().optional().describe('Ending line number (1-indexed) to read to. If not provided, reads from startLine to end of file'),
             lineRange: z.string().optional().describe('Line range in format "start-end" (e.g., "654-661"). Overrides startLine and endLine if provided')
-          }),
-          execute: async ({ path, includeLineNumbers, startLine, endLine, lineRange }, { toolCallId }) => {
-            // This should not execute server-side anymore - client handles it
-            return {
-              success: false,
-              error: 'read_file tool should execute client-side',
-              toolCallId
-            }
-          }
+          })
+          // No execute function - this is a client-side tool
         }),
 
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
@@ -1502,15 +1488,8 @@ ${conversationSummaryContext || ''}`
           description: 'Delete a file from the project. Use this tool to remove files that are no longer needed. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
             path: z.string().describe('The file path relative to project root to delete')
-          }),
-          execute: async ({ path }, { toolCallId }) => {
-            // This should not execute server-side anymore - client handles it
-            return {
-              success: false,
-              error: 'delete_file tool should execute client-side',
-              toolCallId
-            }
-          }
+          })
+          // No execute function - this is a client-side tool
         }),
 
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
@@ -1526,15 +1505,8 @@ ${conversationSummaryContext || ''}`
 >>>>>>> REPLACE`),
             useRegex: z.boolean().optional().describe('Whether to treat search as regex pattern (default: false)'),
             replaceAll: z.boolean().optional().describe('Whether to replace all occurrences (default: false, replaces first occurrence only)')
-          }),
-          execute: async ({ filePath, searchReplaceBlock, useRegex = false, replaceAll = false }, { toolCallId }) => {
-            // This should not execute server-side anymore - client handles it
-            return {
-              success: false,
-              error: 'edit_file tool should execute client-side',
-              toolCallId
-            }
-          }
+          })
+          // No execute function - this is a client-side tool
         }),
 
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
@@ -1547,15 +1519,8 @@ ${conversationSummaryContext || ''}`
             ]).describe('Package name(s) to add'),
             version: z.string().optional().describe('The package version (e.g., "^4.17.21"). Defaults to "latest". Applied to all packages if array provided'),
             isDev: z.boolean().optional().describe('Whether to add as dev dependency (default: false)')
-          }),
-          execute: async (input: { name: string | string[]; version?: string; isDev?: boolean }, { toolCallId }) => {
-            // This should not execute server-side anymore - client handles it
-            return {
-              success: false,
-              error: 'add_package tool should execute client-side',
-              toolCallId
-            }
-          }
+          })
+          // No execute function - this is a client-side tool
         }),
 
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
@@ -1567,15 +1532,8 @@ ${conversationSummaryContext || ''}`
               z.array(z.string()).describe('Array of package names to remove')
             ]).describe('Package name(s) to remove'),
             isDev: z.boolean().optional().describe('Whether to remove from dev dependencies (default: false)')
-          }),
-          execute: async (input: { name: string | string[]; isDev?: boolean }, { toolCallId }) => {
-            // This should not execute server-side anymore - client handles it
-            return {
-              success: false,
-              error: 'remove_package tool should execute client-side',
-              toolCallId
-            }
-          }
+          })
+          // No execute function - this is a client-side tool
         }),
 
         web_search: tool({
@@ -2385,15 +2343,8 @@ ${conversationSummaryContext || ''}`
             isRegexp: z.boolean().optional().describe('Whether the query is a regex pattern (default: false for literal text search)'),
             maxResults: z.number().optional().describe('Maximum number of results to return (default: 100)'),
             caseSensitive: z.boolean().optional().describe('Whether the search is case sensitive (default: false)')
-          }),
-          execute: async ({ query, includePattern, isRegexp = false, maxResults = 100, caseSensitive = false }, { toolCallId }) => {
-            // This should not execute server-side anymore - client handles it
-            return {
-              success: false,
-              error: 'grep_search tool should execute client-side',
-              toolCallId
-            }
-          }
+          })
+          // No execute function - this is a client-side tool
         }),
 
         check_dev_errors: tool({
@@ -2792,15 +2743,8 @@ ${conversationSummaryContext || ''}`
           description: 'List all files and directories in the project with their structure and metadata. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
             path: z.string().optional().describe('Optional: Specific directory path to list. If omitted, lists root directory')
-          }),
-          execute: async ({ path }, { toolCallId }) => {
-            // This should not execute server-side anymore - client handles it
-            return {
-              success: false,
-              error: 'list_files tool should execute client-side',
-              toolCallId
-            }
-          }
+          })
+          // No execute function - this is a client-side tool
         }),
 
       },
