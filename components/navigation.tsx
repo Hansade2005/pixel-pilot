@@ -84,7 +84,7 @@ export function Navigation() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Left Side - Logo */}
-          <div className="flex items-center space-x-2">
+          <div className="hidden md:flex items-center space-x-2">
             <Link href="/">
               <Logo variant="text" size="md" />
             </Link>
@@ -265,7 +265,7 @@ export function Navigation() {
             {/* Left - Logo */}
             <div className="flex items-center">
               <Link href="/">
-                <Logo variant="text" size="md" />
+                <Logo variant="text" size="sm" showSubtitle={false} />
               </Link>
             </div>
 

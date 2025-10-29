@@ -4,10 +4,11 @@ import Image from 'next/image'
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl'
   variant?: 'icon' | 'text' | 'full'
+  showSubtitle?: boolean
   className?: string
 }
 
-export function Logo({ size = 'md', variant = 'icon', className }: LogoProps) {
+export function Logo({ size = 'md', variant = 'icon', showSubtitle = true, className }: LogoProps) {
   const sizeClasses = {
     sm: 'h-6 w-6',
     md: 'h-12 w-12',
@@ -52,9 +53,11 @@ export function Logo({ size = 'md', variant = 'icon', className }: LogoProps) {
           <span className={cn('font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-700 bg-clip-text text-transparent', textSizes[size])}>
             PiPilot
           </span>
-          <span className={cn('text-gray-300 font-medium text-xs', size === 'sm' ? 'text-xs' : size === 'md' ? 'text-xs' : size === 'lg' ? 'text-sm' : 'text-sm')}>
-            Plan, build & ship faster.
-          </span>
+          {showSubtitle && (
+            <span className={cn('text-gray-300 font-medium text-xs', size === 'sm' ? 'text-xs' : size === 'md' ? 'text-xs' : size === 'lg' ? 'text-sm' : 'text-sm')}>
+              Plan, build & ship faster.
+            </span>
+          )}
         </div>
       </div>
     )
