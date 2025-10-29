@@ -265,7 +265,7 @@ export function Navigation() {
             {/* Left - Logo */}
             <div className="flex items-center">
               <Link href="/">
-                <Logo variant="text" size="sm" showSubtitle={false} />
+                <Logo variant="text" size="md" showSubtitle={false} />
               </Link>
             </div>
 
