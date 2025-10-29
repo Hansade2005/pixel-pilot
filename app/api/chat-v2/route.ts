@@ -1039,7 +1039,7 @@ export async function POST(req: Request) {
       
       // Create a tool result message to continue the conversation
       const toolResultMessage = {
-        role: 'tool',
+        role: 'user',
         content: JSON.stringify(toolResult.result),
         name: toolResult.toolName,
         tool_call_id: `client-tool-${Date.now()}` // Generate a unique tool call ID
