@@ -21,7 +21,6 @@ import {
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-import { useSubscriptionCache } from "@/hooks/use-subscription-cache"
 import {
   Select,
   SelectContent,
@@ -110,9 +109,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     }
     checkUser()
   }, [supabase.auth])
-
-  // Subscription status hook
-  const { subscription, loading: subscriptionLoading } = useSubscriptionCache(user?.id)
 
   // Check if Web Speech API is supported
   const isWebSpeechSupported = typeof window !== 'undefined' && 
