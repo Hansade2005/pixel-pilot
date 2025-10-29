@@ -42,6 +42,7 @@ export default function LandingPage() {
   const [sortBy, setSortBy] = useState<string>('popular')
   const [filterBy, setFilterBy] = useState<string>('all')
   const [currentBadgeIndex, setCurrentBadgeIndex] = useState(0)
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   const badgeItems = [
     { icon: <Database className="w-4 h-4 text-blue-400" />, text: "Introducing PiPilot DB 🎉" },
@@ -63,6 +64,21 @@ export default function LandingPage() {
 
     return () => clearInterval(badgeInterval)
   }, [])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element
+      if (!target.closest('.relative.group')) {
+        setIsDropdownOpen(false)
+      }
+    }
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isDropdownOpen])
 
   const loadTemplates = () => {
     const templateData = TemplateManager.getAllTemplates()
@@ -100,6 +116,15 @@ export default function LandingPage() {
   const handleAuthSuccess = () => {
     setShowAuthModal(false)
     checkUser()
+  }
+
+  const handleDropdownToggle = () => {
+    setIsDropdownOpen(!isDropdownOpen)
+  }
+
+  const handleFilterSelect = (filter: string) => {
+    setFilterBy(filter)
+    setIsDropdownOpen(false)
   }
 
   // Function to filter and sort templates
@@ -236,7 +261,11 @@ export default function LandingPage() {
             <div className="flex flex-wrap items-center gap-4">
               {/* Category Dropdown */}
               <div className="relative group">
-                <Button variant="outline" className={`border-gray-600 text-white hover:bg-gray-700 ${filterBy === 'all' ? 'bg-purple-600 border-purple-600' : ''}`}>
+                <Button 
+                  variant="outline" 
+                  className={`border-gray-600 text-white hover:bg-gray-700 ${filterBy === 'all' ? 'bg-purple-600 border-purple-600' : ''}`}
+                  onClick={handleDropdownToggle}
+                >
                   {filterBy === 'all' ? 'View All' :
                    filterBy === 'discover' ? 'Discover' :
                    filterBy === 'internal' ? 'Internal Tools' :
@@ -245,56 +274,56 @@ export default function LandingPage() {
                    filterBy === 'consumer' ? 'Consumer App' :
                    filterBy === 'b2b' ? 'B2B App' :
                    filterBy === 'prototype' ? 'Prototype' : 'View All'}
-                  <ChevronDown className="w-4 h-4 ml-2" />
+                  <ChevronDown className={`w-4 h-4 ml-2 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
                 </Button>
                 {/* Dropdown Menu */}
-                <div className="absolute top-full left-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+                <div className={`absolute top-full left-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-lg transition-all duration-200 z-10 ${isDropdownOpen ? 'opacity-100 visible' : 'opacity-0 invisible'} group-hover:opacity-100 group-hover:visible`}>
                   <div className="py-2">
                     <button
                       className={`w-full text-left px-4 py-2 transition-colors ${filterBy === 'all' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
-                      onClick={() => setFilterBy('all')}
+                      onClick={() => handleFilterSelect('all')}
                     >
                       View All
                     </button>
                     <button
                       className={`w-full text-left px-4 py-2 transition-colors ${filterBy === 'discover' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
-                      onClick={() => setFilterBy('discover')}
+                      onClick={() => handleFilterSelect('discover')}
                     >
                       Discover
                     </button>
                     <button
                       className={`w-full text-left px-4 py-2 transition-colors ${filterBy === 'internal' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
-                      onClick={() => setFilterBy('internal')}
+                      onClick={() => handleFilterSelect('internal')}
                     >
                       Internal Tools
                     </button>
                     <button
                       className={`w-full text-left px-4 py-2 transition-colors ${filterBy === 'website' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
-                      onClick={() => setFilterBy('website')}
+                      onClick={() => handleFilterSelect('website')}
                     >
                       Website
                     </button>
                     <button
                       className={`w-full text-left px-4 py-2 transition-colors ${filterBy === 'personal' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
-                      onClick={() => setFilterBy('personal')}
+                      onClick={() => handleFilterSelect('personal')}
                     >
                       Personal
                     </button>
                     <button
                       className={`w-full text-left px-4 py-2 transition-colors ${filterBy === 'consumer' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
-                      onClick={() => setFilterBy('consumer')}
+                      onClick={() => handleFilterSelect('consumer')}
                     >
                       Consumer App
                     </button>
                     <button
                       className={`w-full text-left px-4 py-2 transition-colors ${filterBy === 'b2b' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
-                      onClick={() => setFilterBy('b2b')}
+                      onClick={() => handleFilterSelect('b2b')}
                     >
                       B2B App
                     </button>
                     <button
                       className={`w-full text-left px-4 py-2 transition-colors ${filterBy === 'prototype' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
-                      onClick={() => setFilterBy('prototype')}
+                      onClick={() => handleFilterSelect('prototype')}
                     >
                       Prototype
                     </button>
