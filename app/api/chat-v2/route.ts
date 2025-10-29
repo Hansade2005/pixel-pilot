@@ -1472,12 +1472,12 @@ ${conversationSummaryContext || ''}`
 
         // CLIENT-SIDE TOOL: Read operations execute on IndexedDB for better performance with large codebases
         read_file: tool({
-          description: 'Read the contents of a file with optional line number information or specific line ranges. Large files (>500KB) will be truncated to prevent response size issues. This tool executes on the client-side IndexedDB.',
+          description: 'Read the contents of a file with optional line number information or specific line ranges. Limited to 500 lines at once for performance. If reading full file, shows first 500 lines only with truncation notice. Use line ranges like "1-500", "501-1000" to read in chunks. This tool executes on the client-side IndexedDB.',
           inputSchema: z.object({
             path: z.string().describe('File path to read'),
             includeLineNumbers: z.boolean().optional().describe('Whether to include line numbers in the response (default: false)'),
             startLine: z.number().optional().describe('Starting line number (1-indexed) to read from'),
-            endLine: z.number().optional().describe('Ending line number (1-indexed) to read to. If not provided, reads from startLine to end of file'),
+            endLine: z.number().optional().describe('Ending line number (1-indexed) to read to. If not provided, reads from startLine to end of file or max 500 lines'),
             lineRange: z.string().optional().describe('Line range in format "start-end" (e.g., "654-661"). Overrides startLine and endLine if provided')
           })
           // No execute function - this is a client-side tool

@@ -185,9 +185,13 @@ export async function handleClientFileOperation(
         }
 
         const fullContent = file.content || '';
+        const allLines = fullContent.split('\n');
+        const totalLines = allLines.length;
         let content = fullContent;
         let actualStartLine = startLine;
         let actualEndLine = endLine;
+        let wasLineTruncated = false;
+        let requestedFullFile = false;
 
         // Parse line range if provided (e.g., "654-661")
         if (lineRange && typeof lineRange === 'string') {
@@ -206,49 +210,76 @@ export async function handleClientFileOperation(
           }
         }
 
+        // Check if AI is trying to read the full file (no line range specified)
+        if (actualStartLine === undefined && actualEndLine === undefined && !lineRange) {
+          requestedFullFile = true;
+          // Limit to first 500 lines for full file reads
+          actualStartLine = 1;
+          actualEndLine = Math.min(500, totalLines);
+          if (totalLines > 500) {
+            wasLineTruncated = true;
+          }
+        }
+
         // Extract specific line range if requested
         if (actualStartLine !== undefined && actualStartLine > 0) {
-          const lines = fullContent.split('\n');
           const startIndex = actualStartLine - 1; // Convert to 0-indexed
-          const endIndex = actualEndLine ? Math.min(actualEndLine - 1, lines.length - 1) : lines.length - 1;
+          const endIndex = actualEndLine ? Math.min(actualEndLine - 1, allLines.length - 1) : allLines.length - 1;
 
-          if (startIndex >= lines.length) {
+          if (startIndex >= allLines.length) {
             addToolResult({
               tool: 'read_file',
               toolCallId: toolCall.toolCallId,
               state: 'output-error',
-              errorText: `Start line ${actualStartLine} is beyond file length (${lines.length} lines)`
+              errorText: `Start line ${actualStartLine} is beyond file length (${allLines.length} lines)`
             });
             return;
           }
 
-          content = lines.slice(startIndex, endIndex + 1).join('\n');
+          // If reading line 1-500 and file is smaller, read the full file
+          if (actualStartLine === 1 && actualEndLine === 500 && totalLines <= 500) {
+            content = fullContent; // Read full file
+            wasLineTruncated = false;
+          } else {
+            content = allLines.slice(startIndex, endIndex + 1).join('\n');
+          }
         }
 
-        // Check for large files and truncate if necessary to prevent response size issues
+        // Check for large content and truncate if necessary to prevent response size issues
         const MAX_CONTENT_SIZE = 500000; // 500KB limit for content in response
-        let wasTruncated = false;
+        let wasContentTruncated = false;
         if (content.length > MAX_CONTENT_SIZE) {
           content = content.substring(0, MAX_CONTENT_SIZE);
-          wasTruncated = true;
+          wasContentTruncated = true;
           console.log(`[ClientFileTool] read_file: Content truncated to ${MAX_CONTENT_SIZE} chars for ${path}`);
         }
 
-        console.log(`[ClientFileTool] read_file: Successfully read ${path} (${content.length} chars${wasTruncated ? ' - TRUNCATED' : ''}, lines ${actualStartLine || 1}-${actualEndLine || 'end'})`);
+        console.log(`[ClientFileTool] read_file: Successfully read ${path} (${content.length} chars${wasContentTruncated ? ' - CONTENT TRUNCATED' : ''}${wasLineTruncated ? ' - LINE TRUNCATED' : ''}, lines ${actualStartLine || 1}-${actualEndLine || 'end'})`);
+
         let response: any = {
           success: true,
-          message: `✅ File ${path} read successfully${wasTruncated ? ` (content truncated to ${MAX_CONTENT_SIZE} characters)` : ''}.`,
+          message: `✅ File ${path} read successfully.`,
           path,
           content,
           name: file.name,
           type: file.type,
           size: file.size,
-          action: 'read'
+          action: 'read',
+          totalLines,
+          linesRead: actualEndLine ? Math.min(actualEndLine, totalLines) - (actualStartLine || 1) + 1 : totalLines
         };
 
-        // Add truncation warning
-        if (wasTruncated) {
-          response.truncated = true;
+        // Add truncation warnings
+        if (wasLineTruncated) {
+          response.message += ` (showing first 500 of ${totalLines} lines - file truncated for performance)`;
+          response.lineTruncated = true;
+          response.linesShown = 500;
+          response.totalLines = totalLines;
+          response.continueReading = `To read the remaining ${totalLines - 500} lines, use line range "${501}-${Math.min(1000, totalLines)}" or similar.`;
+        }
+
+        if (wasContentTruncated) {
+          response.contentTruncated = true;
           response.maxContentSize = MAX_CONTENT_SIZE;
           response.fullSize = fullContent.length;
         }
