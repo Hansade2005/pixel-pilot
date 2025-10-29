@@ -1014,62 +1014,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
             </div>
           )}
 
-          {/* Subscription Status Display */}
-          {!subscriptionLoading && subscription && (
-            <div className="mb-4 p-3 rounded-lg bg-gray-700/30 border border-gray-600/30">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Crown className="h-4 w-4 text-purple-400" />
-                  <span className="text-sm text-gray-300">
-                    {subscription.plan === 'pro' ? 'Unlimited prompts (Pro)' :
-                     subscription.plan === 'enterprise' ? 'Unlimited prompts (Enterprise)' :
-                     'Limited prompts (Free)'}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {subscription.plan === 'pro' ? (
-                    <div className="flex items-center gap-1 text-purple-400">
-                      <Crown className="h-3 w-3" />
-                      <span className="text-xs">Pro</span>
-                    </div>
-                  ) : subscription.plan === 'enterprise' ? (
-                    <div className="flex items-center gap-1 text-blue-400">
-                      <Crown className="h-3 w-3" />
-                      <span className="text-xs">Enterprise</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1 text-gray-400">
-                      <Crown className="h-3 w-3" />
-                      <span className="text-xs">Free</span>
-                        </div>
-                  )}
-                  <span className="text-xs text-gray-500 capitalize">
-                    {subscription.plan} plan
-                  </span>
-                </div>
-              </div>
-
-              {/* Free plan limitations warning */}
-              {subscription.plan === 'free' && (
-                <div className="mt-2 p-2 bg-blue-900/20 border border-blue-700/30 rounded text-sm text-blue-300">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4" />
-                    <span>Free plan: Limited!</span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                      className="ml-auto text-blue-300 border-blue-700/50 hover:bg-blue-900/30"
-                          onClick={() => router.push('/pricing')}
-                        >
-                          Upgrade
-                        </Button>
-                      </div>
-                    </div>
-              )}
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Input Field - Auto-expanding textarea */}
             <div className="relative">
