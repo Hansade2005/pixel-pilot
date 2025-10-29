@@ -1184,21 +1184,48 @@ export function ChatPanelV2({
     setIsContinuationInProgress(true)
 
     try {
-      // Create continuation request with tool result
+      // Get current conversation state up to the assistant message
+      const currentMessages = messages.slice(0, messages.findIndex(msg => msg.id === assistantMessageId) + 1)
+
+      // Create tool result message to add to conversation
+      const toolResultMessage = {
+        role: 'tool',
+        content: JSON.stringify(result.output || { error: result.errorText }),
+        name: toolName,
+        tool_call_id: `client-tool-${Date.now()}`
+      }
+
+      // Add tool result to messages for continuation
+      const messagesWithToolResult = [...currentMessages, toolResultMessage]
+
+      // Create continuation state similar to timeout continuation
+      const continuationState = {
+        continuationToken: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        elapsedTimeMs: 0, // Not applicable for tool continuation
+        messages: messagesWithToolResult,
+        toolResults: [], // Tool results are now part of messages
+        sessionData: {
+          projectId,
+          modelId: selectedModel,
+          aiMode,
+          fileTree: [], // Will be rebuilt on server
+          files: [] // Not needed for continuation
+        }
+      }
+
+      // Create continuation request with proper state
       const continuationPayload = {
-        messages: [], // Empty - we're continuing with tool result
+        messages: [], // Don't send messages - full history is in continuationState
         projectId,
         project: { id: projectId }, // Minimal project info
         fileTree: await buildProjectFileTree(), // Current file tree for context
         modelId: selectedModel,
         aiMode,
-        toolResult: {
-          toolName,
-          result: result.output || { error: result.errorText }
-        }
+        continuationState // Include the continuation state with tool result
       }
 
-      console.log('[ChatPanelV2][ClientTool] 📤 Sending tool result continuation request')
+      console.log('[ChatPanelV2][ClientTool] 📤 Sending tool result continuation request with proper state')
 
       const response = await fetch('/api/chat-v2', {
         method: 'POST',
