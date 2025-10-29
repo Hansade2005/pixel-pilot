@@ -1284,7 +1284,8 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
             <button
               type="button"
               disabled={isGenerating || isImportingGithub}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-transparent hover:bg-gray-700/50 border border-gray-600/50 rounded-full text-gray-400 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-transparent hover:bg-orange-700/50 border border-orange-600/50
+              rounded-full text-gray-400 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
               title="Import from GitHub"
             >Import from
               <Github className="w-3.5 h-3.5" />
