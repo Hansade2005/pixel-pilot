@@ -234,107 +234,72 @@ export default function LandingPage() {
             
             {/* Filter Controls */}
             <div className="flex flex-wrap items-center gap-4">
-              {/* Popular Dropdown */}
+              {/* Category Dropdown */}
               <div className="relative group">
-                <Button variant="outline" className={`border-gray-600 text-white hover:bg-gray-700 ${sortBy === 'popular' ? 'bg-purple-600 border-purple-600' : ''}`}>
-                  {sortBy === 'popular' ? 'Popular' : sortBy === 'recent' ? 'Recent' : 'Trending'}
+                <Button variant="outline" className={`border-gray-600 text-white hover:bg-gray-700 ${filterBy === 'all' ? 'bg-purple-600 border-purple-600' : ''}`}>
+                  {filterBy === 'all' ? 'View All' :
+                   filterBy === 'discover' ? 'Discover' :
+                   filterBy === 'internal' ? 'Internal Tools' :
+                   filterBy === 'website' ? 'Website' :
+                   filterBy === 'personal' ? 'Personal' :
+                   filterBy === 'consumer' ? 'Consumer App' :
+                   filterBy === 'b2b' ? 'B2B App' :
+                   filterBy === 'prototype' ? 'Prototype' : 'View All'}
                   <ChevronDown className="w-4 h-4 ml-2" />
                 </Button>
                 {/* Dropdown Menu */}
                 <div className="absolute top-full left-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
                   <div className="py-2">
                     <button
-                      className={`w-full text-left px-4 py-2 transition-colors ${sortBy === 'popular' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
-                      onClick={() => setSortBy('popular')}
+                      className={`w-full text-left px-4 py-2 transition-colors ${filterBy === 'all' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
+                      onClick={() => setFilterBy('all')}
                     >
-                      Popular
-                    </button>
-                    <button
-                      className={`w-full text-left px-4 py-2 transition-colors ${sortBy === 'recent' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
-                      onClick={() => setSortBy('recent')}
-                    >
-                      Recent
-                    </button>
-                    <button
-                      className={`w-full text-left px-4 py-2 transition-colors ${sortBy === 'trending' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
-                      onClick={() => setSortBy('trending')}
-                    >
-                      Trending
-                    </button>
-                    <div className="border-t border-gray-700 my-1"></div>
-                    <Link href="/showcase" className="block w-full text-left px-4 py-2 text-white hover:bg-gray-700 transition-colors">
                       View All
-                    </Link>
+                    </button>
+                    <button
+                      className={`w-full text-left px-4 py-2 transition-colors ${filterBy === 'discover' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
+                      onClick={() => setFilterBy('discover')}
+                    >
+                      Discover
+                    </button>
+                    <button
+                      className={`w-full text-left px-4 py-2 transition-colors ${filterBy === 'internal' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
+                      onClick={() => setFilterBy('internal')}
+                    >
+                      Internal Tools
+                    </button>
+                    <button
+                      className={`w-full text-left px-4 py-2 transition-colors ${filterBy === 'website' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
+                      onClick={() => setFilterBy('website')}
+                    >
+                      Website
+                    </button>
+                    <button
+                      className={`w-full text-left px-4 py-2 transition-colors ${filterBy === 'personal' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
+                      onClick={() => setFilterBy('personal')}
+                    >
+                      Personal
+                    </button>
+                    <button
+                      className={`w-full text-left px-4 py-2 transition-colors ${filterBy === 'consumer' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
+                      onClick={() => setFilterBy('consumer')}
+                    >
+                      Consumer App
+                    </button>
+                    <button
+                      className={`w-full text-left px-4 py-2 transition-colors ${filterBy === 'b2b' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
+                      onClick={() => setFilterBy('b2b')}
+                    >
+                      B2B App
+                    </button>
+                    <button
+                      className={`w-full text-left px-4 py-2 transition-colors ${filterBy === 'prototype' ? 'bg-purple-600 text-white' : 'text-white hover:bg-gray-700'}`}
+                      onClick={() => setFilterBy('prototype')}
+                    >
+                      Prototype
+                    </button>
                   </div>
                 </div>
-              </div>
-              
-              {/* Filter Buttons */}
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`border-gray-600 text-white hover:bg-gray-700 ${filterBy === 'all' ? 'bg-purple-600 border-purple-600' : ''}`}
-                  onClick={() => setFilterBy('all')}
-                >
-                  View All
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`border-gray-600 text-white hover:bg-gray-700 ${filterBy === 'discover' ? 'bg-purple-600 border-purple-600' : ''}`}
-                  onClick={() => setFilterBy('discover')}
-                >
-                  Discover
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`border-gray-600 text-white hover:bg-gray-700 ${filterBy === 'internal' ? 'bg-purple-600 border-purple-600' : ''}`}
-                  onClick={() => setFilterBy('internal')}
-                >
-                  Internal Tools
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`border-gray-600 text-white hover:bg-gray-700 ${filterBy === 'website' ? 'bg-purple-600 border-purple-600' : ''}`}
-                  onClick={() => setFilterBy('website')}
-                >
-                  Website
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`border-gray-600 text-white hover:bg-gray-700 ${filterBy === 'personal' ? 'bg-purple-600 border-purple-600' : ''}`}
-                  onClick={() => setFilterBy('personal')}
-                >
-                  Personal
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`border-gray-600 text-white hover:bg-gray-700 ${filterBy === 'consumer' ? 'bg-purple-600 border-purple-600' : ''}`}
-                  onClick={() => setFilterBy('consumer')}
-                >
-                  Consumer App
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`border-gray-600 text-white hover:bg-gray-700 ${filterBy === 'b2b' ? 'bg-purple-600 border-purple-600' : ''}`}
-                  onClick={() => setFilterBy('b2b')}
-                >
-                  B2B App
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`border-gray-600 text-white hover:bg-gray-700 ${filterBy === 'prototype' ? 'bg-purple-600 border-purple-600' : ''}`}
-                  onClick={() => setFilterBy('prototype')}
-                >
-                  Prototype
-                </Button>
               </div>
             </div>
           </div>
