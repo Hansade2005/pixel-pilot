@@ -9,8 +9,6 @@ import {
   Plus,
   Image as ImageIcon,
   Zap,
-  AlertTriangle,
-  Crown,
   Mic,
   MicOff,
   Square,
