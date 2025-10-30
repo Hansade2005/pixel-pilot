@@ -157,91 +157,16 @@ function filterReasoningPatterns(text: string): string {
 async function buildOptimizedProjectContext(projectId: string, sessionData: any, fileTree?: string[], userIntent?: any) {
   try {
     if (!sessionData) {
-      console.error(`[buildOptimizedProjectContext] No session data for project ${projectId}`);
-      return `# Project Context Error\nUnable to load project structure. Use list_files tool to explore the project.`;
+      console.error(`[buildOptimizedProjectContext] No session data for project ${projectId}`)
+      return `# Project Context Error\nUnable to load project structure. Use list_files tool to explore the project.`
     }
 
-    const { files: sessionFiles } = sessionData;
-    const allFiles = Array.from(sessionFiles.values());
+    const { files: sessionFiles } = sessionData
 
-    // --- New Filtering Logic ---
-    const FILE_LIMIT = 100;
-    
-    let filteredFiles = allFiles.filter((file: any) => {
-      const path = file.path.toLowerCase();
-      if (
-        path.includes('node_modules/') ||
-        path.includes('.git/') ||
-        path.includes('dist/') ||
-        path.includes('build/') ||
-        path.includes('.next/') ||
-        path.includes('__tests__/')
-      ) {
-        return false;
-      }
-      if ((path.startsWith('components/ui/') || path.startsWith('src/components/ui/')) && !file.isDirectory) {
-          return false;
-      }
-      return true;
-    });
+    // Convert session files to array for filtering
+    const files = Array.from(sessionFiles.values())
 
-    let isTruncated = false;
-
-    if (filteredFiles.length > FILE_LIMIT) {
-      isTruncated = true;
-      
-      // Detect project structure (Next.js with/without src, Vite)
-      const hasSrcDirectory = filteredFiles.some((file: any) => file.path.startsWith('src/'));
-      const projectBase = hasSrcDirectory ? 'src/' : '';
-
-      const allowedRootFolders = ['app', 'components', 'hooks', 'lib', 'public'];
-      const allowedPaths = new Set(allowedRootFolders.map(folder => `${projectBase}${folder}`));
-
-      filteredFiles = filteredFiles.filter((file: any) => {
-        const path = file.path.toLowerCase();
-
-        // 2. Handle root-level files
-        if (!path.includes('/')) {
-          const allowedMarkdownFiles = [
-            'user_authentication_readme.md',
-            'storage_system_implementation.md',
-            'external_app_integration_guide.md',
-            'readme.md'
-          ];
-          if (path.endsWith('.md')) {
-            return allowedMarkdownFiles.includes(path);
-          }
-          return true;
-        }
-
-        // 3. Handle files in subdirectories
-        const topLevelDir = path.split('/')[0];
-        const secondLevelDir = hasSrcDirectory ? `${topLevelDir}/${path.split('/')[1]}` : topLevelDir;
-        
-        const isAllowed = allowedPaths.has(topLevelDir) || allowedPaths.has(secondLevelDir);
-
-        return isAllowed;
-      });
-
-      // 4. Apply file limit if still over
-      if (filteredFiles.length > FILE_LIMIT) {
-        // Basic sorting to keep potentially important files (e.g., configs, main routes)
-        filteredFiles = filteredFiles
-          .sort((a: any, b: any) => {
-            // Prioritize root-level files and config files
-            const aIsRoot = !a.path.includes('/');
-            const bIsRoot = !b.path.includes('/');
-            if (aIsRoot !== bIsRoot) return aIsRoot ? -1 : 1;
-            return a.path.localeCompare(b.path);
-          })
-          .slice(0, FILE_LIMIT);
-      }
-    }
-    
-    const finalFileTree = filteredFiles.map((file: any) => file.path).sort();
-
-    // --- End of New Filtering Logic ---
-
+    // Get current time and working directory for context
     const currentTime = new Date().toLocaleString('en-US', {
       timeZone: 'Africa/Douala',
       year: 'numeric',
@@ -251,40 +176,156 @@ async function buildOptimizedProjectContext(projectId: string, sessionData: any,
       minute: '2-digit',
       second: '2-digit',
       timeZoneName: 'long'
-    });
+    })
 
-    const hasNextConfig = allFiles.some((f: any) => f.path === 'next.config.js' || f.path === 'next.config.mjs');
-    const hasViteConfig = allFiles.some((f: any) => f.path === 'vite.config.ts' || f.path === 'vite.config.js');
-    const projectType = hasNextConfig ? 'nextjs' : hasViteConfig ? 'vite-react' : 'unknown';
+    // Filter out shadcn UI components and common excluded files
+    const filteredFiles = files.filter((file: any) => {
+      const path = file.path.toLowerCase()
+      // Exclude shadcn UI components
+      if (path.includes('components/ui/') && (
+        path.includes('button.tsx') ||
+        path.includes('input.tsx') ||
+        path.includes('dialog.tsx') ||
+        path.includes('card.tsx') ||
+        path.includes('badge.tsx') ||
+        path.includes('alert.tsx') ||
+        path.includes('accordion.tsx') ||
+        path.includes('avatar.tsx') ||
+        path.includes('checkbox.tsx') ||
+        path.includes('dropdown-menu.tsx') ||
+        path.includes('form.tsx') ||
+        path.includes('label.tsx') ||
+        path.includes('select.tsx') ||
+        path.includes('sheet.tsx') ||
+        path.includes('tabs.tsx') ||
+        path.includes('textarea.tsx') ||
+        path.includes('toast.tsx') ||
+        path.includes('tooltip.tsx') ||
+        path.includes('separator.tsx') ||
+        path.includes('skeleton.tsx') ||
+        path.includes('scroll-area.tsx') ||
+        path.includes('progress.tsx') ||
+        path.includes('popover.tsx') ||
+        path.includes('navigation-menu.tsx') ||
+        path.includes('menubar.tsx') ||
+        path.includes('hover-card.tsx') ||
+        path.includes('command.tsx') ||
+        path.includes('calendar.tsx') ||
+        path.includes('table.tsx') ||
+        path.includes('switch.tsx') ||
+        path.includes('slider.tsx') ||
+        path.includes('radio-group.tsx')
+      )) {
+        return false
+      }
 
-    let truncationMessage = '';
-    if (isTruncated) {
-      truncationMessage = `\n---
-**Note**: The file tree is truncated to ${FILE_LIMIT} files due to a large codebase. 
-The AI should use file system tools like \`list_files\`, \`semantic_code_navigator\`, or \`grep_search\` to discover and interact with other files as needed.
----`;
+      // Exclude node_modules, .git, build outputs
+      if (path.includes('node_modules') ||
+          path.includes('.git/') ||
+          path.includes('dist/') ||
+          path.includes('build/') ||
+          path.includes('.next/')) {
+        return false
+      }
+
+      return true
+    })
+
+    // Detect project type (Vite or Next.js)
+    const hasNextConfig = files.some((f: any) => f.path === 'next.config.js' || f.path === 'next.config.mjs')
+    const hasViteConfig = files.some((f: any) => f.path === 'vite.config.ts' || f.path === 'vite.config.js')
+    const projectType = hasNextConfig ? 'nextjs' : hasViteConfig ? 'vite-react' : 'unknown'
+
+    // Use provided file tree or build from files
+    let finalFileTree: string[]
+    if (fileTree && Array.isArray(fileTree) && fileTree.length > 0) {
+      console.log(`[buildOptimizedProjectContext] Using client-provided file tree with ${fileTree.length} entries`)
+      finalFileTree = fileTree
+    } else {
+      console.log(`[buildOptimizedProjectContext] Building file tree from ${filteredFiles.length} files`)
+      // Build file tree structure
+      const builtFileTree: string[] = []
+      const directories = new Set<string>()
+
+      // Sort files for better organization
+      const sortedFiles = filteredFiles.sort((a: any, b: any) => {
+        return a.path.localeCompare(b.path)
+      })
+
+      // Collect all directories
+      sortedFiles.forEach((file: any) => {
+        const pathParts = file.path.split('/')
+        if (pathParts.length > 1) {
+          // Add all parent directories
+          for (let i = 1; i < pathParts.length; i++) {
+            const dirPath = pathParts.slice(0, i).join('/')
+            if (dirPath) {
+              directories.add(dirPath)
+            }
+          }
+        }
+      })
+
+      // Add root files first
+      const rootFiles = sortedFiles.filter((file: any) => !file.path.includes('/'))
+      rootFiles.forEach((file: any) => {
+        builtFileTree.push(file.path)
+      })
+
+      // Add directories and their files
+      const sortedDirectories = Array.from(directories).sort()
+      sortedDirectories.forEach((dir: string) => {
+        builtFileTree.push(`${dir}/`)
+
+        // Add files in this directory
+        const dirFiles = sortedFiles.filter((file: any) => {
+          const filePath = file.path
+          const fileDir = filePath.substring(0, filePath.lastIndexOf('/'))
+          return fileDir === dir
+        })
+
+        dirFiles.forEach((file: any) => {
+          builtFileTree.push(file.path)
+        })
+      })
+
+      finalFileTree = builtFileTree
     }
 
+    // Build the context
     let context = `# Current Time
 ${currentTime}
 
 # Project Type
-${projectType === 'nextjs' ? '**Next.js** - Full-stack React framework' : projectType === 'vite-react' ? '**Vite + React** - Fast build tool' : 'Unknown'}
+${projectType === 'nextjs' ? '**Next.js** - Full-stack React framework with App Router' : projectType === 'vite-react' ? '**Vite + React** - Fast build tool with React' : 'Unknown'}
+
+${projectType === 'nextjs' ? `## Next.js Project Structure
+- **src/app/** - App Router pages and layouts
+- **src/components/** - React components  
+- **src/lib/** - Utilities and helpers
+- **public/** - Static assets
+- **API Routes:** Create in src/app/api/[name]/route.ts` : 
+`## Vite Project Structure
+- **src/** - Source code directory
+- **src/components/** - React components
+- **src/lib/** - Utilities and helpers
+- **public/** - Static assets
+- **api/** - Serverless functions (Vercel)`}
 
 # Current Project Structure
-${finalFileTree.join('\n')}${truncationMessage}
----`;
+${finalFileTree.join('\n')}
+---`
 
-    console.log(`[CONTEXT] Built file tree with ${finalFileTree.length} files. ${isTruncated ? '(Truncated)' : ''}`);
-    return context;
+    console.log(`[CONTEXT] Built file tree with ${finalFileTree.length} files`) 
+    return context
 
   } catch (error) {
-    console.error('Error building project context:', error);
+    console.error('Error building project context:', error)
     return `# Current Time
 ${new Date().toLocaleString()}
 
 # Project Context Error
-Unable to load project structure. Use list_files tool to explore the project.`;
+Unable to load project structure. Use list_files tool to explore the project.`
   }
 }
 
@@ -388,22 +429,7 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           }
         }
 
-        let file = sessionFiles.get(path)
-
-        if (!file) {
-            console.log(`[CONSTRUCT_TOOL_RESULT] read_file: File not found in session, trying storageManager fallback for ${path}`);
-            try {
-                const { storageManager } = await import('@/lib/storage-manager');
-                await storageManager.init();
-                const smFile = await storageManager.getFile(projectId, path);
-                if (smFile) {
-                    file = smFile; // Use the file from storageManager
-                }
-            } catch (storageError) {
-                console.error(`[CONSTRUCT_TOOL_RESULT] read_file: storageManager fallback failed for ${path}:`, storageError);
-                // Continue to the original "file not found" error
-            }
-        }
+        const file = sessionFiles.get(path)
 
         if (!file) {
           console.log(`[CONSTRUCT_TOOL_RESULT] read_file failed: File not found - ${path}`)
@@ -935,77 +961,6 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           content: updatedContent,
           message: `Packages ${removedPackages.join(', ')} removed from ${depType} successfully`,
           toolCallId
-        }
-      }
-
-      case 'list_files': {
-        const { path } = input;
-    
-        // 1. Try session storage first
-        const allSessionFiles = Array.from(sessionFiles.values());
-        let listedSessionFiles = [];
-    
-        if (path === '/' || path === '') {
-            listedSessionFiles = allSessionFiles.filter(f => f.path.split('/').filter((p: string) => p).length === 1);
-        } else {
-            const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
-            const searchPath = normalizedPath.endsWith('/') ? normalizedPath : normalizedPath + '/';
-            listedSessionFiles = allSessionFiles.filter(f => {
-                return f.path.startsWith(searchPath) && f.path.slice(searchPath.length).indexOf('/') === -1;
-            });
-        }
-    
-        if (listedSessionFiles.length > 0) {
-            const fileList = listedSessionFiles.map(f => f.isDirectory ? `${f.path.split('/').pop()}/` : f.path.split('/').pop());
-            return {
-                success: true,
-                message: `Found ${fileList.length} items in ${path}`,
-                files: fileList,
-                toolCallId
-            };
-        }
-    
-        // 2. Fallback to storageManager
-        console.log(`[CONSTRUCT_TOOL_RESULT] list_files: No files found in session for ${path}, trying storageManager fallback.`);
-        try {
-            const { storageManager } = await import('@/lib/storage-manager');
-            await storageManager.init();
-            
-            if (!path || typeof path !== 'string') {
-                return { success: false, error: `Invalid directory path provided`, path, toolCallId };
-            }
-            
-            const allFiles = await storageManager.getFiles(projectId);
-            
-            let filteredFiles;
-            if (path === '/' || path === '') {
-                filteredFiles = allFiles.filter(f => {
-                    const pathParts = f.path.split('/').filter(p => p.length > 0);
-                    return pathParts.length === 1;
-                });
-            } else {
-                const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
-                const searchPath = normalizedPath.endsWith('/') ? normalizedPath : normalizedPath + '/';
-                
-                filteredFiles = allFiles.filter(f => {
-                    return f.path.startsWith(searchPath) && 
-                           f.path.slice(searchPath.length).indexOf('/') === -1;
-                });
-            }
-    
-            const fileList = filteredFiles.map(f => f.isDirectory ? `${f.path.split('/').pop()}/` : f.path.split('/').pop());
-    
-            return {
-                success: true,
-                message: `Found ${fileList.length} items in ${path} (from storage fallback)`,
-                files: fileList,
-                toolCallId
-            };
-    
-        } catch (storageError) {
-            console.error(`[CONSTRUCT_TOOL_RESULT] list_files: storageManager fallback failed for ${path}:`, storageError);
-            const errorMessage = storageError instanceof Error ? storageError.message : 'Unknown error';
-            return { success: false, error: `Failed to list files for ${path}: ${errorMessage}`, toolCallId };
         }
       }
 
@@ -1596,16 +1551,6 @@ ${conversationSummaryContext || ''}`
           execute: async (input: { name: string | string[]; isDev?: boolean }, { toolCallId }) => {
             // Use the powerful constructor to get actual results
             return await constructToolResult('remove_package', input, projectId, toolCallId)
-          }
-        }),
-
-        list_files: tool({
-          description: 'List files and directories in a given path.',
-          inputSchema: z.object({
-              path: z.string().describe('The directory path to list relative to project root (e.g., "src/components/"). Use "/" for the root directory.')
-          }),
-          execute: async ({ path }, { toolCallId }) => {
-              return await constructToolResult('list_files', { path }, projectId, toolCallId);
           }
         }),
 
@@ -2975,6 +2920,100 @@ ${conversationSummaryContext || ''}`
             }
           }
         }),
+
+        list_files: tool({
+          description: 'List all files and directories in the project with their structure and metadata.',
+          inputSchema: z.object({
+            path: z.string().optional().describe('Optional: Specific directory path to list. If omitted, lists root directory')
+          }),
+          execute: async ({ path }, { toolCallId }) => {
+            try {
+              let allFiles: any[] = []
+
+              // First try session storage (client-sent data)
+              const sessionData = sessionProjectStorage.get(projectId)
+              if (sessionData && sessionData.files && sessionData.files.size > 0) {
+                console.log(`[list_files] Using session storage with ${sessionData.files.size} files`)
+                allFiles = Array.from(sessionData.files.values())
+              }
+
+              // If session storage is empty or missing, fall back to direct storage manager query
+              if (allFiles.length === 0) {
+                console.log(`[list_files] Session storage empty, falling back to direct storage manager query`)
+                const { storageManager } = await import('@/lib/storage-manager')
+                await storageManager.init()
+                allFiles = await storageManager.getFiles(projectId)
+                console.log(`[list_files] Retrieved ${allFiles.length} files from storage manager`)
+              }
+
+              let filesToList: any[] = []
+              if (path) {
+                // List files in specific directory
+                const pathPrefix = path.endsWith('/') ? path : `${path}/`
+                for (const file of allFiles) {
+                  if (file.path.startsWith(pathPrefix) &&
+                      !file.path.substring(pathPrefix.length).includes('/')) {
+                    filesToList.push({
+                      name: file.name,
+                      path: file.path,
+                      type: file.type,
+                      size: file.size,
+                      isDirectory: file.isDirectory,
+                      lastModified: file.updatedAt || file.createdAt || new Date().toISOString()
+                    })
+                  }
+                }
+              } else {
+                // List root directory files
+                for (const file of allFiles) {
+                  if (!file.path.includes('/')) {
+                    filesToList.push({
+                      name: file.name,
+                      path: file.path,
+                      type: file.type,
+                      size: file.size,
+                      isDirectory: file.isDirectory,
+                      lastModified: file.updatedAt || file.createdAt || new Date().toISOString()
+                    })
+                  }
+                }
+              }
+
+              // Sort: directories first, then files alphabetically
+              const sortedFiles = filesToList.sort((a: any, b: any) => {
+                // Directories come first
+                if (a.isDirectory && !b.isDirectory) return -1
+                if (!a.isDirectory && b.isDirectory) return 1
+                // Then alphabetical
+                return a.path.localeCompare(b.path)
+              })
+
+              return {
+                success: true,
+                message: path
+                  ? `✅ Listed ${sortedFiles.length} items in directory: ${path}`
+                  : `✅ Listed ${sortedFiles.length} items in root directory`,
+                files: sortedFiles,
+                count: sortedFiles.length,
+                directory: path || '/',
+                action: 'list',
+                toolCallId
+              }
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+              console.error('[ERROR] list_files failed:', error)
+
+              return {
+                success: false,
+                error: `Failed to list files: ${errorMessage}`,
+                files: [],
+                count: 0,
+                action: 'list',
+                toolCallId
+              }
+            }
+          }
+        })
 
       },
       stopWhen: stepCountIs(50),

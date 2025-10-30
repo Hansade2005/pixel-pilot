@@ -999,85 +999,81 @@ export function ChatPanelV2({
   // Build optimized project file tree for server
   const buildProjectFileTree = async () => {
     if (!project) {
-      console.warn('[ChatPanelV2] Cannot build file tree: no project selected');
-      return [];
+      console.warn('[ChatPanelV2] Cannot build file tree: no project selected')
+      return []
     }
 
     try {
-      const { storageManager } = await import('@/lib/storage-manager');
-      await storageManager.init();
-      const allFiles = await storageManager.getFiles(project.id);
+      const { storageManager } = await import('@/lib/storage-manager')
+      await storageManager.init()
+      const allFiles = await storageManager.getFiles(project.id)
 
-      const FILE_LIMIT = 100;
-      
-      let filteredFiles = allFiles.filter((file: any) => {
-        const path = file.path.toLowerCase();
-        if (
-          path.includes('node_modules/') ||
-          path.includes('.git/') ||
-          path.includes('dist/') ||
-          path.includes('build/') ||
-          path.includes('.next/') ||
-          path.includes('__tests__/')
-        ) {
-          return false;
+      // Filter out shadcn UI components and common excluded files
+      const filteredFiles = allFiles.filter((file: any) => {
+        const path = file.path.toLowerCase()
+        // Exclude shadcn UI components (don't list individual files in components/ui/)
+        if (path.includes('components/ui/') && !file.isDirectory) {
+          return false
         }
-        if ((path.startsWith('components/ui/') || path.startsWith('src/components/ui/')) && !file.isDirectory) {
-            return false;
+        // Exclude node_modules, .git, build outputs
+        if (path.includes('node_modules') ||
+            path.includes('.git/') ||
+            path.includes('dist/') ||
+            path.includes('build/') ||
+            path.includes('.next/')) {
+          return false
         }
-        return true;
-      });
+        return true
+      })
 
-      if (filteredFiles.length > FILE_LIMIT) {
-        const hasSrcDirectory = filteredFiles.some((file: any) => file.path.startsWith('src/'));
-        const projectBase = hasSrcDirectory ? 'src/' : '';
+      // Build file tree structure
+      const fileTree: string[] = []
+      const directories = new Set<string>()
 
-        const allowedRootFolders = ['app', 'components', 'hooks', 'lib', 'public'];
-        const allowedPaths = new Set(allowedRootFolders.map(folder => `${projectBase}${folder}`));
-
-        filteredFiles = filteredFiles.filter((file: any) => {
-          const path = file.path.toLowerCase();
-
-          if (!path.includes('/')) {
-            const allowedMarkdownFiles = [
-              'user_authentication_readme.md',
-              'storage_system_implementation.md',
-              'external_app_integration_guide.md',
-              'readme.md'
-            ];
-            if (path.endsWith('.md')) {
-              return allowedMarkdownFiles.includes(path);
+      // Collect all directories
+      filteredFiles.forEach((file: any) => {
+        const pathParts = file.path.split('/')
+        if (pathParts.length > 1) {
+          // Add all parent directories
+          for (let i = 1; i < pathParts.length; i++) {
+            const dirPath = pathParts.slice(0, i).join('/')
+            if (dirPath) {
+              directories.add(dirPath)
             }
-            return true;
           }
-
-          const topLevelDir = path.split('/')[0];
-          const secondLevelDir = hasSrcDirectory ? `${topLevelDir}/${path.split('/')[1]}` : topLevelDir;
-          
-          return allowedPaths.has(topLevelDir) || allowedPaths.has(secondLevelDir);
-        });
-
-        if (filteredFiles.length > FILE_LIMIT) {
-          filteredFiles = filteredFiles
-            .sort((a: any, b: any) => {
-              const aIsRoot = !a.path.includes('/');
-              const bIsRoot = !b.path.includes('/');
-              if (aIsRoot !== bIsRoot) return aIsRoot ? -1 : 1;
-              return a.path.localeCompare(b.path);
-            })
-            .slice(0, FILE_LIMIT);
         }
-      }
+      })
 
-      const fileTree = filteredFiles.map((file: any) => file.path).sort();
+      // Add root files first
+      const rootFiles = filteredFiles.filter((file: any) => !file.path.includes('/'))
+      rootFiles.forEach((file: any) => {
+        fileTree.push(file.path)
+      })
 
-      console.log(`[ChatPanelV2] Built file tree with ${fileTree.length} entries for server`);
-      return fileTree;
+      // Add directories and their files
+      const sortedDirectories = Array.from(directories).sort()
+      sortedDirectories.forEach((dir: string) => {
+        fileTree.push(`${dir}/`)
+
+        // Add files in this directory
+        const dirFiles = filteredFiles.filter((file: any) => {
+          const filePath = file.path
+          const fileDir = filePath.substring(0, filePath.lastIndexOf('/'))
+          return fileDir === dir
+        })
+
+        dirFiles.forEach((file: any) => {
+          fileTree.push(file.path)
+        })
+      })
+
+      console.log(`[ChatPanelV2] Built file tree with ${fileTree.length} entries for server`)
+      return fileTree
     } catch (error) {
-      console.error('[ChatPanelV2] Error building file tree:', error);
-      return [];
+      console.error('[ChatPanelV2] Error building file tree:', error)
+      return []
     }
-  };
+  }
 
   const loadMessages = async () => {
     if (!project?.id) return
