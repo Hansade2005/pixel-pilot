@@ -1,6 +1,5 @@
 /* 
- * ChatPanel V2 - AI SDK Real-Time Streaming Implementation
- * Uses @ai-sdk/react useChat hook with native tool support
+ * ChatPanel V2 - AI SDK Real-Time Streaming Implementation with native tool support
  * Preserves all features from original chat-panel.tsx
  */
 
