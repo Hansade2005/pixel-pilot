@@ -860,7 +860,7 @@ export function ChatPanelV2({
 
               console.log('[ChatPanelV2][Continuation][ClientTool] 🔧 Continuation tool call:', toolCall.toolName)
 
-              const clientSideTools = ['write_file', 'edit_file', 'delete_file', 'add_package', 'remove_package', 'read_file', 'list_files', 'grep_search', 'semantic_code_navigator']
+              const clientSideTools = ['write_file', 'edit_file', 'delete_file', 'add_package', 'remove_package']
               if (clientSideTools.includes(toolCall.toolName)) {
                 const { handleClientFileOperation } = await import('@/lib/client-file-tools')
 
@@ -1163,13 +1163,9 @@ export function ChatPanelV2({
   // Handle client-side tool results by sending continuation request
   const handleClientToolResult = async (
     toolName: string,
-    toolCallId: string,
     result: any,
     projectId: string | undefined,
-    assistantMessageId: string,
-    preToolContent: string,
-    preToolReasoning: string,
-    conversationMessages: any[]
+    assistantMessageId: string
   ) => {
     if (!projectId) {
       console.error('[ChatPanelV2][ClientTool] Cannot send tool result: no project ID')
@@ -1183,26 +1179,19 @@ export function ChatPanelV2({
       projectId
     })
 
-    // Set continuation state (similar to regular continuation)
-    setContinuingMessageId(assistantMessageId)
-    setIsContinuationInProgress(true)
-
     try {
-      // Create continuation request with tool result and accumulated content
+      // Create continuation request with tool result
       const continuationPayload = {
-        messages: conversationMessages, // Include full conversation history
+        messages: [], // Empty - we're continuing with tool result
         projectId,
         project: { id: projectId }, // Minimal project info
-        fileTree: await buildProjectFileTree(), // Current file tree for context
+        files: projectFiles, // Current project files
+        fileTree: await buildProjectFileTree(), // Current file tree
         modelId: selectedModel,
         aiMode,
         toolResult: {
           toolName,
-          toolCallId,
-          result: result.output || { error: result.errorText },
-          accumulatedContent: preToolContent, // Include accumulated content before tool call
-          accumulatedReasoning: preToolReasoning, // Include accumulated reasoning before tool call
-          assistantMessageId // Reference to the original assistant message
+          result: result.output || { error: result.errorText }
         }
       }
 
@@ -1263,7 +1252,7 @@ export function ChatPanelV2({
                 accumulatedContent += parsed.text
                 setMessages(prev => prev.map(msg =>
                   msg.id === assistantMessageId
-                    ? { ...msg, content: preToolContent + accumulatedContent, reasoning: preToolReasoning + accumulatedReasoning }
+                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
                     : msg
                 ))
               }
@@ -1272,7 +1261,7 @@ export function ChatPanelV2({
                 accumulatedReasoning += parsed.text
                 setMessages(prev => prev.map(msg =>
                   msg.id === assistantMessageId
-                    ? { ...msg, content: preToolContent + accumulatedContent, reasoning: preToolReasoning + accumulatedReasoning }
+                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
                     : msg
                 ))
               }
@@ -1304,17 +1293,8 @@ export function ChatPanelV2({
 
                 const addToolResult = (result: any) => {
                   console.log('[ChatPanelV2][ClientTool][Continuation] ✅ Continuation tool completed:', result.tool)
-                  // Send this result back too with accumulated content
-                  handleClientToolResult(
-                    toolCall.toolName, 
-                    toolCall.toolCallId,
-                    result, 
-                    projectId, 
-                    assistantMessageId,
-                    preToolContent,
-                    preToolReasoning,
-                    conversationMessages
-                  )
+                  // Send this result back too
+                  handleClientToolResult(toolCall.toolName, result, projectId, assistantMessageId)
                 }
 
                 handleClientFileOperation(toolCall, projectId, addToolResult)
@@ -1326,16 +1306,7 @@ export function ChatPanelV2({
                       state: 'output-error',
                       errorText: error instanceof Error ? error.message : 'Unknown error'
                     }
-                    handleClientToolResult(
-                      toolCall.toolName, 
-                      toolCall.toolCallId,
-                      errorResult, 
-                      projectId, 
-                      assistantMessageId,
-                      preToolContent,
-                      preToolReasoning,
-                      conversationMessages
-                    )
+                    handleClientToolResult(toolCall.toolName, errorResult, projectId, assistantMessageId)
                   })
               }
             } else if (parsed.type === 'tool-result') {
@@ -1350,19 +1321,17 @@ export function ChatPanelV2({
 
       // Continuation complete - update the original message with combined content
       if (accumulatedContent.trim()) {
-        const finalContent = preToolContent + accumulatedContent
-        const finalReasoning = preToolReasoning + accumulatedReasoning
         setMessages(prev => prev.map(msg =>
           msg.id === assistantMessageId
-            ? { ...msg, content: finalContent, reasoning: finalReasoning }
+            ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
             : msg
         ))
 
         // Save the updated message
         await saveAssistantMessageAfterStreaming(
           assistantMessageId,
-          finalContent,
-          finalReasoning,
+          accumulatedContent,
+          accumulatedReasoning,
           []
         )
       }
@@ -1377,11 +1346,6 @@ export function ChatPanelV2({
         description: "Failed to continue with tool result. Please try again.",
         variant: "destructive"
       })
-    } finally {
-      // Clear continuation-specific state but keep loading active (streaming continues)
-      setContinuingMessageId(null)
-      setIsContinuationInProgress(false)
-      // Note: Don't set setIsLoading(false) - main streaming continues
     }
   }
 
@@ -1563,7 +1527,8 @@ export function ChatPanelV2({
           id: project?.id, // Chat session ID for server-side storage
           projectId: project?.id,
           project,
-          fileTree, // Use client-built file tree for context (all file operations are client-side now)
+          fileTree, // Use client-built file tree instead of raw files
+          files: projectFiles, // Keep raw files for tool operations (now refreshed)
           modelId: selectedModel,
           aiMode
         }),
@@ -1712,7 +1677,7 @@ export function ChatPanelV2({
                   
                   // For client-side tools, we need to send the result back to continue the conversation
                   // Create a continuation request with the tool result
-                  handleClientToolResult(toolCall.toolName, toolCall.toolCallId, result, project?.id, assistantMessageId, accumulatedContent, accumulatedReasoning, messages)
+                  handleClientToolResult(toolCall.toolName, result, project?.id, assistantMessageId)
                 }
                 
                 // Execute the tool asynchronously (don't await - per AI SDK docs)
@@ -1726,7 +1691,7 @@ export function ChatPanelV2({
                       state: 'output-error',
                       errorText: error instanceof Error ? error.message : 'Unknown error'
                     }
-                    handleClientToolResult(toolCall.toolName, toolCall.toolCallId, errorResult, project?.id, assistantMessageId, accumulatedContent, accumulatedReasoning, messages)
+                    handleClientToolResult(toolCall.toolName, errorResult, project?.id, assistantMessageId)
                   })
               } else {
                 console.log('[ChatPanelV2][DataStream] Server-side tool call, server handles:', parsed.toolName)
