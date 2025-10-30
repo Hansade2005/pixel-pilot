@@ -1037,16 +1037,22 @@ export async function POST(req: Request) {
     if (toolResult) {
       console.log('[Chat-V2] Processing client-side tool result:', toolResult.toolName);
 
-      // Create a comprehensive tool result message that includes accumulated content and reasoning
-      const toolResultContent = toolResult.accumulatedContent
-        ? `${toolResult.accumulatedContent}\n\n[Tool Result: ${toolResult.toolName}]\n${JSON.stringify(toolResult.result)}`
-        : `[Tool Result: ${toolResult.toolName}]\n${JSON.stringify(toolResult.result)}`;
+      // Create a structured tool result message to avoid confusing the AI
+      const toolResultContent = `
+=== TOOL EXECUTION RESULT ===
+Tool: ${toolResult.toolName}
+Tool Call ID: ${toolResult.toolCallId}
+Result: ${JSON.stringify(toolResult.result, null, 2)}
+=== END OF TOOL RESULT ===
+
+Based on the result of the tool execution, please continue with your task.
+`;
 
       const toolResultMessage = {
         role: 'user',
         content: toolResultContent,
         name: toolResult.toolName,
-        tool_call_id: `client-tool-${Date.now()}`, // Generate a unique tool call ID
+        tool_call_id: toolResult.toolCallId, // Use the real tool call ID
         reasoning: toolResult.accumulatedReasoning || '', // Include accumulated reasoning if available
         metadata: {
           toolResult: true,

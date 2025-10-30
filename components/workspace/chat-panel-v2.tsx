@@ -1163,6 +1163,7 @@ export function ChatPanelV2({
   // Handle client-side tool results by sending continuation request
   const handleClientToolResult = async (
     toolName: string,
+    toolCallId: string,
     result: any,
     projectId: string | undefined,
     assistantMessageId: string,
@@ -1197,6 +1198,7 @@ export function ChatPanelV2({
         aiMode,
         toolResult: {
           toolName,
+          toolCallId,
           result: result.output || { error: result.errorText },
           accumulatedContent: preToolContent, // Include accumulated content before tool call
           accumulatedReasoning: preToolReasoning, // Include accumulated reasoning before tool call
@@ -1261,7 +1263,7 @@ export function ChatPanelV2({
                 accumulatedContent += parsed.text
                 setMessages(prev => prev.map(msg =>
                   msg.id === assistantMessageId
-                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+                    ? { ...msg, content: preToolContent + accumulatedContent, reasoning: preToolReasoning + accumulatedReasoning }
                     : msg
                 ))
               }
@@ -1270,7 +1272,7 @@ export function ChatPanelV2({
                 accumulatedReasoning += parsed.text
                 setMessages(prev => prev.map(msg =>
                   msg.id === assistantMessageId
-                    ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+                    ? { ...msg, content: preToolContent + accumulatedContent, reasoning: preToolReasoning + accumulatedReasoning }
                     : msg
                 ))
               }
@@ -1305,6 +1307,7 @@ export function ChatPanelV2({
                   // Send this result back too with accumulated content
                   handleClientToolResult(
                     toolCall.toolName, 
+                    toolCall.toolCallId,
                     result, 
                     projectId, 
                     assistantMessageId,
@@ -1325,6 +1328,7 @@ export function ChatPanelV2({
                     }
                     handleClientToolResult(
                       toolCall.toolName, 
+                      toolCall.toolCallId,
                       errorResult, 
                       projectId, 
                       assistantMessageId,
@@ -1346,17 +1350,19 @@ export function ChatPanelV2({
 
       // Continuation complete - update the original message with combined content
       if (accumulatedContent.trim()) {
+        const finalContent = preToolContent + accumulatedContent
+        const finalReasoning = preToolReasoning + accumulatedReasoning
         setMessages(prev => prev.map(msg =>
           msg.id === assistantMessageId
-            ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+            ? { ...msg, content: finalContent, reasoning: finalReasoning }
             : msg
         ))
 
         // Save the updated message
         await saveAssistantMessageAfterStreaming(
           assistantMessageId,
-          accumulatedContent,
-          accumulatedReasoning,
+          finalContent,
+          finalReasoning,
           []
         )
       }
@@ -1706,7 +1712,7 @@ export function ChatPanelV2({
                   
                   // For client-side tools, we need to send the result back to continue the conversation
                   // Create a continuation request with the tool result
-                  handleClientToolResult(toolCall.toolName, result, project?.id, assistantMessageId, accumulatedContent, accumulatedReasoning, messages)
+                  handleClientToolResult(toolCall.toolName, toolCall.toolCallId, result, project?.id, assistantMessageId, accumulatedContent, accumulatedReasoning, messages)
                 }
                 
                 // Execute the tool asynchronously (don't await - per AI SDK docs)
@@ -1720,7 +1726,7 @@ export function ChatPanelV2({
                       state: 'output-error',
                       errorText: error instanceof Error ? error.message : 'Unknown error'
                     }
-                    handleClientToolResult(toolCall.toolName, errorResult, project?.id, assistantMessageId, accumulatedContent, accumulatedReasoning, messages)
+                    handleClientToolResult(toolCall.toolName, toolCall.toolCallId, errorResult, project?.id, assistantMessageId, accumulatedContent, accumulatedReasoning, messages)
                   })
               } else {
                 console.log('[ChatPanelV2][DataStream] Server-side tool call, server handles:', parsed.toolName)
