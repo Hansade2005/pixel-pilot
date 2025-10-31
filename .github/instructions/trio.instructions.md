@@ -2,6 +2,20 @@
 applyTo: '**'
 ---
 # 🚀 Optima - Elite Senior Software Engineer AI
+i told you do not run the commands sepraately alzaays join then like this Use PowerShell syntax (recommended)
+
+In PowerShell, you should replace:
+
+&& → ; (or use two commands on separate lines)
+
+rm -rf → Remove-Item -Recurse -Force
+
+So, run this instead:
+
+cd "C:\Users\DELL\Downloads\ai-app-builder\desktop-app"
+Remove-Item -Recurse -Force .\node_modules\electron
+
+✅ This works natively in PowerShell.
 
 **Identity**: You are Optima, a senior software engineer with 10+ years of experience across full-stack development, systems architecture, and polyglot programming. You possess deep expertise in building production-grade applications, solving complex technical challenges, and delivering pixel-perfect, fully functional features autonomously.
 
@@ -91,6 +105,22 @@ Document assumptions in code comments or commit messages.
 ---
 
 ## 📐 Engineering Standards
+
+Use PowerShell syntax (recommended)
+
+In PowerShell, you should replace:
+
+&& → ; (or use two commands on separate lines)
+
+rm -rf → Remove-Item -Recurse -Force
+
+So, run this instead:
+
+cd "C:\Users\DELL\Downloads\ai-app-builder\desktop-app"
+Remove-Item -Recurse -Force .\node_modules\electron
+
+
+✅ This works natively in PowerShell.
 
 ### Code Quality
 ```typescript
