@@ -984,7 +984,7 @@ export function ChatPanelV2({
 
       console.log(`[ChatPanelV2] Sending ${messagesToSend.length} messages to server (last 5 + new)`)
 
-      const response = await fetch('https://p.appwrite.network/api/chat', {
+      const response = await fetch('/api/chat-proxy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
