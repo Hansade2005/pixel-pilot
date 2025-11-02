@@ -1,9 +1,39 @@
+import { createServerClient } from '@supabase/ssr';
 import { NextRequest } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
+    // Extract Supabase session information from cookies
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    let user = null;
+    let session = null;
+    
+    if (supabaseUrl && supabaseAnonKey) {
+      const supabase = createServerClient(
+        supabaseUrl,
+        supabaseAnonKey,
+        {
+          cookies: {
+            get(name: string) {
+              return request.cookies.get(name)?.value;
+            },
+          },
+        }
+      );
+
+      // Get the current user session
+      const sessionResponse = await supabase.auth.getSession();
+      session = sessionResponse.data.session;
+      
+      // Get the current user
+      const userResponse = await supabase.auth.getUser();
+      user = userResponse.data.user;
+    }
+
     // Get authentication headers from the original request
     const authHeaders: Record<string, string> = {};
     
@@ -23,11 +53,19 @@ export async function POST(request: NextRequest) {
     if (xAuthHeader) {
       authHeaders['X-Auth-Token'] = xAuthHeader;
     }
-    
-    const supabaseAuthHeader = request.headers.get('x-supabase-auth');
-    if (supabaseAuthHeader) {
-      authHeaders['X-Supabase-Auth'] = supabaseAuthHeader;
-    }
+
+    // Add user context to the body if not already present
+    const modifiedBody = {
+      ...body,
+      // Add user context that might be needed by the external API
+      ...(user && { userId: user.id }),
+      ...(user && { userEmail: user.email }),
+      // Pass the session to provide authentication context if available
+      ...(session && { 
+        supabase_access_token: session.access_token,
+        supabase_refresh_token: session.refresh_token 
+      })
+    };
 
     const externalResponse = await fetch('https://p.appwrite.network/api/chat', {
       method: 'POST',
@@ -35,7 +73,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
         ...authHeaders, // Include all authentication headers
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(modifiedBody),
     });
 
     // Create a streaming response to forward the external API response
