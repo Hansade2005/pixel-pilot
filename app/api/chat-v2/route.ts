@@ -1037,21 +1037,21 @@ export async function POST(req: Request) {
     if (toolResult) {
       console.log('[Chat-V2] Processing client-side tool result:', toolResult.toolName);
       
-      // Create a tool result message to continue the conversation
- const toolResultMessage = {
-  role: 'tool',
-  name: toolResult.toolName, // must match the tool name defined in your AI config
-  tool_call_id: `client-tool-${Date.now()}`, // unique ID per call
-  content: [
-    {
-      type: 'text',
-      text: JSON.stringify(toolResult.result)
-    }
-  ]
-};
+      // Create a tool result message in the correct AI SDK format
+      const toolResultMessage = {
+        role: 'tool',
+        content: [
+          {
+            type: 'tool-result',
+            toolCallId: `client-tool-${Date.now()}`, // unique ID per call
+            toolName: toolResult.toolName, // must match the tool name defined in your AI config
+            output: toolResult.result // The actual tool result data
+          }
+        ]
+      };
 
-// Add this to your conversation history
-messages = [...messages, toolResultMessage];
+      // Add this to your conversation history
+      messages = [...messages, toolResultMessage];
       
       // Continue with normal processing but with the tool result included
     }
