@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { ThemeProvider } from "@/components/theme-provider"
+import { ServiceWorkerProvider } from "@/components/service-worker-provider"
 
 // const poppins = Poppins({
 //   subsets: ['latin'],
@@ -92,6 +93,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180x180.png" />
       </head>
       <body className="dark:bg-gray-900 dark:text-white font-sans">
+        <ServiceWorkerProvider />
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

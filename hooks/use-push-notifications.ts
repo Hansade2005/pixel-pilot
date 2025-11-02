@@ -117,8 +117,14 @@ export function usePushNotifications(): PushNotificationHook {
         return false;
       }
 
-      // Wait for service worker
-      const registration = await navigator.serviceWorker.ready;
+      // Wait for service worker with timeout
+      console.log('Waiting for service worker...');
+      const registration = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise<ServiceWorkerRegistration>((_, reject) => 
+          setTimeout(() => reject(new Error('Service worker timeout')), 10000)
+        )
+      ]);
 
       // Subscribe to push
       const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || 
@@ -158,6 +164,16 @@ export function usePushNotifications(): PushNotificationHook {
       return true;
     } catch (error) {
       console.error('Error subscribing to push:', error);
+      
+      // Provide helpful error message
+      if (error instanceof Error) {
+        if (error.message.includes('timeout')) {
+          console.error('Service worker failed to register. Please refresh the page.');
+        } else if (error.message.includes('subscribe')) {
+          console.error('Failed to subscribe to push notifications. Check VAPID keys.');
+        }
+      }
+      
       setIsLoading(false);
       return false;
     }
