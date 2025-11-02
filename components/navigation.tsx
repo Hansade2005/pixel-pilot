@@ -28,6 +28,7 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { useSubscriptionCache } from "@/hooks/use-subscription-cache"
+import { NotificationCenter } from "@/components/notification-center"
 import { checkAdminAccess } from "@/lib/admin-utils"
 import { Shield, Crown } from "lucide-react"
 
@@ -187,9 +188,7 @@ export function Navigation() {
                   <button className="text-white hover:text-gray-300 transition-colors">
                     <ImageIcon className="w-5 h-5" />
                   </button>
-                  <button className="text-white hover:text-gray-300 transition-colors">
-                    <Bell className="w-5 h-5" />
-                  </button>
+                  <NotificationCenter />
                 </>
               )}
 
@@ -297,25 +296,8 @@ export function Navigation() {
                   {user ? (
                     /* Mobile Logged-in Layout */
                     <div className="flex items-center space-x-2">
-                      {/* Bell Icon */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button className="text-white hover:text-gray-300 transition-colors p-2">
-                            <Bell className="w-5 h-5" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-64 bg-gray-800 border-gray-700">
-                          <div className="px-3 py-2 text-sm text-gray-400 border-b border-gray-700">
-                            Notifications
-                          </div>
-                          <div className="py-2">
-                            <div className="px-3 py-4 text-center text-gray-500">
-                              <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                              <div className="text-sm">No new notifications</div>
-                            </div>
-                          </div>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      {/* Notification Center */}
+                      <NotificationCenter />
 
                       {/* Profile Icon Trigger */}
                       <DropdownMenu>
