@@ -1,0 +1,45 @@
+{
+  "name": "starter-for-nextjs",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+     "@supabase/auth-helpers-nextjs": "^0.10.0",
+    "@supabase/ssr": "latest",
+     "@e2b/code-interpreter": "^2.0.0",
+    "@supabase/supabase-js": "latest",
+    "@ai-sdk/cohere": "^2.0.5",
+    "@ai-sdk/google": "^2.0.8",
+    "@ai-sdk/groq": "^2.0.14",
+    "@ai-sdk/mistral": "^2.0.10",
+    "@ai-sdk/openai": "^2.0.20",
+    "@ai-sdk/openai-compatible": "^1.0.11",
+    "@ai-sdk/react": "^2.0.68",
+    "@ai-sdk/rsc": "^1.0.68",
+    "@ai-sdk/togetherai": "^1.0.11",
+    "@ai-sdk/ui-utils": "^1.2.11",
+    "@ai-sdk/xai": "^2.0.23",
+    "@appwrite.io/pink-icons": "^1.0.0",
+    "@tailwindcss/postcss": "^4.0.14",
+    "appwrite": "^16.1.0",
+    "next": "14.2.15",
+    "postcss": "^8.5.3",
+    "react": "^18",
+    "react-dom": "^18",
+    "tailwindcss": "^4.0.14",
+    "ai": "latest",
+    "zod": "^3.22.2"
+  },
+  "devDependencies": {
+    "prettier": "3.5.3",
+    "prettier-plugin-tailwindcss": "^0.6.11",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "typescript": "latest"
+  }
+}

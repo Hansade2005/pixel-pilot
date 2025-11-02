@@ -1,0 +1,42 @@
+name: Update Package Lock
+
+on:
+  push:
+    paths:
+      - 'package.json'
+
+jobs:
+  update-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Check for changes in package-lock.json
+        id: verify-changed-files
+        run: |
+          if git diff --name-only HEAD~1 | grep -q package-lock.json; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push if changed
+        if: steps.verify-changed-files.outputs.changed == 'true'
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          git add package-lock.json
+          git commit -m "Update package-lock.json"
+          git push

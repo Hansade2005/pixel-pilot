@@ -9,30 +9,21 @@ export async function POST(request: NextRequest) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     
-    let user = null;
-    let session = null;
-    
-    if (supabaseUrl && supabaseAnonKey) {
-      const supabase = createServerClient(
-        supabaseUrl,
-        supabaseAnonKey,
-        {
-          cookies: {
-            get(name: string) {
-              return request.cookies.get(name)?.value;
-            },
+    // Create Supabase client to get current session
+    const supabase = createServerClient(
+      supabaseUrl!,
+      supabaseAnonKey!,
+      {
+        cookies: {
+          get(name: string) {
+            return request.cookies.get(name)?.value;
           },
-        }
-      );
+        },
+      }
+    );
 
-      // Get the current user session
-      const sessionResponse = await supabase.auth.getSession();
-      session = sessionResponse.data.session;
-      
-      // Get the current user
-      const userResponse = await supabase.auth.getUser();
-      user = userResponse.data.user;
-    }
+    // Get the current user session
+    const { data: { user } } = await supabase.auth.getUser();
 
     // Get authentication headers from the original request
     const authHeaders: Record<string, string> = {};
@@ -43,7 +34,7 @@ export async function POST(request: NextRequest) {
       authHeaders['Authorization'] = originalAuthHeader;
     }
     
-    // Forward other potential auth-related headers
+    // Forward Supabase session cookies
     const cookieHeader = request.headers.get('cookie');
     if (cookieHeader) {
       authHeaders['Cookie'] = cookieHeader;
@@ -59,12 +50,7 @@ export async function POST(request: NextRequest) {
       ...body,
       // Add user context that might be needed by the external API
       ...(user && { userId: user.id }),
-      ...(user && { userEmail: user.email }),
-      // Pass the session to provide authentication context if available
-      ...(session && { 
-        supabase_access_token: session.access_token,
-        supabase_refresh_token: session.refresh_token 
-      })
+      ...(user && { userEmail: user.email })
     };
 
     const externalResponse = await fetch('https://p.appwrite.network/api/chat', {
