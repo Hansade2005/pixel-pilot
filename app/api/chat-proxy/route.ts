@@ -4,10 +4,36 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
+    // Get authentication headers from the original request
+    const authHeaders: Record<string, string> = {};
+    
+    // Forward common authentication headers
+    const originalAuthHeader = request.headers.get('authorization');
+    if (originalAuthHeader) {
+      authHeaders['Authorization'] = originalAuthHeader;
+    }
+    
+    // Forward other potential auth-related headers
+    const cookieHeader = request.headers.get('cookie');
+    if (cookieHeader) {
+      authHeaders['Cookie'] = cookieHeader;
+    }
+    
+    const xAuthHeader = request.headers.get('x-auth-token');
+    if (xAuthHeader) {
+      authHeaders['X-Auth-Token'] = xAuthHeader;
+    }
+    
+    const supabaseAuthHeader = request.headers.get('x-supabase-auth');
+    if (supabaseAuthHeader) {
+      authHeaders['X-Supabase-Auth'] = supabaseAuthHeader;
+    }
+
     const externalResponse = await fetch('https://p.appwrite.network/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...authHeaders, // Include all authentication headers
       },
       body: JSON.stringify(body),
     });
