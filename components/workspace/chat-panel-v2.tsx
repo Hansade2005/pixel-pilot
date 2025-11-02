@@ -780,7 +780,7 @@ export function ChatPanelV2({
       console.log('[ChatPanelV2][Continuation] 📤 Sending continuation request with token:', continuationState.continuationToken)
 
       const response = await fetch('/api/chat-v2', {
-        method: 'POST',
+     method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(continuationPayload),
         signal: continuationController.signal
@@ -1196,8 +1196,8 @@ export function ChatPanelV2({
 
       console.log('[ChatPanelV2][ClientTool] 📤 Sending tool result continuation request')
 
-      const response = await fetch('/api/chat-v2', {
-        method: 'POST',
+          const response = await fetch('/api/chat-v2', {
+  method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(continuationPayload)
       })
@@ -1518,8 +1518,9 @@ export function ChatPanelV2({
       // Build project file tree on client-side with latest data
       const fileTree = await buildProjectFileTree()
 
+
       const response = await fetch('/api/chat-v2', {
-        method: 'POST',
+      method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: messagesToSend, // Send last 5 + new message
