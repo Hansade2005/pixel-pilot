@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useTransition, useMemo, useCallback, memo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   DropdownMenu,
@@ -26,12 +26,13 @@ interface Notification {
   created_at: string;
 }
 
-export function NotificationCenter() {
+export const NotificationCenter = memo(function NotificationCenter() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [preferences, setPreferences] = useState<any>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [isPending, startTransition] = useTransition();
   
   const {
     isSupported,
@@ -43,7 +44,7 @@ export function NotificationCenter() {
     sendTestNotification
   } = usePushNotifications();
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   // Load notifications
   useEffect(() => {
@@ -55,7 +56,7 @@ export function NotificationCenter() {
     loadPreferences();
   }, []);
 
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -88,9 +89,9 @@ export function NotificationCenter() {
     } catch (error) {
       console.error('Error loading notifications:', error);
     }
-  };
+  }, [supabase]);
 
-  const loadPreferences = async () => {
+  const loadPreferences = useCallback(async () => {
     try {
       const response = await fetch('/api/notifications/preferences');
       if (response.ok) {
@@ -100,9 +101,9 @@ export function NotificationCenter() {
     } catch (error) {
       console.error('Error loading preferences:', error);
     }
-  };
+  }, []);
 
-  const handleEnableNotifications = async () => {
+  const handleEnableNotifications = useCallback(async () => {
     const success = await subscribe();
     if (success) {
       toast.success('🔔 Notifications enabled!');
@@ -110,30 +111,34 @@ export function NotificationCenter() {
     } else {
       toast.error('Failed to enable notifications');
     }
-  };
+  }, [subscribe, sendTestNotification]);
 
-  const handleDisableNotifications = async () => {
+  const handleDisableNotifications = useCallback(async () => {
     const success = await unsubscribe();
     if (success) {
       toast.success('Notifications disabled');
     } else {
       toast.error('Failed to disable notifications');
     }
-  };
+  }, [unsubscribe]);
 
-  const handleMarkAsRead = async (notificationId: string) => {
-    setNotifications(prev =>
-      prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
-    );
-    setUnreadCount(prev => Math.max(0, prev - 1));
-  };
+  const handleMarkAsRead = useCallback(async (notificationId: string) => {
+    startTransition(() => {
+      setNotifications(prev =>
+        prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    });
+  }, []);
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    setUnreadCount(0);
-  };
+  const handleMarkAllAsRead = useCallback(() => {
+    startTransition(() => {
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      setUnreadCount(0);
+    });
+  }, []);
 
-  const handleNotificationClick = (notification: Notification) => {
+  const handleNotificationClick = useCallback((notification: Notification) => {
     if (!notification.read) {
       handleMarkAsRead(notification.id);
     }
@@ -141,12 +146,16 @@ export function NotificationCenter() {
       window.location.href = notification.url;
     }
     setIsOpen(false);
-  };
+  }, [handleMarkAsRead]);
 
-  const handleTogglePreference = async (key: string, value: boolean) => {
+  const handleTogglePreference = useCallback(async (key: string, value: boolean) => {
     try {
       const updated = { ...preferences, [key]: value };
-      setPreferences(updated);
+      
+      // Optimistically update UI
+      startTransition(() => {
+        setPreferences(updated);
+      });
 
       const response = await fetch('/api/notifications/preferences', {
         method: 'PUT',
@@ -162,8 +171,10 @@ export function NotificationCenter() {
     } catch (error) {
       console.error('Error updating preferences:', error);
       toast.error('Failed to update preferences');
+      // Revert on error
+      loadPreferences();
     }
-  };
+  }, [preferences, loadPreferences]);
 
   if (!isSupported) {
     return (
@@ -420,4 +431,4 @@ export function NotificationCenter() {
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
+});
