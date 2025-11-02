@@ -20,12 +20,19 @@ export const metadata: Metadata = {
   authors: [{ name: 'PiPilot Team' }],
   creator: 'PiPilot',
   publisher: 'Anye Happiness Ade',
+  applicationName: 'PiPilot',
   formatDetection: {
     email: false,
     address: false,
     telephone: false,
   },
   metadataBase: new URL('https://pipilot.dev'),
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'PiPilot',
+  },
   openGraph: {
     title: 'PiPilot - Canada\'s First Agentic Vibe Coding Platform',
     description: 'Build apps 10x faster with Canada\'s leading AI coding platform. Agentic Vibe Coding - the future of development. Superior to Lovable, Bolt, v0, and Replit.',
@@ -56,9 +63,15 @@ export const metadata: Metadata = {
   },
   category: 'Technology',
   icons: {
-    icon: '/logo.png',
+    icon: [
+      { url: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
+    ],
     shortcut: '/logo.png',
-    apple: '/logo.png',
+    apple: [
+      { url: '/icons/icon-152x152.png', sizes: '152x152', type: 'image/png' },
+      { url: '/icons/icon-180x180.png', sizes: '180x180', type: 'image/png' },
+    ],
   },
 }
 
@@ -69,6 +82,15 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
+      <head>
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="PiPilot" />
+        <meta name="theme-color" content="#6366f1" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180x180.png" />
+      </head>
       <body className="dark:bg-gray-900 dark:text-white font-sans">
         <ThemeProvider
           attribute="class"

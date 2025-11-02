@@ -28,6 +28,9 @@ import { AuthModal } from "@/components/auth-modal"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import FeatureShowcase from "@/components/FeatureShowcase"
+import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
+import { PWAUpdatePrompt } from "@/components/pwa-update-prompt"
+import { OfflineIndicator } from "@/components/offline-indicator"
 
 import { createClient } from "@/lib/supabase/client"
 import { TemplateManager } from "@/lib/template-manager"
@@ -431,6 +434,11 @@ export default function LandingPage() {
 
       {/* Footer */}
       <Footer />
+
+      {/* PWA Components */}
+      <PWAInstallPrompt />
+      <PWAUpdatePrompt />
+      <OfflineIndicator />
 
       {/* Auth Modal */}
       <AuthModal 
