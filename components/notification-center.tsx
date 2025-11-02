@@ -400,6 +400,18 @@ export function NotificationCenter() {
                   >
                     Send Test Notification
                   </Button>
+
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setShowSettings(false);
+                      window.location.href = '/settings/notifications';
+                    }}
+                    className="w-full mt-2"
+                  >
+                    Advanced Settings & Preview
+                  </Button>
                 </>
               )}
             </div>
