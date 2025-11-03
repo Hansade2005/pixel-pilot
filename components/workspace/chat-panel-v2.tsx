@@ -1132,10 +1132,17 @@ export function ChatPanelV2({
 
   // Handle initial prompt
   useEffect(() => {
-    if (initialPrompt && messages.length === 0) {
+    if (initialPrompt && messages.length === 0 && !isLoading) {
       setInput(initialPrompt)
+      // Auto-submit the initial prompt after a brief delay to ensure state is set
+      setTimeout(() => {
+        const syntheticEvent = {
+          preventDefault: () => {},
+        } as React.FormEvent
+        handleEnhancedSubmit(syntheticEvent)
+      }, 100)
     }
-  }, [initialPrompt])
+  }, [initialPrompt, messages.length, isLoading])
 
   // Handle loading state based on isLoading state
   useEffect(() => {
