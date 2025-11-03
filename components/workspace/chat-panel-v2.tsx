@@ -1130,19 +1130,202 @@ export function ChatPanelV2({
     }
   }
 
-  // Handle initial prompt
+  // Handle initial prompt - auto-send message directly without filling input box
   useEffect(() => {
     if (initialPrompt && messages.length === 0 && !isLoading) {
-      setInput(initialPrompt)
-      // Auto-submit the initial prompt after a brief delay to ensure state is set
-      setTimeout(() => {
-        const syntheticEvent = {
-          preventDefault: () => {},
-        } as React.FormEvent
-        handleEnhancedSubmit(syntheticEvent)
-      }, 100)
+      // Directly submit the message without updating the input box
+      const submitInitialPrompt = async () => {
+        setIsLoading(true)
+        setError(null)
+
+        // Create user message
+        const userMessageId = Date.now().toString()
+        const userMessage = {
+          id: userMessageId,
+          role: 'user',
+          content: initialPrompt
+        }
+
+        // Add user message to local state
+        setMessages(prev => [...prev, userMessage])
+
+        // Save user message to IndexedDB
+        await saveMessageToIndexedDB(userMessage)
+        console.log(`[ChatPanelV2] Initial prompt saved to database: ${userMessageId}`)
+
+        // Create checkpoint for this message
+        if (project) {
+          try {
+            setTimeout(async () => {
+              await createCheckpoint(project.id, userMessage.id)
+              console.log(`[Checkpoint] Created checkpoint for message ${userMessage.id}`)
+            }, 100)
+          } catch (error) {
+            console.error('[Checkpoint] Error creating checkpoint:', error)
+          }
+        }
+
+        // Add placeholder assistant message
+        const assistantMessageId = (Date.now() + 1).toString()
+        const assistantMessage = {
+          id: assistantMessageId,
+          role: 'assistant',
+          content: ''
+        }
+        setMessages(prev => [...prev, assistantMessage])
+
+        // Create abort controller
+        const controller = new AbortController()
+        setAbortController(controller)
+
+        try {
+          // Prepare messages to send
+          const messagesToSend = [{ role: 'user', content: initialPrompt }]
+
+          console.log(`[ChatPanelV2] Auto-sending initial prompt`)
+
+          // Refresh project files
+          await loadProjectFiles()
+          const fileTree = await buildProjectFileTree()
+
+          const response = await fetch('/api/chat-v2', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: messagesToSend,
+              id: project?.id,
+              projectId: project?.id,
+              project,
+              fileTree,
+              files: projectFiles,
+              modelId: selectedModel,
+              aiMode
+            }),
+            signal: controller.signal
+          })
+
+          if (!response.ok) {
+            throw new Error('Failed to send message')
+          }
+
+          // Handle streaming response
+          const reader = response.body?.getReader()
+          if (!reader) throw new Error('No response body')
+
+          const decoder = new TextDecoder()
+          let accumulatedContent = ''
+          let accumulatedReasoning = ''
+          let lineBuffer = ''
+
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = decoder.decode(value, { stream: true })
+            lineBuffer += chunk
+            const lines = lineBuffer.split('\n')
+            lineBuffer = lines.pop() || ''
+
+            const completeLines = lines.filter(line => line.trim())
+
+            for (const line of completeLines) {
+              try {
+                const jsonString = line.startsWith('data: ') ? line.slice(6) : line
+                if (!jsonString || jsonString.startsWith(':')) continue
+
+                const parsed = JSON.parse(jsonString)
+
+                if (parsed.type === 'start-step' || parsed.type === 'reasoning-start') {
+                  continue
+                }
+
+                if (parsed.type === 'text-delta') {
+                  if (parsed.text) {
+                    accumulatedContent += parsed.text
+                    setMessages(prev => prev.map(msg =>
+                      msg.id === assistantMessageId
+                        ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+                        : msg
+                    ))
+                  }
+                } else if (parsed.type === 'reasoning-delta') {
+                  if (parsed.text) {
+                    accumulatedReasoning += parsed.text
+                    setMessages(prev => prev.map(msg =>
+                      msg.id === assistantMessageId
+                        ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
+                        : msg
+                    ))
+                  }
+                } else if (parsed.type === 'continuation_signal') {
+                  setIsContinuationInProgress(true)
+                  toast({
+                    title: "Continuing conversation...",
+                    description: "Stream will continue seamlessly due to time constraints.",
+                    duration: 3000
+                  })
+                  setTimeout(async () => {
+                    await handleStreamContinuation(parsed.continuationState, assistantMessageId, accumulatedContent, accumulatedReasoning)
+                  }, 1000)
+                  break
+                } else if (parsed.type === 'tool-call') {
+                  const toolCall = {
+                    toolName: parsed.toolName,
+                    toolCallId: parsed.toolCallId,
+                    args: parsed.input,
+                    dynamic: false
+                  }
+
+                  const clientSideTools = [
+                    'write_file', 'edit_file', 'delete_file', 'add_package', 'remove_package',
+                    'read_file', 'list_files', 'grep_search', 'semantic_code_navigator'
+                  ]
+
+                  if (clientSideTools.includes(toolCall.toolName)) {
+                    const { handleClientFileOperation } = await import('@/lib/client-file-tools')
+                    const addToolResult = (result: any) => {
+                      console.log('[ChatPanelV2][ClientTool] ✅ Client-side tool completed:', result.tool)
+                    }
+                    handleClientFileOperation(toolCall, project?.id, addToolResult)
+                      .catch(error => {
+                        console.error('[ChatPanelV2][ClientTool] ❌ Tool execution error:', error)
+                      })
+                  }
+                }
+              } catch (e) {
+                console.error('[ChatPanelV2][DataStream] ❌ Failed to parse chunk:', e)
+                continue
+              }
+            }
+          }
+
+          // Save assistant message
+          if (accumulatedContent.trim()) {
+            await saveAssistantMessageAfterStreaming(
+              assistantMessageId,
+              accumulatedContent,
+              accumulatedReasoning,
+              []
+            )
+          }
+        } catch (error: any) {
+          if (error.name === 'AbortError') {
+            setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
+          } else {
+            setError(error)
+            setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
+          }
+        } finally {
+          if (!isContinuationInProgress) {
+            setIsLoading(false)
+          }
+          setAbortController(null)
+        }
+      }
+
+      submitInitialPrompt()
     }
-  }, [initialPrompt, messages.length, isLoading])
+  }, [initialPrompt])
 
   // Handle loading state based on isLoading state
   useEffect(() => {
