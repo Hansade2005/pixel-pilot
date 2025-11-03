@@ -31,8 +31,6 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { storageManager, type Workspace as Project, type Deployment, type EnvironmentVariable } from "@/lib/storage-manager"
 import { createClient } from "@/lib/supabase/client"
-import { Navigation } from "@/components/navigation"
-import { Footer } from "@/components/footer"
 import Link from "next/link"
 
 interface ProjectDetails extends Project {
@@ -369,7 +367,6 @@ export default function ProjectPage() {
             </div>
           </div>
         </div>
-        <Footer />
       </div>
     )
   }

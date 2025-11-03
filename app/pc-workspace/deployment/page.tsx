@@ -4,8 +4,6 @@ import React, { Suspense } from "react"
 // Prevent static prerendering; this page relies on client-side navigation hooks
 export const dynamic = 'force-dynamic'
 import { Loader2 } from "lucide-react"
-import { Navigation } from "@/components/navigation"
-import { Footer } from "@/components/footer"
 import PcDeploymentClient from "@/components/workspace/pc-deployment-client"
 
 function DeploymentPageContent() {
@@ -21,9 +19,6 @@ export default function DeploymentPage() {
       {/* Noise Texture Overlay */}
       <div className="absolute inset-0 noise-texture" />
 
-      {/* Navigation */}
-      <Navigation />
-      
       <div className="relative z-10 pt-16 pb-24">
         <Suspense fallback={
           <div className="flex items-center justify-center h-64">
@@ -33,9 +28,6 @@ export default function DeploymentPage() {
           <DeploymentPageContent />
         </Suspense>
       </div>
-      
-      {/* Footer */}
-      <Footer />
     </div>
   )
 }

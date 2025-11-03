@@ -20,8 +20,6 @@ import StorageManager from '@/components/database/storage-manager';
 import { ApiDocsGenerator } from '@/components/database/api-docs-generator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Navigation } from '@/components/navigation';
-import { Footer } from '@/components/footer';
 import type { Table } from '@/lib/supabase';
 
 interface DatabaseData {
@@ -236,7 +234,6 @@ export default function DatabasePage() {
       <div className="min-h-screen relative overflow-hidden">
         <div className="absolute inset-0 lovable-gradient" />
         <div className="absolute inset-0 noise-texture" />
-        <Navigation />
         <div className="relative z-10 pt-16 pb-24">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl py-8">
             <Card className="bg-gray-800 border-gray-700">
@@ -314,7 +311,6 @@ export default function DatabasePage() {
             </Card>
           </div>
         </div>
-        <Footer />
       </div>
     );
   }
@@ -323,7 +319,6 @@ export default function DatabasePage() {
     <div className="min-h-screen relative overflow-hidden">
       <div className="absolute inset-0 lovable-gradient" />
       <div className="absolute inset-0 noise-texture" />
-      <Navigation />
       <div className="relative z-10 pt-16 pb-24">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-8 space-y-6">
           {/* Header */}
@@ -581,7 +576,6 @@ export default function DatabasePage() {
       </Dialog>
         </div>
       </div>
-      <Footer />
     </div>
   );
 }

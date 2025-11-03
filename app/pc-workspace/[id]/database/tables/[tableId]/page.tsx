@@ -11,8 +11,6 @@ import { AddRecordDialog } from "@/components/database/add-record-dialog";
 import { EditRecordDialog } from "@/components/database/edit-record-dialog";
 import { DeleteRecordDialog } from "@/components/database/delete-record-dialog";
 import { getWorkspaceDatabaseId } from "@/lib/get-current-workspace";
-import { Navigation } from "@/components/navigation";
-import { Footer } from "@/components/footer";
 import type { Table } from "@/lib/supabase";
 
 interface RecordData {
@@ -140,11 +138,9 @@ export default function TableRecordsPage() {
       <div className="min-h-screen relative overflow-hidden">
         <div className="absolute inset-0 lovable-gradient" />
         <div className="absolute inset-0 noise-texture" />
-        <Navigation />
         <div className="relative z-10 flex items-center justify-center min-h-screen pt-16">
           <Loader2 className="h-8 w-8 animate-spin text-white" />
         </div>
-        <Footer />
       </div>
     );
   }
@@ -154,7 +150,6 @@ export default function TableRecordsPage() {
       <div className="min-h-screen relative overflow-hidden">
         <div className="absolute inset-0 lovable-gradient" />
         <div className="absolute inset-0 noise-texture" />
-        <Navigation />
         <div className="relative z-10 pt-16 pb-24">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <Card className="bg-gray-800 border-gray-700">
@@ -167,7 +162,6 @@ export default function TableRecordsPage() {
             </Card>
           </div>
         </div>
-        <Footer />
       </div>
     );
   }
@@ -176,7 +170,6 @@ export default function TableRecordsPage() {
     <div className="min-h-screen relative overflow-hidden">
       <div className="absolute inset-0 lovable-gradient" />
       <div className="absolute inset-0 noise-texture" />
-      <Navigation />
       <div className="relative z-10 pt-16 pb-24">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl py-8 space-y-6">
           {/* Header */}
@@ -313,7 +306,6 @@ export default function TableRecordsPage() {
           )}
         </div>
       </div>
-      <Footer />
     </div>
   );
 }

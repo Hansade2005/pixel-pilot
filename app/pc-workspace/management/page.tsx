@@ -32,8 +32,6 @@ import { storageManager, type Workspace as Project, type Deployment, type Enviro
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Navigation } from "@/components/navigation"
-import { Footer } from "@/components/footer"
 
 // Extended project interface for display
 interface ProjectDisplay extends Project {
