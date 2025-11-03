@@ -1159,7 +1159,8 @@ export function ChatPanelV2({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Handle client-side tool results by sending continuation request
+  // Handle client-side tool results by sending continuation request - DISABLED
+  /*
   const handleClientToolResult = async (
     toolName: string,
     result: any,
@@ -1293,7 +1294,7 @@ export function ChatPanelV2({
                 const addToolResult = (result: any) => {
                   console.log('[ChatPanelV2][ClientTool][Continuation] ✅ Continuation tool completed:', result.tool)
                   // Send this result back too
-                  handleClientToolResult(toolCall.toolName, result, projectId, assistantMessageId)
+                  // handleClientToolResult(toolCall.toolName, result, projectId, assistantMessageId)
                 }
 
                 handleClientFileOperation(toolCall, projectId, addToolResult)
@@ -1305,7 +1306,7 @@ export function ChatPanelV2({
                       state: 'output-error',
                       errorText: error instanceof Error ? error.message : 'Unknown error'
                     }
-                    handleClientToolResult(toolCall.toolName, errorResult, projectId, assistantMessageId)
+                    // handleClientToolResult(toolCall.toolName, errorResult, projectId, assistantMessageId)
                   })
               }
             } else if (parsed.type === 'tool-result') {
@@ -1347,6 +1348,7 @@ export function ChatPanelV2({
       })
     }
   }
+  */
 
   // Enhanced submit with attachments - AI SDK Pattern: Send last 5 messages
   const handleEnhancedSubmit = async (e: React.FormEvent) => {
@@ -1677,7 +1679,7 @@ export function ChatPanelV2({
                   
                   // For client-side tools, we need to send the result back to continue the conversation
                   // Create a continuation request with the tool result
-                  handleClientToolResult(toolCall.toolName, result, project?.id, assistantMessageId)
+                  // handleClientToolResult(toolCall.toolName, result, project?.id, assistantMessageId)
                 }
                 
                 // Execute the tool asynchronously (don't await - per AI SDK docs)
@@ -1691,7 +1693,7 @@ export function ChatPanelV2({
                       state: 'output-error',
                       errorText: error instanceof Error ? error.message : 'Unknown error'
                     }
-                    handleClientToolResult(toolCall.toolName, errorResult, project?.id, assistantMessageId)
+                    // handleClientToolResult(toolCall.toolName, errorResult, project?.id, assistantMessageId)
                   })
               } else {
                 console.log('[ChatPanelV2][DataStream] Server-side tool call, server handles:', parsed.toolName)

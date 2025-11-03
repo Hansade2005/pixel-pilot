@@ -1030,13 +1030,14 @@ export async function POST(req: Request) {
       modelId,
       aiMode,
       continuationState, // New field for stream continuation
-      toolResult // New field for client-side tool results
+      // toolResult // New field for client-side tool results - DISABLED
     } = body
 
-    // Handle client-side tool results
+    // Handle client-side tool results - DISABLED
+    /*
     if (toolResult) {
       console.log('[Chat-V2] Processing client-side tool result:', toolResult.toolName);
-      
+
        // Create a tool result message to continue the conversation
       const toolResultMessage = {
         role: 'user',
@@ -1047,9 +1048,10 @@ export async function POST(req: Request) {
 
       // Add the tool result to messages
       messages = [...messages, toolResultMessage];
-      
+
       // Continue with normal processing but with the tool result included
     }
+    */
       
   
 
@@ -1161,8 +1163,7 @@ export async function POST(req: Request) {
       aiMode, 
       originalMessageCount: messages?.length || 0,
       processedMessageCount: processedMessages.length,
-      hasMessages: !!messages,
-      hasToolResult: !!toolResult
+      hasMessages: !!messages
     })
 
     // Auth check
