@@ -282,7 +282,7 @@ export function ProjectHeader({
   return (
     <div className="h-16 border-b border-border bg-card px-6 flex items-center justify-between">
       <div className="flex items-center space-x-4">
-        <Logo variant="icon" size="sm" />
+        <Logo variant="icon" size="md" />
         <div>
           {editing ? (
             <input
@@ -308,10 +308,7 @@ export function ProjectHeader({
           )}
           {project.description && <p className="text-sm text-muted-foreground">{project.description.length > 12 ? `${project.description.substring(0, 12)}...` : project.description}</p>}
         </div>
-        <Badge variant="secondary">
-          <GitBranch className="h-3 w-3 mr-1" />
-          main
-        </Badge>
+       
         {/* Model label and selector */}
         {selectedModel && onModelChange && (
           <div className="flex items-center gap-2">

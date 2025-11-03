@@ -595,7 +595,7 @@ export function PcChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps
       // Clear the input and redirect
       setPrompt("")
       setGithubRepoUrl("")
-      router.push(`/workspace?newProject=${workspace.id}`)
+      router.push(`/pc-workspace?newProject=${workspace.id}`)
 
     } catch (error) {
       console.error('❌ Error importing GitHub repo:', error)
@@ -703,7 +703,7 @@ export function PcChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps
       // Clear the input and redirect
       setPrompt("")
       setGitlabRepoUrl("")
-      router.push(`/workspace?newProject=${workspace.id}`)
+      router.push(`/pc-workspace?newProject=${workspace.id}`)
 
     } catch (error) {
       console.error('❌ Error importing GitLab repo:', error)
@@ -931,7 +931,7 @@ export function PcChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps
         // No need to pass prompt in URL anymore - it's in sessionStorage
         setPrompt("")
         setAttachedUrl("") // Clear URL attachment
-        router.push(`/workspace?newProject=${workspace.id}`)
+        router.push(`/pc-workspace?newProject=${workspace.id}`)
       } else {
         throw new Error('Failed to generate project suggestion')
       }

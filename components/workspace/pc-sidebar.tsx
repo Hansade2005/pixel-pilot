@@ -81,7 +81,7 @@ interface SidebarProps {
   onTriggerBackup?: () => Promise<boolean>
 }
 
-export function Sidebar({
+export function PcSidebar({
   user,
   projects,
   selectedProject,
@@ -539,7 +539,7 @@ export function Sidebar({
               variant="outline" 
               size="sm" 
               className="w-20"
-              onClick={() => window.open('https://pipilot.dev/workspace/deployment', '_blank')}
+              onClick={() => window.open('https://pipilot.dev/pc-workspace/deployment', '_blank')}
             >
               Deploy
             </Button>
@@ -547,7 +547,7 @@ export function Sidebar({
               variant="outline" 
               size="sm" 
               className="w-20"
-              onClick={() => window.open('https://pipilot.dev/workspace/management', '_blank')}
+              onClick={() => window.open('https://pipilot.dev/pc-workspace/management', '_blank')}
             >
               Manage
             </Button>
