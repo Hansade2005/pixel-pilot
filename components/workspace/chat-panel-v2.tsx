@@ -35,13 +35,18 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
       case 'list_files':
       case 'delete_file':
         return FileText
+      case 'add_package':
+      case 'remove_package':
+        return Plus
       case 'grep_search':
-        return FileText
-      case 'semantic_search':
+      case 'semantic_code_navigator':
         return FileText
       case 'web_search':
+      case 'web_extract':
       case 'vscode-websearchforcopilot_webSearch':
         return Link as any
+      case 'check_dev_errors':
+        return AlertTriangle
       default:
         return Zap
     }
@@ -58,13 +63,24 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
       return `${action} ${fileName}`
     }
 
+    // For package management tools
+    if (toolName === 'add_package') {
+      const packageName = toolCall.args?.name || toolCall.result?.packageName || 'package'
+      return `Add package ${packageName}`
+    }
+
+    if (toolName === 'remove_package') {
+      const packageName = toolCall.args?.name || toolCall.result?.packageName || 'package'
+      return `Remove package ${packageName}`
+    }
+
     // For search tools: show statements like "Search Codebase for 'query'"
     if (toolName === 'grep_search') {
       const query = toolCall.args?.query || toolCall.result?.query || 'query'
       return `Grep codebase for "${query.length > 20 ? query.substring(0, 20) + '...' : query}"`
     }
 
-    if (toolName === 'semantic_search') {
+    if (toolName === 'semantic_code_navigator') {
       const query = toolCall.args?.query || toolCall.result?.query || 'query'
       return `Search codebase for "${query.length > 20 ? query.substring(0, 20) + '...' : query}"`
     }
@@ -72,6 +88,17 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
     if (toolName === 'web_search' || toolName === 'vscode-websearchforcopilot_webSearch') {
       const query = toolCall.args?.query || toolCall.result?.query || 'query'
       return `Search web for "${query.length > 20 ? query.substring(0, 20) + '...' : query}"`
+    }
+
+    if (toolName === 'web_extract') {
+      const urls = toolCall.args?.urls || toolCall.result?.urls || []
+      const urlCount = Array.isArray(urls) ? urls.length : 1
+      return `Extract content from ${urlCount} URL${urlCount > 1 ? 's' : ''}`
+    }
+
+    if (toolName === 'check_dev_errors') {
+      const mode = toolCall.args?.mode || 'dev'
+      return `Check ${mode} errors`
     }
 
     // Default: just show the tool name
