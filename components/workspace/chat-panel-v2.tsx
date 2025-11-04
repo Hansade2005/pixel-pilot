@@ -55,7 +55,10 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
   const getToolDisplayText = (toolName: string, toolCall: any) => {
     // For file operation tools: show tool name, file name, and status
     if (['write_file', 'edit_file', 'read_file', 'list_files', 'delete_file'].includes(toolName)) {
-      const fileName = toolCall.result?.path?.split('/').pop() || toolCall.args?.path?.split('/').pop() || toolCall.args?.filePath?.split('/').pop() || 'file'
+      const fileName = toolCall.result?.path?.split('/').pop() || 
+                      toolCall.args?.path?.split('/').pop() || 
+                      toolCall.args?.filePath?.split('/').pop() || 
+                      'file'
       const action = toolName === 'write_file' ? 'Create' :
                     toolName === 'edit_file' ? 'Edit' :
                     toolName === 'read_file' ? 'Read' :
@@ -105,9 +108,9 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
     return toolName.replace(/_/g, ' ')
   }
 
-  const isSuccess = toolCall.result?.success !== false && status !== 'failed'
-  const IconComponent = getToolIcon(toolCall.name || toolCall.toolName)
-  const displayText = getToolDisplayText(toolCall.name || toolCall.toolName, toolCall)
+  const isSuccess = toolCall.result && toolCall.result.success !== false
+  const IconComponent = getToolIcon(toolCall.toolName)
+  const displayText = getToolDisplayText(toolCall.toolName, toolCall)
 
   return (
     <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-muted/50 border rounded-full text-xs text-muted-foreground mr-2 mb-2">
@@ -2350,18 +2353,50 @@ export function ChatPanelV2({
                   : "bg-transparent border-0"
               )}>
                 <div className="p-4 break-words overflow-wrap-anywhere">
-                  {/* Inline Tool Pills */}
-                  {Array.from(activeToolCalls.values()).length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {Array.from(activeToolCalls.values()).map((toolCall) => (
-                        <ToolPill
-                          key={toolCall.toolCallId}
-                          toolCall={toolCall}
-                          status={toolCall.status}
-                        />
-                      ))}
-                    </div>
-                  )}
+                  {/* Inline Tool Pills - Show both active (streaming) and completed tool calls */}
+                  {(() => {
+                    const activeTools = Array.from(activeToolCalls.values())
+                    const completedTools = message.toolInvocations || []
+                    
+                    // Combine active and completed tools, preferring active status for duplicates
+                    const allTools = [...completedTools]
+                    
+                    // Add active tools that aren't already in completed tools
+                    activeTools.forEach(activeTool => {
+                      const existingIndex = allTools.findIndex(completed => 
+                        completed.toolCallId === activeTool.toolCallId
+                      )
+                      if (existingIndex === -1) {
+                        // Convert active tool format to completed tool format
+                        allTools.push({
+                          toolCallId: activeTool.toolCallId,
+                          toolName: activeTool.name || activeTool.toolName,
+                          args: activeTool.args,
+                          result: activeTool.result,
+                          state: activeTool.status === 'executing' ? 'call' : 'result'
+                        })
+                      } else {
+                        // Update existing tool with active status
+                        allTools[existingIndex] = {
+                          ...allTools[existingIndex],
+                          state: activeTool.status === 'executing' ? 'call' : 'result'
+                        }
+                      }
+                    })
+                    
+                    return allTools.length > 0 ? (
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {allTools.map((toolCall) => (
+                          <ToolPill
+                            key={toolCall.toolCallId}
+                            toolCall={toolCall}
+                            status={toolCall.state === 'call' ? 'executing' : 
+                                   toolCall.state === 'result' ? 'completed' : 'failed'}
+                          />
+                        ))}
+                      </div>
+                    ) : null
+                  })()}
                   
                   <MessageWithTools
                     message={message}
