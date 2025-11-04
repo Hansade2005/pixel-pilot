@@ -2353,51 +2353,6 @@ export function ChatPanelV2({
                   : "bg-transparent border-0"
               )}>
                 <div className="p-4 break-words overflow-wrap-anywhere">
-                  {/* Inline Tool Pills - Show both active (streaming) and completed tool calls */}
-                  {(() => {
-                    const activeTools = Array.from(activeToolCalls.values())
-                    const completedTools = message.toolInvocations || []
-                    
-                    // Combine active and completed tools, preferring active status for duplicates
-                    const allTools = [...completedTools]
-                    
-                    // Add active tools that aren't already in completed tools
-                    activeTools.forEach(activeTool => {
-                      const existingIndex = allTools.findIndex(completed => 
-                        completed.toolCallId === activeTool.toolCallId
-                      )
-                      if (existingIndex === -1) {
-                        // Convert active tool format to completed tool format
-                        allTools.push({
-                          toolCallId: activeTool.toolCallId,
-                          toolName: activeTool.name || activeTool.toolName,
-                          args: activeTool.args,
-                          result: activeTool.result,
-                          state: activeTool.status === 'executing' ? 'call' : 'result'
-                        })
-                      } else {
-                        // Update existing tool with active status
-                        allTools[existingIndex] = {
-                          ...allTools[existingIndex],
-                          state: activeTool.status === 'executing' ? 'call' : 'result'
-                        }
-                      }
-                    })
-                    
-                    return allTools.length > 0 ? (
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {allTools.map((toolCall) => (
-                          <ToolPill
-                            key={toolCall.toolCallId}
-                            toolCall={toolCall}
-                            status={toolCall.state === 'call' ? 'executing' : 
-                                   toolCall.state === 'result' ? 'completed' : 'failed'}
-                          />
-                        ))}
-                      </div>
-                    ) : null
-                  })()}
-                  
                   <MessageWithTools
                     message={message}
                     projectId={project?.id}
