@@ -31,6 +31,7 @@ import FeatureShowcase from "@/components/FeatureShowcase"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { PWAUpdatePrompt } from "@/components/pwa-update-prompt"
 import { OfflineIndicator } from "@/components/offline-indicator"
+import { ProjectGrid } from "@/components/project-grid"
 
 import { createClient } from "@/lib/supabase/client"
 import { TemplateManager } from "@/lib/template-manager"
@@ -213,6 +214,11 @@ export default function LandingPage() {
         {/* Chat Input Section */}
         <div className="w-full max-w-4xl mx-auto">
           <PcChatInput onAuthRequired={handleAuthRequired} />
+        </div>
+
+        {/* Projects Section */}
+        <div className="w-full max-w-7xl mx-auto mt-16">
+          <ProjectGrid />
         </div>
       </main>
 
