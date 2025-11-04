@@ -344,7 +344,7 @@ export function PcSidebar({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => router.push('/')}
+            onClick={() => router.push('https://pipilot.dev/pc-home')}
             className="h-8 w-8 p-0"
             title="Go to Home"
           >
