@@ -159,7 +159,7 @@ export function ProjectGrid() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {projects.map((project) => (
-          <Link key={project.id} href={`/workspace/${project.id}`} className="group">
+          <Link key={project.id} href={`/pc-workspace?projectId=${project.id}`} className="group">
             <Card className="bg-white/5 border-white/10 hover:bg-white/10 transition-all duration-300 hover:scale-105 cursor-pointer overflow-hidden">
               <div className="relative aspect-video overflow-hidden">
                 <Image
