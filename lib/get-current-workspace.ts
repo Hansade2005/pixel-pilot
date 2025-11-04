@@ -31,6 +31,16 @@ export async function getCurrentWorkspace(): Promise<WorkspaceWithDatabase | nul
           return workspace as WorkspaceWithDatabase;
         }
       }
+
+      // Check /pc-workspace/[id] pattern (for Electron interface)
+      const pcWorkspaceMatch = pathname.match(/\/pc-workspace\/([^\/]+)/);
+      if (pcWorkspaceMatch) {
+        const workspaceId = pcWorkspaceMatch[1];
+        const workspace = await storageManager.getWorkspace(workspaceId);
+        if (workspace) {
+          return workspace as WorkspaceWithDatabase;
+        }
+      }
       
       // Check ?workspaceId= query param
       const workspaceIdParam = searchParams.get('workspaceId');
