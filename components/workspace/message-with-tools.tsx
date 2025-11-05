@@ -730,7 +730,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
 
       {/* Render reasoning if present */}
       {hasReasoning && (
-        <Reasoning isStreaming={isStreaming && !hasResponse} toolInvocations={toolInvocations}>
+        <Reasoning isStreaming={isStreaming && !hasResponse}>
           <ReasoningTrigger />
           <ReasoningContent>
             {reasoningContent}
@@ -745,7 +745,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
           'prose-pre:bg-muted prose-pre:text-foreground',
           'prose-code:text-foreground prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded'
         )}>
-          <Response toolInvocations={toolInvocations}>
+          <Response>
             {responseContent}
           </Response>
         </div>

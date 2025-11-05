@@ -16,7 +16,7 @@ import { MessageWithTools } from './message-with-tools'
 import {
   Send, Paperclip, Mic, MicOff, X, FileText, Image as ImageIcon,
   Link as LinkIcon, Loader2, ChevronDown, ChevronUp, StopCircle, Trash2, Plus,
-  Copy, ArrowUp, Undo2, Redo2, Check, AlertTriangle, Zap, Link
+  Copy, ArrowUp, Undo2, Redo2, Check, AlertTriangle, Zap
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Actions, Action } from '@/components/ai-elements/actions'
@@ -24,104 +24,6 @@ import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown
 import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
 import { FileSearchResult, FileLookupService } from "@/lib/file-lookup-service"
 import { createCheckpoint } from '@/lib/checkpoint-utils'
-
-// ToolPill component for displaying inline tool execution status
-const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 'executing' | 'completed' | 'failed' }) => {
-  const getToolIcon = (toolName: string) => {
-    switch (toolName) {
-      case 'write_file':
-      case 'edit_file':
-      case 'read_file':
-      case 'list_files':
-      case 'delete_file':
-        return FileText
-      case 'add_package':
-      case 'remove_package':
-        return Plus
-      case 'grep_search':
-      case 'semantic_code_navigator':
-        return FileText
-      case 'web_search':
-      case 'web_extract':
-      case 'vscode-websearchforcopilot_webSearch':
-        return Link as any
-      case 'check_dev_errors':
-        return AlertTriangle
-      default:
-        return Zap
-    }
-  }
-
-  const getToolDisplayText = (toolName: string, toolCall: any) => {
-    // For file operation tools: show tool name, file name, and status
-    if (['write_file', 'edit_file', 'read_file', 'list_files', 'delete_file'].includes(toolName)) {
-      const fileName = toolCall.result?.path?.split('/').pop() || 
-                      toolCall.args?.path?.split('/').pop() || 
-                      toolCall.args?.filePath?.split('/').pop() || 
-                      'file'
-      const action = toolName === 'write_file' ? 'Create' :
-                    toolName === 'edit_file' ? 'Edit' :
-                    toolName === 'read_file' ? 'Read' :
-                    toolName === 'list_files' ? 'List' : 'Delete'
-      return `${action} ${fileName}`
-    }
-
-    // For package management tools
-    if (toolName === 'add_package') {
-      const packageName = toolCall.args?.name || toolCall.result?.packageName || 'package'
-      return `Add package ${packageName}`
-    }
-
-    if (toolName === 'remove_package') {
-      const packageName = toolCall.args?.name || toolCall.result?.packageName || 'package'
-      return `Remove package ${packageName}`
-    }
-
-    // For search tools: show statements like "Search Codebase for 'query'"
-    if (toolName === 'grep_search') {
-      const query = toolCall.args?.query || toolCall.result?.query || 'query'
-      return `Grep codebase for "${query.length > 20 ? query.substring(0, 20) + '...' : query}"`
-    }
-
-    if (toolName === 'semantic_code_navigator') {
-      const query = toolCall.args?.query || toolCall.result?.query || 'query'
-      return `Search codebase for "${query.length > 20 ? query.substring(0, 20) + '...' : query}"`
-    }
-
-    if (toolName === 'web_search' || toolName === 'vscode-websearchforcopilot_webSearch') {
-      const query = toolCall.args?.query || toolCall.result?.query || 'query'
-      return `Search web for "${query.length > 20 ? query.substring(0, 20) + '...' : query}"`
-    }
-
-    if (toolName === 'web_extract') {
-      const urls = toolCall.args?.urls || toolCall.result?.urls || []
-      const urlCount = Array.isArray(urls) ? urls.length : 1
-      return `Extract content from ${urlCount} URL${urlCount > 1 ? 's' : ''}`
-    }
-
-    if (toolName === 'check_dev_errors') {
-      const mode = toolCall.args?.mode || 'dev'
-      return `Check ${mode} errors`
-    }
-
-    // Default: just show the tool name
-    return toolName.replace(/_/g, ' ')
-  }
-
-  const isSuccess = toolCall.result && toolCall.result.success !== false
-  const IconComponent = getToolIcon(toolCall.toolName)
-  const displayText = getToolDisplayText(toolCall.toolName, toolCall)
-
-  return (
-    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-muted/50 border rounded-full text-xs text-muted-foreground mr-2 mb-2">
-      <IconComponent className="w-3 h-3" />
-      <span className="truncate max-w-48">{displayText}</span>
-      {status === 'executing' && <Loader2 className="w-3 h-3 animate-spin" />}
-      {status === 'completed' && isSuccess && <Check className="w-3 h-3 text-green-500" />}
-      {status === 'failed' && <AlertTriangle className="w-3 h-3 text-red-500" />}
-    </div>
-  )
-}
 
 // ExpandableUserMessage component for long user messages
 const ExpandableUserMessage = ({
@@ -294,6 +196,107 @@ const ExpandableUserMessage = ({
   )
 }
 
+// Inline Tool Pill Component
+const InlineToolPill = ({ toolName, input, status = 'executing' }: { 
+  toolName: string, 
+  input?: any, 
+  status?: 'executing' | 'completed' | 'failed' 
+}) => {
+  const getToolEmoji = (tool: string) => {
+    switch (tool) {
+      case 'write_file':
+      case 'edit_file':
+      case 'read_file':
+      case 'list_files':
+      case 'delete_file':
+        return '📄'
+      case 'add_package':
+      case 'remove_package':
+        return '📦'
+      case 'grep_search':
+      case 'semantic_code_navigator':
+        return '🔍'
+      case 'web_search':
+      case 'web_extract':
+      case 'vscode-websearchforcopilot_webSearch':
+        return '🌐'
+      case 'check_dev_errors':
+        return '🔧'
+      default:
+        return '⚙️'
+    }
+  }
+
+  const getToolLabel = (tool: string, args?: any) => {
+    switch (tool) {
+      case 'write_file':
+        return `Creating ${args?.path ? args.path.split('/').pop() : 'file'}`
+      case 'edit_file':
+        return `Editing ${args?.filePath ? args.filePath.split('/').pop() : 'file'}`
+      case 'delete_file':
+        return `Deleting ${args?.path ? args.path.split('/').pop() : 'file'}`
+      case 'read_file':
+        return `Reading ${args?.path ? args.path.split('/').pop() : 'file'}`
+      case 'list_files':
+        return 'Listing files'
+      case 'add_package':
+        return `Adding ${args?.packageName || 'package'}`
+      case 'remove_package':
+        return `Removing ${args?.packageName || 'package'}`
+      case 'grep_search':
+        return `Grep codebase for "${args?.query || 'pattern'}"`
+      case 'semantic_code_navigator':
+        return `Search codebase for "${args?.query || 'query'}"`
+      case 'web_search':
+      case 'vscode-websearchforcopilot_webSearch':
+        return `Search web for "${args?.query || 'query'}"`
+      case 'web_extract':
+        return 'Extracting web content'
+      case 'check_dev_errors':
+        return 'Checking for errors'
+      default:
+        return tool
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'executing':
+        return 'bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400'
+      case 'completed':
+        return 'bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400'
+      case 'failed':
+        return 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400'
+      default:
+        return 'bg-muted/10 border-border text-muted-foreground'
+    }
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'executing':
+        return <Loader2 className="w-3 h-3 animate-spin" />
+      case 'completed':
+        return <Check className="w-3 h-3" />
+      case 'failed':
+        return <AlertTriangle className="w-3 h-3" />
+      default:
+        return null
+    }
+  }
+
+  return (
+    <div className={cn(
+      "inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border mb-1 mr-1",
+      getStatusColor(status)
+    )}>
+      <span>{getToolEmoji(toolName)}</span>
+      <span className="max-w-[200px] truncate">{getToolLabel(toolName, input)}</span>
+      {getStatusIcon(status)}
+    </div>
+  )
+}
+
 // Types
 interface AttachedFile {
   id: string
@@ -414,6 +417,14 @@ export function ChatPanelV2({
   const [isLoading, setIsLoading] = useState(false)
   const [continuingMessageId, setContinuingMessageId] = useState<string | null>(null)
   const [isContinuationInProgress, setIsContinuationInProgress] = useState(false)
+  
+  // Tool invocations tracking for inline pills
+  const [activeToolCalls, setActiveToolCalls] = useState<Map<string, Array<{
+    toolName: string
+    toolCallId: string
+    input?: any
+    status: 'executing' | 'completed' | 'failed'
+  }>>>(new Map())
 
   // Auto-adjust textarea height on input change
   useEffect(() => {
@@ -426,9 +437,6 @@ export function ChatPanelV2({
   const [messages, setMessages] = useState<any[]>([])
   const [error, setError] = useState<Error | null>(null)
   const [abortController, setAbortController] = useState<AbortController | null>(null)
-
-  // Tool tracking state for inline tool pills
-  const [activeToolCalls, setActiveToolCalls] = useState<Map<string, any>>(new Map())
 
   // Message actions state
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
@@ -721,6 +729,13 @@ export function ChatPanelV2({
     try {
       // Remove message from UI immediately for better UX
       setMessages(prev => prev.filter(msg => msg.id !== messageId))
+      
+      // Remove tool calls for this message
+      setActiveToolCalls(prev => {
+        const newMap = new Map(prev)
+        newMap.delete(messageId)
+        return newMap
+      })
 
       // Delete message from IndexedDB
       const { storageManager } = await import('@/lib/storage-manager')
@@ -960,21 +975,85 @@ export function ChatPanelV2({
 
               console.log('[ChatPanelV2][Continuation][ClientTool] 🔧 Continuation tool call:', toolCall.toolName)
 
-              const clientSideTools = ['write_file', 'edit_file', 'delete_file', 'add_package', 'remove_package']
+              // Track tool call inline with executing status
+              setActiveToolCalls(prev => {
+                const newMap = new Map(prev)
+                const messageCalls = newMap.get(originalAssistantMessageId) || []
+                messageCalls.push({
+                  toolName: toolCall.toolName,
+                  toolCallId: toolCall.toolCallId,
+                  input: toolCall.args,
+                  status: 'executing'
+                })
+                newMap.set(originalAssistantMessageId, messageCalls)
+                return newMap
+              })
+
+              const clientSideTools = [
+                'write_file', 
+                'edit_file', 
+                'delete_file', 
+                'add_package', 
+                'remove_package',
+                'read_file',
+                'list_files',
+                'grep_search',
+                'semantic_code_navigator'
+              ]
+              
               if (clientSideTools.includes(toolCall.toolName)) {
                 const { handleClientFileOperation } = await import('@/lib/client-file-tools')
 
                 const addToolResult = (result: any) => {
                   console.log('[ChatPanelV2][Continuation][ClientTool] ✅ Continuation tool completed:', result.tool)
+                  
+                  // Update tool status
+                  setActiveToolCalls(prev => {
+                    const newMap = new Map(prev)
+                    const messageCalls = newMap.get(originalAssistantMessageId) || []
+                    const updatedCalls = messageCalls.map(call =>
+                      call.toolCallId === toolCall.toolCallId
+                        ? { ...call, status: (result.errorText ? 'failed' : 'completed') as 'executing' | 'completed' | 'failed' }
+                        : call
+                    )
+                    newMap.set(originalAssistantMessageId, updatedCalls)
+                    return newMap
+                  })
                 }
 
                 handleClientFileOperation(toolCall, project.id, addToolResult)
                   .catch(error => {
                     console.error('[ChatPanelV2][Continuation][ClientTool] ❌ Tool execution error:', error)
+                    
+                    // Update tool status to failed
+                    setActiveToolCalls(prev => {
+                      const newMap = new Map(prev)
+                      const messageCalls = newMap.get(originalAssistantMessageId) || []
+                      const updatedCalls = messageCalls.map(call =>
+                        call.toolCallId === toolCall.toolCallId
+                          ? { ...call, status: 'failed' as 'executing' | 'completed' | 'failed' }
+                          : call
+                      )
+                      newMap.set(originalAssistantMessageId, updatedCalls)
+                      return newMap
+                    })
                   })
               }
             } else if (parsed.type === 'tool-result') {
               console.log('[ChatPanelV2][Continuation][DataStream] Tool result received:', parsed.toolName)
+              
+              // Update tool status to completed or failed for server-side tools
+              setActiveToolCalls(prev => {
+                const newMap = new Map(prev)
+                const messageCalls = newMap.get(originalAssistantMessageId) || []
+                const updatedCalls = messageCalls.map(call =>
+                  call.toolCallId === parsed.toolCallId
+                    ? { ...call, status: (parsed.result?.error ? 'failed' : 'completed') as 'executing' | 'completed' | 'failed' }
+                    : call
+                )
+                newMap.set(originalAssistantMessageId, updatedCalls)
+                return newMap
+              })
             }
           } catch (e) {
             console.error('[ChatPanelV2][Continuation] ❌ Failed to parse continuation chunk:', e)
@@ -1221,9 +1300,33 @@ export function ChatPanelV2({
 
         console.log(`[ChatPanelV2] Loaded ${uiMessages.length} messages from database`)
         setMessages(uiMessages)
+        
+        // Populate activeToolCalls for loaded messages
+        const toolCallsMap = new Map<string, Array<{
+          toolName: string
+          toolCallId: string
+          input?: any
+          status: 'executing' | 'completed' | 'failed'
+        }>>()
+        
+        uiMessages.forEach((msg: any) => {
+          if (msg.toolInvocations && msg.toolInvocations.length > 0) {
+            const toolCalls = msg.toolInvocations.map((inv: any) => ({
+              toolName: inv.toolName,
+              toolCallId: inv.toolCallId,
+              input: inv.args,
+              status: (inv.state === 'result' 
+                ? (inv.result?.error ? 'failed' : 'completed')
+                : 'executing') as 'executing' | 'completed' | 'failed'
+            }))
+            toolCallsMap.set(msg.id, toolCalls)
+          }
+        })
+        setActiveToolCalls(toolCallsMap)
       } else {
         console.log(`[ChatPanelV2] No active chat session found for project ${project.id}, starting fresh`)
         setMessages([])
+        setActiveToolCalls(new Map())
       }
     } catch (error) {
       console.error(`[ChatPanelV2] Error loading messages for project ${project?.id}:`, error)
@@ -1574,7 +1677,6 @@ export function ChatPanelV2({
     setAttachedImages([])
     setAttachedUploadedFiles([])
     setAttachedUrls([])
-    setActiveToolCalls(new Map()) // Clear tool calls for new conversation
     setInput('')
     setIsLoading(true)
 
@@ -1756,24 +1858,31 @@ export function ChatPanelV2({
             } else if (parsed.type === 'tool-call') {
               // CLIENT-SIDE TOOL EXECUTION: Execute file operation tools on IndexedDB
               const toolCall = {
-                name: parsed.toolName,
+                toolName: parsed.toolName,
                 toolCallId: parsed.toolCallId,
                 args: parsed.input, // AI SDK sends 'input' not 'args'
                 dynamic: false // We don't use dynamic tools
               }
               
               console.log('[ChatPanelV2][ClientTool] 🔧 Tool call received:', {
-                toolName: toolCall.name,
+                toolName: toolCall.toolName,
                 toolCallId: toolCall.toolCallId,
                 args: toolCall.args
               })
 
-              // Track tool call for inline display
-              setActiveToolCalls(prev => new Map(prev.set(toolCall.toolCallId, {
-                ...toolCall,
-                status: 'executing',
-                startTime: Date.now()
-              })))
+              // Track tool call inline with executing status
+              setActiveToolCalls(prev => {
+                const newMap = new Map(prev)
+                const messageCalls = newMap.get(assistantMessageId) || []
+                messageCalls.push({
+                  toolName: toolCall.toolName,
+                  toolCallId: toolCall.toolCallId,
+                  input: toolCall.args,
+                  status: 'executing'
+                })
+                newMap.set(assistantMessageId, messageCalls)
+                return newMap
+              })
 
               // Check if this is a client-side tool (both read and write operations)
               const clientSideTools = [
@@ -1788,8 +1897,8 @@ export function ChatPanelV2({
                 'semantic_code_navigator'
               ]
               
-              if (clientSideTools.includes(toolCall.name)) {
-                console.log('[ChatPanelV2][ClientTool] ⚡ Executing client-side tool:', toolCall.name)
+              if (clientSideTools.includes(toolCall.toolName)) {
+                console.log('[ChatPanelV2][ClientTool] ⚡ Executing client-side tool:', toolCall.toolName)
                 
                 // Execute the tool on client-side IndexedDB immediately
                 const { handleClientFileOperation } = await import('@/lib/client-file-tools')
@@ -1803,19 +1912,17 @@ export function ChatPanelV2({
                     output: result.output
                   })
                   
-                  // Update tool status for inline display
+                  // Update tool status to completed or failed
                   setActiveToolCalls(prev => {
-                    const updated = new Map(prev)
-                    const existingTool = updated.get(result.toolCallId)
-                    if (existingTool) {
-                      updated.set(result.toolCallId, {
-                        ...existingTool,
-                        status: result.errorText ? 'failed' : 'completed',
-                        result: result.output || { error: result.errorText },
-                        endTime: Date.now()
-                      })
-                    }
-                    return updated
+                    const newMap = new Map(prev)
+                    const messageCalls = newMap.get(assistantMessageId) || []
+                    const updatedCalls = messageCalls.map(call =>
+                      call.toolCallId === toolCall.toolCallId
+                        ? { ...call, status: (result.errorText ? 'failed' : 'completed') as 'executing' | 'completed' | 'failed' }
+                        : call
+                    )
+                    newMap.set(assistantMessageId, updatedCalls)
+                    return newMap
                   })
                   
                   // For client-side tools, we need to send the result back to continue the conversation
@@ -1828,24 +1935,22 @@ export function ChatPanelV2({
                   .catch(error => {
                     console.error('[ChatPanelV2][ClientTool] ❌ Tool execution error:', error)
                     
-                    // Update tool status for failed execution
+                    // Update tool status to failed
                     setActiveToolCalls(prev => {
-                      const updated = new Map(prev)
-                      const existingTool = updated.get(toolCall.toolCallId)
-                      if (existingTool) {
-                        updated.set(toolCall.toolCallId, {
-                          ...existingTool,
-                          status: 'failed',
-                          result: { error: error instanceof Error ? error.message : 'Unknown error' },
-                          endTime: Date.now()
-                        })
-                      }
-                      return updated
+                      const newMap = new Map(prev)
+                      const messageCalls = newMap.get(assistantMessageId) || []
+                      const updatedCalls = messageCalls.map(call =>
+                        call.toolCallId === toolCall.toolCallId
+                          ? { ...call, status: 'failed' as 'executing' | 'completed' | 'failed' }
+                          : call
+                      )
+                      newMap.set(assistantMessageId, updatedCalls)
+                      return newMap
                     })
                     
                     // Send error result back
                     const errorResult = {
-                      tool: toolCall.name,
+                      tool: toolCall.toolName,
                       toolCallId: toolCall.toolCallId,
                       state: 'output-error',
                       errorText: error instanceof Error ? error.message : 'Unknown error'
@@ -1853,14 +1958,8 @@ export function ChatPanelV2({
                     // handleClientToolResult(toolCall.toolName, errorResult, project?.id, assistantMessageId)
                   })
               } else {
+                // Server-side tool - mark as completed immediately since server handles it
                 console.log('[ChatPanelV2][DataStream] Server-side tool call, server handles:', parsed.toolName)
-                
-                // Track server-side tool call for inline display
-                setActiveToolCalls(prev => new Map(prev.set(toolCall.toolCallId, {
-                  ...toolCall,
-                  status: 'executing',
-                  startTime: Date.now()
-                })))
               }
             } else if (parsed.type === 'tool-result') {
               // Tool result - these come from server-side tool executions
@@ -1869,19 +1968,17 @@ export function ChatPanelV2({
                 toolCallId: parsed.toolCallId
               })
               
-              // Update server-side tool status
+              // Update tool status to completed or failed for server-side tools
               setActiveToolCalls(prev => {
-                const updated = new Map(prev)
-                const existingTool = updated.get(parsed.toolCallId)
-                if (existingTool) {
-                  updated.set(parsed.toolCallId, {
-                    ...existingTool,
-                    status: 'completed',
-                    result: parsed.result || {},
-                    endTime: Date.now()
-                  })
-                }
-                return updated
+                const newMap = new Map(prev)
+                const messageCalls = newMap.get(assistantMessageId) || []
+                const updatedCalls = messageCalls.map(call =>
+                  call.toolCallId === parsed.toolCallId
+                    ? { ...call, status: (parsed.result?.error ? 'failed' : 'completed') as 'executing' | 'completed' | 'failed' }
+                    : call
+                )
+                newMap.set(assistantMessageId, updatedCalls)
+                return newMap
               })
             }
           } catch (e) {
@@ -1917,10 +2014,22 @@ export function ChatPanelV2({
       if (error.name === 'AbortError') {
         // Request was aborted, remove the placeholder assistant message
         setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
+        // Clean up tool calls for aborted message
+        setActiveToolCalls(prev => {
+          const newMap = new Map(prev)
+          newMap.delete(assistantMessageId)
+          return newMap
+        })
       } else {
         setError(error)
         // Remove the placeholder assistant message on error
         setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
+        // Clean up tool calls for failed message
+        setActiveToolCalls(prev => {
+          const newMap = new Map(prev)
+          newMap.delete(assistantMessageId)
+          return newMap
+        })
       }
     } finally {
       // Only turn off loading if continuation is not in progress
@@ -2353,6 +2462,20 @@ export function ChatPanelV2({
                   : "bg-transparent border-0"
               )}>
                 <div className="p-4 break-words overflow-wrap-anywhere">
+                  {/* Inline Tool Pills - Show before message content */}
+                  {activeToolCalls.get(message.id) && activeToolCalls.get(message.id)!.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-3">
+                      {activeToolCalls.get(message.id)!.map((toolCall, idx) => (
+                        <InlineToolPill
+                          key={`${toolCall.toolCallId}-${idx}`}
+                          toolName={toolCall.toolName}
+                          input={toolCall.input}
+                          status={toolCall.status}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  
                   <MessageWithTools
                     message={message}
                     projectId={project?.id}
