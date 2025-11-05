@@ -254,7 +254,6 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       case 'semantic_code_navigator':
         return `Search codebase for "${args?.query || 'query'}"`
       case 'web_search':
-      case 'vscode-websearchforcopilot_webSearch':
         return `Search web for "${args?.query || 'query'}"`
       case 'web_extract':
         return 'Extracting web content'
