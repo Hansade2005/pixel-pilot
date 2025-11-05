@@ -336,8 +336,19 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
                 label="Thinking Process"
                 status={isStreaming && !hasResponse ? "active" : "complete"}
               >
-                <div className="text-sm text-muted-foreground whitespace-pre-wrap mt-2">
-                  {reasoningContent}
+                <div className={cn(
+                  'prose prose-sm dark:prose-invert max-w-none mt-2',
+                  'prose-pre:bg-muted prose-pre:text-foreground',
+                  'prose-code:text-foreground prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded',
+                  'prose-p:text-muted-foreground',
+                  'prose-headings:text-foreground',
+                  'prose-strong:text-foreground',
+                  'prose-ul:text-muted-foreground',
+                  'prose-ol:text-muted-foreground'
+                )}>
+                  <Response>
+                    {reasoningContent}
+                  </Response>
                 </div>
               </ChainOfThoughtStep>
             )}
