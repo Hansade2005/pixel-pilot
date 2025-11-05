@@ -2357,70 +2357,260 @@ ${conversationSummaryContext || ''}`
         }),
 
         grep_search: tool({
-          description: 'Powerful text and regex search tool that searches through the entire codebase. Supports both literal text search and regular expressions with advanced filtering options. Returns matches with file paths, line numbers, and context.',
+          description: 'Elite multi-strategy search tool combining literal text, regex, and semantic pattern matching. Features intelligent fallbacks, relevance scoring, code pattern detection, and comprehensive diagnostics. Rivals semantic_code_navigator with additional precision control.',
           inputSchema: z.object({
-            query: z.string().describe('The search query - either literal text or regex pattern'),
-            includePattern: z.string().optional().describe('Optional glob pattern to filter files (e.g., "*.ts,*.tsx" or "src/**")'),
-            isRegexp: z.boolean().optional().describe('Whether the query is a regex pattern (default: false for literal text search)'),
-            maxResults: z.number().optional().describe('Maximum number of results to return (default: 100)'),
-            caseSensitive: z.boolean().optional().describe('Whether the search is case sensitive (default: false)')
+            query: z.string().describe('Search query - supports literal text, regex patterns, or natural language descriptions (e.g., "useState", "function.*async", "find React components")'),
+            includePattern: z.string().optional().describe('Glob pattern to filter files (e.g., "**/*.ts,**/*.tsx" for TypeScript, "src/**" for src folder)'),
+            excludePattern: z.string().optional().describe('Glob pattern to exclude files (e.g., "**/*.test.ts,**/node_modules/**")'),
+            isRegexp: z.boolean().optional().describe('Whether query is a regex pattern (default: false). Auto-detected if query contains regex syntax.'),
+            maxResults: z.number().optional().describe('Maximum results to return (default: 100, max: 500)'),
+            caseSensitive: z.boolean().optional().describe('Case-sensitive search (default: false)'),
+            searchMode: z.enum(['literal', 'regex', 'semantic', 'hybrid']).optional().describe('Search strategy: literal (exact text), regex (pattern), semantic (code patterns), hybrid (all strategies, default)'),
+            enableSmartPatterns: z.boolean().optional().describe('Enable intelligent code pattern detection like semantic_code_navigator (default: true in hybrid mode)'),
+            sortByRelevance: z.boolean().optional().describe('Sort results by relevance score instead of file path (default: true)'),
+            includeContext: z.boolean().optional().describe('Include surrounding code context (default: true)'),
+            contextLines: z.number().optional().describe('Number of context lines before/after match (default: 3, max: 10)')
           }),
-          execute: async ({ query, includePattern, isRegexp = false, maxResults = 100, caseSensitive = false }, { toolCallId }) => {
+          execute: async ({ 
+            query, 
+            includePattern, 
+            excludePattern,
+            isRegexp = false, 
+            maxResults = 100, 
+            caseSensitive = false,
+            searchMode = 'hybrid',
+            enableSmartPatterns = true,
+            sortByRelevance = true,
+            includeContext = true,
+            contextLines = 3
+          }, { toolCallId }) => {
             try {
-              // Get session storage
-              const sessionData = sessionProjectStorage.get(projectId)
-              if (!sessionData) {
+              // Clamp and validate inputs
+              maxResults = Math.min(Math.max(maxResults, 1), 500)
+              const actualContextLines = Math.min(Math.max(contextLines, 0), 10)
+              
+              console.log(`[grep_search] ⚡ ELITE SEARCH MODE: "${searchMode}" | Query: "${query}"`)
+              console.log(`[grep_search] Settings: regexp=${isRegexp}, case=${caseSensitive}, patterns=${enableSmartPatterns}, relevance=${sortByRelevance}`)
+              
+              // 🚀 STRATEGY 1: Try Session Storage First
+              let sessionData = sessionProjectStorage.get(projectId)
+              let filesSource = 'session'
+              
+              // 🚀 STRATEGY 2: Fallback to IndexedDB if session empty
+              if (!sessionData || !sessionData.files || sessionData.files.size === 0) {
+                console.log(`[grep_search] 🔄 Session storage empty, attempting IndexedDB fallback...`)
+                
+                try {
+                  const storage = await getStorageManager()
+                  const workspaceFiles = await storage.getFiles(projectId)
+                  
+                  if (workspaceFiles && workspaceFiles.length > 0) {
+                    console.log(`[grep_search] ✅ IndexedDB fallback successful! Loaded ${workspaceFiles.length} files`)
+                    
+                    // Build session-like structure from IndexedDB
+                    const filesMap = new Map()
+                    for (const file of workspaceFiles) {
+                      if (file.path && file.content) {
+                        filesMap.set(file.path, {
+                          workspaceId: projectId,
+                          name: file.name || file.path.split('/').pop(),
+                          path: file.path,
+                          content: file.content,
+                          fileType: file.type || file.fileType || 'text',
+                          type: file.type || file.fileType || 'text',
+                          size: file.size || file.content.length,
+                          isDirectory: false
+                        })
+                      }
+                    }
+                    
+                    sessionData = {
+                      fileTree: workspaceFiles.map((f: any) => f.path),
+                      files: filesMap
+                    }
+                    
+                    // Cache it for future use
+                    sessionProjectStorage.set(projectId, sessionData)
+                    filesSource = 'indexeddb'
+                  }
+                } catch (indexedDBError) {
+                  console.error(`[grep_search] IndexedDB fallback failed:`, indexedDBError)
+                }
+              }
+              
+              // Final validation
+              if (!sessionData || !sessionData.files || sessionData.files.size === 0) {
+                console.error(`[grep_search] ❌ No file source available (tried session + IndexedDB)`)
                 return {
                   success: false,
-                  error: `Session storage not found for project ${projectId}`,
+                  error: `No files available for search. Session storage and IndexedDB are both empty. Please load files first using list_files tool.`,
                   query,
+                  diagnostics: {
+                    sessionStorageAvailable: false,
+                    indexedDBAttempted: true,
+                    totalSessionProjects: sessionProjectStorage.size,
+                    filesSource: 'none'
+                  },
                   toolCallId
                 }
               }
 
               const { files: sessionFiles } = sessionData
+              console.log(`[grep_search] ✅ Files loaded from ${filesSource}: ${sessionFiles.size} total files`)
 
-              // Convert session files to array and filter if needed
+              // Convert session files to array
               let filesToSearch = Array.from(sessionFiles.values())
+              console.log(`[grep_search] 📂 Initial files array: ${filesToSearch.length} files`)
 
-              // Filter by include pattern if specified
+              // Log first few file paths for debugging
+              const samplePaths = filesToSearch.slice(0, 5).map((f: any) => f.path)
+              console.log(`[grep_search] 📝 Sample file paths:`, samplePaths)
+
+              // 🎯 Advanced Glob Pattern Filtering
               if (includePattern) {
+                const beforeFilter = filesToSearch.length
                 const patterns = includePattern.split(',').map((p: string) => p.trim())
+                console.log(`[grep_search] 🔍 Applying INCLUDE patterns:`, patterns)
+                
                 filesToSearch = filesToSearch.filter((file: any) => {
                   const filePath = file.path.toLowerCase()
                   return patterns.some((pattern: string) => {
                     const lowerPattern = pattern.toLowerCase()
-                    // Support glob patterns
                     if (lowerPattern.includes('*')) {
-                      // Simple glob matching
                       const regexPattern = lowerPattern
-                        .replace(/\*/g, '.*')
-                        .replace(/\?/g, '.')
-                      return new RegExp(regexPattern).test(filePath)
+                        .replace(/\*\*/g, '__DOUBLE_STAR__')
+                        .replace(/\*/g, '[^/]*')
+                        .replace(/__DOUBLE_STAR__/g, '.*')
+                        .replace(/\?/g, '[^/]')
+                      try {
+                        return new RegExp(regexPattern).test(filePath)
+                      } catch (e) {
+                        console.warn(`[grep_search] ⚠️  Invalid glob pattern: ${pattern}`, e)
+                        return false
+                      }
                     }
-                    return filePath.includes(lowerPattern)
+                    return filePath.includes(lowerPattern) || filePath.endsWith(lowerPattern)
                   })
                 })
+                console.log(`[grep_search] ✅ After INCLUDE filter: ${beforeFilter} -> ${filesToSearch.length} files`)
+              }
+
+              // 🚫 Exclude Pattern Filtering
+              if (excludePattern) {
+                const beforeFilter = filesToSearch.length
+                const patterns = excludePattern.split(',').map((p: string) => p.trim())
+                console.log(`[grep_search] 🚫 Applying EXCLUDE patterns:`, patterns)
+                
+                filesToSearch = filesToSearch.filter((file: any) => {
+                  const filePath = file.path.toLowerCase()
+                  return !patterns.some((pattern: string) => {
+                    const lowerPattern = pattern.toLowerCase()
+                    if (lowerPattern.includes('*')) {
+                      const regexPattern = lowerPattern
+                        .replace(/\*\*/g, '__DOUBLE_STAR__')
+                        .replace(/\*/g, '[^/]*')
+                        .replace(/__DOUBLE_STAR__/g, '.*')
+                        .replace(/\?/g, '[^/]')
+                      try {
+                        return new RegExp(regexPattern).test(filePath)
+                      } catch (e) {
+                        return false
+                      }
+                    }
+                    return filePath.includes(lowerPattern) || filePath.endsWith(lowerPattern)
+                  })
+                })
+                console.log(`[grep_search] ✅ After EXCLUDE filter: ${beforeFilter} -> ${filesToSearch.length} files`)
               }
 
               // Filter out directories and files without content
-              filesToSearch = filesToSearch.filter((file: any) => !file.isDirectory && file.content)
+              const beforeContentFilter = filesToSearch.length
+              filesToSearch = filesToSearch.filter((file: any) => {
+                const hasContent = !file.isDirectory && file.content && file.content.length > 0
+                if (!hasContent) {
+                  console.log(`[grep_search] Skipping file without content: ${file.path} (isDirectory: ${file.isDirectory}, contentLength: ${file.content?.length || 0})`)
+                }
+                return hasContent
+              })
+              console.log(`[grep_search] After content filter: ${beforeContentFilter} -> ${filesToSearch.length} files with content`)
+
+              if (filesToSearch.length === 0) {
+                console.warn(`[grep_search] No files to search after filtering`)
+                return {
+                  success: true,
+                  message: `No files found to search. This could mean files are not loaded or the pattern doesn't match any files.`,
+                  query,
+                  isRegexp,
+                  caseSensitive,
+                  includePattern,
+                  results: [],
+                  totalMatches: 0,
+                  filesSearched: 0,
+                  diagnostics: {
+                    totalSessionFiles: sessionFiles.size,
+                    filesAfterPatternFilter: beforeContentFilter,
+                    filesWithContent: filesToSearch.length,
+                    suggestion: includePattern 
+                      ? "Try adjusting your includePattern or ensure it matches your project structure"
+                      : "Files may not have content loaded. Try calling list_files first or check file loading."
+                  },
+                  maxResults,
+                  toolCallId
+                }
+              }
 
               const results: any[] = []
               let totalMatches = 0
+              let filesSearchedCount = 0
+              const searchStrategies: string[] = []
 
-              // Prepare search regex
-              let searchRegex: RegExp
+              // 🧠 Auto-detect regex patterns
+              const hasRegexSyntax = /[.*+?^${}()|[\]\\]/.test(query)
+              const autoDetectedRegex = !isRegexp && hasRegexSyntax
+              if (autoDetectedRegex) {
+                console.log(`[grep_search] 🤖 Auto-detected regex syntax in query`)
+                isRegexp = true
+              }
+
+              // 📋 Define Smart Code Patterns (like semantic_code_navigator)
+              const smartPatterns = enableSmartPatterns && (searchMode === 'semantic' || searchMode === 'hybrid') ? [
+                { type: 'react_component', regex: /^\s*(export\s+)?(const|function)\s+(\w+)\s*[=:]\s*(React\.)?(memo\()?(\([^)]*\)\s*=>|function)/gm, score: 10, description: 'React component' },
+                { type: 'typescript_interface', regex: /^\s*(export\s+)?interface\s+(\w+)/gm, score: 8, description: 'TypeScript interface' },
+                { type: 'typescript_type', regex: /^\s*(export\s+)?type\s+(\w+)\s*=/gm, score: 8, description: 'TypeScript type' },
+                { type: 'api_route', regex: /^\s*export\s+(async\s+)?function\s+(GET|POST|PUT|DELETE|PATCH)/gm, score: 10, description: 'API route handler' },
+                { type: 'async_function', regex: /^\s*(export\s+)?async\s+(function|const)\s+(\w+)/gm, score: 9, description: 'Async function' },
+                { type: 'hook_definition', regex: /^\s*(export\s+)?function\s+use\w+/gm, score: 9, description: 'React hook' },
+                { type: 'class_definition', regex: /^\s*(export\s+)?class\s+(\w+)/gm, score: 8, description: 'Class definition' },
+                { type: 'error_handling', regex: /\b(try\s*\{|catch\s*\(|throw\s+new|\.catch\()/gi, score: 7, description: 'Error handling' },
+                { type: 'database_query', regex: /\b(SELECT|INSERT|UPDATE|DELETE)\b.*\bFROM\b|\bCREATE\s+TABLE\b/gi, score: 7, description: 'Database query' },
+                { type: 'test_case', regex: /^\s*(it|test|describe)\s*\(/gm, score: 6, description: 'Test case' },
+              ] : []
+
+              // 🎯 Prepare Primary Search Strategy
+              let primarySearchRegex: RegExp
               try {
-                if (isRegexp) {
-                  // Use provided regex pattern
-                  searchRegex = new RegExp(query, caseSensitive ? 'g' : 'gi')
-                } else {
-                  // Escape special regex characters for literal text search
+                if (searchMode === 'regex' || isRegexp) {
+                  primarySearchRegex = new RegExp(query, caseSensitive ? 'gm' : 'gim')
+                  searchStrategies.push('regex')
+                } else if (searchMode === 'literal') {
                   const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-                  searchRegex = new RegExp(escapedQuery, caseSensitive ? 'g' : 'gi')
+                  primarySearchRegex = new RegExp(escapedQuery, caseSensitive ? 'gm' : 'gim')
+                  searchStrategies.push('literal')
+                } else if (searchMode === 'semantic') {
+                  // For semantic, we'll use smart patterns only
+                  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                  primarySearchRegex = new RegExp(escapedQuery, 'gim') // Always case-insensitive for semantic
+                  searchStrategies.push('semantic-patterns')
+                } else {
+                  // Hybrid mode: literal + smart patterns
+                  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                  primarySearchRegex = new RegExp(escapedQuery, caseSensitive ? 'gm' : 'gim')
+                  searchStrategies.push('hybrid-literal', 'hybrid-patterns')
                 }
+                console.log(`[grep_search] 🎯 Search strategies: [${searchStrategies.join(', ')}]`)
+                console.log(`[grep_search] 📐 Primary regex: /${primarySearchRegex.source}/${primarySearchRegex.flags}`)
               } catch (regexError) {
+                console.error(`[grep_search] ❌ Invalid regex:`, regexError)
                 return {
                   success: false,
                   error: `Invalid regex pattern: ${regexError instanceof Error ? regexError.message : 'Unknown error'}`,
@@ -2429,103 +2619,276 @@ ${conversationSummaryContext || ''}`
                 }
               }
 
-              // Search through each file
+              // 🚀 MULTI-STRATEGY SEARCH ENGINE
+              console.log(`[grep_search] 🔍 Starting multi-strategy search across ${filesToSearch.length} files...`)
+              
               for (const file of filesToSearch) {
-                if (results.length >= maxResults) break
-
-                const content = file.content
-                const lines = content.split('\n')
-                let lineNumber = 0
-                let matchCount = 0
-
-                // Search line by line for better context
-                for (let i = 0; i < lines.length; i++) {
-                  lineNumber = i + 1 // 1-indexed
-                  const line = lines[i]
-
-                  // Find all matches in this line
-                  const lineMatches = []
-                  let match
-                  searchRegex.lastIndex = 0 // Reset regex state
-
-                  while ((match = searchRegex.exec(line)) !== null) {
-                    lineMatches.push({
-                      match: match[0],
-                      index: match.index,
-                      lineNumber,
-                      line: line
-                    })
-
-                    // Prevent infinite loops
-                    if (!searchRegex.global) break
-                  }
-
-                  // Process matches for this line
-                  for (const lineMatch of lineMatches) {
-                    if (results.length >= maxResults) break
-
-                    // Extract context (3 lines before and after)
-                    const startLine = Math.max(1, lineNumber - 3)
-                    const endLine = Math.min(lines.length, lineNumber + 3)
-                    const contextLines = lines.slice(startLine - 1, endLine)
-
-                    // Create context with line numbers
-                    const contextWithNumbers = contextLines.map((ctxLine: string, idx: number) => {
-                      const ctxLineNumber = startLine + idx
-                      const marker = ctxLineNumber === lineNumber ? '>' : ' '
-                      return `${marker}${String(ctxLineNumber).padStart(4, ' ')}: ${ctxLine}`
-                    }).join('\n')
-
-                    results.push({
-                      file: file.path,
-                      lineNumber: lineMatch.lineNumber,
-                      column: lineMatch.index + 1, // 1-indexed
-                      match: lineMatch.match,
-                      line: lineMatch.line.trim(),
-                      context: contextWithNumbers,
-                      beforeContext: lineNumber > 1 ? lines.slice(Math.max(0, lineNumber - 4), lineNumber - 1) : [],
-                      afterContext: lineNumber < lines.length ? lines.slice(lineNumber, Math.min(lines.length, lineNumber + 3)) : []
-                    })
-
-                    matchCount++
-                    totalMatches++
-                  }
-
-                  if (results.length >= maxResults) break
+                if (results.length >= maxResults) {
+                  console.log(`[grep_search] 🛑 Reached maxResults limit (${maxResults})`)
+                  break
                 }
 
-                console.log(`[grep_search] Found ${matchCount} matches in ${file.path}`)
+                filesSearchedCount++
+                const content = file.content || ''
+                
+                if (!content) {
+                  console.log(`[grep_search] ⚠️  Empty content: ${file.path}`)
+                  continue
+                }
+
+                const lines = content.split('\n')
+                let fileMatchCount = 0
+                const fileExtension = file.path.split('.').pop()?.toLowerCase()
+
+                // 🎯 STRATEGY 1: Primary Search (Literal/Regex)
+                if (searchMode !== 'semantic') {
+                  for (let i = 0; i < lines.length; i++) {
+                    if (results.length >= maxResults) break
+                    
+                    const lineNumber = i + 1
+                    const line = lines[i]
+                    const lineMatches: any[] = []
+                    let match
+                    primarySearchRegex.lastIndex = 0
+
+                    while ((match = primarySearchRegex.exec(line)) !== null) {
+                      // Calculate relevance score
+                      let relevanceScore = 5 // Base score
+                      
+                      // Boost for exact matches
+                      if (match[0].toLowerCase() === query.toLowerCase()) {
+                        relevanceScore += 5
+                      }
+                      
+                      // Boost for word boundaries
+                      if (new RegExp(`\\b${query}\\b`, 'i').test(match[0])) {
+                        relevanceScore += 3
+                      }
+                      
+                      // Boost based on file type
+                      const codeExtensions = ['ts', 'tsx', 'js', 'jsx', 'py', 'java', 'cpp', 'rs', 'go']
+                      if (codeExtensions.includes(fileExtension || '')) {
+                        relevanceScore += 2
+                      }
+
+                      lineMatches.push({
+                        match: match[0],
+                        index: match.index,
+                        lineNumber,
+                        line: line,
+                        relevanceScore,
+                        matchType: 'primary'
+                      })
+
+                      if (!primarySearchRegex.global) break
+                    }
+
+                    // Process matches
+                    for (const lineMatch of lineMatches) {
+                      if (results.length >= maxResults) break
+
+                      const startLine = Math.max(1, lineNumber - actualContextLines)
+                      const endLine = Math.min(lines.length, lineNumber + actualContextLines)
+                      const contextLines = lines.slice(startLine - 1, endLine)
+
+                      const contextWithNumbers = includeContext ? contextLines.map((ctxLine: string, idx: number) => {
+                        const ctxLineNumber = startLine + idx
+                        const marker = ctxLineNumber === lineNumber ? '>' : ' '
+                        return `${marker}${String(ctxLineNumber).padStart(4, ' ')}: ${ctxLine}`
+                      }).join('\n') : ''
+
+                      results.push({
+                        file: file.path,
+                        lineNumber: lineMatch.lineNumber,
+                        column: lineMatch.index + 1,
+                        match: lineMatch.match,
+                        line: lineMatch.line.trim(),
+                        context: contextWithNumbers,
+                        relevanceScore: lineMatch.relevanceScore,
+                        matchType: lineMatch.matchType,
+                        fileType: fileExtension
+                      })
+
+                      fileMatchCount++
+                      totalMatches++
+                    }
+                  }
+                }
+
+                // 🧠 STRATEGY 2: Smart Pattern Matching (Semantic)
+                if ((searchMode === 'semantic' || searchMode === 'hybrid') && smartPatterns.length > 0) {
+                  for (const pattern of smartPatterns) {
+                    if (results.length >= maxResults) break
+
+                    let match
+                    while ((match = pattern.regex.exec(content)) !== null) {
+                      if (results.length >= maxResults) break
+
+                      // Calculate line number
+                      const matchIndex = match.index
+                      let lineNumber = 1
+                      let charCount = 0
+
+                      for (let i = 0; i < lines.length; i++) {
+                        charCount += lines[i].length + 1
+                        if (charCount > matchIndex) {
+                          lineNumber = i + 1
+                          break
+                        }
+                      }
+
+                      // Check if this line contains our query (for relevance)
+                      const matchLine = lines[lineNumber - 1]
+                      const queryLower = query.toLowerCase()
+                      const matchLower = match[0].toLowerCase()
+                      const lineLower = matchLine.toLowerCase()
+                      
+                      // Only include if relevant to query in semantic/hybrid mode
+                      if (!lineLower.includes(queryLower) && !matchLower.includes(queryLower)) {
+                        continue
+                      }
+
+                      const startLine = Math.max(1, lineNumber - actualContextLines)
+                      const endLine = Math.min(lines.length, lineNumber + actualContextLines)
+                      const contextLines = lines.slice(startLine - 1, endLine)
+                      
+                      const contextWithNumbers = includeContext ? contextLines.map((line: string, idx: number) => {
+                        const ctxLineNumber = startLine + idx
+                        const marker = ctxLineNumber === lineNumber ? '>' : ' '
+                        return `${marker}${String(ctxLineNumber).padStart(4, ' ')}: ${line}`
+                      }).join('\n') : ''
+
+                      // Calculate relevance with pattern score
+                      let relevanceScore = pattern.score
+                      if (matchLower.includes(queryLower)) relevanceScore += 5
+                      if (lineLower === queryLower) relevanceScore += 10
+
+                      results.push({
+                        file: file.path,
+                        lineNumber,
+                        match: match[0].trim(),
+                        line: matchLine.trim(),
+                        context: contextWithNumbers,
+                        relevanceScore,
+                        matchType: pattern.type,
+                        description: pattern.description,
+                        fileType: fileExtension
+                      })
+
+                      fileMatchCount++
+                      totalMatches++
+
+                      if (!pattern.regex.global) break
+                    }
+                  }
+                }
+
+                if (fileMatchCount > 0) {
+                  console.log(`[grep_search] ✅ Found ${fileMatchCount} matches in ${file.path}`)
+                }
               }
 
-              // Sort results by file path and line number
-              results.sort((a, b) => {
-                const fileCompare = a.file.localeCompare(b.file)
-                if (fileCompare !== 0) return fileCompare
-                return a.lineNumber - b.lineNumber
+              console.log(`[grep_search] 🎉 Search complete: ${totalMatches} matches across ${filesSearchedCount} files`)
+
+              // 📊 Deduplicate results (same file, line, and match)
+              const uniqueResults = results.filter((result, index, arr) =>
+                index === 0 || !(
+                  arr[index - 1].file === result.file &&
+                  arr[index - 1].lineNumber === result.lineNumber &&
+                  arr[index - 1].match === result.match
+                )
+              )
+
+              console.log(`[grep_search] 🔄 Deduplication: ${results.length} -> ${uniqueResults.length} unique results`)
+
+              // 🎯 Sort results
+              if (sortByRelevance && uniqueResults.some(r => r.relevanceScore !== undefined)) {
+                uniqueResults.sort((a, b) => {
+                  const scoreCompare = (b.relevanceScore || 0) - (a.relevanceScore || 0)
+                  if (scoreCompare !== 0) return scoreCompare
+                  const fileCompare = a.file.localeCompare(b.file)
+                  if (fileCompare !== 0) return fileCompare
+                  return a.lineNumber - b.lineNumber
+                })
+                console.log(`[grep_search] 📊 Sorted by relevance score`)
+              } else {
+                uniqueResults.sort((a, b) => {
+                  const fileCompare = a.file.localeCompare(b.file)
+                  if (fileCompare !== 0) return fileCompare
+                  return a.lineNumber - b.lineNumber
+                })
+                console.log(`[grep_search] 📊 Sorted by file path and line number`)
+              }
+
+              // 📈 Calculate statistics
+              const fileMatches = new Map<string, number>()
+              const matchTypeStats = new Map<string, number>()
+              
+              uniqueResults.forEach(result => {
+                fileMatches.set(result.file, (fileMatches.get(result.file) || 0) + 1)
+                if (result.matchType) {
+                  matchTypeStats.set(result.matchType, (matchTypeStats.get(result.matchType) || 0) + 1)
+                }
               })
+
+              const topFiles = Array.from(fileMatches.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5)
+                .map(([file, count]) => ({ file, matches: count }))
 
               return {
                 success: true,
-                message: `Found ${totalMatches} matches for "${query}" across ${filesToSearch.length} files`,
+                message: totalMatches > 0 
+                  ? `🎯 Found ${totalMatches} matches (${uniqueResults.length} unique) for "${query}" using [${searchStrategies.join(', ')}] strategies`
+                  : `🔍 No matches found for "${query}" in ${filesSearchedCount} files. Try broader search terms or check spelling.`,
                 query,
-                isRegexp,
-                caseSensitive,
-                includePattern,
-                results,
+                searchMode,
+                strategies: searchStrategies,
+                results: uniqueResults,
                 totalMatches,
-                filesSearched: filesToSearch.length,
-                maxResults,
+                uniqueMatches: uniqueResults.length,
+                filesSearched: filesSearchedCount,
+                topFiles,
+                matchTypeBreakdown: Array.from(matchTypeStats.entries()).map(([type, count]) => ({ type, count })),
+                diagnostics: {
+                  filesSource,
+                  totalSessionFiles: sessionFiles.size,
+                  filesWithContent: filesToSearch.length,
+                  filesActuallySearched: filesSearchedCount,
+                  primaryRegexPattern: primarySearchRegex.source,
+                  primaryRegexFlags: primarySearchRegex.flags,
+                  smartPatternsEnabled: enableSmartPatterns && smartPatterns.length > 0,
+                  smartPatternsCount: smartPatterns.length,
+                  autoDetectedRegex,
+                  sortedByRelevance: sortByRelevance,
+                  contextLinesUsed: actualContextLines,
+                  searchStrategies,
+                  includePattern: includePattern || 'none',
+                  excludePattern: excludePattern || 'none'
+                },
+                settings: {
+                  maxResults,
+                  caseSensitive,
+                  isRegexp,
+                  searchMode,
+                  enableSmartPatterns,
+                  sortByRelevance,
+                  includeContext,
+                  contextLines: actualContextLines
+                },
                 toolCallId
               }
 
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+              const errorStack = error instanceof Error ? error.stack : undefined
               console.error(`[ERROR] grep_search failed for query "${query}":`, error)
 
               return {
                 success: false,
                 error: `Failed to search code: ${errorMessage}`,
                 query,
+                errorStack,
                 toolCallId
               }
             }
