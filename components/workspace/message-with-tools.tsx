@@ -730,7 +730,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
 
       {/* Render reasoning if present */}
       {hasReasoning && (
-        <Reasoning isStreaming={isStreaming && !hasResponse}>
+        <Reasoning isStreaming={isStreaming && !hasResponse} defaultOpen={false}>
           <ReasoningTrigger />
           <ReasoningContent>
             {reasoningContent}
