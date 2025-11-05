@@ -138,6 +138,43 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
   const hasReasoning = reasoningContent.trim().length > 0
   const hasResponse = responseContent.trim().length > 0
 
+  // Timer state for duration display
+  const [elapsedTime, setElapsedTime] = useState(0)
+  const messageCreatedAt = message.createdAt ? new Date(message.createdAt).getTime() : Date.now()
+
+  // Update elapsed time for streaming messages
+  useEffect(() => {
+    if (!isStreaming) {
+      // For past messages, calculate final duration once
+      const now = Date.now()
+      const duration = Math.floor((now - messageCreatedAt) / 1000)
+      setElapsedTime(duration)
+      return
+    }
+
+    // For streaming messages, update timer every second
+    const interval = setInterval(() => {
+      const now = Date.now()
+      const duration = Math.floor((now - messageCreatedAt) / 1000)
+      setElapsedTime(duration)
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [isStreaming, messageCreatedAt])
+
+  // Format elapsed time as "X seconds" or "X minutes"
+  const formatDuration = (seconds: number) => {
+    if (seconds < 60) {
+      return `${seconds} second${seconds !== 1 ? 's' : ''}`
+    }
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = seconds % 60
+    if (remainingSeconds === 0) {
+      return `${minutes} minute${minutes !== 1 ? 's' : ''}`
+    }
+    return `${minutes} minute${minutes !== 1 ? 's' : ''} ${remainingSeconds} second${remainingSeconds !== 1 ? 's' : ''}`
+  }
+
   // Debug logging
   console.log(`[MessageWithTools] Message ${message.id}:`, {
     role: message.role,
@@ -147,7 +184,8 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
     toolCount: toolInvocations.length,
     hasResponse,
     responseLength: responseContent.length,
-    isStreaming
+    isStreaming,
+    elapsedTime
   })
 
   // Dispatch events when tools complete
@@ -284,7 +322,12 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
       {/* Render reasoning and tools if present */}
       {(hasReasoning || hasTools) && (
         <ChainOfThought defaultOpen={false}>
-          <ChainOfThoughtHeader>PiPilot is working</ChainOfThoughtHeader>
+          <ChainOfThoughtHeader>
+            {isStreaming 
+              ? `PiPilot is working ${elapsedTime > 0 ? `[${formatDuration(elapsedTime)}]` : ''}` 
+              : `PiPilot worked for ${formatDuration(elapsedTime)}`
+            }
+          </ChainOfThoughtHeader>
           <ChainOfThoughtContent>
             {/* Reasoning step */}
             {hasReasoning && (
