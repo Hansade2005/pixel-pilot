@@ -141,32 +141,44 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
   // Get saved duration from metadata (for past messages)
   const savedDuration = message.metadata?.durationSeconds
 
-  // Timer state for duration display
-  const [elapsedTime, setElapsedTime] = useState(savedDuration || 0)
-  const messageCreatedAt = message.createdAt ? new Date(message.createdAt).getTime() : Date.now()
+  // Timer state for duration display (using Reasoning component's strategy)
+  const [duration, setDuration] = useState(savedDuration || 0)
+  const [startTime, setStartTime] = useState<number | null>(null)
 
-  // Update elapsed time for streaming messages only
+  // Track duration when streaming starts and ends (same as Reasoning component)
   useEffect(() => {
-    // For past messages, use the saved duration
+    // For past messages with saved duration, use it
     if (!isStreaming && savedDuration !== undefined) {
-      setElapsedTime(savedDuration)
+      setDuration(savedDuration)
+      setStartTime(null)
       return
     }
 
-    // For past messages without saved duration (legacy), don't show duration
-    if (!isStreaming) {
-      return
+    // For streaming messages
+    if (isStreaming) {
+      if (startTime === null) {
+        // Start timing when streaming begins
+        setStartTime(Date.now())
+      }
+    } else if (startTime !== null) {
+      // Calculate final duration when streaming ends
+      const calculatedDuration = Math.ceil((Date.now() - startTime) / 1000)
+      setDuration(Math.max(1, calculatedDuration)) // Ensure minimum 1 second
+      setStartTime(null)
     }
+  }, [isStreaming, startTime, savedDuration])
 
-    // For streaming messages, update timer every second
+  // Live timer update during streaming (same as Reasoning component)
+  useEffect(() => {
+    if (!isStreaming || startTime === null) return
+
     const interval = setInterval(() => {
-      const now = Date.now()
-      const duration = Math.floor((now - messageCreatedAt) / 1000)
-      setElapsedTime(duration)
+      const elapsed = Math.ceil((Date.now() - startTime) / 1000)
+      setDuration(Math.max(1, elapsed))
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [isStreaming, messageCreatedAt, savedDuration])
+  }, [isStreaming, startTime])
 
   // Format elapsed time as "X seconds" or "X minutes"
   const formatDuration = (seconds: number) => {
@@ -191,7 +203,8 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
     hasResponse,
     responseLength: responseContent.length,
     isStreaming,
-    elapsedTime
+    duration,
+    savedDuration
   })
 
   // Dispatch events when tools complete
@@ -330,8 +343,8 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
         <ChainOfThought defaultOpen={false}>
           <ChainOfThoughtHeader>
             {isStreaming 
-              ? `PiPilot is working ${elapsedTime > 0 ? `[${formatDuration(elapsedTime)}]` : ''}` 
-              : `PiPilot worked for ${formatDuration(elapsedTime)}`
+              ? `PiPilot is working ${duration > 0 ? `[${formatDuration(duration)}]` : ''}` 
+              : `PiPilot worked for ${formatDuration(duration)}`
             }
           </ChainOfThoughtHeader>
           <ChainOfThoughtContent>
