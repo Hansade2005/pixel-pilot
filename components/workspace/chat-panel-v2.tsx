@@ -17,7 +17,7 @@ import {
   Send, Paperclip, Mic, MicOff, X, FileText, Image as ImageIcon,
   Link as LinkIcon, Loader2, ChevronDown, ChevronUp, StopCircle, Trash2, Plus,
   Copy, ArrowUp, Undo2, Redo2, Check, AlertTriangle, Zap, Package, PackageMinus,
-  Search, Globe, Eye, FolderOpen, Settings
+  Search, Globe, Eye, FolderOpen, Settings, Edit3, CheckCircle2, XCircle
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Actions, Action } from '@/components/ai-elements/actions'
@@ -206,8 +206,9 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
   const getToolIcon = (tool: string) => {
     switch (tool) {
       case 'write_file':
-      case 'edit_file':
         return <FileText className="w-3.5 h-3.5" />
+      case 'edit_file':
+        return <Edit3 className="w-3.5 h-3.5" />
       case 'read_file':
         return <Eye className="w-3.5 h-3.5" />
       case 'list_files':
@@ -280,11 +281,11 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'executing':
-        return <Loader2 className="w-3 h-3 animate-spin" />
+        return <Loader2 className="w-3.5 h-3.5 animate-spin" />
       case 'completed':
-        return <Check className="w-3 h-3" />
+        return <CheckCircle2 className="w-3.5 h-3.5" />
       case 'failed':
-        return <AlertTriangle className="w-3 h-3" />
+        return <XCircle className="w-3.5 h-3.5" />
       default:
         return null
     }
@@ -1340,13 +1341,25 @@ export function ChatPanelV2({
             
             const toolCalls = msg.toolInvocations.map((inv: any) => {
               // Determine status based on state and result
-              let status: 'executing' | 'completed' | 'failed' = 'executing'
+              let status: 'executing' | 'completed' | 'failed' = 'completed' // Default to completed for loaded messages
               
               if (inv.state === 'result') {
-                // Tool has completed
+                // Tool has explicit result state
                 if (inv.result?.error) {
                   status = 'failed'
                 } else {
+                  status = 'completed'
+                }
+              } else if (inv.state === 'call') {
+                // Tool was saved in 'call' state - check for error/warning
+                // If there's a result with error, mark as failed
+                // Otherwise, assume completed (stream finished)
+                if (inv.result?.error || inv.result?.warning) {
+                  status = 'failed'
+                } else if (inv.result) {
+                  status = 'completed'
+                } else {
+                  // No result at all - could be incomplete, but since message is saved, treat as completed
                   status = 'completed'
                 }
               }

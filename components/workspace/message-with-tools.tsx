@@ -721,12 +721,12 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
 
   return (
     <div className="space-y-3">
-      {/* Render tools if present */}
-      {hasTools && (
+      {/* OLD PILL SYSTEM - DISABLED IN FAVOR OF NEW INLINE PILL SYSTEM IN CHAT-PANEL-V2 */}
+      {/* {hasTools && (
         <div className="space-y-2">
           {toolInvocations?.map((toolInvocation: any) => renderToolInvocation(toolInvocation))}
         </div>
-      )}
+      )} */}
 
       {/* Render reasoning if present */}
       {hasReasoning && (
