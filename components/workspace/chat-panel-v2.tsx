@@ -430,9 +430,6 @@ export function ChatPanelV2({
     status: 'executing' | 'completed' | 'failed'
   }>>>(new Map())
 
-  // Track message start times for duration calculation
-  const [messageStartTimes, setMessageStartTimes] = useState<Map<string, number>>(new Map())
-
   // Auto-adjust textarea height on input change
   useEffect(() => {
     if (textareaRef.current) {
@@ -534,9 +531,28 @@ export function ChatPanelV2({
     try {
       console.log(`[ChatPanelV2] Saving complete assistant message after streaming: ${assistantMessageId}`)
 
+      // Get start time from the message metadata (more reliable than Map)
+      const messageInState = messages.find(m => m.id === assistantMessageId)
+      const startTime = messageInState?.metadata?.startTime
+      
+      console.log(`[ChatPanelV2] 🔍 Looking up start time from message:`, {
+        assistantMessageId,
+        foundMessage: !!messageInState,
+        startTime,
+        hasStartTime: startTime !== undefined
+      })
+      
       // Calculate duration from start time
-      const startTime = messageStartTimes.get(assistantMessageId)
       const elapsedSeconds = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0
+
+      console.log(`[ChatPanelV2] Duration calculation:`, {
+        assistantMessageId,
+        startTime,
+        now: Date.now(),
+        elapsedSeconds,
+        hasStartTime: startTime !== undefined,
+        messagesLength: messages.length
+      })
 
       const finalAssistantMessage = {
         id: assistantMessageId,
@@ -551,15 +567,14 @@ export function ChatPanelV2({
         }
       }
 
+      console.log(`[ChatPanelV2] Saving message with metadata:`, {
+        id: assistantMessageId,
+        metadataKeys: Object.keys(finalAssistantMessage.metadata),
+        durationSeconds: finalAssistantMessage.metadata.durationSeconds
+      })
+
       await saveMessageToIndexedDB(finalAssistantMessage)
       console.log(`[ChatPanelV2] Complete assistant message saved to database: ${assistantMessageId}, duration: ${elapsedSeconds}s`)
-
-      // Clean up start time from map
-      setMessageStartTimes(prev => {
-        const newMap = new Map(prev)
-        newMap.delete(assistantMessageId)
-        return newMap
-      })
 
       // Dispatch event to switch to preview tab and trigger auto-preview creation
       // This creates the illusion of "hot reload" after AI code generation
@@ -1367,7 +1382,9 @@ export function ChatPanelV2({
             hasReasoning: !!uiMessage.reasoning,
             reasoningLength: uiMessage.reasoning.length,
             hasTools: uiMessage.toolInvocations.length > 0,
-            toolCount: uiMessage.toolInvocations.length
+            toolCount: uiMessage.toolInvocations.length,
+            durationSeconds: msg.metadata?.durationSeconds,
+            metadataKeys: Object.keys(msg.metadata || {})
           })
           return uiMessage
         })
@@ -1836,15 +1853,21 @@ export function ChatPanelV2({
 
     // Add placeholder assistant message
     const assistantMessageId = (Date.now() + 1).toString()
+    const messageStartTime = Date.now() // Track start time
     const assistantMessage = {
       id: assistantMessageId,
       role: 'assistant',
-      content: '' // Start with empty content so spinner shows immediately
+      content: '', // Start with empty content so spinner shows immediately
+      metadata: {
+        startTime: messageStartTime // Store start time in message metadata
+      }
     }
     setMessages(prev => [...prev, assistantMessage])
 
-    // Track start time for duration calculation
-    setMessageStartTimes(prev => new Map(prev).set(assistantMessageId, Date.now()))
+    console.log(`[ChatPanelV2] 🕐 Created assistant message with start time:`, {
+      id: assistantMessageId,
+      startTime: messageStartTime
+    })
 
     // Create abort controller for this request
     const controller = new AbortController()
