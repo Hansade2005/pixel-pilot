@@ -1328,17 +1328,43 @@ export function ChatPanelV2({
         
         uiMessages.forEach((msg: any) => {
           if (msg.toolInvocations && msg.toolInvocations.length > 0) {
-            const toolCalls = msg.toolInvocations.map((inv: any) => ({
-              toolName: inv.toolName,
-              toolCallId: inv.toolCallId,
-              input: inv.args,
-              status: (inv.state === 'result' 
-                ? (inv.result?.error ? 'failed' : 'completed')
-                : 'executing') as 'executing' | 'completed' | 'failed'
-            }))
+            console.log(`[ChatPanelV2] Restoring tool pills for message ${msg.id}:`, {
+              toolCount: msg.toolInvocations.length,
+              tools: msg.toolInvocations.map((inv: any) => ({
+                name: inv.toolName,
+                state: inv.state,
+                hasResult: !!inv.result,
+                hasError: inv.result?.error
+              }))
+            })
+            
+            const toolCalls = msg.toolInvocations.map((inv: any) => {
+              // Determine status based on state and result
+              let status: 'executing' | 'completed' | 'failed' = 'executing'
+              
+              if (inv.state === 'result') {
+                // Tool has completed
+                if (inv.result?.error) {
+                  status = 'failed'
+                } else {
+                  status = 'completed'
+                }
+              }
+              
+              return {
+                toolName: inv.toolName,
+                toolCallId: inv.toolCallId,
+                input: inv.args,
+                status
+              }
+            })
+            
+            console.log(`[ChatPanelV2] Setting ${toolCalls.length} tool pills for message ${msg.id}`)
             toolCallsMap.set(msg.id, toolCalls)
           }
         })
+        
+        console.log(`[ChatPanelV2] Total messages with tool pills: ${toolCallsMap.size}`)
         setActiveToolCalls(toolCallsMap)
       } else {
         console.log(`[ChatPanelV2] No active chat session found for project ${project.id}, starting fresh`)
@@ -2031,6 +2057,10 @@ export function ChatPanelV2({
       // Get tool invocations for this message from activeToolCalls
       const toolInvocationsForMessage = activeToolCalls.get(assistantMessageId) || []
       
+      console.log(`[ChatPanelV2][Save] Preparing to save ${toolInvocationsForMessage.length} tool invocations:`, 
+        toolInvocationsForMessage.map(t => ({ name: t.toolName, status: t.status }))
+      )
+      
       // Convert to the format expected by the database
       const toolInvocationsData = toolInvocationsForMessage.map(tool => ({
         toolName: tool.toolName,
@@ -2039,6 +2069,8 @@ export function ChatPanelV2({
         state: tool.status === 'completed' ? 'result' : 'call',
         result: tool.status === 'completed' ? { success: true } : (tool.status === 'failed' ? { error: 'Tool execution failed' } : undefined)
       }))
+      
+      console.log(`[ChatPanelV2][Save] Tool invocations data for database:`, toolInvocationsData)
       
       // Save assistant message to database after streaming completes
       if (accumulatedContent.trim() || toolInvocationsData.length > 0) {
