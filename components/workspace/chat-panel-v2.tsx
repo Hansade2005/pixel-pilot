@@ -16,7 +16,8 @@ import { MessageWithTools } from './message-with-tools'
 import {
   Send, Paperclip, Mic, MicOff, X, FileText, Image as ImageIcon,
   Link as LinkIcon, Loader2, ChevronDown, ChevronUp, StopCircle, Trash2, Plus,
-  Copy, ArrowUp, Undo2, Redo2, Check, AlertTriangle, Zap
+  Copy, ArrowUp, Undo2, Redo2, Check, AlertTriangle, Zap, Package, PackageMinus,
+  Search, Globe, Eye, FolderOpen, Settings
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Actions, Action } from '@/components/ai-elements/actions'
@@ -202,28 +203,32 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
   input?: any, 
   status?: 'executing' | 'completed' | 'failed' 
 }) => {
-  const getToolEmoji = (tool: string) => {
+  const getToolIcon = (tool: string) => {
     switch (tool) {
       case 'write_file':
       case 'edit_file':
+        return <FileText className="w-3.5 h-3.5" />
       case 'read_file':
+        return <Eye className="w-3.5 h-3.5" />
       case 'list_files':
+        return <FolderOpen className="w-3.5 h-3.5" />
       case 'delete_file':
-        return '📄'
+        return <X className="w-3.5 h-3.5" />
       case 'add_package':
+        return <Package className="w-3.5 h-3.5" />
       case 'remove_package':
-        return '📦'
+        return <PackageMinus className="w-3.5 h-3.5" />
       case 'grep_search':
       case 'semantic_code_navigator':
-        return '🔍'
+        return <Search className="w-3.5 h-3.5" />
       case 'web_search':
       case 'web_extract':
       case 'vscode-websearchforcopilot_webSearch':
-        return '🌐'
+        return <Globe className="w-3.5 h-3.5" />
       case 'check_dev_errors':
-        return '🔧'
+        return <Settings className="w-3.5 h-3.5" />
       default:
-        return '⚙️'
+        return <Zap className="w-3.5 h-3.5" />
     }
   }
 
@@ -290,7 +295,7 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
       "inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border mb-1 mr-1",
       getStatusColor(status)
     )}>
-      <span>{getToolEmoji(toolName)}</span>
+      {getToolIcon(toolName)}
       <span className="max-w-[200px] truncate">{getToolLabel(toolName, input)}</span>
       {getStatusIcon(status)}
     </div>
