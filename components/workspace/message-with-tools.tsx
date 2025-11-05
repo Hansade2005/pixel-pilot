@@ -344,7 +344,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
           <ChainOfThoughtHeader>
             {isStreaming 
               ? `PiPilot is working ${duration > 0 ? `${formatDuration(duration)}` : ''}` 
-              : `PiPilot worked for ${formatDuration(duration)}`
+              : `PiPilot worked for a moment`
             }
           </ChainOfThoughtHeader>
           <ChainOfThoughtContent>
