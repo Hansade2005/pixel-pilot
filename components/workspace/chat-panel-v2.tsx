@@ -2534,18 +2534,24 @@ export function ChatPanelV2({
               )}>
                 <div className="p-4 break-words overflow-wrap-anywhere">
                   {/* Inline Tool Pills - Show before message content */}
-                  {activeToolCalls.get(message.id) && activeToolCalls.get(message.id)!.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {activeToolCalls.get(message.id)!.map((toolCall, idx) => (
-                        <InlineToolPill
-                          key={`${toolCall.toolCallId}-${idx}`}
-                          toolName={toolCall.toolName}
-                          input={toolCall.input}
-                          status={toolCall.status}
-                        />
-                      ))}
-                    </div>
-                  )}
+                  {(() => {
+                    const toolCalls = activeToolCalls.get(message.id)
+                    if (toolCalls && toolCalls.length > 0) {
+                      console.log(`[ChatPanelV2][Render] Rendering ${toolCalls.length} tool pills for message ${message.id}`)
+                    }
+                    return toolCalls && toolCalls.length > 0 ? (
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {toolCalls.map((toolCall, idx) => (
+                          <InlineToolPill
+                            key={`${toolCall.toolCallId}-${idx}`}
+                            toolName={toolCall.toolName}
+                            input={toolCall.input}
+                            status={toolCall.status}
+                          />
+                        ))}
+                      </div>
+                    ) : null
+                  })()}
                   
                   <MessageWithTools
                     message={message}
