@@ -138,17 +138,23 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
   const hasReasoning = reasoningContent.trim().length > 0
   const hasResponse = responseContent.trim().length > 0
 
+  // Get saved duration from metadata (for past messages)
+  const savedDuration = message.metadata?.durationSeconds
+
   // Timer state for duration display
-  const [elapsedTime, setElapsedTime] = useState(0)
+  const [elapsedTime, setElapsedTime] = useState(savedDuration || 0)
   const messageCreatedAt = message.createdAt ? new Date(message.createdAt).getTime() : Date.now()
 
-  // Update elapsed time for streaming messages
+  // Update elapsed time for streaming messages only
   useEffect(() => {
+    // For past messages, use the saved duration
+    if (!isStreaming && savedDuration !== undefined) {
+      setElapsedTime(savedDuration)
+      return
+    }
+
+    // For past messages without saved duration (legacy), don't show duration
     if (!isStreaming) {
-      // For past messages, calculate final duration once
-      const now = Date.now()
-      const duration = Math.floor((now - messageCreatedAt) / 1000)
-      setElapsedTime(duration)
       return
     }
 
@@ -160,7 +166,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [isStreaming, messageCreatedAt])
+  }, [isStreaming, messageCreatedAt, savedDuration])
 
   // Format elapsed time as "X seconds" or "X minutes"
   const formatDuration = (seconds: number) => {

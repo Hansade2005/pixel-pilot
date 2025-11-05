@@ -430,6 +430,9 @@ export function ChatPanelV2({
     status: 'executing' | 'completed' | 'failed'
   }>>>(new Map())
 
+  // Track message start times for duration calculation
+  const [messageStartTimes, setMessageStartTimes] = useState<Map<string, number>>(new Map())
+
   // Auto-adjust textarea height on input change
   useEffect(() => {
     if (textareaRef.current) {
@@ -531,6 +534,10 @@ export function ChatPanelV2({
     try {
       console.log(`[ChatPanelV2] Saving complete assistant message after streaming: ${assistantMessageId}`)
 
+      // Calculate duration from start time
+      const startTime = messageStartTimes.get(assistantMessageId)
+      const elapsedSeconds = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0
+
       const finalAssistantMessage = {
         id: assistantMessageId,
         role: 'assistant',
@@ -539,12 +546,20 @@ export function ChatPanelV2({
         metadata: {
           toolInvocations: accumulatedToolInvocations,
           reasoning: accumulatedReasoning,
-          hasToolCalls: accumulatedToolInvocations.length > 0
+          hasToolCalls: accumulatedToolInvocations.length > 0,
+          durationSeconds: elapsedSeconds  // Save the actual elapsed time
         }
       }
 
       await saveMessageToIndexedDB(finalAssistantMessage)
-      console.log(`[ChatPanelV2] Complete assistant message saved to database: ${assistantMessageId}`)
+      console.log(`[ChatPanelV2] Complete assistant message saved to database: ${assistantMessageId}, duration: ${elapsedSeconds}s`)
+
+      // Clean up start time from map
+      setMessageStartTimes(prev => {
+        const newMap = new Map(prev)
+        newMap.delete(assistantMessageId)
+        return newMap
+      })
 
       // Dispatch event to switch to preview tab and trigger auto-preview creation
       // This creates the illusion of "hot reload" after AI code generation
@@ -1827,6 +1842,9 @@ export function ChatPanelV2({
       content: '' // Start with empty content so spinner shows immediately
     }
     setMessages(prev => [...prev, assistantMessage])
+
+    // Track start time for duration calculation
+    setMessageStartTimes(prev => new Map(prev).set(assistantMessageId, Date.now()))
 
     // Create abort controller for this request
     const controller = new AbortController()
