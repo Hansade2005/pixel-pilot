@@ -224,7 +224,6 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
         return <Search className="w-3.5 h-3.5" />
       case 'web_search':
       case 'web_extract':
-      case 'vscode-websearchforcopilot_webSearch':
         return <Globe className="w-3.5 h-3.5" />
       case 'check_dev_errors':
         return <Settings className="w-3.5 h-3.5" />
@@ -919,6 +918,14 @@ export function ChatPanelV2({
       let continuationAccumulatedContent = ''
       let continuationAccumulatedReasoning = ''
       let lineBuffer = ''
+      
+      // Track tool calls locally during continuation to avoid React state race conditions
+      const continuationLocalToolCalls: Array<{
+        toolName: string
+        toolCallId: string
+        input: any
+        status: 'executing' | 'completed' | 'failed'
+      }> = []
 
       console.log('[ChatPanelV2][Continuation] 📥 Processing continuation stream')
 
@@ -980,16 +987,20 @@ export function ChatPanelV2({
 
               console.log('[ChatPanelV2][Continuation][ClientTool] 🔧 Continuation tool call:', toolCall.toolName)
 
-              // Track tool call inline with executing status
+              // Track tool call inline with executing status (both local and state)
+              const toolCallEntry = {
+                toolName: toolCall.toolName,
+                toolCallId: toolCall.toolCallId,
+                input: toolCall.args,
+                status: 'executing' as 'executing' | 'completed' | 'failed'
+              }
+              
+              continuationLocalToolCalls.push(toolCallEntry)
+              
               setActiveToolCalls(prev => {
                 const newMap = new Map(prev)
                 const messageCalls = newMap.get(originalAssistantMessageId) || []
-                messageCalls.push({
-                  toolName: toolCall.toolName,
-                  toolCallId: toolCall.toolCallId,
-                  input: toolCall.args,
-                  status: 'executing'
-                })
+                messageCalls.push(toolCallEntry)
                 newMap.set(originalAssistantMessageId, messageCalls)
                 return newMap
               })
@@ -1012,13 +1023,21 @@ export function ChatPanelV2({
                 const addToolResult = (result: any) => {
                   console.log('[ChatPanelV2][Continuation][ClientTool] ✅ Continuation tool completed:', result.tool)
                   
-                  // Update tool status
+                  const newStatus = result.errorText ? 'failed' : 'completed'
+                  
+                  // Update local tracking
+                  const localTool = continuationLocalToolCalls.find(call => call.toolCallId === toolCall.toolCallId)
+                  if (localTool) {
+                    localTool.status = newStatus
+                  }
+                  
+                  // Update tool status in state for UI
                   setActiveToolCalls(prev => {
                     const newMap = new Map(prev)
                     const messageCalls = newMap.get(originalAssistantMessageId) || []
                     const updatedCalls = messageCalls.map(call =>
                       call.toolCallId === toolCall.toolCallId
-                        ? { ...call, status: (result.errorText ? 'failed' : 'completed') as 'executing' | 'completed' | 'failed' }
+                        ? { ...call, status: newStatus as 'executing' | 'completed' | 'failed' }
                         : call
                     )
                     newMap.set(originalAssistantMessageId, updatedCalls)
@@ -1030,7 +1049,13 @@ export function ChatPanelV2({
                   .catch(error => {
                     console.error('[ChatPanelV2][Continuation][ClientTool] ❌ Tool execution error:', error)
                     
-                    // Update tool status to failed
+                    // Update local tracking
+                    const localTool = continuationLocalToolCalls.find(call => call.toolCallId === toolCall.toolCallId)
+                    if (localTool) {
+                      localTool.status = 'failed'
+                    }
+                    
+                    // Update tool status to failed in state
                     setActiveToolCalls(prev => {
                       const newMap = new Map(prev)
                       const messageCalls = newMap.get(originalAssistantMessageId) || []
@@ -1047,13 +1072,21 @@ export function ChatPanelV2({
             } else if (parsed.type === 'tool-result') {
               console.log('[ChatPanelV2][Continuation][DataStream] Tool result received:', parsed.toolName)
               
+              const resultStatus = parsed.result?.error ? 'failed' : 'completed'
+              
+              // Update local tracking
+              const localTool = continuationLocalToolCalls.find(call => call.toolCallId === parsed.toolCallId)
+              if (localTool) {
+                localTool.status = resultStatus
+              }
+              
               // Update tool status to completed or failed for server-side tools
               setActiveToolCalls(prev => {
                 const newMap = new Map(prev)
                 const messageCalls = newMap.get(originalAssistantMessageId) || []
                 const updatedCalls = messageCalls.map(call =>
                   call.toolCallId === parsed.toolCallId
-                    ? { ...call, status: (parsed.result?.error ? 'failed' : 'completed') as 'executing' | 'completed' | 'failed' }
+                    ? { ...call, status: resultStatus as 'executing' | 'completed' | 'failed' }
                     : call
                 )
                 newMap.set(originalAssistantMessageId, updatedCalls)
@@ -1071,16 +1104,25 @@ export function ChatPanelV2({
       const finalContent = accumulatedContent + continuationAccumulatedContent
       const finalReasoning = accumulatedReasoning + continuationAccumulatedReasoning
 
-      // Get tool invocations for this message from activeToolCalls
-      const toolInvocationsForMessage = activeToolCalls.get(originalAssistantMessageId) || []
+      // Use local tool tracking instead of state (avoids React state race conditions)
+      const toolInvocationsForMessage = continuationLocalToolCalls
+      
+      console.log(`[ChatPanelV2][Continuation][Save] Preparing to save ${toolInvocationsForMessage.length} tool invocations:`, 
+        toolInvocationsForMessage.map(t => ({ name: t.toolName, status: t.status }))
+      )
       
       // Convert to the format expected by the database
       const toolInvocationsData = toolInvocationsForMessage.map(tool => ({
         toolName: tool.toolName,
         toolCallId: tool.toolCallId,
         args: tool.input,
-        state: tool.status === 'completed' ? 'result' : 'call',
-        result: tool.status === 'completed' ? { success: true } : (tool.status === 'failed' ? { error: 'Tool execution failed' } : undefined)
+        // Both 'completed' and 'failed' should have state='result'
+        state: (tool.status === 'completed' || tool.status === 'failed') ? 'result' : 'call',
+        result: tool.status === 'completed' 
+          ? { success: true } 
+          : (tool.status === 'failed' 
+            ? { error: 'Tool execution failed' } 
+            : undefined)
       }))
 
       if (finalContent.trim() || toolInvocationsData.length > 0) {
