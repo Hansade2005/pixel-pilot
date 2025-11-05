@@ -343,7 +343,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
         <ChainOfThought defaultOpen={false}>
           <ChainOfThoughtHeader>
             {isStreaming 
-              ? `PiPilot is working ${duration > 0 ? `[${formatDuration(duration)}]` : ''}` 
+              ? `PiPilot is working ${duration > 0 ? `${formatDuration(duration)}` : ''}` 
               : `PiPilot worked for ${formatDuration(duration)}`
             }
           </ChainOfThoughtHeader>
