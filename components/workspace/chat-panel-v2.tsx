@@ -1071,7 +1071,19 @@ export function ChatPanelV2({
       const finalContent = accumulatedContent + continuationAccumulatedContent
       const finalReasoning = accumulatedReasoning + continuationAccumulatedReasoning
 
-      if (finalContent.trim()) {
+      // Get tool invocations for this message from activeToolCalls
+      const toolInvocationsForMessage = activeToolCalls.get(originalAssistantMessageId) || []
+      
+      // Convert to the format expected by the database
+      const toolInvocationsData = toolInvocationsForMessage.map(tool => ({
+        toolName: tool.toolName,
+        toolCallId: tool.toolCallId,
+        args: tool.input,
+        state: tool.status === 'completed' ? 'result' : 'call',
+        result: tool.status === 'completed' ? { success: true } : (tool.status === 'failed' ? { error: 'Tool execution failed' } : undefined)
+      }))
+
+      if (finalContent.trim() || toolInvocationsData.length > 0) {
         // Update the original message with the complete content
         setMessages(prev => prev.map(msg =>
           msg.id === originalAssistantMessageId
@@ -1084,7 +1096,7 @@ export function ChatPanelV2({
           originalAssistantMessageId,
           finalContent,
           finalReasoning,
-          []
+          toolInvocationsData
         )
       }
 
@@ -1546,7 +1558,19 @@ export function ChatPanelV2({
       }
 
       // Continuation complete - update the original message with combined content
-      if (accumulatedContent.trim()) {
+      // Get tool invocations for this message from activeToolCalls
+      const toolInvocationsForMessage = activeToolCalls.get(assistantMessageId) || []
+      
+      // Convert to the format expected by the database
+      const toolInvocationsData = toolInvocationsForMessage.map(tool => ({
+        toolName: tool.toolName,
+        toolCallId: tool.toolCallId,
+        args: tool.input,
+        state: tool.status === 'completed' ? 'result' : 'call',
+        result: tool.status === 'completed' ? { success: true } : (tool.status === 'failed' ? { error: 'Tool execution failed' } : undefined)
+      }))
+      
+      if (accumulatedContent.trim() || toolInvocationsData.length > 0) {
         setMessages(prev => prev.map(msg =>
           msg.id === assistantMessageId
             ? { ...msg, content: accumulatedContent, reasoning: accumulatedReasoning }
@@ -1558,7 +1582,7 @@ export function ChatPanelV2({
           assistantMessageId,
           accumulatedContent,
           accumulatedReasoning,
-          []
+          toolInvocationsData
         )
       }
 
@@ -2004,15 +2028,25 @@ export function ChatPanelV2({
         hasProject: !!project
       })
       
-      // All file operations now execute client-side during streaming - no end-of-stream processing needed
-       
+      // Get tool invocations for this message from activeToolCalls
+      const toolInvocationsForMessage = activeToolCalls.get(assistantMessageId) || []
+      
+      // Convert to the format expected by the database
+      const toolInvocationsData = toolInvocationsForMessage.map(tool => ({
+        toolName: tool.toolName,
+        toolCallId: tool.toolCallId,
+        args: tool.input,
+        state: tool.status === 'completed' ? 'result' : 'call',
+        result: tool.status === 'completed' ? { success: true } : (tool.status === 'failed' ? { error: 'Tool execution failed' } : undefined)
+      }))
+      
       // Save assistant message to database after streaming completes
-      if (accumulatedContent.trim()) {
+      if (accumulatedContent.trim() || toolInvocationsData.length > 0) {
         await saveAssistantMessageAfterStreaming(
           assistantMessageId,
           accumulatedContent,
           accumulatedReasoning,
-          [] // No tool invocations tracking - tools execute during streaming
+          toolInvocationsData
         )
       }
     } catch (error: any) {
