@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { VercelDeploymentManager } from '@/components/vercel-deployment-manager';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -10,7 +10,7 @@ import { storageManager } from '@/lib/storage-manager';
 import { getDeploymentTokens } from '@/lib/cloud-sync';
 import { useSearchParams } from 'next/navigation';
 
-export default function HostingManagementPage() {
+function HostingManagementContent() {
   const searchParams = useSearchParams();
   const projectId = searchParams.get('project');
   

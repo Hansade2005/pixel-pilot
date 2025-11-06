@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { VercelDeploymentManager } from '@/components/vercel-deployment-manager';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -10,7 +10,7 @@ import { storageManager } from '@/lib/storage-manager';
 import { getDeploymentTokens } from '@/lib/cloud-sync';
 import { useSearchParams } from 'next/navigation';
 
-export default function HostingManagementPage() {
+function HostingManagementContent() {
   const searchParams = useSearchParams();
   const projectId = searchParams.get('project');
   
@@ -263,5 +263,20 @@ export default function HostingManagementPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function HostingManagementPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-900 to-black">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-12 h-12 animate-spin mx-auto text-blue-500" />
+          <p className="text-gray-400">Loading hosting management...</p>
+        </div>
+      </div>
+    }>
+      <HostingManagementContent />
+    </Suspense>
   );
 }
