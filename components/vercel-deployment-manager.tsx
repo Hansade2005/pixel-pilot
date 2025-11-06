@@ -242,7 +242,7 @@ export function VercelDeploymentManager({
           githubToken: localGithubToken,
           token: localVercelToken,
           workspaceId,
-          framework: framework || undefined,
+          framework: framework && framework !== 'auto' ? framework : undefined,
         }),
       });
 
@@ -687,7 +687,7 @@ function CreateProjectForm({
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {workspaces.map((workspace: any) => (
+                {workspaces.filter((workspace: any) => workspace.id).map((workspace: any) => (
                   <SelectItem key={workspace.id} value={workspace.id}>
                     <div className="flex items-center gap-2">
                       <FolderOpen className="w-4 h-4" />
@@ -806,7 +806,7 @@ function CreateProjectForm({
               <SelectValue placeholder="Auto-detect" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Auto-detect</SelectItem>
+              <SelectItem value="auto">Auto-detect</SelectItem>
               <SelectItem value="nextjs">Next.js</SelectItem>
               <SelectItem value="react">React</SelectItem>
               <SelectItem value="vue">Vue</SelectItem>
