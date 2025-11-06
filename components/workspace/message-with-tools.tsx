@@ -373,7 +373,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
             )}
             
             {/* Tool execution steps */}
-            {hasTools && toolInvocations?.map((tool: any) => {
+           {/* {hasTools && toolInvocations?.map((tool: any) => {
               const ToolIcon = getToolIcon(tool.toolName)
               return (
                 <ChainOfThoughtStep
@@ -383,20 +383,21 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
                   status={getToolStatus(tool)}
                 >
                   {/* Show error message if tool failed */}
-                  {tool.state === 'result' && tool.result?.error && (
+                 {/* {tool.state === 'result' && tool.result?.error && (
                     <div className="text-sm text-red-500 mt-2">
                       Error: {tool.result.error}
                     </div>
                   )}
                   {/* Show success message if available */}
-                  {tool.state === 'result' && !tool.result?.error && tool.result?.message && (
+                  {/* {tool.state === 'result' && !tool.result?.error && tool.result?.message && (
                     <div className="text-sm text-green-600 mt-2">
                       {tool.result.message}
                     </div>
                   )}
-                </ChainOfThoughtStep>
+                </ChainOfThoughtContent></ChainOfThought>
               )
-            })}
+            })}*/}
+
           </ChainOfThoughtContent>
         </ChainOfThought>
       )}
