@@ -1330,7 +1330,21 @@ EXAMPLES:
         {/* Enhanced Header with Project Context */}
         <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
           <div className="flex items-center justify-between">
-
+            <div className="flex items-center space-x-3">
+              <Rocket className="h-6 w-6 text-blue-400" />
+              <div>
+                <h1 className="text-xl font-bold">Quick Deploy</h1>
+                <p className="text-sm text-gray-400">Deploy to GitHub, Vercel, or Netlify</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              <Link href={`/pc-workspace/hosting${selectedProject ? `?project=${selectedProject.id}` : ''}`}>
+                <Button variant="outline" className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600">
+                  <Globe className="h-4 w-4 mr-2" />
+                  Advanced Hosting
+                </Button>
+              </Link>
+            </div>
           </div>
 
           {/* Quick Stats Row */}
@@ -1951,6 +1965,27 @@ EXAMPLES:
             {/* Vercel Deployment Form */}
             {activeTab === 'vercel' && (
               <div className="space-y-6">
+                {/* Advanced Hosting Notice */}
+                <Alert className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border-blue-700">
+                  <Sparkles className="h-4 w-4 text-blue-400" />
+                  <AlertDescription className="text-gray-300">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold mb-1">🚀 New: Advanced Hosting Management</p>
+                        <p className="text-sm">
+                          Get access to full Vercel features: custom domains, environment variables, deployment history, and real-time build logs!
+                        </p>
+                      </div>
+                      <Link href={`/pc-workspace/hosting${selectedProject ? `?project=${selectedProject.id}` : ''}`}>
+                        <Button variant="outline" size="sm" className="ml-4 bg-blue-600 hover:bg-blue-700 border-blue-500 text-white">
+                          <Rocket className="h-3 w-3 mr-2" />
+                          Try It Now
+                        </Button>
+                      </Link>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+
                 {/* Git-based deployment notice */}
                 <div className="p-4 bg-blue-900/20 border border-blue-700 rounded-lg">
                   <div className="flex items-center space-x-2 mb-2">
