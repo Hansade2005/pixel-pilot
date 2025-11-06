@@ -163,25 +163,29 @@ export async function POST(request: NextRequest) {
       // Redeploy to existing project
       console.log(`Redeploying to existing Vercel project: ${existingProjectId}`);
 
-      // Trigger new deployment from main branch
-      const deployResponse = await fetch('https://api.vercel.com/v13/deployments', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: existingProjectId, // Use project ID for redeployment
-          gitSource: {
-            type: 'github',
-            repo: githubRepo,
-            ref: 'main',
-          },
-          projectSettings: {
-            ...(detectedFramework && { framework: detectedFramework }),
-          },
-        }),
-      });
+      
+    // Trigger new deployment from main branch
+const deployResponse = await fetch('https://api.vercel.com/v13/deployments', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    name: existingProjectId, // You can keep this if it matches your project slug
+    gitSource: {
+      type: 'github',
+      repo: githubRepo,
+      ref: 'main', // branch name
+    },
+    withLatestCommit: true, // ✅ ensures latest commit is pulled
+    target: 'production', // optional but recommended
+    projectSettings: {
+      ...(detectedFramework && { framework: detectedFramework }),
+    },
+  }),
+});
+
 
       if (!deployResponse.ok) {
         const errorData = await deployResponse.json();
@@ -417,13 +421,49 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Return project info with GitHub integration
-    return NextResponse.json({
-      url: finalDeploymentUrl || `https://${projectData.name}.vercel.app`,
+    // Store project metadata for future operations
+    const projectMetadata = {
       projectId: projectData.id,
+      projectName: projectData.name,
+      workspaceId: workspaceId,
+      githubRepo: githubRepo,
+      framework: detectedFramework,
+      productionUrl: finalDeploymentUrl || `https://${projectData.name}.vercel.app`,
+      createdAt: Date.now(),
+      lastDeployedAt: Date.now(),
+      deploymentCount: 1,
+      autoDeployEnabled: true,
+      customDomains: [],
+      environmentVariables: environmentVariables?.map((ev: { key: string; value: string }) => ({ 
+        key: ev.key, 
+        target: ['production'] 
+      })) || [],
+    };
+
+    // Store in workspace metadata
+    try {
+      await storageManager.updateWorkspace(workspaceId, {
+        vercelProjectId: projectData.id,
+        vercelDeploymentUrl: finalDeploymentUrl || `https://${projectData.name}.vercel.app`,
+        deploymentStatus: 'deployed',
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (storageError) {
+      console.error('Failed to store project metadata:', storageError);
+      // Continue even if storage fails
+    }
+
+    // Return comprehensive project info with GitHub integration
+    return NextResponse.json({
+      success: true,
+      url: finalDeploymentUrl || `https://${projectData.name}.vercel.app`,
+      projectId: projectData.id, // ✅ Store this for future operations!
+      projectName: projectData.name,
       deploymentId: deploymentData?.uid,
       commitSha: deploymentData?.meta?.githubCommitSha || `vercel_project_${Date.now()}`,
       status: mode === 'redeploy' ? 'ready' : 'ready',
+      framework: detectedFramework,
+      metadata: projectMetadata,
     });
 
   } catch (error) {
