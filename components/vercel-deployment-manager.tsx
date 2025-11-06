@@ -202,7 +202,9 @@ export function VercelDeploymentManager({
     
     setLoadingRepos(true);
     try {
-      const response = await fetch('https://api.github.com/user/repos?sort=updated&per_page=100', {
+      // Use internal API route to avoid CORS/401 issues when calling GitHub directly from browser
+      const response = await fetch('/api/github/repos', {
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${localGithubToken}`,
           'Accept': 'application/vnd.github.v3+json',
@@ -765,7 +767,7 @@ function CreateProjectForm({
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {githubRepos.map((repo: any) => (
+                  {githubRepos.filter((repo: any) => repo.full_name).map((repo: any) => (
                     <SelectItem key={repo.id} value={repo.full_name}>
                       <div className="flex items-center gap-2">
                         <GitBranch className="w-4 h-4" />
