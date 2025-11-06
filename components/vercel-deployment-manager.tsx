@@ -129,7 +129,7 @@ export function VercelDeploymentManager({
   // Form states
   const [projectName, setProjectName] = useState('');
   const [githubRepo, setGithubRepo] = useState('');
-  const [framework, setFramework] = useState('');
+  const [framework, setFramework] = useState('auto-detect');
   const [showTokens, setShowTokens] = useState(false);
   const [localVercelToken, setLocalVercelToken] = useState(vercelToken || '');
   const [localGithubToken, setLocalGithubToken] = useState(githubToken || '');
@@ -242,7 +242,7 @@ export function VercelDeploymentManager({
           githubToken: localGithubToken,
           token: localVercelToken,
           workspaceId,
-          framework: framework || undefined,
+          framework: framework === 'auto-detect' ? undefined : framework,
         }),
       });
 
@@ -673,7 +673,7 @@ function CreateProjectForm({
           <div className="space-y-2">
             <Label htmlFor="workspace">Workspace Project</Label>
             <Select 
-              value={selectedWorkspace?.id || ''} 
+              value={selectedWorkspace?.id} 
               onValueChange={handleWorkspaceChange}
             >
               <SelectTrigger>
@@ -806,7 +806,7 @@ function CreateProjectForm({
               <SelectValue placeholder="Auto-detect" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Auto-detect</SelectItem>
+              <SelectItem value="auto-detect">Auto-detect</SelectItem>
               <SelectItem value="nextjs">Next.js</SelectItem>
               <SelectItem value="react">React</SelectItem>
               <SelectItem value="vue">Vue</SelectItem>
