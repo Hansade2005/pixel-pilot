@@ -6,12 +6,16 @@ import { NextRequest, NextResponse } from 'next/server';
  * This endpoint provides access to deployment build logs, supporting both
  * streaming (Server-Sent Events) and paginated JSON responses.
  * 
+ * Uses GET /v3/deployments/{idOrUrl}/events
+ * Official API: https://vercel.com/docs/rest-api/reference/endpoints/deployments/get-deployment-events
+ * 
  * Query Parameters:
  * - token: Vercel access token (required)
  * - teamId: Team ID (optional)
  * - stream: Enable SSE streaming (default: false)
  * - limit: Number of log entries to return (default: 100)
  * - follow: Keep connection open for live logs (default: false)
+ * - direction: Order of events (forward/backward, default: forward)
  */
 export async function GET(
   request: NextRequest,
@@ -26,6 +30,7 @@ export async function GET(
     const follow = searchParams.get('follow') === 'true';
     const since = searchParams.get('since');
     const until = searchParams.get('until');
+    const direction = searchParams.get('direction') || 'forward';
 
     // Validate required parameters
     if (!vercelToken) {
@@ -34,15 +39,27 @@ export async function GET(
       }, { status: 400 });
     }
 
-    // Build query parameters for Vercel API
+    // Validate deployment ID is not undefined or empty
+    if (!params.deploymentId || params.deploymentId === 'undefined') {
+      return NextResponse.json({
+        error: 'Valid deployment ID is required',
+        code: 'INVALID_DEPLOYMENT_ID'
+      }, { status: 400 });
+    }
+
+    // Build query parameters for Vercel API (v3 format)
     const queryParams = new URLSearchParams();
     if (teamId) queryParams.set('teamId', teamId);
     if (limit) queryParams.set('limit', limit.toString());
     if (follow) queryParams.set('follow', '1');
     if (since) queryParams.set('since', since);
     if (until) queryParams.set('until', until);
+    if (direction) queryParams.set('direction', direction);
+    queryParams.set('builds', '1'); // Include build logs
+    queryParams.set('delimiter', '1'); // Include delimiters
 
-    const apiUrl = `https://api.vercel.com/v2/deployments/${params.deploymentId}/events?${queryParams.toString()}`;
+    // Use v3 API endpoint as per official documentation
+    const apiUrl = `https://api.vercel.com/v3/deployments/${params.deploymentId}/events?${queryParams.toString()}`;
 
     // Handle streaming response (Server-Sent Events)
     if (stream || follow) {

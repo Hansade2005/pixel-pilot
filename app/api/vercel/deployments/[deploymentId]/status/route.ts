@@ -22,6 +22,14 @@ export async function GET(
       }, { status: 400 });
     }
 
+    // Validate deployment ID is not undefined or empty
+    if (!params.deploymentId || params.deploymentId === 'undefined') {
+      return NextResponse.json({
+        error: 'Valid deployment ID is required',
+        code: 'INVALID_DEPLOYMENT_ID'
+      }, { status: 400 });
+    }
+
     // Build API URL with optional team parameter
     let apiUrl = `https://api.vercel.com/v13/deployments/${params.deploymentId}`;
     if (teamId) {
@@ -68,8 +76,9 @@ export async function GET(
     const deployment = await response.json();
 
     // Parse and format deployment information
+    // Note: Vercel API returns `uid` for deployment ID
     const deploymentInfo = {
-      id: deployment.uid,
+      id: deployment.uid || deployment.id, // Support both field names
       url: `https://${deployment.url}`,
       status: deployment.readyState,
       state: deployment.state,

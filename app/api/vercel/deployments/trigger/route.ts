@@ -138,6 +138,24 @@ export async function POST(request: NextRequest) {
 
     const deployment = await deployResponse.json();
 
+    console.log('Deployment API response:', JSON.stringify(deployment, null, 2));
+    console.log('Deployment created successfully:', {
+      id: deployment.id || deployment.uid,
+      url: deployment.url,
+      readyState: deployment.readyState
+    });
+
+    // Ensure we have a valid deployment ID
+    const deploymentId = deployment.id || deployment.uid;
+    if (!deploymentId) {
+      console.error('No deployment ID in response:', deployment);
+      return NextResponse.json({
+        error: 'Failed to get deployment ID from Vercel API',
+        code: 'MISSING_DEPLOYMENT_ID',
+        response: deployment
+      }, { status: 500 });
+    }
+
     // Update workspace metadata in storage
     if (workspaceId) {
       try {
@@ -154,12 +172,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Return deployment information
+    // Note: Vercel v13 API returns `id` field for deployment ID
     return NextResponse.json({
       success: true,
-      deploymentId: deployment.uid,
+      deploymentId: deploymentId,
       deploymentUrl: `https://${deployment.url}`,
       status: deployment.readyState || 'BUILDING',
-      inspectorUrl: deployment.inspectorUrl || `https://vercel.com/${project.name}/${deployment.uid}`,
+      inspectorUrl: deployment.inspectorUrl || `https://vercel.com/${project.name}/${deploymentId}`,
       target: target,
       branch: branch,
       createdAt: deployment.createdAt,
