@@ -1316,13 +1316,17 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
         <div className="flex items-center justify-between">
           <div>
             <CardTitle>Deployment History</CardTitle>
-            <CardDescription className="mt-1">
+            <CardDescription className="mt-1 flex items-center gap-2">
               Click "Promote" to instantly make any READY deployment live in production
+              <Badge variant="outline" className="text-xs">
+                <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                Auto-refreshing every 5s
+              </Badge>
             </CardDescription>
           </div>
           <Button onClick={onRefresh} size="sm" variant="outline">
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            Refresh Now
           </Button>
         </div>
       </CardHeader>
