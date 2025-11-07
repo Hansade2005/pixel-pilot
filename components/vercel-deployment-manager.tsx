@@ -1251,6 +1251,7 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
   const [selectedDeploymentForLogs, setSelectedDeploymentForLogs] = useState<string | null>(null);
   const [runtimeLogs, setRuntimeLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const [runtimeLogsError, setRuntimeLogsError] = useState<string | null>(null);
   
   // Build logs state
   const [selectedDeploymentForBuildLogs, setSelectedDeploymentForBuildLogs] = useState<string | null>(null);
@@ -1267,23 +1268,57 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
   }, [onRefresh]);
 
   const loadRuntimeLogs = async (deploymentId: string) => {
+    if (!projectId || !vercelToken) {
+      console.error('Missing required parameters:', { projectId, vercelToken: !!vercelToken });
+      setLoadingLogs(false);
+      setRuntimeLogs([]);
+      setRuntimeLogsError('Missing project ID or token');
+      return;
+    }
+
     setLoadingLogs(true);
+    setRuntimeLogsError(null);
+    console.log('Loading runtime logs for:', { projectId, deploymentId });
+    
     try {
-      const response = await fetch(
-        `/api/vercel/projects/${projectId}/deployments/${deploymentId}/runtime-logs?token=${vercelToken}&limit=100`
-      );
+      const url = `/api/vercel/projects/${projectId}/deployments/${deploymentId}/runtime-logs?token=${vercelToken}&limit=100`;
+      console.log('Fetching runtime logs from:', url.replace(vercelToken, 'HIDDEN'));
+      
+      const response = await fetch(url);
+      console.log('Response status:', response.status, response.statusText);
+      
       const data = await response.json();
       
-      if (response.ok && data.logs) {
-        setRuntimeLogs(data.logs);
+      console.log('Runtime logs response:', { 
+        ok: response.ok, 
+        status: response.status, 
+        hasLogs: !!data.logs,
+        logsCount: data.logs?.length || 0,
+        error: data.error,
+        fullData: data
+      });
+      
+      if (response.ok) {
+        if (data.logs && Array.isArray(data.logs)) {
+          setRuntimeLogs(data.logs);
+          setRuntimeLogsError(null);
+        } else {
+          console.warn('Response OK but no logs array:', data);
+          setRuntimeLogs([]);
+          setRuntimeLogsError(null); // No error, just no logs yet
+        }
       } else {
-        console.error('Failed to load runtime logs:', data.error);
+        const errorMsg = data.error || `HTTP ${response.status}: ${response.statusText}`;
+        console.error('Failed to load runtime logs:', errorMsg);
         setRuntimeLogs([]);
+        setRuntimeLogsError(errorMsg);
       }
     } catch (err) {
       console.error('Error loading runtime logs:', err);
       setRuntimeLogs([]);
+      setRuntimeLogsError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
+      console.log('Setting loadingLogs to false');
       setLoadingLogs(false);
     }
   };
@@ -1488,6 +1523,15 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
                               <div className="flex items-center gap-2 text-gray-500">
                                 <Loader2 className="w-4 h-4 animate-spin" />
                                 Loading runtime logs...
+                                <span className="text-[10px]">(Check console for details)</span>
+                              </div>
+                            ) : runtimeLogsError ? (
+                              <div className="text-red-400">
+                                <div className="font-bold">Error loading runtime logs:</div>
+                                <div className="mt-2">{runtimeLogsError}</div>
+                                <div className="mt-4 text-gray-500 text-[10px]">
+                                  Check the browser console for more details.
+                                </div>
                               </div>
                             ) : runtimeLogs.length > 0 ? (
                               runtimeLogs.map((log: any, i: number) => (

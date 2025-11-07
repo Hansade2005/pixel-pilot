@@ -119,11 +119,12 @@ export async function GET(
       });
     }
 
-    // Handle regular JSON response (non-streaming)
+    // Handle regular JSON response (non-streaming) with timeout
     const response = await fetch(apiUrl, {
       headers: {
         'Authorization': `Bearer ${vercelToken}`,
       },
+      signal: AbortSignal.timeout(5000), // 5 second timeout
     });
 
     if (!response.ok) {
@@ -156,30 +157,85 @@ export async function GET(
       }, { status: response.status });
     }
 
-    // Parse the stream response
+    // Read the stream for a limited time (5 seconds) to get recent logs
     const logs: any[] = [];
-    const text = await response.text();
+    const reader = response.body?.getReader();
     
-    // Split by newlines and parse each line as JSON
-    const lines = text.trim().split('\n').filter(line => line.trim());
-    
-    for (const line of lines) {
+    if (!reader) {
+      return NextResponse.json({
+        logs: [],
+        count: 0,
+        projectId: params.projectId,
+        deploymentId: params.deploymentId,
+        message: 'No response body'
+      });
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+    const startTime = Date.now();
+    const timeoutMs = 5000; // Read for 5 seconds max
+
+    try {
+      while (true) {
+        // Check if we've exceeded the time limit
+        if (Date.now() - startTime > timeoutMs) {
+          console.log('Runtime logs read timeout reached, returning collected logs');
+          break;
+        }
+
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        
+        // Process complete lines
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+        
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          
+          try {
+            const log = JSON.parse(line);
+            logs.push({
+              level: log.level,
+              message: log.message,
+              rowId: log.rowId,
+              source: log.source,
+              timestamp: log.timestampInMs,
+              domain: log.domain,
+              messageTruncated: log.messageTruncated,
+              requestMethod: log.requestMethod,
+              requestPath: log.requestPath,
+              responseStatusCode: log.responseStatusCode,
+            });
+            
+            // Stop after collecting a reasonable number of logs
+            if (logs.length >= parseInt(limit)) {
+              console.log(`Collected ${logs.length} logs, stopping read`);
+              reader.cancel();
+              break;
+            }
+          } catch (parseError) {
+            console.error('Failed to parse log line:', line, parseError);
+          }
+        }
+        
+        // If we've collected enough logs, stop reading
+        if (logs.length >= parseInt(limit)) {
+          break;
+        }
+      }
+    } catch (error) {
+      console.error('Error reading stream:', error);
+      // Return whatever logs we collected so far
+    } finally {
       try {
-        const log = JSON.parse(line);
-        logs.push({
-          level: log.level,
-          message: log.message,
-          rowId: log.rowId,
-          source: log.source,
-          timestamp: log.timestampInMs,
-          domain: log.domain,
-          messageTruncated: log.messageTruncated,
-          requestMethod: log.requestMethod,
-          requestPath: log.requestPath,
-          responseStatusCode: log.responseStatusCode,
-        });
-      } catch (parseError) {
-        console.error('Failed to parse log line:', line, parseError);
+        reader.cancel();
+      } catch (e) {
+        // Ignore cancel errors
       }
     }
 
