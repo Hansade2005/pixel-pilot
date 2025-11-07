@@ -2060,6 +2060,22 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
         },
       };
 
+      // Validate phone number format before sending
+      const formattedPhone = formatPhoneForVercel(phone, phoneCountryCode);
+      const phoneRegex = /^\+[1-9]\d{1,14}$/;
+      if (!phoneRegex.test(formattedPhone)) {
+        setError(`Invalid Phone Number: ${formattedPhone}. Must be in E.164 format (e.g., +14155552671)`);
+        return;
+      }
+
+      // Validate country code format
+      const selectedCountryCode = countryCodeMap[country] || 'US';
+      const countryRegex = /^[A-Z]{2}$/;
+      if (!countryRegex.test(selectedCountryCode)) {
+        setError(`Invalid Country Code: ${selectedCountryCode}. Must be a 2-letter ISO code (e.g., US, GB)`);
+        return;
+      }
+
       console.log('Purchase data being sent:', {
         ...purchaseData,
         vercelToken: '***hidden***' // Hide token in logs
