@@ -1861,6 +1861,7 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [countries, setCountries] = useState<string[]>([]);
+  const [countryPhoneCodes, setCountryPhoneCodes] = useState<Record<string, string>>({});
 
   // Contact info
   const [firstName, setFirstName] = useState('');
@@ -1929,23 +1930,74 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
     'Zambia': 'ZM', 'Zimbabwe': 'ZW'
   };
 
-  // Load countries from countries.txt
+  // Load countries and phone codes from files
   useEffect(() => {
-    const loadCountries = async () => {
+    const loadCountriesAndCodes = async () => {
       try {
-        const response = await fetch('/countries.txt');
-        const text = await response.text();
-        const countriesList = text.split('\n').filter(country => country.trim() !== '');
+        // Load countries list
+        const countriesResponse = await fetch('/countries.txt');
+        const countriesText = await countriesResponse.text();
+        const countriesList = countriesText.split('\n').filter(country => country.trim() !== '');
         setCountries(countriesList);
+
+        // Load country phone codes
+        const codesResponse = await fetch('/country-codes.txt');
+        const codesText = await codesResponse.text();
+        const codesLines = codesText.split('\n').filter(line => line.trim() !== '');
+        
+        const phoneCodesMap: Record<string, string> = {};
+        codesLines.forEach(line => {
+          try {
+            const countryData = JSON.parse(line);
+            if (countryData.label && countryData.value) {
+              phoneCodesMap[countryData.label] = countryData.value;
+            }
+          } catch (parseErr) {
+            console.warn('Failed to parse country code line:', line);
+          }
+        });
+        
+        setCountryPhoneCodes(phoneCodesMap);
       } catch (err) {
-        console.error('Failed to load countries:', err);
-        // Fallback to hardcoded countries if file fails to load
+        console.error('Failed to load countries or codes:', err);
+        // Fallback to hardcoded data if files fail to load
         setCountries(['United States', 'Canada', 'United Kingdom', 'Germany', 'France']);
+        setCountryPhoneCodes({
+          'United States': '+1',
+          'Canada': '+1',
+          'United Kingdom': '+44',
+          'Germany': '+49',
+          'France': '+33'
+        });
       }
     };
 
-    loadCountries();
+    loadCountriesAndCodes();
   }, []);
+
+  // Format phone number for Vercel API based on country
+  const formatPhoneForVercel = (phoneNumber: string, selectedCountry: string): string => {
+    // Remove all non-digit characters
+    const digits = phoneNumber.replace(/\D/g, '');
+    
+    // If already has country code (starts with +), return as-is with dots
+    if (phoneNumber.startsWith('+')) {
+      const cleanNumber = phoneNumber.replace(/[^\d+]/g, '');
+      // Add dots after country code (Vercel format: +1.4158551452)
+      if (cleanNumber.length > 3) {
+        const countryCodeEnd = cleanNumber.indexOf('.') > 0 ? cleanNumber.indexOf('.') : (cleanNumber.startsWith('+1') ? 2 : 3);
+        return cleanNumber.slice(0, countryCodeEnd) + '.' + cleanNumber.slice(countryCodeEnd);
+      }
+      return cleanNumber;
+    }
+    
+    // Get country code from loaded data
+    const countryCode = countryPhoneCodes[selectedCountry] || '+1';
+    
+    // Format: +[country code].[phone number] (e.g., +1.4158551452)
+    return `${countryCode}.${digits}`;
+  };
+
   const checkAvailability = async () => {
     if (!domain) return;
 
@@ -2008,7 +2060,7 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
             firstName,
             lastName,
             email,
-            phone: phone.startsWith('+') ? phone : `+1${phone.replace(/\D/g, '')}`,
+            phone: formatPhoneForVercel(phone, country),
             address1: address,
             city,
             state,
