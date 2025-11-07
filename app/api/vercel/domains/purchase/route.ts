@@ -3,25 +3,52 @@ import { NextRequest, NextResponse } from 'next/server';
 /**
  * Purchase a domain through Vercel
  * 
- * This endpoint initiates a domain purchase order through Vercel's domain marketplace.
- * Uses POST /v1/domains/buy for bulk domain purchases.
+ * This endpoint initiates a domain purchase through Vercel's domain registrar.
+ * Uses POST /v1/registrar/domains/{domain}/buy for single domain purchases.
  * 
- * Official API: https://vercel.com/docs/rest-api/reference/endpoints/domains-registrar/buy-multiple-domains
+ * Official API: https://vercel.com/docs/rest-api/reference/endpoints/domains-registrar/buy-a-domain
  */
 export async function POST(request: NextRequest) {
   try {
+    const requestBody = await request.json();
+    console.log('Domain purchase request received:', {
+      ...requestBody,
+      vercelToken: requestBody.vercelToken ? '***hidden***' : undefined
+    });
+
     const { 
-      domains, // Array of domain objects: [{ domainName, autoRenew?, years?, expectedPrice? }]
+      domain, // Single domain name string
+      autoRenew,
+      years,
+      expectedPrice,
       vercelToken, 
       teamId,
       // Contact information
       contactInformation,
-    } = await request.json();
+    } = requestBody;
 
     // Validate required fields
-    if (!domains || !Array.isArray(domains) || domains.length === 0) {
+    if (!domain || typeof domain !== 'string') {
       return NextResponse.json({
-        error: 'Domains array is required and must contain at least one domain'
+        error: 'Domain name is required'
+      }, { status: 400 });
+    }
+
+    if (!autoRenew || typeof autoRenew !== 'boolean') {
+      return NextResponse.json({
+        error: 'autoRenew is required and must be a boolean'
+      }, { status: 400 });
+    }
+
+    if (!years || typeof years !== 'number' || years < 1) {
+      return NextResponse.json({
+        error: 'years is required and must be a number >= 1'
+      }, { status: 400 });
+    }
+
+    if (!expectedPrice || typeof expectedPrice !== 'number' || expectedPrice < 0.01) {
+      return NextResponse.json({
+        error: 'expectedPrice is required and must be >= 0.01'
       }, { status: 400 });
     }
 
@@ -32,50 +59,51 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate contact information
-    if (!contactInformation || !contactInformation.firstName || !contactInformation.lastName || 
-        !contactInformation.email || !contactInformation.phone || !contactInformation.address1 || 
-        !contactInformation.city || !contactInformation.state || !contactInformation.zip || 
-        !contactInformation.country) {
+    if (!contactInformation) {
       return NextResponse.json({
-        error: 'Complete contact information is required for domain purchase',
-        required: {
-          firstName: 'string',
-          lastName: 'string',
-          email: 'string',
-          phone: 'string',
-          address1: 'string',
-          city: 'string',
-          state: 'string',
-          zip: 'string',
-          country: 'string (e.g., US, GB, DE)'
-        },
-        optional: {
-          address2: 'string',
-          companyName: 'string',
-          fax: 'string'
-        }
+        error: 'contactInformation is required'
       }, { status: 400 });
     }
 
-    // Validate team ID is required
-    if (!teamId) {
+    const requiredFields = ['firstName', 'lastName', 'email', 'phone', 'address1', 'city', 'state', 'zip', 'country'];
+    const missingFields = requiredFields.filter(field => !contactInformation[field] || contactInformation[field].trim() === '');
+    
+    if (missingFields.length > 0) {
       return NextResponse.json({
-        error: 'Team ID is required for domain purchases',
-        code: 'TEAM_ID_REQUIRED'
+        error: `Missing required contact information fields: ${missingFields.join(', ')}`,
+        missingFields,
+        received: Object.keys(contactInformation),
+        details: 'All contact fields must be non-empty strings. Country must be ISO 3166-1 alpha-2 code (e.g., US, GB, DE). Phone must be E.164 format.'
       }, { status: 400 });
     }
 
-    // Build API URL with required team ID
-    const apiUrl = `https://api.vercel.com/v1/domains/buy?teamId=${teamId}`;
+    // Validate phone number format (E.164)
+    if (!contactInformation.phone.match(/^\+[1-9]\d{1,14}$/)) {
+      return NextResponse.json({
+        error: 'Phone number must be in valid E.164 format (e.g., +14155552671)',
+        received: contactInformation.phone
+      }, { status: 400 });
+    }
+
+    // Validate country code (ISO 3166-1 alpha-2)
+    if (contactInformation.country.length !== 2 || !/^[A-Z]{2}$/.test(contactInformation.country)) {
+      return NextResponse.json({
+        error: 'Country must be a valid ISO 3166-1 alpha-2 country code (e.g., US, GB, DE)',
+        received: contactInformation.country
+      }, { status: 400 });
+    }
+
+    // Build API URL for single domain purchase
+    let apiUrl = `https://api.vercel.com/v1/registrar/domains/${encodeURIComponent(domain)}/buy`;
+    if (teamId) {
+      apiUrl += `?teamId=${teamId}`;
+    }
 
     // Prepare purchase payload according to official API spec
     const purchasePayload = {
-      domains: domains.map((d: any) => ({
-        domainName: d.domainName,
-        autoRenew: d.autoRenew !== undefined ? d.autoRenew : true,
-        years: d.years || 1,
-        ...(d.expectedPrice && { expectedPrice: d.expectedPrice })
-      })),
+      autoRenew,
+      years,
+      expectedPrice,
       contactInformation: {
         firstName: contactInformation.firstName,
         lastName: contactInformation.lastName,
@@ -92,7 +120,12 @@ export async function POST(request: NextRequest) {
       }
     };
 
-    // Purchase domain(s) using the official API
+    console.log('Making request to Vercel API:', {
+      url: apiUrl,
+      payload: purchasePayload
+    });
+
+    // Purchase domain using the official API
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -101,6 +134,8 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify(purchasePayload),
     });
+
+    console.log('Vercel API response status:', response.status);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -161,11 +196,14 @@ export async function POST(request: NextRequest) {
 
     const data = await response.json();
 
-    // Return purchase order information
+    // Return purchase information (single domain response)
     return NextResponse.json({
-      orderId: data.orderId,
-      links: data._links,
-      message: 'Domain purchase order created successfully',
+      id: data.id,
+      name: data.name,
+      createdAt: data.createdAt,
+      expiresAt: data.expiresAt,
+      autoRenew: data.autoRenew,
+      message: 'Domain purchased successfully',
       timestamp: Date.now(),
     });
 

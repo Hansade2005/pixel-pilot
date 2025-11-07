@@ -1985,10 +1985,13 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
     // If phone number is empty, return empty
     if (!digits) return '';
     
-    // Format: +[country code].[phone number] (e.g., +1.4158551452)
-    // Remove + from country code for dot formatting
-    const codeWithoutPlus = selectedPhoneCountryCode.replace('+', '');
-    return `+${codeWithoutPlus}.${digits}`;
+    // Format: E.164 format as required by Vercel API (e.g., +14158551452)
+    // Ensure the country code is included
+    const cleanCountryCode = selectedPhoneCountryCode.startsWith('+') 
+      ? selectedPhoneCountryCode 
+      : `+${selectedPhoneCountryCode}`;
+    
+    return `${cleanCountryCode}${digits}`;
   };
 
   const checkAvailability = async () => {
@@ -2037,30 +2040,35 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
     setError('');
 
     try {
+      const purchaseData = {
+        domain: domain,
+        autoRenew: true,
+        years: 1,
+        expectedPrice: availability?.price,
+        vercelToken,
+        teamId: teamId, // Required by the API
+        contactInformation: {
+          firstName,
+          lastName,
+          email,
+          phone: formatPhoneForVercel(phone, phoneCountryCode),
+          address1: address,
+          city,
+          state,
+          zip: postalCode,
+          country: countryCodeMap[country] || 'US', // Fallback to US if country code not found
+        },
+      };
+
+      console.log('Purchase data being sent:', {
+        ...purchaseData,
+        vercelToken: '***hidden***' // Hide token in logs
+      });
+
       const response = await fetch('/api/vercel/domains/purchase', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          domains: [{
-            domainName: domain,
-            autoRenew: true,
-            years: 1,
-            expectedPrice: availability?.price,
-          }],
-          vercelToken,
-          teamId: teamId, // Required by the API
-          contactInformation: {
-            firstName,
-            lastName,
-            email,
-            phone: formatPhoneForVercel(phone, phoneCountryCode),
-            address1: address,
-            city,
-            state,
-            zip: postalCode,
-            country: countryCodeMap[country] || country,
-          },
-        }),
+        body: JSON.stringify(purchaseData),
       });
 
       const data = await response.json();
