@@ -1868,6 +1868,7 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [phoneCountryCode, setPhoneCountryCode] = useState('+1'); // Separate state for phone country code
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
@@ -1969,33 +1970,25 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
           'Germany': '+49',
           'France': '+33'
         });
+        setPhoneCountryCode('+1'); // Set default phone country code
       }
     };
 
     loadCountriesAndCodes();
   }, []);
 
-  // Format phone number for Vercel API based on country
-  const formatPhoneForVercel = (phoneNumber: string, selectedCountry: string): string => {
-    // Remove all non-digit characters
+  // Format phone number for Vercel API using selected country code and phone number
+  const formatPhoneForVercel = (phoneNumber: string, selectedPhoneCountryCode: string): string => {
+    // Remove all non-digit characters from phone number
     const digits = phoneNumber.replace(/\D/g, '');
     
-    // If already has country code (starts with +), return as-is with dots
-    if (phoneNumber.startsWith('+')) {
-      const cleanNumber = phoneNumber.replace(/[^\d+]/g, '');
-      // Add dots after country code (Vercel format: +1.4158551452)
-      if (cleanNumber.length > 3) {
-        const countryCodeEnd = cleanNumber.indexOf('.') > 0 ? cleanNumber.indexOf('.') : (cleanNumber.startsWith('+1') ? 2 : 3);
-        return cleanNumber.slice(0, countryCodeEnd) + '.' + cleanNumber.slice(countryCodeEnd);
-      }
-      return cleanNumber;
-    }
-    
-    // Get country code from loaded data
-    const countryCode = countryPhoneCodes[selectedCountry] || '+1';
+    // If phone number is empty, return empty
+    if (!digits) return '';
     
     // Format: +[country code].[phone number] (e.g., +1.4158551452)
-    return `${countryCode}.${digits}`;
+    // Remove + from country code for dot formatting
+    const codeWithoutPlus = selectedPhoneCountryCode.replace('+', '');
+    return `+${codeWithoutPlus}.${digits}`;
   };
 
   const checkAvailability = async () => {
@@ -2060,7 +2053,7 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
             firstName,
             lastName,
             email,
-            phone: formatPhoneForVercel(phone, country),
+            phone: formatPhoneForVercel(phone, phoneCountryCode),
             address1: address,
             city,
             state,
@@ -2162,7 +2155,27 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
 
           <div>
             <Label>Phone</Label>
-            <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            <div className="flex gap-2">
+              <Select value={phoneCountryCode} onValueChange={setPhoneCountryCode}>
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(countryPhoneCodes).map(([countryName, code]) => (
+                    <SelectItem key={countryName} value={code}>
+                      {code} {countryName.length > 20 ? countryName.substring(0, 17) + '...' : countryName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input 
+                type="tel" 
+                value={phone} 
+                onChange={(e) => setPhone(e.target.value)} 
+                placeholder="Phone number"
+                className="flex-1"
+              />
+            </div>
           </div>
 
           <div>
@@ -2215,7 +2228,7 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
             </Button>
             <Button 
               onClick={purchaseDomain} 
-              disabled={loading || !firstName || !lastName || !email} 
+              disabled={loading || !firstName || !lastName || !email || !phone} 
               className="flex-1"
             >
               {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
