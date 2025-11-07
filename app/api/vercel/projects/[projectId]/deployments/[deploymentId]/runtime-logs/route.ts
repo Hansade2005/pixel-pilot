@@ -156,7 +156,7 @@ export async function GET(
       }, { status: response.status });
     }
 
-    // Read the stream for a limited time (3 seconds) to get recent logs
+    // Read the stream for a limited time (2 seconds) to get recent logs
     const logs: any[] = [];
     const reader = response.body?.getReader();
     
@@ -172,70 +172,88 @@ export async function GET(
 
     const decoder = new TextDecoder();
     let buffer = '';
-    const readTimeoutMs = 3000; // Read for 3 seconds max
+    const readTimeoutMs = 2000; // Read for 2 seconds max
+    let timeoutId: NodeJS.Timeout | undefined;
 
     try {
-      // Create a timeout promise
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Read timeout')), readTimeoutMs);
-      });
+      // Set a hard timeout to cancel the reader
+      const readPromise = new Promise<void>(async (resolve, reject) => {
+        timeoutId = setTimeout(() => {
+          console.log('Timeout reached, cancelling reader');
+          reader.cancel().catch(() => {});
+          resolve(); // Resolve instead of reject to return collected logs
+        }, readTimeoutMs);
 
-      // Read with timeout
-      const readWithTimeout = async () => {
-        while (true) {
-          const { done, value } = await reader.read();
-          
-          if (done) break;
-          
-          buffer += decoder.decode(value, { stream: true });
-          
-          // Process complete lines
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // Keep incomplete line in buffer
-          
-          for (const line of lines) {
-            if (!line.trim()) continue;
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
             
-            try {
-              const log = JSON.parse(line);
-              logs.push({
-                level: log.level,
-                message: log.message,
-                rowId: log.rowId,
-                source: log.source,
-                timestamp: log.timestampInMs,
-                domain: log.domain,
-                messageTruncated: log.messageTruncated,
-                requestMethod: log.requestMethod,
-                requestPath: log.requestPath,
-                responseStatusCode: log.responseStatusCode,
-              });
+            if (done) {
+              clearTimeout(timeoutId);
+              resolve();
+              break;
+            }
+            
+            buffer += decoder.decode(value, { stream: true });
+            
+            // Process complete lines
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || ''; // Keep incomplete line in buffer
+            
+            for (const line of lines) {
+              if (!line.trim()) continue;
               
-              // Stop after collecting the requested number of logs
-              if (logs.length >= parseInt(limit)) {
-                console.log(`Collected ${logs.length} logs, stopping read`);
-                return; // Exit the function
+              try {
+                const log = JSON.parse(line);
+                logs.push({
+                  level: log.level,
+                  message: log.message,
+                  rowId: log.rowId,
+                  source: log.source,
+                  timestamp: log.timestampInMs,
+                  domain: log.domain,
+                  messageTruncated: log.messageTruncated,
+                  requestMethod: log.requestMethod,
+                  requestPath: log.requestPath,
+                  responseStatusCode: log.responseStatusCode,
+                });
+                
+                // Stop after collecting the requested number of logs
+                if (logs.length >= parseInt(limit)) {
+                  console.log(`Collected ${logs.length} logs, stopping read`);
+                  clearTimeout(timeoutId);
+                  await reader.cancel();
+                  resolve();
+                  return;
+                }
+              } catch (parseError) {
+                console.error('Failed to parse log line:', line.substring(0, 100), parseError);
               }
-            } catch (parseError) {
-              console.error('Failed to parse log line:', line, parseError);
             }
           }
+        } catch (error: any) {
+          clearTimeout(timeoutId);
+          if (error.name !== 'AbortError') {
+            console.error('Error reading stream:', error);
+          }
+          resolve(); // Still resolve to return collected logs
         }
-      };
+      });
 
-      // Race between reading and timeout
-      await Promise.race([readWithTimeout(), timeoutPromise]);
+      await readPromise;
       
     } catch (error: any) {
-      // Timeout or other error - return whatever logs we collected
-      console.log(`Stream read completed/timeout: ${error.message}. Collected ${logs.length} logs`);
+      console.log(`Stream read error: ${error.message}. Collected ${logs.length} logs`);
     } finally {
+      if (timeoutId) clearTimeout(timeoutId);
       try {
-        reader.cancel();
+        await reader.cancel();
       } catch (e) {
         // Ignore cancel errors
       }
     }
+
+    console.log(`Returning ${logs.length} runtime logs`);
 
     // Return formatted logs
     return NextResponse.json({
