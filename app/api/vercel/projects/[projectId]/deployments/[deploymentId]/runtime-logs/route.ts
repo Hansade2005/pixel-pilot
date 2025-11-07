@@ -119,24 +119,16 @@ export async function GET(
       });
     }
 
-    // Handle regular JSON response (non-streaming) - read stream with HARD timeout using AbortController
-    const controller = new AbortController();
-    const fetchTimeout = setTimeout(() => {
-      console.log('Aborting entire fetch after 5 seconds');
-      controller.abort();
-    }, 5000);
+    // Handle regular JSON response (non-streaming)
+    // Let the fetch connect without timeout, then read stream with timeout
+    const response = await fetch(apiUrl, {
+      headers: {
+        'Authorization': `Bearer ${vercelToken}`,
+      },
+      // No signal here - let it connect and start streaming
+    });
 
-    try {
-      const response = await fetch(apiUrl, {
-        headers: {
-          'Authorization': `Bearer ${vercelToken}`,
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(fetchTimeout);
-
-      if (!response.ok) {
+    if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       
       if (response.status === 404) {
@@ -166,7 +158,7 @@ export async function GET(
       }, { status: response.status });
     }
 
-      // Read the stream - will be automatically aborted after 5 seconds by AbortController
+      // Read the stream with a timeout - give it time to actually receive data
       const logs: any[] = [];
       const reader = response.body?.getReader();
       
@@ -182,13 +174,27 @@ export async function GET(
 
       const decoder = new TextDecoder();
       let buffer = '';
+      const startTime = Date.now();
+      const readTimeoutMs = 15000; // 15 seconds to read logs
+      let hasReceivedData = false;
 
       try {
         while (true) {
+          // Check timeout - but only after we've tried to read some data
+          const elapsed = Date.now() - startTime;
+          if (elapsed > readTimeoutMs) {
+            console.log(`Read timeout after ${elapsed}ms, collected ${logs.length} logs`);
+            break;
+          }
+
           const { done, value } = await reader.read();
           
-          if (done) break;
+          if (done) {
+            console.log('Stream ended naturally');
+            break;
+          }
           
+          hasReceivedData = true;
           buffer += decoder.decode(value, { stream: true });
           
           // Process complete lines
@@ -215,8 +221,7 @@ export async function GET(
               
               // Stop after collecting the requested number of logs
               if (logs.length >= parseInt(limit)) {
-                console.log(`Collected ${logs.length} logs, stopping read`);
-                reader.cancel();
+                console.log(`Collected ${logs.length} logs (limit reached)`);
                 break;
               }
             } catch (parseError) {
@@ -224,15 +229,13 @@ export async function GET(
             }
           }
           
+          // Exit if we hit the limit
           if (logs.length >= parseInt(limit)) {
             break;
           }
         }
       } catch (error: any) {
-        // Stream reading error (possibly from AbortController)
-        if (error.name !== 'AbortError') {
-          console.error('Error reading stream:', error);
-        }
+        console.error('Error reading stream:', error);
       } finally {
         try {
           reader.cancel();
@@ -241,7 +244,9 @@ export async function GET(
         }
       }
 
-      console.log(`Returning ${logs.length} runtime logs`);      // Return formatted logs
+      console.log(`Returning ${logs.length} runtime logs (received data: ${hasReceivedData})`);
+      
+      // Return formatted logs
       return NextResponse.json({
         logs,
         count: logs.length,
@@ -249,35 +254,12 @@ export async function GET(
         deploymentId: params.deploymentId,
       });
 
-    } catch (error: any) {
-      clearTimeout(fetchTimeout);
-      
-      // AbortError is expected when timeout fires - return SUCCESS with empty logs
-      if (error.name === 'AbortError') {
-        console.log('Fetch aborted after 5 seconds - this is NORMAL behavior, returning 200 OK');
-        // Return 200 OK status - timeout is expected, not an error
-        return NextResponse.json({
-          logs: [],
-          count: 0,
-          projectId: params.projectId,
-          deploymentId: params.deploymentId,
-        }, { status: 200 });
-      }
-
-      // Other errors - these are actual failures
-      console.error('Runtime logs error:', error);
-      return NextResponse.json({ 
-        error: 'Failed to fetch runtime logs',
-        code: 'INTERNAL_ERROR',
-        details: error.message
-      }, { status: 500 });
-    }
-
-  } catch (error) {
-    console.error('Runtime logs outer error:', error);
+  } catch (error: any) {
+    console.error('Runtime logs error:', error);
     return NextResponse.json({ 
       error: 'Failed to fetch runtime logs',
-      code: 'INTERNAL_ERROR'
+      code: 'INTERNAL_ERROR',
+      details: error.message
     }, { status: 500 });
   }
 }
