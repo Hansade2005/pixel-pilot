@@ -695,14 +695,23 @@ export function VercelDeploymentManager({
       // Show success message
       alert(data.message || 'Deployment promoted successfully!');
 
-      // CRITICAL: Update the promoted deployment immediately
+      // CRITICAL: Update deployments immediately with proper badge swapping
       // This ensures the UI reflects the change before the API refresh
+      const currentTime = Date.now();
+      const currentProductionId = deployments.find(d => d.aliasAssigned && d.readyState === 'READY')?.id ||
+                                  deployments.find(d => d.target === 'production' && (d.readyState === 'READY' || d.status === 'READY'))?.id;
+      
       setDeployments(prevDeployments => 
-        prevDeployments.map(d => 
-          d.id === deploymentId 
-            ? { ...d, target: 'production', aliasAssigned: Date.now() }
-            : d
-        )
+        prevDeployments.map(d => {
+          if (d.id === deploymentId) {
+            // This becomes the new CURRENT deployment
+            return { ...d, target: 'production', aliasAssigned: currentTime, isRollbackCandidate: false };
+          } else if (d.id === currentProductionId) {
+            // Previous CURRENT becomes a rollback candidate and loses aliasAssigned
+            return { ...d, aliasAssigned: undefined, isRollbackCandidate: true };
+          }
+          return d;
+        })
       );
       
       // Save promotion record to storage
@@ -1322,10 +1331,14 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
   // Fallback to the most recent READY production deployment if aliasAssigned is not available
   const currentProductionDeploymentId = React.useMemo(() => {
     // First try to find deployment with aliasAssigned (most recent alias assignment)
-    const aliasedDeployments = deployments.filter((d: Deployment) => d.aliasAssigned && d.readyState === 'READY');
+    const aliasedDeployments = deployments.filter((d: Deployment) => 
+      d.aliasAssigned && (d.readyState === 'READY' || d.status === 'READY')
+    );
     if (aliasedDeployments.length > 0) {
       // Sort by aliasAssigned timestamp (most recent first)
-      const currentAliased = aliasedDeployments.sort((a: Deployment, b: Deployment) => (b.aliasAssigned || 0) - (a.aliasAssigned || 0))[0];
+      const currentAliased = aliasedDeployments.sort((a: Deployment, b: Deployment) => 
+        (b.aliasAssigned || 0) - (a.aliasAssigned || 0)
+      )[0];
       return currentAliased.id;
     }
     
@@ -1412,16 +1425,17 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
                     {deployment.id === currentProductionDeploymentId && (
                       <Badge className="bg-blue-500 text-white">CURRENT</Badge>
                     )}
-                    {/* Show when deployment was assigned to production alias */}
+                    {/* Show when deployment was previously assigned to production alias but is no longer current */}
                     {deployment.aliasAssigned && deployment.id !== currentProductionDeploymentId && (
                       <Badge variant="outline" className="text-xs text-muted-foreground">
                         WAS LIVE
                       </Badge>
                     )}
+                    {/* Show for ready deployments that are accessible */}
                     {(deployment.readyState === 'READY' || deployment.status === 'READY') && (
                       <Badge variant="secondary">LIVE</Badge>
                     )}
-                    {/* Show rollback candidate indicator */}
+                    {/* Show rollback candidate indicator for non-current deployments */}
                     {deployment.isRollbackCandidate && deployment.id !== currentProductionDeploymentId && (
                       <Badge variant="outline" className="text-green-600 border-green-600">
                         ROLLBACK
@@ -1565,7 +1579,13 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
                       size="sm" 
                       variant="default"
                       onClick={() => {
-                        if (confirm(`Promote this deployment to production?\n\nThis will instantly update all production domains to point to this deployment without rebuilding.\n\nThis deployment will become the new CURRENT production deployment.`)) {
+                        const isRollback = deployment.isRollbackCandidate;
+                        const actionType = isRollback ? 'Roll back' : 'Promote';
+                        const confirmMessage = isRollback 
+                          ? `${actionType} to this deployment?\n\nThis will instantly roll back production to this previous deployment.\n\n• This deployment will become CURRENT\n• The current deployment will become a ROLLBACK candidate\n\nNo rebuild required.`
+                          : `${actionType} this deployment to production?\n\nThis will instantly update all production domains to point to this deployment without rebuilding.\n\nThis deployment will become the new CURRENT production deployment.`;
+                        
+                        if (confirm(confirmMessage)) {
                           onPromote(deployment.id);
                         }
                       }}
@@ -1573,7 +1593,7 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
                       className="ml-auto"
                     >
                       <Rocket className="w-3 h-3 mr-1" />
-                      Promote to Production
+                      {deployment.isRollbackCandidate ? 'Roll Back' : 'Promote to Production'}
                     </Button>
                   )}
                 </div>
