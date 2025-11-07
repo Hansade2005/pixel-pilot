@@ -172,14 +172,14 @@ export async function GET(
 
     const decoder = new TextDecoder();
     let buffer = '';
-    const readTimeoutMs = 2000; // Read for 2 seconds max
+    const readTimeoutMs = 5000; // Read for 5 seconds max
     let timeoutId: NodeJS.Timeout | undefined;
 
     try {
       // Set a hard timeout to cancel the reader
       const readPromise = new Promise<void>(async (resolve, reject) => {
         timeoutId = setTimeout(() => {
-          console.log('Timeout reached, cancelling reader');
+          console.log('Timeout reached after 5 seconds, cancelling reader');
           reader.cancel().catch(() => {});
           resolve(); // Resolve instead of reject to return collected logs
         }, readTimeoutMs);
