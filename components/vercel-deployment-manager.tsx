@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,10 +55,16 @@ interface VercelProject {
 
 interface Deployment {
   id: string;
+  uid: string;
   url: string;
   status: string;
+  state: string;
+  readyState: string;
+  created: number;
   createdAt: number;
   target: string;
+  aliasAssigned?: number; // Timestamp when deployment was assigned to production alias
+  isRollbackCandidate?: boolean;
   commit?: {
     sha: string;
     message: string;
@@ -185,10 +191,16 @@ export function VercelDeploymentManager({
         const deployments = await storageManager.getVercelDeploymentsByWorkspace(workspaceId);
         setDeployments(deployments.map(d => ({
           id: d.deploymentId,
+          uid: d.deploymentId, // Use deploymentId as fallback for uid
           url: d.url,
           status: d.status,
+          state: d.status,
+          readyState: d.status,
+          created: d.createdAt,
           createdAt: d.createdAt,
           target: d.target,
+          aliasAssigned: undefined, // Will be filled by API refresh
+          isRollbackCandidate: undefined,
           commit: d.commit,
         })));
         
@@ -682,6 +694,16 @@ export function VercelDeploymentManager({
       setError(null);
       // Show success message
       alert(data.message || 'Deployment promoted successfully!');
+
+      // CRITICAL: Update the promoted deployment immediately
+      // This ensures the UI reflects the change before the API refresh
+      setDeployments(prevDeployments => 
+        prevDeployments.map(d => 
+          d.id === deploymentId 
+            ? { ...d, target: 'production', aliasAssigned: Date.now() }
+            : d
+        )
+      );
       
       // Save promotion record to storage
       await storageManager.init();
@@ -709,7 +731,8 @@ export function VercelDeploymentManager({
         });
       }
       
-      // Refresh deployments to show updated production status
+      // Refresh deployments from API to get the complete updated state
+      // This will ensure proper sorting and any other changes from Vercel
       await loadDeployments();
       
       // Update local project state
@@ -1293,6 +1316,25 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
   const [buildLogs, setBuildLogs] = useState<any[]>([]);
   const [loadingBuildLogs, setLoadingBuildLogs] = useState(false);
 
+  // Find the actual current production deployment 
+  // Logic: Use aliasAssigned field to identify which deployment is actually live on production domains
+  // This is more accurate than just checking target === 'production'
+  // Fallback to the most recent READY production deployment if aliasAssigned is not available
+  const currentProductionDeploymentId = React.useMemo(() => {
+    // First try to find deployment with aliasAssigned (most recent alias assignment)
+    const aliasedDeployments = deployments.filter((d: Deployment) => d.aliasAssigned && d.readyState === 'READY');
+    if (aliasedDeployments.length > 0) {
+      // Sort by aliasAssigned timestamp (most recent first)
+      const currentAliased = aliasedDeployments.sort((a: Deployment, b: Deployment) => (b.aliasAssigned || 0) - (a.aliasAssigned || 0))[0];
+      return currentAliased.id;
+    }
+    
+    // Fallback: Find first READY deployment with production target
+    return deployments.find(
+      (d: Deployment) => d.target === 'production' && (d.readyState === 'READY' || d.status === 'READY')
+    )?.id;
+  }, [deployments]);
+
   // Auto-refresh deployments every 5 seconds
   useEffect(() => {
     const interval = setInterval(() => {
@@ -1332,12 +1374,17 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
         <div className="flex items-center justify-between">
           <div>
             <CardTitle>Deployment History</CardTitle>
-            <CardDescription className="mt-1 flex items-center gap-2">
+            <CardDescription className="mt-1 flex items-center gap-2 flex-wrap">
               Click "Promote" to instantly make any READY deployment live in production
               <Badge variant="outline" className="text-xs">
                 <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
                 Auto-refreshing every 5s
               </Badge>
+              <div className="text-xs text-muted-foreground">
+                Badges: <span className="font-mono bg-blue-500 text-white px-1 rounded">CURRENT</span> = Live on production domains | 
+                <span className="font-mono bg-secondary text-secondary-foreground px-1 rounded ml-1">LIVE</span> = Accessible | 
+                <span className="font-mono border border-green-600 text-green-600 px-1 rounded ml-1">ROLLBACK</span> = Can rollback
+              </div>
             </CardDescription>
           </div>
           <Button onClick={onRefresh} size="sm" variant="outline">
@@ -1353,23 +1400,36 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
               <div key={deployment.id} className="border rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    {deployment.status === 'READY' ? (
+                    {(deployment.readyState === 'READY' || deployment.status === 'READY') ? (
                       <CheckCircle className="w-4 h-4 text-green-500" />
-                    ) : deployment.status === 'ERROR' ? (
+                    ) : (deployment.state === 'ERROR' || deployment.status === 'ERROR') ? (
                       <XCircle className="w-4 h-4 text-red-500" />
                     ) : (
                       <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
                     )}
                     <Badge variant="outline">{deployment.target || 'preview'}</Badge>
-                    {deployment.target === 'production' && deployment.status === 'READY' && (
-                      <Badge className="bg-blue-500">CURRENT</Badge>
+                    {/* Only show CURRENT badge for the actual current production deployment */}
+                    {deployment.id === currentProductionDeploymentId && (
+                      <Badge className="bg-blue-500 text-white">CURRENT</Badge>
                     )}
-                    {deployment.status === 'READY' && (
+                    {/* Show when deployment was assigned to production alias */}
+                    {deployment.aliasAssigned && deployment.id !== currentProductionDeploymentId && (
+                      <Badge variant="outline" className="text-xs text-muted-foreground">
+                        WAS LIVE
+                      </Badge>
+                    )}
+                    {(deployment.readyState === 'READY' || deployment.status === 'READY') && (
                       <Badge variant="secondary">LIVE</Badge>
+                    )}
+                    {/* Show rollback candidate indicator */}
+                    {deployment.isRollbackCandidate && deployment.id !== currentProductionDeploymentId && (
+                      <Badge variant="outline" className="text-green-600 border-green-600">
+                        ROLLBACK
+                      </Badge>
                     )}
                   </div>
                   <span className="text-sm text-muted-foreground">
-                    {new Date(deployment.createdAt).toLocaleString()}
+                    {new Date(deployment.created || deployment.createdAt).toLocaleString()}
                   </span>
                 </div>
 
@@ -1479,7 +1539,7 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
                   </Dialog>
                   
                   {/* View Runtime Logs button for READY deployments */}
-                  {deployment.status === 'READY' && teamSlug && projectId && (
+                  {(deployment.readyState === 'READY' || deployment.status === 'READY') && teamSlug && projectId && (
                     <Button 
                       size="sm" 
                       variant="outline"
@@ -1498,13 +1558,14 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
                     </Button>
                   )}
                   
-                  {/* Promote button for READY deployments that aren't already in production */}
-                  {deployment.status === 'READY' && (!deployment.target || deployment.target !== 'production') && (
+                  {/* Promote button for READY deployments that aren't the current production deployment */}
+                  {/* When promoted, the deployment will become the new CURRENT production deployment */}
+                  {(deployment.readyState === 'READY' || deployment.status === 'READY') && deployment.id !== currentProductionDeploymentId && (
                     <Button 
                       size="sm" 
                       variant="default"
                       onClick={() => {
-                        if (confirm(`Promote this deployment to production?\n\nThis will instantly update all production domains to point to this deployment without rebuilding.`)) {
+                        if (confirm(`Promote this deployment to production?\n\nThis will instantly update all production domains to point to this deployment without rebuilding.\n\nThis deployment will become the new CURRENT production deployment.`)) {
                           onPromote(deployment.id);
                         }
                       }}
