@@ -119,14 +119,24 @@ export async function GET(
       });
     }
 
-    // Handle regular JSON response (non-streaming) - read stream with timeout
-    const response = await fetch(apiUrl, {
-      headers: {
-        'Authorization': `Bearer ${vercelToken}`,
-      },
-    });
+    // Handle regular JSON response (non-streaming) - read stream with HARD timeout using AbortController
+    const controller = new AbortController();
+    const fetchTimeout = setTimeout(() => {
+      console.log('Aborting entire fetch after 5 seconds');
+      controller.abort();
+    }, 5000);
 
-    if (!response.ok) {
+    try {
+      const response = await fetch(apiUrl, {
+        headers: {
+          'Authorization': `Bearer ${vercelToken}`,
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(fetchTimeout);
+
+      if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       
       if (response.status === 404) {
@@ -156,115 +166,115 @@ export async function GET(
       }, { status: response.status });
     }
 
-    // Read the stream for a limited time (2 seconds) to get recent logs
-    const logs: any[] = [];
-    const reader = response.body?.getReader();
-    
-    if (!reader) {
+      // Read the stream - will be automatically aborted after 5 seconds by AbortController
+      const logs: any[] = [];
+      const reader = response.body?.getReader();
+      
+      if (!reader) {
+        return NextResponse.json({
+          logs: [],
+          count: 0,
+          projectId: params.projectId,
+          deploymentId: params.deploymentId,
+          message: 'No response body'
+        });
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) break;
+          
+          buffer += decoder.decode(value, { stream: true });
+          
+          // Process complete lines
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+          
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            
+            try {
+              const log = JSON.parse(line);
+              logs.push({
+                level: log.level,
+                message: log.message,
+                rowId: log.rowId,
+                source: log.source,
+                timestamp: log.timestampInMs,
+                domain: log.domain,
+                messageTruncated: log.messageTruncated,
+                requestMethod: log.requestMethod,
+                requestPath: log.requestPath,
+                responseStatusCode: log.responseStatusCode,
+              });
+              
+              // Stop after collecting the requested number of logs
+              if (logs.length >= parseInt(limit)) {
+                console.log(`Collected ${logs.length} logs, stopping read`);
+                reader.cancel();
+                break;
+              }
+            } catch (parseError) {
+              console.error('Failed to parse log line:', parseError);
+            }
+          }
+          
+          if (logs.length >= parseInt(limit)) {
+            break;
+          }
+        }
+      } catch (error: any) {
+        // Stream reading error (possibly from AbortController)
+        if (error.name !== 'AbortError') {
+          console.error('Error reading stream:', error);
+        }
+      } finally {
+        try {
+          reader.cancel();
+        } catch (e) {
+          // Ignore cancel errors
+        }
+      }
+
+      console.log(`Returning ${logs.length} runtime logs`);      // Return formatted logs
       return NextResponse.json({
-        logs: [],
-        count: 0,
+        logs,
+        count: logs.length,
         projectId: params.projectId,
         deploymentId: params.deploymentId,
-        message: 'No response body'
-      });
-    }
-
-    const decoder = new TextDecoder();
-    let buffer = '';
-    const readTimeoutMs = 5000; // Read for 5 seconds max
-    let timeoutId: NodeJS.Timeout | undefined;
-
-    try {
-      // Set a hard timeout to cancel the reader
-      const readPromise = new Promise<void>(async (resolve, reject) => {
-        timeoutId = setTimeout(() => {
-          console.log('Timeout reached after 5 seconds, cancelling reader');
-          reader.cancel().catch(() => {});
-          resolve(); // Resolve instead of reject to return collected logs
-        }, readTimeoutMs);
-
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            
-            if (done) {
-              clearTimeout(timeoutId);
-              resolve();
-              break;
-            }
-            
-            buffer += decoder.decode(value, { stream: true });
-            
-            // Process complete lines
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || ''; // Keep incomplete line in buffer
-            
-            for (const line of lines) {
-              if (!line.trim()) continue;
-              
-              try {
-                const log = JSON.parse(line);
-                logs.push({
-                  level: log.level,
-                  message: log.message,
-                  rowId: log.rowId,
-                  source: log.source,
-                  timestamp: log.timestampInMs,
-                  domain: log.domain,
-                  messageTruncated: log.messageTruncated,
-                  requestMethod: log.requestMethod,
-                  requestPath: log.requestPath,
-                  responseStatusCode: log.responseStatusCode,
-                });
-                
-                // Stop after collecting the requested number of logs
-                if (logs.length >= parseInt(limit)) {
-                  console.log(`Collected ${logs.length} logs, stopping read`);
-                  clearTimeout(timeoutId);
-                  await reader.cancel();
-                  resolve();
-                  return;
-                }
-              } catch (parseError) {
-                console.error('Failed to parse log line:', line.substring(0, 100), parseError);
-              }
-            }
-          }
-        } catch (error: any) {
-          clearTimeout(timeoutId);
-          if (error.name !== 'AbortError') {
-            console.error('Error reading stream:', error);
-          }
-          resolve(); // Still resolve to return collected logs
-        }
       });
 
-      await readPromise;
-      
     } catch (error: any) {
-      console.log(`Stream read error: ${error.message}. Collected ${logs.length} logs`);
-    } finally {
-      if (timeoutId) clearTimeout(timeoutId);
-      try {
-        await reader.cancel();
-      } catch (e) {
-        // Ignore cancel errors
+      clearTimeout(fetchTimeout);
+      
+      // AbortError is expected when timeout fires - return SUCCESS with empty logs
+      if (error.name === 'AbortError') {
+        console.log('Fetch aborted after 5 seconds - this is NORMAL behavior, returning 200 OK');
+        // Return 200 OK status - timeout is expected, not an error
+        return NextResponse.json({
+          logs: [],
+          count: 0,
+          projectId: params.projectId,
+          deploymentId: params.deploymentId,
+        }, { status: 200 });
       }
+
+      // Other errors - these are actual failures
+      console.error('Runtime logs error:', error);
+      return NextResponse.json({ 
+        error: 'Failed to fetch runtime logs',
+        code: 'INTERNAL_ERROR',
+        details: error.message
+      }, { status: 500 });
     }
-
-    console.log(`Returning ${logs.length} runtime logs`);
-
-    // Return formatted logs
-    return NextResponse.json({
-      logs,
-      count: logs.length,
-      projectId: params.projectId,
-      deploymentId: params.deploymentId,
-    });
 
   } catch (error) {
-    console.error('Runtime logs error:', error);
+    console.error('Runtime logs outer error:', error);
     return NextResponse.json({ 
       error: 'Failed to fetch runtime logs',
       code: 'INTERNAL_ERROR'
