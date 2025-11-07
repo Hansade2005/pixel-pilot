@@ -570,6 +570,97 @@ export function VercelDeploymentManager({
     }
   };
 
+  // Promote deployment to production
+  const promoteDeployment = async (deploymentId: string) => {
+    if (!project?.projectId) return;
+
+    setLoading(true);
+    setError(null);
+
+    // Find the deployment being promoted to get its current target
+    const deployment = deployments.find(d => d.id === deploymentId);
+    const fromTarget = deployment?.target || 'preview';
+
+    try {
+      const response = await fetch(`/api/vercel/projects/${project.projectId}/promote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deploymentId,
+          vercelToken: localVercelToken,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to promote deployment');
+      }
+
+      setError(null);
+      // Show success message
+      alert(data.message || 'Deployment promoted successfully!');
+      
+      // Save promotion record to storage
+      await storageManager.init();
+      const existingProject = await storageManager.getVercelProject(workspaceId);
+      if (existingProject) {
+        try {
+          await storageManager.createVercelPromotion({
+            projectId: existingProject.id,
+            workspaceId,
+            deploymentId,
+            fromTarget,
+            toTarget: 'production',
+            promotedAt: Date.now(),
+            status: data.status === 'processing' ? 'processing' : 'success',
+            vercelResponse: data,
+          });
+        } catch (err) {
+          console.log('Promotion record already saved or error:', err);
+        }
+        
+        // Update project status
+        await storageManager.updateVercelProject(existingProject.id, {
+          status: 'READY',
+          lastDeployed: Date.now(),
+        });
+      }
+      
+      // Refresh deployments to show updated production status
+      await loadDeployments();
+      
+      // Update local project state
+      setProject(prev => prev ? { ...prev, status: 'READY', lastDeployed: Date.now() } : null);
+      
+    } catch (err: any) {
+      console.error('Promotion error:', err);
+      setError(err.message || 'Failed to promote deployment');
+      
+      // Save failed promotion record
+      await storageManager.init();
+      const existingProject = await storageManager.getVercelProject(workspaceId);
+      if (existingProject) {
+        try {
+          await storageManager.createVercelPromotion({
+            projectId: existingProject.id,
+            workspaceId,
+            deploymentId,
+            fromTarget,
+            toTarget: 'production',
+            promotedAt: Date.now(),
+            status: 'failed',
+            reason: err.message,
+          });
+        } catch (saveErr) {
+          console.log('Failed to save error promotion record:', saveErr);
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Load environment variables
   const loadEnvVars = async () => {
     if (!project?.projectId) return;
@@ -788,6 +879,7 @@ export function VercelDeploymentManager({
             loading={loading}
             onRefresh={loadDeployments}
             projectUrl={project?.url}
+            onPromote={promoteDeployment}
           />
         </TabsContent>
 
@@ -1101,12 +1193,17 @@ function ProjectOverview({ project, loading, onRedeploy }: any) {
 }
 
 // Deployments Tab Component
-function DeploymentsTab({ deployments, loading, onRefresh, projectUrl }: any) {
+function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote }: any) {
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>Deployment History</CardTitle>
+          <div>
+            <CardTitle>Deployment History</CardTitle>
+            <CardDescription className="mt-1">
+              Click "Promote" to instantly make any READY deployment live in production
+            </CardDescription>
+          </div>
           <Button onClick={onRefresh} size="sm" variant="outline">
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
@@ -1117,7 +1214,7 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl }: any) {
         <ScrollArea className="h-[500px]">
           <div className="space-y-4">
             {deployments.map((deployment: Deployment) => (
-              <div key={deployment.id} className="border rounded-lg p-4 space-y-2">
+              <div key={deployment.id} className="border rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {deployment.status === 'READY' ? (
@@ -1128,6 +1225,9 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl }: any) {
                       <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
                     )}
                     <Badge variant="outline">{deployment.target}</Badge>
+                    {deployment.target === 'production' && deployment.status === 'READY' && (
+                      <Badge className="bg-green-500">LIVE</Badge>
+                    )}
                   </div>
                   <span className="text-sm text-muted-foreground">
                     {new Date(deployment.createdAt).toLocaleString()}
@@ -1142,11 +1242,31 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl }: any) {
                   </div>
                 )}
                 
-                <Button size="sm" variant="link" asChild className="p-0 h-auto">
-                  <a href={deployment.url} target="_blank" rel="noopener noreferrer">
-                    {deployment.url} <ExternalLink className="w-3 h-3 ml-1" />
-                  </a>
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="link" asChild className="p-0 h-auto">
+                    <a href={deployment.url} target="_blank" rel="noopener noreferrer">
+                      {deployment.url} <ExternalLink className="w-3 h-3 ml-1" />
+                    </a>
+                  </Button>
+                  
+                  {/* Promote button for READY deployments that aren't already in production */}
+                  {deployment.status === 'READY' && deployment.target !== 'production' && (
+                    <Button 
+                      size="sm" 
+                      variant="default"
+                      onClick={() => {
+                        if (confirm(`Promote this deployment to production?\n\nThis will instantly update all production domains to point to this deployment without rebuilding.`)) {
+                          onPromote(deployment.id);
+                        }
+                      }}
+                      disabled={loading}
+                      className="ml-auto"
+                    >
+                      <Rocket className="w-3 h-3 mr-1" />
+                      Promote to Production
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
             

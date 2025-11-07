@@ -243,6 +243,23 @@ export interface VercelLog {
   createdAt: string
 }
 
+export interface VercelPromotion {
+  id: string
+  projectId: string // Reference to VercelProject
+  workspaceId: string
+  deploymentId: string // Deployment that was promoted
+  fromTarget: string // preview, development
+  toTarget: string // production
+  promotedBy?: string // User ID who triggered promotion
+  promotedAt: number // Timestamp of promotion
+  status: 'success' | 'failed' | 'processing'
+  reason?: string // Optional reason/notes
+  previousProductionDeploymentId?: string // For rollback reference
+  vercelResponse?: any // Raw Vercel API response
+  createdAt: string
+  updatedAt: string
+}
+
 // Tool execution tracking interface for preventing duplicate executions
 export interface ToolExecution {
   id: string
@@ -610,6 +627,7 @@ class InMemoryStorage implements StorageInterface {
   private vercelEnvVariables: Map<string, VercelEnvVariable> = new Map()
   private vercelDomains: Map<string, VercelDomain> = new Map()
   private vercelLogs: Map<string, VercelLog> = new Map()
+  private vercelPromotions: Map<string, VercelPromotion> = new Map()
 
   async createVercelProject(project: Omit<VercelProject, 'id' | 'createdAt' | 'updatedAt'>): Promise<VercelProject> {
     const id = this.generateId()
@@ -776,6 +794,54 @@ class InMemoryStorage implements StorageInterface {
     return true
   }
 
+  // Vercel Promotion methods
+  async createVercelPromotion(promotion: Omit<VercelPromotion, 'id' | 'createdAt' | 'updatedAt'>): Promise<VercelPromotion> {
+    const id = this.generateId()
+    const now = new Date().toISOString()
+    const newPromotion: VercelPromotion = {
+      ...promotion,
+      id,
+      createdAt: now,
+      updatedAt: now
+    }
+    this.vercelPromotions.set(id, newPromotion)
+    return newPromotion
+  }
+
+  async getVercelPromotion(id: string): Promise<VercelPromotion | null> {
+    return this.vercelPromotions.get(id) || null
+  }
+
+  async getVercelPromotionsByProject(projectId: string): Promise<VercelPromotion[]> {
+    return Array.from(this.vercelPromotions.values())
+      .filter(p => p.projectId === projectId)
+      .sort((a, b) => b.promotedAt - a.promotedAt)
+  }
+
+  async getVercelPromotionsByWorkspace(workspaceId: string): Promise<VercelPromotion[]> {
+    return Array.from(this.vercelPromotions.values())
+      .filter(p => p.workspaceId === workspaceId)
+      .sort((a, b) => b.promotedAt - a.promotedAt)
+  }
+
+  async getVercelPromotionsByDeployment(deploymentId: string): Promise<VercelPromotion[]> {
+    return Array.from(this.vercelPromotions.values())
+      .filter(p => p.deploymentId === deploymentId)
+      .sort((a, b) => b.promotedAt - a.promotedAt)
+  }
+
+  async updateVercelPromotion(id: string, updates: Partial<VercelPromotion>): Promise<VercelPromotion> {
+    const existing = this.vercelPromotions.get(id)
+    if (!existing) throw new Error('Promotion not found')
+    const updated = { ...existing, ...updates, updatedAt: new Date().toISOString() }
+    this.vercelPromotions.set(id, updated)
+    return updated
+  }
+
+  async deleteVercelPromotion(id: string): Promise<boolean> {
+    return this.vercelPromotions.delete(id)
+  }
+
   // Utility methods
   async clearAll(): Promise<void> {
     this.workspaces.clear()
@@ -789,6 +855,7 @@ class InMemoryStorage implements StorageInterface {
     this.vercelEnvVariables.clear()
     this.vercelDomains.clear()
     this.vercelLogs.clear()
+    this.vercelPromotions.clear()
   }
 
   async exportData(): Promise<any> {
@@ -1099,7 +1166,7 @@ class InMemoryStorage implements StorageInterface {
 class IndexedDBStorage implements StorageInterface {
   private db: IDBDatabase | null = null
   private dbName = 'PixelPilotDB'
-  private version = 14 // Updated version to add Vercel management object stores
+  private version = 15 // Updated version to add Vercel promotions store
 
   async init(): Promise<void> {
     if (this.db) return
@@ -1225,6 +1292,15 @@ class IndexedDBStorage implements StorageInterface {
           logStore.createIndex('deploymentId', 'deploymentId', { unique: false })
           logStore.createIndex('workspaceId', 'workspaceId', { unique: false })
           logStore.createIndex('timestamp', 'timestamp', { unique: false })
+        }
+
+        if (!db.objectStoreNames.contains('vercelPromotions')) {
+          const promotionStore = db.createObjectStore('vercelPromotions', { keyPath: 'id' })
+          promotionStore.createIndex('projectId', 'projectId', { unique: false })
+          promotionStore.createIndex('workspaceId', 'workspaceId', { unique: false })
+          promotionStore.createIndex('deploymentId', 'deploymentId', { unique: false })
+          promotionStore.createIndex('promotedAt', 'promotedAt', { unique: false })
+          promotionStore.createIndex('status', 'status', { unique: false })
         }
       }
     })
@@ -2279,6 +2355,138 @@ class IndexedDBStorage implements StorageInterface {
     })
   }
 
+  // Vercel Promotion methods (IndexedDB)
+  async createVercelPromotion(promotion: Omit<VercelPromotion, 'id' | 'createdAt' | 'updatedAt'>): Promise<VercelPromotion> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    const id = this.generateId()
+    const now = new Date().toISOString()
+    const newPromotion: VercelPromotion = {
+      ...promotion,
+      id,
+      createdAt: now,
+      updatedAt: now
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelPromotions'], 'readwrite')
+      const store = transaction.objectStore('vercelPromotions')
+      const request = store.add(newPromotion)
+
+      request.onsuccess = () => resolve(newPromotion)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getVercelPromotion(id: string): Promise<VercelPromotion | null> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelPromotions'], 'readonly')
+      const store = transaction.objectStore('vercelPromotions')
+      const request = store.get(id)
+
+      request.onsuccess = () => resolve(request.result || null)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getVercelPromotionsByProject(projectId: string): Promise<VercelPromotion[]> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelPromotions'], 'readonly')
+      const store = transaction.objectStore('vercelPromotions')
+      const index = store.index('projectId')
+      const request = index.getAll(projectId)
+
+      request.onsuccess = () => {
+        const promotions = request.result || []
+        promotions.sort((a, b) => b.promotedAt - a.promotedAt)
+        resolve(promotions)
+      }
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getVercelPromotionsByWorkspace(workspaceId: string): Promise<VercelPromotion[]> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelPromotions'], 'readonly')
+      const store = transaction.objectStore('vercelPromotions')
+      const index = store.index('workspaceId')
+      const request = index.getAll(workspaceId)
+
+      request.onsuccess = () => {
+        const promotions = request.result || []
+        promotions.sort((a, b) => b.promotedAt - a.promotedAt)
+        resolve(promotions)
+      }
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getVercelPromotionsByDeployment(deploymentId: string): Promise<VercelPromotion[]> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelPromotions'], 'readonly')
+      const store = transaction.objectStore('vercelPromotions')
+      const index = store.index('deploymentId')
+      const request = index.getAll(deploymentId)
+
+      request.onsuccess = () => {
+        const promotions = request.result || []
+        promotions.sort((a, b) => b.promotedAt - a.promotedAt)
+        resolve(promotions)
+      }
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async updateVercelPromotion(id: string, updates: Partial<VercelPromotion>): Promise<VercelPromotion | null> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelPromotions'], 'readwrite')
+      const store = transaction.objectStore('vercelPromotions')
+      const getRequest = store.get(id)
+
+      getRequest.onsuccess = () => {
+        const existing = getRequest.result
+        if (!existing) {
+          resolve(null)
+          return
+        }
+
+        const updated: VercelPromotion = {
+          ...existing,
+          ...updates,
+          updatedAt: new Date().toISOString()
+        }
+
+        const putRequest = store.put(updated)
+        putRequest.onsuccess = () => resolve(updated)
+        putRequest.onerror = () => reject(putRequest.error)
+      }
+      getRequest.onerror = () => reject(getRequest.error)
+    })
+  }
+
+  async deleteVercelPromotion(id: string): Promise<boolean> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelPromotions'], 'readwrite')
+      const store = transaction.objectStore('vercelPromotions')
+      const request = store.delete(id)
+
+      request.onsuccess = () => resolve(true)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
   // Utility methods
   async clearAll(): Promise<void> {
   if (!this.db) throw new Error('Database not initialized')
@@ -3252,6 +3460,42 @@ class StorageManager {
   async deleteVercelLogs(deploymentId: string): Promise<boolean> {
     await this.init()
     return this.storage!.deleteVercelLogs(deploymentId)
+  }
+
+  // Vercel Promotion methods
+  async createVercelPromotion(promotion: Omit<VercelPromotion, 'id' | 'createdAt' | 'updatedAt'>): Promise<VercelPromotion> {
+    await this.init()
+    return this.storage!.createVercelPromotion(promotion)
+  }
+
+  async getVercelPromotion(id: string): Promise<VercelPromotion | null> {
+    await this.init()
+    return this.storage!.getVercelPromotion(id)
+  }
+
+  async getVercelPromotionsByProject(projectId: string): Promise<VercelPromotion[]> {
+    await this.init()
+    return this.storage!.getVercelPromotionsByProject(projectId)
+  }
+
+  async getVercelPromotionsByWorkspace(workspaceId: string): Promise<VercelPromotion[]> {
+    await this.init()
+    return this.storage!.getVercelPromotionsByWorkspace(workspaceId)
+  }
+
+  async getVercelPromotionsByDeployment(deploymentId: string): Promise<VercelPromotion[]> {
+    await this.init()
+    return this.storage!.getVercelPromotionsByDeployment(deploymentId)
+  }
+
+  async updateVercelPromotion(id: string, updates: Partial<VercelPromotion>): Promise<VercelPromotion | null> {
+    await this.init()
+    return this.storage!.updateVercelPromotion(id, updates)
+  }
+
+  async deleteVercelPromotion(id: string): Promise<boolean> {
+    await this.init()
+    return this.storage!.deleteVercelPromotion(id)
   }
 
   /**

@@ -31,7 +31,7 @@ All Vercel API implementations have been thoroughly audited against official Ver
 **Required Fields:**
 - ✅ `name` - Project name/slug (FIXED - was missing)
 - ✅ `gitSource.repo` - Owner/repo string format
-- ✅ `gitSource.projectId` - Numeric repository ID (FIXED - was `repoId`)
+- ✅ `gitSource.repoId` - Numeric repository ID (FIXED - was named `projectId`)
 
 **Implementation:**
 ```typescript
@@ -41,7 +41,7 @@ All Vercel API implementations have been thoroughly audited against official Ver
     type: 'github',
     repo: repoFullName,            // ✅ Correct format
     ref: branch || 'main',
-    projectId: Number(repoId)      // ✅ Fixed from repoId
+    repoId: Number(repoId)         // ✅ Fixed: was projectId, now repoId
   },
   target: 'production'
 }
@@ -49,8 +49,10 @@ All Vercel API implementations have been thoroughly audited against official Ver
 
 **Changes Made:**
 - Added required `name` field with project name
-- Changed `repoId` → `projectId` in gitSource
+- Fixed `projectId` → `repoId` in gitSource (Vercel requires this specific field name)
 - Verified against SDK examples and v13 API spec
+
+**Note:** The `repoId` field is required when triggering redeployments of existing projects. For initial deployments, it may be optional if Vercel can infer it from the `repo` field.
 
 ---
 
@@ -362,12 +364,41 @@ All Vercel API implementations have been thoroughly audited against official Ver
 ## 🔄 Advanced Operations
 
 ### 23. ✅ Promote Deployment to Production
-**File:** Implementation TBD (not found in current codebase)  
+**File:** `app/api/vercel/projects/[projectId]/promote/route.ts`  
 **API Version:** v10  
 **Method:** POST `/v10/projects/{projectId}/promote/{deploymentId}`  
-**Status:** ⚠️ **NOT IMPLEMENTED**
+**Status:** ✅ **IMPLEMENTED**
 
-**Note:** This endpoint is documented but not yet implemented in the codebase. Consider adding if production promotion workflows are needed.
+**Required Fields:**
+- ✅ `deploymentId` - ID of deployment to promote
+- ✅ `vercelToken` - Authentication token
+
+**Features:**
+- ✅ Instant production promotion (no rebuild)
+- ✅ GET endpoint for promotion history
+- ✅ Comprehensive error handling
+- ✅ Async operation support (202 Accepted)
+- ✅ UI integration in deployment manager
+
+**Use Cases:**
+- Instant rollback to previous stable deployment
+- Promote preview deployments to production
+- Quick production updates without CI/CD pipeline
+
+**Implementation Highlights:**
+```typescript
+// Promote with single API call
+POST /v10/projects/{projectId}/promote/{deploymentId}
+
+// Returns 201 (immediate) or 202 (async processing)
+// All production domains instantly point to promoted deployment
+```
+
+**UI Integration:**
+- "Promote to Production" button on READY preview/development deployments
+- Confirmation dialog before promotion
+- Automatic refresh after successful promotion
+- Visual indicator for current production deployment
 
 ---
 
@@ -492,7 +523,7 @@ All endpoints return consistent JSON structure:
 4. **Consistent patterns** - Uniform authentication and error handling
 
 ### 🔮 Future Enhancements
-1. **Add Promote Endpoint** - Implement POST `/v10/projects/{projectId}/promote/{deploymentId}` for instant production promotions without rebuilding
+1. ~~**Add Promote Endpoint**~~ ✅ **COMPLETED** - Implemented POST `/v10/projects/{projectId}/promote/{deploymentId}` for instant production promotions without rebuilding
 2. **Rate Limiting** - Add client-side rate limit tracking to prevent 429 errors
 3. **Webhook Support** - Consider adding Vercel webhook handlers for real-time deployment updates
 4. **Caching Layer** - Implement Redis/memory cache for frequently accessed project data
@@ -536,6 +567,7 @@ The codebase demonstrates excellent engineering practices:
 - ✅ Deployment trigger `name` field added
 - ✅ GitSource `projectId` corrected
 - ✅ IndexedDB persistence implemented
+- ✅ **Promote endpoint implemented with full UI integration**
 
 **No further API compliance issues found.**
 

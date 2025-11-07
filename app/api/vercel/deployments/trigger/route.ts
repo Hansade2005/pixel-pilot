@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
         type: project.link.type || 'github',
         repo: project.link.repo, // Required: full repo path (owner/repo)
         ref: branch,
-        ...(project.link.repoId && { projectId: project.link.repoId }), // Optional: numeric repo ID
+        ...(project.link.repoId && { repoId: project.link.repoId }), // Required: numeric repo ID
       },
       target: target,
       withLatestCommit: withLatestCommit,
