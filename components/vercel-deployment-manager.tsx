@@ -1860,6 +1860,7 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
   const [availability, setAvailability] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [countries, setCountries] = useState<string[]>([]);
 
   // Contact info
   const [firstName, setFirstName] = useState('');
@@ -1871,7 +1872,24 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
   const [state, setState] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [country, setCountry] = useState('US');
+  
+  // Load countries from countries.txt
+  useEffect(() => {
+    const loadCountries = async () => {
+      try {
+        const response = await fetch('/countries.txt');
+        const text = await response.text();
+        const countriesList = text.split('\n').filter(country => country.trim() !== '');
+        setCountries(countriesList);
+      } catch (err) {
+        console.error('Failed to load countries:', err);
+        // Fallback to hardcoded countries if file fails to load
+        setCountries(['United States', 'Canada', 'United Kingdom', 'Germany', 'France']);
+      }
+    };
 
+    loadCountries();
+  }, []);
   const checkAvailability = async () => {
     if (!domain) return;
 
@@ -2067,11 +2085,11 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="US">United States</SelectItem>
-                  <SelectItem value="CA">Canada</SelectItem>
-                  <SelectItem value="GB">United Kingdom</SelectItem>
-                  <SelectItem value="DE">Germany</SelectItem>
-                  <SelectItem value="FR">France</SelectItem>
+                  {countries.map((countryName) => (
+                    <SelectItem key={countryName} value={countryName}>
+                      {countryName}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
