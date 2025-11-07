@@ -596,13 +596,31 @@ export function VercelDeploymentManager({
         `/api/vercel/projects/${project.projectId}/deployments?token=${localVercelToken}&limit=20`
       );
       const data = await response.json();
-      
+
       if (data.deployments) {
-        setDeployments(data.deployments);
-        
-        // Save to storage
+        // Load badge states from storage
         await storageManager.init();
         const existingProject = await storageManager.getVercelProject(workspaceId);
+        let badgeStates: any[] = [];
+        if (existingProject) {
+          badgeStates = await storageManager.getVercelDeploymentBadgeStates(existingProject.id);
+        }
+
+        // Merge API data with stored badge states
+        const mergedDeployments = data.deployments.map((apiDeployment: any) => {
+          const badgeState = badgeStates.find(bs => bs.deploymentId === apiDeployment.id);
+
+          // Apply stored badge state if it exists
+          return {
+            ...apiDeployment,
+            aliasAssigned: badgeState?.aliasAssigned,
+            isRollbackCandidate: badgeState?.isRollbackCandidate
+          };
+        });
+
+        setDeployments(mergedDeployments);
+
+        // Save to storage (existing deployments)
         if (existingProject) {
           // Save each deployment
           for (const deployment of data.deployments) {
@@ -626,42 +644,6 @@ export function VercelDeploymentManager({
       }
     } catch (err) {
       console.error('Failed to load deployments:', err);
-    }
-  };
-
-  // Refresh deployments from API while preserving local badge state
-  const refreshDeploymentsPreservingBadges = async () => {
-    if (!project?.projectId) return;
-
-    try {
-      const response = await fetch(
-        `/api/vercel/projects/${project.projectId}/deployments?token=${localVercelToken}&limit=20`
-      );
-      const data = await response.json();
-      
-      if (data.deployments) {
-        // Get current local state for badge preservation
-        const currentLocalDeployments = deployments;
-        
-        // Merge API data with preserved local badge state
-        const mergedDeployments = data.deployments.map((apiDeployment: any) => {
-          const localDeployment = currentLocalDeployments.find(d => d.id === apiDeployment.id);
-
-          // Always preserve our local badge state if it exists
-          // The API doesn't return aliasAssigned or isRollbackCandidate, so we must keep our local values
-          return {
-            ...apiDeployment,           // Fresh API data for all standard fields
-            aliasAssigned: localDeployment?.aliasAssigned,         // Preserve our badge state
-            isRollbackCandidate: localDeployment?.isRollbackCandidate
-          };
-        });
-        
-        setDeployments(mergedDeployments);
-      }
-    } catch (err) {
-      console.error('Failed to refresh deployments:', err);
-      // Fallback to regular load if there's an error
-      await loadDeployments();
     }
   };
 
@@ -749,14 +731,43 @@ export function VercelDeploymentManager({
           return d;
         })
       );
-      
-      // Save promotion record to storage
+
+      // Save badge states to storage for persistence
       await storageManager.init();
       const existingProject = await storageManager.getVercelProject(workspaceId);
       if (existingProject) {
+        // Save CURRENT badge for the promoted deployment
+        await storageManager.createVercelDeploymentBadgeState({
+          projectId: existingProject.id,
+          workspaceId,
+          deploymentId,
+          aliasAssigned: currentTime,
+          isRollbackCandidate: false,
+          badgeType: 'current',
+          assignedAt: currentTime,
+        });
+
+        // Save ROLLBACK badge for the previous current deployment
+        if (currentProductionId) {
+          await storageManager.createVercelDeploymentBadgeState({
+            projectId: existingProject.id,
+            workspaceId,
+            deploymentId: currentProductionId,
+            aliasAssigned: undefined,
+            isRollbackCandidate: true,
+            badgeType: 'rollback',
+            assignedAt: currentTime,
+          });
+        }
+      }
+      
+      // Save promotion record to storage
+      await storageManager.init();
+      const promotionProject = await storageManager.getVercelProject(workspaceId);
+      if (promotionProject) {
         try {
           await storageManager.createVercelPromotion({
-            projectId: existingProject.id,
+            projectId: promotionProject.id,
             workspaceId,
             deploymentId,
             fromTarget,
@@ -770,15 +781,15 @@ export function VercelDeploymentManager({
         }
         
         // Update project status
-        await storageManager.updateVercelProject(existingProject.id, {
+        await storageManager.updateVercelProject(promotionProject.id, {
           status: 'READY',
           lastDeployed: Date.now(),
         });
       }
       
       // Refresh deployments from API to get the complete updated state
-      // But preserve our local badge swapping logic
-      await refreshDeploymentsPreservingBadges();
+      // Badge states will be loaded from storage and merged
+      await loadDeployments();
       
       // Update local project state
       setProject(prev => prev ? { ...prev, status: 'READY', lastDeployed: Date.now() } : null);

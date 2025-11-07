@@ -261,6 +261,19 @@ export interface VercelPromotion {
   updatedAt: string
 }
 
+export interface VercelDeploymentBadgeState {
+  id: string
+  projectId: string // Reference to VercelProject
+  workspaceId: string
+  deploymentId: string // Vercel's deployment ID
+  aliasAssigned?: number // Timestamp when alias was assigned (for CURRENT badge)
+  isRollbackCandidate?: boolean // Whether this deployment can be rolled back to
+  badgeType?: 'current' | 'was_live' | 'rollback' | 'live' // Current badge type
+  assignedAt: number // When this badge state was last updated
+  createdAt: string
+  updatedAt: string
+}
+
 // Tool execution tracking interface for preventing duplicate executions
 export interface ToolExecution {
   id: string
@@ -368,6 +381,13 @@ export interface StorageInterface {
   createVercelLog(log: Omit<VercelLog, 'id' | 'createdAt'>): Promise<VercelLog>;
   getVercelLogs(deploymentId: string): Promise<VercelLog[]>;
   deleteVercelLogs(deploymentId: string): Promise<boolean>;
+  
+  // Vercel deployment badge state methods
+  createVercelDeploymentBadgeState(badgeState: Omit<VercelDeploymentBadgeState, 'id' | 'createdAt' | 'updatedAt'>): Promise<VercelDeploymentBadgeState>;
+  getVercelDeploymentBadgeState(deploymentId: string): Promise<VercelDeploymentBadgeState | null>;
+  getVercelDeploymentBadgeStates(projectId: string): Promise<VercelDeploymentBadgeState[]>;
+  updateVercelDeploymentBadgeState(deploymentId: string, updates: Partial<VercelDeploymentBadgeState>): Promise<VercelDeploymentBadgeState | null>;
+  deleteVercelDeploymentBadgeState(deploymentId: string): Promise<boolean>;
   
   // Additional utility methods
   importTable(tableName: string, data: any[]): Promise<void>;
@@ -629,6 +649,7 @@ class InMemoryStorage implements StorageInterface {
   private vercelDomains: Map<string, VercelDomain> = new Map()
   private vercelLogs: Map<string, VercelLog> = new Map()
   private vercelPromotions: Map<string, VercelPromotion> = new Map()
+  private vercelDeploymentBadgeStates: Map<string, VercelDeploymentBadgeState> = new Map()
 
   async createVercelProject(project: Omit<VercelProject, 'id' | 'createdAt' | 'updatedAt'>): Promise<VercelProject> {
     const id = this.generateId()
@@ -793,6 +814,54 @@ class InMemoryStorage implements StorageInterface {
     const logs = await this.getVercelLogs(deploymentId)
     logs.forEach(log => this.vercelLogs.delete(log.id))
     return true
+  }
+
+  // Vercel deployment badge state methods
+  async createVercelDeploymentBadgeState(badgeState: Omit<VercelDeploymentBadgeState, 'id' | 'createdAt' | 'updatedAt'>): Promise<VercelDeploymentBadgeState> {
+    const id = this.generateId()
+    const now = new Date().toISOString()
+    const newBadgeState: VercelDeploymentBadgeState = {
+      ...badgeState,
+      id,
+      createdAt: now,
+      updatedAt: now
+    }
+    this.vercelDeploymentBadgeStates.set(id, newBadgeState)
+    return newBadgeState
+  }
+
+  async getVercelDeploymentBadgeState(deploymentId: string): Promise<VercelDeploymentBadgeState | null> {
+    for (const badgeState of this.vercelDeploymentBadgeStates.values()) {
+      if (badgeState.deploymentId === deploymentId) {
+        return badgeState
+      }
+    }
+    return null
+  }
+
+  async getVercelDeploymentBadgeStates(projectId: string): Promise<VercelDeploymentBadgeState[]> {
+    return Array.from(this.vercelDeploymentBadgeStates.values()).filter(state => state.projectId === projectId)
+  }
+
+  async updateVercelDeploymentBadgeState(deploymentId: string, updates: Partial<VercelDeploymentBadgeState>): Promise<VercelDeploymentBadgeState | null> {
+    for (const [id, badgeState] of this.vercelDeploymentBadgeStates.entries()) {
+      if (badgeState.deploymentId === deploymentId) {
+        const updated = { ...badgeState, ...updates, updatedAt: new Date().toISOString() }
+        this.vercelDeploymentBadgeStates.set(id, updated)
+        return updated
+      }
+    }
+    return null
+  }
+
+  async deleteVercelDeploymentBadgeState(deploymentId: string): Promise<boolean> {
+    for (const [id, badgeState] of this.vercelDeploymentBadgeStates.entries()) {
+      if (badgeState.deploymentId === deploymentId) {
+        this.vercelDeploymentBadgeStates.delete(id)
+        return true
+      }
+    }
+    return false
   }
 
   // Vercel Promotion methods
@@ -1167,7 +1236,7 @@ class InMemoryStorage implements StorageInterface {
 class IndexedDBStorage implements StorageInterface {
   private db: IDBDatabase | null = null
   private dbName = 'PixelPilotDB'
-  private version = 15 // Updated version to add Vercel promotions store
+  private version = 16 // Updated version to add Vercel deployment badge states store
 
   async init(): Promise<void> {
     if (this.db) return
@@ -1302,6 +1371,15 @@ class IndexedDBStorage implements StorageInterface {
           promotionStore.createIndex('deploymentId', 'deploymentId', { unique: false })
           promotionStore.createIndex('promotedAt', 'promotedAt', { unique: false })
           promotionStore.createIndex('status', 'status', { unique: false })
+        }
+
+        if (!db.objectStoreNames.contains('vercelDeploymentBadgeStates')) {
+          const badgeStateStore = db.createObjectStore('vercelDeploymentBadgeStates', { keyPath: 'id' })
+          badgeStateStore.createIndex('projectId', 'projectId', { unique: false })
+          badgeStateStore.createIndex('workspaceId', 'workspaceId', { unique: false })
+          badgeStateStore.createIndex('deploymentId', 'deploymentId', { unique: true })
+          badgeStateStore.createIndex('badgeType', 'badgeType', { unique: false })
+          badgeStateStore.createIndex('assignedAt', 'assignedAt', { unique: false })
         }
       }
     })
@@ -2353,6 +2431,106 @@ class IndexedDBStorage implements StorageInterface {
       })
 
       if (logs.length === 0) resolve(true)
+    })
+  }
+
+  // Vercel deployment badge state methods (IndexedDB)
+  async createVercelDeploymentBadgeState(badgeState: Omit<VercelDeploymentBadgeState, 'id' | 'createdAt' | 'updatedAt'>): Promise<VercelDeploymentBadgeState> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelDeploymentBadgeStates'], 'readwrite')
+      const store = transaction.objectStore('vercelDeploymentBadgeStates')
+
+      const id = this.generateId()
+      const now = new Date().toISOString()
+      const newBadgeState: VercelDeploymentBadgeState = {
+        ...badgeState,
+        id,
+        createdAt: now,
+        updatedAt: now
+      }
+
+      const request = store.add(newBadgeState)
+      request.onsuccess = () => resolve(newBadgeState)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getVercelDeploymentBadgeState(deploymentId: string): Promise<VercelDeploymentBadgeState | null> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelDeploymentBadgeStates'], 'readonly')
+      const store = transaction.objectStore('vercelDeploymentBadgeStates')
+      const index = store.index('deploymentId')
+      const request = index.get(deploymentId)
+
+      request.onsuccess = () => resolve(request.result || null)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getVercelDeploymentBadgeStates(projectId: string): Promise<VercelDeploymentBadgeState[]> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelDeploymentBadgeStates'], 'readonly')
+      const store = transaction.objectStore('vercelDeploymentBadgeStates')
+      const index = store.index('projectId')
+      const request = index.getAll(projectId)
+
+      request.onsuccess = () => resolve(request.result || [])
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async updateVercelDeploymentBadgeState(deploymentId: string, updates: Partial<VercelDeploymentBadgeState>): Promise<VercelDeploymentBadgeState | null> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelDeploymentBadgeStates'], 'readwrite')
+      const store = transaction.objectStore('vercelDeploymentBadgeStates')
+      const index = store.index('deploymentId')
+      const getRequest = index.get(deploymentId)
+
+      getRequest.onsuccess = () => {
+        const existing = getRequest.result
+        if (!existing) {
+          resolve(null)
+          return
+        }
+
+        const updated = { ...existing, ...updates, updatedAt: new Date().toISOString() }
+        const putRequest = store.put(updated)
+        putRequest.onsuccess = () => resolve(updated)
+        putRequest.onerror = () => reject(putRequest.error)
+      }
+      getRequest.onerror = () => reject(getRequest.error)
+    })
+  }
+
+  async deleteVercelDeploymentBadgeState(deploymentId: string): Promise<boolean> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelDeploymentBadgeStates'], 'readwrite')
+      const store = transaction.objectStore('vercelDeploymentBadgeStates')
+      const index = store.index('deploymentId')
+      const getRequest = index.get(deploymentId)
+
+      getRequest.onsuccess = () => {
+        const existing = getRequest.result
+        if (!existing) {
+          resolve(false)
+          return
+        }
+
+        const deleteRequest = store.delete(existing.id)
+        deleteRequest.onsuccess = () => resolve(true)
+        deleteRequest.onerror = () => reject(deleteRequest.error)
+      }
+      getRequest.onerror = () => reject(getRequest.error)
     })
   }
 
@@ -3461,6 +3639,32 @@ class StorageManager {
   async deleteVercelLogs(deploymentId: string): Promise<boolean> {
     await this.init()
     return this.storage!.deleteVercelLogs(deploymentId)
+  }
+
+  // Vercel deployment badge state methods
+  async createVercelDeploymentBadgeState(badgeState: Omit<VercelDeploymentBadgeState, 'id' | 'createdAt' | 'updatedAt'>): Promise<VercelDeploymentBadgeState> {
+    await this.init()
+    return this.storage!.createVercelDeploymentBadgeState(badgeState)
+  }
+
+  async getVercelDeploymentBadgeState(deploymentId: string): Promise<VercelDeploymentBadgeState | null> {
+    await this.init()
+    return this.storage!.getVercelDeploymentBadgeState(deploymentId)
+  }
+
+  async getVercelDeploymentBadgeStates(projectId: string): Promise<VercelDeploymentBadgeState[]> {
+    await this.init()
+    return this.storage!.getVercelDeploymentBadgeStates(projectId)
+  }
+
+  async updateVercelDeploymentBadgeState(deploymentId: string, updates: Partial<VercelDeploymentBadgeState>): Promise<VercelDeploymentBadgeState | null> {
+    await this.init()
+    return this.storage!.updateVercelDeploymentBadgeState(deploymentId, updates)
+  }
+
+  async deleteVercelDeploymentBadgeState(deploymentId: string): Promise<boolean> {
+    await this.init()
+    return this.storage!.deleteVercelDeploymentBadgeState(deploymentId)
   }
 
   // Vercel Promotion methods
