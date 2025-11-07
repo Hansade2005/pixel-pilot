@@ -646,18 +646,14 @@ export function VercelDeploymentManager({
         // Merge API data with preserved local badge state
         const mergedDeployments = data.deployments.map((apiDeployment: any) => {
           const localDeployment = currentLocalDeployments.find(d => d.id === apiDeployment.id);
-          
-          // If we have local badge state for this deployment, preserve it
-          if (localDeployment && (localDeployment.aliasAssigned !== undefined || localDeployment.isRollbackCandidate !== undefined)) {
-            return {
-              ...apiDeployment,
-              aliasAssigned: localDeployment.aliasAssigned,
-              isRollbackCandidate: localDeployment.isRollbackCandidate
-            };
-          }
-          
-          // Otherwise use API data as-is
-          return apiDeployment;
+
+          // Always preserve our local badge state if it exists
+          // The API doesn't return aliasAssigned or isRollbackCandidate, so we must keep our local values
+          return {
+            ...apiDeployment,           // Fresh API data for all standard fields
+            aliasAssigned: localDeployment?.aliasAssigned,         // Preserve our badge state
+            isRollbackCandidate: localDeployment?.isRollbackCandidate
+          };
         });
         
         setDeployments(mergedDeployments);
