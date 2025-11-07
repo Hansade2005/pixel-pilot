@@ -34,6 +34,7 @@ import {
   FolderOpen,
   GitBranch,
   Lightbulb,
+  FileText,
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -922,6 +923,8 @@ export function VercelDeploymentManager({
             onRefresh={loadDeployments}
             projectUrl={project?.url}
             onPromote={promoteDeployment}
+            projectId={project?.projectId}
+            vercelToken={localVercelToken}
           />
         </TabsContent>
 
@@ -948,7 +951,15 @@ export function VercelDeploymentManager({
 
         {/* Logs Tab */}
         <TabsContent value="logs">
-          <LogsTab logs={logs} deploymentId={currentDeploymentId} />
+          <LogsTab 
+            logs={logs} 
+            deploymentId={currentDeploymentId}
+            onRefresh={() => {
+              if (currentDeploymentId) {
+                loadLogs(currentDeploymentId);
+              }
+            }}
+          />
         </TabsContent>
       </Tabs>
     </div>
@@ -1236,7 +1247,69 @@ function ProjectOverview({ project, loading, onRedeploy }: any) {
 }
 
 // Deployments Tab Component
-function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote }: any) {
+function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote, projectId, vercelToken }: any) {
+  const [selectedDeploymentForLogs, setSelectedDeploymentForLogs] = useState<string | null>(null);
+  const [runtimeLogs, setRuntimeLogs] = useState<any[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  
+  // Build logs state
+  const [selectedDeploymentForBuildLogs, setSelectedDeploymentForBuildLogs] = useState<string | null>(null);
+  const [buildLogs, setBuildLogs] = useState<string[]>([]);
+  const [loadingBuildLogs, setLoadingBuildLogs] = useState(false);
+
+  // Auto-refresh deployments every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      onRefresh();
+    }, 5000); // 5 seconds
+
+    return () => clearInterval(interval); // Cleanup on unmount
+  }, [onRefresh]);
+
+  const loadRuntimeLogs = async (deploymentId: string) => {
+    setLoadingLogs(true);
+    try {
+      const response = await fetch(
+        `/api/vercel/projects/${projectId}/deployments/${deploymentId}/runtime-logs?token=${vercelToken}&limit=100`
+      );
+      const data = await response.json();
+      
+      if (response.ok && data.logs) {
+        setRuntimeLogs(data.logs);
+      } else {
+        console.error('Failed to load runtime logs:', data.error);
+        setRuntimeLogs([]);
+      }
+    } catch (err) {
+      console.error('Error loading runtime logs:', err);
+      setRuntimeLogs([]);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  const loadBuildLogs = async (deploymentId: string) => {
+    setLoadingBuildLogs(true);
+    try {
+      const response = await fetch(
+        `/api/vercel/deployments/${deploymentId}/logs?token=${vercelToken}`
+      );
+      const data = await response.json();
+      
+      if (response.ok && data.logs) {
+        setBuildLogs(data.logs);
+      } else {
+        console.error('Failed to load build logs:', data.error);
+        setBuildLogs([]);
+      }
+    } catch (err) {
+      console.error('Error loading build logs:', err);
+      setBuildLogs([]);
+    } finally {
+      setLoadingBuildLogs(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -1276,6 +1349,11 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
                     {new Date(deployment.createdAt).toLocaleString()}
                   </span>
                 </div>
+
+                {/* Deployment ID display */}
+                <div className="text-xs text-muted-foreground font-mono">
+                  ID: {deployment.id}
+                </div>
                 
                 {deployment.commit && (
                   <div className="text-sm">
@@ -1285,12 +1363,155 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
                   </div>
                 )}
                 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Button size="sm" variant="link" asChild className="p-0 h-auto">
                     <a href={deployment.url} target="_blank" rel="noopener noreferrer">
                       {deployment.url} <ExternalLink className="w-3 h-3 ml-1" />
                     </a>
                   </Button>
+                  
+                  {/* View Build Logs button - available for all deployments */}
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedDeploymentForBuildLogs(deployment.id);
+                          loadBuildLogs(deployment.id);
+                        }}
+                      >
+                        <FileText className="w-3 h-3 mr-1" />
+                        Build Logs
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl max-h-[80vh]">
+                      <DialogHeader>
+                        <DialogTitle>Build Logs - {deployment.id}</DialogTitle>
+                        <DialogDescription>
+                          Deployment build output and logs
+                        </DialogDescription>
+                      </DialogHeader>
+                      <ScrollArea className="h-[500px] w-full">
+                        <div className="bg-black text-green-400 p-4 rounded font-mono text-xs space-y-1">
+                          {loadingBuildLogs ? (
+                            <div className="flex items-center gap-2 text-gray-500">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Loading build logs...
+                            </div>
+                          ) : buildLogs.length > 0 ? (
+                            buildLogs.map((log: string, i: number) => (
+                              <div key={i} className="whitespace-pre-wrap">{log}</div>
+                            ))
+                          ) : (
+                            <div className="text-gray-500">
+                              No build logs available for this deployment yet.
+                            </div>
+                          )}
+                        </div>
+                      </ScrollArea>
+                      <div className="flex justify-end gap-2 mt-4">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => loadBuildLogs(selectedDeploymentForBuildLogs!)}
+                          disabled={loadingBuildLogs}
+                        >
+                          <RefreshCw className="w-3 h-3 mr-1" />
+                          Refresh Logs
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  
+                  {/* View Runtime Logs button for READY deployments */}
+                  {deployment.status === 'READY' && (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedDeploymentForLogs(deployment.id);
+                            loadRuntimeLogs(deployment.id);
+                          }}
+                        >
+                          <Terminal className="w-3 h-3 mr-1" />
+                          Runtime Logs
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl max-h-[80vh]">
+                        <DialogHeader>
+                          <DialogTitle>Runtime Logs - {deployment.id}</DialogTitle>
+                          <DialogDescription>
+                            Live application logs from this deployment
+                          </DialogDescription>
+                        </DialogHeader>
+                        <ScrollArea className="h-[500px] w-full">
+                          <div className="bg-black text-green-400 p-4 rounded font-mono text-xs space-y-1">
+                            {loadingLogs ? (
+                              <div className="flex items-center gap-2 text-gray-500">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Loading runtime logs...
+                              </div>
+                            ) : runtimeLogs.length > 0 ? (
+                              runtimeLogs.map((log: any, i: number) => (
+                                <div key={log.rowId || i} className="border-b border-gray-800 pb-1 mb-1">
+                                  <div className="flex items-start gap-2">
+                                    <span className={`
+                                      ${log.level === 'error' ? 'text-red-400' : ''}
+                                      ${log.level === 'warning' ? 'text-yellow-400' : ''}
+                                      ${log.level === 'info' ? 'text-blue-400' : ''}
+                                      font-bold
+                                    `}>
+                                      [{log.level?.toUpperCase()}]
+                                    </span>
+                                    <span className="text-gray-400 text-[10px]">
+                                      {new Date(log.timestamp).toLocaleTimeString()}
+                                    </span>
+                                    <span className="text-purple-400 text-[10px]">
+                                      [{log.source}]
+                                    </span>
+                                  </div>
+                                  <div className="mt-1 text-green-300">{log.message}</div>
+                                  {log.requestPath && (
+                                    <div className="mt-1 text-gray-500 text-[10px]">
+                                      {log.requestMethod} {log.requestPath} → {log.responseStatusCode}
+                                    </div>
+                                  )}
+                                  {log.domain && (
+                                    <div className="text-gray-600 text-[10px]">
+                                      {log.domain}
+                                    </div>
+                                  )}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-gray-500">
+                                No runtime logs available for this deployment yet.
+                                {deployment.status === 'READY' && (
+                                  <div className="mt-2">
+                                    Tip: Visit the deployment URL to generate some logs!
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </ScrollArea>
+                        <div className="flex justify-end gap-2 mt-4">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => loadRuntimeLogs(selectedDeploymentForLogs!)}
+                            disabled={loadingLogs}
+                          >
+                            <RefreshCw className="w-3 h-3 mr-1" />
+                            Refresh Logs
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  )}
                   
                   {/* Promote button for READY deployments that aren't already in production */}
                   {deployment.status === 'READY' && deployment.target !== 'production' && (
@@ -1872,14 +2093,35 @@ function EnvironmentTab({ envVars, projectId, vercelToken, onRefresh }: any) {
 }
 
 // Logs Tab Component
-function LogsTab({ logs, deploymentId }: any) {
+function LogsTab({ logs, deploymentId, onRefresh }: any) {
+  // Auto-refresh logs every 5 seconds
+  useEffect(() => {
+    if (!deploymentId || !onRefresh) return;
+
+    const interval = setInterval(() => {
+      onRefresh();
+    }, 5000); // 5 seconds
+
+    return () => clearInterval(interval); // Cleanup on unmount
+  }, [deploymentId, onRefresh]);
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Build Logs</CardTitle>
-        {deploymentId && (
-          <CardDescription>Deployment: {deploymentId}</CardDescription>
-        )}
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Build Logs</CardTitle>
+            {deploymentId && (
+              <CardDescription>
+                Deployment: {deploymentId}
+                <Badge variant="outline" className="ml-2 text-xs">
+                  <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                  Auto-refreshing every 5s
+                </Badge>
+              </CardDescription>
+            )}
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-[500px] w-full">
