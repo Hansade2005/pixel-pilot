@@ -1254,7 +1254,7 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
   
   // Build logs state
   const [selectedDeploymentForBuildLogs, setSelectedDeploymentForBuildLogs] = useState<string | null>(null);
-  const [buildLogs, setBuildLogs] = useState<string[]>([]);
+  const [buildLogs, setBuildLogs] = useState<any[]>([]);
   const [loadingBuildLogs, setLoadingBuildLogs] = useState(false);
 
   // Auto-refresh deployments every 5 seconds
@@ -1404,9 +1404,40 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
                               Loading build logs...
                             </div>
                           ) : buildLogs.length > 0 ? (
-                            buildLogs.map((log: string, i: number) => (
-                              <div key={i} className="whitespace-pre-wrap">{log}</div>
-                            ))
+                            buildLogs.map((log: any, i: number) => {
+                              // Handle string logs (legacy format)
+                              if (typeof log === 'string') {
+                                return <div key={i} className="whitespace-pre-wrap">{log}</div>;
+                              }
+                              
+                              // Handle object logs (new format)
+                              const logType = log.type || 'info';
+                              const logMessage = log.message || '';
+                              const logTimestamp = log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : '';
+                              
+                              return (
+                                <div key={log.id || i} className="whitespace-pre-wrap">
+                                  <span className={`
+                                    ${logType === 'stderr' || logType === 'error' ? 'text-red-400' : ''}
+                                    ${logType === 'warning' ? 'text-yellow-400' : ''}
+                                    ${logType === 'command' ? 'text-blue-400' : ''}
+                                    font-bold
+                                  `}>
+                                    [{logType.toUpperCase()}]
+                                  </span>
+                                  {logTimestamp && (
+                                    <>
+                                      {' '}
+                                      <span className="text-gray-400 text-[10px]">
+                                        {logTimestamp}
+                                      </span>
+                                    </>
+                                  )}
+                                  {' '}
+                                  {logMessage}
+                                </div>
+                              );
+                            })
                           ) : (
                             <div className="text-gray-500">
                               No build logs available for this deployment yet.
