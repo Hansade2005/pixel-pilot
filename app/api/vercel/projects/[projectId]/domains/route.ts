@@ -12,7 +12,8 @@ export async function POST(
 ) {
   try {
     const { 
-      domain, 
+      name, // Domain name (matches official API spec)
+      domain, // Also accept 'domain' for backwards compatibility
       vercelToken, 
       teamId,
       redirect,
@@ -20,10 +21,12 @@ export async function POST(
       gitBranch,
     } = await request.json();
 
+    const domainName = name || domain;
+
     // Validate input
-    if (!domain) {
+    if (!domainName) {
       return NextResponse.json({
-        error: 'Domain is required'
+        error: 'Domain name is required'
       }, { status: 400 });
     }
 
@@ -41,7 +44,7 @@ export async function POST(
 
     // Prepare request body
     const requestBody: any = {
-      name: domain,
+      name: domainName,
     };
 
     if (redirect) {

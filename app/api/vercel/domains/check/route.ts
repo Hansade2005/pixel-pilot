@@ -5,6 +5,9 @@ import { NextRequest, NextResponse } from 'next/server';
  * 
  * This endpoint checks if domains are available for purchase and returns
  * pricing information from Vercel's domain marketplace.
+ * 
+ * Uses POST /v1/registrar/domains/availability for bulk domain checks
+ * Official API: https://vercel.com/docs/rest-api/reference/endpoints/domains-registrar/get-availability-for-multiple-domains
  */
 export async function POST(request: NextRequest) {
   try {
@@ -17,9 +20,9 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    if (domains.length > 10) {
+    if (domains.length > 50) {
       return NextResponse.json({
-        error: 'Maximum 10 domains can be checked at once'
+        error: 'Maximum 50 domains can be checked at once'
       }, { status: 400 });
     }
 
@@ -29,21 +32,22 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Build query parameters
-    const queryParams = new URLSearchParams();
-    queryParams.set('names', domains.join(','));
+    // Build API URL with optional team parameter
+    let apiUrl = 'https://api.vercel.com/v1/registrar/domains/availability';
     if (teamId) {
-      queryParams.set('teamId', teamId);
+      apiUrl += `?teamId=${teamId}`;
     }
 
-    // Check domain availability using newer GET /domains/availability endpoint
-    // Note: v5/domains/check is deprecated, but still works. Consider migrating to GET /domains/availability
-    const apiUrl = `https://api.vercel.com/v5/domains/check?${queryParams.toString()}`;
-    
+    // Check domain availability using the official registrar API
     const response = await fetch(apiUrl, {
+      method: 'POST',
       headers: {
         'Authorization': `Bearer ${vercelToken}`,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        domains: domains
+      }),
     });
 
     if (!response.ok) {
@@ -78,15 +82,13 @@ export async function POST(request: NextRequest) {
 
     const data = await response.json();
 
-    // Format response
-    const formattedDomains = data.domains?.map((domain: any) => ({
-      name: domain.name,
-      available: domain.available,
-      price: domain.price,
-      currency: domain.currency || 'USD',
-      period: domain.period || 1, // years
-      serviceType: domain.serviceType,
-      verified: domain.verified,
+    // Format response according to the official API format
+    // Response has { results: [{ domain: string, available: boolean }] }
+    const formattedDomains = data.results?.map((result: any) => ({
+      name: result.domain,
+      available: result.available,
+      // Note: The v1/registrar/domains/availability endpoint doesn't include price
+      // To get price, we need to call GET /v1/domains/available for each domain
     })) || [];
 
     return NextResponse.json({

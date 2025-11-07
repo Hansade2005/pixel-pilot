@@ -4,97 +4,95 @@ import { NextRequest, NextResponse } from 'next/server';
  * Purchase a domain through Vercel
  * 
  * This endpoint initiates a domain purchase order through Vercel's domain marketplace.
- * Requires payment information and domain contact details.
+ * Uses POST /v1/domains/buy for bulk domain purchases.
+ * 
+ * Official API: https://vercel.com/docs/rest-api/reference/endpoints/domains-registrar/buy-multiple-domains
  */
 export async function POST(request: NextRequest) {
   try {
     const { 
-      domain, 
+      domains, // Array of domain objects: [{ domainName, autoRenew?, years?, expectedPrice? }]
       vercelToken, 
       teamId,
       // Contact information
-      country,
-      firstName,
-      lastName,
-      email,
-      phone,
-      address,
-      city,
-      state,
-      postalCode,
-      // Optional
-      autoRenew = true,
-      years = 1,
+      contactInformation,
     } = await request.json();
 
     // Validate required fields
-    if (!domain || !vercelToken) {
+    if (!domains || !Array.isArray(domains) || domains.length === 0) {
       return NextResponse.json({
-        error: 'Domain and Vercel token are required'
+        error: 'Domains array is required and must contain at least one domain'
+      }, { status: 400 });
+    }
+
+    if (!vercelToken) {
+      return NextResponse.json({
+        error: 'Vercel token is required'
       }, { status: 400 });
     }
 
     // Validate contact information
-    if (!country || !firstName || !lastName || !email || !phone || !address || !city || !postalCode) {
+    if (!contactInformation || !contactInformation.firstName || !contactInformation.lastName || 
+        !contactInformation.email || !contactInformation.phone || !contactInformation.address1 || 
+        !contactInformation.city || !contactInformation.state || !contactInformation.zip || 
+        !contactInformation.country) {
       return NextResponse.json({
         error: 'Complete contact information is required for domain purchase',
-        required: ['country', 'firstName', 'lastName', 'email', 'phone', 'address', 'city', 'postalCode']
+        required: {
+          firstName: 'string',
+          lastName: 'string',
+          email: 'string',
+          phone: 'string',
+          address1: 'string',
+          city: 'string',
+          state: 'string',
+          zip: 'string',
+          country: 'string (e.g., US, GB, DE)'
+        },
+        optional: {
+          address2: 'string',
+          companyName: 'string',
+          fax: 'string'
+        }
       }, { status: 400 });
     }
 
-    // Build API URL
-    let apiUrl = 'https://api.vercel.com/v5/domains/buy';
-    if (teamId) {
-      apiUrl += `?teamId=${teamId}`;
+    // Validate team ID is required
+    if (!teamId) {
+      return NextResponse.json({
+        error: 'Team ID is required for domain purchases',
+        code: 'TEAM_ID_REQUIRED'
+      }, { status: 400 });
     }
 
-    // Prepare purchase payload
+    // Build API URL with required team ID
+    const apiUrl = `https://api.vercel.com/v1/domains/buy?teamId=${teamId}`;
+
+    // Prepare purchase payload according to official API spec
     const purchasePayload = {
-      name: domain,
-      expectedPrice: undefined, // Will be filled from check endpoint
-      renew: autoRenew,
-      country,
-      orgName: undefined, // For organizations
-      firstName,
-      lastName,
-      address1: address,
-      address2: undefined,
-      city,
-      state,
-      postalCode,
-      phone,
-      email,
+      domains: domains.map((d: any) => ({
+        domainName: d.domainName,
+        autoRenew: d.autoRenew !== undefined ? d.autoRenew : true,
+        years: d.years || 1,
+        ...(d.expectedPrice && { expectedPrice: d.expectedPrice })
+      })),
+      contactInformation: {
+        firstName: contactInformation.firstName,
+        lastName: contactInformation.lastName,
+        email: contactInformation.email,
+        phone: contactInformation.phone,
+        address1: contactInformation.address1,
+        ...(contactInformation.address2 && { address2: contactInformation.address2 }),
+        city: contactInformation.city,
+        state: contactInformation.state,
+        zip: contactInformation.zip,
+        country: contactInformation.country,
+        ...(contactInformation.companyName && { companyName: contactInformation.companyName }),
+        ...(contactInformation.fax && { fax: contactInformation.fax }),
+      }
     };
 
-    // First, check domain availability and get price
-    const checkUrl = `https://api.vercel.com/v5/domains/check?names=${domain}${teamId ? `&teamId=${teamId}` : ''}`;
-    const checkResponse = await fetch(checkUrl, {
-      headers: {
-        'Authorization': `Bearer ${vercelToken}`,
-      },
-    });
-
-    if (!checkResponse.ok) {
-      return NextResponse.json({
-        error: 'Failed to check domain availability',
-        code: 'DOMAIN_CHECK_FAILED'
-      }, { status: checkResponse.status });
-    }
-
-    const checkData = await checkResponse.json();
-    const domainInfo = checkData.domains?.[0];
-
-    if (!domainInfo?.available) {
-      return NextResponse.json({
-        error: 'Domain is not available for purchase',
-        code: 'DOMAIN_NOT_AVAILABLE'
-      }, { status: 400 });
-    }
-
-    // Set expected price
-    purchasePayload.expectedPrice = domainInfo.price;
-
-    // Purchase domain
+    // Purchase domain(s) using the official API
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -108,9 +106,22 @@ export async function POST(request: NextRequest) {
       const errorData = await response.json().catch(() => ({}));
       
       if (response.status === 400) {
+        // Specific error codes from official API
+        const errorCode = errorData.code;
+        let errorMessage = errorData.message || 'Invalid purchase request';
+        
+        if (errorCode === 'domain_too_short') {
+          errorMessage = 'The domain name (excluding the TLD) is too short.';
+        } else if (errorCode === 'order_too_expensive') {
+          errorMessage = 'The total price of the order is too high.';
+        } else if (errorCode === 'too_many_domains') {
+          errorMessage = 'The number of domains in the order is too high.';
+        }
+        
         return NextResponse.json({
-          error: errorData.error?.message || 'Invalid purchase request',
-          code: 'INVALID_PURCHASE_REQUEST'
+          error: errorMessage,
+          code: errorCode || 'INVALID_PURCHASE_REQUEST',
+          details: errorData.issues || []
         }, { status: 400 });
       }
       
@@ -143,29 +154,25 @@ export async function POST(request: NextRequest) {
       }
 
       return NextResponse.json({
-        error: errorData.error?.message || 'Failed to purchase domain',
-        code: 'PURCHASE_FAILED'
+        error: errorData.message || 'Failed to purchase domain',
+        code: errorData.code || 'PURCHASE_FAILED'
       }, { status: response.status });
     }
 
     const data = await response.json();
 
+    // Return purchase order information
     return NextResponse.json({
-      success: true,
-      domain: domain,
-      orderId: data.uid,
-      price: domainInfo.price,
-      currency: domainInfo.currency || 'USD',
-      status: 'pending',
-      autoRenew: autoRenew,
-      expiresAt: data.expiresAt,
-      message: 'Domain purchase initiated successfully',
+      orderId: data.orderId,
+      links: data._links,
+      message: 'Domain purchase order created successfully',
+      timestamp: Date.now(),
     });
 
   } catch (error) {
     console.error('Domain purchase error:', error);
     return NextResponse.json({ 
-      error: 'Failed to purchase domain',
+      error: 'Failed to process domain purchase',
       code: 'INTERNAL_ERROR'
     }, { status: 500 });
   }

@@ -183,6 +183,7 @@ export interface VercelProject {
   status: string
   framework?: string
   githubRepo?: string
+  teamId?: string // Vercel team ID (required for some API endpoints)
   lastDeployed?: number
   createdAt: string
   updatedAt: string

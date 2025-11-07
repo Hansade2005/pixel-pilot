@@ -48,6 +48,7 @@ interface VercelProject {
   url: string;
   status: string;
   framework?: string;
+  teamId?: string; // Vercel team ID (required for some API operations)
   lastDeployed?: number;
 }
 
@@ -929,6 +930,7 @@ export function VercelDeploymentManager({
           <DomainsTab
             domains={domains}
             projectId={project?.projectId || ''}
+            teamId={project?.teamId}
             vercelToken={localVercelToken}
             onRefresh={loadDomains}
           />
@@ -1322,7 +1324,7 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
 }
 
 // Domains Tab Component
-function DomainsTab({ domains, projectId, vercelToken, onRefresh }: any) {
+function DomainsTab({ domains, projectId, teamId, vercelToken, onRefresh }: any) {
   const [showAddDomain, setShowAddDomain] = useState(false);
   const [showBuyDomain, setShowBuyDomain] = useState(false);
   const [newDomain, setNewDomain] = useState('');
@@ -1340,7 +1342,7 @@ function DomainsTab({ domains, projectId, vercelToken, onRefresh }: any) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          domain: newDomain,
+          name: newDomain, // API expects 'name', not 'domain'
           vercelToken,
         }),
       });
@@ -1378,6 +1380,7 @@ function DomainsTab({ domains, projectId, vercelToken, onRefresh }: any) {
                 <DialogContent>
                   <BuyDomainDialog 
                     projectId={projectId} 
+                    teamId={teamId}
                     vercelToken={vercelToken}
                     onSuccess={() => {
                       setShowBuyDomain(false);
@@ -1473,7 +1476,7 @@ function DomainsTab({ domains, projectId, vercelToken, onRefresh }: any) {
 }
 
 // Buy Domain Dialog Component
-function BuyDomainDialog({ projectId, vercelToken, onSuccess }: any) {
+function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
   const [step, setStep] = useState(1);
   const [domain, setDomain] = useState('');
   const [availability, setAvailability] = useState<any>(null);
@@ -1536,17 +1539,25 @@ function BuyDomainDialog({ projectId, vercelToken, onSuccess }: any) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          domain,
+          domains: [{
+            domainName: domain,
+            autoRenew: true,
+            years: 1,
+            expectedPrice: availability?.price,
+          }],
           vercelToken,
-          firstName,
-          lastName,
-          email,
-          phone,
-          address,
-          city,
-          state,
-          postalCode,
-          country,
+          teamId: teamId, // Required by the API
+          contactInformation: {
+            firstName,
+            lastName,
+            email,
+            phone,
+            address1: address,
+            city,
+            state,
+            zip: postalCode,
+            country,
+          },
         }),
       });
 
