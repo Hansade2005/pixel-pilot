@@ -64,13 +64,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Prepare deployment payload according to Vercel v13 API
+    // Based on working deploy route and Vercel SDK documentation
     const deploymentPayload = {
       name: project.name, // Required: project name/slug
       gitSource: {
         type: project.link.type || 'github',
         repo: project.link.repo, // Required: full repo path (owner/repo)
         ref: branch,
-        repoId: project.link.repoId,
+        ...(project.link.repoId && { projectId: project.link.repoId }), // Optional: numeric repo ID
       },
       target: target,
       withLatestCommit: withLatestCommit,

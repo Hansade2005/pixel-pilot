@@ -36,7 +36,8 @@ export async function POST(request: NextRequest) {
       queryParams.set('teamId', teamId);
     }
 
-    // Check domain availability
+    // Check domain availability using newer GET /domains/availability endpoint
+    // Note: v5/domains/check is deprecated, but still works. Consider migrating to GET /domains/availability
     const apiUrl = `https://api.vercel.com/v5/domains/check?${queryParams.toString()}`;
     
     const response = await fetch(apiUrl, {
