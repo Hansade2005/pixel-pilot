@@ -2112,6 +2112,39 @@ function EnvironmentTab({ envVars, projectId, vercelToken, onRefresh }: any) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const deleteEnvVar = async (envId: string) => {
+    if (!confirm('Are you sure you want to delete this environment variable?')) return;
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/vercel/projects/${projectId}/env/${envId}?token=${vercelToken}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error);
+      }
+
+      // Remove from local storage
+      await storageManager.init();
+      try {
+        await storageManager.deleteVercelEnvVariable(envId);
+      } catch (storageErr) {
+        console.log('Failed to remove from storage:', storageErr);
+      }
+
+      onRefresh();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const addEnvVar = async () => {
     if (!newKey || !newValue) return;
 
@@ -2244,7 +2277,7 @@ function EnvironmentTab({ envVars, projectId, vercelToken, onRefresh }: any) {
                   ))}
                 </div>
               </div>
-              <Button size="sm" variant="ghost">
+              <Button size="sm" variant="ghost" onClick={() => deleteEnvVar(envVar.id)}>
                 <Trash2 className="w-4 h-4" />
               </Button>
             </div>
