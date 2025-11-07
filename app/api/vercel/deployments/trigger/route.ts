@@ -63,11 +63,12 @@ export async function POST(request: NextRequest) {
       deployApiUrl += `?teamId=${teamId}`;
     }
 
-    // Prepare deployment payload
+    // Prepare deployment payload according to Vercel v13 API
     const deploymentPayload = {
-      project: projectId,
+      name: project.name, // Required: project name/slug
       gitSource: {
         type: project.link.type || 'github',
+        repo: project.link.repo, // Required: full repo path (owner/repo)
         ref: branch,
         repoId: project.link.repoId,
       },

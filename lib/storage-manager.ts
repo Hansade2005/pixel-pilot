@@ -173,6 +173,76 @@ export interface EnvironmentVariable {
   updatedAt: string
 }
 
+// Vercel project management interfaces
+export interface VercelProject {
+  id: string
+  workspaceId: string
+  projectId: string // Vercel's project ID
+  projectName: string
+  url: string
+  status: string
+  framework?: string
+  githubRepo?: string
+  lastDeployed?: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface VercelDeployment {
+  id: string
+  projectId: string // Reference to VercelProject
+  workspaceId: string
+  deploymentId: string // Vercel's deployment ID
+  url: string
+  status: string
+  target: string
+  commit?: {
+    sha: string
+    message: string
+    author: string
+  }
+  createdAt: number
+  updatedAt: string
+}
+
+export interface VercelEnvVariable {
+  id: string
+  projectId: string // Reference to VercelProject
+  workspaceId: string
+  envId: string // Vercel's env variable ID
+  key: string
+  type: string
+  target: string[]
+  hasValue: boolean
+  createdAt: number
+  updatedAt: string
+}
+
+export interface VercelDomain {
+  id: string
+  projectId: string // Reference to VercelProject
+  workspaceId: string
+  name: string
+  verified: boolean
+  verification?: Array<{
+    type: string
+    domain: string
+    value: string
+  }>
+  createdAt: number
+  updatedAt: string
+}
+
+export interface VercelLog {
+  id: string
+  deploymentId: string // Reference to VercelDeployment
+  workspaceId: string
+  message: string
+  type: string
+  timestamp: number
+  createdAt: string
+}
+
 // Tool execution tracking interface for preventing duplicate executions
 export interface ToolExecution {
   id: string
@@ -249,6 +319,37 @@ export interface StorageInterface {
   updateToolExecution(id: string, updates: Partial<ToolExecution>): Promise<ToolExecution | null>;
   deleteToolExecution(id: string): Promise<boolean>;
   findExistingExecution(workspaceId: string, toolName: string, args: Record<string, any>): Promise<ToolExecution | null>;
+  
+  // Vercel project management methods
+  createVercelProject(project: Omit<VercelProject, 'id' | 'createdAt' | 'updatedAt'>): Promise<VercelProject>;
+  getVercelProject(workspaceId: string): Promise<VercelProject | null>;
+  getVercelProjectById(id: string): Promise<VercelProject | null>;
+  updateVercelProject(id: string, updates: Partial<VercelProject>): Promise<VercelProject | null>;
+  deleteVercelProject(id: string): Promise<boolean>;
+  
+  // Vercel deployment methods
+  createVercelDeployment(deployment: Omit<VercelDeployment, 'id' | 'updatedAt'>): Promise<VercelDeployment>;
+  getVercelDeployments(projectId: string): Promise<VercelDeployment[]>;
+  getVercelDeploymentsByWorkspace(workspaceId: string): Promise<VercelDeployment[]>;
+  updateVercelDeployment(id: string, updates: Partial<VercelDeployment>): Promise<VercelDeployment | null>;
+  deleteVercelDeployment(id: string): Promise<boolean>;
+  
+  // Vercel environment variable methods
+  createVercelEnvVariable(envVar: Omit<VercelEnvVariable, 'id' | 'updatedAt'>): Promise<VercelEnvVariable>;
+  getVercelEnvVariables(projectId: string): Promise<VercelEnvVariable[]>;
+  updateVercelEnvVariable(id: string, updates: Partial<VercelEnvVariable>): Promise<VercelEnvVariable | null>;
+  deleteVercelEnvVariable(id: string): Promise<boolean>;
+  
+  // Vercel domain methods
+  createVercelDomain(domain: Omit<VercelDomain, 'id' | 'updatedAt'>): Promise<VercelDomain>;
+  getVercelDomains(projectId: string): Promise<VercelDomain[]>;
+  updateVercelDomain(id: string, updates: Partial<VercelDomain>): Promise<VercelDomain | null>;
+  deleteVercelDomain(id: string): Promise<boolean>;
+  
+  // Vercel log methods
+  createVercelLog(log: Omit<VercelLog, 'id' | 'createdAt'>): Promise<VercelLog>;
+  getVercelLogs(deploymentId: string): Promise<VercelLog[]>;
+  deleteVercelLogs(deploymentId: string): Promise<boolean>;
   
   // Additional utility methods
   importTable(tableName: string, data: any[]): Promise<void>;
@@ -503,6 +604,178 @@ class InMemoryStorage implements StorageInterface {
     return this.environmentVariables.delete(id)
   }
 
+  // Vercel Project Management Methods
+  private vercelProjects: Map<string, VercelProject> = new Map()
+  private vercelDeployments: Map<string, VercelDeployment> = new Map()
+  private vercelEnvVariables: Map<string, VercelEnvVariable> = new Map()
+  private vercelDomains: Map<string, VercelDomain> = new Map()
+  private vercelLogs: Map<string, VercelLog> = new Map()
+
+  async createVercelProject(project: Omit<VercelProject, 'id' | 'createdAt' | 'updatedAt'>): Promise<VercelProject> {
+    const id = this.generateId()
+    const now = new Date().toISOString()
+    const newProject: VercelProject = {
+      ...project,
+      id,
+      createdAt: now,
+      updatedAt: now
+    }
+    this.vercelProjects.set(id, newProject)
+    return newProject
+  }
+
+  async getVercelProject(workspaceId: string): Promise<VercelProject | null> {
+    return Array.from(this.vercelProjects.values()).find(p => p.workspaceId === workspaceId) || null
+  }
+
+  async getVercelProjectById(id: string): Promise<VercelProject | null> {
+    return this.vercelProjects.get(id) || null
+  }
+
+  async updateVercelProject(id: string, updates: Partial<VercelProject>): Promise<VercelProject | null> {
+    const project = this.vercelProjects.get(id)
+    if (!project) return null
+    
+    const updatedProject: VercelProject = {
+      ...project,
+      ...updates,
+      updatedAt: new Date().toISOString()
+    }
+    this.vercelProjects.set(id, updatedProject)
+    return updatedProject
+  }
+
+  async deleteVercelProject(id: string): Promise<boolean> {
+    return this.vercelProjects.delete(id)
+  }
+
+  async createVercelDeployment(deployment: Omit<VercelDeployment, 'id' | 'updatedAt'>): Promise<VercelDeployment> {
+    const id = this.generateId()
+    const now = new Date().toISOString()
+    const newDeployment: VercelDeployment = {
+      ...deployment,
+      id,
+      updatedAt: now
+    }
+    this.vercelDeployments.set(id, newDeployment)
+    return newDeployment
+  }
+
+  async getVercelDeployments(projectId: string): Promise<VercelDeployment[]> {
+    return Array.from(this.vercelDeployments.values()).filter(d => d.projectId === projectId)
+  }
+
+  async getVercelDeploymentsByWorkspace(workspaceId: string): Promise<VercelDeployment[]> {
+    return Array.from(this.vercelDeployments.values()).filter(d => d.workspaceId === workspaceId)
+  }
+
+  async updateVercelDeployment(id: string, updates: Partial<VercelDeployment>): Promise<VercelDeployment | null> {
+    const deployment = this.vercelDeployments.get(id)
+    if (!deployment) return null
+    
+    const updatedDeployment: VercelDeployment = {
+      ...deployment,
+      ...updates,
+      updatedAt: new Date().toISOString()
+    }
+    this.vercelDeployments.set(id, updatedDeployment)
+    return updatedDeployment
+  }
+
+  async deleteVercelDeployment(id: string): Promise<boolean> {
+    return this.vercelDeployments.delete(id)
+  }
+
+  async createVercelEnvVariable(envVar: Omit<VercelEnvVariable, 'id' | 'updatedAt'>): Promise<VercelEnvVariable> {
+    const id = this.generateId()
+    const now = new Date().toISOString()
+    const newEnvVar: VercelEnvVariable = {
+      ...envVar,
+      id,
+      updatedAt: now
+    }
+    this.vercelEnvVariables.set(id, newEnvVar)
+    return newEnvVar
+  }
+
+  async getVercelEnvVariables(projectId: string): Promise<VercelEnvVariable[]> {
+    return Array.from(this.vercelEnvVariables.values()).filter(e => e.projectId === projectId)
+  }
+
+  async updateVercelEnvVariable(id: string, updates: Partial<VercelEnvVariable>): Promise<VercelEnvVariable | null> {
+    const envVar = this.vercelEnvVariables.get(id)
+    if (!envVar) return null
+    
+    const updatedEnvVar: VercelEnvVariable = {
+      ...envVar,
+      ...updates,
+      updatedAt: new Date().toISOString()
+    }
+    this.vercelEnvVariables.set(id, updatedEnvVar)
+    return updatedEnvVar
+  }
+
+  async deleteVercelEnvVariable(id: string): Promise<boolean> {
+    return this.vercelEnvVariables.delete(id)
+  }
+
+  async createVercelDomain(domain: Omit<VercelDomain, 'id' | 'updatedAt'>): Promise<VercelDomain> {
+    const id = this.generateId()
+    const now = new Date().toISOString()
+    const newDomain: VercelDomain = {
+      ...domain,
+      id,
+      updatedAt: now
+    }
+    this.vercelDomains.set(id, newDomain)
+    return newDomain
+  }
+
+  async getVercelDomains(projectId: string): Promise<VercelDomain[]> {
+    return Array.from(this.vercelDomains.values()).filter(d => d.projectId === projectId)
+  }
+
+  async updateVercelDomain(id: string, updates: Partial<VercelDomain>): Promise<VercelDomain | null> {
+    const domain = this.vercelDomains.get(id)
+    if (!domain) return null
+    
+    const updatedDomain: VercelDomain = {
+      ...domain,
+      ...updates,
+      updatedAt: new Date().toISOString()
+    }
+    this.vercelDomains.set(id, updatedDomain)
+    return updatedDomain
+  }
+
+  async deleteVercelDomain(id: string): Promise<boolean> {
+    return this.vercelDomains.delete(id)
+  }
+
+  async createVercelLog(log: Omit<VercelLog, 'id' | 'createdAt'>): Promise<VercelLog> {
+    const id = this.generateId()
+    const now = new Date().toISOString()
+    const newLog: VercelLog = {
+      ...log,
+      id,
+      createdAt: now
+    }
+    this.vercelLogs.set(id, newLog)
+    return newLog
+  }
+
+  async getVercelLogs(deploymentId: string): Promise<VercelLog[]> {
+    return Array.from(this.vercelLogs.values())
+      .filter(l => l.deploymentId === deploymentId)
+      .sort((a, b) => a.timestamp - b.timestamp)
+  }
+
+  async deleteVercelLogs(deploymentId: string): Promise<boolean> {
+    const logs = await this.getVercelLogs(deploymentId)
+    logs.forEach(log => this.vercelLogs.delete(log.id))
+    return true
+  }
+
   // Utility methods
   async clearAll(): Promise<void> {
     this.workspaces.clear()
@@ -511,6 +784,11 @@ class InMemoryStorage implements StorageInterface {
     this.messages.clear()
     this.deployments.clear()
     this.environmentVariables.clear()
+    this.vercelProjects.clear()
+    this.vercelDeployments.clear()
+    this.vercelEnvVariables.clear()
+    this.vercelDomains.clear()
+    this.vercelLogs.clear()
   }
 
   async exportData(): Promise<any> {
@@ -821,7 +1099,7 @@ class InMemoryStorage implements StorageInterface {
 class IndexedDBStorage implements StorageInterface {
   private db: IDBDatabase | null = null
   private dbName = 'PixelPilotDB'
-  private version = 13 // Updated version to add conversationSummaries object store
+  private version = 14 // Updated version to add Vercel management object stores
 
   async init(): Promise<void> {
     if (this.db) return
@@ -910,6 +1188,43 @@ class IndexedDBStorage implements StorageInterface {
           executionStore.createIndex('toolName', 'toolName', { unique: false })
           executionStore.createIndex('status', 'status', { unique: false })
           executionStore.createIndex('createdAt', 'createdAt', { unique: false })
+        }
+
+        // Create Vercel project management stores
+        if (!db.objectStoreNames.contains('vercelProjects')) {
+          const projectStore = db.createObjectStore('vercelProjects', { keyPath: 'id' })
+          projectStore.createIndex('workspaceId', 'workspaceId', { unique: true })
+          projectStore.createIndex('projectId', 'projectId', { unique: false })
+          projectStore.createIndex('createdAt', 'createdAt', { unique: false })
+        }
+
+        if (!db.objectStoreNames.contains('vercelDeployments')) {
+          const deploymentStore = db.createObjectStore('vercelDeployments', { keyPath: 'id' })
+          deploymentStore.createIndex('projectId', 'projectId', { unique: false })
+          deploymentStore.createIndex('workspaceId', 'workspaceId', { unique: false })
+          deploymentStore.createIndex('deploymentId', 'deploymentId', { unique: false })
+          deploymentStore.createIndex('createdAt', 'createdAt', { unique: false })
+        }
+
+        if (!db.objectStoreNames.contains('vercelEnvVariables')) {
+          const envStore = db.createObjectStore('vercelEnvVariables', { keyPath: 'id' })
+          envStore.createIndex('projectId', 'projectId', { unique: false })
+          envStore.createIndex('workspaceId', 'workspaceId', { unique: false })
+          envStore.createIndex('envId', 'envId', { unique: false })
+        }
+
+        if (!db.objectStoreNames.contains('vercelDomains')) {
+          const domainStore = db.createObjectStore('vercelDomains', { keyPath: 'id' })
+          domainStore.createIndex('projectId', 'projectId', { unique: false })
+          domainStore.createIndex('workspaceId', 'workspaceId', { unique: false })
+          domainStore.createIndex('name', 'name', { unique: false })
+        }
+
+        if (!db.objectStoreNames.contains('vercelLogs')) {
+          const logStore = db.createObjectStore('vercelLogs', { keyPath: 'id' })
+          logStore.createIndex('deploymentId', 'deploymentId', { unique: false })
+          logStore.createIndex('workspaceId', 'workspaceId', { unique: false })
+          logStore.createIndex('timestamp', 'timestamp', { unique: false })
         }
       }
     })
@@ -1564,11 +1879,423 @@ class IndexedDBStorage implements StorageInterface {
   //   });
   // }
 
+  // Vercel Project Management Methods
+  async createVercelProject(project: Omit<VercelProject, 'id' | 'createdAt' | 'updatedAt'>): Promise<VercelProject> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    const id = this.generateId()
+    const now = new Date().toISOString()
+    const newProject: VercelProject = {
+      ...project,
+      id,
+      createdAt: now,
+      updatedAt: now
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelProjects'], 'readwrite')
+      const store = transaction.objectStore('vercelProjects')
+      const request = store.add(newProject)
+
+      request.onsuccess = () => resolve(newProject)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getVercelProject(workspaceId: string): Promise<VercelProject | null> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelProjects'], 'readonly')
+      const store = transaction.objectStore('vercelProjects')
+      const index = store.index('workspaceId')
+      const request = index.get(workspaceId)
+
+      request.onsuccess = () => resolve(request.result || null)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getVercelProjectById(id: string): Promise<VercelProject | null> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelProjects'], 'readonly')
+      const store = transaction.objectStore('vercelProjects')
+      const request = store.get(id)
+
+      request.onsuccess = () => resolve(request.result || null)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async updateVercelProject(id: string, updates: Partial<VercelProject>): Promise<VercelProject | null> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    const existing = await this.getVercelProjectById(id)
+    if (!existing) return null
+
+    const updated: VercelProject = {
+      ...existing,
+      ...updates,
+      updatedAt: new Date().toISOString()
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelProjects'], 'readwrite')
+      const store = transaction.objectStore('vercelProjects')
+      const request = store.put(updated)
+
+      request.onsuccess = () => resolve(updated)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async deleteVercelProject(id: string): Promise<boolean> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelProjects'], 'readwrite')
+      const store = transaction.objectStore('vercelProjects')
+      const request = store.delete(id)
+
+      request.onsuccess = () => resolve(true)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async createVercelDeployment(deployment: Omit<VercelDeployment, 'id' | 'updatedAt'>): Promise<VercelDeployment> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    const id = this.generateId()
+    const now = new Date().toISOString()
+    const newDeployment: VercelDeployment = {
+      ...deployment,
+      id,
+      updatedAt: now
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelDeployments'], 'readwrite')
+      const store = transaction.objectStore('vercelDeployments')
+      const request = store.add(newDeployment)
+
+      request.onsuccess = () => resolve(newDeployment)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getVercelDeployments(projectId: string): Promise<VercelDeployment[]> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelDeployments'], 'readonly')
+      const store = transaction.objectStore('vercelDeployments')
+      const index = store.index('projectId')
+      const request = index.getAll(projectId)
+
+      request.onsuccess = () => {
+        const deployments = request.result || []
+        deployments.sort((a, b) => b.createdAt - a.createdAt)
+        resolve(deployments)
+      }
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getVercelDeploymentsByWorkspace(workspaceId: string): Promise<VercelDeployment[]> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelDeployments'], 'readonly')
+      const store = transaction.objectStore('vercelDeployments')
+      const index = store.index('workspaceId')
+      const request = index.getAll(workspaceId)
+
+      request.onsuccess = () => {
+        const deployments = request.result || []
+        deployments.sort((a, b) => b.createdAt - a.createdAt)
+        resolve(deployments)
+      }
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async updateVercelDeployment(id: string, updates: Partial<VercelDeployment>): Promise<VercelDeployment | null> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelDeployments'], 'readwrite')
+      const store = transaction.objectStore('vercelDeployments')
+      const getRequest = store.get(id)
+
+      getRequest.onsuccess = () => {
+        const existing = getRequest.result
+        if (!existing) {
+          resolve(null)
+          return
+        }
+
+        const updated: VercelDeployment = {
+          ...existing,
+          ...updates,
+          updatedAt: new Date().toISOString()
+        }
+
+        const putRequest = store.put(updated)
+        putRequest.onsuccess = () => resolve(updated)
+        putRequest.onerror = () => reject(putRequest.error)
+      }
+      getRequest.onerror = () => reject(getRequest.error)
+    })
+  }
+
+  async deleteVercelDeployment(id: string): Promise<boolean> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelDeployments'], 'readwrite')
+      const store = transaction.objectStore('vercelDeployments')
+      const request = store.delete(id)
+
+      request.onsuccess = () => resolve(true)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async createVercelEnvVariable(envVar: Omit<VercelEnvVariable, 'id' | 'updatedAt'>): Promise<VercelEnvVariable> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    const id = this.generateId()
+    const now = new Date().toISOString()
+    const newEnvVar: VercelEnvVariable = {
+      ...envVar,
+      id,
+      updatedAt: now
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelEnvVariables'], 'readwrite')
+      const store = transaction.objectStore('vercelEnvVariables')
+      const request = store.add(newEnvVar)
+
+      request.onsuccess = () => resolve(newEnvVar)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getVercelEnvVariables(projectId: string): Promise<VercelEnvVariable[]> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelEnvVariables'], 'readonly')
+      const store = transaction.objectStore('vercelEnvVariables')
+      const index = store.index('projectId')
+      const request = index.getAll(projectId)
+
+      request.onsuccess = () => resolve(request.result || [])
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async updateVercelEnvVariable(id: string, updates: Partial<VercelEnvVariable>): Promise<VercelEnvVariable | null> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelEnvVariables'], 'readwrite')
+      const store = transaction.objectStore('vercelEnvVariables')
+      const getRequest = store.get(id)
+
+      getRequest.onsuccess = () => {
+        const existing = getRequest.result
+        if (!existing) {
+          resolve(null)
+          return
+        }
+
+        const updated: VercelEnvVariable = {
+          ...existing,
+          ...updates,
+          updatedAt: new Date().toISOString()
+        }
+
+        const putRequest = store.put(updated)
+        putRequest.onsuccess = () => resolve(updated)
+        putRequest.onerror = () => reject(putRequest.error)
+      }
+      getRequest.onerror = () => reject(getRequest.error)
+    })
+  }
+
+  async deleteVercelEnvVariable(id: string): Promise<boolean> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelEnvVariables'], 'readwrite')
+      const store = transaction.objectStore('vercelEnvVariables')
+      const request = store.delete(id)
+
+      request.onsuccess = () => resolve(true)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async createVercelDomain(domain: Omit<VercelDomain, 'id' | 'updatedAt'>): Promise<VercelDomain> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    const id = this.generateId()
+    const now = new Date().toISOString()
+    const newDomain: VercelDomain = {
+      ...domain,
+      id,
+      updatedAt: now
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelDomains'], 'readwrite')
+      const store = transaction.objectStore('vercelDomains')
+      const request = store.add(newDomain)
+
+      request.onsuccess = () => resolve(newDomain)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getVercelDomains(projectId: string): Promise<VercelDomain[]> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelDomains'], 'readonly')
+      const store = transaction.objectStore('vercelDomains')
+      const index = store.index('projectId')
+      const request = index.getAll(projectId)
+
+      request.onsuccess = () => resolve(request.result || [])
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async updateVercelDomain(id: string, updates: Partial<VercelDomain>): Promise<VercelDomain | null> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelDomains'], 'readwrite')
+      const store = transaction.objectStore('vercelDomains')
+      const getRequest = store.get(id)
+
+      getRequest.onsuccess = () => {
+        const existing = getRequest.result
+        if (!existing) {
+          resolve(null)
+          return
+        }
+
+        const updated: VercelDomain = {
+          ...existing,
+          ...updates,
+          updatedAt: new Date().toISOString()
+        }
+
+        const putRequest = store.put(updated)
+        putRequest.onsuccess = () => resolve(updated)
+        putRequest.onerror = () => reject(putRequest.error)
+      }
+      getRequest.onerror = () => reject(getRequest.error)
+    })
+  }
+
+  async deleteVercelDomain(id: string): Promise<boolean> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelDomains'], 'readwrite')
+      const store = transaction.objectStore('vercelDomains')
+      const request = store.delete(id)
+
+      request.onsuccess = () => resolve(true)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async createVercelLog(log: Omit<VercelLog, 'id' | 'createdAt'>): Promise<VercelLog> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    const id = this.generateId()
+    const now = new Date().toISOString()
+    const newLog: VercelLog = {
+      ...log,
+      id,
+      createdAt: now
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelLogs'], 'readwrite')
+      const store = transaction.objectStore('vercelLogs')
+      const request = store.add(newLog)
+
+      request.onsuccess = () => resolve(newLog)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getVercelLogs(deploymentId: string): Promise<VercelLog[]> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelLogs'], 'readonly')
+      const store = transaction.objectStore('vercelLogs')
+      const index = store.index('deploymentId')
+      const request = index.getAll(deploymentId)
+
+      request.onsuccess = () => {
+        const logs = request.result || []
+        logs.sort((a, b) => a.timestamp - b.timestamp)
+        resolve(logs)
+      }
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async deleteVercelLogs(deploymentId: string): Promise<boolean> {
+    if (!this.db) throw new Error('Database not initialized')
+
+    const logs = await this.getVercelLogs(deploymentId)
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['vercelLogs'], 'readwrite')
+      const store = transaction.objectStore('vercelLogs')
+      let deleted = 0
+
+      logs.forEach(log => {
+        const request = store.delete(log.id)
+        request.onsuccess = () => {
+          deleted++
+          if (deleted === logs.length) resolve(true)
+        }
+        request.onerror = () => reject(request.error)
+      })
+
+      if (logs.length === 0) resolve(true)
+    })
+  }
+
   // Utility methods
   async clearAll(): Promise<void> {
   if (!this.db) throw new Error('Database not initialized')
     return new Promise((resolve, reject) => {
-      const storeNames = ['workspaces', 'files', 'chatSessions', 'messages', 'deployments', 'environmentVariables']
+      const storeNames = [
+        'workspaces', 
+        'files', 
+        'chatSessions', 
+        'messages', 
+        'deployments', 
+        'environmentVariables',
+        'vercelProjects',
+        'vercelDeployments',
+        'vercelEnvVariables',
+        'vercelDomains',
+        'vercelLogs'
+      ]
       const transaction = this.db!.transaction(storeNames, 'readwrite')
       let cleared = 0
       storeNames.forEach(storeName => {
@@ -2419,6 +3146,112 @@ class StorageManager {
   async findExistingExecution(workspaceId: string, toolName: string, args: Record<string, any>): Promise<ToolExecution | null> {
     await this.init()
     return this.storage!.findExistingExecution(workspaceId, toolName, args)
+  }
+
+  // Vercel Project Management Methods
+  async createVercelProject(project: Omit<VercelProject, 'id' | 'createdAt' | 'updatedAt'>): Promise<VercelProject> {
+    await this.init()
+    return this.storage!.createVercelProject(project)
+  }
+
+  async getVercelProject(workspaceId: string): Promise<VercelProject | null> {
+    await this.init()
+    return this.storage!.getVercelProject(workspaceId)
+  }
+
+  async getVercelProjectById(id: string): Promise<VercelProject | null> {
+    await this.init()
+    return this.storage!.getVercelProjectById(id)
+  }
+
+  async updateVercelProject(id: string, updates: Partial<VercelProject>): Promise<VercelProject | null> {
+    await this.init()
+    return this.storage!.updateVercelProject(id, updates)
+  }
+
+  async deleteVercelProject(id: string): Promise<boolean> {
+    await this.init()
+    return this.storage!.deleteVercelProject(id)
+  }
+
+  async createVercelDeployment(deployment: Omit<VercelDeployment, 'id' | 'updatedAt'>): Promise<VercelDeployment> {
+    await this.init()
+    return this.storage!.createVercelDeployment(deployment)
+  }
+
+  async getVercelDeployments(projectId: string): Promise<VercelDeployment[]> {
+    await this.init()
+    return this.storage!.getVercelDeployments(projectId)
+  }
+
+  async getVercelDeploymentsByWorkspace(workspaceId: string): Promise<VercelDeployment[]> {
+    await this.init()
+    return this.storage!.getVercelDeploymentsByWorkspace(workspaceId)
+  }
+
+  async updateVercelDeployment(id: string, updates: Partial<VercelDeployment>): Promise<VercelDeployment | null> {
+    await this.init()
+    return this.storage!.updateVercelDeployment(id, updates)
+  }
+
+  async deleteVercelDeployment(id: string): Promise<boolean> {
+    await this.init()
+    return this.storage!.deleteVercelDeployment(id)
+  }
+
+  async createVercelEnvVariable(envVar: Omit<VercelEnvVariable, 'id' | 'updatedAt'>): Promise<VercelEnvVariable> {
+    await this.init()
+    return this.storage!.createVercelEnvVariable(envVar)
+  }
+
+  async getVercelEnvVariables(projectId: string): Promise<VercelEnvVariable[]> {
+    await this.init()
+    return this.storage!.getVercelEnvVariables(projectId)
+  }
+
+  async updateVercelEnvVariable(id: string, updates: Partial<VercelEnvVariable>): Promise<VercelEnvVariable | null> {
+    await this.init()
+    return this.storage!.updateVercelEnvVariable(id, updates)
+  }
+
+  async deleteVercelEnvVariable(id: string): Promise<boolean> {
+    await this.init()
+    return this.storage!.deleteVercelEnvVariable(id)
+  }
+
+  async createVercelDomain(domain: Omit<VercelDomain, 'id' | 'updatedAt'>): Promise<VercelDomain> {
+    await this.init()
+    return this.storage!.createVercelDomain(domain)
+  }
+
+  async getVercelDomains(projectId: string): Promise<VercelDomain[]> {
+    await this.init()
+    return this.storage!.getVercelDomains(projectId)
+  }
+
+  async updateVercelDomain(id: string, updates: Partial<VercelDomain>): Promise<VercelDomain | null> {
+    await this.init()
+    return this.storage!.updateVercelDomain(id, updates)
+  }
+
+  async deleteVercelDomain(id: string): Promise<boolean> {
+    await this.init()
+    return this.storage!.deleteVercelDomain(id)
+  }
+
+  async createVercelLog(log: Omit<VercelLog, 'id' | 'createdAt'>): Promise<VercelLog> {
+    await this.init()
+    return this.storage!.createVercelLog(log)
+  }
+
+  async getVercelLogs(deploymentId: string): Promise<VercelLog[]> {
+    await this.init()
+    return this.storage!.getVercelLogs(deploymentId)
+  }
+
+  async deleteVercelLogs(deploymentId: string): Promise<boolean> {
+    await this.init()
+    return this.storage!.deleteVercelLogs(deploymentId)
   }
 
   /**

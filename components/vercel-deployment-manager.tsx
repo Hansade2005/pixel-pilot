@@ -137,6 +137,7 @@ export function VercelDeploymentManager({
   // Load workspaces and check for existing deployment
   useEffect(() => {
     loadWorkspaces();
+    loadExistingVercelProject();
   }, [workspaceId]);
 
   // Load GitHub repos when token is available
@@ -145,6 +146,59 @@ export function VercelDeploymentManager({
       loadGithubRepos();
     }
   }, [localGithubToken]);
+
+  // Load existing Vercel project from storage
+  const loadExistingVercelProject = async () => {
+    try {
+      await storageManager.init();
+      const existingProject = await storageManager.getVercelProject(workspaceId);
+      
+      if (existingProject) {
+        setProject({
+          projectId: existingProject.projectId,
+          projectName: existingProject.projectName,
+          url: existingProject.url,
+          status: existingProject.status,
+          framework: existingProject.framework,
+          lastDeployed: existingProject.lastDeployed,
+        });
+        
+        // Load associated data
+        const deployments = await storageManager.getVercelDeploymentsByWorkspace(workspaceId);
+        setDeployments(deployments.map(d => ({
+          id: d.deploymentId,
+          url: d.url,
+          status: d.status,
+          createdAt: d.createdAt,
+          target: d.target,
+          commit: d.commit,
+        })));
+        
+        // Load env vars if we have projectId
+        if (existingProject.projectId) {
+          const envVars = await storageManager.getVercelEnvVariables(existingProject.projectId);
+          setEnvVars(envVars.map(e => ({
+            id: e.envId,
+            key: e.key,
+            type: e.type,
+            target: e.target,
+            hasValue: e.hasValue,
+            createdAt: e.createdAt,
+          })));
+          
+          const domains = await storageManager.getVercelDomains(existingProject.projectId);
+          setDomains(domains.map(d => ({
+            name: d.name,
+            verified: d.verified,
+            createdAt: d.createdAt,
+            verification: d.verification,
+          })));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load existing Vercel project:', err);
+    }
+  };
 
   // Load workspaces
   const loadWorkspaces = async () => {
@@ -252,16 +306,45 @@ export function VercelDeploymentManager({
         throw new Error(data.error || 'Failed to create project');
       }
 
-      setProject({
+      const newProject = {
         projectId: data.projectId,
         projectName: data.projectName,
         url: data.url,
         status: data.status,
         framework: data.framework,
         lastDeployed: Date.now(),
-      });
+      };
 
+      setProject(newProject);
       setCurrentDeploymentId(data.deploymentId);
+      
+      // Save to IndexedDB
+      await storageManager.init();
+      await storageManager.createVercelProject({
+        workspaceId,
+        projectId: data.projectId,
+        projectName: data.projectName,
+        url: data.url,
+        status: data.status,
+        framework: data.framework,
+        githubRepo,
+        lastDeployed: Date.now(),
+      });
+      
+      // Also update the workspace with Vercel info
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const workspacesData = await storageManager.getWorkspaces(user.id);
+        const currentWorkspace = workspacesData.find((w: Workspace) => w.id === workspaceId);
+        if (currentWorkspace) {
+          await storageManager.updateWorkspace(workspaceId, {
+            vercelProjectId: data.projectId,
+            vercelDeploymentUrl: data.url,
+            deploymentStatus: 'in_progress',
+          });
+        }
+      }
       
       // Start monitoring deployment
       if (data.deploymentId) {
@@ -326,10 +409,31 @@ export function VercelDeploymentManager({
 
         if (data.status === 'READY') {
           setProject(prev => prev ? { ...prev, status: 'deployed', lastDeployed: Date.now() } : null);
+          
+          // Update in storage
+          await storageManager.init();
+          const existingProject = await storageManager.getVercelProject(workspaceId);
+          if (existingProject) {
+            await storageManager.updateVercelProject(existingProject.id, {
+              status: 'deployed',
+              lastDeployed: Date.now(),
+            });
+          }
+          
           loadLogs(deploymentId);
           return true;
         } else if (data.status === 'ERROR') {
           setError(`Deployment failed: ${data.errorMessage || 'Unknown error'}`);
+          
+          // Update in storage
+          await storageManager.init();
+          const existingProject = await storageManager.getVercelProject(workspaceId);
+          if (existingProject) {
+            await storageManager.updateVercelProject(existingProject.id, {
+              status: 'error',
+            });
+          }
+          
           return true;
         }
 
@@ -359,10 +463,25 @@ export function VercelDeploymentManager({
       `/api/vercel/deployments/${deploymentId}/logs?token=${localVercelToken}&stream=true&follow=true`
     );
 
-    eventSource.onmessage = (event) => {
+    eventSource.onmessage = async (event) => {
       try {
         const log = JSON.parse(event.data);
-        setLogs(prev => [...prev, `[${log.type}] ${log.message}`]);
+        const logMessage = `[${log.type}] ${log.message}`;
+        setLogs(prev => [...prev, logMessage]);
+        
+        // Save log to storage
+        try {
+          await storageManager.init();
+          await storageManager.createVercelLog({
+            deploymentId,
+            workspaceId,
+            message: log.message,
+            type: log.type,
+            timestamp: Date.now(),
+          });
+        } catch (err) {
+          // Ignore storage errors for logs
+        }
       } catch (err) {
         console.error('Log parse error:', err);
       }
@@ -385,7 +504,24 @@ export function VercelDeploymentManager({
       const data = await response.json();
       
       if (data.logs) {
-        setLogs(data.logs.map((log: any) => `[${log.type}] ${log.message}`));
+        const logMessages = data.logs.map((log: any) => `[${log.type}] ${log.message}`);
+        setLogs(logMessages);
+        
+        // Save to storage
+        await storageManager.init();
+        for (const log of data.logs) {
+          try {
+            await storageManager.createVercelLog({
+              deploymentId,
+              workspaceId,
+              message: log.message,
+              type: log.type,
+              timestamp: log.timestamp || Date.now(),
+            });
+          } catch (err) {
+            // Ignore duplicates
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to load logs:', err);
@@ -404,6 +540,30 @@ export function VercelDeploymentManager({
       
       if (data.deployments) {
         setDeployments(data.deployments);
+        
+        // Save to storage
+        await storageManager.init();
+        const existingProject = await storageManager.getVercelProject(workspaceId);
+        if (existingProject) {
+          // Save each deployment
+          for (const deployment of data.deployments) {
+            try {
+              await storageManager.createVercelDeployment({
+                projectId: existingProject.id,
+                workspaceId,
+                deploymentId: deployment.id,
+                url: deployment.url,
+                status: deployment.status,
+                target: deployment.target,
+                commit: deployment.commit,
+                createdAt: deployment.createdAt,
+              });
+            } catch (err) {
+              // Might already exist, that's okay
+              console.log('Deployment already saved:', deployment.id);
+            }
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to load deployments:', err);
@@ -422,6 +582,28 @@ export function VercelDeploymentManager({
       
       if (data.envs) {
         setEnvVars(data.envs);
+        
+        // Save to storage
+        await storageManager.init();
+        const existingProject = await storageManager.getVercelProject(workspaceId);
+        if (existingProject) {
+          for (const envVar of data.envs) {
+            try {
+              await storageManager.createVercelEnvVariable({
+                projectId: existingProject.id,
+                workspaceId,
+                envId: envVar.id,
+                key: envVar.key,
+                type: envVar.type,
+                target: envVar.target,
+                hasValue: envVar.hasValue,
+                createdAt: envVar.createdAt,
+              });
+            } catch (err) {
+              console.log('Env var already saved:', envVar.id);
+            }
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to load env vars:', err);
@@ -440,6 +622,26 @@ export function VercelDeploymentManager({
       
       if (data.domains) {
         setDomains(data.domains);
+        
+        // Save to storage
+        await storageManager.init();
+        const existingProject = await storageManager.getVercelProject(workspaceId);
+        if (existingProject) {
+          for (const domain of data.domains) {
+            try {
+              await storageManager.createVercelDomain({
+                projectId: existingProject.id,
+                workspaceId,
+                name: domain.name,
+                verified: domain.verified,
+                verification: domain.verification,
+                createdAt: domain.createdAt,
+              });
+            } catch (err) {
+              console.log('Domain already saved:', domain.name);
+            }
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to load domains:', err);
