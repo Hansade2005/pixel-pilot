@@ -34,6 +34,7 @@ import {
   FolderOpen,
   GitBranch,
   Lightbulb,
+  Activity,
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -1898,11 +1899,13 @@ function EnvironmentTab({ envVars, projectId, vercelToken, onRefresh }: any) {
 // Deployment Details Dialog Component
 function DeploymentDetailsDialog({ deploymentId, open, onOpenChange }: any) {
   const [logs, setLogs] = useState<string[]>([]);
+  const [runtimeLogs, setRuntimeLogs] = useState<any[]>([]);
   const [deploymentInfo, setDeploymentInfo] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingRuntimeLogs, setLoadingRuntimeLogs] = useState(false);
   const [activeTab, setActiveTab] = useState('logs');
 
-  // Get Vercel token from localStorage
+  // Get Vercel token and project ID from localStorage
   const getVercelToken = () => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('vercel_token') || '';
@@ -1910,7 +1913,15 @@ function DeploymentDetailsDialog({ deploymentId, open, onOpenChange }: any) {
     return '';
   };
 
+  const getProjectId = () => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('vercel_project_id') || '';
+    }
+    return '';
+  };
+
   const vercelToken = getVercelToken();
+  const projectId = getProjectId();
 
   // Load deployment details when dialog opens
   useEffect(() => {
@@ -1957,8 +1968,38 @@ function DeploymentDetailsDialog({ deploymentId, open, onOpenChange }: any) {
     }
   };
 
+  const loadRuntimeLogs = async () => {
+    if (!projectId || projectId === 'undefined') {
+      setRuntimeLogs([{ level: 'error', message: 'Project ID not found. Please ensure a project is connected.', timestamp: Date.now() }]);
+      return;
+    }
+
+    setLoadingRuntimeLogs(true);
+    try {
+      const response = await fetch(
+        `/api/vercel/projects/${projectId}/deployments/${deploymentId}/runtime-logs?token=${vercelToken}`
+      );
+      const data = await response.json();
+      
+      if (response.ok && data.logs) {
+        setRuntimeLogs(data.logs);
+      } else {
+        setRuntimeLogs([{ level: 'error', message: data.error || 'Failed to load runtime logs', timestamp: Date.now() }]);
+      }
+    } catch (err) {
+      console.error('Failed to load runtime logs:', err);
+      setRuntimeLogs([{ level: 'error', message: 'Error loading runtime logs. Please try again.', timestamp: Date.now() }]);
+    } finally {
+      setLoadingRuntimeLogs(false);
+    }
+  };
+
   const refreshLogs = () => {
     loadDeploymentLogs();
+  };
+
+  const refreshRuntimeLogs = () => {
+    loadRuntimeLogs();
   };
 
   return (
@@ -1972,10 +2013,18 @@ function DeploymentDetailsDialog({ deploymentId, open, onOpenChange }: any) {
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="logs">
               <Terminal className="w-4 h-4 mr-2" />
               Build Logs
+            </TabsTrigger>
+            <TabsTrigger value="runtime" onClick={() => {
+              if (runtimeLogs.length === 0 && !loadingRuntimeLogs) {
+                loadRuntimeLogs();
+              }
+            }}>
+              <Activity className="w-4 h-4 mr-2" />
+              Runtime Logs
             </TabsTrigger>
             <TabsTrigger value="details">
               <Lightbulb className="w-4 h-4 mr-2" />
@@ -2003,6 +2052,105 @@ function DeploymentDetailsDialog({ deploymentId, open, onOpenChange }: any) {
                 ) : (
                   <div className="text-gray-500">
                     {loading ? 'Loading logs...' : 'No logs available for this deployment.'}
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+
+          {/* Runtime Logs Tab */}
+          <TabsContent value="runtime" className="flex-1 overflow-hidden">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm text-muted-foreground">
+                {runtimeLogs.length} runtime log entries
+              </p>
+              <Button onClick={refreshRuntimeLogs} size="sm" variant="outline" disabled={loadingRuntimeLogs}>
+                <RefreshCw className={`w-3 h-3 mr-1 ${loadingRuntimeLogs ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+            <ScrollArea className="h-[500px] w-full border rounded-lg">
+              <div className="bg-slate-950 p-4 space-y-2">
+                {loadingRuntimeLogs ? (
+                  <div className="flex items-center justify-center py-12 text-slate-400">
+                    <Loader2 className="w-6 h-6 animate-spin mr-2" />
+                    Loading runtime logs...
+                  </div>
+                ) : runtimeLogs.length > 0 ? (
+                  runtimeLogs.map((log: any, i: number) => {
+                    // Determine color based on log level
+                    const levelColors = {
+                      error: 'text-red-400 bg-red-950/30 border-red-800',
+                      warning: 'text-yellow-400 bg-yellow-950/30 border-yellow-800',
+                      info: 'text-blue-400 bg-blue-950/30 border-blue-800',
+                    };
+                    const colorClass = levelColors[log.level as keyof typeof levelColors] || levelColors.info;
+
+                    // Format status code color
+                    let statusColor = 'text-slate-400';
+                    if (log.responseStatusCode) {
+                      const code = log.responseStatusCode;
+                      if (code >= 500) statusColor = 'text-red-400';
+                      else if (code >= 400) statusColor = 'text-yellow-400';
+                      else if (code >= 200 && code < 300) statusColor = 'text-green-400';
+                    }
+
+                    return (
+                      <div key={i} className={`border rounded p-3 ${colorClass} font-mono text-xs`}>
+                        <div className="flex items-start justify-between gap-4 mb-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="uppercase text-[10px]">
+                              {log.level}
+                            </Badge>
+                            {log.source && (
+                              <Badge variant="secondary" className="text-[10px]">
+                                {log.source}
+                              </Badge>
+                            )}
+                          </div>
+                          {log.timestamp && (
+                            <span className="text-[10px] text-slate-500">
+                              {new Date(log.timestamp).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                        
+                        {/* Request Info */}
+                        {(log.requestMethod || log.requestPath) && (
+                          <div className="mb-2 flex items-center gap-2 text-slate-300">
+                            {log.requestMethod && (
+                              <Badge variant="outline" className="text-[10px] font-bold">
+                                {log.requestMethod}
+                              </Badge>
+                            )}
+                            {log.requestPath && (
+                              <code className="text-[11px]">{log.requestPath}</code>
+                            )}
+                            {log.responseStatusCode && (
+                              <Badge variant="outline" className={`text-[10px] ${statusColor}`}>
+                                {log.responseStatusCode}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Domain */}
+                        {log.domain && (
+                          <div className="mb-2 text-[10px] text-slate-400">
+                            Domain: <code>{log.domain}</code>
+                          </div>
+                        )}
+
+                        {/* Log Message */}
+                        <div className="whitespace-pre-wrap break-all">
+                          {log.message || JSON.stringify(log, null, 2)}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-slate-500 text-center py-12">
+                    No runtime logs available for this deployment yet.
                   </div>
                 )}
               </div>
