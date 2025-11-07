@@ -6,6 +6,10 @@ import { storageManager } from '@/lib/storage-manager';
  * 
  * This endpoint triggers a new deployment by calling Vercel's REST API
  * with the stored project configuration and Git repository information.
+ * 
+ * Note: withLatestCommit is only used when redeploying an existing deployment
+ * (requires deploymentId). For git-based deployments, Vercel automatically
+ * uses the latest commit from the specified branch.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +19,6 @@ export async function POST(request: NextRequest) {
       workspaceId,
       branch = 'main',
       target = 'production',
-      withLatestCommit = true,
       teamId 
     } = await request.json();
 
@@ -65,6 +68,7 @@ export async function POST(request: NextRequest) {
 
     // Prepare deployment payload according to Vercel v13 API
     // Official API spec: https://vercel.com/docs/rest-api/reference/endpoints/deployments/create-a-new-deployment
+    // Note: withLatestCommit should only be used when redeploying an existing deployment (with deploymentId)
     const deploymentPayload = {
       name: project.name, // Required: project name/slug
       gitSource: {
@@ -73,7 +77,6 @@ export async function POST(request: NextRequest) {
         repoId: project.link.repoId, // Required: numeric GitHub repository ID
       },
       target: target,
-      withLatestCommit: withLatestCommit,
       // Include project settings if available
       ...(project.framework && {
         projectSettings: {

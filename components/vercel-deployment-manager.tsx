@@ -147,6 +147,13 @@ export function VercelDeploymentManager({
     }
   }, [localGithubToken]);
 
+  // Refresh project details from Vercel API when project is loaded
+  useEffect(() => {
+    if (project?.projectId && localVercelToken) {
+      refreshProjectDetails();
+    }
+  }, [project?.projectId, localVercelToken]);
+
   // Load existing Vercel project from storage
   const loadExistingVercelProject = async () => {
     try {
@@ -373,7 +380,6 @@ export function VercelDeploymentManager({
           projectId: project.projectId,
           vercelToken: localVercelToken,
           workspaceId,
-          withLatestCommit: true,
         }),
       });
 
@@ -567,6 +573,41 @@ export function VercelDeploymentManager({
       }
     } catch (err) {
       console.error('Failed to load deployments:', err);
+    }
+  };
+
+  // Refresh project details from Vercel API
+  const refreshProjectDetails = async () => {
+    if (!project?.projectId || !localVercelToken) return;
+
+    try {
+      const response = await fetch(
+        `/api/vercel/projects/${project.projectId}?token=${localVercelToken}`
+      );
+      const data = await response.json();
+
+      if (response.ok && data) {
+        // Update project with fresh data from Vercel
+        const updatedProject = {
+          ...project,
+          framework: data.framework || project.framework,
+          url: data.targets?.production?.url || `https://${project.projectName}.vercel.app`,
+        };
+
+        setProject(updatedProject);
+
+        // Save updated data to storage
+        await storageManager.init();
+        const existingProject = await storageManager.getVercelProject(workspaceId);
+        if (existingProject) {
+          await storageManager.updateVercelProject(existingProject.id, {
+            framework: updatedProject.framework,
+            url: updatedProject.url,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Failed to refresh project details:', err);
     }
   };
 
