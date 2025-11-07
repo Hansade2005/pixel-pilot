@@ -629,6 +629,46 @@ export function VercelDeploymentManager({
     }
   };
 
+  // Refresh deployments from API while preserving local badge state
+  const refreshDeploymentsPreservingBadges = async () => {
+    if (!project?.projectId) return;
+
+    try {
+      const response = await fetch(
+        `/api/vercel/projects/${project.projectId}/deployments?token=${localVercelToken}&limit=20`
+      );
+      const data = await response.json();
+      
+      if (data.deployments) {
+        // Get current local state for badge preservation
+        const currentLocalDeployments = deployments;
+        
+        // Merge API data with preserved local badge state
+        const mergedDeployments = data.deployments.map((apiDeployment: any) => {
+          const localDeployment = currentLocalDeployments.find(d => d.id === apiDeployment.id);
+          
+          // If we have local badge state for this deployment, preserve it
+          if (localDeployment && (localDeployment.aliasAssigned !== undefined || localDeployment.isRollbackCandidate !== undefined)) {
+            return {
+              ...apiDeployment,
+              aliasAssigned: localDeployment.aliasAssigned,
+              isRollbackCandidate: localDeployment.isRollbackCandidate
+            };
+          }
+          
+          // Otherwise use API data as-is
+          return apiDeployment;
+        });
+        
+        setDeployments(mergedDeployments);
+      }
+    } catch (err) {
+      console.error('Failed to refresh deployments:', err);
+      // Fallback to regular load if there's an error
+      await loadDeployments();
+    }
+  };
+
   // Refresh project details from Vercel API
   const refreshProjectDetails = async () => {
     if (!project?.projectId || !localVercelToken) return;
@@ -741,8 +781,8 @@ export function VercelDeploymentManager({
       }
       
       // Refresh deployments from API to get the complete updated state
-      // This will ensure proper sorting and any other changes from Vercel
-      await loadDeployments();
+      // But preserve our local badge swapping logic
+      await refreshDeploymentsPreservingBadges();
       
       // Update local project state
       setProject(prev => prev ? { ...prev, status: 'READY', lastDeployed: Date.now() } : null);
