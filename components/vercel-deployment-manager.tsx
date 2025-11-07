@@ -1237,22 +1237,31 @@ function ProjectOverview({ project, loading, onRedeploy }: any) {
 
 // Deployments Tab Component
 function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote }: any) {
+  const [selectedDeploymentId, setSelectedDeploymentId] = useState<string | null>(null);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+
+  const viewDeploymentDetails = (deploymentId: string) => {
+    setSelectedDeploymentId(deploymentId);
+    setShowDetailsDialog(true);
+  };
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Deployment History</CardTitle>
-            <CardDescription className="mt-1">
-              Click "Promote" to instantly make any READY deployment live in production
-            </CardDescription>
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Deployment History</CardTitle>
+              <CardDescription className="mt-1">
+                Click "Promote" to instantly make any READY deployment live in production
+              </CardDescription>
+            </div>
+            <Button onClick={onRefresh} size="sm" variant="outline">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
           </div>
-          <Button onClick={onRefresh} size="sm" variant="outline">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
-        </div>
-      </CardHeader>
+        </CardHeader>
       <CardContent>
         <ScrollArea className="h-[500px]">
           <div className="space-y-4">
@@ -1286,6 +1295,11 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
                 )}
                 
                 <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={() => viewDeploymentDetails(deployment.id)}>
+                    <Eye className="w-3 h-3 mr-1" />
+                    View Details
+                  </Button>
+                  
                   <Button size="sm" variant="link" asChild className="p-0 h-auto">
                     <a href={deployment.url} target="_blank" rel="noopener noreferrer">
                       {deployment.url} <ExternalLink className="w-3 h-3 ml-1" />
@@ -1320,6 +1334,16 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
         </ScrollArea>
       </CardContent>
     </Card>
+
+    {/* Deployment Details Dialog */}
+    {selectedDeploymentId && (
+      <DeploymentDetailsDialog
+        deploymentId={selectedDeploymentId}
+        open={showDetailsDialog}
+        onOpenChange={setShowDetailsDialog}
+      />
+    )}
+    </>
   );
 }
 
@@ -1868,6 +1892,242 @@ function EnvironmentTab({ envVars, projectId, vercelToken, onRefresh }: any) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// Deployment Details Dialog Component
+function DeploymentDetailsDialog({ deploymentId, open, onOpenChange }: any) {
+  const [logs, setLogs] = useState<string[]>([]);
+  const [deploymentInfo, setDeploymentInfo] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('logs');
+
+  // Get Vercel token from localStorage
+  const getVercelToken = () => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('vercel_token') || '';
+    }
+    return '';
+  };
+
+  const vercelToken = getVercelToken();
+
+  // Load deployment details when dialog opens
+  useEffect(() => {
+    if (open && deploymentId) {
+      loadDeploymentDetails();
+      loadDeploymentLogs();
+    }
+  }, [open, deploymentId]);
+
+  const loadDeploymentDetails = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `/api/vercel/deployments/${deploymentId}/status?token=${vercelToken}`
+      );
+      const data = await response.json();
+      
+      if (response.ok) {
+        setDeploymentInfo(data);
+      }
+    } catch (err) {
+      console.error('Failed to load deployment details:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadDeploymentLogs = async () => {
+    try {
+      const response = await fetch(
+        `/api/vercel/deployments/${deploymentId}/logs?token=${vercelToken}&limit=100`
+      );
+      const data = await response.json();
+      
+      if (data.logs) {
+        const logMessages = data.logs.map((log: any) => 
+          `[${log.type || 'info'}] ${log.message || log.text || JSON.stringify(log)}`
+        );
+        setLogs(logMessages);
+      }
+    } catch (err) {
+      console.error('Failed to load logs:', err);
+      setLogs(['Error loading logs. Please try again.']);
+    }
+  };
+
+  const refreshLogs = () => {
+    loadDeploymentLogs();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Deployment Details</DialogTitle>
+          <DialogDescription>
+            {deploymentId}
+          </DialogDescription>
+        </DialogHeader>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="logs">
+              <Terminal className="w-4 h-4 mr-2" />
+              Build Logs
+            </TabsTrigger>
+            <TabsTrigger value="details">
+              <Lightbulb className="w-4 h-4 mr-2" />
+              Details
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Logs Tab */}
+          <TabsContent value="logs" className="flex-1 overflow-hidden">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm text-muted-foreground">
+                {logs.length} log entries
+              </p>
+              <Button onClick={refreshLogs} size="sm" variant="outline">
+                <RefreshCw className="w-3 h-3 mr-1" />
+                Refresh
+              </Button>
+            </div>
+            <ScrollArea className="h-[500px] w-full border rounded-lg">
+              <div className="bg-black text-green-400 p-4 font-mono text-xs space-y-1">
+                {logs.length > 0 ? (
+                  logs.map((log: string, i: number) => (
+                    <div key={i} className="whitespace-pre-wrap break-all">{log}</div>
+                  ))
+                ) : (
+                  <div className="text-gray-500">
+                    {loading ? 'Loading logs...' : 'No logs available for this deployment.'}
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+
+          {/* Details Tab */}
+          <TabsContent value="details" className="flex-1 overflow-hidden">
+            <ScrollArea className="h-[500px] w-full">
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                </div>
+              ) : deploymentInfo ? (
+                <div className="space-y-4">
+                  {/* Status Section */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm">Status</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">State:</span>
+                        <Badge variant={deploymentInfo.status === 'READY' ? 'default' : 'secondary'}>
+                          {deploymentInfo.status}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Target:</span>
+                        <Badge variant="outline">{deploymentInfo.target || 'preview'}</Badge>
+                      </div>
+                      {deploymentInfo.url && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">URL:</span>
+                          <Button size="sm" variant="link" asChild className="p-0 h-auto">
+                            <a href={deploymentInfo.url} target="_blank" rel="noopener noreferrer">
+                              {deploymentInfo.url} <ExternalLink className="w-3 h-3 ml-1" />
+                            </a>
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Timing Section */}
+                  {(deploymentInfo.createdAt || deploymentInfo.buildingAt || deploymentInfo.readyAt) && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">Timeline</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {deploymentInfo.createdAt && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Created:</span>
+                            <span className="text-sm">{new Date(deploymentInfo.createdAt).toLocaleString()}</span>
+                          </div>
+                        )}
+                        {deploymentInfo.buildingAt && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Building Started:</span>
+                            <span className="text-sm">{new Date(deploymentInfo.buildingAt).toLocaleString()}</span>
+                          </div>
+                        )}
+                        {deploymentInfo.readyAt && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Ready:</span>
+                            <span className="text-sm">{new Date(deploymentInfo.readyAt).toLocaleString()}</span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Commit Info */}
+                  {deploymentInfo.commit && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm">Git Commit</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">SHA:</span>
+                          <code className="text-sm font-mono">{deploymentInfo.commit.sha?.substring(0, 7)}</code>
+                        </div>
+                        {deploymentInfo.commit.message && (
+                          <div>
+                            <span className="text-sm text-muted-foreground">Message:</span>
+                            <p className="text-sm mt-1">{deploymentInfo.commit.message}</p>
+                          </div>
+                        )}
+                        {deploymentInfo.commit.author && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Author:</span>
+                            <span className="text-sm">{deploymentInfo.commit.author}</span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Error Info */}
+                  {deploymentInfo.errorMessage && (
+                    <Card className="border-red-500">
+                      <CardHeader>
+                        <CardTitle className="text-sm text-red-500">Error</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-red-600">{deploymentInfo.errorMessage}</p>
+                        {deploymentInfo.errorCode && (
+                          <p className="text-xs text-muted-foreground mt-2">Code: {deploymentInfo.errorCode}</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center py-12 text-muted-foreground">
+                  No deployment details available
+                </div>
+              )}
+            </ScrollArea>
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
   );
 }
 
