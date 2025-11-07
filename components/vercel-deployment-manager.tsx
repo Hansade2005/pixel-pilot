@@ -592,20 +592,53 @@ export function VercelDeploymentManager({
     if (!project?.projectId) return;
 
     try {
+      // First, fetch aliases to determine which deployment is in production
+      const aliasesResponse = await fetch(
+        `/api/vercel/projects/${project.projectId}/aliases?token=${localVercelToken}${teamId ? `&teamId=${teamId}` : ''}`
+      );
+      const aliasesData = aliasesResponse.ok ? await aliasesResponse.json() : { aliases: [] };
+
+      // Create a map of deploymentId -> alias info for production aliases
+      const productionAliases = new Map();
+      if (aliasesData.aliases) {
+        for (const alias of aliasesData.aliases) {
+          // Check if this is a production alias (project name + .vercel.app or custom domain)
+          if (alias.alias && (alias.alias.includes('.vercel.app') || !alias.alias.includes('vercel.app'))) {
+            productionAliases.set(alias.deploymentId, {
+              alias: alias.alias,
+              created: alias.created
+            });
+          }
+        }
+      }
+
+      // Now fetch deployments
       const response = await fetch(
         `/api/vercel/projects/${project.projectId}/deployments?token=${localVercelToken}&limit=20`
       );
       const data = await response.json();
-      
+
       if (data.deployments) {
-        setDeployments(data.deployments);
-        
+        // Enhance deployments with alias information
+        const enhancedDeployments = data.deployments.map((deployment: any) => {
+          const aliasInfo = productionAliases.get(deployment.id);
+          const hasAliasAssigned = !!aliasInfo;
+          const aliasAssignedTime = aliasInfo ? new Date(aliasInfo.created).getTime() : undefined;
+
+          return {
+            ...deployment,
+            aliasAssigned: hasAliasAssigned ? aliasAssignedTime : undefined
+          };
+        });
+
+        setDeployments(enhancedDeployments);
+
         // Save to storage
         await storageManager.init();
         const existingProject = await storageManager.getVercelProject(workspaceId);
         if (existingProject) {
           // Save each deployment
-          for (const deployment of data.deployments) {
+          for (const deployment of enhancedDeployments) {
             try {
               await storageManager.createVercelDeployment({
                 projectId: existingProject.id,
@@ -634,28 +667,52 @@ export function VercelDeploymentManager({
     if (!project?.projectId) return;
 
     try {
+      // First, fetch aliases to determine which deployment is in production
+      const aliasesResponse = await fetch(
+        `/api/vercel/projects/${project.projectId}/aliases?token=${localVercelToken}${teamId ? `&teamId=${teamId}` : ''}`
+      );
+      const aliasesData = aliasesResponse.ok ? await aliasesResponse.json() : { aliases: [] };
+
+      // Create a map of deploymentId -> alias info for production aliases
+      const productionAliases = new Map();
+      if (aliasesData.aliases) {
+        for (const alias of aliasesData.aliases) {
+          // Check if this is a production alias (project name + .vercel.app or custom domain)
+          if (alias.alias && (alias.alias.includes('.vercel.app') || !alias.alias.includes('vercel.app'))) {
+            productionAliases.set(alias.deploymentId, {
+              alias: alias.alias,
+              created: alias.created
+            });
+          }
+        }
+      }
+
+      // Now fetch deployments
       const response = await fetch(
         `/api/vercel/projects/${project.projectId}/deployments?token=${localVercelToken}&limit=20`
       );
       const data = await response.json();
-      
+
       if (data.deployments) {
         // Get current local state for badge preservation
         const currentLocalDeployments = deployments;
-        
-        // Merge API data with preserved local badge state
+
+        // Merge API data with preserved local badge state and alias information
         const mergedDeployments = data.deployments.map((apiDeployment: any) => {
           const localDeployment = currentLocalDeployments.find(d => d.id === apiDeployment.id);
+          const aliasInfo = productionAliases.get(apiDeployment.id);
 
-          // Always preserve our local badge state if it exists
-          // The API doesn't return aliasAssigned or isRollbackCandidate, so we must keep our local values
+          // Determine if this deployment has an alias assigned
+          const hasAliasAssigned = !!aliasInfo;
+          const aliasAssignedTime = aliasInfo ? new Date(aliasInfo.created).getTime() : undefined;
+
           return {
             ...apiDeployment,           // Fresh API data for all standard fields
-            aliasAssigned: localDeployment?.aliasAssigned,         // Preserve our badge state
-            isRollbackCandidate: localDeployment?.isRollbackCandidate
+            aliasAssigned: hasAliasAssigned ? aliasAssignedTime : undefined,  // Use API-derived alias info
+            isRollbackCandidate: localDeployment?.isRollbackCandidate         // Preserve rollback state
           };
         });
-        
+
         setDeployments(mergedDeployments);
       }
     } catch (err) {
@@ -663,9 +720,7 @@ export function VercelDeploymentManager({
       // Fallback to regular load if there's an error
       await loadDeployments();
     }
-  };
-
-  // Refresh project details from Vercel API
+  };  // Refresh project details from Vercel API
   const refreshProjectDetails = async () => {
     if (!project?.projectId || !localVercelToken) return;
 
@@ -736,15 +791,15 @@ export function VercelDeploymentManager({
       const currentTime = Date.now();
       const currentProductionId = deployments.find(d => d.aliasAssigned && d.readyState === 'READY')?.id ||
                                   deployments.find(d => d.target === 'production' && (d.readyState === 'READY' || d.status === 'READY'))?.id;
-      
-      setDeployments(prevDeployments => 
+
+      setDeployments(prevDeployments =>
         prevDeployments.map(d => {
           if (d.id === deploymentId) {
             // This becomes the new CURRENT deployment
-            return { ...d, target: 'production', aliasAssigned: currentTime, isRollbackCandidate: false };
+            return { ...d, target: 'production', isRollbackCandidate: false };
           } else if (d.id === currentProductionId) {
-            // Previous CURRENT becomes a rollback candidate and loses aliasAssigned
-            return { ...d, aliasAssigned: undefined, isRollbackCandidate: true };
+            // Previous CURRENT becomes a rollback candidate
+            return { ...d, isRollbackCandidate: true };
           }
           return d;
         })
