@@ -136,6 +136,7 @@ export function VercelDeploymentManager({
   const [localVercelToken, setLocalVercelToken] = useState(vercelToken || '');
   const [localGithubToken, setLocalGithubToken] = useState(githubToken || '');
   const [teamSlug, setTeamSlug] = useState<string | null>(null);
+  const [teamId, setTeamId] = useState<string | null>(null);
 
   // Load workspaces and check for existing deployment
   useEffect(() => {
@@ -293,7 +294,7 @@ export function VercelDeploymentManager({
     }
   };
 
-  // Fetch team slug from Vercel API
+  // Fetch team slug and ID from Vercel API
   const fetchTeamSlug = async () => {
     if (!localVercelToken) return;
     
@@ -307,13 +308,19 @@ export function VercelDeploymentManager({
       if (response.ok) {
         const data = await response.json();
         if (data.teams && data.teams.length > 0) {
-          // Use the first team's slug
-          setTeamSlug(data.teams[0].slug);
-          console.log('Team slug:', data.teams[0].slug);
+          // Use the first team's slug and ID
+          const firstTeam = data.teams[0];
+          setTeamSlug(firstTeam.slug);
+          setTeamId(firstTeam.id);
+          console.log('Team info:', { 
+            slug: firstTeam.slug, 
+            id: firstTeam.id,
+            name: firstTeam.name 
+          });
         }
       }
     } catch (err) {
-      console.error('Failed to fetch team slug:', err);
+      console.error('Failed to fetch team info:', err);
     }
   };
 
@@ -966,7 +973,7 @@ export function VercelDeploymentManager({
           <DomainsTab
             domains={domains}
             projectId={project?.projectId || ''}
-            teamId={project?.teamId}
+            teamId={teamId || project?.teamId}
             vercelToken={localVercelToken}
             onRefresh={loadDomains}
           />
@@ -1727,6 +1734,11 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
   };
 
   const purchaseDomain = async () => {
+    if (!teamId) {
+      setError('Team ID is required for domain purchases. Please ensure you have a Vercel token configured.');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -1787,6 +1799,11 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
         <DialogTitle>Buy Domain</DialogTitle>
         <DialogDescription>
           {step === 1 ? 'Check domain availability' : 'Complete purchase'}
+          {teamId && (
+            <span className="text-xs text-green-600 dark:text-green-400 ml-2">
+              ✓ Team ID configured
+            </span>
+          )}
         </DialogDescription>
       </DialogHeader>
 
