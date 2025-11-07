@@ -1360,9 +1360,12 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
                     ) : (
                       <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
                     )}
-                    <Badge variant="outline">{deployment.target}</Badge>
+                    <Badge variant="outline">{deployment.target || 'preview'}</Badge>
                     {deployment.target === 'production' && deployment.status === 'READY' && (
-                      <Badge className="bg-green-500">LIVE</Badge>
+                      <Badge className="bg-blue-500">CURRENT</Badge>
+                    )}
+                    {deployment.status === 'READY' && (
+                      <Badge variant="secondary">LIVE</Badge>
                     )}
                   </div>
                   <span className="text-sm text-muted-foreground">
@@ -1496,7 +1499,7 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
                   )}
                   
                   {/* Promote button for READY deployments that aren't already in production */}
-                  {deployment.status === 'READY' && deployment.target !== 'production' && (
+                  {deployment.status === 'READY' && (!deployment.target || deployment.target !== 'production') && (
                     <Button 
                       size="sm" 
                       variant="default"
