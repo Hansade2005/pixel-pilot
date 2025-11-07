@@ -1278,47 +1278,152 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
 
     setLoadingLogs(true);
     setRuntimeLogsError(null);
-    console.log('Loading runtime logs for:', { projectId, deploymentId });
+    setRuntimeLogs([]); // Clear previous logs
+    console.log('🚀 Starting streaming runtime logs for:', { projectId, deploymentId });
     
     try {
-      const url = `/api/vercel/projects/${projectId}/deployments/${deploymentId}/runtime-logs?token=${vercelToken}&limit=100`;
-      console.log('Fetching runtime logs from:', url.replace(vercelToken, 'HIDDEN'));
+      // Use streaming mode with client-side timeout and limit
+      const url = `/api/vercel/projects/${projectId}/deployments/${deploymentId}/runtime-logs?token=${vercelToken}&stream=true`;
+      console.log('📡 Fetching streaming logs from:', url.replace(vercelToken, 'HIDDEN'));
       
       const response = await fetch(url);
-      console.log('Response status:', response.status, response.statusText);
+      console.log('📊 Response status:', response.status, response.statusText);
       
-      const data = await response.json();
-      
-      console.log('Runtime logs response:', { 
-        ok: response.ok, 
-        status: response.status, 
-        hasLogs: !!data.logs,
-        logsCount: data.logs?.length || 0,
-        error: data.error,
-        fullData: data
-      });
-      
-      if (response.ok) {
-        if (data.logs && Array.isArray(data.logs)) {
-          setRuntimeLogs(data.logs);
-          setRuntimeLogsError(null);
-        } else {
-          console.warn('Response OK but no logs array:', data);
-          setRuntimeLogs([]);
-          setRuntimeLogsError(null); // No error, just no logs yet
-        }
-      } else {
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
         const errorMsg = data.error || `HTTP ${response.status}: ${response.statusText}`;
-        console.error('Failed to load runtime logs:', errorMsg);
-        setRuntimeLogs([]);
+        console.error('❌ Failed to start streaming:', errorMsg);
         setRuntimeLogsError(errorMsg);
+        setLoadingLogs(false);
+        return;
       }
+
+      // Read stream with 15-second timeout and 15-log limit
+      const reader = response.body?.getReader();
+      if (!reader) {
+        console.error('❌ No response body reader available');
+        setRuntimeLogsError('No response body');
+        setLoadingLogs(false);
+        return;
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      const startTime = Date.now();
+      const TIMEOUT_MS = 15000; // 15 seconds
+      const MAX_LOGS = 15; // Limit to 15 logs
+      const collectedLogs: any[] = [];
+
+      console.log('⏱️  Starting stream read (timeout: 15s, max logs: 15)');
+
+      try {
+        while (true) {
+          const elapsed = Date.now() - startTime;
+          
+          // Check timeout
+          if (elapsed > TIMEOUT_MS) {
+            console.log(`⏰ Timeout reached after ${elapsed}ms, collected ${collectedLogs.length} logs`);
+            break;
+          }
+
+          // Check log limit
+          if (collectedLogs.length >= MAX_LOGS) {
+            console.log(`📊 Reached log limit (${MAX_LOGS}), stopping stream`);
+            break;
+          }
+
+          const { done, value } = await reader.read();
+          
+          if (done) {
+            console.log('✅ Stream ended naturally');
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          
+          // Process complete lines (SSE format: "data: {...}\n\n")
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+          
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed === 'data:') continue;
+            
+            // Parse SSE format
+            let jsonStr = trimmed;
+            if (trimmed.startsWith('data:')) {
+              jsonStr = trimmed.substring(5).trim();
+            }
+            
+            if (!jsonStr) continue;
+            
+            try {
+              const log = JSON.parse(jsonStr);
+              
+              // Check for error in stream
+              if (log.error) {
+                console.error('❌ Error in stream:', log.error);
+                setRuntimeLogsError(log.error);
+                reader.cancel();
+                return;
+              }
+              
+              // Add log to collection
+              collectedLogs.push({
+                level: log.level,
+                message: log.message,
+                rowId: log.rowId,
+                source: log.source,
+                timestamp: log.timestampInMs,
+                domain: log.domain,
+                messageTruncated: log.messageTruncated,
+                requestMethod: log.requestMethod,
+                requestPath: log.requestPath,
+                responseStatusCode: log.responseStatusCode,
+              });
+              
+              // Update UI in real-time
+              setRuntimeLogs([...collectedLogs]);
+              console.log(`📝 Collected ${collectedLogs.length} logs (${elapsed}ms elapsed)`);
+              
+              // Stop if we hit the limit
+              if (collectedLogs.length >= MAX_LOGS) {
+                console.log(`🎯 Reached ${MAX_LOGS} logs, stopping`);
+                break;
+              }
+            } catch (parseError) {
+              console.warn('⚠️  Failed to parse log line:', jsonStr, parseError);
+            }
+          }
+          
+          // Break outer loop if we hit limit in inner loop
+          if (collectedLogs.length >= MAX_LOGS) {
+            break;
+          }
+        }
+      } finally {
+        try {
+          reader.cancel();
+          console.log('🔌 Stream reader cancelled');
+        } catch (e) {
+          console.log('Stream already closed');
+        }
+      }
+
+      console.log(`✨ Finished: ${collectedLogs.length} logs in ${Date.now() - startTime}ms`);
+      
+      if (collectedLogs.length === 0) {
+        setRuntimeLogsError('No runtime logs available for this deployment yet');
+      } else {
+        setRuntimeLogsError(null);
+      }
+      
     } catch (err) {
-      console.error('Error loading runtime logs:', err);
+      console.error('💥 Error loading runtime logs:', err);
       setRuntimeLogs([]);
       setRuntimeLogsError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
-      console.log('Setting loadingLogs to false');
+      console.log('🏁 Setting loadingLogs to false');
       setLoadingLogs(false);
     }
   };
@@ -1512,9 +1617,16 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
                       </DialogTrigger>
                       <DialogContent className="max-w-4xl max-h-[80vh]">
                         <DialogHeader>
-                          <DialogTitle>Runtime Logs - {deployment.id}</DialogTitle>
+                          <DialogTitle className="flex items-center gap-2">
+                            Runtime Logs - {deployment.id}
+                            {!loadingLogs && runtimeLogs.length > 0 && (
+                              <Badge variant="secondary" className="text-xs">
+                                {runtimeLogs.length} {runtimeLogs.length === 15 ? '(max)' : 'logs'}
+                              </Badge>
+                            )}
+                          </DialogTitle>
                           <DialogDescription>
-                            Live application logs from this deployment
+                            Live application logs from this deployment (last 15 logs, streamed in real-time)
                           </DialogDescription>
                         </DialogHeader>
                         <ScrollArea className="h-[500px] w-full">
@@ -1522,8 +1634,12 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
                             {loadingLogs ? (
                               <div className="flex items-center gap-2 text-gray-500">
                                 <Loader2 className="w-4 h-4 animate-spin" />
-                                Loading runtime logs...
-                                <span className="text-[10px]">(Check console for details)</span>
+                                <div>
+                                  <div>Streaming runtime logs...</div>
+                                  <div className="text-[10px] text-blue-400 mt-1">
+                                    📡 Reading stream (max 15 logs, 15s timeout) - {runtimeLogs.length} collected
+                                  </div>
+                                </div>
                               </div>
                             ) : runtimeLogsError ? (
                               <div className="text-red-400">
