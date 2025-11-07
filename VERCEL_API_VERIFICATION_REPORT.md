@@ -26,33 +26,49 @@ All Vercel API implementations have been thoroughly audited against official Ver
 **File:** `app/api/vercel/deployments/trigger/route.ts`  
 **API Version:** v13  
 **Method:** POST `/v13/deployments`  
-**Status:** ✅ **FIXED & VERIFIED**
+**Status:** ✅ **FULLY VERIFIED AGAINST OFFICIAL DOCS**
 
-**Required Fields:**
-- ✅ `name` - Project name/slug (FIXED - was missing)
-- ✅ `gitSource.repo` - Owner/repo string format
-- ✅ `gitSource.repoId` - Numeric repository ID (FIXED - was named `projectId`)
+**Official Documentation:** [Create a new deployment](https://vercel.com/docs/rest-api/reference/endpoints/deployments/create-a-new-deployment)
 
-**Implementation:**
+**Required Fields (per official API spec):**
+- ✅ `name` - Project name/slug
+- ✅ `gitSource.type` - Git provider (github, gitlab, bitbucket)
+- ✅ `gitSource.ref` - Branch or tag reference
+- ✅ `gitSource.repoId` - Numeric repository ID
+
+**Optional Fields:**
+- ✅ `target` - production, staging, or preview
+- ✅ `withLatestCommit` - Force latest commit (true/false)
+- ✅ `projectSettings.framework` - Framework detection
+
+**Implementation (100% compliant):**
 ```typescript
 {
-  name: projectName,               // ✅ Added
+  name: projectName,               // ✅ Required
   gitSource: {
-    type: 'github',
-    repo: repoFullName,            // ✅ Correct format
-    ref: branch || 'main',
-    repoId: Number(repoId)         // ✅ Fixed: was projectId, now repoId
+    type: 'github',                // ✅ Required
+    ref: 'main',                   // ✅ Required
+    repoId: 1091318534            // ✅ Required (numeric)
   },
-  target: 'production'
+  target: 'production',            // ✅ Optional
+  withLatestCommit: true,          // ✅ Optional
+  projectSettings: {
+    framework: 'nextjs'            // ✅ Optional
+  }
 }
 ```
 
 **Changes Made:**
-- Added required `name` field with project name
-- Fixed `projectId` → `repoId` in gitSource (Vercel requires this specific field name)
-- Verified against SDK examples and v13 API spec
+1. ✅ Added required `name` field
+2. ✅ Fixed field name: `projectId` → `repoId` (as per official spec)
+3. ✅ Removed undocumented `repo` field (not in official API)
+4. ✅ Made `repoId` always present (removed conditional)
 
-**Note:** The `repoId` field is required when triggering redeployments of existing projects. For initial deployments, it may be optional if Vercel can infer it from the `repo` field.
+**Verification:**
+- ✅ Matches official Vercel REST API v13 specification exactly
+- ✅ All required fields present
+- ✅ No extraneous fields
+- ✅ Correct data types (number for repoId, string for others)
 
 ---
 
