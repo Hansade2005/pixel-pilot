@@ -38,6 +38,7 @@ import {
   FileText,
   Hammer,
   Cpu,
+  AlertCircle,
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -1480,7 +1481,7 @@ function ProjectsDashboard({
           className="inline-flex items-center px-4 py-2.5 text-sm font-medium text-white bg-black rounded-lg hover:bg-gray-800 transition-colors"
         >
           <Plus className="w-4 h-4 mr-2" />
-          New Project
+          New
         </button>
       </div>
 
@@ -1558,6 +1559,26 @@ function ProjectCard({
     return <Globe className="w-4 h-4" />;
   };
 
+  // Helper function to format time ago
+  const getTimeAgo = (timestamp: number): string => {
+    const now = Date.now();
+    const diff = now - timestamp;
+    
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    const months = Math.floor(days / 30);
+    const years = Math.floor(days / 365);
+    
+    if (years > 0) return `${years}y ago`;
+    if (months > 0) return `${months}mo ago`;
+    if (days > 0) return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    if (minutes > 0) return `${minutes}m ago`;
+    return `${seconds}s ago`;
+  };
+
   return (
     <div 
       onClick={() => onSelect(project)}
@@ -1598,9 +1619,10 @@ function ProjectCard({
 
       {/* Last Deployed */}
       <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-        <span>
+        <span className="flex items-center gap-1">
+          <Clock className="w-3 h-3" />
           {project.lastDeployed 
-            ? `Deployed ${new Date(project.lastDeployed).toLocaleDateString()}`
+            ? getTimeAgo(project.lastDeployed)
             : 'Not deployed'
           }
         </span>
@@ -1835,27 +1857,53 @@ function ProjectOverview({ project, loading, onRedeploy }: any) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Helper function to format time ago
+  const getTimeAgo = (timestamp: number): string => {
+    const now = Date.now();
+    const diff = now - timestamp;
+    
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    const months = Math.floor(days / 30);
+    const years = Math.floor(days / 365);
+    
+    if (years > 0) return `${years}y ago`;
+    if (months > 0) return `${months}mo ago`;
+    if (days > 0) return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    if (minutes > 0) return `${minutes}m ago`;
+    return `${seconds}s ago`;
+  };
+
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>{project.projectName}</span>
-            <Button onClick={onRedeploy} disabled={loading} size="sm">
-              {loading ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Deploying...</>
-              ) : (
-                <><RefreshCw className="w-4 h-4 mr-2" /> Redeploy</>
-              )}
-            </Button>
-          </CardTitle>
-          <CardDescription>
-            Project ID: {project.projectId}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <div className="space-y-6">
+      {/* Project Info Card */}
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              {project.projectName}
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 font-mono">
+              {project.projectId}
+            </p>
+          </div>
+          <Button onClick={onRedeploy} disabled={loading} size="sm">
+            {loading ? (
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Deploying...</>
+            ) : (
+              <><RefreshCw className="w-4 h-4 mr-2" /> Redeploy</>
+            )}
+          </Button>
+        </div>
+
+        {/* Project URL */}
+        <div className="mb-6">
+          <Label className="text-sm text-muted-foreground mb-2">Project URL</Label>
           <div className="flex items-center gap-2">
-            <Input value={project.url} readOnly />
+            <Input value={project.url} readOnly className="flex-1" />
             <Button size="icon" variant="outline" onClick={copyUrl}>
               {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             </Button>
@@ -1865,25 +1913,30 @@ function ProjectOverview({ project, loading, onRedeploy }: any) {
               </a>
             </Button>
           </div>
+        </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Framework</p>
-              <p className="font-semibold">{project.framework || 'Unknown'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Status</p>
-              <p className="font-semibold capitalize">{project.status}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Last Deployed</p>
-              <p className="font-semibold">
-                {project.lastDeployed ? new Date(project.lastDeployed).toLocaleString() : 'Never'}
-              </p>
-            </div>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+            <p className="text-xs text-muted-foreground mb-1">Framework</p>
+            <p className="text-lg font-semibold text-gray-900 dark:text-white">
+              {project.framework || 'Auto-detect'}
+            </p>
           </div>
-        </CardContent>
-      </Card>
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+            <p className="text-xs text-muted-foreground mb-1">Status</p>
+            <p className="text-lg font-semibold text-gray-900 dark:text-white capitalize">
+              {project.status}
+            </p>
+          </div>
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+            <p className="text-xs text-muted-foreground mb-1">Last Deployed</p>
+            <p className="text-lg font-semibold text-gray-900 dark:text-white">
+              {project.lastDeployed ? getTimeAgo(project.lastDeployed) : 'Never'}
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1972,27 +2025,27 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Deployment History</CardTitle>
-            <CardDescription className="mt-1 flex items-center gap-2 flex-wrap">
-              <Badge variant="outline" className="text-xs">
-                <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-                Auto-refreshing every 5s
-              </Badge>
-            </CardDescription>
+    <div className="space-y-6">
+      {/* Header - Outside cards */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Deployment History</h2>
+          <div className="mt-2 flex items-center gap-2 flex-wrap">
+            <Badge variant="outline" className="text-xs">
+              <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+              Auto-refreshing every 5s
+            </Badge>
           </div>
-          <Button onClick={onRefresh} size="sm" variant="outline">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {deployments.map((deployment: Deployment) => (
+        <Button onClick={onRefresh} size="sm" variant="outline">
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Deployment Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {deployments.map((deployment: Deployment) => (
             <div 
               key={deployment.id} 
               className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 hover:border-gray-300 dark:hover:border-gray-700 transition-all group"
@@ -2096,61 +2149,63 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
                       </TooltipTrigger>
                       <TooltipContent>Build Logs</TooltipContent>
                     </Tooltip>
-                    <DialogContent className="max-w-4xl max-h-[80vh]">
+                    <DialogContent className="max-w-4xl max-h-[90vh] sm:max-w-[90vw] md:max-w-4xl overflow-hidden flex flex-col">
                       <DialogHeader>
                         <DialogTitle>Build Logs</DialogTitle>
                         <DialogDescription>
                           Deployment build output and logs
                         </DialogDescription>
                       </DialogHeader>
-                      <ScrollArea className="h-[500px] w-full">
-                        <div className="bg-black text-green-400 p-4 rounded font-mono text-xs space-y-1">
-                          {loadingBuildLogs ? (
-                            <div className="flex items-center gap-2 text-gray-500">
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Loading build logs...
-                            </div>
-                          ) : buildLogs.length > 0 ? (
-                            buildLogs.map((log: any, i: number) => {
-                              if (typeof log === 'string') {
-                                return <div key={i} className="whitespace-pre-wrap">{log}</div>;
-                              }
-                              
-                              const logType = log.type || 'info';
-                              const logMessage = log.message || '';
-                              const logTimestamp = log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : '';
-                              
-                              return (
-                                <div key={log.id || i} className="whitespace-pre-wrap">
-                                  <span className={`
-                                    ${logType === 'stderr' || logType === 'error' ? 'text-red-400' : ''}
-                                    ${logType === 'warning' ? 'text-yellow-400' : ''}
-                                    ${logType === 'command' ? 'text-blue-400' : ''}
-                                    font-bold
-                                  `}>
-                                    [{logType.toUpperCase()}]
-                                  </span>
-                                  {logTimestamp && (
-                                    <>
-                                      {' '}
-                                      <span className="text-gray-400 text-[10px]">
-                                        {logTimestamp}
-                                      </span>
-                                    </>
-                                  )}
-                                  {' '}
-                                  {logMessage}
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="text-gray-500">
-                              No build logs available for this deployment yet.
-                            </div>
-                          )}
+                      <div className="flex-1 overflow-hidden">
+                        <div className="h-full bg-black text-green-400 rounded overflow-auto">
+                          <div className="p-4 font-mono text-xs space-y-1 min-w-max">
+                            {loadingBuildLogs ? (
+                              <div className="flex items-center gap-2 text-gray-500">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Loading build logs...
+                              </div>
+                            ) : buildLogs.length > 0 ? (
+                              buildLogs.map((log: any, i: number) => {
+                                if (typeof log === 'string') {
+                                  return <div key={i} className="whitespace-pre-wrap break-all">{log}</div>;
+                                }
+                                
+                                const logType = log.type || 'info';
+                                const logMessage = log.message || '';
+                                const logTimestamp = log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : '';
+                                
+                                return (
+                                  <div key={log.id || i} className="whitespace-pre-wrap break-all">
+                                    <span className={`
+                                      ${logType === 'stderr' || logType === 'error' ? 'text-red-400' : ''}
+                                      ${logType === 'warning' ? 'text-yellow-400' : ''}
+                                      ${logType === 'command' ? 'text-blue-400' : ''}
+                                      font-bold
+                                    `}>
+                                      [{logType.toUpperCase()}]
+                                    </span>
+                                    {logTimestamp && (
+                                      <>
+                                        {' '}
+                                        <span className="text-gray-400 text-[10px]">
+                                          {logTimestamp}
+                                        </span>
+                                      </>
+                                    )}
+                                    {' '}
+                                    {logMessage}
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="text-gray-500">
+                                No build logs available for this deployment yet.
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </ScrollArea>
-                      <div className="flex justify-end gap-2 mt-4">
+                      </div>
+                      <div className="flex justify-end gap-2 pt-4 border-t">
                         <Button 
                           size="sm" 
                           variant="outline"
@@ -2242,8 +2297,7 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
             </div>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
   );
 }
 
@@ -2288,118 +2342,156 @@ function DomainsTab({ domains, projectId, teamId, vercelToken, onRefresh }: any)
   };
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Domains</CardTitle>
-            <div className="flex gap-2">
-              <Dialog open={showBuyDomain} onOpenChange={setShowBuyDomain}>
-                <DialogTrigger asChild>
-                  <Button size="sm" variant="outline">
-                    <ShoppingCart className="w-4 h-4 mr-2" />
-                    Buy
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <BuyDomainDialog 
-                    projectId={projectId} 
-                    teamId={teamId}
-                    vercelToken={vercelToken}
-                    onSuccess={() => {
-                      setShowBuyDomain(false);
-                      onRefresh();
-                    }}
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Domains</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Manage custom domains for your project
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Dialog open={showBuyDomain} onOpenChange={setShowBuyDomain}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline">
+                <ShoppingCart className="w-4 h-4 mr-2" />
+                Buy
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <BuyDomainDialog 
+                projectId={projectId} 
+                teamId={teamId}
+                vercelToken={vercelToken}
+                onSuccess={() => {
+                  setShowBuyDomain(false);
+                  onRefresh();
+                }}
+              />
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={showAddDomain} onOpenChange={setShowAddDomain}>
+            <DialogTrigger asChild>
+              <Button size="sm">
+                <Plus className="w-4 h-4 mr-2" />Add
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Custom Domain</DialogTitle>
+                <DialogDescription>
+                  Attach an existing domain to your project
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label>Domain Name</Label>
+                  <Input
+                    value={newDomain}
+                    onChange={(e) => setNewDomain(e.target.value)}
+                    placeholder="example.com"
                   />
-                </DialogContent>
-              </Dialog>
-
-              <Dialog open={showAddDomain} onOpenChange={setShowAddDomain}>
-                <DialogTrigger asChild>
-                  <Button size="sm">
-                    <Plus className="w-4 h-4 mr-2" />Add
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Add Custom Domain</DialogTitle>
-                    <DialogDescription>
-                      Attach an existing domain to your project
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label>Domain Name</Label>
-                      <Input
-                        value={newDomain}
-                        onChange={(e) => setNewDomain(e.target.value)}
-                        placeholder="example.com"
-                      />
-                    </div>
-                    {error && (
-                      <Alert variant="destructive">
-                        <AlertDescription>{error}</AlertDescription>
-                      </Alert>
-                    )}
-                    <Button onClick={attachDomain} disabled={loading || !newDomain} className="w-full">
-                      {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                      Add Domain
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {domains.map((domain: Domain) => (
-              <div key={domain.name} className="border rounded-lg p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Globe className="w-4 h-4" />
-                    <span className="font-semibold">{domain.name}</span>
-                    {domain.verified ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <CheckCircle className="w-3 h-3 mr-1 fill-green-500 text-white" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          Verified
-                        </TooltipContent>
-                      </Tooltip>
-                    ) : (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                           <Clock className="w-3 h-3 mr-1" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                         Pending                                  </TooltipContent>
-                      </Tooltip>
-                     
-        )}
-      </div>
-    </div>                {!domain.verified && domain.verification && (
-                  <div className="bg-muted p-3 rounded text-sm space-y-2">
-                    <p className="font-semibold">Verification Required:</p>
-                    {domain.verification.map((v, i) => (
-                      <div key={i} className="font-mono text-xs">
-                        <p>Type: {v.type}</p>
-                        <p>Name: {v.domain}</p>
-                        <p>Value: {v.value}</p>
-                      </div>
-                    ))}
-                  </div>
+                </div>
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
                 )}
+                <Button onClick={attachDomain} disabled={loading || !newDomain} className="w-full">
+                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  Add Domain
+                </Button>
               </div>
-            ))}
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
 
-            {domains.length === 0 && (
-              <p className="text-center text-muted-foreground py-8">No domains attached</p>
+      {/* Domain Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {domains.map((domain: Domain) => (
+          <div 
+            key={domain.name} 
+            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 hover:border-gray-300 dark:hover:border-gray-700 transition-all"
+          >
+            {/* Domain Header */}
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Globe className="w-5 h-5 text-blue-500" />
+                <div>
+                  <h3 className="font-semibold text-gray-900 dark:text-white break-all">
+                    {domain.name}
+                  </h3>
+                </div>
+              </div>
+              {domain.verified ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <CheckCircle className="w-5 h-5 fill-green-500 text-white flex-shrink-0" />
+                  </TooltipTrigger>
+                  <TooltipContent>Verified</TooltipContent>
+                </Tooltip>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Clock className="w-5 h-5 text-yellow-500 flex-shrink-0" />
+                  </TooltipTrigger>
+                  <TooltipContent>Pending Verification</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+
+            {/* Status Badge */}
+            <div className="mb-4">
+              <Badge variant={domain.verified ? "secondary" : "outline"} className="text-xs">
+                {domain.verified ? "Active" : "Pending"}
+              </Badge>
+            </div>
+
+            {/* Verification Instructions */}
+            {!domain.verified && domain.verification && (
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 text-sm space-y-3">
+                <p className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  Verification Required
+                </p>
+                {domain.verification.map((v, i) => (
+                  <div key={i} className="bg-white dark:bg-gray-800 rounded p-3 font-mono text-xs space-y-1">
+                    <div className="flex gap-2">
+                      <span className="text-gray-500 dark:text-gray-400 min-w-[60px]">Type:</span>
+                      <span className="text-gray-900 dark:text-white">{v.type}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <span className="text-gray-500 dark:text-gray-400 min-w-[60px]">Name:</span>
+                      <span className="text-gray-900 dark:text-white break-all">{v.domain}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <span className="text-gray-500 dark:text-gray-400 min-w-[60px]">Value:</span>
+                      <span className="text-gray-900 dark:text-white break-all">{v.value}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
-        </CardContent>
-      </Card>
+        ))}
+
+        {domains.length === 0 && (
+          <div className="col-span-full text-center py-12">
+            <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+              <Globe className="w-8 h-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              No domains attached
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400">
+              Add or buy a domain to get started
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -2756,7 +2848,7 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
   };
 
   return (
-    <div className="space-y-4">
+    <>
       <DialogHeader>
         <DialogTitle>Buy Domain</DialogTitle>
         <DialogDescription>
@@ -2769,202 +2861,206 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
         </DialogDescription>
       </DialogHeader>
 
-      {step === 1 ? (
+      <ScrollArea className="max-h-[60vh] pr-4">
         <div className="space-y-4">
-          <div>
-            <Label>Domain Name</Label>
-            <Input
-              value={domain}
-              onChange={(e) => setDomain(e.target.value)}
-              placeholder="example.com"
-            />
-          </div>
-          
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+          {step === 1 ? (
+            <>
+              <div>
+                <Label>Domain Name</Label>
+                <Input
+                  value={domain}
+                  onChange={(e) => setDomain(e.target.value)}
+                  placeholder="example.com"
+                />
+              </div>
+              
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
 
-          <Button onClick={checkAvailability} disabled={loading || !domain} className="w-full">
-            {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-            Check Availability
-          </Button>
-        </div>
-      ) : step === 2 ? (
-        <div className="space-y-4">
-          <Alert>
-            <CreditCard className="w-4 h-4" />
-            <AlertDescription>
-              <div className="space-y-2">
+              <Button onClick={checkAvailability} disabled={loading || !domain} className="w-full">
+                {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Check Availability
+              </Button>
+            </>
+          ) : step === 2 ? (
+            <>
+              <Alert>
+                <CreditCard className="w-4 h-4" />
+                <AlertDescription>
+                  <div className="space-y-2">
+                    <div>
+                      <p className="font-semibold">Domain: {domain}</p>
+                      <p>Price: ${availability?.price} {availability?.currency}/year</p>
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400 border-t pt-2 space-y-1">
+                      <p>💳 <strong>Payment:</strong> Will be charged to your Vercel account's default payment method</p>
+                      <p>⚡ <strong>Processing:</strong> Domain registration is immediate upon successful payment</p>
+                      <p className="flex items-center gap-1">
+                        ⚙️ <strong>Billing:</strong> 
+                        <button 
+                          onClick={() => window.open('https://vercel.com/account/settings/billing-information', '_blank')}
+                          className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+                        >
+                          Manage payment method
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </button>
+                      </p>
+                    </div>
+                  </div>
+                </AlertDescription>
+              </Alert>
+
+              <div className="text-center">
+                <Button
+                  onClick={() => window.open('https://vercel.com/account/settings/billing-information', '_blank')}
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  <Settings className="w-3 h-3 mr-1" />
+                  Verify Payment Method Before Purchase
+                  <ExternalLink className="w-3 h-3 ml-1" />
+                </Button>
+              </div>
+
+              <Separator />
+
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="font-semibold">Domain: {domain}</p>
-                  <p>Price: ${availability?.price} {availability?.currency}/year</p>
+                  <Label>First Name</Label>
+                  <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} />
                 </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400 border-t pt-2 space-y-1">
-                  <p>💳 <strong>Payment:</strong> Will be charged to your Vercel account's default payment method</p>
-                  <p>⚡ <strong>Processing:</strong> Domain registration is immediate upon successful payment</p>
-                  <p className="flex items-center gap-1">
-                    ⚙️ <strong>Billing:</strong> 
-                    <button 
-                      onClick={() => window.open('https://vercel.com/account/settings/billing-information', '_blank')}
-                      className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
-                    >
-                      Manage payment method
-                      <ExternalLink className="w-2.5 h-2.5" />
-                    </button>
-                  </p>
+                <div>
+                  <Label>Last Name</Label>
+                  <Input value={lastName} onChange={(e) => setLastName(e.target.value)} />
                 </div>
               </div>
-            </AlertDescription>
-          </Alert>
 
-          <div className="text-center">
-            <Button
-              onClick={() => window.open('https://vercel.com/account/settings/billing-information', '_blank')}
-              variant="ghost"
-              size="sm"
-              className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            >
-              <Settings className="w-3 h-3 mr-1" />
-              Verify Payment Method Before Purchase
-              <ExternalLink className="w-3 h-3 ml-1" />
-            </Button>
-          </div>
+              <div>
+                <Label>Email</Label>
+                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </div>
 
-          <Separator />
+              <div>
+                <Label>Phone</Label>
+                <div className="flex gap-2">
+                  <Select value={phoneCountryCode} onValueChange={setPhoneCountryCode}>
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(countryPhoneCodes).map(([countryName, code]) => (
+                        <SelectItem key={countryName} value={code}>
+                          {code} {countryName.length > 20 ? countryName.substring(0, 17) + '...' : countryName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input 
+                    type="tel" 
+                    value={phone} 
+                    onChange={(e) => setPhone(e.target.value)} 
+                    placeholder="Phone number"
+                    className="flex-1"
+                  />
+                </div>
+              </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>First Name</Label>
-              <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-            </div>
-            <div>
-              <Label>Last Name</Label>
-              <Input value={lastName} onChange={(e) => setLastName(e.target.value)} />
-            </div>
-          </div>
+              <div>
+                <Label>Address</Label>
+                <Input value={address} onChange={(e) => setAddress(e.target.value)} />
+              </div>
 
-          <div>
-            <Label>Email</Label>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>City</Label>
+                  <Input value={city} onChange={(e) => setCity(e.target.value)} />
+                </div>
+                <div>
+                  <Label>State/Province</Label>
+                  <Input value={state} onChange={(e) => setState(e.target.value)} />
+                </div>
+              </div>
 
-          <div>
-            <Label>Phone</Label>
-            <div className="flex gap-2">
-              <Select value={phoneCountryCode} onValueChange={setPhoneCountryCode}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(countryPhoneCodes).map(([countryName, code]) => (
-                    <SelectItem key={countryName} value={code}>
-                      {code} {countryName.length > 20 ? countryName.substring(0, 17) + '...' : countryName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input 
-                type="tel" 
-                value={phone} 
-                onChange={(e) => setPhone(e.target.value)} 
-                placeholder="Phone number"
-                className="flex-1"
-              />
-            </div>
-          </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Postal Code</Label>
+                  <Input value={postalCode} onChange={(e) => setPostalCode(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Country</Label>
+                  <Select value={country} onValueChange={setCountry}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {countries.map((countryName) => (
+                        <SelectItem key={countryName} value={countryName}>
+                          {countryName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-          <div>
-            <Label>Address</Label>
-            <Input value={address} onChange={(e) => setAddress(e.target.value)} />
-          </div>
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    {error}
+                    {renderBillingCTA(errorDetails)}
+                  </AlertDescription>
+                </Alert>
+              )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>City</Label>
-              <Input value={city} onChange={(e) => setCity(e.target.value)} />
-            </div>
-            <div>
-              <Label>State/Province</Label>
-              <Input value={state} onChange={(e) => setState(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Postal Code</Label>
-              <Input value={postalCode} onChange={(e) => setPostalCode(e.target.value)} />
-            </div>
-            <div>
-              <Label>Country</Label>
-              <Select value={country} onValueChange={setCountry}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {countries.map((countryName) => (
-                    <SelectItem key={countryName} value={countryName}>
-                      {countryName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>
-                {error}
-                {renderBillingCTA(errorDetails)}
-              </AlertDescription>
-            </Alert>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
+                  Back
+                </Button>
+                <Button 
+                  onClick={purchaseDomain} 
+                  disabled={loading || !firstName || !lastName || !email || !phone || !availability?.price || availability.price < 0.01} 
+                  className="flex-1"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  {availability?.price ? `Purchase $${availability.price}` : 'Purchase Domain'}
+                </Button>
+              </div>
+            </>
+          ) : (
+            // Success step
+            <>
+              <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
+                <CheckCircle className="w-4 h-4 text-green-600" />
+                <AlertDescription>
+                  <div className="space-y-2">
+                    <p className="font-semibold text-green-800 dark:text-green-200">
+                      🎉 Domain Purchase Successful!
+                    </p>
+                    <div className="text-sm space-y-1">
+                      <p><strong>Domain:</strong> {domain}</p>
+                      <p><strong>Status:</strong> Purchase completed</p>
+                      <p><strong>Auto-renew:</strong> Enabled</p>
+                      <p className="text-green-600 dark:text-green-400">
+                        Domain has been added to your account and attached to this project.
+                      </p>
+                    </div>
+                  </div>
+                </AlertDescription>
+              </Alert>
+              
+              <div className="flex items-center justify-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Closing dialog and refreshing domain list...</span>
+              </div>
+            </>
           )}
-
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
-              Back
-            </Button>
-            <Button 
-              onClick={purchaseDomain} 
-              disabled={loading || !firstName || !lastName || !email || !phone || !availability?.price || availability.price < 0.01} 
-              className="flex-1"
-            >
-              {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              {availability?.price ? `Purchase $${availability.price}` : 'Purchase Domain'}
-            </Button>
-          </div>
         </div>
-      ) : (
-        // Success step
-        <div className="space-y-4 text-center">
-          <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
-            <CheckCircle className="w-4 h-4 text-green-600" />
-            <AlertDescription>
-              <div className="space-y-2">
-                <p className="font-semibold text-green-800 dark:text-green-200">
-                  🎉 Domain Purchase Successful!
-                </p>
-                <div className="text-sm space-y-1">
-                  <p><strong>Domain:</strong> {domain}</p>
-                  <p><strong>Status:</strong> Purchase completed</p>
-                  <p><strong>Auto-renew:</strong> Enabled</p>
-                  <p className="text-green-600 dark:text-green-400">
-                    Domain has been added to your account and attached to this project.
-                  </p>
-                </div>
-              </div>
-            </AlertDescription>
-          </Alert>
-          
-          <div className="flex items-center justify-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span>Closing dialog and refreshing domain list...</span>
-          </div>
-        </div>
-      )}
-    </div>
+      </ScrollArea>
+    </>
   );
 }
 
@@ -3050,111 +3146,172 @@ function EnvironmentTab({ envVars, projectId, vercelToken, onRefresh }: any) {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>Environment Variables</CardTitle>
-          <Dialog open={showAdd} onOpenChange={setShowAdd}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Variable
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Environment Variable</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label>Key</Label>
-                  <Input
-                    value={newKey}
-                    onChange={(e) => setNewKey(e.target.value)}
-                    placeholder="API_KEY"
-                  />
-                </div>
-                <div>
-                  <Label>Value</Label>
-                  <Textarea
-                    value={newValue}
-                    onChange={(e) => setNewValue(e.target.value)}
-                    placeholder="your-secret-value"
-                  />
-                </div>
-                <div>
-                  <Label>Type</Label>
-                  <Select value={newType} onValueChange={setNewType}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="plain">Plain</SelectItem>
-                      <SelectItem value="sensitive">Sensitive</SelectItem>
-                      <SelectItem value="encrypted">Encrypted</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Environment</Label>
-                  <div className="space-y-2">
-                    {['production', 'preview', 'development'].map((env) => (
-                      <label key={env} className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={newTarget.includes(env)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setNewTarget([...newTarget, env]);
-                            } else {
-                              setNewTarget(newTarget.filter(t => t !== env));
-                            }
-                          }}
-                        />
-                        <span className="capitalize">{env}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-                <Button onClick={addEnvVar} disabled={loading || !newKey || !newValue} className="w-full">
-                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                  Add Variable
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Environment Variables</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Manage secure environment variables for your project
+          </p>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          {envVars.map((envVar: EnvVariable) => (
-            <div key={envVar.id} className="border rounded-lg p-3 flex items-center justify-between">
+        <Dialog open={showAdd} onOpenChange={setShowAdd}>
+          <DialogTrigger asChild>
+            <Button size="sm">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Variable
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Environment Variable</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
               <div>
-                <p className="font-mono font-semibold">{envVar.key}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge variant="outline">{envVar.type}</Badge>
-                  {envVar.target.map((t: string) => (
-                    <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>
+                <Label>Key</Label>
+                <Input
+                  value={newKey}
+                  onChange={(e) => setNewKey(e.target.value)}
+                  placeholder="API_KEY"
+                />
+              </div>
+              <div>
+                <Label>Value</Label>
+                <Textarea
+                  value={newValue}
+                  onChange={(e) => setNewValue(e.target.value)}
+                  placeholder="your-secret-value"
+                />
+              </div>
+              <div>
+                <Label>Type</Label>
+                <Select value={newType} onValueChange={setNewType}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="plain">Plain</SelectItem>
+                    <SelectItem value="sensitive">Sensitive</SelectItem>
+                    <SelectItem value="encrypted">Encrypted</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Environment</Label>
+                <div className="space-y-2">
+                  {['production', 'preview', 'development'].map((env) => (
+                    <label key={env} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={newTarget.includes(env)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setNewTarget([...newTarget, env]);
+                          } else {
+                            setNewTarget(newTarget.filter(t => t !== env));
+                          }
+                        }}
+                      />
+                      <span className="capitalize">{env}</span>
+                    </label>
                   ))}
                 </div>
               </div>
-              <Button size="sm" variant="ghost" onClick={() => deleteEnvVar(envVar.id)}>
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              <Button onClick={addEnvVar} disabled={loading || !newKey || !newValue} className="w-full">
+                {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Add Variable
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Environment Variables Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {envVars.map((envVar: EnvVariable) => (
+          <div 
+            key={envVar.id} 
+            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 hover:border-gray-300 dark:hover:border-gray-700 transition-all group"
+          >
+            {/* Variable Header */}
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-2">
+                  <Settings className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                  <h3 className="font-mono font-semibold text-gray-900 dark:text-white truncate">
+                    {envVar.key}
+                  </h3>
+                </div>
+              </div>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                onClick={() => deleteEnvVar(envVar.id)}
+                className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950 dark:hover:text-red-400"
+              >
                 <Trash2 className="w-4 h-4" />
               </Button>
             </div>
-          ))}
 
-          {envVars.length === 0 && (
-            <p className="text-center text-muted-foreground py-8">No environment variables</p>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+            {/* Type Badge */}
+            <div className="mb-4">
+              <Badge 
+                variant="outline" 
+                className={`text-xs ${
+                  envVar.type === 'encrypted' 
+                    ? 'border-green-500 text-green-700 dark:text-green-400' 
+                    : envVar.type === 'sensitive' 
+                    ? 'border-yellow-500 text-yellow-700 dark:text-yellow-400'
+                    : 'border-gray-300 text-gray-700 dark:text-gray-400'
+                }`}
+              >
+                {envVar.type === 'encrypted' && '🔒 '}
+                {envVar.type === 'sensitive' && '👁️ '}
+                {envVar.type}
+              </Badge>
+            </div>
+
+            {/* Environment Targets */}
+            <div className="space-y-2">
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Environments:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {envVar.target.map((t: string) => (
+                  <Badge 
+                    key={t} 
+                    variant="secondary" 
+                    className="text-xs"
+                  >
+                    {t === 'production' && '🚀 '}
+                    {t === 'preview' && '👁️ '}
+                    {t === 'development' && '🔧 '}
+                    {t}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {envVars.length === 0 && (
+          <div className="col-span-full text-center py-12">
+            <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+              <Settings className="w-8 h-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              No environment variables
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400">
+              Add variables to configure your project
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -3190,17 +3347,17 @@ function LogsTab({ logs, deploymentId, onRefresh }: any) {
         </div>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[500px] w-full">
-          <div className="bg-black text-green-400 p-4 rounded font-mono text-sm space-y-1">
+        <div className="h-[500px] w-full bg-black text-green-400 rounded overflow-auto">
+          <div className="p-4 font-mono text-sm space-y-1 min-w-max">
             {logs.length > 0 ? (
               logs.map((log: string, i: number) => (
-                <div key={i}>{log}</div>
+                <div key={i} className="whitespace-pre-wrap break-all">{log}</div>
               ))
             ) : (
               <div className="text-gray-500">No logs yet. Deploy your project to see build logs.</div>
             )}
           </div>
-        </ScrollArea>
+        </div>
       </CardContent>
     </Card>
   );
