@@ -1,5 +1,5 @@
 'use client';
-
+import Link  from 'next/link';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 // Tabs removed - using custom tab implementation
 import { Badge } from '@/components/ui/badge';
+import { Logo } from '@/components/ui/logo';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Textarea } from '@/components/ui/textarea';
 import { 
@@ -1144,10 +1145,12 @@ export function VercelDeploymentManager({
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <div className="w-6 h-6 bg-black dark:bg-white rounded-sm flex items-center justify-center">
-                  <Rocket className="w-4 h-4 text-white dark:text-black" />
+                  <Link href="/">
+                <Logo variant="text" size="md" />
+              </Link>
                 </div>
                 <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  {viewMode === 'dashboard' ? 'Hosting Management' : (selectedProject?.projectName || 'New Project')}
+                  {viewMode === 'dashboard' ? 'Hosting' : (selectedProject?.projectName || 'New Project')}
                 </h1>
               </div>
             </div>
@@ -1292,31 +1295,19 @@ export function VercelDeploymentManager({
                     <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
                       {selectedProject?.projectName || 'New Project'}
                     </h1>
-                    {selectedProject && (
-                      <>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ml-2 ${
-                          selectedProject.status === 'deployed' || selectedProject.status === 'ready'
-                            ? 'text-green-600 bg-green-50 dark:bg-green-950/50 dark:text-green-400'
-                            : selectedProject.status === 'building'
-                            ? 'text-yellow-600 bg-yellow-50 dark:bg-yellow-950/50 dark:text-yellow-400'
-                            : 'text-red-600 bg-red-50 dark:bg-red-950/50 dark:text-red-400'
-                        }`}>
-                          <div className="w-1.5 h-1.5 rounded-full bg-current mr-1.5"></div>
-                          {selectedProject.status || 'Unknown'}
-                        </span>
-                        <span className="text-gray-400 dark:text-gray-600 ml-2">Deploy</span>
-                      </>
-                    )}
                   </div>
                   {selectedProject && (
                     <div className="flex items-center space-x-3">
-                      <a
-                        href="https://pipilot.dev/workspace"
-                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700"
-                      >
-                        <FolderOpen className="w-4 h-4 mr-2" />
-                        Workspace
-                      </a>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        selectedProject.status === 'deployed' || selectedProject.status === 'ready'
+                          ? 'text-green-600 bg-green-50 dark:bg-green-950/50 dark:text-green-400'
+                          : selectedProject.status === 'building'
+                          ? 'text-yellow-600 bg-yellow-50 dark:bg-yellow-950/50 dark:text-yellow-400'
+                          : 'text-red-600 bg-red-50 dark:bg-red-950/50 dark:text-red-400'
+                      }`}>
+                        <div className="w-1.5 h-1.5 rounded-full bg-current mr-1.5"></div>
+                        {selectedProject.status || 'Unknown'}
+                      </span>
                       <button
                         onClick={triggerDeploy}
                         disabled={loading}
