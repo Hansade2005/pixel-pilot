@@ -2287,7 +2287,7 @@ function DomainsTab({ domains, projectId, teamId, vercelToken, onRefresh }: any)
                     {domain.verified ? (
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <CheckCircle className="w-3 h-3 mr-1" />
+                          <CheckCircle className="w-3 h-3 mr-1 fill-green-500 text-white" />
                         </TooltipTrigger>
                         <TooltipContent>
                           Verified
