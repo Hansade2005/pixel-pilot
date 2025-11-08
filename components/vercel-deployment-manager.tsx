@@ -1149,9 +1149,28 @@ export function VercelDeploymentManager({
                 <Logo variant="icon" size="md" />
               </Link>
                 </div>
-                <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  {viewMode === 'dashboard' ? 'Hosting' : (selectedProject?.projectName || 'New Project')}
-                </h1>
+                {viewMode === 'project' && selectedProject && (
+                  <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                    <button
+                      onClick={backToDashboard}
+                      className="hover:text-gray-900 dark:hover:text-white transition-colors"
+                    >
+                      Projects
+                    </button>
+                    <span>/</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {selectedProject.projectName.length > 6
+                        ? `${selectedProject.projectName.substring(0, 6)}...`
+                        : selectedProject.projectName
+                      }
+                    </span>
+                  </div>
+                )}
+                {viewMode === 'dashboard' && (
+                  <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+                    Hosting
+                  </h1>
+                )}
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -1176,14 +1195,27 @@ export function VercelDeploymentManager({
                   )}
                 </div>
               )}
-              
-              {/* Prominent Back to Workspace CTA */}
+              {/* Action buttons */}
+              {viewMode === 'project' && selectedProject && (
+                <button
+                  onClick={triggerDeploy}
+                  disabled={loading}
+                  className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-black hover:bg-gray-800 disabled:opacity-50 rounded-lg transition-colors"
+                  title="Deploy project"
+                >
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Rocket className="w-4 h-4" />
+                  )}
+                </button>
+              )}
               <a
                 href="https://pipilot.dev/workspace"
-                className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700"
+                className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700"
+                title="Go to workspace"
               >
-                <FolderOpen className="w-4 h-4 mr-2" />
-                Workspace
+                <Upload className="w-4 h-4" />
               </a>
             </div>
           </div>
@@ -1281,49 +1313,6 @@ export function VercelDeploymentManager({
             ) : (
               /* Single Project View */
               <div className="space-y-6">
-                {/* Project Header with Back Navigation */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <button
-                      onClick={backToDashboard}
-                      className="inline-flex items-center text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-                    >
-                      <Rocket className="w-4 h-4 mr-2" />
-                      Projects
-                    </button>
-                    <span className="text-gray-400 dark:text-gray-600">/</span>
-                    <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-                      {selectedProject?.projectName || 'New Project'}
-                    </h1>
-                  </div>
-                  {selectedProject && (
-                    <div className="flex items-center space-x-3">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        selectedProject.status === 'deployed' || selectedProject.status === 'ready'
-                          ? 'text-green-600 bg-green-50 dark:bg-green-950/50 dark:text-green-400'
-                          : selectedProject.status === 'building'
-                          ? 'text-yellow-600 bg-yellow-50 dark:bg-yellow-950/50 dark:text-yellow-400'
-                          : 'text-red-600 bg-red-50 dark:bg-red-950/50 dark:text-red-400'
-                      }`}>
-                        <div className="w-1.5 h-1.5 rounded-full bg-current mr-1.5"></div>
-                        {selectedProject.status || 'Unknown'}
-                      </span>
-                      <button
-                        onClick={triggerDeploy}
-                        disabled={loading}
-                        className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-black rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
-                      >
-                        {loading ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <Upload className="w-4 h-4 mr-2" />
-                        )}
-                        Deploy
-                      </button>
-                    </div>
-                  )}
-                </div>
-
                 {/* Project Tabs - Horizontally scrollable on mobile like Vercel */}
                 <div className="w-full">
                   <div className="border-b border-gray-200 dark:border-gray-800">
@@ -2227,13 +2216,13 @@ function DomainsTab({ domains, projectId, teamId, vercelToken, onRefresh }: any)
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Custom Domains</CardTitle>
+            <CardTitle>Domains</CardTitle>
             <div className="flex gap-2">
               <Dialog open={showBuyDomain} onOpenChange={setShowBuyDomain}>
                 <DialogTrigger asChild>
                   <Button size="sm" variant="outline">
                     <ShoppingCart className="w-4 h-4 mr-2" />
-                    Buy Domain
+                    Buy
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
@@ -2252,8 +2241,7 @@ function DomainsTab({ domains, projectId, teamId, vercelToken, onRefresh }: any)
               <Dialog open={showAddDomain} onOpenChange={setShowAddDomain}>
                 <DialogTrigger asChild>
                   <Button size="sm">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Domain
+                    <Plus className="w-4 h-4 mr-2" />Add
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
