@@ -178,8 +178,18 @@ export async function POST(request: NextRequest) {
       
       if (response.status === 402) {
         return NextResponse.json({
-          error: 'Payment required or insufficient funds',
-          code: 'PAYMENT_REQUIRED'
+          error: 'Payment required: Please ensure you have a valid payment method configured in your Vercel account and sufficient funds available.',
+          code: 'PAYMENT_REQUIRED',
+          details: {
+            message: 'This error typically occurs when:',
+            causes: [
+              'No payment method is configured in your Vercel account',
+              'Your credit card has expired or been declined',
+              'Insufficient funds or credit limit reached',
+              'Your Vercel account billing is suspended'
+            ],
+            solution: 'Visit https://vercel.com/account/billing to update your payment method'
+          }
         }, { status: 402 });
       }
       
@@ -212,8 +222,13 @@ export async function POST(request: NextRequest) {
       createdAt: data.createdAt,
       expiresAt: data.expiresAt,
       autoRenew: data.autoRenew,
-      message: 'Domain purchased successfully',
+      message: 'Domain purchased successfully and added to your Vercel account',
       timestamp: Date.now(),
+      purchaseInfo: {
+        status: 'completed',
+        paymentStatus: 'charged',
+        note: 'Domain purchase is immediate with Vercel. No separate payment step required.'
+      }
     });
 
   } catch (error) {

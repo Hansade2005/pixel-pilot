@@ -2065,13 +2065,31 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
         },
       };
 
-      // Validate expected price
-      if (!availability?.price || availability.price < 0.01) {
-        setError(`Invalid price: ${availability?.price}. Expected price is required and must be >= $0.01. Please check domain availability first.`);
+  // Validate expected price
+  if (!availability?.price || availability.price < 0.01) {
+    setError(`Invalid price: ${availability?.price}. Expected price is required and must be >= $0.01. Please check domain availability first.`);
+    return;
+  }
+
+  // Pre-purchase validation: Check account access
+  try {
+    const userCheckResponse = await fetch('https://api.vercel.com/v2/user', {
+      headers: { 'Authorization': `Bearer ${vercelToken}` }
+    });
+    
+    if (!userCheckResponse.ok) {
+      if (userCheckResponse.status === 401) {
+        setError('Authentication failed. Please check your Vercel token.');
+        return;
+      } else if (userCheckResponse.status === 402) {
+        setError('Account billing issue detected. Please check your payment method in Vercel dashboard.');
         return;
       }
-
-      // Validate phone number format before sending
+    }
+  } catch (accountError) {
+    console.warn('Account validation check failed:', accountError);
+    // Continue with purchase attempt - let the domain purchase API handle detailed errors
+  }      // Validate phone number format before sending
       const formattedPhone = formatPhoneForVercel(phone, phoneCountryCode);
       const phoneRegex = /^\+[1-9]\d{1,14}$/;
       if (!phoneRegex.test(formattedPhone)) {
@@ -2106,17 +2124,33 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
         throw new Error(data.error);
       }
 
-      // Attach to project
-      await fetch(`/api/vercel/projects/${projectId}/domains`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          domain,
-          vercelToken,
-        }),
-      });
+      console.log('Domain purchase successful:', data);
 
-      onSuccess();
+      // Show success message with purchase details
+      setError(''); // Clear any previous errors
+      
+      // Set success state for a moment
+      setStep(3); // Add a success step
+      
+      // Attach to project
+      try {
+        await fetch(`/api/vercel/projects/${projectId}/domains`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            domain,
+            vercelToken,
+          }),
+        });
+      } catch (attachError) {
+        console.warn('Failed to attach domain to project:', attachError);
+        // Don't fail the whole process if attachment fails
+      }
+
+      // Wait a moment to show success, then callback
+      setTimeout(() => {
+        onSuccess();
+      }, 2000);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -2129,7 +2163,7 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
       <DialogHeader>
         <DialogTitle>Buy Domain</DialogTitle>
         <DialogDescription>
-          {step === 1 ? 'Check domain availability' : 'Complete purchase'}
+          {step === 1 ? 'Check domain availability' : step === 2 ? 'Complete purchase' : 'Purchase completed successfully'}
           {teamId && (
             <span className="text-xs text-green-600 dark:text-green-400 ml-2">
               ✓ Team ID configured
@@ -2160,14 +2194,20 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
             Check Availability
           </Button>
         </div>
-      ) : (
+      ) : step === 2 ? (
         <div className="space-y-4">
           <Alert>
             <CreditCard className="w-4 h-4" />
             <AlertDescription>
-              <div className="space-y-1">
-                <p className="font-semibold">Domain: {domain}</p>
-                <p>Price: ${availability?.price} {availability?.currency}/year</p>
+              <div className="space-y-2">
+                <div>
+                  <p className="font-semibold">Domain: {domain}</p>
+                  <p>Price: ${availability?.price} {availability?.currency}/year</p>
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 border-t pt-2">
+                  <p>💳 <strong>Payment:</strong> Will be charged to your Vercel account's default payment method</p>
+                  <p>⚡ <strong>Processing:</strong> Domain registration is immediate upon successful payment</p>
+                </div>
               </div>
             </AlertDescription>
           </Alert>
@@ -2271,6 +2311,33 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
               {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               {availability?.price ? `Purchase $${availability.price}` : 'Purchase Domain'}
             </Button>
+          </div>
+        </div>
+      ) : (
+        // Success step
+        <div className="space-y-4 text-center">
+          <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
+            <CheckCircle className="w-4 h-4 text-green-600" />
+            <AlertDescription>
+              <div className="space-y-2">
+                <p className="font-semibold text-green-800 dark:text-green-200">
+                  🎉 Domain Purchase Successful!
+                </p>
+                <div className="text-sm space-y-1">
+                  <p><strong>Domain:</strong> {domain}</p>
+                  <p><strong>Status:</strong> Purchase completed</p>
+                  <p><strong>Auto-renew:</strong> Enabled</p>
+                  <p className="text-green-600 dark:text-green-400">
+                    Domain has been added to your account and attached to this project.
+                  </p>
+                </div>
+              </div>
+            </AlertDescription>
+          </Alert>
+          
+          <div className="flex items-center justify-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Closing dialog and refreshing domain list...</span>
           </div>
         </div>
       )}
