@@ -1963,16 +1963,10 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
           <div>
             <CardTitle>Deployment History</CardTitle>
             <CardDescription className="mt-1 flex items-center gap-2 flex-wrap">
-              Click "Promote" to instantly make any READY deployment live in production
               <Badge variant="outline" className="text-xs">
                 <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
                 Auto-refreshing every 5s
               </Badge>
-              <div className="text-xs text-muted-foreground">
-                Badges: <span className="font-mono bg-blue-500 text-white px-1 rounded">CURRENT</span> = Live on production domains | 
-                <span className="font-mono bg-secondary text-secondary-foreground px-1 rounded ml-1">LIVE</span> = Accessible | 
-                <span className="font-mono border border-green-600 text-green-600 px-1 rounded ml-1">ROLLBACK</span> = Can rollback
-              </div>
             </CardDescription>
           </div>
           <Button onClick={onRefresh} size="sm" variant="outline">
