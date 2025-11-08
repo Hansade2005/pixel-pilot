@@ -6,8 +6,13 @@ import { NextRequest, NextResponse } from 'next/server';
  * This endpoint checks if domains are available for purchase and returns
  * pricing information from Vercel's domain marketplace.
  * 
- * Uses POST /v1/registrar/domains/availability for bulk domain checks
- * Official API: https://vercel.com/docs/rest-api/reference/endpoints/domains-registrar/get-availability-for-multiple-domains
+ * Uses:
+ * - POST /v1/registrar/domains/availability for bulk availability checks
+ * - GET /v1/registrar/domains/{domain}/price for individual domain pricing
+ * 
+ * Official API docs:
+ * - Availability: https://vercel.com/docs/rest-api/reference/endpoints/domains-registrar/get-availability-for-multiple-domains
+ * - Pricing: https://vercel.com/docs/rest-api/reference/endpoints/domains-registrar/get-price-data-for-a-domain
  */
 export async function POST(request: NextRequest) {
   try {
@@ -82,14 +87,65 @@ export async function POST(request: NextRequest) {
 
     const data = await response.json();
 
-    // Format response according to the official API format
-    // Response has { results: [{ domain: string, available: boolean }] }
-    const formattedDomains = data.results?.map((result: any) => ({
-      name: result.domain,
-      available: result.available,
-      // Note: The v1/registrar/domains/availability endpoint doesn't include price
-      // To get price, we need to call GET /v1/domains/available for each domain
-    })) || [];
+    // Format response and fetch pricing for available domains
+    const formattedDomains = [];
+    
+    if (data.results) {
+      for (const result of data.results) {
+        let domainData = {
+          name: result.domain,
+          available: result.available,
+          price: null as number | null,
+          currency: 'USD',
+          years: 1
+        };
+
+        // If domain is available, fetch pricing information using the correct registrar API
+        if (result.available) {
+          try {
+            // Use the official registrar pricing endpoint
+            let priceApiUrl = `https://api.vercel.com/v1/registrar/domains/${encodeURIComponent(result.domain)}/price?years=1`;
+            if (teamId) {
+              priceApiUrl += `&teamId=${teamId}`;
+            }
+
+            console.log(`Fetching price for ${result.domain} from:`, priceApiUrl);
+
+            const priceResponse = await fetch(priceApiUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${vercelToken}`,
+                'Content-Type': 'application/json',
+              },
+            });
+
+            if (priceResponse.ok) {
+              const priceData = await priceResponse.json();
+              console.log(`Price data for ${result.domain}:`, priceData);
+              
+              // Use purchasePrice from the registrar API response
+              if (priceData.purchasePrice !== null && priceData.purchasePrice > 0) {
+                domainData.price = priceData.purchasePrice;
+                domainData.currency = 'USD'; // Vercel prices are in USD
+                domainData.years = priceData.years || 1;
+              } else {
+                console.warn(`Domain ${result.domain} is not available for purchase (null price)`);
+                domainData.available = false; // Mark as unavailable if price is null
+                domainData.price = null;
+              }
+            } else {
+              console.warn(`Price API error for ${result.domain}:`, priceResponse.status, await priceResponse.text());
+            }
+          } catch (priceError) {
+            console.warn(`Failed to fetch price for ${result.domain}:`, priceError);
+            // Don't set a default price - let the frontend handle missing pricing
+            domainData.price = null;
+          }
+        }
+
+        formattedDomains.push(domainData);
+      }
+    }
 
     return NextResponse.json({
       domains: formattedDomains,

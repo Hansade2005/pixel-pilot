@@ -2016,9 +2016,14 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
         throw new Error(data.error);
       }
 
+      console.log('Domain availability response:', data.domains[0]);
       setAvailability(data.domains[0]);
       
       if (data.domains[0].available) {
+        if (!data.domains[0].price || data.domains[0].price < 0.01) {
+          setError(`Price information unavailable for ${domain}. Price: ${data.domains[0].price}`);
+          return;
+        }
         setStep(2);
       } else {
         setError('Domain is not available');
@@ -2060,6 +2065,12 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
         },
       };
 
+      // Validate expected price
+      if (!availability?.price || availability.price < 0.01) {
+        setError(`Invalid price: ${availability?.price}. Expected price is required and must be >= $0.01. Please check domain availability first.`);
+        return;
+      }
+
       // Validate phone number format before sending
       const formattedPhone = formatPhoneForVercel(phone, phoneCountryCode);
       const phoneRegex = /^\+[1-9]\d{1,14}$/;
@@ -2080,6 +2091,8 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
         ...purchaseData,
         vercelToken: '***hidden***' // Hide token in logs
       });
+
+      console.log('Domain availability data:', availability);
 
       const response = await fetch('/api/vercel/domains/purchase', {
         method: 'POST',
@@ -2252,11 +2265,11 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
             </Button>
             <Button 
               onClick={purchaseDomain} 
-              disabled={loading || !firstName || !lastName || !email || !phone} 
+              disabled={loading || !firstName || !lastName || !email || !phone || !availability?.price || availability.price < 0.01} 
               className="flex-1"
             >
               {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Purchase ${availability?.price}
+              {availability?.price ? `Purchase $${availability.price}` : 'Purchase Domain'}
             </Button>
           </div>
         </div>

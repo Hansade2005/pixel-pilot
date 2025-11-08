@@ -122,7 +122,13 @@ export async function POST(request: NextRequest) {
 
     console.log('Making request to Vercel API:', {
       url: apiUrl,
-      payload: purchasePayload
+      payload: {
+        ...purchasePayload,
+        contactInformation: {
+          ...purchasePayload.contactInformation,
+          email: '***hidden***' // Hide email in logs for privacy
+        }
+      }
     });
 
     // Purchase domain using the official API
@@ -147,6 +153,9 @@ export async function POST(request: NextRequest) {
         
         if (errorCode === 'domain_too_short') {
           errorMessage = 'The domain name (excluding the TLD) is too short.';
+        } else if (errorCode === 'price_mismatch') {
+          const actualPrice = errorData.price || 'unknown';
+          errorMessage = `Price mismatch. Expected: $${expectedPrice}, Actual: $${actualPrice}. Please check domain availability again.`;
         } else if (errorCode === 'order_too_expensive') {
           errorMessage = 'The total price of the order is too high.';
         } else if (errorCode === 'too_many_domains') {
