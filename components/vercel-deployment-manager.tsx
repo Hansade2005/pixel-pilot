@@ -176,12 +176,25 @@ export function VercelDeploymentManager({
     }
   }, [localVercelToken]);
 
-  // Load all projects when both tokens are available (for dashboard view)
+  // Load all projects when tokens and team info are available (for dashboard view)
   useEffect(() => {
-    if (localVercelToken && localGithubToken) {
+    if (localVercelToken && localGithubToken && teamId) {
+      console.log('Loading projects with team info:', { teamId, teamSlug });
       loadAllProjects();
     }
-  }, [localVercelToken, localGithubToken]);
+  }, [localVercelToken, localGithubToken, teamId]);
+
+  // Debug logging
+  useEffect(() => {
+    console.log('Component state update:', { 
+      hasVercelToken: !!localVercelToken, 
+      hasGithubToken: !!localGithubToken, 
+      teamId, 
+      teamSlug, 
+      projectsCount: projects.length,
+      viewMode 
+    });
+  }, [localVercelToken, localGithubToken, teamId, teamSlug, projects.length, viewMode]);
 
   // Refresh project details from Vercel API when project is loaded
   useEffect(() => {
@@ -608,50 +621,116 @@ export function VercelDeploymentManager({
 
   // Load all projects for dashboard view
   const loadAllProjects = async () => {
+    if (!localVercelToken || !teamId) {
+      console.log('Missing tokens or team info for loading projects');
+      return;
+    }
+
     setLoading(true);
     try {
-      await storageManager.init();
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      console.log('Loading projects from Vercel API...');
       
-      if (user) {
-        // Get all workspaces for this user
-        const workspacesData = await storageManager.getWorkspaces(user.id);
+      // Fetch projects from Vercel API
+      const response = await fetch(`/api/vercel/projects?token=${localVercelToken}&teamId=${teamId}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch projects: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Vercel API response:', data);
+      
+      if (data.projects && Array.isArray(data.projects)) {
+        const vercelProjects: VercelProject[] = data.projects.map((project: any) => ({
+          projectId: project.id,
+          projectName: project.name,
+          url: project.targets?.production?.url 
+            ? `https://${project.targets.production.url}` 
+            : project.alias?.[0]?.domain 
+            ? `https://${project.alias[0].domain}`
+            : `https://${project.name}.vercel.app`,
+          status: project.targets?.production?.readyState || 'unknown',
+          framework: project.framework || 'auto-detect',
+          lastDeployed: project.updatedAt || project.createdAt || Date.now(),
+          teamId: teamId,
+        }));
         
-        // Get all Vercel projects from workspaces
-        const allProjects: VercelProject[] = [];
+        console.log('Parsed projects:', vercelProjects);
+        setProjects(vercelProjects);
         
-        for (const workspace of workspacesData) {
-          try {
-            const vercelProject = await storageManager.getVercelProject(workspace.id);
-            if (vercelProject) {
-              allProjects.push({
-                projectId: vercelProject.projectId,
-                projectName: vercelProject.projectName,
-                url: vercelProject.url,
-                status: vercelProject.status,
-                framework: vercelProject.framework,
-                lastDeployed: vercelProject.lastDeployed,
-                workspaceId: workspace.id,
-                workspaceName: workspace.name,
-              });
+        // Also merge with any local storage projects
+        try {
+          await storageManager.init();
+          const supabase = createClient();
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          if (user) {
+            const workspacesData = await storageManager.getWorkspaces(user.id);
+            
+            // Add workspace names to matching projects
+            const enhancedProjects = vercelProjects.map(project => {
+              const matchingWorkspace = workspacesData.find((w: any) => w.vercelProjectId === project.projectId);
+              return {
+                ...project,
+                workspaceId: matchingWorkspace?.id,
+                workspaceName: matchingWorkspace?.name,
+              };
+            });
+            
+            setProjects(enhancedProjects);
+            
+            // Set current project if it matches current workspace
+            const currentProject = enhancedProjects.find(p => p.workspaceId === workspaceId);
+            if (currentProject) {
+              setProject(currentProject);
             }
-          } catch (err) {
-            // Skip workspaces without Vercel projects
-            console.log(`No Vercel project for workspace ${workspace.id}`);
           }
+        } catch (storageErr) {
+          console.log('Storage enhancement failed, using API data only:', storageErr);
         }
-        
-        setProjects(allProjects);
-        
-        // If we have the current workspace project, also set it as legacy project
-        const currentProject = allProjects.find(p => p.workspaceId === workspaceId);
-        if (currentProject) {
-          setProject(currentProject);
-        }
+      } else {
+        console.log('No projects found or invalid response format');
+        setProjects([]);
       }
     } catch (err) {
-      console.error('Failed to load all projects:', err);
+      console.error('Failed to load projects from Vercel API:', err);
+      setError(`Failed to load projects: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      
+      // Fallback to local storage
+      try {
+        await storageManager.init();
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user) {
+          const workspacesData = await storageManager.getWorkspaces(user.id);
+          const localProjects: VercelProject[] = [];
+          
+          for (const workspace of workspacesData) {
+            try {
+              const vercelProject = await storageManager.getVercelProject(workspace.id);
+              if (vercelProject) {
+                localProjects.push({
+                  projectId: vercelProject.projectId,
+                  projectName: vercelProject.projectName,
+                  url: vercelProject.url,
+                  status: vercelProject.status,
+                  framework: vercelProject.framework,
+                  lastDeployed: vercelProject.lastDeployed,
+                  workspaceId: workspace.id,
+                  workspaceName: workspace.name,
+                });
+              }
+            } catch (err) {
+              // Skip workspaces without Vercel projects
+            }
+          }
+          
+          setProjects(localProjects);
+        }
+      } catch (fallbackErr) {
+        console.error('Fallback to local storage also failed:', fallbackErr);
+      }
     } finally {
       setLoading(false);
     }
