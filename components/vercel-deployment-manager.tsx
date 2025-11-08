@@ -1170,6 +1170,20 @@ export function VercelDeploymentManager({
                     </span>
                   </div>
                 )}
+                {viewMode === 'project' && !selectedProject && (
+                  <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                    <button
+                      onClick={backToDashboard}
+                      className="hover:text-gray-900 dark:hover:text-white transition-colors"
+                    >
+                      Projects
+                    </button>
+                    <span>/</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      New Project
+                    </span>
+                  </div>
+                )}
                 {viewMode === 'dashboard' && (
                   <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
                    PiPilot Hosting
