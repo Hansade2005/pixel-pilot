@@ -1137,8 +1137,8 @@ export function VercelDeploymentManager({
 
   return (
     <div className="min-h-screen bg-white dark:bg-black">
-      {/* Header */}
-      <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-black">
+      {/* Header - Fixed on scroll like Vercel */}
+      <div className="sticky top-0 z-40 border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-black/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
@@ -1151,7 +1151,8 @@ export function VercelDeploymentManager({
                 </h1>
               </div>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-4">
+              {/* Status indicators */}
               {viewMode === 'dashboard' && projects.length > 0 && (
                 <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
                   <span>{projects.length} project{projects.length !== 1 ? 's' : ''}</span>
@@ -1172,6 +1173,15 @@ export function VercelDeploymentManager({
                   )}
                 </div>
               )}
+              
+              {/* Prominent Back to Workspace CTA */}
+              <a
+                href="https://pipilot.dev/workspace"
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700"
+              >
+                <FolderOpen className="w-4 h-4 mr-2" />
+                Workspace
+              </a>
             </div>
           </div>
         </div>
@@ -1311,37 +1321,41 @@ export function VercelDeploymentManager({
                   )}
                 </div>
 
-                {/* Project Tabs */}
+                {/* Project Tabs - Horizontally scrollable on mobile like Vercel */}
                 <div className="w-full">
                   <div className="border-b border-gray-200 dark:border-gray-800">
-                    <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-                      {[
-                        { id: 'overview', name: 'Overview', icon: Rocket, disabled: false },
-                        { id: 'deployments', name: 'Deployments', icon: History, disabled: !selectedProject },
-                        { id: 'domains', name: 'Domains', icon: Globe, disabled: !selectedProject },
-                        { id: 'environment', name: 'Environment', icon: Settings, disabled: !selectedProject },
-                        { id: 'logs', name: 'Logs', icon: Terminal, disabled: !selectedProject },
-                      ].map((tab) => {
-                        const Icon = tab.icon;
-                        return (
-                          <button
-                            key={tab.id}
-                            onClick={() => !tab.disabled && setActiveTab(tab.id)}
-                            className={`${
-                              activeTab === tab.id
-                                ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
-                                : tab.disabled
-                                ? 'border-transparent text-gray-400 dark:text-gray-600 cursor-not-allowed'
-                                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-                            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 transition-colors`}
-                            disabled={tab.disabled}
-                          >
-                            <Icon className="w-4 h-4" />
-                            <span>{tab.name}</span>
-                          </button>
-                        );
-                      })}
-                    </nav>
+                    <div className="max-w-7xl mx-auto">
+                      <nav className="-mb-px overflow-x-auto" aria-label="Tabs">
+                        <div className="flex space-x-8 min-w-max px-4 sm:px-6 lg:px-8">
+                          {[
+                            { id: 'overview', name: 'Overview', icon: Rocket, disabled: false },
+                            { id: 'deployments', name: 'Deployments', icon: History, disabled: !selectedProject },
+                            { id: 'domains', name: 'Domains', icon: Globe, disabled: !selectedProject },
+                            { id: 'environment', name: 'Environment', icon: Settings, disabled: !selectedProject },
+                            { id: 'logs', name: 'Logs', icon: Terminal, disabled: !selectedProject },
+                          ].map((tab) => {
+                            const Icon = tab.icon;
+                            return (
+                              <button
+                                key={tab.id}
+                                onClick={() => !tab.disabled && setActiveTab(tab.id)}
+                                className={`${
+                                  activeTab === tab.id
+                                    ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
+                                    : tab.disabled
+                                    ? 'border-transparent text-gray-400 dark:text-gray-600 cursor-not-allowed'
+                                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 transition-colors flex-shrink-0`}
+                                disabled={tab.disabled}
+                              >
+                                <Icon className="w-4 h-4" />
+                                <span>{tab.name}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </nav>
+                    </div>
                   </div>
 
                   {/* Tab Content */}

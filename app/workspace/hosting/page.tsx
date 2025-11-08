@@ -10,6 +10,140 @@ import { storageManager } from '@/lib/storage-manager';
 import { getDeploymentTokens } from '@/lib/cloud-sync';
 import { useSearchParams } from 'next/navigation';
 
+// Vercel-style Footer Component
+function VercelFooter() {
+  const [theme, setTheme] = useState('light');
+
+  // Initialize theme based on current document class
+  useEffect(() => {
+    const isDark = document.documentElement.classList.contains('dark');
+    setTheme(isDark ? 'dark' : 'light');
+  }, []);
+
+  return (
+    <footer className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-black/80 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
+        {/* Desktop Layout */}
+        <div className="hidden md:flex items-center justify-between">
+          {/* Left side - Navigation */}
+          <div className="flex items-center space-x-6">
+            <a 
+              href="/"
+              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            >
+              Home
+            </a>
+            <a 
+              href="https://pipilot.dev/workspace"
+              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            >
+              Workspace
+            </a>
+          </div>
+
+          {/* Center - Status */}
+          <div className="flex items-center space-x-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              All systems normal
+            </span>
+          </div>
+
+          {/* Right side - Theme selector */}
+          <div className="flex items-center space-x-3">
+            <span className="text-sm text-gray-600 dark:text-gray-400 hidden lg:block">
+              Select a display theme:
+            </span>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => {
+                  setTheme('light');
+                  document.documentElement.classList.remove('dark');
+                }}
+                className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                  theme === 'light'
+                    ? 'bg-gray-900 text-white dark:bg-white dark:text-black'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                light
+              </button>
+              <button
+                onClick={() => {
+                  setTheme('dark');
+                  document.documentElement.classList.add('dark');
+                }}
+                className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                  theme === 'dark'
+                    ? 'bg-gray-900 text-white dark:bg-white dark:text-black'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                dark
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Layout */}
+        <div className="md:hidden flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <a 
+              href="/"
+              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            >
+              Home
+            </a>
+            <a 
+              href="https://pipilot.dev/workspace"
+              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            >
+              Workspace
+            </a>
+          </div>
+          
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span className="text-xs text-gray-600 dark:text-gray-400">
+                Normal
+              </span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <button
+                onClick={() => {
+                  setTheme('light');
+                  document.documentElement.classList.remove('dark');
+                }}
+                className={`px-2 py-1 text-xs rounded transition-colors ${
+                  theme === 'light'
+                    ? 'bg-gray-900 text-white dark:bg-white dark:text-black'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                light
+              </button>
+              <button
+                onClick={() => {
+                  setTheme('dark');
+                  document.documentElement.classList.add('dark');
+                }}
+                className={`px-2 py-1 text-xs rounded transition-colors ${
+                  theme === 'dark'
+                    ? 'bg-gray-900 text-white dark:bg-white dark:text-black'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                dark
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
 function HostingManagementContent() {
   const searchParams = useSearchParams();
   const projectId = searchParams.get('project');
@@ -160,32 +294,7 @@ function HostingManagementContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-black">
-      {/* Header with branding */}
-      <div className="border-b border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-600 rounded-lg">
-                <Rocket className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">Hosting Management</h1>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Deploy and manage your projects with Vercel</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <a
-                href="/workspace"
-                className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
-              >
-                ← Back to Workspace
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-black pb-16">
       {/* Main content */}
       <div className="max-w-7xl mx-auto p-6">
         {(!vercelToken || !githubToken) && (
@@ -208,60 +317,8 @@ function HostingManagementContent() {
         />
       </div>
 
-      {/* Footer info */}
-      <div className="max-w-7xl mx-auto px-6 py-8 mt-12 border-t border-gray-200 dark:border-gray-800">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-gray-600 dark:text-gray-400">
-          <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Getting Started</h3>
-            <ul className="space-y-1">
-              <li>
-                <a href="https://vercel.com/docs" target="_blank" className="hover:text-gray-900 dark:hover:text-gray-300">
-                  Vercel Documentation
-                </a>
-              </li>
-              <li>
-                <a href="https://vercel.com/account/tokens" target="_blank" className="hover:text-gray-900 dark:hover:text-gray-300">
-                  Create Vercel Token
-                </a>
-              </li>
-              <li>
-                <a href="https://github.com/settings/tokens" target="_blank" className="hover:text-gray-900 dark:hover:text-gray-300">
-                  Create GitHub Token
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Features</h3>
-            <ul className="space-y-1">
-              <li>✓ Git-based deployments</li>
-              <li>✓ Custom domains</li>
-              <li>✓ Environment variables</li>
-              <li>✓ Real-time build logs</li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Need Help?</h3>
-            <ul className="space-y-1">
-              <li>
-                <a href="/docs" className="hover:text-gray-900 dark:hover:text-gray-300">
-                  Documentation
-                </a>
-              </li>
-              <li>
-                <a href="/community" className="hover:text-gray-900 dark:hover:text-gray-300">
-                  Community Support
-                </a>
-              </li>
-              <li>
-                <a href="mailto:support@example.com" className="hover:text-gray-900 dark:hover:text-gray-300">
-                  Contact Support
-                </a>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
+      {/* Vercel-style Footer */}
+      <VercelFooter />
     </div>
   );
 }
