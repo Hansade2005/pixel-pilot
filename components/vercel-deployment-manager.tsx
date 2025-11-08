@@ -43,6 +43,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { storageManager } from '@/lib/storage-manager';
 import { createClient } from '@/lib/supabase/client';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface VercelProject {
   projectId: string;
@@ -2284,15 +2285,23 @@ function DomainsTab({ domains, projectId, teamId, vercelToken, onRefresh }: any)
                     <Globe className="w-4 h-4" />
                     <span className="font-semibold">{domain.name}</span>
                     {domain.verified ? (
-                      <Badge variant="default">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Verified
-                      </Badge>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Verified
+                        </TooltipContent>
+                      </Tooltip>
                     ) : (
-                      <Badge variant="secondary">
-                        <Clock className="w-3 h-3 mr-1" />
-                        Pending
-                      </Badge>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                           <Clock className="w-3 h-3 mr-1" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                         Pending                                  </TooltipContent>
+                      </Tooltip>
+                     
         )}
       </div>
     </div>                {!domain.verified && domain.verification && (
