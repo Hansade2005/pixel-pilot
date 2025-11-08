@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+// Tabs removed - using custom tab implementation
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Textarea } from '@/components/ui/textarea';
@@ -51,6 +51,8 @@ interface VercelProject {
   framework?: string;
   teamId?: string; // Vercel team ID (required for some API operations)
   lastDeployed?: number;
+  workspaceId?: string; // Associated workspace ID
+  workspaceName?: string; // Associated workspace name for display
 }
 
 interface Deployment {
@@ -117,8 +119,18 @@ export function VercelDeploymentManager({
   vercelToken?: string; 
   githubToken?: string; 
 }) {
+  // Navigation state
+  const [viewMode, setViewMode] = useState<'dashboard' | 'project'>('dashboard');
   const [activeTab, setActiveTab] = useState('overview');
+  
+  // Multi-project state
+  const [projects, setProjects] = useState<VercelProject[]>([]);
+  const [selectedProject, setSelectedProject] = useState<VercelProject | null>(null);
+  
+  // Legacy single project state (for backward compatibility)
   const [project, setProject] = useState<VercelProject | null>(null);
+  
+  // Project-specific data
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [envVars, setEnvVars] = useState<EnvVariable[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
@@ -163,6 +175,13 @@ export function VercelDeploymentManager({
       fetchTeamSlug();
     }
   }, [localVercelToken]);
+
+  // Load all projects when both tokens are available (for dashboard view)
+  useEffect(() => {
+    if (localVercelToken && localGithubToken) {
+      loadAllProjects();
+    }
+  }, [localVercelToken, localGithubToken]);
 
   // Refresh project details from Vercel API when project is loaded
   useEffect(() => {
@@ -587,6 +606,90 @@ export function VercelDeploymentManager({
     }
   };
 
+  // Load all projects for dashboard view
+  const loadAllProjects = async () => {
+    setLoading(true);
+    try {
+      await storageManager.init();
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // Get all workspaces for this user
+        const workspacesData = await storageManager.getWorkspaces(user.id);
+        
+        // Get all Vercel projects from workspaces
+        const allProjects: VercelProject[] = [];
+        
+        for (const workspace of workspacesData) {
+          try {
+            const vercelProject = await storageManager.getVercelProject(workspace.id);
+            if (vercelProject) {
+              allProjects.push({
+                projectId: vercelProject.projectId,
+                projectName: vercelProject.projectName,
+                url: vercelProject.url,
+                status: vercelProject.status,
+                framework: vercelProject.framework,
+                lastDeployed: vercelProject.lastDeployed,
+                workspaceId: workspace.id,
+                workspaceName: workspace.name,
+              });
+            }
+          } catch (err) {
+            // Skip workspaces without Vercel projects
+            console.log(`No Vercel project for workspace ${workspace.id}`);
+          }
+        }
+        
+        setProjects(allProjects);
+        
+        // If we have the current workspace project, also set it as legacy project
+        const currentProject = allProjects.find(p => p.workspaceId === workspaceId);
+        if (currentProject) {
+          setProject(currentProject);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load all projects:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Select a project and switch to project view
+  const selectProject = (selectedProj: VercelProject) => {
+    setSelectedProject(selectedProj);
+    setProject(selectedProj); // For backward compatibility
+    setViewMode('project');
+    setActiveTab('overview');
+    
+    // Load project-specific data
+    if (selectedProj.projectId && localVercelToken) {
+      loadDeployments();
+      loadDomains();
+      loadEnvVars();
+    }
+  };
+
+  // Go back to dashboard view
+  const backToDashboard = () => {
+    setViewMode('dashboard');
+    setSelectedProject(null);
+    setActiveTab('overview');
+  };
+
+  // Create new project and update projects list
+  const createProjectAndUpdateList = async () => {
+    await createProject();
+    await loadAllProjects(); // Refresh the projects list
+    
+    // If project was created successfully, switch to project view
+    if (project) {
+      setViewMode('project');
+    }
+  };
+
   // Load deployments
   const loadDeployments = async () => {
     if (!project?.projectId) return;
@@ -954,183 +1057,471 @@ export function VercelDeploymentManager({
   }, [activeTab, project?.projectId]);
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-6 space-y-6">
+    <div className="min-h-screen bg-white dark:bg-black">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Vercel Deployment Manager</h1>
-          <p className="text-muted-foreground">Deploy and manage your projects on Vercel</p>
+      <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-black">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-6 h-6 bg-black dark:bg-white rounded-sm flex items-center justify-center">
+                  <Rocket className="w-4 h-4 text-white dark:text-black" />
+                </div>
+                <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  {viewMode === 'dashboard' ? 'Hosting Management' : (selectedProject?.projectName || 'New Project')}
+                </h1>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              {viewMode === 'dashboard' && projects.length > 0 && (
+                <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                  <span>{projects.length} project{projects.length !== 1 ? 's' : ''}</span>
+                </div>
+              )}
+              {viewMode === 'project' && selectedProject && (
+                <div className="flex items-center space-x-2">
+                  {selectedProject.status === 'deployed' ? (
+                    <div className="flex items-center space-x-1.5 text-green-600 dark:text-green-400 text-sm font-medium">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      Deployed
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-1.5 text-yellow-600 dark:text-yellow-400 text-sm font-medium">
+                      <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                      {selectedProject.status}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-        {project && (
-          <Badge variant="outline" className="text-lg">
-            {project.status === 'deployed' ? (
-              <><CheckCircle className="w-4 h-4 mr-2 text-green-500" /> Deployed</>
-            ) : (
-              <><Clock className="w-4 h-4 mr-2 text-yellow-500" /> {project.status}</>
-            )}
-          </Badge>
-        )}
       </div>
 
-      {/* Tokens Configuration */}
-      {(!vercelToken || !githubToken) && (
-        <Alert>
-          <AlertDescription>
-            <div className="space-y-4">
-              <p className="font-semibold">Configure your API tokens to get started:</p>
-              <div className="grid grid-cols-2 gap-4">
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="space-y-8">
+
+        {/* Tokens Configuration */}
+        {(!vercelToken || !githubToken) && (
+          <div className="bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-xl p-6">
+            <div className="space-y-6">
+              <div className="flex items-start space-x-3">
+                <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center mt-0.5">
+                  <Settings className="w-3 h-3 text-white" />
+                </div>
                 <div>
-                  <Label>Vercel Token</Label>
-                  <div className="flex gap-2">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Configure API Tokens</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Connect your Vercel and GitHub accounts to get started</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Vercel Token</label>
+                  <div className="flex space-x-2">
                     <Input
                       type={showTokens ? 'text' : 'password'}
                       value={localVercelToken}
                       onChange={(e) => setLocalVercelToken(e.target.value)}
                       placeholder="vercel_xxxxx"
+                      className="flex-1 h-9 text-sm border-gray-300 dark:border-gray-600 focus:border-blue-500 focus:ring-blue-500"
                     />
                     <Button
-                      size="icon"
-                      variant="outline"
+                      size="sm"
+                      variant="ghost"
                       onClick={() => setShowTokens(!showTokens)}
+                      className="h-9 w-9 p-0"
                     >
                       {showTokens ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </Button>
                   </div>
                 </div>
-                <div>
-                  <Label>GitHub Token</Label>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">GitHub Token</label>
                   <Input
                     type={showTokens ? 'text' : 'password'}
                     value={localGithubToken}
                     onChange={(e) => setLocalGithubToken(e.target.value)}
                     placeholder="ghp_xxxxx"
+                    className="h-9 text-sm border-gray-300 dark:border-gray-600 focus:border-blue-500 focus:ring-blue-500"
                   />
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Get tokens: <a href="https://vercel.com/account/tokens" target="_blank" className="underline">Vercel</a> | <a href="https://github.com/settings/tokens" target="_blank" className="underline">GitHub</a>
-              </p>
+              <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                <span>Get your tokens from:</span>
+                <div className="flex space-x-4">
+                  <a href="https://vercel.com/account/tokens" target="_blank" className="hover:text-gray-700 dark:hover:text-gray-300 underline">
+                    Vercel Tokens
+                  </a>
+                  <a href="https://github.com/settings/tokens" target="_blank" className="hover:text-gray-700 dark:hover:text-gray-300 underline">
+                    GitHub Tokens
+                  </a>
+                </div>
+              </div>
             </div>
-          </AlertDescription>
-        </Alert>
-      )}
+          </div>
+        )}
 
-      {/* Error Display */}
-      {error && (
-        <Alert variant="destructive">
-          <XCircle className="w-4 h-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+        {/* Error Display */}
+        {error && (
+          <div className="bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 rounded-xl p-4">
+            <div className="flex items-start space-x-3">
+              <XCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <h3 className="text-sm font-semibold text-red-800 dark:text-red-200">Error</h3>
+                <p className="text-sm text-red-700 dark:text-red-300 mt-1">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
-      {/* Main Content */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="overview">
-            <Rocket className="w-4 h-4 mr-2" />
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="deployments" disabled={!project}>
-            <History className="w-4 h-4 mr-2" />
-            Deployments
-          </TabsTrigger>
-          <TabsTrigger value="domains" disabled={!project}>
-            <Globe className="w-4 h-4 mr-2" />
-            Domains
-          </TabsTrigger>
-          <TabsTrigger value="environment" disabled={!project}>
-            <Settings className="w-4 h-4 mr-2" />
-            Environment
-          </TabsTrigger>
-          <TabsTrigger value="logs" disabled={!project}>
-            <Terminal className="w-4 h-4 mr-2" />
-            Logs
-          </TabsTrigger>
-        </TabsList>
+        {/* Main Content - Two Level Navigation */}
+        {vercelToken && githubToken && (
+          <div className="space-y-6">
+            {viewMode === 'dashboard' ? (
+              /* Projects Dashboard View */
+              <ProjectsDashboard
+                projects={projects}
+                loading={loading}
+                onSelectProject={selectProject}
+                onCreateNew={() => setViewMode('project')}
+              />
+            ) : (
+              /* Single Project View */
+              <div className="space-y-6">
+                {/* Project Header with Back Navigation */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <button
+                      onClick={backToDashboard}
+                      className="inline-flex items-center text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                    >
+                      <Rocket className="w-4 h-4 mr-2" />
+                      Projects
+                    </button>
+                    <span className="text-gray-400 dark:text-gray-600">/</span>
+                    <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      {selectedProject?.projectName || 'New Project'}
+                    </h1>
+                  </div>
+                  {selectedProject && (
+                    <div className="flex items-center space-x-3">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        selectedProject.status === 'deployed' || selectedProject.status === 'ready'
+                          ? 'text-green-600 bg-green-50 dark:bg-green-950/50 dark:text-green-400'
+                          : selectedProject.status === 'building'
+                          ? 'text-yellow-600 bg-yellow-50 dark:bg-yellow-950/50 dark:text-yellow-400'
+                          : 'text-red-600 bg-red-50 dark:bg-red-950/50 dark:text-red-400'
+                      }`}>
+                        <div className="w-1.5 h-1.5 rounded-full bg-current mr-1.5"></div>
+                        {selectedProject.status || 'Unknown'}
+                      </span>
+                      <button
+                        onClick={triggerDeploy}
+                        disabled={loading}
+                        className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-black rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                      >
+                        {loading ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Upload className="w-4 h-4 mr-2" />
+                        )}
+                        Deploy
+                      </button>
+                    </div>
+                  )}
+                </div>
 
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-4">
-          {!project ? (
-            <CreateProjectForm
-              projectName={projectName}
-              setProjectName={setProjectName}
-              githubRepo={githubRepo}
-              setGithubRepo={setGithubRepo}
-              selectedGithubRepo={selectedGithubRepo}
-              setSelectedGithubRepo={setSelectedGithubRepo}
-              framework={framework}
-              setFramework={setFramework}
-              loading={loading}
-              loadingRepos={loadingRepos}
-              githubRepos={githubRepos}
-              workspaces={workspaces}
-              selectedWorkspace={selectedWorkspace}
-              setSelectedWorkspace={setSelectedWorkspace}
-              onSubmit={createProject}
-            />
-          ) : (
-            <ProjectOverview
-              project={project}
-              loading={loading}
-              onRedeploy={triggerDeploy}
-            />
-          )}
-        </TabsContent>
+                {/* Project Tabs */}
+                <div className="w-full">
+                  <div className="border-b border-gray-200 dark:border-gray-800">
+                    <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+                      {[
+                        { id: 'overview', name: 'Overview', icon: Rocket, disabled: false },
+                        { id: 'deployments', name: 'Deployments', icon: History, disabled: !selectedProject },
+                        { id: 'domains', name: 'Domains', icon: Globe, disabled: !selectedProject },
+                        { id: 'environment', name: 'Environment', icon: Settings, disabled: !selectedProject },
+                        { id: 'logs', name: 'Logs', icon: Terminal, disabled: !selectedProject },
+                      ].map((tab) => {
+                        const Icon = tab.icon;
+                        return (
+                          <button
+                            key={tab.id}
+                            onClick={() => !tab.disabled && setActiveTab(tab.id)}
+                            className={`${
+                              activeTab === tab.id
+                                ? 'border-gray-900 dark:border-white text-gray-900 dark:text-white'
+                                : tab.disabled
+                                ? 'border-transparent text-gray-400 dark:text-gray-600 cursor-not-allowed'
+                                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 transition-colors`}
+                            disabled={tab.disabled}
+                          >
+                            <Icon className="w-4 h-4" />
+                            <span>{tab.name}</span>
+                          </button>
+                        );
+                      })}
+                    </nav>
+                  </div>
 
-        {/* Deployments Tab */}
-        <TabsContent value="deployments">
-          <DeploymentsTab
-            deployments={deployments}
-            loading={loading}
-            onRefresh={loadDeployments}
-            projectUrl={project?.url}
-            onPromote={promoteDeployment}
-            projectId={project?.projectId}
-            vercelToken={localVercelToken}
-            teamSlug={teamSlug}
-          />
-        </TabsContent>
+                  {/* Tab Content */}
+                  <div className="py-8">
+                    {activeTab === 'overview' && (
+                      <div className="space-y-8">
+                        {!selectedProject ? (
+                          <div className="max-w-2xl">
+                            <div className="mb-8">
+                              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                                Create New Project
+                              </h2>
+                              <p className="text-gray-600 dark:text-gray-400">
+                                Deploy your project with zero configuration and get your changes live instantly.
+                              </p>
+                            </div>
+                            <CreateProjectForm
+                              projectName={projectName}
+                              setProjectName={setProjectName}
+                              githubRepo={githubRepo}
+                              setGithubRepo={setGithubRepo}
+                              selectedGithubRepo={selectedGithubRepo}
+                              setSelectedGithubRepo={setSelectedGithubRepo}
+                              framework={framework}
+                              setFramework={setFramework}
+                              loading={loading}
+                              loadingRepos={loadingRepos}
+                              githubRepos={githubRepos}
+                              workspaces={workspaces}
+                              selectedWorkspace={selectedWorkspace}
+                              setSelectedWorkspace={setSelectedWorkspace}
+                              onSubmit={createProjectAndUpdateList}
+                            />
+                          </div>
+                        ) : (
+                          <ProjectOverview
+                            project={selectedProject}
+                            loading={loading}
+                            onRedeploy={triggerDeploy}
+                          />
+                        )}
+                      </div>
+                    )}
 
-        {/* Domains Tab */}
-        <TabsContent value="domains">
-          <DomainsTab
-            domains={domains}
-            projectId={project?.projectId || ''}
-            teamId={teamId || project?.teamId}
-            vercelToken={localVercelToken}
-            onRefresh={loadDomains}
-          />
-        </TabsContent>
+                    {activeTab === 'deployments' && selectedProject && (
+                      <DeploymentsTab
+                        deployments={deployments}
+                        loading={loading}
+                        onRefresh={loadDeployments}
+                        projectUrl={selectedProject?.url}
+                        onPromote={promoteDeployment}
+                        projectId={selectedProject?.projectId}
+                        vercelToken={localVercelToken}
+                        teamSlug={teamSlug}
+                      />
+                    )}
 
-        {/* Environment Tab */}
-        <TabsContent value="environment">
-          <EnvironmentTab
-            envVars={envVars}
-            projectId={project?.projectId || ''}
-            vercelToken={localVercelToken}
-            onRefresh={loadEnvVars}
-          />
-        </TabsContent>
+                    {activeTab === 'domains' && selectedProject && (
+                      <DomainsTab
+                        domains={domains}
+                        projectId={selectedProject?.projectId || ''}
+                        teamId={teamId || selectedProject?.teamId}
+                        vercelToken={localVercelToken}
+                        onRefresh={loadDomains}
+                      />
+                    )}
 
-        {/* Logs Tab */}
-        <TabsContent value="logs">
-          <LogsTab 
-            logs={logs} 
-            deploymentId={currentDeploymentId}
-            onRefresh={() => {
-              if (currentDeploymentId) {
-                loadLogs(currentDeploymentId);
-              }
-            }}
-          />
-        </TabsContent>
-      </Tabs>
+                    {activeTab === 'environment' && selectedProject && (
+                      <EnvironmentTab
+                        envVars={envVars}
+                        projectId={selectedProject?.projectId || ''}
+                        vercelToken={localVercelToken}
+                        onRefresh={loadEnvVars}
+                      />
+                    )}
+
+                    {activeTab === 'logs' && selectedProject && (
+                      <LogsTab 
+                        logs={logs} 
+                        deploymentId={currentDeploymentId}
+                        onRefresh={() => {
+                          if (currentDeploymentId) {
+                            loadLogs(currentDeploymentId);
+                          }
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>  
+      </div>
+
     </div>
   );
 }
 
-// Create Project Form Component
-// Create Project Form Component
+// Projects Dashboard Component
+function ProjectsDashboard({ 
+  projects, 
+  loading, 
+  onSelectProject, 
+  onCreateNew 
+}: {
+  projects: VercelProject[];
+  loading: boolean;
+  onSelectProject: (project: VercelProject) => void;
+  onCreateNew: () => void;
+}) {
+  return (
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+            Projects
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            Manage and deploy your applications with Vercel
+          </p>
+        </div>
+        <button
+          onClick={onCreateNew}
+          className="inline-flex items-center px-4 py-2.5 text-sm font-medium text-white bg-black rounded-lg hover:bg-gray-800 transition-colors"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          New Project
+        </button>
+      </div>
+
+      {/* Projects Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 animate-pulse">
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-3"></div>
+              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-4"></div>
+              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+            </div>
+          ))}
+        </div>
+      ) : projects.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {projects.map((project) => (
+            <ProjectCard 
+              key={project.projectId} 
+              project={project} 
+              onSelect={onSelectProject}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+            <Rocket className="w-8 h-8 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            No projects yet
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-sm mx-auto">
+            Get started by creating your first project. Deploy with zero configuration.
+          </p>
+          <button
+            onClick={onCreateNew}
+            className="inline-flex items-center px-6 py-3 text-sm font-medium text-white bg-black rounded-lg hover:bg-gray-800 transition-colors"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Create Your First Project
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Project Card Component
+function ProjectCard({ 
+  project, 
+  onSelect 
+}: {
+  project: VercelProject;
+  onSelect: (project: VercelProject) => void;
+}) {
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'deployed':
+      case 'ready':
+        return 'text-green-600 bg-green-50 dark:bg-green-950/50 dark:text-green-400';
+      case 'building':
+      case 'deploying':
+        return 'text-yellow-600 bg-yellow-50 dark:bg-yellow-950/50 dark:text-yellow-400';
+      case 'error':
+      case 'failed':
+        return 'text-red-600 bg-red-50 dark:bg-red-950/50 dark:text-red-400';
+      default:
+        return 'text-gray-600 bg-gray-50 dark:bg-gray-950/50 dark:text-gray-400';
+    }
+  };
+
+  const getFrameworkIcon = (framework?: string) => {
+    // Return appropriate icon based on framework
+    return <Globe className="w-4 h-4" />;
+  };
+
+  return (
+    <div 
+      onClick={() => onSelect(project)}
+      className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 hover:border-gray-300 dark:hover:border-gray-700 cursor-pointer transition-all group"
+    >
+      {/* Project Header */}
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center space-x-3">
+          {getFrameworkIcon(project.framework)}
+          <div>
+            <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+              {project.projectName}
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {project.workspaceName || 'Workspace'}
+            </p>
+          </div>
+        </div>
+        <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
+      </div>
+
+      {/* Status Badge */}
+      <div className="mb-4">
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(project.status || 'unknown')}`}>
+          <div className="w-1.5 h-1.5 rounded-full bg-current mr-1.5"></div>
+          {project.status || 'Unknown'}
+        </span>
+      </div>
+
+      {/* Project URL */}
+      {project.url && (
+        <div className="mb-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
+            {project.url}
+          </p>
+        </div>
+      )}
+
+      {/* Last Deployed */}
+      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+        <span>
+          {project.lastDeployed 
+            ? `Deployed ${new Date(project.lastDeployed).toLocaleDateString()}`
+            : 'Not deployed'
+          }
+        </span>
+        <span className="capitalize">{project.framework || 'Auto'}</span>
+      </div>
+    </div>
+  );
+}
+
 function CreateProjectForm({
   projectName,
   setProjectName,
@@ -1824,11 +2215,9 @@ function DomainsTab({ domains, projectId, teamId, vercelToken, onRefresh }: any)
                         <Clock className="w-3 h-3 mr-1" />
                         Pending
                       </Badge>
-                    )}
-                  </div>
-                </div>
-
-                {!domain.verified && domain.verification && (
+        )}
+      </div>
+    </div>                {!domain.verified && domain.verification && (
                   <div className="bg-muted p-3 rounded text-sm space-y-2">
                     <p className="font-semibold">Verification Required:</p>
                     {domain.verification.map((v, i) => (
