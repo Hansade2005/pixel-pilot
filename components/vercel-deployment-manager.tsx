@@ -1146,7 +1146,7 @@ export function VercelDeploymentManager({
               <div className="flex items-center space-x-2">
                 <div className="w-6 h-6 bg-black dark:bg-white rounded-sm flex items-center justify-center">
                   <Link href="/">
-                <Logo variant="text" size="md" />
+                <Logo variant="icon" size="md" />
               </Link>
                 </div>
                 <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
