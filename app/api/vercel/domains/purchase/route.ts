@@ -188,15 +188,27 @@ export async function POST(request: NextRequest) {
               'Insufficient funds or credit limit reached',
               'Your Vercel account billing is suspended'
             ],
-            solution: 'Visit https://vercel.com/account/billing to update your payment method'
+            solution: 'Visit your Vercel billing settings to update your payment method',
+            billingUrl: 'https://vercel.com/account/settings/billing-information'
           }
         }, { status: 402 });
       }
       
       if (response.status === 403) {
         return NextResponse.json({
-          error: 'Insufficient permissions or domain not available',
-          code: 'INSUFFICIENT_PERMISSIONS'
+          error: 'Insufficient permissions or account access restricted. This may be due to billing issues or account limitations.',
+          code: 'INSUFFICIENT_PERMISSIONS',
+          details: {
+            message: 'Access denied - this could be related to:',
+            causes: [
+              'Account billing or payment issues',
+              'Domain purchase restrictions on your plan',
+              'Team permission limitations',
+              'Account suspension or limitations'
+            ],
+            solution: 'Check your account status and billing information',
+            billingUrl: 'https://vercel.com/account/settings/billing-information'
+          }
         }, { status: 403 });
       }
       

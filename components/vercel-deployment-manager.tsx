@@ -1860,6 +1860,7 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
   const [availability, setAvailability] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [errorDetails, setErrorDetails] = useState<any>(null);
   const [countries, setCountries] = useState<string[]>([]);
   const [countryPhoneCodes, setCountryPhoneCodes] = useState<Record<string, string>>({});
 
@@ -2035,6 +2036,48 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
     }
   };
 
+  // Helper function to render billing CTA
+  const renderBillingCTA = (errorData: any) => {
+    if (errorData?.code === 'PAYMENT_REQUIRED' || errorData?.code === 'INSUFFICIENT_PERMISSIONS' || errorData?.details?.billingUrl) {
+      const isPaymentIssue = errorData?.code === 'PAYMENT_REQUIRED';
+      const isPermissionIssue = errorData?.code === 'INSUFFICIENT_PERMISSIONS';
+      
+      return (
+        <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-950 rounded-md border border-orange-200 dark:border-orange-800">
+          <p className="text-sm text-orange-800 dark:text-orange-200 mb-3">
+            <strong>🚨 Action Required:</strong> {
+              isPaymentIssue ? 'Please update your payment method to continue.' :
+              isPermissionIssue ? 'Account access issue - check billing and permissions.' :
+              'Billing verification needed to proceed.'
+            }
+          </p>
+          
+          {errorData?.details?.causes && (
+            <div className="text-xs text-orange-700 dark:text-orange-300 mb-3">
+              <p className="font-medium mb-1">Common causes:</p>
+              <ul className="list-disc list-inside space-y-0.5">
+                {errorData.details.causes.slice(0, 3).map((cause: string, index: number) => (
+                  <li key={index}>{cause}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
+          <Button
+            onClick={() => window.open('https://vercel.com/account/settings/billing-information', '_blank')}
+            size="sm"
+            className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white border-0"
+          >
+            <Settings className="w-4 h-4" />
+            Fix Billing Settings
+            <ExternalLink className="w-3 h-3" />
+          </Button>
+        </div>
+      );
+    }
+    return null;
+  };
+
   const purchaseDomain = async () => {
     if (!teamId) {
       setError('Team ID is required for domain purchases. Please ensure you have a Vercel token configured.');
@@ -2043,6 +2086,7 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
 
     setLoading(true);
     setError('');
+    setErrorDetails(null);
 
     try {
       const purchaseData = {
@@ -2083,6 +2127,7 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
         return;
       } else if (userCheckResponse.status === 402) {
         setError('Account billing issue detected. Please check your payment method in Vercel dashboard.');
+        setErrorDetails({ code: 'PAYMENT_REQUIRED', details: { billingUrl: 'https://vercel.com/account/settings/billing-information' } });
         return;
       }
     }
@@ -2121,6 +2166,7 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
       const data = await response.json();
 
       if (!response.ok) {
+        setErrorDetails(data);
         throw new Error(data.error);
       }
 
@@ -2204,13 +2250,36 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
                   <p className="font-semibold">Domain: {domain}</p>
                   <p>Price: ${availability?.price} {availability?.currency}/year</p>
                 </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400 border-t pt-2">
+                <div className="text-xs text-gray-600 dark:text-gray-400 border-t pt-2 space-y-1">
                   <p>💳 <strong>Payment:</strong> Will be charged to your Vercel account's default payment method</p>
                   <p>⚡ <strong>Processing:</strong> Domain registration is immediate upon successful payment</p>
+                  <p className="flex items-center gap-1">
+                    ⚙️ <strong>Billing:</strong> 
+                    <button 
+                      onClick={() => window.open('https://vercel.com/account/settings/billing-information', '_blank')}
+                      className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+                    >
+                      Manage payment method
+                      <ExternalLink className="w-2.5 h-2.5" />
+                    </button>
+                  </p>
                 </div>
               </div>
             </AlertDescription>
           </Alert>
+
+          <div className="text-center">
+            <Button
+              onClick={() => window.open('https://vercel.com/account/settings/billing-information', '_blank')}
+              variant="ghost"
+              size="sm"
+              className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              <Settings className="w-3 h-3 mr-1" />
+              Verify Payment Method Before Purchase
+              <ExternalLink className="w-3 h-3 ml-1" />
+            </Button>
+          </div>
 
           <Separator />
 
@@ -2295,7 +2364,10 @@ function BuyDomainDialog({ projectId, vercelToken, teamId, onSuccess }: any) {
 
           {error && (
             <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>
+                {error}
+                {renderBillingCTA(errorDetails)}
+              </AlertDescription>
             </Alert>
           )}
 
