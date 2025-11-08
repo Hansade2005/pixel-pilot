@@ -1292,19 +1292,31 @@ export function VercelDeploymentManager({
                     <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
                       {selectedProject?.projectName || 'New Project'}
                     </h1>
+                    {selectedProject && (
+                      <>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ml-2 ${
+                          selectedProject.status === 'deployed' || selectedProject.status === 'ready'
+                            ? 'text-green-600 bg-green-50 dark:bg-green-950/50 dark:text-green-400'
+                            : selectedProject.status === 'building'
+                            ? 'text-yellow-600 bg-yellow-50 dark:bg-yellow-950/50 dark:text-yellow-400'
+                            : 'text-red-600 bg-red-50 dark:bg-red-950/50 dark:text-red-400'
+                        }`}>
+                          <div className="w-1.5 h-1.5 rounded-full bg-current mr-1.5"></div>
+                          {selectedProject.status || 'Unknown'}
+                        </span>
+                        <span className="text-gray-400 dark:text-gray-600 ml-2">Deploy</span>
+                      </>
+                    )}
                   </div>
                   {selectedProject && (
                     <div className="flex items-center space-x-3">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        selectedProject.status === 'deployed' || selectedProject.status === 'ready'
-                          ? 'text-green-600 bg-green-50 dark:bg-green-950/50 dark:text-green-400'
-                          : selectedProject.status === 'building'
-                          ? 'text-yellow-600 bg-yellow-50 dark:bg-yellow-950/50 dark:text-yellow-400'
-                          : 'text-red-600 bg-red-50 dark:bg-red-950/50 dark:text-red-400'
-                      }`}>
-                        <div className="w-1.5 h-1.5 rounded-full bg-current mr-1.5"></div>
-                        {selectedProject.status || 'Unknown'}
-                      </span>
+                      <a
+                        href="https://pipilot.dev/workspace"
+                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-200 dark:border-gray-700"
+                      >
+                        <FolderOpen className="w-4 h-4 mr-2" />
+                        Workspace
+                      </a>
                       <button
                         onClick={triggerDeploy}
                         disabled={loading}
