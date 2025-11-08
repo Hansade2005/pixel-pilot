@@ -294,28 +294,30 @@ function HostingManagementContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-black pb-16">
-      {/* Main content */}
-      <div className="max-w-7xl mx-auto p-6">
-        {(!vercelToken || !githubToken) && (
-          <Alert className="mb-6">
-            <Info className="w-4 h-4" />
-            <AlertDescription>
-              <strong>Tip:</strong> You haven't configured your API tokens yet. You can add them in{' '}
-              <a href="/workspace/account" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline">
-                Account Settings
-              </a>{' '}
-              or enter them directly in the form below.
-            </AlertDescription>
-          </Alert>
-        )}
+    <div className="w-full min-h-screen m-0 p-0 hosting-container">
+      {/* Alert notification - only show if tokens missing */}
+      {(!vercelToken || !githubToken) && (
+        <div className="w-full bg-blue-50 dark:bg-blue-950 border-b border-blue-200 dark:border-blue-800">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <Alert className="border-blue-200 dark:border-blue-800 bg-transparent">
+              <Info className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <AlertDescription className="text-blue-800 dark:text-blue-200">
+                <strong>Tip:</strong> You haven't configured your API tokens yet. You can add them in{' '}
+                <a href="/workspace/account" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline">
+                  Account Settings
+                </a>{' '}
+                or enter them directly in the form below.
+              </AlertDescription>
+            </Alert>
+          </div>
+        </div>
+      )}
 
-        <VercelDeploymentManager
-          workspaceId={workspaceId}
-          vercelToken={vercelToken}
-          githubToken={githubToken}
-        />
-      </div>
+      <VercelDeploymentManager
+        workspaceId={workspaceId}
+        vercelToken={vercelToken}
+        githubToken={githubToken}
+      />
 
       {/* Vercel-style Footer */}
       <VercelFooter />

@@ -404,3 +404,24 @@ body {
 .chat-message-content a:hover {
   text-decoration-color: rgba(96, 165, 250, 1);
 }
+
+/* Reset browser defaults for hosting page */
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Ensure hosting management header is truly at top */
+.hosting-container {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.hosting-header-fixed {
+  position: sticky !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}

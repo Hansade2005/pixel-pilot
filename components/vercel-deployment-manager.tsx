@@ -1136,10 +1136,10 @@ export function VercelDeploymentManager({
   }, [activeTab, project?.projectId]);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black">
-      {/* Header - Fixed on scroll like Vercel */}
-      <div className="sticky top-0 z-40 border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-black/80 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-white dark:bg-black w-full hosting-container">
+      {/* Header - Fixed on scroll like Vercel - Absolutely at top */}
+      <div className="hosting-header-fixed border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-black/80 backdrop-blur-md w-full">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
@@ -1188,7 +1188,7 @@ export function VercelDeploymentManager({
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
 
         {/* Tokens Configuration */}
@@ -1324,7 +1324,7 @@ export function VercelDeploymentManager({
                 {/* Project Tabs - Horizontally scrollable on mobile like Vercel */}
                 <div className="w-full">
                   <div className="border-b border-gray-200 dark:border-gray-800">
-                    <div className="max-w-7xl mx-auto">
+                    <div className="w-full">
                       <nav className="-mb-px overflow-x-auto" aria-label="Tabs">
                         <div className="flex space-x-8 min-w-max px-4 sm:px-6 lg:px-8">
                           {[
