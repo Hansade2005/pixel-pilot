@@ -1881,16 +1881,16 @@ function ProjectOverview({ project, loading, onRedeploy }: any) {
     <div className="space-y-6">
       {/* Project Info Card */}
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 break-words">
               {project.projectName}
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 font-mono">
+            <p className="text-sm text-gray-500 dark:text-gray-400 font-mono truncate">
               {project.projectId}
             </p>
           </div>
-          <Button onClick={onRedeploy} disabled={loading} size="sm">
+          <Button onClick={onRedeploy} disabled={loading} size="sm" className="flex-shrink-0">
             {loading ? (
               <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Deploying...</>
             ) : (
