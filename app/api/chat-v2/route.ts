@@ -368,7 +368,7 @@ Unable to load project structure. Use list_files tool to explore the project.`
 }
 
 // Powerful function to construct proper tool result messages using in-memory storage
-const constructToolResult = async (toolName: string, input: any, projectId: string, toolCallId: string) => {
+const constructToolResult = async (toolName: string, input: any, projectId: string, toolCallId: string, supabase?: any) => {
   console.log(`[CONSTRUCT_TOOL_RESULT] Starting ${toolName} operation with input:`, JSON.stringify(input, null, 2).substring(0, 200) + '...')
 
   try {
@@ -1019,29 +1019,153 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
         try {
           console.log(`[CONSTRUCT_TOOL_RESULT] create_database: Creating database "${name}" for project ${projectId}`)
 
-          // Call the database creation API
-          const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/create`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              projectId,
-              name
-            })
-          });
-
-          const result = await response.json();
-
-          if (!response.ok) {
-            console.error('[CONSTRUCT_TOOL_RESULT] Database creation failed:', result);
+          if (!supabase) {
             return {
               success: false,
-              error: `Failed to create database: ${result.error || 'Unknown error'}`,
+              error: `Authentication required for database creation`,
               name,
               toolCallId
             };
           }
+
+          // Get current user session
+          const { data: { user }, error: sessionError } = await supabase.auth.getUser();
+          
+          if (sessionError || !user) {
+            return {
+              success: false,
+              error: `Unauthorized - Please log in`,
+              name,
+              toolCallId
+            };
+          }
+
+          const userId = user.id;
+
+          // Check if database already exists for this project
+          const { data: existingDatabase, error: checkError } = await supabase
+            .from('databases')
+            .select('*')
+            .eq('project_id', projectId)
+            .eq('user_id', userId)
+            .maybeSingle();
+
+          if (checkError && checkError.code !== 'PGRST116') {
+            console.error('[CONSTRUCT_TOOL_RESULT] Error checking existing database:', checkError);
+            return {
+              success: false,
+              error: `Failed to check existing database: ${checkError.message}`,
+              name,
+              toolCallId
+            };
+          }
+
+          if (existingDatabase) {
+            console.log('[CONSTRUCT_TOOL_RESULT] Database already exists for this project');
+            return {
+              success: false,
+              error: `Database already exists for this project`,
+              database: existingDatabase,
+              name,
+              toolCallId
+            };
+          }
+
+          // Create the database directly using Supabase client
+          const { data: database, error: dbError } = await supabase
+            .from('databases')
+            .insert({
+              user_id: userId,
+              project_id: projectId,
+              name: name || 'main'
+            })
+            .select()
+            .single();
+
+          if (dbError) {
+            console.error('[CONSTRUCT_TOOL_RESULT] Error creating database:', dbError);
+            return {
+              success: false,
+              error: `Failed to create database: ${dbError.message}`,
+              name,
+              toolCallId
+            };
+          }
+
+          // Auto-create users table for authentication
+          const usersTableSchema = {
+            columns: [
+              { 
+                name: 'id', 
+                type: 'uuid', 
+                primary_key: true, 
+                required: true,
+                default: 'gen_random_uuid()'
+              },
+              { 
+                name: 'email', 
+                type: 'text', 
+                unique: true, 
+                required: true 
+              },
+              { 
+                name: 'password_hash', 
+                type: 'text', 
+                required: true 
+              },
+              { 
+                name: 'full_name', 
+                type: 'text', 
+                required: false 
+              },
+              { 
+                name: 'avatar_url', 
+                type: 'text', 
+                required: false 
+              },
+              { 
+                name: 'created_at', 
+                type: 'timestamp', 
+                required: true,
+                default: 'NOW()'
+              },
+              { 
+                name: 'updated_at', 
+                type: 'timestamp', 
+                required: true,
+                default: 'NOW()'
+              }
+            ]
+          };
+
+          const { data: usersTable, error: tableError } = await supabase
+            .from('tables')
+            .insert({
+              database_id: database.id,
+              name: 'users',
+              schema_json: usersTableSchema
+            })
+            .select()
+            .single();
+
+          if (tableError) {
+            console.error('[CONSTRUCT_TOOL_RESULT] Error creating users table:', tableError);
+            // Rollback: delete the database if table creation fails
+            await supabase.from('databases').delete().eq('id', database.id);
+            return {
+              success: false,
+              error: `Failed to create users table: ${tableError.message}`,
+              name,
+              toolCallId
+            };
+          }
+
+          const result = {
+            success: true,
+            database,
+            usersTable,
+            message: 'Database created successfully with users table'
+          };
 
           console.log('[CONSTRUCT_TOOL_RESULT] Database created successfully:', result);
           
@@ -1478,8 +1602,9 @@ Begin with a concise checklist  use check box emojis filled and unfilled.
 3. **Excellence**: Deliver fully complete, market-ready products
 
 ## Tools
-- **Client-Side (IndexedDB)**: \`read_file\` (with line numbers), \`write_file\`, \`edit_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`
+- **Client-Side (IndexedDB)**: \`read_file\` (with line numbers), \`write_file\`, \`edit_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`, \`create_database\`
 - **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers),\`grep_search\`, \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync)
+- **Database Tools**: \`create_table\`, \`query_database\`, \`manipulate_table_data\`, \`manage_api_keys\`
 
 ## PiPilot DB Integration
 For **authentication, database, or file storage**:
@@ -1487,6 +1612,23 @@ For **authentication, database, or file storage**:
 - 📚 Review \`STORAGE_SYSTEM_IMPLEMENTATION.md\` for file storage
 - 📚 Reference \`EXTERNAL_APP_INTEGRATION_GUIDE.md\` for API integration
 - 🛠️ Strictly use documented patterns and endpoints
+
+### 🗄️ Database Automation Tools
+**Complete database workflow in 4 simple steps:**
+1. **\`create_database\`** - Creates database with auto-generated users table (client-side)
+2. **\`create_table\`** - AI-powered schema generation from natural language descriptions
+3. **\`query_database\`** - Advanced MySQL-like querying with auto-detection, filtering, sorting, pagination
+4. **\`manipulate_table_data\`** - Full CRUD operations (insert, update, delete) with bulk support
+5. **\`manage_api_keys\`** - Generate secure API keys for external database access
+
+**Features:**
+- 🤖 **AI Schema Generation**: Describe your table needs, get optimized database schema
+- 🔍 **Auto-Detection**: Tools automatically find your project's database
+- 🚀 **MySQL-Like Syntax**: Familiar WHERE, ORDER BY, JOIN operations  
+- 📊 **Advanced Queries**: JSONB field querying, complex filtering, pagination
+- 🔐 **Secure Access**: API key management for external integrations
+- ⚡ **Bulk Operations**: Insert/update multiple records efficiently
+
 ### 🖼️ Image API
 Image generation: \`https://api.a0.dev/assets/image?text={description}&aspect=1:1&seed={seed}\`
 - \`text\`: Clear description
@@ -1589,7 +1731,7 @@ ${conversationSummaryContext || ''}`
           }),
           execute: async ({ path, content }, { toolCallId }) => {
             // Use the powerful constructor to get actual results
-            return await constructToolResult('write_file', { path, content }, projectId, toolCallId)
+            return await constructToolResult('write_file', { path, content }, projectId, toolCallId, supabase)
           }
         }),
 
@@ -1605,7 +1747,7 @@ ${conversationSummaryContext || ''}`
           }),
           execute: async ({ path, includeLineNumbers, startLine, endLine, lineRange }, { toolCallId }) => {
             // Use the powerful constructor to get actual results from in-memory store
-            return await constructToolResult('read_file', { path, includeLineNumbers, startLine, endLine, lineRange }, projectId, toolCallId)
+            return await constructToolResult('read_file', { path, includeLineNumbers, startLine, endLine, lineRange }, projectId, toolCallId, supabase)
           }
         }),
 
@@ -1617,7 +1759,7 @@ ${conversationSummaryContext || ''}`
           }),
           execute: async ({ path }, { toolCallId }) => {
             // Use the powerful constructor to get actual results
-            return await constructToolResult('delete_file', { path }, projectId, toolCallId)
+            return await constructToolResult('delete_file', { path }, projectId, toolCallId, supabase)
           }
         }),
 
@@ -1637,7 +1779,7 @@ ${conversationSummaryContext || ''}`
           }),
           execute: async ({ filePath, searchReplaceBlock, useRegex = false, replaceAll = false }, { toolCallId }) => {
             // Use the powerful constructor to get actual results
-            return await constructToolResult('edit_file', { filePath, searchReplaceBlock, useRegex, replaceAll }, projectId, toolCallId)
+            return await constructToolResult('edit_file', { filePath, searchReplaceBlock, useRegex, replaceAll }, projectId, toolCallId, supabase)
           }
         }),
 
@@ -1654,7 +1796,7 @@ ${conversationSummaryContext || ''}`
           }),
           execute: async (input: { name: string | string[]; version?: string; isDev?: boolean }, { toolCallId }) => {
             // Use the powerful constructor to get actual results
-            return await constructToolResult('add_package', input, projectId, toolCallId)
+            return await constructToolResult('add_package', input, projectId, toolCallId, supabase)
           }
         }),
 
@@ -1670,7 +1812,7 @@ ${conversationSummaryContext || ''}`
           }),
           execute: async (input: { name: string | string[]; isDev?: boolean }, { toolCallId }) => {
             // Use the powerful constructor to get actual results
-            return await constructToolResult('remove_package', input, projectId, toolCallId)
+            return await constructToolResult('remove_package', input, projectId, toolCallId, supabase)
           }
         }),
 
@@ -3507,7 +3649,7 @@ ${conversationSummaryContext || ''}`
           execute: async ({ name = 'main' }, { toolCallId }) => {
             // This is a client-side tool - execution will be handled by client
             // The actual implementation will be in the client-side code with IndexedDB access
-            return await constructToolResult('create_database', { name }, projectId, toolCallId);
+            return await constructToolResult('create_database', { name }, projectId, toolCallId, supabase);
           }
         }),
 
