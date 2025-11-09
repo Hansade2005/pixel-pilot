@@ -3587,6 +3587,22 @@ ${conversationSummaryContext || ''}`
               }
             }
 
+            // Auth check - same as main route
+            const supabase = await createClient()
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+            
+            if (sessionError || !session) {
+              return {
+                success: false,
+                error: 'Authentication required. Please log in.',
+                databaseId,
+                name,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
             try {
               let finalSchema = schema;
               let aiGenerated = false;
@@ -3595,11 +3611,12 @@ ${conversationSummaryContext || ''}`
               if (!schema && description) {
                 console.log('[INFO] Generating AI schema for table:', name);
                 
-                // Call the AI schema generation API
+                // Call the AI schema generation API with authentication
                 const schemaResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${databaseId}/ai-schema`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
                   },
                   body: JSON.stringify({
                     description,
@@ -3651,6 +3668,7 @@ ${conversationSummaryContext || ''}`
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session.access_token}`,
                 },
                 body: JSON.stringify({
                   name,
@@ -3751,6 +3769,35 @@ ${conversationSummaryContext || ''}`
               throw new Error('Operation cancelled')
             }
 
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Database query cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                databaseId,
+                tableId,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            // Auth check - same as main route
+            const supabase = await createClient()
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+            
+            if (sessionError || !session) {
+              return {
+                success: false,
+                error: 'Authentication required. Please log in.',
+                databaseId,
+                tableId,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
             // Auto-detect database ID if not provided
             let actualDatabaseId = databaseId;
             if (!actualDatabaseId) {
@@ -3848,6 +3895,7 @@ ${conversationSummaryContext || ''}`
                 method: 'GET',
                 headers: {
                   'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session.access_token}`,
                 }
               });
 
@@ -3982,6 +4030,23 @@ ${conversationSummaryContext || ''}`
               }
             }
 
+            // Auth check - same as main route
+            const supabase = await createClient()
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+            
+            if (sessionError || !session) {
+              return {
+                success: false,
+                error: 'Authentication required. Please log in.',
+                databaseId,
+                tableId,
+                operation,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
             try {
               const baseUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${databaseId}/tables/${tableId}/records`;
               let response;
@@ -4005,6 +4070,7 @@ ${conversationSummaryContext || ''}`
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${session.access_token}`,
                     },
                     body: JSON.stringify({
                       data_json: data
@@ -4043,6 +4109,7 @@ ${conversationSummaryContext || ''}`
                     method: 'PUT',
                     headers: {
                       'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${session.access_token}`,
                     },
                     body: JSON.stringify({
                       data_json: data
@@ -4068,6 +4135,7 @@ ${conversationSummaryContext || ''}`
                     method: 'DELETE',
                     headers: {
                       'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${session.access_token}`,
                     }
                   });
                   break;
@@ -4156,6 +4224,22 @@ ${conversationSummaryContext || ''}`
               }
             }
 
+            // Auth check - same as main route
+            const supabase = await createClient()
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+            
+            if (sessionError || !session) {
+              return {
+                success: false,
+                error: 'Authentication required. Please log in.',
+                databaseId,
+                action,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
             try {
               let response;
               const baseUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${databaseId}/api-keys`;
@@ -4177,6 +4261,7 @@ ${conversationSummaryContext || ''}`
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${session.access_token}`,
                     },
                     body: JSON.stringify({ name: keyName })
                   });
@@ -4187,6 +4272,7 @@ ${conversationSummaryContext || ''}`
                     method: 'GET',
                     headers: {
                       'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${session.access_token}`,
                     }
                   });
                   break;
@@ -4207,6 +4293,7 @@ ${conversationSummaryContext || ''}`
                     method: 'DELETE',
                     headers: {
                       'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${session.access_token}`,
                     }
                   });
                   break;
