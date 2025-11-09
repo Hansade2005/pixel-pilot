@@ -354,6 +354,7 @@ export function ChatPanelV2({
   const { toast } = useToast()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const sendButtonRef = useRef<HTMLButtonElement>(null)
 
   // Debounce utility function
   const debounce = (func: Function, wait: number) => {
@@ -1463,28 +1464,27 @@ export function ChatPanelV2({
     }
   }
 
-  // Auto-send initial prompt when provided and no messages exist
+  // Auto-fill input and simulate user click after delay
   useEffect(() => {
-    const autoSendInitialPrompt = async () => {
+    const autoFillAndSend = async () => {
       if (initialPrompt && project && messages.length === 0 && !isLoading) {
-        console.log(`[ChatPanelV2] Auto-sending initial prompt (already includes URL content if attached)`)
+        console.log(`[ChatPanelV2] Auto-filling input with initial prompt`)
         
-        // Set the input message (already includes URL content from chat-input)
+        // Set the input message (auto-fill the input box)
         setInput(initialPrompt)
         
-        // Small delay to ensure state is updated
+        // Wait 3 seconds then simulate user clicking the send button
         setTimeout(() => {
-          // Create a synthetic form event to trigger handleEnhancedSubmit
-          const syntheticEvent = {
-            preventDefault: () => {},
-          } as React.FormEvent
-          
-          handleEnhancedSubmit(syntheticEvent)
-        }, 100)
+          console.log(`[ChatPanelV2] Auto-clicking send button after 3 second delay`)
+          if (sendButtonRef.current) {
+            // Simulate a user click on the send button
+            sendButtonRef.current.click()
+          }
+        }, 3000) // 3 second delay
       }
     }
 
-    autoSendInitialPrompt()
+    autoFillAndSend()
   }, [initialPrompt, project, messages.length, isLoading])
 
   // Handle loading state based on isLoading state
@@ -3098,6 +3098,7 @@ export function ChatPanelV2({
               </Button>
             ) : (
               <Button
+                ref={sendButtonRef}
                 type="submit"
                 size="icon"
                 className="h-8 w-8"

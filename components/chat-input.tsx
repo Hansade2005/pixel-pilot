@@ -986,12 +986,17 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     toast.success("GitLab repository removed")
   }
 
+  // Simple, clean keyboard handler
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Only handle Enter key for form submission
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSubmit(e as any)
     }
+    // Let all other keys (including space) work normally
   }
+
+
 
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -1110,12 +1115,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                           placeholder="https://example.com"
                           value={urlInput}
                           onChange={(e) => setUrlInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault()
-                              handleUrlAttachment()
-                            }
-                          }}
                           className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                           autoFocus
                         />
@@ -1244,12 +1243,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   placeholder="https://github.com/owner/repo"
                   value={githubInput}
                   onChange={(e) => setGithubInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      handleGithubAttachment()
-                    }
-                  }}
                   className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   autoFocus
                 />
