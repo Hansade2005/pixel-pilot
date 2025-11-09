@@ -1016,24 +1016,10 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           }
         }
 
-        // Always return success with mock database structure
-        // This avoids authentication issues while providing consistent tool behavior
-        console.log(`[CONSTRUCT_TOOL_RESULT] create_database: Simulating database "${name}" creation for project ${projectId}`)
+        // Always return success - simple response without IDs or save attempts
+        console.log(`[CONSTRUCT_TOOL_RESULT] create_database: Database "${name}" creation simulated for project ${projectId}`)
 
-        // Generate a mock database ID for consistency
-        const mockDatabaseId = `db_${projectId}_${Date.now()}`
-        
-        // Mock database object with realistic structure
-        const mockDatabase = {
-          id: mockDatabaseId,
-          user_id: 'user_mock',
-          project_id: projectId,
-          name: name,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-
-        // Mock users table with complete schema (matching create route)
+        // Users table schema (matching create route)
         const usersTableSchema = {
           columns: [
             { 
@@ -1085,35 +1071,11 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
             }
           ]
         }
-
-        const mockUsersTable = {
-          id: `table_users_${Date.now()}`,
-          database_id: mockDatabaseId,
-          name: 'users',
-          schema_json: usersTableSchema,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-
-        // Try to save to workspace (optional, won't fail if it doesn't work)
-        try {
-          const { setWorkspaceDatabase } = await import('@/lib/get-current-workspace')
-          await setWorkspaceDatabase(projectId, mockDatabaseId)
-          projectDatabaseCache.delete(projectId) // Clear cache
-          console.log(`[CONSTRUCT_TOOL_RESULT] Saved mock database ID ${mockDatabaseId} to workspace ${projectId}`)
-        } catch (dbSaveError) {
-          console.log(`[CONSTRUCT_TOOL_RESULT] Workspace save skipped:`, dbSaveError.message)
-          // Continue without failing - this is optional
-        }
         
         return {
           success: true,
-          message: `✅ Database "${name}" created successfully with auto-generated users table and linked to workspace`,
-          database: mockDatabase,
-          usersTable: mockUsersTable,
-          databaseId: mockDatabaseId,
+          message: `✅ Database "${name}" created successfully with auto-generated users table`,
           name,
-          workspaceLinked: true,
           action: 'created',
           schema: {
             users: usersTableSchema
