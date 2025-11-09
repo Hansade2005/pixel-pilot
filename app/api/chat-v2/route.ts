@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getModel } from '@/lib/ai-providers'
 import { DEFAULT_CHAT_MODEL, getModelById } from '@/lib/ai-models'
 import { NextResponse } from 'next/server'
+import { getWorkspaceDatabaseId, workspaceHasDatabase, setWorkspaceDatabase } from '@/lib/get-current-workspace'
 
 // Get AI model by ID with fallback to default
 const getAIModel = (modelId?: string) => {
@@ -69,6 +70,43 @@ const sessionProjectStorage = new Map<string, {
   fileTree: string[]
   files: Map<string, any>
 }>()
+
+// Database ID cache for projects (to avoid repeated lookups)
+const projectDatabaseCache = new Map<string, { databaseId: number | null, timestamp: number }>()
+
+// Helper function to get database ID for current project/workspace
+async function getProjectDatabaseId(projectId: string): Promise<string | null> {
+  try {
+    // Check cache first (cache for 5 minutes)
+    const cached = projectDatabaseCache.get(projectId)
+    const now = Date.now()
+    if (cached && (now - cached.timestamp) < 300000) { // 5 minutes
+      return cached.databaseId?.toString() || null
+    }
+
+    // Get database ID from workspace
+    const databaseId = await getWorkspaceDatabaseId(projectId)
+    
+    // Update cache
+    projectDatabaseCache.set(projectId, { databaseId, timestamp: now })
+    
+    console.log(`[DATABASE] Project ${projectId} database ID: ${databaseId || 'none'}`)
+    return databaseId?.toString() || null
+  } catch (error) {
+    console.error(`[DATABASE] Failed to get database ID for project ${projectId}:`, error)
+    return null
+  }
+}
+
+// Helper function to check if project has database
+async function projectHasDatabase(projectId: string): Promise<boolean> {
+  try {
+    return await workspaceHasDatabase(projectId)
+  } catch (error) {
+    console.error(`[DATABASE] Failed to check database for project ${projectId}:`, error)
+    return false
+  }
+}
 
 // Helper function to get file extension for syntax highlighting
 const getFileExtension = (filePath: string): string => {
@@ -961,6 +999,85 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           content: updatedContent,
           message: `Packages ${removedPackages.join(', ')} removed from ${depType} successfully`,
           toolCallId
+        }
+      }
+
+      case 'create_database': {
+        const { name = 'main' } = input
+
+        // Validate inputs
+        if (name && typeof name !== 'string') {
+          console.log(`[CONSTRUCT_TOOL_RESULT] create_database failed: Invalid database name - ${name}`)
+          return {
+            success: false,
+            error: `Invalid database name provided`,
+            name,
+            toolCallId
+          }
+        }
+
+        try {
+          console.log(`[CONSTRUCT_TOOL_RESULT] create_database: Creating database "${name}" for project ${projectId}`)
+
+          // Call the database creation API
+          const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/create`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              projectId,
+              name
+            })
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            console.error('[CONSTRUCT_TOOL_RESULT] Database creation failed:', result);
+            return {
+              success: false,
+              error: `Failed to create database: ${result.error || 'Unknown error'}`,
+              name,
+              toolCallId
+            };
+          }
+
+          console.log('[CONSTRUCT_TOOL_RESULT] Database created successfully:', result);
+          
+          // Automatically save database ID to workspace
+          try {
+            await setWorkspaceDatabase(projectId, result.database.id);
+            
+            // Clear cache so next lookup gets fresh data
+            projectDatabaseCache.delete(projectId);
+            
+            console.log(`[CONSTRUCT_TOOL_RESULT] Saved database ID ${result.database.id} to workspace ${projectId}`);
+          } catch (dbSaveError) {
+            console.warn(`[CONSTRUCT_TOOL_RESULT] Failed to save database ID to workspace:`, dbSaveError);
+            // Don't fail the entire operation if workspace save fails
+          }
+          
+          return {
+            success: true,
+            message: `✅ Database "${name}" created successfully with auto-generated users table and linked to workspace`,
+            database: result.database,
+            usersTable: result.usersTable,
+            databaseId: result.database.id,
+            name,
+            workspaceLinked: true,
+            action: 'created',
+            toolCallId
+          };
+
+        } catch (error) {
+          console.error('[CONSTRUCT_TOOL_RESULT] Database creation failed:', error);
+          return {
+            success: false,
+            error: `Database creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            name,
+            toolCallId
+          };
         }
       }
 
@@ -3381,88 +3498,16 @@ ${conversationSummaryContext || ''}`
           }
         }),
 
-        // DATABASE MANAGEMENT TOOLS
+        // DATABASE MANAGEMENT TOOLS (CLIENT-SIDE)
         create_database: tool({
-          description: 'Create a new database for the current project. Automatically creates a database with a default users table for authentication. This eliminates the need for manual database setup.',
+          description: 'Create a new database for the current project. Automatically creates a database with a default users table for authentication. This tool runs client-side with IndexedDB access and eliminates the need for manual database setup.',
           inputSchema: z.object({
             name: z.string().optional().describe('Database name (defaults to "main")')
           }),
-          execute: async ({ name = 'main' }, { abortSignal, toolCallId }) => {
-            const toolStartTime = Date.now();
-            const timeStatus = getTimeStatus();
-
-            if (abortSignal?.aborted) {
-              throw new Error('Operation cancelled')
-            }
-
-            // Check if we're approaching timeout
-            if (timeStatus.isApproachingTimeout) {
-              return {
-                success: false,
-                error: `Database creation cancelled due to timeout warning: ${timeStatus.warningMessage}`,
-                name,
-                toolCallId,
-                executionTimeMs: Date.now() - toolStartTime,
-                timeWarning: timeStatus.warningMessage
-              }
-            }
-
-            try {
-              // Call the database creation API
-              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/create`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  projectId,
-                  name
-                })
-              });
-
-              const result = await response.json();
-              const executionTime = Date.now() - toolStartTime;
-              toolExecutionTimes['create_database'] = (toolExecutionTimes['create_database'] || 0) + executionTime;
-
-              if (!response.ok) {
-                console.error('[ERROR] Database creation failed:', result);
-                return {
-                  success: false,
-                  error: `Failed to create database: ${result.error || 'Unknown error'}`,
-                  name,
-                  toolCallId,
-                  executionTimeMs: executionTime,
-                  timeWarning: timeStatus.warningMessage
-                };
-              }
-
-              console.log('[SUCCESS] Database created:', result);
-              return {
-                success: true,
-                message: `✅ Database "${name}" created successfully with auto-generated users table`,
-                database: result.database,
-                usersTable: result.usersTable,
-                databaseId: result.database.id,
-                name,
-                toolCallId,
-                executionTimeMs: executionTime,
-                timeWarning: timeStatus.warningMessage
-              };
-
-            } catch (error) {
-              const executionTime = Date.now() - toolStartTime;
-              toolExecutionTimes['create_database'] = (toolExecutionTimes['create_database'] || 0) + executionTime;
-              
-              console.error('[ERROR] Database creation failed:', error);
-              return {
-                success: false,
-                error: `Database creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                name,
-                toolCallId,
-                executionTimeMs: executionTime,
-                timeWarning: timeStatus.warningMessage
-              };
-            }
+          execute: async ({ name = 'main' }, { toolCallId }) => {
+            // This is a client-side tool - execution will be handled by client
+            // The actual implementation will be in the client-side code with IndexedDB access
+            return await constructToolResult('create_database', { name }, projectId, toolCallId);
           }
         }),
 
@@ -3634,9 +3679,9 @@ ${conversationSummaryContext || ''}`
         }),
 
         query_database: tool({
-          description: 'Advanced database querying tool with MySQL-like capabilities. Supports table data retrieval with sorting, filtering, pagination, column selection, and JSONB field querying. Matches the table view implementation but with enhanced features.',
+          description: 'Advanced database querying tool with MySQL-like capabilities. Supports table data retrieval with sorting, filtering, pagination, column selection, and JSONB field querying. Automatically detects project database if no databaseId provided.',
           inputSchema: z.object({
-            databaseId: z.string().describe('The database ID to query'),
+            databaseId: z.string().optional().describe('The database ID to query (optional - will auto-detect from workspace if not provided)'),
             tableId: z.string().describe('The table ID to query records from'),
             // MySQL-like query options
             select: z.array(z.string()).optional().describe('Columns to select (default: all columns). Use "*" for all or specify column names'),
@@ -3675,13 +3720,33 @@ ${conversationSummaryContext || ''}`
               throw new Error('Operation cancelled')
             }
 
+            // Auto-detect database ID if not provided
+            let actualDatabaseId = databaseId;
+            if (!actualDatabaseId) {
+              console.log(`[QUERY_DATABASE] No database ID provided, attempting auto-detection for project ${projectId}`);
+              const detectedDatabaseId = await getProjectDatabaseId(projectId);
+              
+              if (!detectedDatabaseId) {
+                return {
+                  success: false,
+                  error: `No database found for project ${projectId}. Please create a database first using create_database tool.`,
+                  projectId,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  suggestion: 'Use create_database tool to create a database for this project'
+                }
+              }
+              
+              actualDatabaseId = detectedDatabaseId;
+              console.log(`[QUERY_DATABASE] Auto-detected database ID: ${actualDatabaseId}`);
+            }
+
             // Check if we're approaching timeout
             if (timeStatus.isApproachingTimeout) {
               return {
                 success: false,
                 error: `Database query cancelled due to timeout warning: ${timeStatus.warningMessage}`,
-                databaseId,
-      
+                databaseId: actualDatabaseId,
                 toolCallId,
                 executionTimeMs: Date.now() - toolStartTime,
                 timeWarning: timeStatus.warningMessage
@@ -3694,7 +3759,7 @@ ${conversationSummaryContext || ''}`
               const actualOffset = Math.max(offset, 0);
 
               // Build query URL with enhanced query endpoint
-              const baseUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${databaseId}/tables/${tableId}/query`;
+              const baseUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${actualDatabaseId}/tables/${tableId}/query`;
               const queryParams = new URLSearchParams({
                 limit: actualLimit.toString(),
                 offset: actualOffset.toString()
@@ -3826,7 +3891,7 @@ ${conversationSummaryContext || ''}`
                   isSorted: !!orderBy,
                   isGrouped: !!(groupBy && groupBy.length > 0)
                 },
-                databaseId,
+                databaseId: actualDatabaseId,
                 tableId,
                 toolCallId,
                 executionTimeMs: executionTime,
@@ -3841,7 +3906,7 @@ ${conversationSummaryContext || ''}`
               return {
                 success: false,
                 error: `Enhanced database query failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                databaseId,
+                databaseId: actualDatabaseId,
                 tableId,
                 toolCallId,
                 executionTimeMs: executionTime,

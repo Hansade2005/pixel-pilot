@@ -2172,7 +2172,7 @@ function DeploymentsTab({ deployments, loading, onRefresh, projectUrl, onPromote
                       </DialogHeader>
                       <div className="flex-1 overflow-hidden">
                         <div className="h-full bg-black text-green-400 rounded overflow-auto">
-                          <div className="p-4 font-mono text-xs space-y-1 min-w-max">
+                          <div className="p-4 font-mono text-xs space-y-1 min-w-max max-h-full overflow-y-auto overflow-x-auto">
                             {loadingBuildLogs ? (
                               <div className="flex items-center gap-2 text-gray-500">
                                 <Loader2 className="w-4 h-4 animate-spin" />

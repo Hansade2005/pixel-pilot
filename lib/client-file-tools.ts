@@ -762,6 +762,100 @@ export async function handleClientFileOperation(
         break;
       }
 
+      case 'create_database': {
+        const { name = 'main' } = toolCall.args;
+        console.log(`[ClientFileTool] create_database: ${name}`);
+
+        // Validate inputs
+        if (name && typeof name !== 'string') {
+          addToolResult({
+            tool: 'create_database',
+            toolCallId: toolCall.toolCallId,
+            state: 'output-error',
+            errorText: 'Invalid database name provided'
+          });
+          return;
+        }
+
+        try {
+          console.log(`[ClientFileTool] create_database: Creating database "${name}" for project ${projectId}`);
+
+          // Call the database creation API directly from client
+          const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/database/create`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              projectId,
+              name
+            })
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            console.error('[ClientFileTool] Database creation failed:', result);
+            addToolResult({
+              tool: 'create_database',
+              toolCallId: toolCall.toolCallId,
+              state: 'output-error',
+              errorText: `Failed to create database: ${result.error || 'Unknown error'}`
+            });
+            return;
+          }
+
+          console.log('[ClientFileTool] Database created successfully:', result);
+
+          // Store database ID in workspace using the proper storage manager method
+          try {
+            const { setWorkspaceDatabase } = await import('@/lib/get-current-workspace');
+            await setWorkspaceDatabase(projectId, result.database.id);
+            console.log(`[ClientFileTool] Saved database ID ${result.database.id} to workspace ${projectId}`);
+          } catch (storageError) {
+            console.warn('[ClientFileTool] Failed to save database ID to workspace:', storageError);
+            // Don't fail the entire operation if workspace save fails
+          }
+
+          addToolResult({
+            tool: 'create_database',
+            toolCallId: toolCall.toolCallId,
+            state: 'output',
+            result: {
+              success: true,
+              message: `✅ Database "${name}" created successfully with auto-generated users table and linked to workspace`,
+              database: result.database,
+              usersTable: result.usersTable,
+              databaseId: result.database.id,
+              name,
+              workspaceLinked: true,
+              action: 'created'
+            }
+          });
+
+          // Dispatch events to notify UI
+          window.dispatchEvent(new CustomEvent('database-created', {
+            detail: { database: result.database, projectId, name }
+          }));
+
+          window.dispatchEvent(new CustomEvent('files-changed', {
+            detail: { projectId, forceRefresh: true }
+          }));
+
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          console.error(`[ClientFileTool] create_database error:`, error);
+          
+          addToolResult({
+            tool: 'create_database',
+            toolCallId: toolCall.toolCallId,
+            state: 'output-error',
+            errorText: `Database creation failed: ${errorMessage}`
+          });
+        }
+        break;
+      }
+
       default:
         console.warn(`[ClientFileTool] Unknown tool: ${toolCall.toolName}`);
     }

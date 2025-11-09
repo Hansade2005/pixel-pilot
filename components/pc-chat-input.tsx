@@ -986,15 +986,7 @@ export function PcChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps
     toast.success("GitLab repository removed")
   }
 
-  // Simple, clean keyboard handler
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Only handle Enter key for form submission
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSubmit(e as any)
-    }
-    // Let all other keys (including space) work normally
-  }
+
 
 
 
@@ -1027,7 +1019,12 @@ export function PcChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps
                   textarea.style.height = 'auto'
                   textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px'
                 }}
-                onKeyDown={handleKeyDown}
+                onKeyDown={(e: any) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSubmit(e)
+                  }
+                }}
                 className="w-full bg-transparent outline-none text-lg text-white placeholder-gray-400 py-3 px-4 resize-none overflow-y-auto min-h-[60px] max-h-[200px]"
                 disabled={isGenerating}
                 rows={1}

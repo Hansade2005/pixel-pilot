@@ -1,6 +1,30 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+interface QueryCondition {
+  field: string;
+  operator: '=' | '!=' | '>' | '<' | '>=' | '<=' | 'LIKE' | 'ILIKE' | 'IN' | 'NOT IN' | 'IS NULL' | 'IS NOT NULL' | 'CONTAINS';
+  value?: any;
+  logic?: 'AND' | 'OR';
+}
+
+interface HavingCondition {
+  field: string;
+  operator: '=' | '!=' | '>' | '<' | '>=' | '<=' | 'LIKE' | 'ILIKE';
+  value: any;
+}
+
+interface TableSchema {
+  columns: Array<{
+    name: string;
+    type: string;
+    required?: boolean;
+    defaultValue?: string;
+    unique?: boolean;
+    description?: string;
+  }>;
+}
+
 /**
  * Enhanced GET /api/database/[id]/tables/[tableId]/query
  * Advanced database querying with MySQL-like capabilities:
@@ -26,9 +50,9 @@ export async function GET(
     const orderBy = searchParams.get('orderBy');
     const orderDirection = searchParams.get('orderDirection')?.toUpperCase() as 'ASC' | 'DESC' || 'ASC';
     const select = searchParams.get('select')?.split(',').map(s => s.trim()).filter(Boolean);
-    const conditions = searchParams.get('conditions') ? JSON.parse(searchParams.get('conditions')!) : [];
+    const conditions: QueryCondition[] = searchParams.get('conditions') ? JSON.parse(searchParams.get('conditions')!) : [];
     const groupBy = searchParams.get('groupBy')?.split(',').map(s => s.trim()).filter(Boolean);
-    const having = searchParams.get('having') ? JSON.parse(searchParams.get('having')!) : null;
+    const having: HavingCondition | null = searchParams.get('having') ? JSON.parse(searchParams.get('having')!) : null;
     const includeCount = searchParams.get('includeCount') !== 'false';
 
     const supabase = await createClient();
@@ -61,7 +85,7 @@ export async function GET(
     }
 
     const tableIdInt = parseInt(params.tableId, 10);
-    const schema = table.schema_json;
+    const schema = table.schema_json as TableSchema;
 
     // Build base query
     let query = supabase
@@ -73,7 +97,7 @@ export async function GET(
     if (conditions && conditions.length > 0) {
       // Build complex conditions with AND/OR logic
       for (let i = 0; i < conditions.length; i++) {
-        const condition = conditions[i];
+        const condition: QueryCondition = conditions[i];
         const { field, operator, value, logic } = condition;
 
         // Apply JSONB field filtering
@@ -129,8 +153,8 @@ export async function GET(
     // Apply full-text search across all text fields
     if (search && schema?.columns) {
       const textFields = schema.columns
-        .filter((col: any) => ['text', 'email', 'url'].includes(col.type))
-        .map((col: any) => col.name);
+        .filter((col) => ['text', 'email', 'url'].includes(col.type))
+        .map((col) => col.name);
       
       if (textFields.length > 0) {
         // Build OR conditions for searching across all text fields

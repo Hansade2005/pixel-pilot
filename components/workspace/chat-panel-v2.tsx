@@ -1045,7 +1045,8 @@ export function ChatPanelV2({
                 'read_file',
                 'list_files',
                 'grep_search',
-                'semantic_code_navigator'
+                'semantic_code_navigator',
+                'create_database'
               ]
               
               if (clientSideTools.includes(toolCall.toolName)) {
@@ -1635,7 +1636,8 @@ export function ChatPanelV2({
                 'read_file',
                 'list_files',
                 'grep_search',
-                'semantic_code_navigator'
+                'semantic_code_navigator',
+                'create_database'
               ]
               
               if (clientSideTools.includes(toolCall.toolName)) {
@@ -2056,7 +2058,8 @@ export function ChatPanelV2({
                 'read_file',
                 'list_files',
                 'grep_search',
-                'semantic_code_navigator'
+                'semantic_code_navigator',
+                'create_database'
               ]
               
               if (clientSideTools.includes(toolCall.toolName)) {
