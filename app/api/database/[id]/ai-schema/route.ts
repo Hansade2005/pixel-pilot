@@ -19,7 +19,7 @@ const ColumnSchema = z.object({
 })
 
 const TableSchemaOutput = z.object({
-  tableName: z.string().min(1).describe('The name of the table in snake_case (singular)'),
+  tableName: z.string().min(1).describe('The name of the table in snake_case, following the user\'s intent (can be singular or plural as appropriate)'),
   columns: z.array(ColumnSchema).min(1).describe('Array of column definitions'),
   indexes: z.array(z.string()).default([]).describe('Array of column names to index'),
   explanation: z.string().describe('Detailed explanation of the table schema and design decisions')
@@ -117,13 +117,13 @@ export async function POST(
 7. Add foreign keys for relationships (references)
 8. Mark required fields appropriately
 9. Suggest useful indexes for performance (return column names as strings in indexes array)
-10. Keep table names singular (e.g., 'user' not 'users')
+10. Use appropriate table names in snake_case, following user intent (can be singular or plural as appropriate)
 11. Ensure column names are descriptive and clear
 12. MUST include an 'explanation' field describing your schema decisions
 
 **FOREIGN KEYS:**
 When creating relationships:
-- Use {related_table}_id as the column name
+- Use {related_table_singular}_id as the column name (e.g., if related table is 'widgets', use 'widget_id')
 - Set type to 'uuid'
 - Add references object: { "table": "related_table", "column": "id" }
 - Mark as required if it's a mandatory relationship
@@ -159,12 +159,12 @@ ${existingTableNames.length > 0 ? `\nExisting tables in this database: ${existin
 - json → 'json'
 
 IMPORTANT: Generate ONLY ONE table. Do not wrap it in a "tables" array. Return the schema directly with:
-- tableName: string (the table name)
+- tableName: string (the table name in snake_case, following user intent)
 - columns: array (list of column definitions)
 - indexes: array of strings (column names to index)
 - explanation: string (why you designed it this way)
 
-Be creative but practical. ONLY USE THE 10 ALLOWED PIPILOT DATATYPES.`
+Be creative but practical in your schema design.`
 
     console.log('[AI Schema] Generating schema with Codestral...')
     const startTime = Date.now()
