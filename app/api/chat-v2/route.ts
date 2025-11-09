@@ -3379,6 +3379,803 @@ ${conversationSummaryContext || ''}`
               }
             }
           }
+        }),
+
+        // DATABASE MANAGEMENT TOOLS
+        create_database: tool({
+          description: 'Create a new database for the current project. Automatically creates a database with a default users table for authentication. This eliminates the need for manual database setup.',
+          inputSchema: z.object({
+            name: z.string().optional().describe('Database name (defaults to "main")')
+          }),
+          execute: async ({ name = 'main' }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Database creation cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                name,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              // Call the database creation API
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/create`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  projectId,
+                  name
+                })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['create_database'] = (toolExecutionTimes['create_database'] || 0) + executionTime;
+
+              if (!response.ok) {
+                console.error('[ERROR] Database creation failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to create database: ${result.error || 'Unknown error'}`,
+                  name,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              console.log('[SUCCESS] Database created:', result);
+              return {
+                success: true,
+                message: `✅ Database "${name}" created successfully with auto-generated users table`,
+                database: result.database,
+                usersTable: result.usersTable,
+                databaseId: result.database.id,
+                name,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['create_database'] = (toolExecutionTimes['create_database'] || 0) + executionTime;
+              
+              console.error('[ERROR] Database creation failed:', error);
+              return {
+                success: false,
+                error: `Database creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                name,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        create_table: tool({
+          description: 'Create a new table in the database. Can either use AI to generate optimal schema from description, or create table with predefined schema. Supports complex relationships, constraints, and indexes.',
+          inputSchema: z.object({
+            databaseId: z.string().describe('The database ID to create the table in'),
+            name: z.string().describe('Table name (should be singular, snake_case)'),
+            // Either provide a description for AI schema generation, or a predefined schema
+            description: z.string().optional().describe('Natural language description for AI schema generation (e.g., "e-commerce product with name, price, category, inventory")'),
+            schema: z.object({
+              columns: z.array(z.object({
+                name: z.string(),
+                type: z.enum(['text', 'number', 'boolean', 'date', 'datetime', 'timestamp', 'uuid', 'json', 'email', 'url']),
+                required: z.boolean().optional(),
+                defaultValue: z.string().optional(),
+                unique: z.boolean().optional(),
+                description: z.string().optional(),
+                references: z.object({
+                  table: z.string(),
+                  column: z.string()
+                }).optional()
+              })),
+              indexes: z.array(z.string()).optional().describe('Column names to create indexes on')
+            }).optional().describe('Predefined schema with columns and constraints (optional if using description)'),
+            refinementPrompt: z.string().optional().describe('Additional refinement instructions for AI schema generation')
+          }),
+          execute: async ({ databaseId, name, description, schema, refinementPrompt }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Table creation cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                databaseId,
+                name,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              let finalSchema = schema;
+              let aiGenerated = false;
+
+              // If no predefined schema but description provided, generate schema using AI
+              if (!schema && description) {
+                console.log('[INFO] Generating AI schema for table:', name);
+                
+                // Call the AI schema generation API
+                const schemaResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${databaseId}/ai-schema`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    description,
+                    refinementPrompt,
+                    existingTables: [] // Will be populated by the API
+                  })
+                });
+
+                const schemaResult = await schemaResponse.json();
+
+                if (!schemaResponse.ok) {
+                  console.error('[ERROR] AI schema generation failed:', schemaResult);
+                  return {
+                    success: false,
+                    error: `Failed to generate AI schema: ${schemaResult.error || 'Unknown error'}`,
+                    databaseId,
+                    name,
+                    description,
+                    toolCallId,
+                    executionTimeMs: Date.now() - toolStartTime,
+                    timeWarning: timeStatus.warningMessage
+                  };
+                }
+
+                // Use the AI-generated schema
+                finalSchema = {
+                  columns: schemaResult.columns,
+                  indexes: schemaResult.indexes || []
+                };
+                aiGenerated = true;
+                console.log('[SUCCESS] AI schema generated:', schemaResult);
+              }
+
+              // Validate that we have a schema
+              if (!finalSchema) {
+                return {
+                  success: false,
+                  error: 'Either description (for AI schema generation) or predefined schema must be provided',
+                  databaseId,
+                  name,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              // Create the table with the final schema
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${databaseId}/tables/create`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  name,
+                  schema_json: finalSchema
+                })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['create_table'] = (toolExecutionTimes['create_table'] || 0) + executionTime;
+
+              if (!response.ok) {
+                console.error('[ERROR] Table creation failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to create table: ${result.error || 'Unknown error'}`,
+                  databaseId,
+                  name,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              console.log('[SUCCESS] Table created:', result);
+              return {
+                success: true,
+                message: `✅ Table "${name}" created successfully${aiGenerated ? ' with AI-generated schema' : ''} in database`,
+                table: result.table,
+                tableId: result.table.id,
+                databaseId,
+                name,
+                schema: finalSchema,
+                aiGenerated,
+                description: aiGenerated ? description : undefined,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['create_table'] = (toolExecutionTimes['create_table'] || 0) + executionTime;
+              
+              console.error('[ERROR] Table creation failed:', error);
+              return {
+                success: false,
+                error: `Table creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                databaseId,
+                name,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        query_database: tool({
+          description: 'Advanced database querying tool with MySQL-like capabilities. Supports table data retrieval with sorting, filtering, pagination, column selection, and JSONB field querying. Matches the table view implementation but with enhanced features.',
+          inputSchema: z.object({
+            databaseId: z.string().describe('The database ID to query'),
+            tableId: z.string().describe('The table ID to query records from'),
+            // MySQL-like query options
+            select: z.array(z.string()).optional().describe('Columns to select (default: all columns). Use "*" for all or specify column names'),
+            where: z.object({
+              field: z.string(),
+              operator: z.enum(['=', '!=', '>', '<', '>=', '<=', 'LIKE', 'ILIKE', 'IN', 'NOT IN', 'IS NULL', 'IS NOT NULL', 'CONTAINS']),
+              value: z.any().optional().describe('Value to compare (not needed for IS NULL/IS NOT NULL)')
+            }).optional().describe('WHERE clause for filtering records'),
+            whereConditions: z.array(z.object({
+              field: z.string(),
+              operator: z.enum(['=', '!=', '>', '<', '>=', '<=', 'LIKE', 'ILIKE', 'IN', 'NOT IN', 'IS NULL', 'IS NOT NULL', 'CONTAINS']),
+              value: z.any().optional(),
+              logic: z.enum(['AND', 'OR']).optional().describe('Logic operator to combine with next condition (default: AND)')
+            })).optional().describe('Multiple WHERE conditions for complex filtering'),
+            orderBy: z.object({
+              field: z.string().describe('Field to sort by'),
+              direction: z.enum(['ASC', 'DESC']).optional().describe('Sort direction (default: ASC)')
+            }).optional().describe('ORDER BY clause for sorting'),
+            limit: z.number().optional().describe('Maximum number of records to return (default: 100, max: 1000)'),
+            offset: z.number().optional().describe('Number of records to skip for pagination (default: 0)'),
+            // Advanced options
+            search: z.string().optional().describe('Full-text search across all text fields'),
+            groupBy: z.array(z.string()).optional().describe('Fields to group by'),
+            having: z.object({
+              field: z.string(),
+              operator: z.enum(['=', '!=', '>', '<', '>=', '<=', 'LIKE', 'ILIKE']),
+              value: z.any()
+            }).optional().describe('HAVING clause for grouped results'),
+            includeCount: z.boolean().optional().describe('Include total count of records (default: true)')
+          }),
+          execute: async ({ databaseId, tableId, select, where, whereConditions, orderBy, limit = 100, offset = 0, search, groupBy, having, includeCount = true }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Database query cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                databaseId,
+      
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              // Validate and clamp limit
+              const actualLimit = Math.min(Math.max(limit, 1), 1000);
+              const actualOffset = Math.max(offset, 0);
+
+              // Build query URL with enhanced query endpoint
+              const baseUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${databaseId}/tables/${tableId}/query`;
+              const queryParams = new URLSearchParams({
+                limit: actualLimit.toString(),
+                offset: actualOffset.toString()
+              });
+
+              // Add search parameter if provided
+              if (search) {
+                queryParams.append('search', search);
+              }
+
+              // Add orderBy parameter if provided
+              if (orderBy) {
+                queryParams.append('orderBy', orderBy.field);
+                queryParams.append('orderDirection', orderBy.direction || 'ASC');
+              }
+
+              // Add select fields if provided
+              if (select && select.length > 0 && !select.includes('*')) {
+                queryParams.append('select', select.join(','));
+              }
+
+              // Build WHERE conditions
+              const conditions: any[] = [];
+              
+              // Single where condition
+              if (where) {
+                conditions.push(where);
+              }
+              
+              // Multiple where conditions
+              if (whereConditions && whereConditions.length > 0) {
+                conditions.push(...whereConditions);
+              }
+
+              // Add conditions as query parameters
+              if (conditions.length > 0) {
+                queryParams.append('conditions', JSON.stringify(conditions));
+              }
+
+              // Add groupBy if provided
+              if (groupBy && groupBy.length > 0) {
+                queryParams.append('groupBy', groupBy.join(','));
+              }
+
+              // Add having clause if provided
+              if (having) {
+                queryParams.append('having', JSON.stringify(having));
+              }
+
+              // Add includeCount parameter
+              queryParams.append('includeCount', includeCount.toString());
+
+              // Make the API call
+              const response = await fetch(`${baseUrl}?${queryParams.toString()}`, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                }
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['query_database'] = (toolExecutionTimes['query_database'] || 0) + executionTime;
+
+              if (!response.ok) {
+                console.error('[ERROR] Enhanced database query failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to execute enhanced query: ${result.error || 'Unknown error'}`,
+                  databaseId,
+                  tableId,
+                  queryDetails: {
+                    select,
+                    where,
+                    whereConditions,
+                    orderBy,
+                    limit: actualLimit,
+                    offset: actualOffset,
+                    search,
+                    groupBy,
+                    having
+                  },
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              // Build query summary for logging
+              const queryParts = [];
+              if (select && !select.includes('*')) queryParts.push(`SELECT ${select.join(', ')}`);
+              else queryParts.push('SELECT *');
+              queryParts.push(`FROM table_${tableId}`);
+              if (conditions.length > 0) queryParts.push(`WHERE ${conditions.length} condition(s)`);
+              if (orderBy) queryParts.push(`ORDER BY ${orderBy.field} ${orderBy.direction || 'ASC'}`);
+              if (groupBy) queryParts.push(`GROUP BY ${groupBy.join(', ')}`);
+              if (having) queryParts.push(`HAVING ${having.field} ${having.operator} ${having.value}`);
+              queryParts.push(`LIMIT ${actualLimit} OFFSET ${actualOffset}`);
+              
+              const queryDescription = queryParts.join(' ');
+
+              console.log('[SUCCESS] Enhanced query executed:', { 
+                queryDescription, 
+                rowCount: result.records?.length || 0, 
+                totalCount: result.total || 0 
+              });
+
+              return {
+                success: true,
+                message: `✅ Enhanced database query executed successfully`,
+                query: queryDescription,
+                data: result.records || [],
+                rowCount: result.records?.length || 0,
+                totalCount: result.total || 0,
+                pagination: {
+                  limit: actualLimit,
+                  offset: actualOffset,
+                  hasMore: (result.total || 0) > (actualOffset + actualLimit)
+                },
+                queryDetails: {
+                  select: select || ['*'],
+                  conditions: conditions,
+                  orderBy,
+                  search,
+                  groupBy,
+                  having,
+                  appliedFilters: conditions.length,
+                  isFiltered: conditions.length > 0 || search,
+                  isSorted: !!orderBy,
+                  isGrouped: !!(groupBy && groupBy.length > 0)
+                },
+                databaseId,
+                tableId,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['query_database'] = (toolExecutionTimes['query_database'] || 0) + executionTime;
+              
+              console.error('[ERROR] Enhanced database query failed:', error);
+              return {
+                success: false,
+                error: `Enhanced database query failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                databaseId,
+                tableId,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        manipulate_table_data: tool({
+          description: 'Insert, update, or delete records in database tables. Provides full CRUD operations for table data management.',
+          inputSchema: z.object({
+            databaseId: z.string().describe('The database ID'),
+            tableId: z.string().describe('The table ID to manipulate data in'),
+            operation: z.enum(['insert', 'update', 'delete']).describe('CRUD operation to perform'),
+            data: z.object({}).optional().describe('Data object for insert/update operations (key-value pairs matching table schema)'),
+            recordId: z.string().optional().describe('Record ID for update/delete operations'),
+            whereConditions: z.array(z.object({
+              field: z.string(),
+              operator: z.enum(['=', '!=', '>', '<', '>=', '<=', 'LIKE', 'ILIKE', 'IN', 'NOT IN', 'IS NULL', 'IS NOT NULL']),
+              value: z.any().optional()
+            })).optional().describe('WHERE conditions for bulk update/delete operations (alternative to recordId)')
+          }),
+          execute: async ({ databaseId, tableId, operation, data, recordId, whereConditions }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Data manipulation cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                databaseId,
+                tableId,
+                operation,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              const baseUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${databaseId}/tables/${tableId}/records`;
+              let response;
+
+              switch (operation) {
+                case 'insert':
+                  if (!data) {
+                    return {
+                      success: false,
+                      error: 'Data object is required for insert operation',
+                      databaseId,
+                      tableId,
+                      operation,
+                      toolCallId,
+                      executionTimeMs: Date.now() - toolStartTime,
+                      timeWarning: timeStatus.warningMessage
+                    };
+                  }
+
+                  response = await fetch(baseUrl, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      data_json: data
+                    })
+                  });
+                  break;
+
+                case 'update':
+                  if (!recordId) {
+                    return {
+                      success: false,
+                      error: 'Record ID is required for update operation',
+                      databaseId,
+                      tableId,
+                      operation,
+                      toolCallId,
+                      executionTimeMs: Date.now() - toolStartTime,
+                      timeWarning: timeStatus.warningMessage
+                    };
+                  }
+
+                  if (!data) {
+                    return {
+                      success: false,
+                      error: 'Data object is required for update operation',
+                      databaseId,
+                      tableId,
+                      operation,
+                      toolCallId,
+                      executionTimeMs: Date.now() - toolStartTime,
+                      timeWarning: timeStatus.warningMessage
+                    };
+                  }
+
+                  response = await fetch(`${baseUrl}?recordId=${recordId}`, {
+                    method: 'PUT',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      data_json: data
+                    })
+                  });
+                  break;
+
+                case 'delete':
+                  if (!recordId) {
+                    return {
+                      success: false,
+                      error: 'Record ID is required for delete operation',
+                      databaseId,
+                      tableId,
+                      operation,
+                      toolCallId,
+                      executionTimeMs: Date.now() - toolStartTime,
+                      timeWarning: timeStatus.warningMessage
+                    };
+                  }
+
+                  response = await fetch(`${baseUrl}?recordId=${recordId}`, {
+                    method: 'DELETE',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    }
+                  });
+                  break;
+              }
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['manipulate_table_data'] = (toolExecutionTimes['manipulate_table_data'] || 0) + executionTime;
+
+              if (!response.ok) {
+                console.error('[ERROR] Data manipulation failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to ${operation} record: ${result.error || 'Unknown error'}`,
+                  databaseId,
+                  tableId,
+                  operation,
+                  data,
+                  recordId,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              console.log(`[SUCCESS] Data ${operation} completed:`, { operation, recordId, dataFields: data ? Object.keys(data).length : 0 });
+              return {
+                success: true,
+                message: `✅ Record ${operation} completed successfully`,
+                operation,
+                result: result.record || result,
+                recordId: result.record?.id || recordId,
+                databaseId,
+                tableId,
+                data,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['manipulate_table_data'] = (toolExecutionTimes['manipulate_table_data'] || 0) + executionTime;
+              
+              console.error('[ERROR] Data manipulation failed:', error);
+              return {
+                success: false,
+                error: `Data manipulation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                databaseId,
+                tableId,
+                operation,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        manage_api_keys: tool({
+          description: 'Create and manage API keys for external database access. Enables secure access to database from external applications.',
+          inputSchema: z.object({
+            databaseId: z.string().describe('The database ID to manage API keys for'),
+            action: z.enum(['create', 'list', 'delete']).describe('Action to perform on API keys'),
+            keyName: z.string().optional().describe('Name for the API key (required for create action)'),
+            keyId: z.string().optional().describe('API key ID (required for delete action)')
+          }),
+          execute: async ({ databaseId, action, keyName, keyId }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `API key management cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                databaseId,
+                action,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              let response;
+              const baseUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${databaseId}/api-keys`;
+
+              switch (action) {
+                case 'create':
+                  if (!keyName) {
+                    return {
+                      success: false,
+                      error: 'Key name is required for create action',
+                      databaseId,
+                      action,
+                      toolCallId,
+                      executionTimeMs: Date.now() - toolStartTime
+                    };
+                  }
+
+                  response = await fetch(baseUrl, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name: keyName })
+                  });
+                  break;
+
+                case 'list':
+                  response = await fetch(baseUrl, {
+                    method: 'GET',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    }
+                  });
+                  break;
+
+                case 'delete':
+                  if (!keyId) {
+                    return {
+                      success: false,
+                      error: 'Key ID is required for delete action',
+                      databaseId,
+                      action,
+                      toolCallId,
+                      executionTimeMs: Date.now() - toolStartTime
+                    };
+                  }
+
+                  response = await fetch(`${baseUrl}/${keyId}`, {
+                    method: 'DELETE',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    }
+                  });
+                  break;
+              }
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['manage_api_keys'] = (toolExecutionTimes['manage_api_keys'] || 0) + executionTime;
+
+              if (!response.ok) {
+                console.error('[ERROR] API key management failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to ${action} API key: ${result.error || 'Unknown error'}`,
+                  databaseId,
+                  action,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              let message = '';
+              switch (action) {
+                case 'create':
+                  message = `✅ API key "${keyName}" created successfully`;
+                  break;
+                case 'list':
+                  message = `✅ Retrieved ${result.apiKeys?.length || 0} API keys`;
+                  break;
+                case 'delete':
+                  message = `✅ API key deleted successfully`;
+                  break;
+              }
+
+              console.log('[SUCCESS] API key management:', { action, result });
+              return {
+                success: true,
+                message,
+                data: result,
+                databaseId,
+                action,
+                keyName,
+                keyId,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['manage_api_keys'] = (toolExecutionTimes['manage_api_keys'] || 0) + executionTime;
+              
+              console.error('[ERROR] API key management failed:', error);
+              return {
+                success: false,
+                error: `API key management failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                databaseId,
+                action,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
         })
 
       },
