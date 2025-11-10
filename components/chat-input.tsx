@@ -1113,7 +1113,8 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   return (
     <div className="w-full max-w-4xl mx-auto">
       {/* Main Chat Input */}
-  
+      <div className="relative">
+        <div className="bg-gray-800/80 chat-input-container border border-white rounded-3xl p-4 shadow-2xl">
           {/* Loading Overlay */}
           {isGenerating && (
             <div className="absolute inset-0 bg-gray-800/96 backdrop-blur-sm rounded-3xl flex items-center justify-center z-20 border border-white">
@@ -1401,7 +1402,8 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
               />    
             </PromptInputFooter>
           </PromptInput>
-      
+        </div>
+      </div>
 
       {/* Suggestion Pills */}
       {suggestions.length > 0 && (

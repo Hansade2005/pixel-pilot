@@ -127,21 +127,6 @@ export default function PiPilotFeaturesSlider() {
     return () => clearInterval(interval);
   }, [isAutoPlaying, isHovered, nextSlide]);
 
-  // Keyboard navigation
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') prevSlide();
-      if (e.key === 'ArrowRight') nextSlide();
-      if (e.key === ' ') {
-        e.preventDefault();
-        setIsAutoPlaying(!isAutoPlaying);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [nextSlide, prevSlide, isAutoPlaying]);
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Animated background elements */}

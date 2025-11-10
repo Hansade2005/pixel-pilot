@@ -4804,6 +4804,7 @@ export function ChatPanel({
       recognition.continuous = true
       recognition.interimResults = true // Enable instant real-time results
       recognition.lang = 'en-US'
+       // @ts-ignore - maxAlternatives
       recognition.maxAlternatives = 1
 
       // Store the initial input value when starting
