@@ -14,7 +14,7 @@ import {
   Square,
   Sparkles,
   Link as LinkIcon,
-  X,
+  X,CornerDownLeftIcon,
   Github,
   Gitlab
 } from "lucide-react"
