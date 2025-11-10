@@ -2540,6 +2540,8 @@ export function ChatPanelV2({
       // Stop current recording
       if (recognitionRef.current) {
         recognitionRef.current.stop()
+        setIsRecording(false) // Immediately update state
+        recognitionRef.current = null
       } else if (mediaRecorderRef.current) {
         stopDeepgramRecording()
       }

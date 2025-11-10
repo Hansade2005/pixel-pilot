@@ -402,6 +402,8 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       // Stop recording
       if (isWebSpeechSupported && recognitionRef.current) {
         recognitionRef.current.stop()
+        setIsRecording(false) // Immediately update state
+        recognitionRef.current = null
       } else {
         stopDeepgramRecording()
       }
