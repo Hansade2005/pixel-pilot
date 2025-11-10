@@ -921,6 +921,7 @@ export function ChatPanelV2({
         messages: [], // Don't send messages - full history is in continuationState
         projectId: project.id,
         project,
+        databaseId: project.databaseId, // Pass database ID from workspace
         files: projectFiles, // Use current project files
         fileTree: await buildProjectFileTree(), // Rebuild file tree
         modelId: selectedModel,
@@ -1536,6 +1537,7 @@ export function ChatPanelV2({
         messages: [], // Empty - we're continuing with tool result
         projectId,
         project: { id: projectId }, // Minimal project info
+        databaseId: project?.databaseId, // Pass database ID from workspace
         files: projectFiles, // Current project files
         fileTree: await buildProjectFileTree(), // Current file tree
         modelId: selectedModel,
@@ -1902,6 +1904,7 @@ export function ChatPanelV2({
           id: project?.id, // Chat session ID for server-side storage
           projectId: project?.id,
           project,
+          databaseId: project?.databaseId, // Pass database ID from workspace
           fileTree, // Use client-built file tree instead of raw files
           files: projectFiles, // Keep raw files for tool operations (now refreshed)
           modelId: selectedModel,

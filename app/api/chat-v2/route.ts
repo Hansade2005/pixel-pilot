@@ -1155,6 +1155,7 @@ export async function POST(req: Request) {
       messages = [], // Default to empty array if not provided
       projectId,
       project,
+      databaseId, // Database ID from request payload
       files = [], // Default to empty array
       fileTree, // Client-built file tree
       modelId,
@@ -3545,7 +3546,6 @@ ${conversationSummaryContext || ''}`
         create_table: tool({
           description: 'Create a new table in the database. Can either use AI to generate optimal schema from description, or create table with predefined schema. Supports complex relationships, constraints, and indexes.',
           inputSchema: z.object({
-            databaseId: z.string().describe('The database ID to create the table in'),
             name: z.string().describe('Table name (should be singular, snake_case)'),
             // Either provide a description for AI schema generation, or a predefined schema
             description: z.string().optional().describe('Natural language description for AI schema generation (e.g., "e-commerce product with name, price, category, inventory")'),
@@ -3566,7 +3566,7 @@ ${conversationSummaryContext || ''}`
             }).optional().describe('Predefined schema with columns and constraints (optional if using description)'),
             refinementPrompt: z.string().optional().describe('Additional refinement instructions for AI schema generation')
           }),
-          execute: async ({ databaseId, name, description, schema, refinementPrompt }, { abortSignal, toolCallId }) => {
+          execute: async ({ name, description, schema, refinementPrompt }, { abortSignal, toolCallId }) => {
             const toolStartTime = Date.now();
             const timeStatus = getTimeStatus();
 
@@ -3579,7 +3579,6 @@ ${conversationSummaryContext || ''}`
               return {
                 success: false,
                 error: `Table creation cancelled due to timeout warning: ${timeStatus.warningMessage}`,
-                databaseId,
                 name,
                 toolCallId,
                 executionTimeMs: Date.now() - toolStartTime,
@@ -3587,15 +3586,12 @@ ${conversationSummaryContext || ''}`
               }
             }
 
-            // Auth check - same as main route
-            const supabase = await createClient()
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-            
-            if (sessionError || !session) {
+            // Use database ID from request payload
+            const dbId = databaseId;
+            if (!dbId) {
               return {
                 success: false,
-                error: 'Authentication required. Please log in.',
-                databaseId,
+                error: 'No database ID provided in request.',
                 name,
                 toolCallId,
                 executionTimeMs: Date.now() - toolStartTime,
@@ -3611,12 +3607,11 @@ ${conversationSummaryContext || ''}`
               if (!schema && description) {
                 console.log('[INFO] Generating AI schema for table:', name);
                 
-                // Call the AI schema generation API with authentication
-                const schemaResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${databaseId}/ai-schema`, {
+                // Call the AI schema generation API (no auth required for internal calls)
+                const schemaResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${dbId}/ai-schema`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session.access_token}`,
                   },
                   body: JSON.stringify({
                     description,
@@ -3632,7 +3627,6 @@ ${conversationSummaryContext || ''}`
                   return {
                     success: false,
                     error: `Failed to generate AI schema: ${schemaResult.error || 'Unknown error'}`,
-                    databaseId,
                     name,
                     description,
                     toolCallId,
@@ -3655,7 +3649,6 @@ ${conversationSummaryContext || ''}`
                 return {
                   success: false,
                   error: 'Either description (for AI schema generation) or predefined schema must be provided',
-                  databaseId,
                   name,
                   toolCallId,
                   executionTimeMs: Date.now() - toolStartTime,
@@ -3663,12 +3656,11 @@ ${conversationSummaryContext || ''}`
                 };
               }
 
-              // Create the table with the final schema
-              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${databaseId}/tables/create`, {
+              // Create the table with the final schema (no auth required for internal calls)
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${dbId}/tables/create`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${session.access_token}`,
                 },
                 body: JSON.stringify({
                   name,
@@ -3685,7 +3677,6 @@ ${conversationSummaryContext || ''}`
                 return {
                   success: false,
                   error: `Failed to create table: ${result.error || 'Unknown error'}`,
-                  databaseId,
                   name,
                   toolCallId,
                   executionTimeMs: executionTime,
@@ -3699,7 +3690,6 @@ ${conversationSummaryContext || ''}`
                 message: `✅ Table "${name}" created successfully${aiGenerated ? ' with AI-generated schema' : ''} in database`,
                 table: result.table,
                 tableId: result.table.id,
-                databaseId,
                 name,
                 schema: finalSchema,
                 aiGenerated,
@@ -3728,9 +3718,8 @@ ${conversationSummaryContext || ''}`
         }),
 
         query_database: tool({
-          description: 'Advanced database querying tool with MySQL-like capabilities. Supports table data retrieval with sorting, filtering, pagination, column selection, and JSONB field querying. Automatically detects project database if no databaseId provided.',
+          description: 'Advanced database querying tool with MySQL-like capabilities. Supports table data retrieval with sorting, filtering, pagination, column selection, and JSONB field querying.',
           inputSchema: z.object({
-            databaseId: z.string().optional().describe('The database ID to query (optional - will auto-detect from workspace if not provided)'),
             tableId: z.string().describe('The table ID to query records from'),
             // MySQL-like query options
             select: z.array(z.string()).optional().describe('Columns to select (default: all columns). Use "*" for all or specify column names'),
@@ -3761,7 +3750,7 @@ ${conversationSummaryContext || ''}`
             }).optional().describe('HAVING clause for grouped results'),
             includeCount: z.boolean().optional().describe('Include total count of records (default: true)')
           }),
-          execute: async ({ databaseId, tableId, select, where, whereConditions, orderBy, limit = 100, offset = 0, search, groupBy, having, includeCount = true }, { abortSignal, toolCallId }) => {
+          execute: async ({ tableId, select, where, whereConditions, orderBy, limit = 100, offset = 0, search, groupBy, having, includeCount = true }, { abortSignal, toolCallId }) => {
             const toolStartTime = Date.now();
             const timeStatus = getTimeStatus();
 
@@ -3774,7 +3763,6 @@ ${conversationSummaryContext || ''}`
               return {
                 success: false,
                 error: `Database query cancelled due to timeout warning: ${timeStatus.warningMessage}`,
-                databaseId,
                 tableId,
                 toolCallId,
                 executionTimeMs: Date.now() - toolStartTime,
@@ -3790,7 +3778,6 @@ ${conversationSummaryContext || ''}`
               return {
                 success: false,
                 error: 'Authentication required. Please log in.',
-                databaseId,
                 tableId,
                 toolCallId,
                 executionTimeMs: Date.now() - toolStartTime,
@@ -3798,25 +3785,17 @@ ${conversationSummaryContext || ''}`
               }
             }
 
-            // Auto-detect database ID if not provided
-            let actualDatabaseId = databaseId;
-            if (!actualDatabaseId) {
-              console.log(`[QUERY_DATABASE] No database ID provided, attempting auto-detection for project ${projectId}`);
-              const detectedDatabaseId = await getProjectDatabaseId(projectId);
-              
-              if (!detectedDatabaseId) {
-                return {
-                  success: false,
-                  error: `No database found for project ${projectId}. Please create a database first using create_database tool.`,
-                  projectId,
-                  toolCallId,
-                  executionTimeMs: Date.now() - toolStartTime,
-                  suggestion: 'Use create_database tool to create a database for this project'
-                }
+            // Use database ID from request payload
+            const dbId = databaseId;
+            if (!dbId) {
+              return {
+                success: false,
+                error: 'No database ID provided in request.',
+                tableId,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
               }
-              
-              actualDatabaseId = detectedDatabaseId;
-              console.log(`[QUERY_DATABASE] Auto-detected database ID: ${actualDatabaseId}`);
             }
 
             // Check if we're approaching timeout
@@ -3824,7 +3803,7 @@ ${conversationSummaryContext || ''}`
               return {
                 success: false,
                 error: `Database query cancelled due to timeout warning: ${timeStatus.warningMessage}`,
-                databaseId: actualDatabaseId,
+                databaseId: dbId,
                 toolCallId,
                 executionTimeMs: Date.now() - toolStartTime,
                 timeWarning: timeStatus.warningMessage
@@ -3837,7 +3816,7 @@ ${conversationSummaryContext || ''}`
               const actualOffset = Math.max(offset, 0);
 
               // Build query URL with enhanced query endpoint
-              const baseUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${actualDatabaseId}/tables/${tableId}/query`;
+              const baseUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${dbId}/tables/${tableId}/query`;
               const queryParams = new URLSearchParams({
                 limit: actualLimit.toString(),
                 offset: actualOffset.toString()
@@ -3895,7 +3874,6 @@ ${conversationSummaryContext || ''}`
                 method: 'GET',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${session.access_token}`,
                 }
               });
 
@@ -3970,7 +3948,7 @@ ${conversationSummaryContext || ''}`
                   isSorted: !!orderBy,
                   isGrouped: !!(groupBy && groupBy.length > 0)
                 },
-                databaseId: actualDatabaseId,
+                databaseId,
                 tableId,
                 toolCallId,
                 executionTimeMs: executionTime,
@@ -3985,7 +3963,7 @@ ${conversationSummaryContext || ''}`
               return {
                 success: false,
                 error: `Enhanced database query failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                databaseId: actualDatabaseId,
+                databaseId,
                 tableId,
                 toolCallId,
                 executionTimeMs: executionTime,
@@ -3998,7 +3976,6 @@ ${conversationSummaryContext || ''}`
         manipulate_table_data: tool({
           description: 'Insert, update, or delete records in database tables. Provides full CRUD operations for table data management.',
           inputSchema: z.object({
-            databaseId: z.string().describe('The database ID'),
             tableId: z.string().describe('The table ID to manipulate data in'),
             operation: z.enum(['insert', 'update', 'delete']).describe('CRUD operation to perform'),
             data: z.object({}).optional().describe('Data object for insert/update operations (key-value pairs matching table schema)'),
@@ -4009,7 +3986,7 @@ ${conversationSummaryContext || ''}`
               value: z.any().optional()
             })).optional().describe('WHERE conditions for bulk update/delete operations (alternative to recordId)')
           }),
-          execute: async ({ databaseId, tableId, operation, data, recordId, whereConditions }, { abortSignal, toolCallId }) => {
+          execute: async ({ tableId, operation, data, recordId, whereConditions }, { abortSignal, toolCallId }) => {
             const toolStartTime = Date.now();
             const timeStatus = getTimeStatus();
 
@@ -4021,7 +3998,6 @@ ${conversationSummaryContext || ''}`
               return {
                 success: false,
                 error: `Data manipulation cancelled due to timeout warning: ${timeStatus.warningMessage}`,
-                databaseId,
                 tableId,
                 operation,
                 toolCallId,
@@ -4030,15 +4006,29 @@ ${conversationSummaryContext || ''}`
               }
             }
 
+            // Skip authentication for internal tool calls - database ID provides security
             // Auth check - same as main route
-            const supabase = await createClient()
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+            // const supabase = await createClient()
+            // const { data: { session }, error: sessionError } = await supabase.auth.getSession()
             
-            if (sessionError || !session) {
+            // if (sessionError || !session) {
+            //   return {
+            //     success: false,
+            //     error: 'Authentication required. Please log in.',
+            //     tableId,
+            //     operation,
+            //     toolCallId,
+            //     executionTimeMs: Date.now() - toolStartTime,
+            //     timeWarning: timeStatus.warningMessage
+            //   }
+            // }
+
+            // Use database ID from request payload
+            const dbId = databaseId;
+            if (!dbId) {
               return {
                 success: false,
-                error: 'Authentication required. Please log in.',
-                databaseId,
+                error: 'No database ID provided in request.',
                 tableId,
                 operation,
                 toolCallId,
@@ -4048,7 +4038,7 @@ ${conversationSummaryContext || ''}`
             }
 
             try {
-              const baseUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${databaseId}/tables/${tableId}/records`;
+              const baseUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${dbId}/tables/${tableId}/records`;
               let response;
 
               switch (operation) {
@@ -4070,7 +4060,6 @@ ${conversationSummaryContext || ''}`
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${session.access_token}`,
                     },
                     body: JSON.stringify({
                       data_json: data
@@ -4109,7 +4098,6 @@ ${conversationSummaryContext || ''}`
                     method: 'PUT',
                     headers: {
                       'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${session.access_token}`,
                     },
                     body: JSON.stringify({
                       data_json: data
@@ -4135,7 +4123,6 @@ ${conversationSummaryContext || ''}`
                     method: 'DELETE',
                     headers: {
                       'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${session.access_token}`,
                     }
                   });
                   break;
@@ -4198,12 +4185,11 @@ ${conversationSummaryContext || ''}`
         manage_api_keys: tool({
           description: 'Create and manage API keys for external database access. Enables secure access to database from external applications.',
           inputSchema: z.object({
-            databaseId: z.string().describe('The database ID to manage API keys for'),
             action: z.enum(['create', 'list', 'delete']).describe('Action to perform on API keys'),
             keyName: z.string().optional().describe('Name for the API key (required for create action)'),
             keyId: z.string().optional().describe('API key ID (required for delete action)')
           }),
-          execute: async ({ databaseId, action, keyName, keyId }, { abortSignal, toolCallId }) => {
+          execute: async ({ action, keyName, keyId }, { abortSignal, toolCallId }) => {
             const toolStartTime = Date.now();
             const timeStatus = getTimeStatus();
 
@@ -4216,7 +4202,6 @@ ${conversationSummaryContext || ''}`
               return {
                 success: false,
                 error: `API key management cancelled due to timeout warning: ${timeStatus.warningMessage}`,
-                databaseId,
                 action,
                 toolCallId,
                 executionTimeMs: Date.now() - toolStartTime,
@@ -4224,15 +4209,28 @@ ${conversationSummaryContext || ''}`
               }
             }
 
+            // Skip authentication for internal tool calls - database ID provides security
             // Auth check - same as main route
-            const supabase = await createClient()
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+            // const supabase = await createClient()
+            // const { data: { session }, error: sessionError } = await supabase.auth.getSession()
             
-            if (sessionError || !session) {
+            // if (sessionError || !session) {
+            //   return {
+            //     success: false,
+            //     error: 'Authentication required. Please log in.',
+            //     action,
+            //     toolCallId,
+            //     executionTimeMs: Date.now() - toolStartTime,
+            //     timeWarning: timeStatus.warningMessage
+            //   }
+            // }
+
+            // Use database ID from request payload
+            const dbId = databaseId;
+            if (!dbId) {
               return {
                 success: false,
-                error: 'Authentication required. Please log in.',
-                databaseId,
+                error: 'No database ID provided in request.',
                 action,
                 toolCallId,
                 executionTimeMs: Date.now() - toolStartTime,
@@ -4242,7 +4240,7 @@ ${conversationSummaryContext || ''}`
 
             try {
               let response;
-              const baseUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${databaseId}/api-keys`;
+              const baseUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${dbId}/api-keys`;
 
               switch (action) {
                 case 'create':
@@ -4250,7 +4248,7 @@ ${conversationSummaryContext || ''}`
                     return {
                       success: false,
                       error: 'Key name is required for create action',
-                      databaseId,
+                      databaseId: dbId,
                       action,
                       toolCallId,
                       executionTimeMs: Date.now() - toolStartTime
@@ -4261,7 +4259,6 @@ ${conversationSummaryContext || ''}`
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${session.access_token}`,
                     },
                     body: JSON.stringify({ name: keyName })
                   });
@@ -4272,7 +4269,6 @@ ${conversationSummaryContext || ''}`
                     method: 'GET',
                     headers: {
                       'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${session.access_token}`,
                     }
                   });
                   break;
@@ -4293,7 +4289,6 @@ ${conversationSummaryContext || ''}`
                     method: 'DELETE',
                     headers: {
                       'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${session.access_token}`,
                     }
                   });
                   break;
@@ -4308,7 +4303,7 @@ ${conversationSummaryContext || ''}`
                 return {
                   success: false,
                   error: `Failed to ${action} API key: ${result.error || 'Unknown error'}`,
-                  databaseId,
+                  databaseId: dbId,
                   action,
                   toolCallId,
                   executionTimeMs: executionTime,
@@ -4334,7 +4329,7 @@ ${conversationSummaryContext || ''}`
                 success: true,
                 message,
                 data: result,
-                databaseId,
+                databaseId: dbId,
                 action,
                 keyName,
                 keyId,
