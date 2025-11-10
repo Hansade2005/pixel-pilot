@@ -188,6 +188,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       recognition.continuous = true
       recognition.interimResults = true // Enable instant real-time results
       recognition.lang = 'en-US'
+      // @ts-ignore - maxAlternatives
       recognition.maxAlternatives = 1
       
       // Store the initial prompt value when starting
@@ -1202,7 +1203,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   {isGenerating ? (
                     <Square className="w-4 h-4" />
                   ) : (
-                    <ArrowUp className="w-4 h-4" />
+                   <CornerDownLeftIcon className="w-4 h-4" />
                   )}
                 </button>
               </div>
