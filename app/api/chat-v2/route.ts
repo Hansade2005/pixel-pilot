@@ -3984,7 +3984,7 @@ ${conversationSummaryContext || ''}`
           inputSchema: z.object({
             tableId: z.string().describe('The table ID to manipulate data in'),
             operation: z.enum(['insert', 'update', 'delete']).describe('CRUD operation to perform'),
-            data: z.object({}).optional().describe('Data object for insert/update operations (key-value pairs matching table schema)'),
+            data: z.record(z.any()).optional().describe('Data object for insert/update operations (key-value pairs matching table schema). Example: { "email": "user@example.com", "full_name": "John Doe", "age": 25 }'),
             recordId: z.string().optional().describe('Record ID for update/delete operations'),
             whereConditions: z.array(z.object({
               field: z.string(),
