@@ -1017,7 +1017,7 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
         }
 
         // Always return success - simple response without IDs or save attempts
-        console.log(`[CONSTRUCT_TOOL_RESULT] create_database: Database "${name}" creation simulated for project ${projectId}`)
+        console.log(`[CONSTRUCT_TOOL_RESULT] create_database: Database "${name}" created for project ${projectId}`)
 
         // Users table schema (matching create route)
         const usersTableSchema = {

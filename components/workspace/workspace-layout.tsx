@@ -16,6 +16,7 @@ import { CodePreviewPanel } from "./code-preview-panel"
 import { ProjectHeader } from "./project-header"
 import { FileExplorer } from "./file-explorer"
 import { CodeEditor } from "./code-editor"
+import { DatabaseTab } from "./database-tab/database-tab"
 import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone, Database } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
@@ -58,7 +59,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const { subscription } = useSubscriptionCache(user?.id)
   const userPlan = subscription?.plan || 'free'
   const subscriptionStatus = subscription?.status || 'inactive'
-  const [activeTab, setActiveTab] = useState<"code" | "preview">("code")
+  const [activeTab, setActiveTab] = useState<"code" | "preview" | "database">("code")
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true) // Changed from false to true
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const { toast } = useToast()
@@ -1027,6 +1028,14 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
+                          <Button
+                            variant={activeTab === "database" ? "secondary" : "ghost"}
+                            size="sm"
+                            onClick={() => setActiveTab("database")}
+                            title="Database Manager"
+                          >
+                            <Database className="h-4 w-4" />
+                          </Button>
                         </div>
 
                         {/* Preview Controls - Only show in Preview tab */}
@@ -1166,9 +1175,15 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                           </div>
                         </ResizablePanel>
                       </ResizablePanelGroup>
-                    ) : (
+                    ) : activeTab === "preview" ? (
                       /* Preview Tab: Full-width Preview */
                       <CodePreviewPanel ref={codePreviewRef} project={selectedProject} activeTab={activeTab} onTabChange={setActiveTab} previewViewMode={previewViewMode} />
+                    ) : (
+                      /* Database Tab: Database Manager */
+                      <DatabaseTab 
+                        projectId={selectedProject?.id || ''} 
+                        databaseId={selectedProject?.databaseId || null} 
+                      />
                     )}
                   </div>
                 </ResizablePanel>
