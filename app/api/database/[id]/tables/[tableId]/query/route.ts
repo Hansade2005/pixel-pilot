@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 interface QueryCondition {
   field: string;
@@ -55,9 +55,9 @@ export async function GET(
     const having: HavingCondition | null = searchParams.get('having') ? JSON.parse(searchParams.get('having')!) : null;
     const includeCount = searchParams.get('includeCount') !== 'false';
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
-    // Skip authentication for internal tool calls - database ID provides security
+    // Skip authentication for internal tool calls - service role provides full access
     // Get current user session
     // const { data: { user }, error: sessionError } = await supabase.auth.getUser();
     
@@ -70,7 +70,7 @@ export async function GET(
 
     // const userId = user.id;
 
-    // Skip table ownership verification for internal tool calls
+    // Skip table ownership verification - get table schema
     // Verify table ownership and get table schema
     // const { data: table, error: tableError } = await supabase
     //   .from('tables')

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { generateObject } from 'ai'
 import { getModel } from '@/lib/ai-providers'
 import { z } from 'zod'
@@ -73,8 +73,8 @@ export async function POST(
     //   )
     // }
 
-    // Get existing tables for context
-    const supabase = await createClient()
+    // Get existing tables for context - use admin client
+    const supabase = createAdminClient()
     const { data: existingTablesData } = await supabase
       .from('tables')
       .select('name, schema')

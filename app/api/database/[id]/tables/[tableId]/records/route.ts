@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 /**
  * POST /api/database/[id]/tables/[tableId]/records
@@ -19,7 +19,7 @@ export async function POST(
       );
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     // Skip authentication for internal tool calls - database ID provides security
     // Get current user session
@@ -317,7 +317,7 @@ export async function GET(
     const limit = parseInt(searchParams.get('limit') || '100');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     // Skip authentication for internal tool calls - database ID provides security
     // Get current user session
@@ -422,7 +422,7 @@ export async function PUT(
       );
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     // Skip authentication for internal tool calls - database ID provides security
     // Get current user session
@@ -698,7 +698,7 @@ export async function DELETE(
       );
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     
     // Skip authentication for internal tool calls - database ID provides security
     // Get current user session

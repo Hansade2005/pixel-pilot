@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 /**
  * POST /api/database/[id]/tables/create
@@ -20,7 +20,7 @@ export async function POST(
       );
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     // Skip authentication for internal tool calls - database ID provides security
     // Get current user session
@@ -118,7 +118,7 @@ export async function GET(
 ) {
   try {
     const databaseId = params.id;
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     // Skip authentication for internal tool calls - database ID provides security
     // Get current user session

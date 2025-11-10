@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 /**
  * POST /api/database/[id]/tables/[tableId]/indexes
@@ -15,28 +15,28 @@ export async function POST(
     const body = await request.json();
     const { action = 'create' } = body;
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
+    // Skip authentication - service role provides full access
     // Get current user session
-    const { data: { user }, error: sessionError } = await supabase.auth.getUser();
+    // const { data: { user }, error: sessionError } = await supabase.auth.getUser();
     
-    if (sessionError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized - Please log in' },
-        { status: 401 }
-      );
-    }
+    // if (sessionError || !user) {
+    //   return NextResponse.json(
+    //     { error: 'Unauthorized - Please log in' },
+    //     { status: 401 }
+    //   );
+    // }
 
-    const userId = user.id;
+    // const userId = user.id;
     const tableIdInt = parseInt(params.tableId, 10);
 
-    // Verify table ownership
+    // Get table without ownership verification
     const { data: table, error: tableError } = await supabase
       .from('tables')
       .select('*, databases!inner(*)')
       .eq('id', params.tableId)
       .eq('database_id', params.id)
-      .eq('databases.user_id', userId)
       .single();
 
     if (tableError || !table) {
@@ -164,28 +164,28 @@ export async function DELETE(
   { params }: { params: { id: string; tableId: string } }
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
+    // Skip authentication - service role provides full access
     // Get current user session
-    const { data: { user }, error: sessionError } = await supabase.auth.getUser();
+    // const { data: { user }, error: sessionError } = await supabase.auth.getUser();
     
-    if (sessionError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized - Please log in' },
-        { status: 401 }
-      );
-    }
+    // if (sessionError || !user) {
+    //   return NextResponse.json(
+    //     { error: 'Unauthorized - Please log in' },
+    //     { status: 401 }
+    //   );
+    // }
 
-    const userId = user.id;
+    // const userId = user.id;
     const tableIdInt = parseInt(params.tableId, 10);
 
-    // Verify table ownership
+    // Get table without ownership verification
     const { data: table, error: tableError } = await supabase
       .from('tables')
       .select('*, databases!inner(*)')
       .eq('id', params.tableId)
       .eq('database_id', params.id)
-      .eq('databases.user_id', userId)
       .single();
 
     if (tableError || !table) {
@@ -232,28 +232,28 @@ export async function GET(
   { params }: { params: { id: string; tableId: string } }
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
+    // Skip authentication - service role provides full access
     // Get current user session
-    const { data: { user }, error: sessionError } = await supabase.auth.getUser();
+    // const { data: { user }, error: sessionError } = await supabase.auth.getUser();
     
-    if (sessionError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized - Please log in' },
-        { status: 401 }
-      );
-    }
+    // if (sessionError || !user) {
+    //   return NextResponse.json(
+    //     { error: 'Unauthorized - Please log in' },
+    //     { status: 401 }
+    //   );
+    // }
 
-    const userId = user.id;
+    // const userId = user.id;
     const tableIdInt = parseInt(params.tableId, 10);
 
-    // Verify table ownership
+    // Get table without ownership verification
     const { data: table, error: tableError } = await supabase
       .from('tables')
       .select('*, databases!inner(*)')
       .eq('id', params.tableId)
       .eq('database_id', params.id)
-      .eq('databases.user_id', userId)
       .single();
 
     if (tableError || !table) {

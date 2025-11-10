@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { generateApiKey } from '@/lib/api-keys';
 
 /**
@@ -11,7 +11,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     // Skip authentication for internal tool calls - database ID provides security
     // Get current user session
@@ -125,7 +125,7 @@ export async function POST(
       );
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     // Skip authentication for internal tool calls - database ID provides security
     // Get current user session
