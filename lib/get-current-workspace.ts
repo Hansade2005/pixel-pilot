@@ -191,15 +191,19 @@ export async function getDatabaseIdFromUrl(): Promise<number | null> {
     }
 
     // Check ?projectId= query param (overrides path-based ID)
+    // This takes highest priority to ensure correct project context
     const projectIdParam = searchParams.get('projectId');
     if (projectIdParam) {
       projectId = projectIdParam;
     }
 
     // Check ?newProject= query param (for new project creation)
-    const newProjectParam = searchParams.get('newProject');
-    if (newProjectParam) {
-      projectId = newProjectParam;
+    // Only use this if projectId is not already set
+    if (!projectId) {
+      const newProjectParam = searchParams.get('newProject');
+      if (newProjectParam) {
+        projectId = newProjectParam;
+      }
     }
 
     if (!projectId) {
