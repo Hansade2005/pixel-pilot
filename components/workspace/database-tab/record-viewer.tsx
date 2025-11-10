@@ -171,7 +171,7 @@ export function RecordViewer({
 
     try {
       const response = await fetch(
-        `/api/database/${databaseId}/tables/${table.name}/records`,
+        `/api/database/${databaseId}/tables/${table.id}/records`,
         {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
@@ -208,7 +208,7 @@ export function RecordViewer({
 
     try {
       const response = await fetch(
-        `/api/database/${databaseId}/tables/${table.name}/records/bulk`,
+        `/api/database/${databaseId}/tables/${table.id}/records/bulk`,
         {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
@@ -568,6 +568,7 @@ export function RecordViewer({
           }}
           columns={columns}
           record={editingRecord}
+          tableId={table.id}
           tableName={table.name}
           databaseId={databaseId}
           onSuccess={() => {

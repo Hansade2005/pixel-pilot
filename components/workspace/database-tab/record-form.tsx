@@ -37,6 +37,7 @@ interface RecordFormProps {
   onClose: () => void
   columns: TableColumn[]
   record?: TableRecord
+  tableId: string
   tableName: string
   databaseId: string | number
   onSuccess: () => void
@@ -48,6 +49,7 @@ export function RecordForm({
   onClose,
   columns,
   record,
+  tableId,
   tableName,
   databaseId,
   onSuccess,
@@ -136,7 +138,7 @@ export function RecordForm({
     setIsSubmitting(true)
 
     try {
-      const url = `/api/database/${databaseId}/tables/${tableName}/records`
+      const url = `/api/database/${databaseId}/tables/${tableId}/records`
       const method = mode === 'create' ? 'POST' : 'PUT'
 
       const response = await fetch(url, {

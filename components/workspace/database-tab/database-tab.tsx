@@ -91,10 +91,10 @@ export function DatabaseTab({ projectId, databaseId }: DatabaseTabProps) {
     setState(prev => ({ ...prev, selectedTable: table, isLoading: true }))
 
     try {
-      // Load table structure and initial data
+      // Load table structure and initial data using tableId
       const [structureRes, dataRes] = await Promise.all([
-        fetch(`/api/database/${databaseId}/tables/${table.name}/structure`),
-        fetch(`/api/database/${databaseId}/tables/${table.name}/data?page=1&pageSize=${state.pagination.pageSize}`)
+        fetch(`/api/database/${databaseId}/tables/${tableId}/schema`),
+        fetch(`/api/database/${databaseId}/tables/${tableId}/data?page=1&pageSize=${state.pagination.pageSize}`)
       ])
 
       if (!structureRes.ok || !dataRes.ok) {
