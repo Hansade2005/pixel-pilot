@@ -1,202 +1,200 @@
-"use client"
+"use client";
 
-/**
- * Database Tab - Main container for database management interface
- */
+import { useState, useEffect } from "react";
+import { getWorkspaceDatabaseId } from "@/lib/get-current-workspace";
+import { toast } from "sonner";
+import { Loader2, Database as DatabaseIcon, AlertCircle } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { TableExplorer } from "./table-explorer";
+import { RecordViewer } from "./record-viewer";
+import type { DatabaseTabProps, TableWithCount, RecordData } from "./types";
 
-import { useState, useEffect } from "react"
-import { Database } from "lucide-react"
-import { DatabaseState } from "./types"
-import { useToast } from "@/hooks/use-toast"
+export function DatabaseTab({ workspaceId }: DatabaseTabProps) {
+  const [databaseId, setDatabaseId] = useState<string | null>(null);
+  const [tables, setTables] = useState<TableWithCount[]>([]);
+  const [selectedTable, setSelectedTable] = useState<TableWithCount | null>(null);
+  const [records, setRecords] = useState<RecordData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingRecords, setLoadingRecords] = useState(false);
 
-// Components will be imported below after they are defined
-import { TableExplorer } from "@/components/workspace/database-tab/table-explorer"
-import { RecordViewer } from "@/components/workspace/database-tab/record-viewer"
-
-interface DatabaseTabProps {
-  projectId: string
-  databaseId: string | number | null
-}
-
-export function DatabaseTab({ projectId, databaseId }: DatabaseTabProps) {
-  const { toast } = useToast()
-  
-  const [state, setState] = useState<DatabaseState>({
-    databaseId,
-    tables: [],
-    selectedTable: null,
-    columns: [],
-    records: [],
-    pagination: {
-      page: 1,
-      pageSize: 50,
-      totalRecords: 0,
-      totalPages: 0,
-    },
-    isLoading: false,
-    error: null,
-    searchQuery: "",
-    sortColumn: null,
-    sortDirection: 'asc',
-  })
-
-  // Load tables when database ID is available
   useEffect(() => {
+    initializeDatabase();
+  }, [workspaceId]);
+
+  // Auto-refresh tables every 5 seconds
+  useEffect(() => {
+    if (!databaseId) return;
+
+    const interval = setInterval(() => {
+      loadTables(databaseId, true); // Silent refresh
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [databaseId]);
+
+  // Auto-refresh records every 5 seconds when a table is selected
+  useEffect(() => {
+    if (!databaseId || !selectedTable) return;
+
+    const interval = setInterval(() => {
+      loadRecords(databaseId, selectedTable.id.toString(), true); // Silent refresh
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [databaseId, selectedTable]);
+
+  async function initializeDatabase() {
+    try {
+      setLoading(true);
+
+      // Get database ID for this workspace
+      const dbId = await getWorkspaceDatabaseId(workspaceId);
+      
+      if (!dbId) {
+        toast.error("No database found for this workspace");
+        setLoading(false);
+        return;
+      }
+
+      setDatabaseId(dbId.toString());
+      await loadTables(dbId.toString());
+    } catch (error: any) {
+      console.error("Error initializing database:", error);
+      toast.error(error.message || "Failed to initialize database");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadTables(dbId: string, silent = false) {
+    try {
+      const response = await fetch(`/api/database/${dbId}`);
+      const data = await response.json();
+
+      if (data.success) {
+        const transformedTables = (data.tables || []).map((table: any) => ({
+          ...table,
+          recordCount: table.record_count || 0,
+        }));
+        setTables(transformedTables);
+
+        // If a table was selected, update it with the new data
+        if (selectedTable) {
+          const updatedSelectedTable = transformedTables.find(
+            (t: TableWithCount) => t.id === selectedTable.id
+          );
+          if (updatedSelectedTable) {
+            setSelectedTable(updatedSelectedTable);
+          } else {
+            // Table was deleted
+            setSelectedTable(null);
+            setRecords([]);
+          }
+        }
+      } else if (!silent) {
+        toast.error(data.error || "Failed to load tables");
+      }
+    } catch (error) {
+      if (!silent) {
+        console.error("Error loading tables:", error);
+        toast.error("Failed to load tables");
+      }
+    }
+  }
+
+  async function loadRecords(dbId: string, tableId: string, silent = false) {
+    try {
+      if (!silent) setLoadingRecords(true);
+
+      const response = await fetch(`/api/database/${dbId}/tables/${tableId}/records`);
+      const data = await response.json();
+
+      if (response.ok) {
+        setRecords(data.records || []);
+      } else if (!silent) {
+        toast.error(data.error || "Failed to load records");
+      }
+    } catch (error) {
+      if (!silent) {
+        console.error("Error loading records:", error);
+        toast.error("Failed to load records");
+      }
+    } finally {
+      if (!silent) setLoadingRecords(false);
+    }
+  }
+
+  const handleTableSelect = (table: TableWithCount) => {
+    setSelectedTable(table);
     if (databaseId) {
-      loadTables()
+      loadRecords(databaseId, table.id.toString());
     }
-  }, [databaseId])
+  };
 
-  const loadTables = async () => {
-    if (!databaseId) return
-
-    setState(prev => ({ ...prev, isLoading: true, error: null }))
-
-    try {
-      const response = await fetch(`/api/database/${databaseId}`)
-      
-      if (!response.ok) {
-        throw new Error(`Failed to load tables: ${response.statusText}`)
-      }
-
-      const data = await response.json()
-      
-      setState(prev => ({
-        ...prev,
-        tables: data.tables || [],
-        isLoading: false,
-      }))
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load tables'
-      console.error('[DatabaseTab] Error loading tables:', error)
-      
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: errorMessage,
-      }))
-
-      toast({
-        title: "Error Loading Tables",
-        description: errorMessage,
-        variant: "destructive",
-      })
+  const handleRefreshTables = () => {
+    if (databaseId) {
+      loadTables(databaseId);
+      toast.success("Tables refreshed");
     }
+  };
+
+  const handleRefreshRecords = () => {
+    if (databaseId && selectedTable) {
+      loadRecords(databaseId, selectedTable.id.toString());
+      toast.success("Records refreshed");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
-  const selectTable = async (tableId: string) => {
-    const table = state.tables.find(t => t.id === tableId)
-    if (!table) return
-
-    setState(prev => ({ ...prev, selectedTable: table, isLoading: true }))
-
-    try {
-      // Load table structure and initial data using tableId
-      const [structureRes, dataRes] = await Promise.all([
-        fetch(`/api/database/${databaseId}/tables/${tableId}/schema`),
-        fetch(`/api/database/${databaseId}/tables/${tableId}/data?page=1&pageSize=${state.pagination.pageSize}`)
-      ])
-
-      if (!structureRes.ok || !dataRes.ok) {
-        throw new Error('Failed to load table data')
-      }
-
-      const structure = await structureRes.json()
-      const data = await dataRes.json()
-
-      setState(prev => ({
-        ...prev,
-        columns: structure.columns || [],
-        records: data.rows || [],
-        pagination: {
-          ...prev.pagination,
-          page: 1,
-          totalRecords: data.total || 0,
-          totalPages: Math.ceil((data.total || 0) / prev.pagination.pageSize),
-        },
-        isLoading: false,
-      }))
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load table data'
-      console.error('[DatabaseTab] Error loading table data:', error)
-      
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: errorMessage,
-      }))
-
-      toast({
-        title: "Error Loading Table",
-        description: errorMessage,
-        variant: "destructive",
-      })
-    }
-  }
-
-  const refreshData = () => {
-    if (state.selectedTable) {
-      selectTable(state.selectedTable.id)
-    } else {
-      loadTables()
-    }
-  }
-
-  // Show empty state if no database
   if (!databaseId) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <Database className="h-16 w-16 mx-auto text-muted-foreground" />
-          <div>
-            <h3 className="text-lg font-semibold">No Database Connected</h3>
-            <p className="text-sm text-muted-foreground mt-2">
-              This project doesn't have a database yet.
-            </p>
-          </div>
-        </div>
+      <div className="flex items-center justify-center h-full p-8">
+        <Card className="max-w-md">
+          <CardHeader>
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              <CardTitle>No Database Found</CardTitle>
+            </div>
+            <CardDescription>
+              This workspace doesn't have a database yet. Create one in the Database page.
+            </CardDescription>
+          </CardHeader>
+        </Card>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="h-full flex">
+    <div className="flex h-full overflow-hidden">
       {/* Left Panel - Table Explorer */}
-      <div className="w-64 border-r border-border flex-shrink-0">
+      <div className="w-80 border-r border-border flex-shrink-0 overflow-y-auto">
         <TableExplorer
-          tables={state.tables}
-          selectedTable={state.selectedTable}
-          isLoading={state.isLoading}
-          onSelectTable={selectTable}
-          onRefresh={loadTables}
+          tables={tables}
+          selectedTable={selectedTable}
+          onTableSelect={handleTableSelect}
+          loading={false}
+          databaseId={databaseId}
+          onRefresh={handleRefreshTables}
         />
       </div>
 
       {/* Right Panel - Record Viewer */}
-      <div className="flex-1">
+      <div className="flex-1 overflow-y-auto">
         <RecordViewer
-          table={state.selectedTable}
-          columns={state.columns}
-          records={state.records}
-          pagination={state.pagination}
-          isLoading={state.isLoading}
-          searchQuery={state.searchQuery}
-          sortColumn={state.sortColumn}
-          sortDirection={state.sortDirection}
-          databaseId={databaseId || ''}
-          onRefresh={refreshData}
-          onSearch={(query) => setState(prev => ({ ...prev, searchQuery: query }))}
-          onSort={(column, direction) => setState(prev => ({ 
-            ...prev, 
-            sortColumn: column, 
-            sortDirection: direction 
-          }))}
-          onPageChange={(page) => setState(prev => ({
-            ...prev,
-            pagination: { ...prev.pagination, page }
-          }))}
+          table={selectedTable}
+          records={records}
+          loading={loadingRecords}
+          databaseId={databaseId}
+          onRefresh={handleRefreshRecords}
         />
       </div>
     </div>
-  )
+  );
 }

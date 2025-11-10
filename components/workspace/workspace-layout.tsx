@@ -16,7 +16,7 @@ import { CodePreviewPanel } from "./code-preview-panel"
 import { ProjectHeader } from "./project-header"
 import { FileExplorer } from "./file-explorer"
 import { CodeEditor } from "./code-editor"
-import { DatabaseTab } from "./database-tab/database-tab"
+import { DatabaseTab } from "./database-tab"
 import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone, Database } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
@@ -1032,7 +1032,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                             variant={activeTab === "database" ? "secondary" : "ghost"}
                             size="sm"
                             onClick={() => setActiveTab("database")}
-                            title="Database Manager"
+                            title="Database"
                           >
                             <Database className="h-4 w-4" />
                           </Button>
@@ -1179,11 +1179,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       /* Preview Tab: Full-width Preview */
                       <CodePreviewPanel ref={codePreviewRef} project={selectedProject} activeTab={activeTab} onTabChange={setActiveTab} previewViewMode={previewViewMode} />
                     ) : (
-                      /* Database Tab: Database Manager */
-                      <DatabaseTab 
-                        projectId={selectedProject?.id || ''} 
-                        databaseId={selectedProject?.databaseId || null} 
-                      />
+                      /* Database Tab */
+                      <DatabaseTab workspaceId={selectedProject?.id || ""} />
                     )}
                   </div>
                 </ResizablePanel>

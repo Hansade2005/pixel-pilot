@@ -1,161 +1,146 @@
-"use client"
+"use client";
 
-import { Info, ChevronDown, ChevronUp } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
-import { TableColumn, DatabaseTable } from "./types"
-import { useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Code, Database, Check, X, Key } from "lucide-react";
+import type { SchemaViewerProps } from "./types";
+import type { TableSchema, Column } from "@/lib/supabase";
 
-interface SchemaViewerProps {
-  table: DatabaseTable
-  columns: TableColumn[]
-}
+export function SchemaViewer({ table }: SchemaViewerProps) {
+  if (!table) {
+    return null;
+  }
 
-export function SchemaViewer({ table, columns }: SchemaViewerProps) {
-  const [isOpen, setIsOpen] = useState(false)
+  const schema = table.schema_json as TableSchema;
+  const columns = schema.columns || [];
 
-  const primaryKeys = columns.filter(col => col.is_primary_key)
-  const foreignKeys = columns.filter(col => col.is_foreign_key)
-  const requiredFields = columns.filter(col => !col.nullable && !col.default_value)
+  const getTypeColor = (type: string) => {
+    const typeMap: Record<string, string> = {
+      text: "bg-blue-500/10 text-blue-500",
+      string: "bg-blue-500/10 text-blue-500",
+      number: "bg-green-500/10 text-green-500",
+      integer: "bg-green-500/10 text-green-500",
+      boolean: "bg-purple-500/10 text-purple-500",
+      date: "bg-orange-500/10 text-orange-500",
+      datetime: "bg-orange-500/10 text-orange-500",
+      json: "bg-pink-500/10 text-pink-500",
+      array: "bg-cyan-500/10 text-cyan-500",
+    };
+    
+    return typeMap[type.toLowerCase()] || "bg-gray-500/10 text-gray-500";
+  };
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full justify-between"
-        >
-          <div className="flex items-center gap-2">
-            <Info className="h-3.5 w-3.5" />
-            <span>Table Schema</span>
-            <Badge variant="secondary" className="text-xs">
-              {columns.length} columns
-            </Badge>
-          </div>
-          {isOpen ? (
-            <ChevronUp className="h-3.5 w-3.5" />
-          ) : (
-            <ChevronDown className="h-3.5 w-3.5" />
-          )}
-        </Button>
-      </CollapsibleTrigger>
-
-      <CollapsibleContent className="mt-2">
-        <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
-          {/* Table Info */}
-          <div className="space-y-2">
-            <h4 className="text-sm font-semibold">Table Information</h4>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <span className="text-muted-foreground">Name:</span>
-                <span className="ml-2 font-mono">{table.name}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Schema:</span>
-                <span className="ml-2 font-mono">{table.schema}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Rows:</span>
-                <span className="ml-2">{table.row_count.toLocaleString()}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Size:</span>
-                <span className="ml-2">
-                  {(table.size_bytes / 1024).toFixed(2)} KB
-                </span>
-              </div>
+    <div className="space-y-4">
+      {/* Table Info */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            Table Information
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Table Name</p>
+              <p className="font-medium">{table.name}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Table ID</p>
+              <p className="font-mono text-sm">{table.id}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Created At</p>
+              <p className="text-sm">{new Date(table.created_at).toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Total Columns</p>
+              <p className="font-medium">{columns.length}</p>
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          {/* Keys Summary */}
-          {(primaryKeys.length > 0 || foreignKeys.length > 0) && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-semibold">Keys</h4>
-              <div className="space-y-1 text-xs">
-                {primaryKeys.length > 0 && (
-                  <div>
-                    <Badge variant="default" className="text-xs mr-2">Primary Key</Badge>
-                    {primaryKeys.map(k => k.name).join(', ')}
-                  </div>
-                )}
-                {foreignKeys.length > 0 && (
-                  <div>
-                    <Badge variant="secondary" className="text-xs mr-2">Foreign Keys</Badge>
-                    {foreignKeys.map(k => (
-                      <span key={k.name} className="mr-2">
-                        {k.name}
-                        {k.foreign_key_ref && ` → ${k.foreign_key_ref.table}.${k.foreign_key_ref.column}`}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Required Fields */}
-          {requiredFields.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-semibold">Required Fields</h4>
-              <div className="text-xs text-muted-foreground">
-                {requiredFields.map(f => f.name).join(', ')}
-              </div>
-            </div>
-          )}
-
-          {/* All Columns */}
-          <div className="space-y-2">
-            <h4 className="text-sm font-semibold">Columns</h4>
-            <ScrollArea className="h-[200px]">
-              <div className="space-y-2">
-                {columns.map((col) => (
-                  <div
-                    key={col.name}
-                    className="border rounded p-2 bg-card text-xs space-y-1"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono font-medium">{col.name}</span>
-                      <div className="flex gap-1">
-                        {col.is_primary_key && (
-                          <Badge variant="default" className="text-xs px-1 py-0">PK</Badge>
-                        )}
-                        {col.is_foreign_key && (
-                          <Badge variant="secondary" className="text-xs px-1 py-0">FK</Badge>
-                        )}
-                        {!col.nullable && (
-                          <Badge variant="destructive" className="text-xs px-1 py-0">Required</Badge>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-muted-foreground">
-                      Type: <span className="font-mono">{col.type}</span>
-                    </div>
-                    {col.default_value && (
-                      <div className="text-muted-foreground">
-                        Default: <span className="font-mono">{col.default_value}</span>
-                      </div>
-                    )}
-                    {col.foreign_key_ref && (
-                      <div className="text-purple-600 dark:text-purple-400">
-                        References: <span className="font-mono">
-                          {col.foreign_key_ref.table}.{col.foreign_key_ref.column}
+      {/* Columns */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Code className="h-5 w-5" />
+            Columns ({columns.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {columns.map((column: Column, index: number) => (
+              <Card key={index} className="border-l-4 border-l-primary/50">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-semibold">{column.name}</h4>
+                      {column.name === "id" && (
+                        <span title="Primary Key">
+                          <Key className="h-3 w-3 text-yellow-500" />
                         </span>
-                      </div>
+                      )}
+                    </div>
+                    <Badge className={getTypeColor(column.type)}>
+                      {column.type}
+                    </Badge>
+                  </div>
+                  
+                  {column.description && (
+                    <p className="text-sm text-muted-foreground mb-2">
+                      {column.description}
+                    </p>
+                  )}
+                  
+                  <div className="flex flex-wrap gap-2">
+                    {column.required && (
+                      <Badge variant="outline" className="text-xs">
+                        <Check className="h-3 w-3 mr-1" />
+                        Required
+                      </Badge>
+                    )}
+                    {column.unique && (
+                      <Badge variant="outline" className="text-xs">
+                        <Check className="h-3 w-3 mr-1" />
+                        Unique
+                      </Badge>
+                    )}
+                    {!column.required && (
+                      <Badge variant="outline" className="text-xs text-muted-foreground">
+                        <X className="h-3 w-3 mr-1" />
+                        Optional
+                      </Badge>
+                    )}
+                    {column.defaultValue && (
+                      <Badge variant="secondary" className="text-xs">
+                        Default: {String(column.defaultValue)}
+                      </Badge>
                     )}
                   </div>
-                ))}
-              </div>
-            </ScrollArea>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
-  )
+        </CardContent>
+      </Card>
+
+      {/* Raw Schema JSON */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Code className="h-5 w-5" />
+            Raw Schema (JSON)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs">
+            <code>{JSON.stringify(schema, null, 2)}</code>
+          </pre>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

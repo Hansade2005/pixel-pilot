@@ -14,9 +14,6 @@ export interface Workspace {
   isTemplate: boolean
   isPinned?: boolean
   lastActivity: string
-  // Database tracking
-  databaseId?: string | number  // References Supabase databases.id (can be string or number)
-  hasDatabase?: boolean // Quick check for UI
   // Deployment tracking
   githubRepoUrl?: string
   githubRepoName?: string
