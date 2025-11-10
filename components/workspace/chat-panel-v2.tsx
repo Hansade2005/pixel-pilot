@@ -25,7 +25,7 @@ import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown
 import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
 import { FileSearchResult, FileLookupService } from "@/lib/file-lookup-service"
 import { createCheckpoint } from '@/lib/checkpoint-utils'
-import { getWorkspaceDatabaseId } from '@/lib/get-current-workspace'
+import { getWorkspaceDatabaseId, getDatabaseIdFromUrl } from '@/lib/get-current-workspace'
 
 // ExpandableUserMessage component for long user messages
 const ExpandableUserMessage = ({
@@ -452,14 +452,24 @@ export function ChatPanelV2({
   const [editingMessageContent, setEditingMessageContent] = useState('')
 
   // Load database ID from workspace if not provided
+  // Try multiple methods for maximum accuracy
   useEffect(() => {
     const loadDatabaseId = async () => {
-      if (project?.id && !databaseId) {
+      if (!databaseId) {
         try {
-          const dbId = await getWorkspaceDatabaseId(project.id);
+          // Method 1: Try to get from URL parameters (most accurate for current context)
+          let dbId = await getDatabaseIdFromUrl();
+          
+          // Method 2: If URL method fails, fall back to project.id
+          if (!dbId && project?.id) {
+            dbId = await getWorkspaceDatabaseId(project.id);
+          }
+          
           if (dbId) {
             setDatabaseId(dbId);
-            console.log(`[ChatPanelV2] Loaded database ID ${dbId} for workspace ${project.id}`);
+            console.log(`[ChatPanelV2] Loaded database ID ${dbId} for workspace ${project?.id || 'from URL'}`);
+          } else {
+            console.warn('[ChatPanelV2] No database ID found for this workspace');
           }
         } catch (error) {
           console.error('[ChatPanelV2] Failed to load database ID:', error);

@@ -139,13 +139,105 @@ export async function workspaceHasDatabase(workspaceId: string): Promise<boolean
 
 /**
  * Get workspace's database ID
+ * First checks IndexedDB cache, then falls back to Supabase API
  */
 export async function getWorkspaceDatabaseId(workspaceId: string): Promise<number | null> {
   try {
+    // First, try to get from IndexedDB cache
     const workspace = await storageManager.getWorkspace(workspaceId) as WorkspaceWithDatabase;
-    return workspace?.databaseId || null;
+    if (workspace?.databaseId) {
+      return workspace.databaseId;
+    }
+
+    // If not in cache, fetch from Supabase API
+    const databaseId = await fetchDatabaseIdFromSupabase(workspaceId);
+    
+    // If found, cache it in IndexedDB for future use
+    if (databaseId && workspace) {
+      await setWorkspaceDatabase(workspaceId, databaseId);
+    }
+    
+    return databaseId;
   } catch (error) {
     console.error('Error getting workspace database ID:', error);
+    return null;
+  }
+}
+
+/**
+ * Get workspace's database ID directly from URL params
+ * Handles cases like ?projectId=xxx or ?newProject=xxx&projectId=xxx
+ */
+export async function getDatabaseIdFromUrl(): Promise<number | null> {
+  try {
+    if (typeof window === 'undefined') return null;
+
+    const searchParams = new URLSearchParams(window.location.search);
+    const pathname = window.location.pathname;
+    
+    // Extract project ID from various URL patterns
+    let projectId: string | null = null;
+
+    // Check /workspace/[id] pattern
+    const workspaceMatch = pathname.match(/\/workspace\/([^\/]+)/);
+    if (workspaceMatch) {
+      projectId = workspaceMatch[1];
+    }
+
+    // Check /pc-workspace/[id] pattern
+    const pcWorkspaceMatch = pathname.match(/\/pc-workspace\/([^\/]+)/);
+    if (pcWorkspaceMatch) {
+      projectId = pcWorkspaceMatch[1];
+    }
+
+    // Check ?projectId= query param (overrides path-based ID)
+    const projectIdParam = searchParams.get('projectId');
+    if (projectIdParam) {
+      projectId = projectIdParam;
+    }
+
+    // Check ?newProject= query param (for new project creation)
+    const newProjectParam = searchParams.get('newProject');
+    if (newProjectParam) {
+      projectId = newProjectParam;
+    }
+
+    if (!projectId) {
+      console.warn('[getDatabaseIdFromUrl] No project ID found in URL');
+      return null;
+    }
+
+    // Get database ID for this project
+    return await getWorkspaceDatabaseId(projectId);
+  } catch (error) {
+    console.error('Error getting database ID from URL:', error);
+    return null;
+  }
+}
+
+/**
+ * Fetch database ID from Supabase API based on project_id
+ */
+async function fetchDatabaseIdFromSupabase(projectId: string): Promise<number | null> {
+  try {
+    const response = await fetch(`/api/database/by-project/${projectId}`);
+    
+    if (!response.ok) {
+      console.warn(`[fetchDatabaseIdFromSupabase] API returned ${response.status} for project ${projectId}`);
+      return null;
+    }
+
+    const data = await response.json();
+    
+    if (data.success && data.database?.id) {
+      console.log(`[fetchDatabaseIdFromSupabase] Found database ID ${data.database.id} for project ${projectId}`);
+      return data.database.id;
+    }
+
+    console.warn(`[fetchDatabaseIdFromSupabase] No database found for project ${projectId}`);
+    return null;
+  } catch (error) {
+    console.error('[fetchDatabaseIdFromSupabase] Error:', error);
     return null;
   }
 }

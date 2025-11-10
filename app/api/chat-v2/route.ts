@@ -1494,7 +1494,7 @@ Begin with a concise checklist  use check box emojis filled and unfilled.
 ## Tools
 - **Client-Side (IndexedDB)**: \`read_file\` (with line numbers), \`write_file\`, \`edit_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`, \`create_database\`
 - **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers),\`grep_search\`, \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync)
-- **Database Tools**: \`create_table\`, \`query_database\`, \`manipulate_table_data\`, \`manage_api_keys\`
+- **Database Tools**: \`create_table\`, \`list_tables\`, \`query_database\`, \`manipulate_table_data\`, \`manage_api_keys\`
 
 ## PiPilot DB Integration
 For **authentication, database, or file storage**:
@@ -1504,16 +1504,18 @@ For **authentication, database, or file storage**:
 - 🛠️ Strictly use documented patterns and endpoints
 
 ### 🗄️ Database Automation Tools
-**Complete database workflow in 4 simple steps:**
+**Complete database workflow in 5 simple steps:**
 1. **\`create_database\`** - Creates database with auto-generated users table (client-side)
 2. **\`create_table\`** - AI-powered schema generation from natural language descriptions
-3. **\`query_database\`** - Advanced MySQL-like querying with auto-detection, filtering, sorting, pagination
-4. **\`manipulate_table_data\`** - Full CRUD operations (insert, update, delete) with bulk support
-5. **\`manage_api_keys\`** - Generate secure API keys for external database access
+3. **\`list_tables\`** - Discover all tables in a database with optional schema and record counts
+4. **\`query_database\`** - Advanced MySQL-like querying with auto-detection, filtering, sorting, pagination
+5. **\`manipulate_table_data\`** - Full CRUD operations (insert, update, delete) with bulk support
+6. **\`manage_api_keys\`** - Generate secure API keys for external database access
 
 **Features:**
 - 🤖 **AI Schema Generation**: Describe your table needs, get optimized database schema
 - 🔍 **Auto-Detection**: Tools automatically find your project's database
+- 📋 **Table Discovery**: List all tables with schemas and record counts before operations
 - 🚀 **MySQL-Like Syntax**: Familiar WHERE, ORDER BY, JOIN operations  
 - 📊 **Advanced Queries**: JSONB field querying, complex filtering, pagination
 - 🔐 **Secure Access**: API key management for external integrations
