@@ -4354,10 +4354,149 @@ ${conversationSummaryContext || ''}`
               };
             }
           }
+        }),
+
+        list_tables: tool({
+          description: 'List all tables in the database with their schemas, IDs, and metadata. Essential for discovering available tables before querying or manipulating data. Returns table IDs needed for other database operations.',
+          inputSchema: z.object({
+            includeSchema: z.boolean().optional().describe('Include detailed schema information for each table (default: true)'),
+            includeRecordCount: z.boolean().optional().describe('Include record count for each table (default: true)')
+          }),
+          execute: async ({ includeSchema = true, includeRecordCount = true }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `List tables cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            // Use database ID from request payload
+            const dbId = databaseId;
+            if (!dbId) {
+              return {
+                success: false,
+                error: 'No database ID provided in request.',
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              // Call the database API endpoint to get database with tables (no auth required for internal calls)
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${dbId}`, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                }
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['list_tables'] = (toolExecutionTimes['list_tables'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                console.error('[ERROR] List tables failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to list tables: ${result.error || 'Unknown error'}`,
+                  databaseId: dbId,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              const tables = result.tables || [];
+
+              // Format table information
+              const formattedTables = tables.map((table: any) => {
+                const tableInfo: any = {
+                  id: table.id,
+                  name: table.name,
+                  createdAt: table.created_at,
+                  updatedAt: table.updated_at
+                };
+
+                // Add record count if requested and available
+                if (includeRecordCount && table.record_count !== undefined) {
+                  tableInfo.recordCount = table.record_count;
+                }
+
+                // Add schema if requested
+                if (includeSchema && table.schema_json) {
+                  const schema = table.schema_json;
+                  tableInfo.schema = {
+                    columnCount: schema.columns?.length || 0,
+                    columns: schema.columns?.map((col: any) => ({
+                      name: col.name,
+                      type: col.type,
+                      required: col.required || false,
+                      unique: col.unique || false,
+                      defaultValue: col.defaultValue,
+                      description: col.description,
+                      references: col.references
+                    })) || [],
+                    indexes: schema.indexes || []
+                  };
+                }
+
+                return tableInfo;
+              });
+
+              // Generate summary
+              const totalTables = formattedTables.length;
+              const totalRecords = includeRecordCount 
+                ? formattedTables.reduce((sum: number, t: any) => sum + (t.recordCount || 0), 0)
+                : undefined;
+
+              const summary = totalTables === 0
+                ? 'No tables found in database. Create tables using the create_table tool.'
+                : `Found ${totalTables} table(s)${totalRecords !== undefined ? ` with ${totalRecords} total record(s)` : ''}`;
+
+              console.log('[SUCCESS] Tables listed:', { totalTables, totalRecords });
+              return {
+                success: true,
+                message: `✅ ${summary}`,
+                tables: formattedTables,
+                totalTables,
+                totalRecords,
+                databaseId: dbId,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['list_tables'] = (toolExecutionTimes['list_tables'] || 0) + executionTime;
+              
+              console.error('[ERROR] List tables failed:', error);
+              return {
+                success: false,
+                error: `Failed to list tables: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                databaseId: dbId,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
         })
 
       },
-      stopWhen: stepCountIs(50),
+      stopWhen: stepCountIs(60),
       onFinish: ({ response }) => {
         console.log(`[Chat-V2] Finished with ${response.messages.length} messages`)
         
