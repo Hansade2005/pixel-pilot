@@ -25,6 +25,7 @@ import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown
 import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
 import { FileSearchResult, FileLookupService } from "@/lib/file-lookup-service"
 import { createCheckpoint } from '@/lib/checkpoint-utils'
+import { getWorkspaceDatabaseId } from '@/lib/get-current-workspace'
 
 // ExpandableUserMessage component for long user messages
 const ExpandableUserMessage = ({
@@ -417,6 +418,9 @@ export function ChatPanelV2({
   // Load project files for context
   const [projectFiles, setProjectFiles] = useState<any[]>([])
 
+  // Database ID state - loaded from workspace if not provided
+  const [databaseId, setDatabaseId] = useState<number | null>(project?.databaseId || null)
+
   // Local state for input (not using useChat's input)
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -446,6 +450,25 @@ export function ChatPanelV2({
   // Message actions state
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [editingMessageContent, setEditingMessageContent] = useState('')
+
+  // Load database ID from workspace if not provided
+  useEffect(() => {
+    const loadDatabaseId = async () => {
+      if (project?.id && !databaseId) {
+        try {
+          const dbId = await getWorkspaceDatabaseId(project.id);
+          if (dbId) {
+            setDatabaseId(dbId);
+            console.log(`[ChatPanelV2] Loaded database ID ${dbId} for workspace ${project.id}`);
+          }
+        } catch (error) {
+          console.error('[ChatPanelV2] Failed to load database ID:', error);
+        }
+      }
+    };
+
+    loadDatabaseId();
+  }, [project?.id, databaseId]);
 
   // Save message to IndexedDB for the current project
   const saveMessageToIndexedDB = async (message: any) => {
@@ -921,7 +944,7 @@ export function ChatPanelV2({
         messages: [], // Don't send messages - full history is in continuationState
         projectId: project.id,
         project,
-        databaseId: project.databaseId, // Pass database ID from workspace
+        databaseId, // Pass database ID from state (loaded from workspace)
         files: projectFiles, // Use current project files
         fileTree: await buildProjectFileTree(), // Rebuild file tree
         modelId: selectedModel,
@@ -1537,7 +1560,7 @@ export function ChatPanelV2({
         messages: [], // Empty - we're continuing with tool result
         projectId,
         project: { id: projectId }, // Minimal project info
-        databaseId: project?.databaseId, // Pass database ID from workspace
+        databaseId, // Pass database ID from state (loaded from workspace)
         files: projectFiles, // Current project files
         fileTree: await buildProjectFileTree(), // Current file tree
         modelId: selectedModel,
@@ -1904,7 +1927,7 @@ export function ChatPanelV2({
           id: project?.id, // Chat session ID for server-side storage
           projectId: project?.id,
           project,
-          databaseId: project?.databaseId, // Pass database ID from workspace
+          databaseId, // Pass database ID from state (loaded from workspace)
           fileTree, // Use client-built file tree instead of raw files
           files: projectFiles, // Keep raw files for tool operations (now refreshed)
           modelId: selectedModel,
