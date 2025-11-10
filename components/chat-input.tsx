@@ -1392,68 +1392,14 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   </PopoverContent>
                 </Popover>
 
-                {/* Model Selector */}
-                <ModelSelector
-                  onOpenChange={setModelSelectorOpen}
-                  open={modelSelectorOpen}
-                >
-                  <ModelSelectorTrigger asChild>
-                    <PromptInputButton className="bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 hover:text-white">
-                      {selectedModelData?.chefSlug && (
-                        <ModelSelectorLogo provider={selectedModelData.chefSlug} />
-                      )}
-                      {selectedModelData?.name && (
-                        <ModelSelectorName className="text-sm">
-                          {selectedModelData.name}
-                        </ModelSelectorName>
-                      )}
-                    </PromptInputButton>
-                  </ModelSelectorTrigger>
-                  <ModelSelectorContent>
-                    <ModelSelectorInput placeholder="Search models..." />
-                    <ModelSelectorList>
-                      <ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
-                      {["PiPilot", "PiPilot Advanced", "PiPilot Premium"].map((chef) => (
-                        <ModelSelectorGroup heading={chef} key={chef}>
-                          {models
-                            .filter((m) => m.chef === chef)
-                            .map((m) => (
-                              <ModelSelectorItem
-                                key={m.id}
-                                onSelect={() => {
-                                  setSelectedModel(m.id)
-                                  setModelSelectorOpen(false)
-                                }}
-                                value={m.id}
-                              >
-                                <ModelSelectorLogo provider={m.chefSlug} />
-                                <ModelSelectorName>{m.name}</ModelSelectorName>
-                                {selectedModel === m.id ? (
-                                  <CheckIcon className="ml-auto size-4" />
-                                ) : (
-                                  <div className="ml-auto size-4" />
-                                )}
-                              </ModelSelectorItem>
-                            ))}
-                        </ModelSelectorGroup>
-                      ))}
-                    </ModelSelectorList>
-                  </ModelSelectorContent>
-                </ModelSelector>
+            
               </PromptInputTools>
 
               {/* Right Side - Only Submit Button */}
               <PromptInputSubmit
                 disabled={!prompt.trim() && !githubRepoUrl.trim() && !gitlabRepoUrl.trim() || isGenerating}
-                className="w-8 h-8 rounded-full bg-gray-700/50 hover:bg-gray-600/50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-400 hover:text-white"
                 status={isGenerating ? 'submitted' : undefined}
-              >
-                {isGenerating ? (
-                  <Square className="w-4 h-4" />
-                ) : (
-                  <ArrowUp className="w-4 h-4" />
-                )}
-              </PromptInputSubmit>
+              />    
             </PromptInputFooter>
           </PromptInput>
         </div>
