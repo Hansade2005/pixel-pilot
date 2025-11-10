@@ -2309,6 +2309,7 @@ export function ChatPanelV2({
       recognition.continuous = true
       recognition.interimResults = true // Enable instant real-time results
       recognition.lang = 'en-US'
+      // @ts-ignore - maxAlternatives is supported but not in the TypeScript types
       recognition.maxAlternatives = 1
 
       // Store the initial input value when starting

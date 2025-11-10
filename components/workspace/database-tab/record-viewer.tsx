@@ -119,40 +119,40 @@ export function RecordViewer({
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-3 gap-3 mb-4">
+        {/* Stats Cards - Compact */}
+        <div className="grid grid-cols-3 gap-2 mb-3">
           <Card>
-            <CardContent className="p-3">
+            <CardContent className="p-2">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Records</p>
-                  <p className="text-2xl font-bold">{records.length}</p>
+                  <p className="text-lg font-bold">{records.length}</p>
                 </div>
-                <Database className="h-4 w-4 text-muted-foreground" />
+                <Database className="h-3 w-3 text-muted-foreground" />
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-3">
+            <CardContent className="p-2">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Columns</p>
-                  <p className="text-2xl font-bold">{schema.columns?.length || 0}</p>
+                  <p className="text-lg font-bold">{schema.columns?.length || 0}</p>
                 </div>
-                <TableIcon className="h-4 w-4 text-muted-foreground" />
+                <TableIcon className="h-3 w-3 text-muted-foreground" />
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-3">
+            <CardContent className="p-2">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Table ID</p>
-                  <p className="text-sm font-medium">{table.id}</p>
+                  <p className="text-xs font-medium">{table.id}</p>
                 </div>
-                <Code className="h-4 w-4 text-muted-foreground" />
+                <Code className="h-3 w-3 text-muted-foreground" />
               </div>
             </CardContent>
           </Card>
@@ -161,13 +161,13 @@ export function RecordViewer({
         {/* Action Buttons */}
         <div className="flex items-center justify-between">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-            <TabsList>
-              <TabsTrigger value="records">
-                <Database className="h-4 w-4 mr-2" />
+            <TabsList className="h-8">
+              <TabsTrigger value="records" className="text-xs h-7">
+                <Database className="h-3 w-3 mr-1.5" />
                 Records
               </TabsTrigger>
-              <TabsTrigger value="schema">
-                <Code className="h-4 w-4 mr-2" />
+              <TabsTrigger value="schema" className="text-xs h-7">
+                <Code className="h-3 w-3 mr-1.5" />
                 Schema
               </TabsTrigger>
             </TabsList>
@@ -179,18 +179,20 @@ export function RecordViewer({
               size="sm"
               onClick={() => exportTableData("json")}
               title="Export as JSON"
+              className="h-8"
             >
-              <FileJson className="h-4 w-4 mr-2" />
-              JSON
+              <FileJson className="h-3 w-3 mr-1.5" />
+              <span className="text-xs">JSON</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => exportTableData("csv")}
               title="Export as CSV"
+              className="h-8"
             >
-              <FileText className="h-4 w-4 mr-2" />
-              CSV
+              <FileText className="h-3 w-3 mr-1.5" />
+              <span className="text-xs">CSV</span>
             </Button>
             <Button
               variant="outline"
@@ -198,17 +200,18 @@ export function RecordViewer({
               onClick={onRefresh}
               disabled={loading}
               title="Refresh records"
+              className="h-8 px-2"
             >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
             </Button>
             <AddRecordDialog
               table={table}
               databaseId={databaseId}
               onSuccess={onRefresh}
             >
-              <Button size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Record
+              <Button size="sm" className="h-8">
+                <Plus className="h-3 w-3 mr-1.5" />
+                <span className="text-xs">Add Record</span>
               </Button>
             </AddRecordDialog>
           </div>

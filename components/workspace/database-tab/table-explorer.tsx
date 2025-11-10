@@ -96,20 +96,20 @@ export function TableExplorer({
                 )}
                 onClick={() => onTableSelect(table)}
               >
-                <CardContent className="p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-start gap-2 flex-1 min-w-0">
-                      <TableIcon className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <CardContent className="p-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <TableIcon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm truncate">
+                        <div className="font-medium text-xs truncate">
                           {table.name}
                         </div>
-                        <div className="text-xs text-muted-foreground mt-1">
+                        <div className="text-[10px] text-muted-foreground mt-0.5">
                           {table.recordCount} record{table.recordCount !== 1 ? "s" : ""}
                         </div>
                       </div>
                     </div>
-                    <Badge variant="secondary" className="text-xs flex-shrink-0">
+                    <Badge variant="secondary" className="text-[10px] h-4 px-1.5 flex-shrink-0">
                       {(table.schema_json as any).columns?.length || 0} cols
                     </Badge>
                   </div>

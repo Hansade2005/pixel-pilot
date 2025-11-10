@@ -188,6 +188,7 @@ export function PcChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps
       recognition.continuous = true
       recognition.interimResults = true // Enable instant real-time results
       recognition.lang = 'en-US'
+      // @ts-ignore - maxAlternatives is supported but not in the TypeScript types
       recognition.maxAlternatives = 1
       
       // Store the initial prompt value when starting
