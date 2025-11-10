@@ -1494,7 +1494,7 @@ Begin with a concise checklist  use check box emojis filled and unfilled.
 ## Tools
 - **Client-Side (IndexedDB)**: \`read_file\` (with line numbers), \`write_file\`, \`edit_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`, \`create_database\`
 - **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers),\`grep_search\`, \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync)
-- **Database Tools**: \`create_table\`, \`list_tables\`, \`query_database\`, \`manipulate_table_data\`, \`manage_api_keys\`
+- **Database Tools**: \`create_table\`, \`list_tables\`, \`read_table\`, \`delete_table\`, \`query_database\`, \`manipulate_table_data\`, \`manage_api_keys\`
 
 ## PiPilot DB Integration
 For **authentication, database, or file storage**:
@@ -1504,18 +1504,22 @@ For **authentication, database, or file storage**:
 - 🛠️ Strictly use documented patterns and endpoints
 
 ### 🗄️ Database Automation Tools
-**Complete database workflow in 5 simple steps:**
+**Complete database workflow in 7 simple steps:**
 1. **\`create_database\`** - Creates database with auto-generated users table (client-side)
 2. **\`create_table\`** - AI-powered schema generation from natural language descriptions
 3. **\`list_tables\`** - Discover all tables in a database with optional schema and record counts
-4. **\`query_database\`** - Advanced MySQL-like querying with auto-detection, filtering, sorting, pagination
-5. **\`manipulate_table_data\`** - Full CRUD operations (insert, update, delete) with bulk support
-6. **\`manage_api_keys\`** - Generate secure API keys for external database access
+4. **\`read_table\`** - Get detailed table info, schema, structure, and statistics
+5. **\`delete_table\`** - Delete a table and all its records (destructive, requires confirmation)
+6. **\`query_database\`** - Advanced MySQL-like querying with auto-detection, filtering, sorting, pagination
+7. **\`manipulate_table_data\`** - Full CRUD operations (insert, update, delete) with bulk support
+8. **\`manage_api_keys\`** - Generate secure API keys for external database access
 
 **Features:**
 - 🤖 **AI Schema Generation**: Describe your table needs, get optimized database schema
 - 🔍 **Auto-Detection**: Tools automatically find your project's database
 - 📋 **Table Discovery**: List all tables with schemas and record counts before operations
+- 📖 **Table Inspection**: Read detailed table structure and metadata
+- 🗑️ **Safe Deletion**: Delete tables with confirmation safeguards
 - 🚀 **MySQL-Like Syntax**: Familiar WHERE, ORDER BY, JOIN operations  
 - 📊 **Advanced Queries**: JSONB field querying, complex filtering, pagination
 - 🔐 **Secure Access**: API key management for external integrations
@@ -4489,6 +4493,251 @@ ${conversationSummaryContext || ''}`
                 success: false,
                 error: `Failed to list tables: ${error instanceof Error ? error.message : 'Unknown error'}`,
                 databaseId: dbId,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        read_table: tool({
+          description: 'Get detailed information about a specific table including its schema, structure, metadata, and statistics. Use this to inspect table definition before modifying or querying data.',
+          inputSchema: z.object({
+            tableId: z.number().describe('The unique ID of the table to read (get from list_tables tool)'),
+            includeRecordCount: z.boolean().optional().describe('Include total record count in the response (default: true)')
+          }),
+          execute: async ({ tableId, includeRecordCount = true }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            // Check time budget
+            if (!timeStatus.shouldContinue) {
+              return {
+                success: false,
+                error: `⏱️ Time budget exceeded (${timeStatus.elapsed}ms). ${timeStatus.warningMessage}`,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              // Get database ID
+              const dbId = databaseId;
+              if (!dbId) {
+                return {
+                  success: false,
+                  error: 'No database found for this project. Create a database first using the database panel.',
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              // Call the read table API endpoint
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${dbId}/tables/${tableId}`, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                }
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['read_table'] = (toolExecutionTimes['read_table'] || 0) + executionTime;
+
+              if (!response.ok || !result.table) {
+                console.error('[ERROR] Read table failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to read table: ${result.error || 'Table not found'}`,
+                  databaseId: dbId,
+                  tableId,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              const table = result.table;
+
+              // Optionally get record count
+              let recordCount = undefined;
+              if (includeRecordCount) {
+                try {
+                  const countResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${dbId}/tables/${tableId}/records`, {
+                    method: 'GET',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    }
+                  });
+                  const countData = await countResponse.json();
+                  recordCount = countData.total || 0;
+                } catch (err) {
+                  console.warn('[WARN] Failed to get record count:', err);
+                }
+              }
+
+              // Format table information
+              const schema = table.schema_json || {};
+              const tableInfo = {
+                id: table.id,
+                name: table.name,
+                databaseId: table.database_id,
+                createdAt: table.created_at,
+                updatedAt: table.updated_at,
+                recordCount,
+                schema: {
+                  columnCount: schema.columns?.length || 0,
+                  columns: schema.columns?.map((col: any) => ({
+                    name: col.name,
+                    type: col.type,
+                    required: col.required || false,
+                    unique: col.unique || false,
+                    defaultValue: col.defaultValue,
+                    description: col.description,
+                    references: col.references
+                  })) || [],
+                  indexes: schema.indexes || [],
+                  constraints: schema.constraints || []
+                }
+              };
+
+              console.log('[SUCCESS] Table read:', { tableId, name: table.name, columns: tableInfo.schema.columnCount });
+              return {
+                success: true,
+                message: `✅ Successfully read table "${table.name}" with ${tableInfo.schema.columnCount} column(s)${recordCount !== undefined ? ` and ${recordCount} record(s)` : ''}`,
+                table: tableInfo,
+                databaseId: dbId,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['read_table'] = (toolExecutionTimes['read_table'] || 0) + executionTime;
+              
+              console.error('[ERROR] Read table failed:', error);
+              return {
+                success: false,
+                error: `Failed to read table: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                tableId,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        delete_table: tool({
+          description: 'Delete a table and all its records from the database. THIS IS DESTRUCTIVE and cannot be undone.',
+          inputSchema: z.object({
+            tableId: z.number().describe('The unique ID of the table to delete (get from list_tables tool)')
+          }),
+          execute: async ({ tableId }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            // Check time budget
+            if (!timeStatus.shouldContinue) {
+              return {
+                success: false,
+                error: `⏱️ Time budget exceeded (${timeStatus.elapsed}ms). ${timeStatus.warningMessage}`,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              // Get database ID
+              const dbId = databaseId;
+              if (!dbId) {
+                return {
+                  success: false,
+                  error: 'No database found for this project.',
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              // First, get table info for confirmation message
+              const readResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${dbId}/tables/${tableId}`, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                }
+              });
+
+              if (!readResponse.ok) {
+                return {
+                  success: false,
+                  error: 'Table not found or already deleted',
+                  databaseId: dbId,
+                  tableId,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              const tableData = await readResponse.json();
+              const tableName = tableData.table?.name || 'Unknown';
+
+              // Call the delete table API endpoint
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/database/${dbId}/tables/${tableId}`, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json',
+                }
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['delete_table'] = (toolExecutionTimes['delete_table'] || 0) + executionTime;
+
+              if (!response.ok) {
+                console.error('[ERROR] Delete table failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to delete table: ${result.error || 'Unknown error'}`,
+                  databaseId: dbId,
+                  tableId,
+                  tableName,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              const deletedRecords = result.deletedRecords || 0;
+
+              console.log('[SUCCESS] Table deleted:', { tableId, tableName, deletedRecords });
+              return {
+                success: true,
+                message: `✅ Successfully deleted table "${tableName}" and ${deletedRecords} record(s)`,
+                tableId,
+                tableName,
+                deletedRecords,
+                databaseId: dbId,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['delete_table'] = (toolExecutionTimes['delete_table'] || 0) + executionTime;
+              
+              console.error('[ERROR] Delete table failed:', error);
+              return {
+                success: false,
+                error: `Failed to delete table: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                tableId,
                 toolCallId,
                 executionTimeMs: executionTime,
                 timeWarning: timeStatus.warningMessage
