@@ -1,17 +1,8 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import {
-  ArrowUp,
-  Plus,
-  Image as ImageIcon,
   Zap,
-  Mic,
-  MicOff,
-  Square,
   Sparkles,
   Link as LinkIcon,
   X,
@@ -1113,107 +1104,91 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   return (
     <div className="w-full max-w-4xl mx-auto">
       {/* Main Chat Input */}
-      <div className="relative">
-        <div className="bg-gray-800/80 chat-input-container border border-white rounded-3xl p-4 shadow-2xl">
-          {/* Loading Overlay */}
-          {isGenerating && (
-            <div className="absolute inset-0 bg-gray-800/96 backdrop-blur-sm rounded-3xl flex items-center justify-center z-20 border border-white">
-              <div className="flex items-center gap-3 text-white">
-                <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-lg font-medium">PiPilot is working...</span>
+      <PromptInput
+        onSubmit={(message, e) => {
+          e.preventDefault()
+          handleSubmit(e as any)
+        }}
+      >
+        {/* Custom URL/GitHub/GitLab Attachment Pills in Header */}
+        <PromptInputHeader>
+          {/* URL Attachment Pills */}
+          {attachedUrl && (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 bg-blue-900/20 border border-blue-700/30 px-3 py-1.5 rounded-full text-sm text-blue-300">
+                <LinkIcon className="w-3 h-3" />
+                <span className="truncate max-w-[200px]">{attachedUrl}</span>
+                <button
+                  onClick={handleRemoveUrl}
+                  type="button"
+                  className="ml-1 text-blue-400 hover:text-blue-200 transition-colors"
+                  title="Remove URL"
+                >
+                  <X className="w-3 h-3" />
+                </button>
               </div>
             </div>
           )}
 
-          {/* Migrated PromptInput Component */}
-          <PromptInput
-            onSubmit={(message, e) => {
-              e.preventDefault()
-              handleSubmit(e as any)
+          {/* GitHub Repository Attachment Pills */}
+          {githubRepoUrl && (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 bg-gray-900/20 border border-gray-700/30 px-3 py-1.5 rounded-full text-sm text-gray-300">
+                <Github className="w-3 h-3" />
+                <span className="truncate max-w-[200px]">{githubRepoUrl}</span>
+                <button
+                  onClick={handleRemoveGithub}
+                  type="button"
+                  className="ml-1 text-gray-400 hover:text-gray-200 transition-colors"
+                  title="Remove GitHub repository"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* GitLab Repository Attachment Pills */}
+          {gitlabRepoUrl && (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 bg-orange-900/20 border border-orange-700/30 px-3 py-1.5 rounded-full text-sm text-orange-300">
+                <Gitlab className="w-3 h-3" />
+                <span className="truncate max-w-[200px]">{gitlabRepoUrl}</span>
+                <button
+                  onClick={handleRemoveGitlab}
+                  type="button"
+                  className="ml-1 text-orange-400 hover:text-orange-200 transition-colors"
+                  title="Remove GitLab repository"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          )}
+        </PromptInputHeader>
+
+        {/* Main Input Body */}
+        <PromptInputBody>
+          <PromptInputTextarea
+            ref={inputRef}
+            placeholder={isGenerating ? "PiPilot is working..." : "Describe your app idea..."}
+            value={prompt}
+            onChange={(e) => {
+              setPrompt(e.target.value)
             }}
-            className="space-y-4"
-          >
-            {/* Custom URL/GitHub/GitLab Attachment Pills in Header */}
-            <PromptInputHeader>
-              {/* URL Attachment Pills */}
-              {attachedUrl && (
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1 bg-blue-900/20 border border-blue-700/30 px-3 py-1.5 rounded-full text-sm text-blue-300">
-                    <LinkIcon className="w-3 h-3" />
-                    <span className="truncate max-w-[200px]">{attachedUrl}</span>
-                    <button
-                      onClick={handleRemoveUrl}
-                      type="button"
-                      className="ml-1 text-blue-400 hover:text-blue-200 transition-colors"
-                      title="Remove URL"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              )}
+            disabled={isGenerating}
+          />
+        </PromptInputBody>
 
-              {/* GitHub Repository Attachment Pills */}
-              {githubRepoUrl && (
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1 bg-gray-900/20 border border-gray-700/30 px-3 py-1.5 rounded-full text-sm text-gray-300">
-                    <Github className="w-3 h-3" />
-                    <span className="truncate max-w-[200px]">{githubRepoUrl}</span>
-                    <button
-                      onClick={handleRemoveGithub}
-                      type="button"
-                      className="ml-1 text-gray-400 hover:text-gray-200 transition-colors"
-                      title="Remove GitHub repository"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* GitLab Repository Attachment Pills */}
-              {gitlabRepoUrl && (
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1 bg-orange-900/20 border border-orange-700/30 px-3 py-1.5 rounded-full text-sm text-orange-300">
-                    <Gitlab className="w-3 h-3" />
-                    <span className="truncate max-w-[200px]">{gitlabRepoUrl}</span>
-                    <button
-                      onClick={handleRemoveGitlab}
-                      type="button"
-                      className="ml-1 text-orange-400 hover:text-orange-200 transition-colors"
-                      title="Remove GitLab repository"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </PromptInputHeader>
-
-            {/* Main Input Body */}
-            <PromptInputBody>
-              <PromptInputTextarea
-                ref={inputRef}
-                placeholder={isGenerating ? "PiPilot is working..." : "Describe your app idea..."}
-                value={prompt}
-                onChange={(e) => {
-                  setPrompt(e.target.value)
-                }}
-                disabled={isGenerating}
-                className="w-full bg-transparent outline-none text-lg text-white placeholder-gray-400 py-3 px-4 resize-none overflow-y-auto min-h-[60px] max-h-[200px]"
-              />
-            </PromptInputBody>
-
-            {/* Footer with Tools and Actions */}
-            <PromptInputFooter className="flex items-center justify-between pt-2 border-t border-gray-700/50">
-              {/* Left Side Tools */}
-              <PromptInputTools className="flex items-center space-x-3">
+        {/* Footer with Tools and Actions */}
+        <PromptInputFooter>
+          {/* Left Side Tools */}
+          <PromptInputTools>
                 {/* URL Attachment Popover */}
                 <Popover open={showUrlPopover} onOpenChange={setShowUrlPopover}>
                   <PopoverTrigger asChild>
                     <PromptInputButton
                       disabled={isGenerating}
-                      className="w-8 h-8 rounded-full bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Attach website URL"
                     >
                       <LinkIcon className="w-4 h-4" />
@@ -1253,13 +1228,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   textareaRef={inputRef}
                   onTranscriptionChange={setPrompt}
                   disabled={isTranscribing || isGenerating}
-                  className={`w-8 h-8 rounded-full ${
-                    isRecording 
-                      ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse' 
-                      : isTranscribing
-                      ? 'bg-gray-600/50 cursor-wait'
-                      : 'bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-white'
-                  }`}
                   title={isRecording ? "Stop recording" : isTranscribing ? "Transcribing..." : "Start voice input"}
                 />
 
@@ -1267,11 +1235,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                 <PromptInputButton
                   onClick={handlePromptEnhancement}
                   disabled={!prompt.trim() || isEnhancing || isGenerating}
-                  className={`w-8 h-8 rounded-full disabled:opacity-50 disabled:cursor-not-allowed ${
-                    isEnhancing
-                      ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
-                      : 'bg-gray-700/50 hover:bg-gradient-to-r hover:from-purple-600/80 hover:to-blue-600/80 text-gray-400 hover:text-white'
-                  }`}
                   title="Enhance prompt with AI"
                 >
                   {isEnhancing ? (
@@ -1311,7 +1274,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   <PopoverTrigger asChild>
                     <PromptInputButton
                       disabled={isGenerating || isImportingGithub}
-                      className="w-8 h-8 rounded-full bg-gray-700/50 hover:bg-gray-600/50 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Import from GitHub"
                     >
                       <Github className="w-4 h-4" />
@@ -1331,6 +1293,12 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                           placeholder="https://github.com/owner/repo"
                           value={githubInput}
                           onChange={(e) => setGithubInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              handleGithubAttachment()
+                            }
+                          }}
                           className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                           autoFocus
                         />
@@ -1351,7 +1319,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   <PopoverTrigger asChild>
                     <PromptInputButton
                       disabled={isGenerating || isImportingGitlab}
-                      className="w-8 h-8 rounded-full bg-gray-700/50 hover:bg-gray-600/50 text-orange-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Import from GitLab"
                     >
                       <Gitlab className="w-4 h-4" />
@@ -1398,12 +1365,12 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                   open={modelSelectorOpen}
                 >
                   <ModelSelectorTrigger asChild>
-                    <PromptInputButton className="bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 hover:text-white">
+                    <PromptInputButton>
                       {selectedModelData?.chefSlug && (
                         <ModelSelectorLogo provider={selectedModelData.chefSlug} />
                       )}
                       {selectedModelData?.name && (
-                        <ModelSelectorName className="text-sm">
+                        <ModelSelectorName>
                           {selectedModelData.name}
                         </ModelSelectorName>
                       )}
@@ -1442,22 +1409,13 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                 </ModelSelector>
               </PromptInputTools>
 
-              {/* Right Side - Only Submit Button */}
-              <PromptInputSubmit
-                disabled={!prompt.trim() && !githubRepoUrl.trim() && !gitlabRepoUrl.trim() || isGenerating}
-                className="w-8 h-8 rounded-full bg-gray-700/50 hover:bg-gray-600/50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-400 hover:text-white"
-                status={isGenerating ? 'submitted' : undefined}
-              >
-                {isGenerating ? (
-                  <Square className="w-4 h-4" />
-                ) : (
-                  <ArrowUp className="w-4 h-4" />
-                )}
-              </PromptInputSubmit>
-            </PromptInputFooter>
-          </PromptInput>
-        </div>
-      </div>
+          {/* Submit Button */}
+          <PromptInputSubmit
+            disabled={!prompt.trim() && !githubRepoUrl.trim() && !gitlabRepoUrl.trim() || isGenerating}
+            status={isGenerating ? 'submitted' : 'ready'}
+          />
+        </PromptInputFooter>
+      </PromptInput>
 
       {/* Suggestion Pills */}
       {suggestions.length > 0 && (
