@@ -2838,6 +2838,7 @@ export function ChatPanelV2({
             <Textarea
               ref={textareaRef}
               value={input}
+              disabled={isLoading}
               onChange={(e) => {
                 const newValue = e.target.value
                 setInput(newValue)
@@ -3073,6 +3074,7 @@ export function ChatPanelV2({
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
+                  disabled={isLoading}
                 >
                   <Plus className="size-4" />
                 </Button>
@@ -3126,7 +3128,7 @@ export function ChatPanelV2({
               size="icon"
               className="h-8 w-8"
               onClick={handleMicrophoneClick}
-              disabled={isTranscribing}
+              disabled={isTranscribing || isLoading}
             >
               {isRecording ? <MicOff className="size-4" /> : <Mic className="size-4" />}
             </Button>
