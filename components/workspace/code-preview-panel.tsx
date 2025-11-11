@@ -1,51 +1,67 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Input } from "@/components/ui/input"
-import { Code, Eye, FileText, Download, ExternalLink, RotateCcw, Play, Square, Terminal, Package, Trash2, Copy } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
-import type { Workspace as Project } from "@/lib/storage-manager"
-import { useIsMobile } from "@/hooks/use-mobile"
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import {
+  Code,
+  Eye,
+  FileText,
+  Download,
+  ExternalLink,
+  RotateCcw,
+  Play,
+  Square,
+  Terminal,
+  Package,
+  Trash2,
+  Copy
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import type { Workspace as Project } from "@/lib/storage-manager";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   WebPreview,
   WebPreviewNavigation,
   WebPreviewNavigationButton,
   WebPreviewUrl,
   WebPreviewBody,
-  WebPreviewConsole
-} from "@/components/ai-elements/web-preview"
+  WebPreviewConsole,
+  WebPreviewDeviceSelector,
+  DEVICE_PRESETS
+} from "@/components/ai-elements/web-preview";
 
 interface CodePreviewPanelProps {
-  project: Project | null
-  activeTab: "code" | "preview"
-  onTabChange: (tab: "code" | "preview") => void
-  previewViewMode?: 'desktop' | 'mobile'
+  project: Project | null;
+  activeTab: "code" | "preview";
+  onTabChange: (tab: "code" | "preview") => void;
+  previewViewMode?: "desktop" | "mobile";
 }
 
 export interface CodePreviewPanelRef {
-  createPreview: () => void
-  cleanupSandbox: () => void
-  openStackBlitz: () => void
-  refreshPreview: () => void
-  preview: PreviewState
-  isStackBlitzLoading: boolean
+  createPreview: () => void;
+  cleanupSandbox: () => void;
+  openStackBlitz: () => void;
+  refreshPreview: () => void;
+  preview: PreviewState;
+  isStackBlitzLoading: boolean;
 }
 
 interface PreviewState {
-  sandboxId: string | null
-  url: string | null
-  isLoading: boolean
-  processId: string | null
+  sandboxId: string | null;
+  url: string | null;
+  isLoading: boolean;
+  processId: string | null;
 }
 
-export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanelProps>(({ project, activeTab, onTabChange, previewViewMode = 'desktop' }, ref) => {
-  const { toast } = useToast()
-  const isMobile = useIsMobile()
-  const [preview, setPreview] = useState<PreviewState>({
-    sandboxId: null,
-    url: null,
+export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanelProps>(
+  ({ project, activeTab, onTabChange, previewViewMode = "desktop" }, ref) => {
+    const { toast } = useToast();
+    const isMobile = useIsMobile();
+    const [preview, setPreview] = useState<PreviewState>({
+      sandboxId: null,
+      url: null,
     isLoading: false,
     processId: null,
   })
@@ -1339,6 +1355,7 @@ export default function TodoApp() {
           <WebPreview
             className="h-full"
             defaultUrl={preview.url || ""}
+            defaultDevice={previewViewMode === 'mobile' ? DEVICE_PRESETS.find(d => d.name === 'iPhone 12/13') || null : null}
             onUrlChange={(url) => {
               setCustomUrl(url)
               // Update preview state if needed
@@ -1346,38 +1363,37 @@ export default function TodoApp() {
             }}
           >
             <WebPreviewNavigation>
-              <div className="flex items-center gap-2 flex-1">
-                <WebPreviewNavigationButton
-                  onClick={createPreview}
-                  disabled={!project || preview.isLoading}
-                  tooltip="Start Preview"
-                >
-                  <Play className="h-4 w-4" />
-                </WebPreviewNavigationButton>
-                <WebPreviewNavigationButton
-                  onClick={refreshPreview}
-                  disabled={!preview.url}
-                  tooltip="Refresh Preview"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                </WebPreviewNavigationButton>
-                <WebPreviewNavigationButton
-                  onClick={cleanupSandbox}
-                  disabled={!preview.sandboxId}
-                  tooltip="Stop Preview"
-                >
-                  <Square className="h-4 w-4" />
-                </WebPreviewNavigationButton>
-                <WebPreviewNavigationButton
-                  onClick={openStackBlitz}
-                  disabled={!project}
-                  tooltip="Open in StackBlitz"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                </WebPreviewNavigationButton>
-                <div className="flex-1" />
-                <WebPreviewUrl />
-              </div>
+              <WebPreviewNavigationButton
+                onClick={createPreview}
+                disabled={!project || preview.isLoading}
+                tooltip="Start Preview"
+              >
+                <Play className="h-4 w-4" />
+              </WebPreviewNavigationButton>
+              <WebPreviewNavigationButton
+                onClick={refreshPreview}
+                disabled={!preview.url}
+                tooltip="Refresh Preview"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </WebPreviewNavigationButton>
+              <WebPreviewNavigationButton
+                onClick={cleanupSandbox}
+                disabled={!preview.sandboxId}
+                tooltip="Stop Preview"
+              >
+                <Square className="h-4 w-4" />
+              </WebPreviewNavigationButton>
+              <WebPreviewNavigationButton
+                onClick={openStackBlitz}
+                disabled={!project}
+                tooltip="Open in StackBlitz"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </WebPreviewNavigationButton>
+              <div className="flex-1" />
+              <WebPreviewDeviceSelector />
+              <WebPreviewUrl />
             </WebPreviewNavigation>
 
             <div className={`flex-1 min-h-0 ${isMobile ? 'pb-48' : ''}`}>
@@ -1397,30 +1413,14 @@ export default function TodoApp() {
                   </p>
                 </div>
               ) : preview.url ? (
-                previewViewMode === 'mobile' ? (
-                  <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 p-4">
-                    <div className={`w-80 border-8 border-gray-300 dark:border-gray-600 rounded-[2rem] shadow-2xl bg-white overflow-hidden flex flex-col ${isMobile ? 'h-[calc(100%-12rem)]' : 'h-full max-h-[600px]'}`}>
-                      <WebPreviewBody
-                        src={preview.url}
-                        className="w-full flex-1 rounded-[1.5rem] border-none"
-                        ref={(iframe) => {
-                          if (iframe) {
-                            injectConsoleInterceptor(iframe)
-                          }
-                        }}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <WebPreviewBody
-                    src={preview.url}
-                    ref={(iframe) => {
-                      if (iframe) {
-                        injectConsoleInterceptor(iframe)
-                      }
-                    }}
-                  />
-                )
+                <WebPreviewBody
+                  src={preview.url}
+                  ref={(iframe) => {
+                    if (iframe) {
+                      injectConsoleInterceptor(iframe)
+                    }
+                  }}
+                />
               ) : (
                 <div className="h-full flex items-center justify-center p-8">
                   <div className="text-center">
