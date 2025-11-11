@@ -70,7 +70,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   
   // Mobile-specific state
   const isMobile = useIsMobile()
-  const [mobileTab, setMobileTab] = useState<"chat" | "files" | "editor" | "preview">("chat")
+  const [mobileTab, setMobileTab] = useState<"chat" | "files" | "editor" | "preview" | "database">("chat")
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_CHAT_MODEL)
   const [aiMode, setAiMode] = useState<AIMode>('agent')
@@ -165,7 +165,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       if (shouldSwitchToPreview) {
         // Switch to preview tab
         setActiveTab('preview')
-        console.log('[WorkspaceLayout] Switched to preview tab after AI streaming')
+        // Also switch mobile tab to preview on mobile devices
+        if (isMobile) {
+          setMobileTab('preview')
+        }
+        console.log('[WorkspaceLayout] Switched to preview tab after AI streaming', { isMobile })
       }
 
       if (shouldCreatePreview) {
@@ -913,7 +917,11 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               onSettings={() => window.open('/workspace/management', '_blank')}
               onDeploy={() => router.push(`/workspace/deployment?project=${selectedProject?.id}`)}
               onDatabase={() => {
-                if (selectedProject) {
+                if (isMobile) {
+                  // Switch to database tab on mobile
+                  setMobileTab('database')
+                } else if (selectedProject) {
+                  // Navigate to database page on desktop
                   router.push(`/workspace/${selectedProject.id}/database`)
                 }
               }}
@@ -1545,13 +1553,19 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                     />
                   </div>
                 </TabsContent>
+                
+                <TabsContent value="database" className="flex-1 m-0 data-[state=active]:flex data-[state=active]:flex-col">
+                  <div className="h-full overflow-hidden">
+                    <DatabaseTab workspaceId={selectedProject?.id || ""} />
+                  </div>
+                </TabsContent>
               </Tabs>
             )}
           </div>
 
           {/* Fixed Mobile Bottom Tab Navigation */}
           <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">
-            <div className="grid grid-cols-4 h-12">
+            <div className="grid grid-cols-5 h-12">
               <button
                 onClick={() => setMobileTab("chat")}
                 className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
@@ -1587,6 +1601,15 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               >
                 <Eye className="h-4 w-4" />
                 <span className="text-xs">Preview</span>
+              </button>
+              <button
+                onClick={() => setMobileTab("database")}
+                className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
+                  mobileTab === "database" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Database className="h-4 w-4" />
+                <span className="text-xs">Database</span>
               </button>
             </div>
           </div>

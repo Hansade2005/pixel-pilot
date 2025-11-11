@@ -119,43 +119,23 @@ export function RecordViewer({
           </div>
         </div>
 
-        {/* Stats Cards - Compact */}
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          <Card>
-            <CardContent className="p-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Records</p>
-                  <p className="text-lg font-bold">{records.length}</p>
-                </div>
-                <Database className="h-3 w-3 text-muted-foreground" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Columns</p>
-                  <p className="text-lg font-bold">{schema.columns?.length || 0}</p>
-                </div>
-                <TableIcon className="h-3 w-3 text-muted-foreground" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Table ID</p>
-                  <p className="text-xs font-medium">{table.id}</p>
-                </div>
-                <Code className="h-3 w-3 text-muted-foreground" />
-              </div>
-            </CardContent>
-          </Card>
+        {/* Stats - Button Style Layout */}
+        <div className="flex items-center gap-4 mb-3 p-2 border border-border rounded-md bg-background">
+          <div className="flex items-center gap-2">
+            <Database className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Records:</span>
+            <span className="text-xs font-medium">{records.length}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <TableIcon className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Columns:</span>
+            <span className="text-xs font-medium">{schema.columns?.length || 0}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Code className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">ID:</span>
+            <span className="text-xs font-medium font-mono">{table.id}</span>
+          </div>
         </div>
 
         {/* Action Buttons */}

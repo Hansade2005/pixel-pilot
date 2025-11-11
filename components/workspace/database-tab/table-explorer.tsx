@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Table as TableIcon,
@@ -88,33 +87,21 @@ export function TableExplorer({
         ) : (
           <div className="space-y-1">
             {filteredTables.map((table) => (
-              <Card
+              <Button
                 key={table.id}
+                variant={selectedTable?.id === table.id ? "secondary" : "ghost"}
                 className={cn(
-                  "cursor-pointer transition-colors hover:bg-accent",
+                  "w-full justify-start h-8 px-3 text-left",
                   selectedTable?.id === table.id && "bg-accent border-primary"
                 )}
                 onClick={() => onTableSelect(table)}
               >
-                <CardContent className="p-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <TableIcon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-xs truncate">
-                          {table.name}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground mt-0.5">
-                          {table.recordCount} record{table.recordCount !== 1 ? "s" : ""}
-                        </div>
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="text-[10px] h-4 px-1.5 flex-shrink-0">
-                      {(table.schema_json as any).columns?.length || 0} cols
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
+                <TableIcon className="h-3 w-3 mr-2 flex-shrink-0" />
+                <span className="truncate flex-1 text-xs">{table.name}</span>
+                <span className="text-[10px] text-muted-foreground ml-2 flex-shrink-0">
+                  {table.recordCount}
+                </span>
+              </Button>
             ))}
           </div>
         )}
