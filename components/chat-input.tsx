@@ -990,107 +990,45 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
   }
 
 
-
-
-
   return (
     <div className="w-full max-w-4xl mx-auto">
       {/* Main Chat Input */}
-      <div className="relative max-h-full min-h-[80px] z-40" style={{ opacity: 1 }}>
-        {/* Outer shadow layer */}
-        <div 
-          className="absolute inset-0" 
-          style={{ 
-            borderRadius: '32px', 
-            boxShadow: 'rgba(0, 0, 0, 0.5) 0px 16px 24px -2px',
-            opacity: 1 
-          }}
-        ></div>
-        
-        {/* Solid background container */}
-        <div 
-          className="relative bg-gray-800/80 chat-input-container border border-white rounded-3xl p-4 shadow-2xl"
-          style={{ 
-            borderRadius: '32px',
-            boxShadow: 'rgba(255, 255, 255, 0) 0px 16px 48px -2px',
-            opacity: 1 
-          }}
-        >
-          {/* Inner content wrapper with inset shadow */}
-          <div 
-            className="pointer-events-auto relative flex flex-col overflow-hidden contrast-more:border-2"
-            data-testid="composer-content"
-            style={{ 
-              borderRadius: '32px',
-              boxShadow: 'rgba(255, 255, 255, 0.08) 0px 0px 0px 1px inset',
-              opacity: 1 
-            }}
-          >
-            {/* Gradient padding layer */}
-            <div 
-              className="relative max-h-full w-full bg-gradient-to-b p-1.5 to-gray-800/8 from-gray-800/5 dark:from-gray-200/65 dark:to-gray-200/65"
-              style={{ 
-                borderRadius: '32px',
-                boxShadow: 'rgba(255, 255, 255, 0.08) 0px 0px 0px 1px inset'
-              }}
-            >
-              {/* Main content area */}
-              <div 
-                className="bg-gray-800/80 chat-input-container"
-                style={{ borderRadius: '26px' }}
-              >
-                {/* Loading Overlay */}
-                {isGenerating && (
-                  <div className="absolute inset-0 bg-gray-800/96 backdrop-blur-sm rounded-3xl flex items-center justify-center z-20 border border-white">
-                    <div className="flex items-center gap-3 text-white">
-                      <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                      <span className="text-lg font-medium">PiPilot is working...</span>
-                    </div>
-                  </div>
-                )}
-
-          <form onSubmit={handleSubmit} className="relative">
-            {/* Input Field - Auto-expanding textarea */}
-            <div className="relative flex items-end min-h-0 w-auto grow">
-              <div className="relative grow overflow-hidden">
-                <div className="relative flex size-full cursor-text overflow-hidden text-white">
-                  <div className="flex grow flex-col gap-4 py-2">
-                    <div className="overflow-y-auto px-4 max-h-[15dvh]">
-                      <div className="relative">
-                        <label className="invisible block h-0 w-0 overflow-hidden whitespace-nowrap" htmlFor="userInput">
-                          Message PiPilot
-                        </label>
-                        <textarea
-                          ref={inputRef}
-                          id="userInput"
-                          placeholder={isGenerating ? "PiPilot is working..." : "Describe your app idea..."}
-                          value={prompt}
-                          onChange={(e) => {
-                            setPrompt(e.target.value)
-                            // Auto-resize textarea
-                            const textarea = e.target as HTMLTextAreaElement
-                            textarea.style.height = 'auto'
-                            textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px'
-                          }}
-                          onKeyDown={(e: any) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault()
-                              handleSubmit(e)
-                            }
-                          }}
-                          className="inline-block w-full resize-none overflow-y-hidden whitespace-pre-wrap bg-transparent align-top text-white outline-none placeholder:text-gray-400 text-sm sm:text-base py-[1.5px] sm:py-[0px]"
-                          disabled={isGenerating}
-                          rows={1}
-                          style={{ height: '23px' }}
-                          role="textbox"
-                          aria-autocomplete="both"
-                          spellCheck="false"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
+      <div className="relative">
+        <div className="bg-gray-800/80 chat-input-container border border-white rounded-3xl p-4 shadow-2xl">
+          {/* Loading Overlay */}
+          {isGenerating && (
+            <div className="absolute inset-0 bg-gray-800/96 backdrop-blur-sm rounded-3xl flex items-center justify-center z-20 border border-white">
+              <div className="flex items-center gap-3 text-white">
+                <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-lg font-medium">PiPilot is working...</span>
               </div>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Input Field - Auto-expanding textarea */}
+            <div className="relative">
+              <textarea
+                ref={inputRef}
+                placeholder={isGenerating ? "PiPilot is working..." : "Describe your app idea..."}
+                value={prompt}
+                onChange={(e) => {
+                  setPrompt(e.target.value)
+                  // Auto-resize textarea
+                  const textarea = e.target as HTMLTextAreaElement
+                  textarea.style.height = 'auto'
+                  textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px'
+                }}
+                onKeyDown={(e: any) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSubmit(e)
+                  }
+                }}
+                className="w-full bg-transparent outline-none text-lg text-white placeholder-gray-400 py-3 px-4 resize-none overflow-y-auto min-h-[60px] max-h-[200px]"
+                disabled={isGenerating}
+                rows={1}
+              />
             </div>
 
             {/* URL Attachment Pills */}
@@ -1145,9 +1083,9 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
             )}
 
             {/* Bottom Bar with Buttons */}
-            <div className="flex items-center justify-between px-4 pb-2 pt-2">
+            <div className="flex items-center justify-between pt-2 border-t border-gray-700/50">
               {/* Left Side - URL Attachment, Mic and Template Selector */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center space-x-3">
                 {/* URL Attachment Popover */}
                 <Popover open={showUrlPopover} onOpenChange={setShowUrlPopover}>
                   <PopoverTrigger asChild>
@@ -1271,9 +1209,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
               </div>
             </div>
           </form>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -1390,3 +1325,6 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
     </div>
   )
 }
+
+
+ 
