@@ -17,7 +17,8 @@ import {
   Send, Paperclip, Mic, MicOff, X, FileText, Image as ImageIcon,
   Link as LinkIcon, Loader2, ChevronDown, ChevronUp, StopCircle, Trash2, Plus,
   Copy, ArrowUp, Undo2, Redo2, Check, AlertTriangle, Zap, Package, PackageMinus,
-  Search, Globe, Eye, FolderOpen, Settings, Edit3, CheckCircle2, XCircle
+  Search, Globe, Eye, FolderOpen, Settings, Edit3, CheckCircle2, XCircle,
+  Square, CornerDownLeft
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Actions, Action } from '@/components/ai-elements/actions'
@@ -3141,7 +3142,7 @@ export function ChatPanelV2({
                 className="h-8 w-8"
                 onClick={stop}
               >
-                <Loader2 className="size-4 animate-spin" />
+                <Square className="w-4 h-4 bg-red-500 animate-pulse" />
               </Button>
             ) : (
               <Button
@@ -3152,7 +3153,7 @@ export function ChatPanelV2({
                 disabled={!input.trim() && attachedFiles.length === 0}
                 onClick={handleEnhancedSubmit}
               >
-                <ArrowUp className="size-4" />
+                <CornerDownLeft className="size-4" />
               </Button>
             )}
           </div>
