@@ -8,8 +8,14 @@ import { Code, Eye, FileText, Download, ExternalLink, RotateCcw, Play, Square, T
 import { useToast } from "@/hooks/use-toast"
 import type { Workspace as Project } from "@/lib/storage-manager"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  WebPreview,
+  WebPreviewNavigation,
+  WebPreviewNavigationButton,
+  WebPreviewUrl,
+  WebPreviewBody,
+  WebPreviewConsole
+} from "@/components/ai-elements/web-preview"
 
 interface CodePreviewPanelProps {
   project: Project | null
@@ -1330,271 +1336,127 @@ export default function TodoApp() {
             </div>
           </ScrollArea>
         ) : (
-          <div className="h-full bg-background flex flex-col">
-            {/* Preview Content */}
-            <div className={`flex-1 min-h-0 ${isMobile && isConsoleOpen ? 'pb-48' : ''}`}>
-              {preview.isLoading ? (
-                <div className="text-center">
-                    {/* Interactive Preview Loader */}
-                    <div className="relative w-24 h-24 mx-auto mb-6">
-                      {/* Outer ring */}
-                      <div className="absolute inset-0 rounded-full border-4 border-muted animate-ping"></div>
-                      {/* Middle ring */}
-                      <div className="absolute inset-2 rounded-full border-4 border-primary animate-pulse"></div>
-                      {/* Inner ring with rotation */}
-                      <div className="absolute inset-4 rounded-full border-t-4 border-accent animate-spin"></div>
-                      {/* Center dot */}
-                      <div className="absolute inset-8 rounded-full bg-accent animate-pulse"></div>
-                    </div>
-                    
-                    <h3 className="text-lg font-semibold mb-2">
-                      {truncateMessage(currentLog, 40)}
-                    </h3>
-                    <p className="text-muted-foreground text-sm mb-4">
-                      This may take a few moments
-                    </p>
-                  </div>
-              ) : preview.url ? (
-                <div className="w-full h-full relative">
-                  {previewViewMode === 'mobile' ? (
-                    <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 p-4">
-                      <div className={`w-80 border-8 border-gray-300 dark:border-gray-600 rounded-[2rem] shadow-2xl bg-white overflow-hidden flex flex-col ${isConsoleOpen ? 'h-[calc(100%-12rem)]' : 'h-full max-h-[600px]'}`}>
-                        <iframe
-                          id="preview-iframe"
-                          src={preview.url}
-                          className="w-full flex-1 rounded-[1.5rem] border-none"
-                          sandbox="allow-scripts allow-same-origin allow-forms allow-downloads allow-popups"
-                          ref={(iframe) => {
-                            if (iframe) {
-                              injectConsoleInterceptor(iframe)
-                            }
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <iframe
-                      id="preview-iframe"
-                      src={preview.url}
-                      className="w-full h-full border-none"
-                      sandbox="allow-scripts allow-same-origin allow-forms allow-downloads allow-popups"
-                      ref={(iframe) => {
-                        if (iframe) {
-                          injectConsoleInterceptor(iframe)
-                        }
-                      }}
-                    />
-                  )}
-                </div>
-              ) : (
-                <div className="h-full flex items-center justify-center">
-              <div className="text-center">
-                <Eye className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Live Preview</h3>
-                <p className="text-muted-foreground mb-4">Click "Start Preview" to see your app running</p>
-                <Button 
-                  onClick={createPreview} 
+          <WebPreview
+            className="h-full"
+            defaultUrl={preview.url || ""}
+            onUrlChange={(url) => {
+              setCustomUrl(url)
+              // Update preview state if needed
+              setPreview(prev => ({ ...prev, url }))
+            }}
+          >
+            <WebPreviewNavigation>
+              <div className="flex items-center gap-2 flex-1">
+                <WebPreviewNavigationButton
+                  onClick={createPreview}
                   disabled={!project || preview.isLoading}
-                  className="rounded-full px-6"
+                  tooltip="Start Preview"
                 >
-                  <Play className="h-4 w-4 mr-2" />
-                  {preview.isLoading ? 'Starting...' : 'Start Preview'}
-                </Button>
+                  <Play className="h-4 w-4" />
+                </WebPreviewNavigationButton>
+                <WebPreviewNavigationButton
+                  onClick={refreshPreview}
+                  disabled={!preview.url}
+                  tooltip="Refresh Preview"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </WebPreviewNavigationButton>
+                <WebPreviewNavigationButton
+                  onClick={cleanupSandbox}
+                  disabled={!preview.sandboxId}
+                  tooltip="Stop Preview"
+                >
+                  <Square className="h-4 w-4" />
+                </WebPreviewNavigationButton>
+                <WebPreviewNavigationButton
+                  onClick={openStackBlitz}
+                  disabled={!project}
+                  tooltip="Open in StackBlitz"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </WebPreviewNavigationButton>
+                <div className="flex-1" />
+                <WebPreviewUrl />
               </div>
-              </div>
+            </WebPreviewNavigation>
+
+            <div className={`flex-1 min-h-0 ${isMobile ? 'pb-48' : ''}`}>
+              {preview.isLoading ? (
+                <div className="text-center p-8">
+                  <div className="relative w-24 h-24 mx-auto mb-6">
+                    <div className="absolute inset-0 rounded-full border-4 border-muted animate-ping"></div>
+                    <div className="absolute inset-2 rounded-full border-4 border-primary animate-pulse"></div>
+                    <div className="absolute inset-4 rounded-full border-t-4 border-accent animate-spin"></div>
+                    <div className="absolute inset-8 rounded-full bg-accent animate-pulse"></div>
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">
+                    {truncateMessage(currentLog, 40)}
+                  </h3>
+                  <p className="text-muted-foreground text-sm mb-4">
+                    This may take a few moments
+                  </p>
+                </div>
+              ) : preview.url ? (
+                previewViewMode === 'mobile' ? (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 p-4">
+                    <div className={`w-80 border-8 border-gray-300 dark:border-gray-600 rounded-[2rem] shadow-2xl bg-white overflow-hidden flex flex-col ${isMobile ? 'h-[calc(100%-12rem)]' : 'h-full max-h-[600px]'}`}>
+                      <WebPreviewBody
+                        src={preview.url}
+                        className="w-full flex-1 rounded-[1.5rem] border-none"
+                        ref={(iframe) => {
+                          if (iframe) {
+                            injectConsoleInterceptor(iframe)
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <WebPreviewBody
+                    src={preview.url}
+                    ref={(iframe) => {
+                      if (iframe) {
+                        injectConsoleInterceptor(iframe)
+                      }
+                    }}
+                  />
+                )
+              ) : (
+                <div className="h-full flex items-center justify-center p-8">
+                  <div className="text-center">
+                    <Eye className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">Live Preview</h3>
+                    <p className="text-muted-foreground mb-4">Click "Start Preview" to see your app running</p>
+                    <Button
+                      onClick={createPreview}
+                      disabled={!project || preview.isLoading}
+                      className="rounded-full px-6"
+                    >
+                      <Play className="h-4 w-4 mr-2" />
+                      Start Preview
+                    </Button>
+                  </div>
+                </div>
               )}
             </div>
 
-            {/* Console Output Accordion */}
-            <div className={`border-t border-border ${isMobile ? 'fixed bottom-12 left-0 right-0 z-40 bg-background shadow-lg' : ''}`}>
-              <Accordion 
-                type="single" 
-                collapsible 
-                value={isConsoleOpen ? "console" : undefined}
-                onValueChange={(value) => setIsConsoleOpen(value === "console")}
-              >
-                <AccordionItem value="console" className="border-none">
-                  <AccordionTrigger className={`px-4 py-2 hover:no-underline ${isMobile ? 'py-3' : 'py-2'}`}>
-                    <div className="flex items-center space-x-2">
-                      <Terminal className={`${isMobile ? 'h-5 w-5' : 'h-4 w-4'}`} />
-                      <span className={`font-medium ${isMobile ? 'text-sm' : 'text-base'}`}>Console</span>
-                      {/* Total count badge */}
-                      {(consoleOutput.length > 0 || browserLogs.length > 0) && (
-                        <span className={`ml-2 px-2 py-1 text-xs bg-primary text-primary-foreground rounded-full font-medium ${
-                          isMobile ? 'px-2.5 py-1.5' : 'px-2 py-1'
-                        }`}>
-                          {consoleOutput.length + browserLogs.length}
-                        </span>
-                      )}
-                      {/* Connection status indicator */}
-                      {preview.sandboxId && (
-                        <div className="flex items-center space-x-1">
-                          <div className={`w-2 h-2 rounded-full ${streamReader ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
-                          <span className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-xs'}`}>
-                            {streamReader ? 'Live' : 'Connected'}
-                          </span>
-                        </div>
-                      )}
-                      {/* Clear console button */}
-                      {(consoleOutput.length > 0 || browserLogs.length > 0) && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            clearAllLogs()
-                          }}
-                          className={`h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground ${
-                            isMobile ? 'h-7 w-7' : 'h-6 w-6'
-                          }`}
-                        >
-                          <Trash2 className={`${isMobile ? 'h-4 w-4' : 'h-3 w-3'}`} />
-                        </Button>
-                      )}
-                      {/* Copy console button */}
-                      {(consoleOutput.length > 0 || browserLogs.length > 0) && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            copyConsoleOutput()
-                          }}
-                          className={`h-6 w-6 p-0 hover:bg-primary hover:text-primary-foreground ${
-                            isMobile ? 'h-7 w-7' : 'h-6 w-6'
-                          }`}
-                          title="Copy console output"
-                        >
-                          <Copy className={`${isMobile ? 'h-4 w-4' : 'h-3 w-3'}`} />
-                        </Button>
-                      )}
-                    </div>
-                    {/* Show latest output when collapsed - mobile optimized */}
-                    {!isConsoleOpen && consoleOutput.length > 0 && (
-                      <div className={`ml-auto text-muted-foreground truncate ${
-                        isMobile ? 'text-xs max-w-32' : 'text-xs max-w-48'
-                      }`}>
-                        {consoleOutput[consoleOutput.length - 1]}
-                      </div>
-                    )}
-                  </AccordionTrigger>
-                  <AccordionContent 
-                    className={`px-4 pb-4 ${isMobile ? 'px-3 pb-3' : 'px-4 pb-4'}`}
-                    style={{ height: isConsoleOpen ? `${consoleHeight}px` : 'auto' }}
-                  >
-                    {/* Resize Handle */}
-                    {isConsoleOpen && !isMobile && (
-                      <div
-                        ref={resizeRef}
-                        className={`w-full h-2 bg-border hover:bg-primary/30 cursor-ns-resize transition-colors flex items-center justify-center ${
-                          isResizing ? 'bg-primary/40' : ''
-                        }`}
-                        onMouseDown={handleMouseDown}
-                      >
-                        <div className="w-8 h-0.5 bg-muted-foreground/40 rounded-full" />
-                      </div>
-                    )}
-                    {/* Unified Console Content */}
-                    <div
-                      ref={consoleRef}
-                      className={`bg-muted rounded-lg overflow-y-auto ${
-                        isMobile ? 'max-h-32 p-2' : 'p-3'
-                      }`}
-                      style={{ 
-                        height: isConsoleOpen && !isMobile ? `${consoleHeight - 60}px` : undefined,
-                        maxHeight: isMobile ? '8rem' : undefined
-                      }}
-                    >
-                      {consoleOutput.length === 0 ? (
-                        <div className={`text-center ${isMobile ? 'py-4' : 'py-8'}`}>
-                          <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
-                            {isMobile ? 'Console output will appear here...' : 'Console output will appear here when the dev server starts...'}
-                          </p>
-                          {preview.sandboxId && (
-                            <p className={`text-muted-foreground mt-2 ${isMobile ? 'text-xs' : 'text-sm'}`}>
-                              Logs from E2B sandbox will appear here
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="space-y-1">
-                          {consoleOutput.map((output, index) => {
-                            const isError = output.includes('ERROR:') || output.includes('❌') || output.includes('[SERVER]') && output.includes('stderr')
-                            const isSuccess = output.includes('✅') || output.includes('Server ready') || output.includes('successfully')
-                            const isWarning = output.includes('Warning:') || output.includes('⚠️')
-
-                            return (
-                              <div
-                                key={index}
-                                className={`font-mono ${
-                                  isError ? 'text-red-500' :
-                                  isSuccess ? 'text-green-500' :
-                                  isWarning ? 'text-yellow-500' :
-                                  'text-muted-foreground'
-                                } ${isMobile ? 'text-xs leading-tight' : 'text-xs'}`}
-                              >
-                                {output}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
-
-
-                    {/* Action Buttons - Single Console */}
-                    {consoleOutput.length > 0 && (
-                      <div className={`flex justify-between items-center mt-2 ${isMobile ? 'mt-2' : 'mt-2'}`}>
-                        <div className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-xs'}`}>
-                          Console output captured
-                        </div>
-                        <div className={`flex space-x-2 ${isMobile ? 'space-x-1' : 'space-x-2'}`}>
-                          <Button
-                            variant="outline"
-                            size={isMobile ? "sm" : "sm"}
-                            onClick={copyConsoleOutput}
-                            className={`${isMobile ? 'text-xs px-2 py-1 touch-manipulation' : 'text-xs'}`}
-                          >
-                            <Copy className={`${isMobile ? 'h-3 w-3 mr-1' : 'h-3 w-3 mr-1'}`} />
-                            Copy Logs
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size={isMobile ? "sm" : "sm"}
-                            onClick={clearAllLogs}
-                            className={`${isMobile ? 'text-xs px-2 py-1 touch-manipulation' : 'text-xs'}`}
-                          >
-                            Clear Console
-                          </Button>
-                          {!isMobile && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setConsoleHeight(300)}
-                              className="text-xs"
-                              title="Reset console height"
-                            >
-                              Reset Height
-                            </Button>
-                          )}
-                          {preview.sandboxId && (
-                            <Button
-                              variant="outline"
-                              size={isMobile ? "sm" : "sm"}
-                              onClick={() => setIsConsoleOpen(false)}
-                              className={`${isMobile ? 'text-xs px-2 py-1 touch-manipulation' : 'text-xs'}`}
-                            >
-                              Close Console
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-            </div>
-          </div>
+            <WebPreviewConsole
+              logs={consoleOutput.map((output, index) => {
+                const timestamp = new Date()
+                let level: "log" | "warn" | "error" = "log"
+                if (output.includes('ERROR:') || output.includes('❌') || (output.includes('[SERVER]') && output.includes('stderr'))) {
+                  level = "error"
+                } else if (output.includes('Warning:') || output.includes('⚠️')) {
+                  level = "warn"
+                }
+                return {
+                  level,
+                  message: output.replace(/^\[\d{1,2}:\d{2}:\d{2} (?:AM|PM)\] [^\s]+ \[[A-Z]+\] /, ''),
+                  timestamp
+                }
+              })}
+            />
+          </WebPreview>
         )}
       </div>
 

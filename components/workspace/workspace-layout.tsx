@@ -428,95 +428,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     }
   }, [newProjectId, user.id, searchParams, router])
 
-  // Handle initialPrompt - auto-generate project details and open create modal
-  // DISABLED: Auto-modal opening has been disabled completely
-  // useEffect(() => {
-  //   const generateAndOpenDialog = async () => {
-  //     // Skip auto-modal opening for newly created projects (created instantly on homepage)
-  //     const hasNewProject = searchParams.get('newProject') || newProjectId
-
-  //     if (initialPrompt && !isAutoRestoring && !isLoadingProjects && !hasProcessedInitialPrompt && !hasNewProject) {
-  //       console.log('WorkspaceLayout: Initial prompt detected, generating project suggestion:', initialPrompt)
-  //       console.log('WorkspaceLayout: Restoration status - isAutoRestoring:', isAutoRestoring, 'isLoadingProjects:', isLoadingProjects)
-
-  //       // Immediately clear the prompt from URL to prevent re-processing on refresh
-  //       const params = new URLSearchParams(searchParams.toString())
-  //       params.delete('prompt')
-  //       router.replace(`/workspace?${params.toString()}`)
-
-  //       try {
-  //         // Call AI to generate project name and description
-  //         const response = await fetch('/api/project-suggestions', {
-  //           method: 'POST',
-  //           headers: {
-  //             'Content-Type': 'application/json',
-  //           },
-  //           body: JSON.stringify({
-  //             prompt: initialPrompt,
-  //             userId: user.id,
-  //           }),
-  //         })
-
-  //         if (!response.ok) {
-  //           throw new Error('Failed to generate project suggestion')
-  //         }
-
-  //         const data = await response.json()
-
-  //         if (data.success && data.suggestion) {
-  //           console.log('WorkspaceLayout: AI generated suggestion:', data.suggestion)
-
-  //           if (isMobile) {
-  //             // For mobile, use the mobile dialog
-  //             setNewProjectName(data.suggestion.name)
-  //             setNewProjectDescription(data.suggestion.description)
-  //             setIsCreateDialogOpen(true)
-  //           } else {
-  //             // For desktop, trigger ProjectHeader dialog with generated details
-  //             setProjectHeaderInitialName(data.suggestion.name)
-  //             setProjectHeaderInitialDescription(data.suggestion.description)
-  //             setOpenProjectHeaderDialog(true)
-  //           }
-  //         } else {
-  //           // Fallback: use original prompt as description
-  //           console.warn('WorkspaceLayout: AI generation failed, using fallback')
-  //           if (isMobile) {
-  //             setNewProjectDescription(initialPrompt)
-  //             setIsCreateDialogOpen(true)
-  //           } else {
-  //             setProjectHeaderInitialDescription(initialPrompt)
-  //             setOpenProjectHeaderDialog(true)
-  //           }
-  //         }
-  //       } catch (error) {
-  //         console.error('WorkspaceLayout: Error generating project suggestion:', error)
-  //         // Fallback: use original prompt as description
-  //         if (isMobile) {
-  //           setNewProjectDescription(initialPrompt)
-  //           setIsCreateDialogOpen(true)
-  //         } else {
-  //           setProjectHeaderInitialDescription(initialPrompt)
-  //           setOpenProjectHeaderDialog(true)
-  //         }
-  //       }
-
-  //       // Mark that we've processed this initial prompt
-  //       setHasProcessedInitialPrompt(true)
-  //     }
-  //   }
-
-  //   generateAndOpenDialog()
-  // }, [initialPrompt, searchParams, router, isMobile, user.id, isAutoRestoring, isLoadingProjects, newProjectId])
-
-  // Reset processed flag when initialPrompt changes (new prompt from homepage)
-  // DISABLED: Auto-modal opening has been disabled completely
-  // useEffect(() => {
-  //   if (initialPrompt) {
-  //     setHasProcessedInitialPrompt(false)
-  //   }
-  // }, [initialPrompt])
-
-  // Load project files when selected project changes
   useEffect(() => {
     const loadProjectFiles = async () => {
       if (selectedProject && typeof window !== 'undefined') {
@@ -680,17 +591,6 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   React.useEffect(() => {
     console.log('Selected project changed:', selectedProject)
   }, [selectedProject])
-
-  // Auto-open create project dialog when user has no projects - DISABLED
-  // React.useEffect(() => {
-  //   const projectId = searchParams.get('projectId')
-  //   const newProject = searchParams.get('newProject')
-  //   if (clientProjects.length === 0 && !isLoadingProjects && !isCreateDialogOpen && !hasAutoOpenedCreateDialog && !projectId && !newProject) {
-  //     console.log('WorkspaceLayout: No projects found and not viewing specific project, auto-opening create project dialog')
-  //     setIsCreateDialogOpen(true)
-  //     setHasAutoOpenedCreateDialog(true)
-  //   }
-  // }, [clientProjects.length, isLoadingProjects, isCreateDialogOpen, hasAutoOpenedCreateDialog, searchParams])
 
   // Reset auto-open flag when projects are loaded
   React.useEffect(() => {
