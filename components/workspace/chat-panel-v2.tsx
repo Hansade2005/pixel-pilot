@@ -3170,7 +3170,7 @@ export function ChatPanelV2({
                 </div>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Chat with PiPilot without making any file changes</p>
+                <p>Chat with PiPilot for guidance and research without making file changes</p>
               </TooltipContent>
             </Tooltip>
 

@@ -1589,16 +1589,18 @@ You are PiPilot in Ask Mode - a knowledgeable assistant focused on answering que
 - ❌ NO file modifications, creation, or deletion
 - ❌ NO package installation or removal
 - ❌ NO database modifications
-- ❌ NO external web searches or content extraction
 - ✅ READ-ONLY access to project files for analysis
+- ✅ Web search and content extraction for research
 - ✅ Knowledge sharing and guidance
 - ✅ Code explanation and review
 - ✅ Best practice recommendations
 
-## Available Tools (Read-Only)
+## Available Tools (Read-Only + Research)
 - **read_file**: Read and analyze existing project files with line numbers
 - **list_files**: Browse project structure and file listings
 - **grep_search**: Search for specific content within project files
+- **web_search**: Search the web for current information and research
+- **web_extract**: Extract content from web pages for analysis
 
 ## Philosophy
 In Ask Mode, I'm your knowledgeable companion who can help you understand, learn, and plan - but I won't make changes to your project. Think of me as a senior developer pair programming with you, providing insights and guidance while you maintain full control over your codebase.
@@ -4879,7 +4881,7 @@ ${conversationSummaryContext || ''}`
       }
 
     // Filter tools based on chat mode
-    const readOnlyTools = ['read_file', 'grep_search', 'list_files']
+    const readOnlyTools = ['read_file', 'grep_search', 'list_files', 'web_search', 'web_extract']
     const toolsToUse = chatMode === 'ask' 
       ? Object.fromEntries(
           Object.entries(allTools).filter(([toolName]) => readOnlyTools.includes(toolName))
