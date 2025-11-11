@@ -209,16 +209,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         // Check if we're in a specific project workspace (has projectId in URL)
         const projectId = searchParams.get('projectId')
         const isDeletingProject = searchParams.get('deleting') === 'true'
-        const isNewProject = searchParams.get('newProject') !== null
-        
-        // ✅ CRITICAL FIX: Skip auto-restore for newly created projects from chat-input
-        // Auto-restore clears ALL data and restores from backup, which would DELETE the new project's files!
-        if (isNewProject) {
-          console.log('🆕 WorkspaceLayout: NEW PROJECT detected from chat-input - SKIPPING auto-restore to preserve new project files')
-        }
         
         // Only auto-restore when in a project workspace and not during deletion or creation
-        if (projectId && !isDeletingProject && !justCreatedProject && !isNewProject) {
+        if (projectId && !isDeletingProject && !justCreatedProject) {
           console.log('WorkspaceLayout: In project workspace, checking cloud sync for user:', user.id)
           const cloudSyncEnabled = await isCloudSyncEnabled(user.id)
           console.log('WorkspaceLayout: Cloud sync enabled result:', cloudSyncEnabled)
@@ -279,9 +272,9 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     }
   }, [user.id]) // Only depend on user.id, not projects
 
-  // Handle project selection from URL params (both newProject and projectId)
+  // Handle project selection from URL params
   useEffect(() => {
-    const projectId = searchParams.get('projectId') || searchParams.get('newProject')
+    const projectId = searchParams.get('projectId')
     console.log('WorkspaceLayout: Project selection effect - projectId:', projectId, 'clientProjects length:', clientProjects.length, 'isLoadingProjects:', isLoadingProjects)
 
     if (projectId && clientProjects.length > 0 && !isLoadingProjects) {
@@ -289,35 +282,32 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
       if (project) {
         console.log('WorkspaceLayout: Setting project from URL params:', project.name, 'Project ID:', project.id)
         
-        // CRITICAL FIX: Verify this is a new project from chat-input and load its files explicitly
-        const isNewProjectFromChatInput = searchParams.get('newProject') === projectId
-        if (isNewProjectFromChatInput) {
-          console.log('🆕 New project from chat-input detected, loading files explicitly for:', projectId)
-          
-          // ✅ Set justCreatedProject flag to prevent auto-restore from deleting new files
-          setJustCreatedProject(true)
-          
-          // Clear the flag after 5 seconds (enough time for initial load)
-          setTimeout(() => {
-            setJustCreatedProject(false)
-            console.log('✅ Cleared justCreatedProject flag - auto-restore can now run on next visit')
-          }, 5000)
-          
-          // Load files explicitly for this new project to prevent contamination
-          import('@/lib/storage-manager').then(({ storageManager }) => {
-            storageManager.init().then(() => {
-              storageManager.getFiles(projectId).then(files => {
-                console.log(`✅ Loaded ${files.length} files for new project ${projectId}:`, files.map(f => f.path))
-                
-                // Verify files belong to correct workspace
-                const incorrectFiles = files.filter(f => f.workspaceId !== projectId)
-                if (incorrectFiles.length > 0) {
-                  console.error(`🚨 CONTAMINATION DETECTED: ${incorrectFiles.length} files belong to wrong workspace!`, incorrectFiles)
-                }
-              })
+        // Load project files explicitly
+        console.log('Loading files explicitly for project:', projectId)
+        
+        // Set justCreatedProject flag to prevent auto-restore from deleting new files
+        setJustCreatedProject(true)
+        
+        // Clear the flag after 5 seconds (enough time for initial load)
+        setTimeout(() => {
+          setJustCreatedProject(false)
+          console.log('✅ Cleared justCreatedProject flag - auto-restore can now run on next visit')
+        }, 5000)
+        
+        // Load files explicitly for this project to prevent contamination
+        import('@/lib/storage-manager').then(({ storageManager }) => {
+          storageManager.init().then(() => {
+            storageManager.getFiles(projectId).then(files => {
+              console.log(`✅ Loaded ${files.length} files for project ${projectId}:`, files.map(f => f.path))
+              
+              // Verify files belong to correct workspace
+              const incorrectFiles = files.filter(f => f.workspaceId !== projectId)
+              if (incorrectFiles.length > 0) {
+                console.error(`🚨 CONTAMINATION DETECTED: ${incorrectFiles.length} files belong to wrong workspace!`, incorrectFiles)
+              }
             })
           })
-        }
+        })
         
         setSelectedProject(project)
 
@@ -327,34 +317,14 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
           setFileExplorerKey(prev => prev + 1)
         }, 100)
 
-        // Update URL to ADD projectId alongside newProject (KEEP BOTH for protection)
-        // DO NOT delete newProject parameter - it's needed to prevent auto-restore contamination!
-        if (searchParams.get('newProject') && !searchParams.get('projectId')) {
-          const params = new URLSearchParams(searchParams.toString())
-          // ✅ CRITICAL FIX: Keep newProject parameter AND add projectId
-          // This ensures auto-restore is skipped during the initial load period
-          params.set('projectId', projectId)
-          // DO NOT DELETE: params.delete('newProject') - this would cause contamination!
-          
-          // Retrieve the FULL prompt from sessionStorage (not truncated)
-          // This ensures the complete prompt is sent to the chat panel
-          if (typeof window !== 'undefined') {
-            const storedPrompt = sessionStorage.getItem(`initial-prompt-${projectId}`)
-            if (storedPrompt) {
-              setInitialChatPrompt(storedPrompt)
-              // Clean up sessionStorage after retrieving
-              sessionStorage.removeItem(`initial-prompt-${projectId}`)
-            }
+        // Retrieve the FULL prompt from sessionStorage for newly created projects
+        if (typeof window !== 'undefined') {
+          const storedPrompt = sessionStorage.getItem(`initial-prompt-${projectId}`)
+          if (storedPrompt) {
+            setInitialChatPrompt(storedPrompt)
+            // Clean up sessionStorage after retrieving
+            sessionStorage.removeItem(`initial-prompt-${projectId}`)
           }
-          
-          // Legacy: Also check URL param for backward compatibility
-          const promptParam = searchParams.get('prompt')
-          if (promptParam && !sessionStorage.getItem(`initial-prompt-${projectId}`)) {
-            setInitialChatPrompt(decodeURIComponent(promptParam))
-            params.delete('prompt') // Remove prompt from URL after extracting
-          }
-          
-          router.replace(`/workspace?${params.toString()}`)
         }
         
         // Clear initial chat prompt after a delay to prevent re-sending
