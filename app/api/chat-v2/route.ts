@@ -74,6 +74,40 @@ const sessionProjectStorage = new Map<string, {
 // Database ID cache for projects (to avoid repeated lookups)
 const projectDatabaseCache = new Map<string, { databaseId: number | null, timestamp: number }>()
 
+/**
+ * Fetch database ID directly from Supabase by project_id
+ * This is a fallback when frontend fails to provide the database ID
+ */
+async function fetchDatabaseIdFromSupabase(projectId: string): Promise<number | null> {
+  try {
+    console.log(`[fetchDatabaseIdFromSupabase] 🔍 Querying Supabase for project: ${projectId}`)
+    
+    const { createAdminClient } = await import('@/lib/supabase/admin')
+    const supabase = createAdminClient()
+    
+    const { data: database, error: dbError } = await supabase
+      .from('databases')
+      .select('id')
+      .eq('project_id', projectId)
+      .single()
+    
+    if (database?.id) {
+      console.log(`[fetchDatabaseIdFromSupabase] ✅ Found database ID: ${database.id} for project: ${projectId}`)
+      return database.id
+    }
+    
+    console.warn(`[fetchDatabaseIdFromSupabase] ⚠️ No database found for project: ${projectId}`)
+    if (dbError && dbError.code !== 'PGRST116') {
+      console.error(`[fetchDatabaseIdFromSupabase] ❌ Database lookup error:`, dbError)
+    }
+    
+    return null
+  } catch (error) {
+    console.error(`[fetchDatabaseIdFromSupabase] ❌ Failed to fetch database ID:`, error)
+    return null
+  }
+}
+
 // Helper function to get database ID for current project/workspace
 async function getProjectDatabaseId(projectId: string): Promise<string | null> {
   try {
@@ -1184,7 +1218,40 @@ export async function POST(req: Request) {
     }
     */
       
-  
+    // 🔥 CRITICAL FALLBACK: If frontend didn't provide databaseId, fetch it from Supabase
+    // This ensures all server-side database tools have access to the database ID
+    if (!databaseId && projectId) {
+      console.log(`[Chat-V2] 🔍 No databaseId provided by frontend, attempting fallback fetch for project: ${projectId}`)
+      
+      try {
+        // Fetch directly from Supabase
+        const fetchedDatabaseId = await fetchDatabaseIdFromSupabase(projectId)
+        
+        if (fetchedDatabaseId) {
+          databaseId = fetchedDatabaseId
+          console.log(`[Chat-V2] ✅ Fallback successful: Using database ID ${databaseId} for project: ${projectId}`)
+          
+          // Cache it for future requests (5 minute cache)
+          projectDatabaseCache.set(projectId, { databaseId, timestamp: Date.now() })
+          
+          // Also update IndexedDB cache via the workspace helper
+          try {
+            await setWorkspaceDatabase(projectId, databaseId)
+            console.log(`[Chat-V2] 💾 Cached database ID in IndexedDB for future requests`)
+          } catch (cacheError) {
+            console.warn(`[Chat-V2] ⚠️ Failed to cache database ID in IndexedDB:`, cacheError)
+          }
+        } else {
+          console.warn(`[Chat-V2] ⚠️ Fallback failed: No database found for project: ${projectId}`)
+        }
+      } catch (fallbackError) {
+        console.error(`[Chat-V2] ❌ Fallback error while fetching database ID:`, fallbackError)
+      }
+    } else if (databaseId) {
+      console.log(`[Chat-V2] ✅ Database ID provided by frontend: ${databaseId}`)
+    } else {
+      console.warn(`[Chat-V2] ⚠️ No projectId available, cannot fetch database ID`)
+    }
 
     // Handle stream continuation
     let isContinuation = false
