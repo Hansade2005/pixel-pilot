@@ -449,9 +449,9 @@ export function DataGrid({
       <div className="flex items-center justify-between">
         {/* Search */}
         <div className="flex items-center gap-2 flex-1 max-w-sm">
-          <Search className="h-4 w-4 text-muted-foreground" />
+          <Search className="h-3 w-3 text-muted-foreground" />
           <Input
-            placeholder="Search all columns..."
+            placeholder="Search table..."
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
             className="max-w-sm"
@@ -463,8 +463,8 @@ export function DataGrid({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Export All
+                <Download className="h-3 w-3 mr-2" />
+                Export
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">

@@ -157,26 +157,6 @@ export function RecordViewer({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => exportTableData("json")}
-              title="Export as JSON"
-              className="h-8"
-            >
-              <FileJson className="h-3 w-3 mr-1.5" />
-              <span className="text-xs">JSON</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => exportTableData("csv")}
-              title="Export as CSV"
-              className="h-8"
-            >
-              <FileText className="h-3 w-3 mr-1.5" />
-              <span className="text-xs">CSV</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
               onClick={onRefresh}
               disabled={loading}
               title="Refresh records"
@@ -191,7 +171,7 @@ export function RecordViewer({
             >
               <Button size="sm" className="h-8">
                 <Plus className="h-3 w-3 mr-1.5" />
-                <span className="text-xs">Add Record</span>
+                <span className="text-xs">Add</span>
               </Button>
             </AddRecordDialog>
           </div>
