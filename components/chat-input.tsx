@@ -1007,9 +1007,9 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
           }}
         ></div>
         
-        {/* Glassmorphism container */}
+        {/* Solid background container */}
         <div 
-          className="relative backdrop-blur-2xl backdrop-saturate-200 bg-white/60 dark:bg-gray-900/50"
+          className="relative bg-gray-800/80 chat-input-container border border-white rounded-3xl p-4 shadow-2xl"
           style={{ 
             borderRadius: '32px',
             boxShadow: 'rgba(255, 255, 255, 0) 0px 16px 48px -2px',
@@ -1036,12 +1036,12 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
             >
               {/* Main content area */}
               <div 
-                className="bg-white/90 dark:bg-gray-900/45 chat-input-container"
+                className="bg-gray-800/80 chat-input-container"
                 style={{ borderRadius: '26px' }}
               >
                 {/* Loading Overlay */}
                 {isGenerating && (
-                  <div className="absolute inset-0 bg-gray-800/96 backdrop-blur-sm rounded-3xl flex items-center justify-center z-20 border border-white/10">
+                  <div className="absolute inset-0 bg-gray-800/96 backdrop-blur-sm rounded-3xl flex items-center justify-center z-20 border border-white">
                     <div className="flex items-center gap-3 text-white">
                       <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
                       <span className="text-lg font-medium">PiPilot is working...</span>
@@ -1053,7 +1053,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
             {/* Input Field - Auto-expanding textarea */}
             <div className="relative flex items-end min-h-0 w-auto grow">
               <div className="relative grow overflow-hidden">
-                <div className="relative flex size-full cursor-text overflow-hidden text-black dark:text-white">
+                <div className="relative flex size-full cursor-text overflow-hidden text-white">
                   <div className="flex grow flex-col gap-4 py-2">
                     <div className="overflow-y-auto px-4 max-h-[15dvh]">
                       <div className="relative">
@@ -1078,7 +1078,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
                               handleSubmit(e)
                             }
                           }}
-                          className="inline-block w-full resize-none overflow-y-hidden whitespace-pre-wrap bg-transparent align-top text-black dark:text-white outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm sm:text-base py-[1.5px] sm:py-[0px]"
+                          className="inline-block w-full resize-none overflow-y-hidden whitespace-pre-wrap bg-transparent align-top text-white outline-none placeholder:text-gray-400 text-sm sm:text-base py-[1.5px] sm:py-[0px]"
                           disabled={isGenerating}
                           rows={1}
                           style={{ height: '23px' }}
