@@ -10,6 +10,8 @@ import {
   RefreshCw,
   Database,
   Plus,
+  Menu,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CreateTableDialog } from "@/components/database/create-table-dialog";
@@ -22,7 +24,12 @@ export function TableExplorer({
   loading,
   databaseId,
   onRefresh,
-}: TableExplorerProps) {
+  onToggleExplorer,
+  showExplorer,
+}: TableExplorerProps & {
+  onToggleExplorer?: () => void;
+  showExplorer?: boolean;
+}) {
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredTables = tables.filter((table) =>
@@ -38,16 +45,29 @@ export function TableExplorer({
             <Database className="h-5 w-5 text-muted-foreground" />
             <h2 className="font-semibold">Tables</h2>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onRefresh}
-            disabled={loading}
-            className="h-8 w-8"
-            title="Refresh tables"
-          >
-            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-          </Button>
+          <div className="flex items-center gap-1">
+            {onToggleExplorer && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onToggleExplorer}
+                className="h-8 w-8"
+                title={showExplorer ? "Hide table explorer" : "Show table explorer"}
+              >
+                {showExplorer ? <X className="h-3 w-3" /> : <Menu className="h-3 w-3" />}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onRefresh}
+              disabled={loading}
+              className="h-8 w-8"
+              title="Refresh tables"
+            >
+              <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+            </Button>
+          </div>
         </div>
 
         {/* Search */}

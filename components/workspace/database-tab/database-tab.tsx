@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { getWorkspaceDatabaseId } from "@/lib/get-current-workspace";
 import { toast } from "sonner";
-import { Loader2, Database as DatabaseIcon, AlertCircle, Menu, X } from "lucide-react";
+import { Loader2, Database as DatabaseIcon, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -134,10 +134,8 @@ export function DatabaseTab({ workspaceId }: DatabaseTabProps) {
     if (databaseId) {
       loadRecords(databaseId, table.id.toString());
     }
-    // Close table explorer on mobile after selection
-    if (isMobile) {
-      setShowTableExplorer(false);
-    }
+    // Close table explorer after selection on both mobile and PC
+    setShowTableExplorer(false);
   };
 
   const handleRefreshTables = () => {
@@ -192,21 +190,6 @@ export function DatabaseTab({ workspaceId }: DatabaseTabProps) {
 
   return (
     <div className="flex h-full overflow-hidden relative">
-      {/* Table Explorer Toggle Button - Both Mobile and PC */}
-      <div className={cn(
-        "absolute z-10",
-        isMobile ? "top-4 left-4" : "top-4 left-4"
-      )}>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setShowTableExplorer(!showTableExplorer)}
-          className="bg-background border shadow-md"
-        >
-          {showTableExplorer ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-        </Button>
-      </div>
-
       {/* Table Explorer - Toggleable overlay for both mobile and PC */}
       {showTableExplorer && (
         <div className={cn(
@@ -222,6 +205,8 @@ export function DatabaseTab({ workspaceId }: DatabaseTabProps) {
             loading={false}
             databaseId={databaseId}
             onRefresh={handleRefreshTables}
+            onToggleExplorer={() => setShowTableExplorer(!showTableExplorer)}
+            showExplorer={showTableExplorer}
           />
         </div>
       )}

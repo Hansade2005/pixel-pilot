@@ -20,6 +20,8 @@ export interface TableExplorerProps {
   loading: boolean;
   databaseId: string;
   onRefresh: () => void;
+  onToggleExplorer?: () => void;
+  showExplorer?: boolean;
 }
 
 export interface RecordViewerProps {
