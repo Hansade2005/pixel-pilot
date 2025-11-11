@@ -30,6 +30,8 @@ export interface RecordViewerProps {
   loading: boolean;
   databaseId: string;
   onRefresh: () => void;
+  onToggleExplorer?: () => void;
+  showExplorer?: boolean;
 }
 
 export interface SchemaViewerProps {

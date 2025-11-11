@@ -230,6 +230,8 @@ export function DatabaseTab({ workspaceId }: DatabaseTabProps) {
           loading={loadingRecords}
           databaseId={databaseId}
           onRefresh={handleRefreshRecords}
+          onToggleExplorer={() => setShowTableExplorer(!showTableExplorer)}
+          showExplorer={showTableExplorer}
         />
       </div>
     </div>

@@ -16,6 +16,7 @@ import {
   Trash2,
   Edit,
   Code,
+  Menu,
 } from "lucide-react";
 import { DataGrid } from "@/components/database/data-grid";
 import { AddRecordDialog } from "@/components/database/add-record-dialog";
@@ -34,6 +35,8 @@ export function RecordViewer({
   loading,
   databaseId,
   onRefresh,
+  onToggleExplorer,
+  showExplorer,
 }: RecordViewerProps) {
   const [editingRecord, setEditingRecord] = useState<RecordData | null>(null);
   const [deletingRecord, setDeletingRecord] = useState<RecordData | null>(null);
@@ -43,7 +46,21 @@ export function RecordViewer({
 
   if (!table) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+      <div className="flex flex-col items-center justify-center h-full p-8 text-center relative">
+        {/* Table Explorer Toggle Button - Only show when explorer is closed */}
+        {onToggleExplorer && !showExplorer && (
+          <div className="absolute top-4 left-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onToggleExplorer}
+              className="h-8 w-8"
+              title="Show table explorer"
+            >
+              <Menu className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
         <Database className="h-16 w-16 text-muted-foreground mb-4 opacity-20" />
         <h3 className="text-lg font-medium mb-2">No Table Selected</h3>
         <p className="text-sm text-muted-foreground max-w-md">
@@ -90,6 +107,18 @@ export function RecordViewer({
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
+              {/* Table Explorer Toggle Button - Only show when explorer is closed */}
+              {onToggleExplorer && !showExplorer && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onToggleExplorer}
+                  className="h-8 w-8 mr-1 flex-shrink-0"
+                  title="Show table explorer"
+                >
+                  <Menu className="h-4 w-4" />
+                </Button>
+              )}
               <TableIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
               <h2 className="text-xl font-bold truncate">{table.name}</h2>
             </div>
