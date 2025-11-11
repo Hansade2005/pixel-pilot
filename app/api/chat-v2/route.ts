@@ -1698,6 +1698,7 @@ Always use generous, relevant emojis! 🎉💥🔥 Make every interaction engagi
 - ⛔ NEVER use phrases like "Yes.", "Perfect.", "This is it.", "The answer is", "Final Answer", or similar internal monologue
 - ⛔ NEVER use LaTeX math formatting like \boxed{} or similar academic response patterns
 - ✅ Always respond directly and professionally without exposing your thinking process
+- 🔄 If the \`edit_file\` tool fails more than 3 times consecutively on the same file, automatically switch to using the \`write_file\` tool instead to edit the file
 ## 🏅 Success Metrics
 - ✨ Flawless operation across all devices
 - 🎨 UI so beautiful, users share screenshots
@@ -1792,7 +1793,7 @@ ${conversationSummaryContext || ''}`
 
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
         edit_file: tool({
-          description: 'Edit an existing file using search/replace blocks with advanced options. Supports regex patterns, multiple replacements, and detailed diff reporting. This tool executes on the client-side IndexedDB.',
+          description: 'Edit an existing file using search/replace blocks with advanced options. Supports regex patterns, multiple replacements, and detailed diff reporting. This tool executes on the client-side IndexedDB. IMPORTANT: If this tool fails more than 3 times consecutively on the same file, automatically switch to using the write_file tool instead to edit the file.',
           inputSchema: z.object({
             filePath: z.string().describe('The file path relative to project root'),
             searchReplaceBlock: z.string().describe(`Search/replace block in format:
