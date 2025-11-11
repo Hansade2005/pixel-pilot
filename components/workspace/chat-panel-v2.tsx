@@ -12,7 +12,7 @@ import { Card } from "@/components/ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog"
 import { useToast } from "@/components/ui/use-toast"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Switch } from "@/components/ui/switch"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { MessageWithTools } from './message-with-tools'
 import {
@@ -430,8 +430,8 @@ export function ChatPanelV2({
   const [continuingMessageId, setContinuingMessageId] = useState<string | null>(null)
   const [isContinuationInProgress, setIsContinuationInProgress] = useState(false)
   
-  // Chat mode state - default to 'agent', can be toggled to 'ask' for read-only mode
-  const [chatMode, setChatMode] = useState<'agent' | 'ask'>('agent')
+  // Chat mode state - true for Ask mode, false for Agent mode
+  const [isAskMode, setIsAskMode] = useState(false)
   
   // Tool invocations tracking for inline pills
   const [activeToolCalls, setActiveToolCalls] = useState<Map<string, Array<{
@@ -970,7 +970,7 @@ export function ChatPanelV2({
         fileTree: await buildProjectFileTree(), // Rebuild file tree
         modelId: selectedModel,
         aiMode,
-        chatMode, // Pass the chat mode to the API
+        chatMode: isAskMode ? 'ask' : 'agent', // Pass the chat mode to the API
         continuationState // Include the continuation state
       }
 
@@ -1587,7 +1587,7 @@ export function ChatPanelV2({
         fileTree: await buildProjectFileTree(), // Current file tree
         modelId: selectedModel,
         aiMode,
-        chatMode, // Pass the chat mode to the API
+        chatMode: isAskMode ? 'ask' : 'agent', // Pass the chat mode to the API
         toolResult: {
           toolName,
           result: result.output || { error: result.errorText }
@@ -1955,7 +1955,7 @@ export function ChatPanelV2({
           files: projectFiles, // Keep raw files for tool operations (now refreshed)
           modelId: selectedModel,
           aiMode,
-          chatMode // Pass the chat mode to the API
+          chatMode: isAskMode ? 'ask' : 'agent' // Pass the chat mode to the API
         }),
         signal: controller.signal
       })
@@ -3147,26 +3147,16 @@ export function ChatPanelV2({
             {/* Ask Mode Toggle */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="flex items-center">
-                  <RadioGroup
-                    value={chatMode}
-                    onValueChange={(value: 'agent' | 'ask') => setChatMode(value)}
-                    className="flex items-center gap-1"
-                  >
-                    <div className="flex items-center gap-1">
-                      <RadioGroupItem 
-                        value="ask" 
-                        id="ask-mode"
-                        className="h-3 w-3 border border-gray-400 rounded-full"
-                      />
-                      <label 
-                        htmlFor="ask-mode" 
-                        className="text-xs text-gray-400 cursor-pointer select-none"
-                      >
-                        Ask
-                      </label>
-                    </div>
-                  </RadioGroup>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="ask-mode-switch" className="text-xs text-gray-400 cursor-pointer select-none">
+                    Ask
+                  </label>
+                  <Switch
+                    id="ask-mode-switch"
+                    checked={isAskMode}
+                    onCheckedChange={setIsAskMode}
+                    className="h-4 w-7"
+                  />
                 </div>
               </TooltipTrigger>
               <TooltipContent>
