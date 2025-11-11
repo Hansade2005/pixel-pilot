@@ -598,7 +598,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       // Clear the input and redirect
       setPrompt("")
       setGithubRepoUrl("")
-      router.push(`/workspace?projectId=${workspace.id}`)
+      router.push(`/workspace?newProject=${workspace.id}`)
 
     } catch (error) {
       console.error('❌ Error importing GitHub repo:', error)
@@ -706,7 +706,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
       // Clear the input and redirect
       setPrompt("")
       setGitlabRepoUrl("")
-      router.push(`/workspace?projectId=${workspace.id}`)
+      router.push(`/workspace?newProject=${workspace.id}`)
 
     } catch (error) {
       console.error('❌ Error importing GitLab repo:', error)
@@ -934,7 +934,7 @@ export function ChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps) 
         // No need to pass prompt in URL anymore - it's in sessionStorage
         setPrompt("")
         setAttachedUrl("") // Clear URL attachment
-        router.push(`/workspace?projectId=${workspace.id}`)
+        router.push(`/workspace?newProject=${workspace.id}`)
       } else {
         throw new Error('Failed to generate project suggestion')
       }
