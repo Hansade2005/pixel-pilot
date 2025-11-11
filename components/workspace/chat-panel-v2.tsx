@@ -623,8 +623,14 @@ export function ChatPanelV2({
 
       // Dispatch event to switch to preview tab and trigger auto-preview creation
       // This creates the illusion of "hot reload" after AI code generation
-      if (typeof window !== 'undefined') {
-        console.log('[ChatPanelV2] Dispatching auto-preview event after streaming completion')
+      // Skip in Ask mode since no file changes are made
+      // In Agent mode, only dispatch if file modification tools were actually used
+      const hasFileModifications = accumulatedToolInvocations.some(
+        (tool: any) => ['edit_file', 'write_file', 'delete_file'].includes(tool.toolName)
+      )
+
+      if (typeof window !== 'undefined' && !isAskMode && hasFileModifications) {
+        console.log('[ChatPanelV2] Dispatching auto-preview event after streaming completion (file modifications detected)')
         window.dispatchEvent(new CustomEvent('ai-stream-complete', {
           detail: {
             projectId: project.id,
@@ -632,6 +638,8 @@ export function ChatPanelV2({
             shouldCreatePreview: true
           }
         }))
+      } else if (!isAskMode && !hasFileModifications) {
+        console.log('[ChatPanelV2] Skipping auto-preview event (no file modifications detected)')
       }
     } catch (error) {
       console.error(`[ChatPanelV2] Error saving complete assistant message ${assistantMessageId}:`, error)
