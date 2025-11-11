@@ -453,32 +453,37 @@ export function ChatPanelV2({
 
   // Load database ID from workspace if not provided
   // Try multiple methods for maximum accuracy
+  // CRITICAL: Always re-check when URL or project changes to handle navigation scenarios
   useEffect(() => {
     const loadDatabaseId = async () => {
-      if (!databaseId) {
-        try {
-          // Method 1: Try to get from URL parameters (most accurate for current context)
-          let dbId = await getDatabaseIdFromUrl();
-          
-          // Method 2: If URL method fails, fall back to project.id
-          if (!dbId && project?.id) {
-            dbId = await getWorkspaceDatabaseId(project.id);
-          }
-          
-          if (dbId) {
-            setDatabaseId(dbId);
-            console.log(`[ChatPanelV2] Loaded database ID ${dbId} for workspace ${project?.id || 'from URL'}`);
-          } else {
-            console.warn('[ChatPanelV2] No database ID found for this workspace');
-          }
-        } catch (error) {
-          console.error('[ChatPanelV2] Failed to load database ID:', error);
+      try {
+        // Method 1: Try to get from URL parameters (most accurate for current context)
+        // This handles cases like ?newProject=xxx&projectId=xxx correctly
+        let dbId = await getDatabaseIdFromUrl();
+        
+        // Method 2: If URL method fails, fall back to project.id
+        if (!dbId && project?.id) {
+          dbId = await getWorkspaceDatabaseId(project.id);
         }
+        
+        // Update database ID if we found one (or clear it if not found)
+        if (dbId !== databaseId) {
+          setDatabaseId(dbId);
+          if (dbId) {
+            console.log(`[ChatPanelV2] ✅ Loaded database ID ${dbId} for workspace ${project?.id || 'from URL'}`);
+          } else {
+            console.warn('[ChatPanelV2] ⚠️ No database ID found for this workspace');
+          }
+        }
+      } catch (error) {
+        console.error('[ChatPanelV2] ❌ Failed to load database ID:', error);
       }
     };
 
     loadDatabaseId();
-  }, [project?.id, databaseId]);
+    // IMPORTANT: Removed databaseId from deps to allow re-fetching when URL changes
+    // This fixes the bug where navigation with different URL params doesn't trigger reload
+  }, [project?.id, typeof window !== 'undefined' ? window.location.search : '']);
 
   // Save message to IndexedDB for the current project
   const saveMessageToIndexedDB = async (message: any) => {

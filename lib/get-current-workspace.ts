@@ -143,23 +143,28 @@ export async function workspaceHasDatabase(workspaceId: string): Promise<boolean
  */
 export async function getWorkspaceDatabaseId(workspaceId: string): Promise<number | null> {
   try {
+    console.log(`[getWorkspaceDatabaseId] 🔍 Looking up database ID for workspace: ${workspaceId}`);
+    
     // First, try to get from IndexedDB cache
     const workspace = await storageManager.getWorkspace(workspaceId) as WorkspaceWithDatabase;
     if (workspace?.databaseId) {
+      console.log(`[getWorkspaceDatabaseId] 💾 Found cached database ID: ${workspace.databaseId} for workspace: ${workspaceId}`);
       return workspace.databaseId;
     }
 
     // If not in cache, fetch from Supabase API
+    console.log(`[getWorkspaceDatabaseId] 🌐 No cached database ID, fetching from Supabase for workspace: ${workspaceId}`);
     const databaseId = await fetchDatabaseIdFromSupabase(workspaceId);
     
     // If found, cache it in IndexedDB for future use
     if (databaseId && workspace) {
+      console.log(`[getWorkspaceDatabaseId] 💾 Caching database ID: ${databaseId} for workspace: ${workspaceId}`);
       await setWorkspaceDatabase(workspaceId, databaseId);
     }
     
     return databaseId;
   } catch (error) {
-    console.error('Error getting workspace database ID:', error);
+    console.error(`[getWorkspaceDatabaseId] ❌ Error getting workspace database ID for ${workspaceId}:`, error);
     return null;
   }
 }
@@ -167,6 +172,7 @@ export async function getWorkspaceDatabaseId(workspaceId: string): Promise<numbe
 /**
  * Get workspace's database ID directly from URL params
  * Handles cases like ?projectId=xxx or ?newProject=xxx&projectId=xxx
+ * PRIORITY ORDER: projectId > path-based ID > newProject
  */
 export async function getDatabaseIdFromUrl(): Promise<number | null> {
   try {
@@ -177,44 +183,68 @@ export async function getDatabaseIdFromUrl(): Promise<number | null> {
     
     // Extract project ID from various URL patterns
     let projectId: string | null = null;
+    let source = '';
 
-    // Check /workspace/[id] pattern
-    const workspaceMatch = pathname.match(/\/workspace\/([^\/]+)/);
-    if (workspaceMatch) {
-      projectId = workspaceMatch[1];
-    }
-
-    // Check /pc-workspace/[id] pattern
-    const pcWorkspaceMatch = pathname.match(/\/pc-workspace\/([^\/]+)/);
-    if (pcWorkspaceMatch) {
-      projectId = pcWorkspaceMatch[1];
-    }
-
-    // Check ?projectId= query param (overrides path-based ID)
-    // This takes highest priority to ensure correct project context
+    // Priority 1: Check ?projectId= query param (HIGHEST PRIORITY)
+    // This ensures correct project context even when newProject param exists
     const projectIdParam = searchParams.get('projectId');
     if (projectIdParam) {
       projectId = projectIdParam;
+      source = 'projectId query param';
+      console.log(`[getDatabaseIdFromUrl] 🎯 Using projectId from URL param: ${projectId}`);
     }
 
-    // Check ?newProject= query param (for new project creation)
-    // Only use this if projectId is not already set
+    // Priority 2: Check /workspace/[id] pattern
+    if (!projectId) {
+      const workspaceMatch = pathname.match(/\/workspace\/([^\/]+)/);
+      if (workspaceMatch) {
+        projectId = workspaceMatch[1];
+        source = 'workspace path';
+        console.log(`[getDatabaseIdFromUrl] 📍 Using projectId from workspace path: ${projectId}`);
+      }
+    }
+
+    // Priority 3: Check /pc-workspace/[id] pattern
+    if (!projectId) {
+      const pcWorkspaceMatch = pathname.match(/\/pc-workspace\/([^\/]+)/);
+      if (pcWorkspaceMatch) {
+        projectId = pcWorkspaceMatch[1];
+        source = 'pc-workspace path';
+        console.log(`[getDatabaseIdFromUrl] 📍 Using projectId from pc-workspace path: ${projectId}`);
+      }
+    }
+
+    // Priority 4: Check ?newProject= query param (LOWEST PRIORITY)
+    // Only use this if projectId is not already set from higher priority sources
     if (!projectId) {
       const newProjectParam = searchParams.get('newProject');
       if (newProjectParam) {
         projectId = newProjectParam;
+        source = 'newProject query param';
+        console.log(`[getDatabaseIdFromUrl] 🆕 Using projectId from newProject param: ${projectId}`);
       }
     }
 
     if (!projectId) {
-      console.warn('[getDatabaseIdFromUrl] No project ID found in URL');
+      console.warn('[getDatabaseIdFromUrl] ⚠️ No project ID found in URL');
       return null;
     }
 
+    // Log the final decision
+    console.log(`[getDatabaseIdFromUrl] 🔍 Fetching database ID for project: ${projectId} (from ${source})`);
+
     // Get database ID for this project
-    return await getWorkspaceDatabaseId(projectId);
+    const dbId = await getWorkspaceDatabaseId(projectId);
+    
+    if (dbId) {
+      console.log(`[getDatabaseIdFromUrl] ✅ Found database ID: ${dbId} for project: ${projectId}`);
+    } else {
+      console.warn(`[getDatabaseIdFromUrl] ⚠️ No database ID found for project: ${projectId}`);
+    }
+    
+    return dbId;
   } catch (error) {
-    console.error('Error getting database ID from URL:', error);
+    console.error('[getDatabaseIdFromUrl] ❌ Error getting database ID from URL:', error);
     return null;
   }
 }
