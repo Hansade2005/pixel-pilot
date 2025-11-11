@@ -132,6 +132,37 @@ async function getProjectDatabaseId(projectId: string): Promise<string | null> {
   }
 }
 
+// Helper function to get CURRENT database ID directly from Supabase (bypasses cache for real-time access)
+async function getCurrentDatabaseId(projectId: string): Promise<string | null> {
+  try {
+    console.log(`[getCurrentDatabaseId] 🔄 Fetching current database ID for project: ${projectId}`)
+
+    const { createAdminClient } = await import('@/lib/supabase/admin')
+    const supabase = createAdminClient()
+
+    const { data: database, error: dbError } = await supabase
+      .from('databases')
+      .select('id')
+      .eq('project_id', projectId)
+      .single()
+
+    if (database?.id) {
+      console.log(`[getCurrentDatabaseId] ✅ Found current database ID: ${database.id} for project: ${projectId}`)
+      return database.id.toString()
+    }
+
+    console.warn(`[getCurrentDatabaseId] ⚠️ No current database found for project: ${projectId}`)
+    if (dbError && dbError.code !== 'PGRST116') {
+      console.error(`[getCurrentDatabaseId] ❌ Database lookup error:`, dbError)
+    }
+
+    return null
+  } catch (error) {
+    console.error(`[getCurrentDatabaseId] ❌ Failed to fetch current database ID:`, error)
+    return null
+  }
+}
+
 // Helper function to check if project has database
 async function projectHasDatabase(projectId: string): Promise<boolean> {
   try {
@@ -3659,12 +3690,12 @@ ${conversationSummaryContext || ''}`
               }
             }
 
-            // Use database ID from request payload
-            const dbId = databaseId;
+            // Get current database ID directly from Supabase (real-time access for newly created databases)
+            const dbId = await getCurrentDatabaseId(projectId);
             if (!dbId) {
               return {
                 success: false,
-                error: 'No database ID provided in request.',
+                error: 'No database found for this project. Please create a database first.',
                 name,
                 toolCallId,
                 executionTimeMs: Date.now() - toolStartTime,
@@ -3858,12 +3889,12 @@ ${conversationSummaryContext || ''}`
               }
             }
 
-            // Use database ID from request payload
-            const dbId = databaseId;
+            // Get current database ID directly from Supabase (real-time access for newly created databases)
+            const dbId = await getCurrentDatabaseId(projectId);
             if (!dbId) {
               return {
                 success: false,
-                error: 'No database ID provided in request.',
+                error: 'No database found for this project. Please create a database first.',
                 tableId,
                 toolCallId,
                 executionTimeMs: Date.now() - toolStartTime,
@@ -4097,11 +4128,12 @@ ${conversationSummaryContext || ''}`
             // }
 
             // Use database ID from request payload
-            const dbId = databaseId;
+            // Get current database ID directly from Supabase (real-time access for newly created databases)
+            const dbId = await getCurrentDatabaseId(projectId);
             if (!dbId) {
               return {
                 success: false,
-                error: 'No database ID provided in request.',
+                error: 'No database found for this project. Please create a database first.',
                 tableId,
                 operation,
                 toolCallId,
@@ -4298,12 +4330,12 @@ ${conversationSummaryContext || ''}`
             //   }
             // }
 
-            // Use database ID from request payload
-            const dbId = databaseId;
+            // Get current database ID directly from Supabase (real-time access for newly created databases)
+            const dbId = await getCurrentDatabaseId(projectId);
             if (!dbId) {
               return {
                 success: false,
-                error: 'No database ID provided in request.',
+                error: 'No database found for this project. Please create a database first.',
                 action,
                 toolCallId,
                 executionTimeMs: Date.now() - toolStartTime,
@@ -4454,12 +4486,12 @@ ${conversationSummaryContext || ''}`
               }
             }
 
-            // Use database ID from request payload
-            const dbId = databaseId;
+            // Get current database ID directly from Supabase (real-time access for newly created databases)
+            const dbId = await getCurrentDatabaseId(projectId);
             if (!dbId) {
               return {
                 success: false,
-                error: 'No database ID provided in request.',
+                error: 'No database found for this project. Please create a database first.',
                 toolCallId,
                 executionTimeMs: Date.now() - toolStartTime,
                 timeWarning: timeStatus.warningMessage
@@ -4590,12 +4622,12 @@ ${conversationSummaryContext || ''}`
             }
 
             try {
-              // Get database ID
-              const dbId = databaseId;
+              // Get current database ID directly from Supabase (real-time access for newly created databases)
+              const dbId = await getCurrentDatabaseId(projectId);
               if (!dbId) {
                 return {
                   success: false,
-                  error: 'No database found for this project. Create a database first using the database panel.',
+                  error: 'No database found for this project. Please create a database first.',
                   toolCallId,
                   executionTimeMs: Date.now() - toolStartTime,
                   timeWarning: timeStatus.warningMessage
@@ -4720,12 +4752,12 @@ ${conversationSummaryContext || ''}`
             }
 
             try {
-              // Get database ID
-              const dbId = databaseId;
+              // Get current database ID directly from Supabase (real-time access for newly created databases)
+              const dbId = await getCurrentDatabaseId(projectId);
               if (!dbId) {
                 return {
                   success: false,
-                  error: 'No database found for this project.',
+                  error: 'No database found for this project. Please create a database first.',
                   toolCallId,
                   executionTimeMs: Date.now() - toolStartTime,
                   timeWarning: timeStatus.warningMessage
