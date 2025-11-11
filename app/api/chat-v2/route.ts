@@ -1225,6 +1225,7 @@ export async function POST(req: Request) {
       fileTree, // Client-built file tree
       modelId,
       aiMode,
+      chatMode = 'agent', // Default to 'agent' mode, can be 'ask' for read-only
       continuationState, // New field for stream continuation
       // toolResult // New field for client-side tool results - DISABLED
     } = body
@@ -1569,9 +1570,44 @@ export async function POST(req: Request) {
       // Continue without history on error
     }
 
-    // Build system prompt from pixel_forge_system_prompt.ts
+    // Build system prompt based on chat mode
     const isNextJS = true // We're using Next.js
-    let systemPrompt = `
+    let systemPrompt = chatMode === 'ask' ? `
+# 💬 PiPilot AI: Ask Mode - Your Knowledge Assistant
+## Role
+You are PiPilot in Ask Mode - a knowledgeable assistant focused on answering questions, providing guidance, and sharing insights without making any file changes or modifications to the project.
+
+## Core Capabilities in Ask Mode
+- Answer questions about code, technologies, and best practices
+- Explain existing code and project structure
+- Provide guidance and suggestions
+- Help debug issues by analyzing code
+- Share knowledge about web development, frameworks, and tools
+- Review and analyze existing files (read-only)
+
+## Ask Mode Restrictions
+- ❌ NO file modifications, creation, or deletion
+- ❌ NO package installation or removal
+- ❌ NO database modifications
+- ❌ NO external web searches or content extraction
+- ✅ READ-ONLY access to project files for analysis
+- ✅ Knowledge sharing and guidance
+- ✅ Code explanation and review
+- ✅ Best practice recommendations
+
+## Available Tools (Read-Only)
+- **read_file**: Read and analyze existing project files with line numbers
+- **list_files**: Browse project structure and file listings
+- **grep_search**: Search for specific content within project files
+
+## Philosophy
+In Ask Mode, I'm your knowledgeable companion who can help you understand, learn, and plan - but I won't make changes to your project. Think of me as a senior developer pair programming with you, providing insights and guidance while you maintain full control over your codebase.
+
+Always use generous, relevant emojis! 🎉💥🔥 Make every interaction engaging and educational! 🌟
+
+${projectContext}
+
+${conversationSummaryContext || ''}` : `
 # 🚀 PiPilot AI: Elite Web Architect & Bug Hunter
 ## Role
 You are the expert full-stack architect—a digital superhero with over 15 years of deep, professional experience. Your mission: deliver clean, innovative, market-dominating products with elite code quality, delightful UX, and thorough error handling.
@@ -1600,6 +1636,7 @@ For **authentication, database, or file storage**:
 - 📚 Review \`STORAGE_SYSTEM_IMPLEMENTATION.md\` for file storage
 - 📚 Reference \`EXTERNAL_APP_INTEGRATION_GUIDE.md\` for API integration
 - 🛠️ Strictly use documented patterns and endpoints
+- 🔑 **When setting up database or authentication, ALWAYS manage and setup API keys for the user** - Use the \`manage_api_keys\` tool to create secure API keys for external access
 
 ### 🗄️ Database Automation Tools
 **Complete database workflow in 7 simple steps:**
@@ -1708,14 +1745,8 @@ ${conversationSummaryContext || ''}`
 
     console.log('[Chat-V2] Starting streamText with multi-step tooling')
 
-    // Stream with AI SDK native tools
-    // Pass messages directly without conversion (same as stream.ts)
-    const result = await streamText({
-      model,
-      system: systemPrompt,
-      temperature: 0.7,
-      messages: processedMessages, // Use processed messages
-      tools: {
+    // Define all available tools
+    const allTools = {
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
         write_file: tool({
           description: 'Create or update a file in the project. Use this tool to create new files or update existing ones with new content. This tool executes on the client-side IndexedDB.',
@@ -4845,7 +4876,24 @@ ${conversationSummaryContext || ''}`
           }
         })
 
-      },
+      }
+
+    // Filter tools based on chat mode
+    const readOnlyTools = ['read_file', 'grep_search', 'list_files']
+    const toolsToUse = chatMode === 'ask' 
+      ? Object.fromEntries(
+          Object.entries(allTools).filter(([toolName]) => readOnlyTools.includes(toolName))
+        )
+      : allTools
+
+    // Stream with AI SDK native tools
+    // Pass messages directly without conversion (same as stream.ts)
+    const result = await streamText({
+      model,
+      system: systemPrompt,
+      temperature: 0.7,
+      messages: processedMessages, // Use processed messages
+      tools: toolsToUse,
       stopWhen: stepCountIs(60),
       onFinish: ({ response }) => {
         console.log(`[Chat-V2] Finished with ${response.messages.length} messages`)

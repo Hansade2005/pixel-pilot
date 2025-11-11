@@ -12,6 +12,8 @@ import { Card } from "@/components/ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog"
 import { useToast } from "@/components/ui/use-toast"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { MessageWithTools } from './message-with-tools'
 import {
   Send, Paperclip, Mic, MicOff, X, FileText, Image as ImageIcon,
@@ -427,6 +429,9 @@ export function ChatPanelV2({
   const [isLoading, setIsLoading] = useState(false)
   const [continuingMessageId, setContinuingMessageId] = useState<string | null>(null)
   const [isContinuationInProgress, setIsContinuationInProgress] = useState(false)
+  
+  // Chat mode state - default to 'agent', can be toggled to 'ask' for read-only mode
+  const [chatMode, setChatMode] = useState<'agent' | 'ask'>('agent')
   
   // Tool invocations tracking for inline pills
   const [activeToolCalls, setActiveToolCalls] = useState<Map<string, Array<{
@@ -965,6 +970,7 @@ export function ChatPanelV2({
         fileTree: await buildProjectFileTree(), // Rebuild file tree
         modelId: selectedModel,
         aiMode,
+        chatMode, // Pass the chat mode to the API
         continuationState // Include the continuation state
       }
 
@@ -1581,6 +1587,7 @@ export function ChatPanelV2({
         fileTree: await buildProjectFileTree(), // Current file tree
         modelId: selectedModel,
         aiMode,
+        chatMode, // Pass the chat mode to the API
         toolResult: {
           toolName,
           result: result.output || { error: result.errorText }
@@ -1947,7 +1954,8 @@ export function ChatPanelV2({
           fileTree, // Use client-built file tree instead of raw files
           files: projectFiles, // Keep raw files for tool operations (now refreshed)
           modelId: selectedModel,
-          aiMode
+          aiMode,
+          chatMode // Pass the chat mode to the API
         }),
         signal: controller.signal
       })
@@ -3134,8 +3142,39 @@ export function ChatPanelV2({
             </Button>
           </div>
 
-          {/* Bottom Right: Send/Stop Button */}
-          <div className="absolute bottom-2 right-2">
+          {/* Bottom Right: Mode Toggle and Send/Stop Button */}
+          <div className="absolute bottom-2 right-2 flex items-center gap-2">
+            {/* Ask Mode Toggle */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center">
+                  <RadioGroup
+                    value={chatMode}
+                    onValueChange={(value: 'agent' | 'ask') => setChatMode(value)}
+                    className="flex items-center gap-1"
+                  >
+                    <div className="flex items-center gap-1">
+                      <RadioGroupItem 
+                        value="ask" 
+                        id="ask-mode"
+                        className="h-3 w-3 border border-gray-400 rounded-full"
+                      />
+                      <label 
+                        htmlFor="ask-mode" 
+                        className="text-xs text-gray-400 cursor-pointer select-none"
+                      >
+                        Ask
+                      </label>
+                    </div>
+                  </RadioGroup>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Chat with PiPilot without making any file changes</p>
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Send/Stop Button */}
             {isLoading ? (
               <Button
                 type="button"

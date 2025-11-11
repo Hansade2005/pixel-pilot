@@ -3,9 +3,16 @@
 import { useState, useEffect } from "react";
 import { getWorkspaceDatabaseId } from "@/lib/get-current-workspace";
 import { toast } from "sonner";
-import { Loader2, Database as DatabaseIcon, AlertCircle } from "lucide-react";
+import { Loader2, Database as DatabaseIcon, AlertCircle, Download, Copy, FileJson, FileText } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { TableExplorer } from "./table-explorer";
 import { RecordViewer } from "./record-viewer";
@@ -152,6 +159,109 @@ export function DatabaseTab({ workspaceId }: DatabaseTabProps) {
     }
   };
 
+  // Export database schema as JSON
+  const exportDatabaseSchemaJSON = () => {
+    if (!databaseId || tables.length === 0) {
+      toast.error("No database schema to export");
+      return;
+    }
+
+    const databaseSchema = {
+      databaseId,
+      exportDate: new Date().toISOString(),
+      tables: tables.map(table => ({
+        id: table.id,
+        name: table.name,
+        schema: table.schema_json,
+        recordCount: table.recordCount,
+        created_at: table.created_at,
+        updated_at: table.updated_at,
+      }))
+    };
+
+    const jsonContent = JSON.stringify(databaseSchema, null, 2);
+    const blob = new Blob([jsonContent], { type: 'application/json' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `database_schema_${databaseId}_${new Date().toISOString().split('T')[0]}.json`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success(`Database schema exported as JSON (${tables.length} tables)`);
+  };
+
+  // Export database schema as SQL
+  const exportDatabaseSchemaSQL = () => {
+    if (!databaseId || tables.length === 0) {
+      toast.error("No database schema to export");
+      return;
+    }
+
+    let sqlContent = `-- Database Schema Export\n-- Database ID: ${databaseId}\n-- Export Date: ${new Date().toISOString()}\n-- Tables: ${tables.length}\n\n`;
+
+    tables.forEach(table => {
+      const schema = table.schema_json as any;
+      const columns = schema.columns || [];
+      
+      sqlContent += `-- Table: ${table.name}\n`;
+      sqlContent += `CREATE TABLE ${table.name} (\n`;
+      
+      columns.forEach((col: any, index: number) => {
+        const type = col.type.toUpperCase();
+        const nullable = col.required ? 'NOT NULL' : 'NULL';
+        const defaultValue = col.defaultValue ? ` DEFAULT ${col.defaultValue}` : '';
+        const comma = index < columns.length - 1 ? ',' : '';
+        
+        sqlContent += `  ${col.name} ${type} ${nullable}${defaultValue}${comma}\n`;
+      });
+      
+      sqlContent += `);\n\n`;
+    });
+
+    const blob = new Blob([sqlContent], { type: 'text/plain' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `database_schema_${databaseId}_${new Date().toISOString().split('T')[0]}.sql`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success(`Database schema exported as SQL (${tables.length} tables)`);
+  };
+
+  // Copy database schema to clipboard
+  const copyDatabaseSchema = async () => {
+    if (!databaseId || tables.length === 0) {
+      toast.error("No database schema to copy");
+      return;
+    }
+
+    const databaseSchema = {
+      databaseId,
+      exportDate: new Date().toISOString(),
+      tables: tables.map(table => ({
+        id: table.id,
+        name: table.name,
+        schema: table.schema_json,
+        recordCount: table.recordCount,
+      }))
+    };
+
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(databaseSchema, null, 2));
+      toast.success(`Database schema copied to clipboard (${tables.length} tables)`);
+    } catch (error) {
+      toast.error("Failed to copy schema to clipboard");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -189,9 +299,53 @@ export function DatabaseTab({ workspaceId }: DatabaseTabProps) {
   }
 
   return (
-    <div className="flex h-full overflow-hidden relative">
-      {/* Table Explorer - Toggleable overlay for both mobile and PC */}
-      {showTableExplorer && (
+    <div className="flex flex-col h-full overflow-hidden relative">
+      {/* Database Schema Export Bar */}
+      <div className="flex items-center justify-between p-2 border-b border-border bg-muted/30">
+        <div className="flex items-center gap-2">
+          <DatabaseIcon className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium">Database Schema</span>
+          <Badge variant="secondary" className="text-xs">
+            {tables.length} table{tables.length !== 1 ? 's' : ''}
+          </Badge>
+        </div>
+        
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={copyDatabaseSchema}
+            className="h-7 px-2 text-xs"
+            title="Copy database schema to clipboard"
+          >
+            <Copy className="h-3 w-3 mr-1" />
+            Copy
+          </Button>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                <Download className="h-3 w-3 mr-1" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={exportDatabaseSchemaJSON}>
+                <FileJson className="h-4 w-4 mr-2" />
+                Export as JSON
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportDatabaseSchemaSQL}>
+                <FileText className="h-4 w-4 mr-2" />
+                Export as SQL
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      <div className="flex flex-1 overflow-hidden">
+        {/* Table Explorer - Toggleable overlay for both mobile and PC */}
+        {showTableExplorer && (
         <div className={cn(
           "border-r border-border overflow-y-auto",
           isMobile
@@ -233,6 +387,7 @@ export function DatabaseTab({ workspaceId }: DatabaseTabProps) {
           onToggleExplorer={() => setShowTableExplorer(!showTableExplorer)}
           showExplorer={showTableExplorer}
         />
+      </div>
       </div>
     </div>
   );
