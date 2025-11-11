@@ -19,7 +19,7 @@ export function DatabaseTab({ workspaceId }: DatabaseTabProps) {
   const [records, setRecords] = useState<RecordData[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingRecords, setLoadingRecords] = useState(false);
-  const [showTableExplorer, setShowTableExplorer] = useState(false);
+  const [showTableExplorer, setShowTableExplorer] = useState(true);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -192,22 +192,23 @@ export function DatabaseTab({ workspaceId }: DatabaseTabProps) {
 
   return (
     <div className="flex h-full overflow-hidden relative">
-      {/* Mobile Table Explorer Toggle Button */}
-      {isMobile && (
-        <div className="absolute top-4 left-4 z-10">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setShowTableExplorer(!showTableExplorer)}
-            className="bg-background border shadow-md"
-          >
-            {showTableExplorer ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-          </Button>
-        </div>
-      )}
+      {/* Table Explorer Toggle Button - Both Mobile and PC */}
+      <div className={cn(
+        "absolute z-10",
+        isMobile ? "top-4 left-4" : "top-4 left-4"
+      )}>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setShowTableExplorer(!showTableExplorer)}
+          className="bg-background border shadow-md"
+        >
+          {showTableExplorer ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+        </Button>
+      </div>
 
-      {/* Table Explorer - Desktop: Always visible, Mobile: Toggleable overlay */}
-      {(!isMobile || showTableExplorer) && (
+      {/* Table Explorer - Toggleable overlay for both mobile and PC */}
+      {showTableExplorer && (
         <div className={cn(
           "border-r border-border overflow-y-auto",
           isMobile
