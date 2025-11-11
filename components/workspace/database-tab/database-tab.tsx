@@ -3,10 +3,13 @@
 import { useState, useEffect } from "react";
 import { getWorkspaceDatabaseId } from "@/lib/get-current-workspace";
 import { toast } from "sonner";
-import { Loader2, Database as DatabaseIcon, AlertCircle } from "lucide-react";
+import { Loader2, Database as DatabaseIcon, AlertCircle, Menu, X } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { TableExplorer } from "./table-explorer";
 import { RecordViewer } from "./record-viewer";
+import { cn } from "@/lib/utils";
 import type { DatabaseTabProps, TableWithCount, RecordData } from "./types";
 
 export function DatabaseTab({ workspaceId }: DatabaseTabProps) {
@@ -16,6 +19,8 @@ export function DatabaseTab({ workspaceId }: DatabaseTabProps) {
   const [records, setRecords] = useState<RecordData[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingRecords, setLoadingRecords] = useState(false);
+  const [showTableExplorer, setShowTableExplorer] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     initializeDatabase();
@@ -129,6 +134,10 @@ export function DatabaseTab({ workspaceId }: DatabaseTabProps) {
     if (databaseId) {
       loadRecords(databaseId, table.id.toString());
     }
+    // Close table explorer on mobile after selection
+    if (isMobile) {
+      setShowTableExplorer(false);
+    }
   };
 
   const handleRefreshTables = () => {
@@ -155,38 +164,80 @@ export function DatabaseTab({ workspaceId }: DatabaseTabProps) {
 
   if (!databaseId) {
     return (
-      <div className="flex items-center justify-center h-full p-8">
-        <Card className="max-w-md">
-          <CardHeader>
-            <div className="flex items-center gap-2 text-destructive">
-              <AlertCircle className="h-5 w-5" />
-              <CardTitle>No Database Found</CardTitle>
+      <div className="flex items-center justify-center h-full p-4">
+        <div className="max-w-md w-full">
+          <div className="flex flex-col items-center text-center space-y-4 p-6 border border-border rounded-lg bg-background">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-8 w-8 text-destructive flex-shrink-0" />
+              <div className="text-left">
+                <h3 className="text-lg font-semibold text-destructive">No Database Found</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  This workspace doesn't have a database yet. Create one in the Database page.
+                </p>
+              </div>
             </div>
-            <CardDescription>
-              This workspace doesn't have a database yet. Create one in the Database page.
-            </CardDescription>
-          </CardHeader>
-        </Card>
+            <Button
+              variant="outline"
+              onClick={() => window.open('/workspace/database', '_blank')}
+              className="w-full"
+            >
+              <DatabaseIcon className="h-4 w-4 mr-2" />
+              Go to Database Page
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* Left Panel - Table Explorer */}
-      <div className="w-80 border-r border-border flex-shrink-0 overflow-y-auto">
-        <TableExplorer
-          tables={tables}
-          selectedTable={selectedTable}
-          onTableSelect={handleTableSelect}
-          loading={false}
-          databaseId={databaseId}
-          onRefresh={handleRefreshTables}
+    <div className="flex h-full overflow-hidden relative">
+      {/* Mobile Table Explorer Toggle Button */}
+      {isMobile && (
+        <div className="absolute top-4 left-4 z-10">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setShowTableExplorer(!showTableExplorer)}
+            className="bg-background border shadow-md"
+          >
+            {showTableExplorer ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </Button>
+        </div>
+      )}
+
+      {/* Table Explorer - Desktop: Always visible, Mobile: Toggleable overlay */}
+      {(!isMobile || showTableExplorer) && (
+        <div className={cn(
+          "border-r border-border overflow-y-auto",
+          isMobile
+            ? "absolute inset-y-0 left-0 w-80 bg-background shadow-lg z-20 border-r"
+            : "w-80 flex-shrink-0"
+        )}>
+          <TableExplorer
+            tables={tables}
+            selectedTable={selectedTable}
+            onTableSelect={handleTableSelect}
+            loading={false}
+            databaseId={databaseId}
+            onRefresh={handleRefreshTables}
+          />
+        </div>
+      )}
+
+      {/* Mobile Overlay - Click to close */}
+      {isMobile && showTableExplorer && (
+        <div
+          className="absolute inset-0 bg-black/50 z-10"
+          onClick={() => setShowTableExplorer(false)}
         />
-      </div>
+      )}
 
       {/* Right Panel - Record Viewer */}
-      <div className="flex-1 overflow-y-auto">
+      <div className={cn(
+        "flex-1 overflow-y-auto",
+        isMobile ? "pt-16" : "" // Add top padding on mobile for the toggle button
+      )}>
         <RecordViewer
           table={selectedTable}
           records={records}

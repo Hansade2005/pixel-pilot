@@ -119,22 +119,22 @@ export function RecordViewer({
           </div>
         </div>
 
-        {/* Stats - Button Style Layout */}
-        <div className="flex items-center gap-4 mb-3 p-2 border border-border rounded-md bg-background">
-          <div className="flex items-center gap-2">
-            <Database className="h-3 w-3 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">Records:</span>
-            <span className="text-xs font-medium">{records.length}</span>
+        {/* Stats - Compact Button Style Layout */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-3 px-2 py-1 border border-border rounded-md bg-background">
+          <div className="flex items-center gap-1.5">
+            <Database className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+            <span className="text-[10px] text-muted-foreground">Records:</span>
+            <span className="text-[10px] font-medium">{records.length}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <TableIcon className="h-3 w-3 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">Columns:</span>
-            <span className="text-xs font-medium">{schema.columns?.length || 0}</span>
+          <div className="flex items-center gap-1.5">
+            <TableIcon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+            <span className="text-[10px] text-muted-foreground">Columns:</span>
+            <span className="text-[10px] font-medium">{schema.columns?.length || 0}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Code className="h-3 w-3 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">ID:</span>
-            <span className="text-xs font-medium font-mono">{table.id}</span>
+          <div className="flex items-center gap-1.5">
+            <Code className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+            <span className="text-[10px] text-muted-foreground">ID:</span>
+            <span className="text-[10px] font-medium font-mono truncate max-w-20">{table.id}</span>
           </div>
         </div>
 
