@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast"
 
 interface ProjectHeaderProps {
   project: Project | null
@@ -59,6 +60,7 @@ export function ProjectHeader({
   initialDescription,
   onDialogOpenChange
 }: ProjectHeaderProps) {
+  const { toast } = useToast()
   const [copied, setCopied] = useState(false)
   const [editing, setEditing] = useState(false)
   const [nameInput, setNameInput] = useState(project?.name || "")
@@ -172,16 +174,12 @@ export function ProjectHeader({
       if (!success) throw new Error("Backup failed")
       
       // Show success message
-      const { useToast } = await import('@/hooks/use-toast')
-      const { toast } = useToast()
       toast({
         title: "Backup Complete",
         description: "Project backed up to cloud successfully"
       })
     } catch (error: any) {
       console.error("Error creating backup:", error)
-      const { useToast } = await import('@/hooks/use-toast')
-      const { toast } = useToast()
       toast({
         title: "Backup Failed",
         description: error.message || "Failed to create backup",
