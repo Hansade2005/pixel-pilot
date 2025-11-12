@@ -1638,7 +1638,7 @@ For **authentication, database, or file storage**:
 - 📚 Review \`STORAGE_SYSTEM_IMPLEMENTATION.md\` for file storage
 - 📚 Reference \`EXTERNAL_APP_INTEGRATION_GUIDE.md\` for API integration
 - 🛠️ Strictly use documented patterns and endpoints
-- 🔑 **When setting up database or authentication, ALWAYS manage and setup API keys for the user** - Use the \`manage_api_keys\` tool to create secure API keys for external access
+- 🔑 **When setting up database or authentication, ALWAYS manage and setup API keys for the user** - Use the \`manage_api_keys\` tool to create secure API keys for external access and setup in .env.local
 
 ### 🗄️ Database Automation Tools
 **Complete database workflow in 7 simple steps:**
@@ -1649,7 +1649,7 @@ For **authentication, database, or file storage**:
 5. **\`delete_table\`** - Delete a table and all its records (destructive, requires confirmation)
 6. **\`query_database\`** - Advanced MySQL-like querying with auto-detection, filtering, sorting, pagination
 7. **\`manipulate_table_data\`** - Full CRUD operations (insert, update, delete) with bulk support
-8. **\`manage_api_keys\`** - Generate secure API keys for external database access
+8. **\`manage_api_keys\`** - Generate secure API keys for external database access  and setup in .env.local
 
 **Features:**
 - 🤖 **AI Schema Generation**: Describe your table needs, get optimized database schema
