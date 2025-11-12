@@ -5881,6 +5881,87 @@ ${conversationSummaryContext || ''}`
               };
             }
           }
+        }),
+
+        // Connect PixelPilot project to Supabase project
+        supabase_connect_project: tool({
+          description: 'Connect a PixelPilot project to a Supabase project for database operations.',
+          inputSchema: z.object({
+            pixelPilotProjectId: z.string().describe('The PixelPilot project ID'),
+            supabaseProjectId: z.string().describe('The Supabase project ID to connect to'),
+            supabaseProjectName: z.string().optional().describe('Optional name of the Supabase project'),
+            supabaseProjectUrl: z.string().optional().describe('Optional URL of the Supabase project')
+          }),
+          execute: async ({ pixelPilotProjectId, supabaseProjectId, supabaseProjectName, supabaseProjectUrl }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              return {
+                success: false,
+                error: 'Operation cancelled',
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+
+            try {
+              // Get the user's Supabase access token from cloud-sync
+              const { getSupabaseAccessToken } = await import('@/lib/cloud-sync')
+              const token = await getSupabaseAccessToken()
+
+              if (!token) {
+                return {
+                  success: false,
+                  error: 'No Supabase access token found. Please connect your Supabase account in settings.',
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Call the Supabase connect project API
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/supabase/connect-project`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token, pixelPilotProjectId, supabaseProjectId, supabaseProjectName, supabaseProjectUrl })
+              })
+
+              if (!response.ok) {
+                const errorData = await response.json()
+                throw new Error(errorData.error || `HTTP ${response.status}`)
+              }
+
+              const result = await response.json()
+
+              console.log('[SUCCESS] PixelPilot project connected to Supabase:', { pixelPilotProjectId, supabaseProjectId });
+              return {
+                success: true,
+                message: result.message || '✅ Projects connected successfully',
+                pixelPilotProjectId,
+                supabaseProjectId,
+                supabaseProjectName,
+                supabaseProjectUrl,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_connect_project'] = (toolExecutionTimes['supabase_connect_project'] || 0) + executionTime;
+
+              console.error('[ERROR] Supabase connect project failed:', error);
+              return {
+                success: false,
+                error: `Failed to connect projects: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
         })
 
       }
