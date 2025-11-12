@@ -1399,24 +1399,27 @@ export default function TodoApp() {
               <WebPreviewUrl />
             </WebPreviewNavigation>
 
-            <div className={`flex-1 min-h-0 ${isMobile ? 'pb-12' : ''}`}>
+            <div className="flex-1 min-h-0">
               {preview.isLoading ? (
-                <div className="text-center p-8">
-                  <div className="relative w-24 h-24 mx-auto mb-6">
-                    <div className="absolute inset-0 rounded-full border-4 border-muted animate-ping"></div>
-                    <div className="absolute inset-2 rounded-full border-4 border-primary animate-pulse"></div>
-                    <div className="absolute inset-4 rounded-full border-t-4 border-accent animate-spin"></div>
-                    <div className="absolute inset-8 rounded-full bg-accent animate-pulse"></div>
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-center p-8">
+                    <div className="relative w-24 h-24 mx-auto mb-6">
+                      <div className="absolute inset-0 rounded-full border-4 border-muted animate-ping"></div>
+                      <div className="absolute inset-2 rounded-full border-4 border-primary animate-pulse"></div>
+                      <div className="absolute inset-4 rounded-full border-t-4 border-accent animate-spin"></div>
+                      <div className="absolute inset-8 rounded-full bg-accent animate-pulse"></div>
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2">
+                      {truncateMessage(currentLog, 40)}
+                    </h3>
+                    <p className="text-muted-foreground text-sm mb-4">
+                      This may take a few moments
+                    </p>
                   </div>
-                  <h3 className="text-lg font-semibold mb-2">
-                    {truncateMessage(currentLog, 40)}
-                  </h3>
-                  <p className="text-muted-foreground text-sm mb-4">
-                    This may take a few moments
-                  </p>
                 </div>
               ) : preview.url ? (
                 <WebPreviewBody
+                  className="h-full"
                   src={preview.url}
                   ref={(iframe) => {
                     if (iframe) {
