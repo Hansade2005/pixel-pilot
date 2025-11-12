@@ -14,7 +14,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { ChevronDownIcon, Monitor, Smartphone, Tablet } from "lucide-react";
+import { ChevronDownIcon, Monitor, Smartphone, Tablet, RotateCcw, ExternalLink } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { createContext, useContext, useEffect, useState } from "react";
 
@@ -175,12 +175,21 @@ export const WebPreviewNavigationButton = ({
   </TooltipProvider>
 );
 
-export type WebPreviewUrlProps = ComponentProps<typeof Input>;
+export type WebPreviewUrlProps = ComponentProps<typeof Input> & {
+  onRefresh?: () => void;
+  onOpenExternal?: () => void;
+  refreshDisabled?: boolean;
+  externalDisabled?: boolean;
+};
 
 export const WebPreviewUrl = ({
   value,
   onChange,
   onKeyDown,
+  onRefresh,
+  onOpenExternal,
+  refreshDisabled = false,
+  externalDisabled = false,
   ...props
 }: WebPreviewUrlProps) => {
   const { url, setUrl } = useWebPreview();
@@ -205,14 +214,40 @@ export const WebPreviewUrl = ({
   };
 
   return (
-    <Input
-      className="h-8 flex-1 text-sm"
-      onChange={onChange ?? handleChange}
-      onKeyDown={handleKeyDown}
-      placeholder="Enter URL..."
-      value={value ?? inputValue}
-      {...props}
-    />
+    <div className="flex items-center h-8 flex-1 relative">
+      {onRefresh && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 w-6 p-0 mr-1"
+          onClick={onRefresh}
+          disabled={refreshDisabled}
+          title="Refresh Preview"
+        >
+          <RotateCcw className="h-3 w-3" />
+        </Button>
+      )}
+      <Input
+        className="h-8 flex-1 text-sm pr-8"
+        onChange={onChange ?? handleChange}
+        onKeyDown={handleKeyDown}
+        placeholder="Enter URL..."
+        value={value ?? inputValue}
+        {...props}
+      />
+      {onOpenExternal && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 w-6 p-0 absolute right-1"
+          onClick={onOpenExternal}
+          disabled={externalDisabled}
+          title="Open in new tab"
+        >
+          <ExternalLink className="h-3 w-3" />
+        </Button>
+      )}
+    </div>
   );
 };
 

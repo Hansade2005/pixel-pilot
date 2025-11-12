@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import {
   Code,
   Eye,
+  Zap,
   FileText,
   Download,
   ExternalLink,
@@ -1366,6 +1367,14 @@ export default function TodoApp() {
             }}
           >
             <WebPreviewNavigation>
+              <div className="flex-1" />
+              <WebPreviewDeviceSelector />
+              <WebPreviewUrl
+                onRefresh={refreshPreview}
+                onOpenExternal={openStackBlitz}
+                refreshDisabled={!preview.url}
+                externalDisabled={!project}
+              />
               <WebPreviewNavigationButton
                 onClick={createPreview}
                 disabled={!project || preview.isLoading}
@@ -1373,30 +1382,15 @@ export default function TodoApp() {
               >
                 <Play className="h-4 w-4" />
               </WebPreviewNavigationButton>
-              <WebPreviewNavigationButton
-                onClick={refreshPreview}
-                disabled={!preview.url}
-                tooltip="Refresh Preview"
-              >
-                <RotateCcw className="h-4 w-4" />
-              </WebPreviewNavigationButton>
-              <WebPreviewNavigationButton
-                onClick={cleanupSandbox}
-                disabled={!preview.sandboxId}
-                tooltip="Stop Preview"
-              >
-                <Square className="h-4 w-4" />
-              </WebPreviewNavigationButton>
-              <WebPreviewNavigationButton
-                onClick={openStackBlitz}
-                disabled={!project}
-                tooltip="Open in StackBlitz"
-              >
-                <ExternalLink className="h-4 w-4" />
-              </WebPreviewNavigationButton>
-              <div className="flex-1" />
-              <WebPreviewDeviceSelector />
-              <WebPreviewUrl />
+              {preview.sandboxId && (
+                <WebPreviewNavigationButton
+                  onClick={cleanupSandbox}
+                  disabled={!preview.sandboxId}
+                  tooltip="Stop Preview"
+                >
+                  <Square className="h-4 w-4" />
+                </WebPreviewNavigationButton>
+              )}
             </WebPreviewNavigation>
 
             <div className="flex-1 min-h-0">
