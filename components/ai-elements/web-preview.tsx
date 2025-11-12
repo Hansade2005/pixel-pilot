@@ -84,6 +84,16 @@ export const WebPreview = ({
   const [consoleOpen, setConsoleOpen] = useState(false);
   const [device, setDevice] = useState<DevicePreset | null>(defaultDevice);
 
+  // Sync URL state when defaultUrl changes
+  useEffect(() => {
+    setUrl(defaultUrl);
+  }, [defaultUrl]);
+
+  // Sync device state when defaultDevice changes
+  useEffect(() => {
+    setDevice(defaultDevice);
+  }, [defaultDevice]);
+
   const handleUrlChange = (newUrl: string) => {
     setUrl(newUrl);
     onUrlChange?.(newUrl);

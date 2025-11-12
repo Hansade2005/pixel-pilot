@@ -1085,7 +1085,15 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       </ResizablePanelGroup>
                     ) : activeTab === "preview" ? (
                       /* Preview Tab: Full-width Preview */
-                      <CodePreviewPanel ref={codePreviewRef} project={selectedProject} activeTab={activeTab} onTabChange={setActiveTab} previewViewMode={previewViewMode} />
+                      <CodePreviewPanel 
+                        ref={codePreviewRef} 
+                        project={selectedProject} 
+                        activeTab={activeTab} 
+                        onTabChange={setActiveTab} 
+                        previewViewMode={previewViewMode}
+                        syncedUrl={syncedPreview.url || customUrl}
+                        onUrlChange={setCustomUrl}
+                      />
                     ) : (
                       /* Database Tab */
                       <DatabaseTab workspaceId={selectedProject?.id || ""} />
@@ -1450,6 +1458,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                       activeTab="preview"
                       onTabChange={() => {}}
                       previewViewMode={previewViewMode}
+                      syncedUrl={syncedPreview.url || customUrl}
+                      onUrlChange={setCustomUrl}
                     />
                   </div>
                 </TabsContent>

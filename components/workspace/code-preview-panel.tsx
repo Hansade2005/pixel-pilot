@@ -37,6 +37,8 @@ interface CodePreviewPanelProps {
   activeTab: "code" | "preview";
   onTabChange: (tab: "code" | "preview") => void;
   previewViewMode?: "desktop" | "mobile";
+  syncedUrl?: string;
+  onUrlChange?: (url: string) => void;
 }
 
 export interface CodePreviewPanelRef {
@@ -56,7 +58,7 @@ interface PreviewState {
 }
 
 export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanelProps>(
-  ({ project, activeTab, onTabChange, previewViewMode = "desktop" }, ref) => {
+  ({ project, activeTab, onTabChange, previewViewMode = "desktop", syncedUrl, onUrlChange }, ref) => {
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const [preview, setPreview] = useState<PreviewState>({
@@ -1354,10 +1356,11 @@ export default function TodoApp() {
         ) : (
           <WebPreview
             className="h-full"
-            defaultUrl={preview.url || ""}
+            defaultUrl={syncedUrl || preview.url || ""}
             defaultDevice={previewViewMode === 'mobile' ? DEVICE_PRESETS.find(d => d.name === 'iPhone 12/13') || null : null}
             onUrlChange={(url) => {
               setCustomUrl(url)
+              onUrlChange?.(url)
               // Update preview state if needed
               setPreview(prev => ({ ...prev, url }))
             }}
@@ -1396,7 +1399,7 @@ export default function TodoApp() {
               <WebPreviewUrl />
             </WebPreviewNavigation>
 
-            <div className={`flex-1 min-h-0 ${isMobile ? 'pb-48' : ''}`}>
+            <div className={`flex-1 min-h-0 ${isMobile ? 'pb-12' : ''}`}>
               {preview.isLoading ? (
                 <div className="text-center p-8">
                   <div className="relative w-24 h-24 mx-auto mb-6">
