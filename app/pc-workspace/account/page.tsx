@@ -43,35 +43,35 @@ import {
 const GitHubIcon = ({ className }: { className?: string }) => (
   <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className={className}>
     <title>GitHub</title>
-    <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+    <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
   </svg>
 )
 
 const VercelIcon = ({ className }: { className?: string }) => (
   <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className={className}>
     <title>Vercel</title>
-    <path d="m12 1.608 12 20.784H0Z"/>
+    <path d="m12 1.608 12 20.784H0Z" />
   </svg>
 )
 
 const NetlifyIcon = ({ className }: { className?: string }) => (
   <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className={className}>
     <title>Netlify</title>
-    <path d="M6.49 19.04h-.23L5.13 17.9v-.23l1.73-1.71h1.2l.15.15v1.2L6.5 19.04ZM5.13 6.31V6.1l1.13-1.13h.23L8.2 6.68v1.2l-.15.15h-1.2L5.13 6.31Zm9.96 9.09h-1.65l-.14-.13v-3.83c0-.68-.27-1.2-1.1-1.23-.42 0-.9 0-1.43.02l-.07.08v4.96l-.14.14H8.9l-.13-.14V8.73l.13-.14h3.7a2.6 2.6 0 0 1 2.61 2.6v4.08l-.13.14Zm-8.37-2.44H.14L0 12.82v-1.64l.14-.14h6.58l.14.14v1.64l-.14.14Zm17.14 0h-6.58l-.14-.14v-1.64l.14-.14h6.58l.14.14v1.64l-.14.14ZM11.05 6.55V1.64l.14-.14h1.65l.14.14v4.9l-.14.14h-1.65l-.14-.13Zm0 15.81v-4.9l.14-.14h1.65l.14.13v4.91l-.14.14h-1.65l-.14-.14Z"/>
+    <path d="M6.49 19.04h-.23L5.13 17.9v-.23l1.73-1.71h1.2l.15.15v1.2L6.5 19.04ZM5.13 6.31V6.1l1.13-1.13h.23L8.2 6.68v1.2l-.15.15h-1.2L5.13 6.31Zm9.96 9.09h-1.65l-.14-.13v-3.83c0-.68-.27-1.2-1.1-1.23-.42 0-.9 0-1.43.02l-.07.08v4.96l-.14.14H8.9l-.13-.14V8.73l.13-.14h3.7a2.6 2.6 0 0 1 2.61 2.6v4.08l-.13.14Zm-8.37-2.44H.14L0 12.82v-1.64l.14-.14h6.58l.14.14v1.64l-.14.14Zm17.14 0h-6.58l-.14-.14v-1.64l.14-.14h6.58l.14.14v1.64l-.14.14ZM11.05 6.55V1.64l.14-.14h1.65l.14.14v4.9l-.14.14h-1.65l-.14-.13Zm0 15.81v-4.9l.14-.14h1.65l.14.13v4.91l-.14.14h-1.65l-.14-.14Z" />
   </svg>
 )
 
 const SupabaseIcon = ({ className }: { className?: string }) => (
   <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className={className}>
     <title>Supabase</title>
-    <path d="M21.362 9.354H12V.396a.396.396 0 0 0-.716-.233L2.724 9.355H.642A.643.643 0 0 0 0 10v4a.64.64 0 0 0 .643.643h2.724l8.56 9.192a.396.396 0 0 0 .716-.233V14.61h9.362a.643.643 0 0 0 .643-.643v-4a.643.643 0 0 0-.643-.643Z"/>
+    <path d="M21.362 9.354H12V.396a.396.396 0 0 0-.716-.233L2.724 9.355H.642A.643.643 0 0 0 0 10v4a.64.64 0 0 0 .643.643h2.724l8.56 9.192a.396.396 0 0 0 .716-.233V14.61h9.362a.643.643 0 0 0 .643-.643v-4a.643.643 0 0 0-.643-.643Z" />
   </svg>
 )
 
 const StripeIcon = ({ className }: { className?: string }) => (
   <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className={className}>
     <title>Stripe</title>
-    <path d="M13.976 9.15c-1.37 0-2.313.917-2.313 2.445 0 2.807 4.878 1.47 4.878 4.435 0 .871-.776 1.428-1.958 1.428-1.618 0-2.413-.854-2.413-2.165h-2.03c0 2.145 1.618 3.507 4.443 3.507 1.618 0 2.783-.661 2.783-2.445 0-2.806-4.878-1.47-4.878-4.435 0-.661.465-1.244 1.754-1.244 1.244 0 1.863.661 1.863 1.754h2.03c0-1.754-1.37-2.807-3.559-2.807zm7.024 8.85h2.03V6.22h-2.03v11.78z"/>
+    <path d="M13.976 9.15c-1.37 0-2.313.917-2.313 2.445 0 2.807 4.878 1.47 4.878 4.435 0 .871-.776 1.428-1.958 1.428-1.618 0-2.413-.854-2.413-2.165h-2.03c0 2.145 1.618 3.507 4.443 3.507 1.618 0 2.783-.661 2.783-2.445 0-2.806-4.878-1.47-4.878-4.435 0-.661.465-1.244 1.754-1.244 1.244 0 1.863.661 1.863 1.754h2.03c0-1.754-1.37-2.807-3.559-2.807zm7.024 8.85h2.03V6.22h-2.03v11.78z" />
   </svg>
 )
 import { useToast } from "@/hooks/use-toast"
@@ -93,7 +93,7 @@ import {
   getSupabaseProjectDetails
 } from "@/lib/cloud-sync"
 import { useCloudSync } from "@/hooks/use-cloud-sync"
-import { 
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -154,7 +154,7 @@ function AccountSettingsPageContent() {
     supabase: { token: '', anonKey: '', serviceRoleKey: '', isValidating: false, error: '' },
     stripe: { token: '', isValidating: false, error: '' }
   })
-  
+
   // Password change form state
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
@@ -182,16 +182,16 @@ function AccountSettingsPageContent() {
     const handleOAuthCallback = async () => {
       const token = searchParams.get('token')
       const processed = searchParams.get('processed')
-      
+
       console.log('[OAUTH] Current URL:', window.location.href)
-      console.log('[OAUTH] handleOAuthCallback called:', { 
-        hasToken: !!token, 
+      console.log('[OAUTH] handleOAuthCallback called:', {
+        hasToken: !!token,
         tokenLength: token?.length || 0,
-        hasUser: !!user?.id, 
+        hasUser: !!user?.id,
         userId: user?.id,
-        processed: processed 
+        processed: processed
       })
-      
+
       // Only process if we have a token and haven't processed it yet
       if (token && user?.id && !processed) {
         console.log('[OAUTH] Starting OAuth callback processing...')
@@ -203,7 +203,7 @@ function AccountSettingsPageContent() {
 
           // First validate the token before storing it
           console.log('[OAUTH] Validating Supabase OAuth token...')
-          
+
           // Call our server-side API to validate the token (avoids CORS issues)
           console.log('[OAUTH] Calling server API to validate token...')
           const validateResponse = await fetch('/api/supabase/validate-token', {
@@ -213,13 +213,13 @@ function AccountSettingsPageContent() {
             },
             body: JSON.stringify({ token }),
           })
-          
+
           const validateResult = await validateResponse.json()
-          
+
           if (!validateResponse.ok || !validateResult.valid) {
             throw new Error(validateResult.error || 'Token validation failed')
           }
-          
+
           const projects = validateResult.projects || []
           console.log('[OAUTH] Token validation successful, found', projects.length, 'projects')
 
@@ -227,7 +227,7 @@ function AccountSettingsPageContent() {
           console.log('[OAUTH] Storing token and connection state...')
           const tokensToStore: any = { supabase: token }
           const success = await storeDeploymentTokens(user.id, tokensToStore)
-          
+
           if (!success) {
             console.error('[OAUTH] Failed to store token in database')
             throw new Error('Failed to save your Supabase token to the database. Please try again or contact support if the issue persists.')
@@ -237,12 +237,12 @@ function AccountSettingsPageContent() {
           // Store connection state
           const statesToStore: any = { supabase_connected: true }
           const connectionSuccess = await storeDeploymentConnectionStates(user.id, statesToStore)
-          
+
           if (!connectionSuccess) {
             console.error('[OAUTH] Failed to store connection state')
             throw new Error('Token saved but failed to update connection status. Please refresh the page.')
           }
-          
+
           console.log('[OAUTH] Connection state stored successfully')
 
           // Refresh connection status to show the new connection
@@ -265,20 +265,20 @@ function AccountSettingsPageContent() {
           })
         } catch (error: any) {
           console.error("Error handling OAuth callback:", error)
-          
+
           // Clear URL parameters even on error
           window.history.replaceState({}, document.title, window.location.pathname)
-          
+
           // Provide specific error messages based on the error type
           let errorMessage = "Failed to complete Supabase connection. Please try again."
-          
-          if (error.message?.toLowerCase().includes('unauthorized') || 
-              error.message?.toLowerCase().includes('invalid') || 
-              error.message?.toLowerCase().includes('403')) {
+
+          if (error.message?.toLowerCase().includes('unauthorized') ||
+            error.message?.toLowerCase().includes('invalid') ||
+            error.message?.toLowerCase().includes('403')) {
             errorMessage = "The OAuth token received is invalid or expired. Please try connecting again through OAuth."
-          } else if (error.message?.toLowerCase().includes('network') || 
-                     error.message?.toLowerCase().includes('fetch') ||
-                     error.message?.toLowerCase().includes('timeout')) {
+          } else if (error.message?.toLowerCase().includes('network') ||
+            error.message?.toLowerCase().includes('fetch') ||
+            error.message?.toLowerCase().includes('timeout')) {
             errorMessage = "Network error during token validation. Please check your internet connection and try again."
           } else if (error.message?.includes('Failed to store')) {
             errorMessage = "Token validation succeeded but failed to save your connection. Please try again."
@@ -288,7 +288,7 @@ function AccountSettingsPageContent() {
             // Use the actual error message if it's descriptive
             errorMessage = `Connection failed: ${error.message}`
           }
-          
+
           toast({
             title: "Connection Failed",
             description: errorMessage,
@@ -449,7 +449,7 @@ function AccountSettingsPageContent() {
       } else if (provider === 'supabase') {
         // Use server-side API to validate token (avoids CORS issues)
         console.log('[SUPABASE] Validating manual access token...')
-        
+
         const validateResponse = await fetch('/api/supabase/validate-token', {
           method: 'POST',
           headers: {
@@ -457,25 +457,25 @@ function AccountSettingsPageContent() {
           },
           body: JSON.stringify({ token }),
         })
-        
+
         const validateResult = await validateResponse.json()
-        
+
         if (!validateResponse.ok || !validateResult.valid) {
           const errorMessage = validateResult.error || 'Token validation failed'
           console.error('[SUPABASE] Manual token validation failed:', errorMessage)
-          
-          if (errorMessage.toLowerCase().includes('unauthorized') || 
-              errorMessage.toLowerCase().includes('invalid') || 
-              errorMessage.toLowerCase().includes('403')) {
+
+          if (errorMessage.toLowerCase().includes('unauthorized') ||
+            errorMessage.toLowerCase().includes('invalid') ||
+            errorMessage.toLowerCase().includes('403')) {
             throw new Error(`Invalid Supabase Management API token. Please ensure you're using a Management API token from https://supabase.com/dashboard/account/tokens, not an anon or service role key.`)
-          } else if (errorMessage.toLowerCase().includes('network') || 
-                     errorMessage.toLowerCase().includes('fetch')) {
+          } else if (errorMessage.toLowerCase().includes('network') ||
+            errorMessage.toLowerCase().includes('fetch')) {
             throw new Error('Network error while validating token. Please check your internet connection and try again.')
           } else {
             throw new Error(`Failed to validate Supabase token: ${errorMessage}. Please ensure you have the correct Management API token.`)
           }
         }
-        
+
         const projects = validateResult.projects || []
         console.log('[SUPABASE] Manual token validation successful, found', projects.length, 'projects')
         userData = { name: 'Supabase User', projects } // Include projects in userData
@@ -485,7 +485,7 @@ function AccountSettingsPageContent() {
       const tokensToStore: any = {}
       tokensToStore[provider] = token
       const success = await storeDeploymentTokens(user.id, tokensToStore)
-      
+
       if (!success) {
         throw new Error(`Failed to store ${provider} token`)
       }
@@ -545,10 +545,10 @@ function AccountSettingsPageContent() {
     try {
       const id = userId || user?.id
       if (!id) return
-      
+
       const enabled = await isCloudSyncEnabledUtil(id)
       setCloudSyncEnabledState(enabled)
-      
+
       const lastBackupTime = await getLastBackupTimeUtil(id)
       setLastBackup(lastBackupTime)
     } catch (error) {
@@ -558,7 +558,7 @@ function AccountSettingsPageContent() {
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       toast({
         title: "Error",
@@ -615,16 +615,16 @@ function AccountSettingsPageContent() {
         })
         return
       }
-      
+
       const newStatus = !cloudSyncEnabled
-      
+
       // Update in Supabase
       const success = await setCloudSyncEnabledUtil(user.id, newStatus)
-      
+
       if (!success) throw new Error("Failed to update cloud sync settings")
 
       setCloudSyncEnabledState(newStatus)
-      
+
       toast({
         title: "Success",
         description: `Cloud sync ${newStatus ? 'enabled' : 'disabled'}`
@@ -648,20 +648,20 @@ function AccountSettingsPageContent() {
       })
       return
     }
-    
+
     setBackupStatus("syncing")
-    
+
     try {
       const success = await uploadBackupToCloud(user.id)
-      
+
       if (!success) throw new Error("Backup failed")
-      
+
       // Update last backup time
       const lastBackupTime = await getLastBackupTimeUtil(user.id)
       setLastBackup(lastBackupTime)
-      
+
       setBackupStatus("success")
-      
+
       toast({
         title: "Success",
         description: "Backup completed successfully"
@@ -669,7 +669,7 @@ function AccountSettingsPageContent() {
     } catch (error: any) {
       console.error("Error creating backup:", error)
       setBackupStatus("error")
-      
+
       toast({
         title: "Error",
         description: error.message || "Failed to create backup",
@@ -689,16 +689,16 @@ function AccountSettingsPageContent() {
       })
       return
     }
-    
+
     setBackupStatus("syncing")
-    
+
     try {
       const success = await restoreBackupFromCloud(user.id)
-      
+
       if (!success) throw new Error("Restore failed")
-      
+
       setBackupStatus("success")
-      
+
       toast({
         title: "Success",
         description: "Backup restored successfully. Please refresh the page to see changes."
@@ -706,7 +706,7 @@ function AccountSettingsPageContent() {
     } catch (error: any) {
       console.error("Error restoring backup:", error)
       setBackupStatus("error")
-      
+
       toast({
         title: "Error",
         description: error.message || "Failed to restore backup",
@@ -728,28 +728,28 @@ function AccountSettingsPageContent() {
     }
 
     setIsDeleting(true)
-    
+
     try {
       // Delete user data from Supabase tables
       const tables = ['workspaces', 'files', 'deployments', 'environment_variables', 'chat_sessions', 'messages', 'user_settings', 'user_backups']
-      
+
       for (const table of tables) {
         await supabase
           .from(table)
           .delete()
           .eq('user_id', user?.id)
       }
-      
+
       // Delete the user account itself
       const { error } = await supabase.auth.admin.deleteUser(user?.id)
-      
+
       if (error) throw error
 
       toast({
         title: "Success",
         description: "Account deleted successfully"
       })
-      
+
       // Redirect to home or login page
       window.location.href = "/"
     } catch (error: any) {
@@ -792,7 +792,7 @@ function AccountSettingsPageContent() {
       const tokensToStore: any = {}
       tokensToStore[provider] = token
       const success = await storeDeploymentTokens(user.id, tokensToStore)
-      
+
       if (!success) {
         throw new Error(`Failed to store ${provider} token`)
       }
@@ -808,10 +808,10 @@ function AccountSettingsPageContent() {
       // Update connection status
       setConnections(prev => ({
         ...prev,
-        [provider]: { 
-          ...prev[provider], 
-          connected: true, 
-          loading: false 
+        [provider]: {
+          ...prev[provider],
+          connected: true,
+          loading: false
         }
       }))
 
@@ -823,13 +823,13 @@ function AccountSettingsPageContent() {
       return true
     } catch (error: any) {
       console.error(`Error validating ${provider} token:`, error)
-      
+
       setConnectionForms(prev => ({
         ...prev,
-        [provider]: { 
-          ...prev[provider], 
-          isValidating: false, 
-          error: error.message || `Failed to validate ${provider} token` 
+        [provider]: {
+          ...prev[provider],
+          isValidating: false,
+          error: error.message || `Failed to validate ${provider} token`
         }
       }))
 
@@ -868,7 +868,7 @@ function AccountSettingsPageContent() {
       ) => {
         const token = tokens?.[provider]
         const isConnected = connectionStates?.[`${provider}_connected`] || false
-        
+
         if (!token || !isConnected) {
           return { connected: false, username: '', avatarUrl: '', loading: false, projects: undefined, selectedProject: null }
         }
@@ -907,7 +907,7 @@ function AccountSettingsPageContent() {
           } else if (provider === 'supabase') {
             // Use server-side API to validate token and fetch projects (avoids CORS issues)
             console.log('[SUPABASE] Validating access token...')
-            
+
             const validateResponse = await fetch('/api/supabase/validate-token', {
               method: 'POST',
               headers: {
@@ -915,31 +915,31 @@ function AccountSettingsPageContent() {
               },
               body: JSON.stringify({ token }),
             })
-            
+
             const validateResult = await validateResponse.json()
-            
+
             if (!validateResponse.ok || !validateResult.valid) {
               throw new Error(validateResult.error || 'Invalid Supabase Management API access token. Please ensure you\'re using a Management API token from https://supabase.com/dashboard/account/tokens, not an anon or service role key.')
             }
-            
+
             const projects = validateResult.projects || []
             console.log('[SUPABASE] Token validation successful, found', projects.length, 'projects')
             userData = { name: 'Supabase User', projects }
           } else if (provider === 'stripe') {
             // Validate Stripe secret key by making a test API call
             console.log('[STRIPE] Validating secret key...')
-            
+
             const response = await fetch('https://api.stripe.com/v1/account', {
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/x-www-form-urlencoded'
               }
             })
-            
+
             if (!response.ok) {
               throw new Error('Invalid Stripe secret key')
             }
-            
+
             userData = await response.json()
             console.log('[STRIPE] Secret key validation successful')
           }
@@ -947,15 +947,15 @@ function AccountSettingsPageContent() {
           return {
             connected: true,
             username: provider === 'github' ? userData.login :
-                     provider === 'vercel' ? (userData.username || userData.name) :
-                     provider === 'supabase' ? userData.name :
-                     provider === 'stripe' ? (userData.business_name || userData.email || 'Stripe Account') :
-                     (userData.login || userData.email),
+              provider === 'vercel' ? (userData.username || userData.name) :
+                provider === 'supabase' ? userData.name :
+                  provider === 'stripe' ? (userData.business_name || userData.email || 'Stripe Account') :
+                    (userData.login || userData.email),
             avatarUrl: provider === 'github' ? userData.avatar_url :
-                      provider === 'vercel' ? userData.avatar :
-                      provider === 'supabase' ? '' :
-                      provider === 'stripe' ? '' :
-                      userData.avatar_url,
+              provider === 'vercel' ? userData.avatar :
+                provider === 'supabase' ? '' :
+                  provider === 'stripe' ? '' :
+                    userData.avatar_url,
             loading: false,
             projects: provider === 'supabase' ? userData.projects : undefined,
             selectedProject: provider === 'supabase' ? null : undefined
@@ -967,7 +967,7 @@ function AccountSettingsPageContent() {
             const tokensToUpdate: any = {}
             tokensToUpdate[provider] = null
             await storeDeploymentTokens(userId, tokensToUpdate)
-            
+
             const statesToUpdate: any = {}
             statesToUpdate[`${provider}_connected`] = false
             await storeDeploymentConnectionStates(userId, statesToUpdate)
@@ -1105,7 +1105,7 @@ function AccountSettingsPageContent() {
       const tokensToUpdate: any = {}
       tokensToUpdate[provider] = null
       await storeDeploymentTokens(user.id, tokensToUpdate)
-      
+
       // Update connection state
       const statesToUpdate: any = {}
       statesToUpdate[`${provider}_connected`] = false
@@ -1232,7 +1232,7 @@ function AccountSettingsPageContent() {
             },
             body: JSON.stringify({ token }),
           })
-          
+
           const validateResult = await validateResponse.json()
           return validateResponse.ok && validateResult.valid
         } catch {
@@ -1261,12 +1261,12 @@ function AccountSettingsPageContent() {
       <div className="min-h-screen relative overflow-hidden">
         <div className="absolute inset-0 lovable-gradient" />
         <div className="absolute inset-0 noise-texture" />
-      <div className="relative z-10 pt-16 pb-24">
-        <div className="flex items-center justify-center min-h-screen">
-          <RefreshCw className="h-8 w-8 animate-spin text-white" />
+        <div className="relative z-10 pt-16 pb-24">
+          <div className="flex items-center justify-center min-h-screen">
+            <RefreshCw className="h-8 w-8 animate-spin text-white" />
+          </div>
         </div>
       </div>
-    </div>
     )
   }
 
@@ -1286,1171 +1286,1170 @@ function AccountSettingsPageContent() {
             <div className="flex flex-col space-y-2 mb-6">
               <h1 className="text-3xl font-bold text-white">Account Settings</h1>
               <p className="text-gray-400">
-              Manage your account information, security, and preferences
-            </p>
-          </div>
+                Manage your account information, security, and preferences
+              </p>
+            </div>
 
             <div className="grid gap-6 md:grid-cols-2">
-            {/* Profile Information Card */}
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Profile Information
-                </CardTitle>
-                <CardDescription>
-                  Your account details and contact information
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      {isEditingName ? (
-                        <Input
-                          id="name"
-                          value={editingName}
-                          onChange={(e) => setEditingName(e.target.value)}
-                          placeholder="Enter your full name"
-                          className="flex-1"
-                          disabled={isUpdatingName}
-                        />
-                      ) : (
-                        <Input
-                          id="name"
-                          value={user?.user_metadata?.full_name || "Not set"}
-                          readOnly
-                          className="bg-muted flex-1"
-                        />
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      {isEditingName ? (
-                        <>
-                          <Button
-                            size="sm"
-                            onClick={handleSaveName}
-                            disabled={isUpdatingName || !editingName.trim()}
-                          >
-                            {isUpdatingName ? (
-                              <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                            ) : (
-                              <Check className="h-4 w-4 mr-2" />
-                            )}
-                            Save
-                          </Button>
+              {/* Profile Information Card */}
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    Profile Information
+                  </CardTitle>
+                  <CardDescription>
+                    Your account details and contact information
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Full Name</Label>
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        {isEditingName ? (
+                          <Input
+                            id="name"
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            placeholder="Enter your full name"
+                            className="flex-1"
+                            disabled={isUpdatingName}
+                          />
+                        ) : (
+                          <Input
+                            id="name"
+                            value={user?.user_metadata?.full_name || "Not set"}
+                            readOnly
+                            className="bg-muted flex-1"
+                          />
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        {isEditingName ? (
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={handleSaveName}
+                              disabled={isUpdatingName || !editingName.trim()}
+                            >
+                              {isUpdatingName ? (
+                                <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                              ) : (
+                                <Check className="h-4 w-4 mr-2" />
+                              )}
+                              Save
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleCancelEditingName}
+                              disabled={isUpdatingName}
+                            >
+                              <X className="h-4 w-4 mr-2" />
+                              Cancel
+                            </Button>
+                          </>
+                        ) : (
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={handleCancelEditingName}
-                            disabled={isUpdatingName}
+                            onClick={handleStartEditingName}
                           >
-                            <X className="h-4 w-4 mr-2" />
-                            Cancel
+                            <Edit3 className="h-4 w-4 mr-2" />
+                            Edit Name
                           </Button>
-                        </>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={handleStartEditingName}
-                        >
-                          <Edit3 className="h-4 w-4 mr-2" />
-                          Edit Name
-                        </Button>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="email"
-                        value={user?.email || "Not set"}
-                        readOnly
-                        className="bg-muted"
-                      />
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email Address</Label>
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="email"
+                          value={user?.email || "Not set"}
+                          readOnly
+                          className="bg-muted"
+                        />
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Change Password Card (Security) */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Lock className="h-5 w-5" />
-                  Security
-                </CardTitle>
-                <CardDescription>
-                  Update your password and security settings
-                </CardDescription>
-              </CardHeader>
-              <form onSubmit={handleChangePassword}>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="newPassword">New Password</Label>
-                    <Input
-                      id="newPassword"
-                      type="password"
-                      value={passwordForm.newPassword}
-                      onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      value={passwordForm.confirmPassword}
-                      onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
-                      required
-                    />
                   </div>
                 </CardContent>
-                <CardFooter>
-                  <Button type="submit" className="w-full">
-                    Update Password
-                  </Button>
-                </CardFooter>
-              </form>
-            </Card>
+              </Card>
 
-            {/* Cloud Sync Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {cloudSyncEnabled ? (
-                      <Cloud className="h-5 w-5 text-blue-500" />
-                    ) : (
-                      <CloudOff className="h-5 w-5 text-muted-foreground" />
-                    )}
-                    Cloud Sync
+              {/* Change Password Card (Security) */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Lock className="h-5 w-5" />
+                    Security
+                  </CardTitle>
+                  <CardDescription>
+                    Update your password and security settings
+                  </CardDescription>
+                </CardHeader>
+                <form onSubmit={handleChangePassword}>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="newPassword">New Password</Label>
+                      <Input
+                        id="newPassword"
+                        type="password"
+                        value={passwordForm.newPassword}
+                        onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                      <Input
+                        id="confirmPassword"
+                        type="password"
+                        value={passwordForm.confirmPassword}
+                        onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <Button type="submit" className="w-full">
+                      Update Password
+                    </Button>
+                  </CardFooter>
+                </form>
+              </Card>
+
+              {/* Cloud Sync Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {cloudSyncEnabled ? (
+                        <Cloud className="h-5 w-5 text-blue-500" />
+                      ) : (
+                        <CloudOff className="h-5 w-5 text-muted-foreground" />
+                      )}
+                      Cloud Sync
+                    </div>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Automatically backup your projects to the cloud</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </CardTitle>
+                  <CardDescription>
+                    Sync your projects across devices
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Auto Backup</p>
+                      <p className="text-sm text-muted-foreground">
+                        {cloudSyncEnabled
+                          ? "Enabled - Backups created automatically"
+                          : "Disabled - Enable to sync across devices"}
+                      </p>
+                    </div>
+                    <Button
+                      variant={cloudSyncEnabled ? "destructive" : "default"}
+                      onClick={toggleCloudSync}
+                    >
+                      {cloudSyncEnabled ? "Disable" : "Enable"}
+                    </Button>
                   </div>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Automatically backup your projects to the cloud</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </CardTitle>
-                <CardDescription>
-                  Sync your projects across devices
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">Auto Backup</p>
-                    <p className="text-sm text-muted-foreground">
-                      {cloudSyncEnabled 
-                        ? "Enabled - Backups created automatically" 
-                        : "Disabled - Enable to sync across devices"}
-                    </p>
+
+                  <Separator />
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium">Manual Backup</p>
+                        {backupStatus === "syncing" && (
+                          <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
+                        )}
+                        {backupStatus === "success" && (
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                        )}
+                        {backupStatus === "error" && (
+                          <AlertCircle className="h-4 w-4 text-red-500" />
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {lastBackup
+                          ? `Last backup: ${new Date(lastBackup).toLocaleString()}`
+                          : "No backups yet"}
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={triggerManualBackup}
+                          disabled={backupStatus === "syncing"}
+                          className="flex-1"
+                        >
+                          {backupStatus === "syncing" ? "Backing up..." : "Create Backup"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={handleRestoreBackup}
+                          disabled={backupStatus === "syncing"}
+                          className="flex-1"
+                        >
+                          {backupStatus === "syncing" ? "Restoring..." : "Restore Backup"}
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                  <Button
-                    variant={cloudSyncEnabled ? "destructive" : "default"}
-                    onClick={toggleCloudSync}
-                  >
-                    {cloudSyncEnabled ? "Disable" : "Enable"}
-                  </Button>
-                </div>
-                
-                <Separator />
-                
-                <div className="space-y-4">
-                  <div className="space-y-2">
+                </CardContent>
+              </Card>
+
+              {/* Current Subscription Card */}
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Crown className="h-5 w-5" />
+                    Current Subscription
+                  </CardTitle>
+                  <CardDescription>
+                    Manage your subscription plan and billing
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {subscriptionLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                      <span className="ml-2">Loading subscription...</span>
+                    </div>
+                  ) : subscription ? (
+                    <>
+                      {/* Plan Status */}
+                      <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-3 h-3 rounded-full ${subscription.status === 'active' ? 'bg-green-500' :
+                            subscription.status === 'trialing' ? 'bg-blue-500' :
+                              subscription.status === 'past_due' ? 'bg-yellow-500' : 'bg-red-500'
+                            }`} />
+                          <div>
+                            <p className="font-medium capitalize">{subscription.plan} Plan</p>
+                            <p className="text-sm text-muted-foreground">
+                              Status: {subscription.status === 'active' ? 'Active' :
+                                subscription.status === 'trialing' ? 'Trial' :
+                                  subscription.status === 'past_due' ? 'Payment Due' : 'Inactive'}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge variant={subscription.status === 'active' ? 'default' : 'secondary'}>
+                          {subscription.status}
+                        </Badge>
+                      </div>
+
+                      {/* Usage Limits */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">Deployments This Month</span>
+                          <span className="text-sm text-muted-foreground">
+                            {subscription.deploymentsThisMonth || 0} / {getLimits(subscription.plan).deploymentsPerMonth}
+                          </span>
+                        </div>
+                        <Progress
+                          value={((subscription.deploymentsThisMonth || 0) / getLimits(subscription.plan).deploymentsPerMonth) * 100}
+                          className="h-2"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Resets monthly • {subscription.githubPushesThisMonth || 0} GitHub pushes used
+                        </p>
+                      </div>
+
+                      {/* Billing Information */}
+                      {subscription.subscriptionEndDate && (
+                        <div className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm">Next billing date</span>
+                          </div>
+                          <span className="text-sm font-medium">
+                            {new Date(subscription.subscriptionEndDate).toLocaleDateString()}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-2">
+                        {subscription.plan !== 'enterprise' && (
+                          <Button
+                            variant="outline"
+                            onClick={() => handleUpgradePlan('enterprise')}
+                            className="flex-1"
+                          >
+                            <TrendingUp className="h-4 w-4 mr-2" />
+                            Upgrade to Enterprise
+                          </Button>
+                        )}
+                        {subscription.plan !== 'free' && (
+                          <Button
+                            variant="outline"
+                            onClick={handleCancelSubscription}
+                            className="flex-1 text-red-600 hover:text-red-700"
+                          >
+                            <AlertTriangle className="h-4 w-4 mr-2" />
+                            Cancel Subscription
+                          </Button>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Crown className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground mb-4">No active subscription</p>
+                      <Button asChild>
+                        <a href="/pricing">Choose a Plan</a>
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Usage Statistics Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    Usage Statistics
+                  </CardTitle>
+                  <CardDescription>
+                    Your current usage and limits
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <p className="font-medium">Manual Backup</p>
-                      {backupStatus === "syncing" && (
-                        <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
-                      )}
-                      {backupStatus === "success" && (
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                      )}
-                      {backupStatus === "error" && (
-                        <AlertCircle className="h-4 w-4 text-red-500" />
-                      )}
+                      <div className="flex items-center gap-2">
+                        <Download className="h-4 w-4 text-blue-500" />
+                        <span className="text-sm">Deployments</span>
+                      </div>
+                      <span className="text-sm font-medium">
+                        {usageStats.deploymentsThisMonth} / {getLimits(subscription?.plan || 'free').deploymentsPerMonth}
+                      </span>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {lastBackup 
-                        ? `Last backup: ${new Date(lastBackup).toLocaleString()}` 
-                        : "No backups yet"}
-                    </p>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        onClick={triggerManualBackup}
-                        disabled={backupStatus === "syncing"}
-                        className="flex-1"
-                      >
-                        {backupStatus === "syncing" ? "Backing up..." : "Create Backup"}
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        onClick={handleRestoreBackup}
-                        disabled={backupStatus === "syncing"}
-                        className="flex-1"
-                      >
-                        {backupStatus === "syncing" ? "Restoring..." : "Restore Backup"}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
 
-            {/* Current Subscription Card */}
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Crown className="h-5 w-5" />
-                  Current Subscription
-                </CardTitle>
-                <CardDescription>
-                  Manage your subscription plan and billing
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {subscriptionLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                    <span className="ml-2">Loading subscription...</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <GitHubIcon className="h-4 w-4 text-gray-700" />
+                        <span className="text-sm">GitHub Pushes</span>
+                      </div>
+                      <span className="text-sm font-medium">
+                        {usageStats.githubPushesThisMonth} / {subscription?.plan === 'free' ? 2 : 'Unlimited'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Cloud className="h-4 w-4 text-green-500" />
+                        <span className="text-sm">Storage</span>
+                      </div>
+                      <span className="text-sm font-medium">
+                        {usageStats.storageUsed}GB / Unlimited
+                      </span>
+                    </div>
                   </div>
-                ) : subscription ? (
-                  <>
-                    {/* Plan Status */}
-                    <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-3 h-3 rounded-full ${
-                          subscription.status === 'active' ? 'bg-green-500' :
-                          subscription.status === 'trialing' ? 'bg-blue-500' :
-                          subscription.status === 'past_due' ? 'bg-yellow-500' : 'bg-red-500'
-                        }`} />
-                        <div>
-                          <p className="font-medium capitalize">{subscription.plan} Plan</p>
+
+                  <Button variant="outline" className="w-full">
+                    <Settings className="h-4 w-4 mr-2" />
+                    View Detailed Usage
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Billing History Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Receipt className="h-5 w-5" />
+                    Billing History
+                  </CardTitle>
+                  <CardDescription>
+                    View your past invoices and payments
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {/* This would be populated with actual billing history */}
+                    <div className="text-center py-8">
+                      <Receipt className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">
+                        No billing history available
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Invoices will appear here after your first payment
+                      </p>
+                    </div>
+                  </div>
+
+                  <Button variant="outline" className="w-full mt-4">
+                    <Download className="h-4 w-4 mr-2" />
+                    Download All Invoices
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Billing Information Card */}
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="h-5 w-5" />
+                    Billing Information
+                  </CardTitle>
+                  <CardDescription>
+                    Manage your payment methods and billing details
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {subscription && subscription.plan !== 'free' ? (
+                    <>
+                      {/* Payment Method */}
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium">Payment Method</h4>
+                        <div className="flex items-center justify-between p-4 border rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-6 bg-blue-600 rounded flex items-center justify-center">
+                              <CreditCard className="h-3 w-3 text-white" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">•••• •••• •••• 4242</p>
+                              <p className="text-xs text-muted-foreground">Expires 12/26</p>
+                            </div>
+                          </div>
+                          <Badge variant="secondary">Primary</Badge>
+                        </div>
+                        <Button variant="outline" size="sm">
+                          <CreditCard className="h-4 w-4 mr-2" />
+                          Update Payment Method
+                        </Button>
+                      </div>
+
+                      {/* Billing Address */}
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium">Billing Address</h4>
+                        <div className="p-4 border rounded-lg">
+                          <p className="text-sm">John Doe</p>
                           <p className="text-sm text-muted-foreground">
-                            Status: {subscription.status === 'active' ? 'Active' :
-                                   subscription.status === 'trialing' ? 'Trial' :
-                                   subscription.status === 'past_due' ? 'Payment Due' : 'Inactive'}
+                            123 Main Street<br />
+                            San Francisco, CA 94102<br />
+                            United States
+                          </p>
+                        </div>
+                        <Button variant="outline" size="sm">
+                          Update Billing Address
+                        </Button>
+                      </div>
+
+                      {/* Billing Preferences */}
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium">Billing Preferences</h4>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm">Email receipts</span>
+                            <input type="checkbox" defaultChecked className="rounded" />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm">Auto-renewal</span>
+                            <input
+                              type="checkbox"
+                              defaultChecked={!subscription.cancelAtPeriodEnd}
+                              className="rounded"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm">Usage alerts</span>
+                            <input type="checkbox" defaultChecked className="rounded" />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-8">
+                      <CreditCard className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground mb-4">
+                        Billing information will be available once you subscribe to a plan
+                      </p>
+                      <Button asChild>
+                        <a href="/pricing">Choose a Plan</a>
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Connected Services Card */}
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ExternalLink className="h-5 w-5" />
+                    Connected Services
+                  </CardTitle>
+                  <CardDescription>
+                    Manage your connections to external services for deployments
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* GitHub Connection */}
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gray-100 rounded-full">
+                          <GitHubIcon className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="font-medium">GitHub</p>
+                          <p className="text-sm text-muted-foreground">
+                            {connections.github.connected
+                              ? `Connected as ${connections.github.username}`
+                              : "Connect your GitHub account for deployments"}
                           </p>
                         </div>
                       </div>
-                      <Badge variant={subscription.status === 'active' ? 'default' : 'secondary'}>
-                        {subscription.status}
-                      </Badge>
-                    </div>
-
-                    {/* Usage Limits */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Deployments This Month</span>
-                        <span className="text-sm text-muted-foreground">
-                          {subscription.deploymentsThisMonth || 0} / {getLimits(subscription.plan).deploymentsPerMonth}
-                        </span>
-                      </div>
-                      <Progress
-                        value={((subscription.deploymentsThisMonth || 0) / getLimits(subscription.plan).deploymentsPerMonth) * 100}
-                        className="h-2"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Resets monthly • {subscription.githubPushesThisMonth || 0} GitHub pushes used
-                      </p>
-                    </div>
-
-                    {/* Billing Information */}
-                    {subscription.subscriptionEndDate && (
-                      <div className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">Next billing date</span>
-                        </div>
-                        <span className="text-sm font-medium">
-                          {new Date(subscription.subscriptionEndDate).toLocaleDateString()}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-2">
-                      {subscription.plan !== 'enterprise' && (
-                        <Button
-                          variant="outline"
-                          onClick={() => handleUpgradePlan('enterprise')}
-                          className="flex-1"
-                        >
-                          <TrendingUp className="h-4 w-4 mr-2" />
-                          Upgrade to Enterprise
-                        </Button>
-                      )}
-                      {subscription.plan !== 'free' && (
-                        <Button
-                          variant="outline"
-                          onClick={handleCancelSubscription}
-                          className="flex-1 text-red-600 hover:text-red-700"
-                        >
-                          <AlertTriangle className="h-4 w-4 mr-2" />
-                          Cancel Subscription
-                        </Button>
+                      {connections.github.connected && connections.github.avatarUrl && (
+                        <img
+                          src={connections.github.avatarUrl}
+                          alt="GitHub Avatar"
+                          className="w-8 h-8 rounded-full"
+                        />
                       )}
                     </div>
-                  </>
-                ) : (
-                  <div className="text-center py-8">
-                    <Crown className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground mb-4">No active subscription</p>
-                    <Button asChild>
-                      <a href="/pricing">Choose a Plan</a>
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
 
-            {/* Usage Statistics Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  Usage Statistics
-                </CardTitle>
-                <CardDescription>
-                  Your current usage and limits
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Download className="h-4 w-4 text-blue-500" />
-                      <span className="text-sm">Deployments</span>
-                    </div>
-                    <span className="text-sm font-medium">
-                      {usageStats.deploymentsThisMonth} / {getLimits(subscription?.plan || 'free').deploymentsPerMonth}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <GitHubIcon className="h-4 w-4 text-gray-700" />
-                      <span className="text-sm">GitHub Pushes</span>
-                    </div>
-                    <span className="text-sm font-medium">
-                      {usageStats.githubPushesThisMonth} / {subscription?.plan === 'free' ? 2 : 'Unlimited'}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Cloud className="h-4 w-4 text-green-500" />
-                      <span className="text-sm">Storage</span>
-                    </div>
-                    <span className="text-sm font-medium">
-                      {usageStats.storageUsed}GB / Unlimited
-                    </span>
-                  </div>
-                </div>
-
-                <Button variant="outline" className="w-full">
-                  <Settings className="h-4 w-4 mr-2" />
-                  View Detailed Usage
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Billing History Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Receipt className="h-5 w-5" />
-                  Billing History
-                </CardTitle>
-                <CardDescription>
-                  View your past invoices and payments
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {/* This would be populated with actual billing history */}
-                  <div className="text-center py-8">
-                    <Receipt className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">
-                      No billing history available
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Invoices will appear here after your first payment
-                    </p>
-                  </div>
-                </div>
-
-                <Button variant="outline" className="w-full mt-4">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download All Invoices
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Billing Information Card */}
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
-                  Billing Information
-                </CardTitle>
-                <CardDescription>
-                  Manage your payment methods and billing details
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {subscription && subscription.plan !== 'free' ? (
-                  <>
-                    {/* Payment Method */}
                     <div className="space-y-3">
-                      <h4 className="text-sm font-medium">Payment Method</h4>
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-6 bg-blue-600 rounded flex items-center justify-center">
-                            <CreditCard className="h-3 w-3 text-white" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">•••• •••• •••• 4242</p>
-                            <p className="text-xs text-muted-foreground">Expires 12/26</p>
-                          </div>
-                        </div>
-                        <Badge variant="secondary">Primary</Badge>
-                      </div>
-                      <Button variant="outline" size="sm">
-                        <CreditCard className="h-4 w-4 mr-2" />
-                        Update Payment Method
-                      </Button>
-                    </div>
-
-                    {/* Billing Address */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium">Billing Address</h4>
-                      <div className="p-4 border rounded-lg">
-                        <p className="text-sm">John Doe</p>
-                        <p className="text-sm text-muted-foreground">
-                          123 Main Street<br />
-                          San Francisco, CA 94102<br />
-                          United States
-                        </p>
-                      </div>
-                      <Button variant="outline" size="sm">
-                        Update Billing Address
-                      </Button>
-                    </div>
-
-                    {/* Billing Preferences */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium">Billing Preferences</h4>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Email receipts</span>
-                          <input type="checkbox" defaultChecked className="rounded" />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Auto-renewal</span>
-                          <input
-                            type="checkbox"
-                            defaultChecked={!subscription.cancelAtPeriodEnd}
-                            className="rounded"
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Usage alerts</span>
-                          <input type="checkbox" defaultChecked className="rounded" />
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center py-8">
-                    <CreditCard className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground mb-4">
-                      Billing information will be available once you subscribe to a plan
-                    </p>
-                    <Button asChild>
-                      <a href="/pricing">Choose a Plan</a>
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Connected Services Card */}
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ExternalLink className="h-5 w-5" />
-                  Connected Services
-                </CardTitle>
-                <CardDescription>
-                  Manage your connections to external services for deployments
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* GitHub Connection */}
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-gray-100 rounded-full">
-                        <GitHubIcon className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="font-medium">GitHub</p>
-                        <p className="text-sm text-muted-foreground">
-                          {connections.github.connected
-                            ? `Connected as ${connections.github.username}`
-                            : "Connect your GitHub account for deployments"}
-                        </p>
-                      </div>
-                    </div>
-                    {connections.github.connected && connections.github.avatarUrl && (
-                      <img
-                        src={connections.github.avatarUrl}
-                        alt="GitHub Avatar"
-                        className="w-8 h-8 rounded-full"
-                      />
-                    )}
-                  </div>
-
-                  <div className="space-y-3">
-                    {/* Token Input - Always visible but disabled when connected */}
-                    <div className="flex gap-2">
-                      <Input
-                        type="password"
-                        placeholder={connections.github.connected ? "Token saved and secured" : "Enter your GitHub personal access token"}
-                        value={connections.github.connected ? "••••••••••••••••••••••••••••••••" : connectionForms.github.token}
-                        onChange={(e) => setConnectionForms(prev => ({
-                          ...prev,
-                          github: { ...prev.github, token: e.target.value, error: '' }
-                        }))}
-                        disabled={connections.github.connected}
-                        className={connections.github.connected
-                          ? "bg-green-50 border-green-200 cursor-not-allowed"
-                          : connectionForms.github.error ? "border-red-500" : ""
-                        }
-                      />
-                  {connections.github.connected ? (
-                      <Button
-                          variant="destructive"
-                        onClick={() => handleDisconnect('github')}
-                        disabled={connections.github.loading}
-                      >
-                        {connections.github.loading ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      {/* Token Input - Always visible but disabled when connected */}
+                      <div className="flex gap-2">
+                        <Input
+                          type="password"
+                          placeholder={connections.github.connected ? "Token saved and secured" : "Enter your GitHub personal access token"}
+                          value={connections.github.connected ? "••••••••••••••••••••••••••••••••" : connectionForms.github.token}
+                          onChange={(e) => setConnectionForms(prev => ({
+                            ...prev,
+                            github: { ...prev.github, token: e.target.value, error: '' }
+                          }))}
+                          disabled={connections.github.connected}
+                          className={connections.github.connected
+                            ? "bg-green-50 border-green-200 cursor-not-allowed"
+                            : connectionForms.github.error ? "border-red-500" : ""
+                          }
+                        />
+                        {connections.github.connected ? (
+                          <Button
+                            variant="destructive"
+                            onClick={() => handleDisconnect('github')}
+                            disabled={connections.github.loading}
+                          >
+                            {connections.github.loading ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <Unlink className="h-4 w-4 mr-2" />
+                            )}
+                            Disconnect
+                          </Button>
                         ) : (
-                          <Unlink className="h-4 w-4 mr-2" />
+                          <Button
+                            onClick={() => handleConnect('github')}
+                            disabled={connectionForms.github.isValidating || !connectionForms.github.token.trim()}
+                          >
+                            {connectionForms.github.isValidating ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              "Connect"
+                            )}
+                          </Button>
                         )}
-                        Disconnect
-                      </Button>
-                      ) : (
-                        <Button
-                          onClick={() => handleConnect('github')}
-                          disabled={connectionForms.github.isValidating || !connectionForms.github.token.trim()}
-                        >
-                          {connectionForms.github.isValidating ? (
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          ) : (
-                            "Connect"
-                          )}
-                        </Button>
+                      </div>
+
+                      {/* Connection Status */}
+                      {connections.github.connected && (
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span className="text-sm text-green-600 font-medium">Connected and secured</span>
+                        </div>
                       )}
-                      </div>
 
-                    {/* Connection Status */}
-                    {connections.github.connected && (
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span className="text-sm text-green-600 font-medium">Connected and secured</span>
-                      </div>
-                    )}
-
-                    {/* Error Message */}
+                      {/* Error Message */}
                       {connectionForms.github.error && (
                         <p className="text-sm text-red-600">{connectionForms.github.error}</p>
                       )}
 
-                    {/* Help Text */}
+                      {/* Help Text */}
                       <p className="text-xs text-muted-foreground">
-                      {connections.github.connected ? (
-                        "Your token is securely stored. Click disconnect to change it."
-                      ) : (
-                        <>Need a token? <a href="https://github.com/settings/tokens/new?description=Pipilot%20(repo%20workflow)&scopes=repo,workflow,user,delete_repo" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Create one here</a></>
-                      )}
+                        {connections.github.connected ? (
+                          "Your token is securely stored. Click disconnect to change it."
+                        ) : (
+                          <>Need a token? <a href="https://github.com/settings/tokens/new?description=Pipilot%20(repo%20workflow)&scopes=repo,workflow,user,delete_repo" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Create one here</a></>
+                        )}
                       </p>
                     </div>
-                </div>
-
-                {/* Vercel Connection */}
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-black rounded-full flex items-center justify-center">
-                        <VercelIcon className="h-4 w-4 text-white" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Vercel</p>
-                        <p className="text-sm text-muted-foreground">
-                          {connections.vercel.connected
-                            ? `Connected as ${connections.vercel.username}`
-                            : "Connect your Vercel account for deployments"}
-                        </p>
-                      </div>
-                    </div>
-                    {connections.vercel.connected && connections.vercel.avatarUrl && (
-                      <img
-                        src={connections.vercel.avatarUrl}
-                        alt="Vercel Avatar"
-                        className="w-8 h-8 rounded-full"
-                      />
-                    )}
                   </div>
 
-                  <div className="space-y-3">
-                    {/* Token Input - Always visible but disabled when connected */}
-                    <div className="flex gap-2">
-                      <Input
-                        type="password"
-                        placeholder={connections.vercel.connected ? "Token saved and secured" : "Enter your Vercel personal access token"}
-                        value={connections.vercel.connected ? "••••••••••••••••••••••••••••••••" : connectionForms.vercel.token}
-                        onChange={(e) => setConnectionForms(prev => ({
-                          ...prev,
-                          vercel: { ...prev.vercel, token: e.target.value, error: '' }
-                        }))}
-                        disabled={connections.vercel.connected}
-                        className={connections.vercel.connected
-                          ? "bg-green-50 border-green-200 cursor-not-allowed"
-                          : connectionForms.vercel.error ? "border-red-500" : ""
-                        }
-                      />
-                  {connections.vercel.connected ? (
-                      <Button
-                          variant="destructive"
-                        onClick={() => handleDisconnect('vercel')}
-                        disabled={connections.vercel.loading}
-                      >
-                        {connections.vercel.loading ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <Unlink className="h-4 w-4 mr-2" />
-                        )}
-                        Disconnect
-                      </Button>
-                      ) : (
-                        <Button
-                          onClick={() => handleConnect('vercel')}
-                          disabled={connectionForms.vercel.isValidating || !connectionForms.vercel.token.trim()}
-                        >
-                          {connectionForms.vercel.isValidating ? (
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          ) : (
-                            "Connect"
-                          )}
-                        </Button>
+                  {/* Vercel Connection */}
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-black rounded-full flex items-center justify-center">
+                          <VercelIcon className="h-4 w-4 text-white" />
+                        </div>
+                        <div>
+                          <p className="font-medium">Vercel</p>
+                          <p className="text-sm text-muted-foreground">
+                            {connections.vercel.connected
+                              ? `Connected as ${connections.vercel.username}`
+                              : "Connect your Vercel account for deployments"}
+                          </p>
+                        </div>
+                      </div>
+                      {connections.vercel.connected && connections.vercel.avatarUrl && (
+                        <img
+                          src={connections.vercel.avatarUrl}
+                          alt="Vercel Avatar"
+                          className="w-8 h-8 rounded-full"
+                        />
                       )}
+                    </div>
+
+                    <div className="space-y-3">
+                      {/* Token Input - Always visible but disabled when connected */}
+                      <div className="flex gap-2">
+                        <Input
+                          type="password"
+                          placeholder={connections.vercel.connected ? "Token saved and secured" : "Enter your Vercel personal access token"}
+                          value={connections.vercel.connected ? "••••••••••••••••••••••••••••••••" : connectionForms.vercel.token}
+                          onChange={(e) => setConnectionForms(prev => ({
+                            ...prev,
+                            vercel: { ...prev.vercel, token: e.target.value, error: '' }
+                          }))}
+                          disabled={connections.vercel.connected}
+                          className={connections.vercel.connected
+                            ? "bg-green-50 border-green-200 cursor-not-allowed"
+                            : connectionForms.vercel.error ? "border-red-500" : ""
+                          }
+                        />
+                        {connections.vercel.connected ? (
+                          <Button
+                            variant="destructive"
+                            onClick={() => handleDisconnect('vercel')}
+                            disabled={connections.vercel.loading}
+                          >
+                            {connections.vercel.loading ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <Unlink className="h-4 w-4 mr-2" />
+                            )}
+                            Disconnect
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => handleConnect('vercel')}
+                            disabled={connectionForms.vercel.isValidating || !connectionForms.vercel.token.trim()}
+                          >
+                            {connectionForms.vercel.isValidating ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              "Connect"
+                            )}
+                          </Button>
+                        )}
                       </div>
 
-                    {/* Connection Status */}
-                    {connections.vercel.connected && (
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span className="text-sm text-green-600 font-medium">Connected and secured</span>
-                      </div>
-                    )}
+                      {/* Connection Status */}
+                      {connections.vercel.connected && (
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span className="text-sm text-green-600 font-medium">Connected and secured</span>
+                        </div>
+                      )}
 
-                    {/* Error Message */}
+                      {/* Error Message */}
                       {connectionForms.vercel.error && (
                         <p className="text-sm text-red-600">{connectionForms.vercel.error}</p>
                       )}
 
-                    {/* Help Text */}
+                      {/* Help Text */}
                       <p className="text-xs text-muted-foreground">
-                      {connections.vercel.connected ? (
-                        "Your token is securely stored. Click disconnect to change it."
-                      ) : (
-                        <>Need a token? <a href="https://vercel.com/account/tokens" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Create one here</a></>
-                      )}
+                        {connections.vercel.connected ? (
+                          "Your token is securely stored. Click disconnect to change it."
+                        ) : (
+                          <>Need a token? <a href="https://vercel.com/account/tokens" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Create one here</a></>
+                        )}
                       </p>
                     </div>
-                </div>
-
-                {/* Netlify Connection */}
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-teal-500 rounded-full flex items-center justify-center">
-                        <NetlifyIcon className="h-4 w-4 text-white" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Netlify</p>
-                        <p className="text-sm text-muted-foreground">
-                          {connections.netlify.connected
-                            ? `Connected as ${connections.netlify.username}`
-                            : "Connect your Netlify account for deployments"}
-                        </p>
-                      </div>
-                    </div>
-                    {connections.netlify.connected && connections.netlify.avatarUrl && (
-                      <img
-                        src={connections.netlify.avatarUrl}
-                        alt="Netlify Avatar"
-                        className="w-8 h-8 rounded-full"
-                      />
-                    )}
                   </div>
 
-                  <div className="space-y-3">
-                    {/* Token Input - Always visible but disabled when connected */}
-                    <div className="flex gap-2">
-                      <Input
-                        type="password"
-                        placeholder={connections.netlify.connected ? "Token saved and secured" : "Enter your Netlify personal access token"}
-                        value={connections.netlify.connected ? "••••••••••••••••••••••••••••••••" : connectionForms.netlify.token}
-                        onChange={(e) => setConnectionForms(prev => ({
-                          ...prev,
-                          netlify: { ...prev.netlify, token: e.target.value, error: '' }
-                        }))}
-                        disabled={connections.netlify.connected}
-                        className={connections.netlify.connected
-                          ? "bg-green-50 border-green-200 cursor-not-allowed"
-                          : connectionForms.netlify.error ? "border-red-500" : ""
-                        }
-                      />
-                  {connections.netlify.connected ? (
-                      <Button
-                          variant="destructive"
-                        onClick={() => handleDisconnect('netlify')}
-                        disabled={connections.netlify.loading}
-                      >
-                        {connections.netlify.loading ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <Unlink className="h-4 w-4 mr-2" />
-                        )}
-                        Disconnect
-                      </Button>
-                      ) : (
-                        <Button
-                          onClick={() => handleConnect('netlify')}
-                          disabled={connectionForms.netlify.isValidating || !connectionForms.netlify.token.trim()}
-                        >
-                          {connectionForms.netlify.isValidating ? (
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          ) : (
-                            "Connect"
-                          )}
-                        </Button>
+                  {/* Netlify Connection */}
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-teal-500 rounded-full flex items-center justify-center">
+                          <NetlifyIcon className="h-4 w-4 text-white" />
+                        </div>
+                        <div>
+                          <p className="font-medium">Netlify</p>
+                          <p className="text-sm text-muted-foreground">
+                            {connections.netlify.connected
+                              ? `Connected as ${connections.netlify.username}`
+                              : "Connect your Netlify account for deployments"}
+                          </p>
+                        </div>
+                      </div>
+                      {connections.netlify.connected && connections.netlify.avatarUrl && (
+                        <img
+                          src={connections.netlify.avatarUrl}
+                          alt="Netlify Avatar"
+                          className="w-8 h-8 rounded-full"
+                        />
                       )}
+                    </div>
+
+                    <div className="space-y-3">
+                      {/* Token Input - Always visible but disabled when connected */}
+                      <div className="flex gap-2">
+                        <Input
+                          type="password"
+                          placeholder={connections.netlify.connected ? "Token saved and secured" : "Enter your Netlify personal access token"}
+                          value={connections.netlify.connected ? "••••••••••••••••••••••••••••••••" : connectionForms.netlify.token}
+                          onChange={(e) => setConnectionForms(prev => ({
+                            ...prev,
+                            netlify: { ...prev.netlify, token: e.target.value, error: '' }
+                          }))}
+                          disabled={connections.netlify.connected}
+                          className={connections.netlify.connected
+                            ? "bg-green-50 border-green-200 cursor-not-allowed"
+                            : connectionForms.netlify.error ? "border-red-500" : ""
+                          }
+                        />
+                        {connections.netlify.connected ? (
+                          <Button
+                            variant="destructive"
+                            onClick={() => handleDisconnect('netlify')}
+                            disabled={connections.netlify.loading}
+                          >
+                            {connections.netlify.loading ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <Unlink className="h-4 w-4 mr-2" />
+                            )}
+                            Disconnect
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => handleConnect('netlify')}
+                            disabled={connectionForms.netlify.isValidating || !connectionForms.netlify.token.trim()}
+                          >
+                            {connectionForms.netlify.isValidating ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              "Connect"
+                            )}
+                          </Button>
+                        )}
                       </div>
 
-                    {/* Connection Status */}
-                    {connections.netlify.connected && (
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span className="text-sm text-green-600 font-medium">Connected and secured</span>
-                      </div>
-                    )}
+                      {/* Connection Status */}
+                      {connections.netlify.connected && (
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span className="text-sm text-green-600 font-medium">Connected and secured</span>
+                        </div>
+                      )}
 
-                    {/* Error Message */}
+                      {/* Error Message */}
                       {connectionForms.netlify.error && (
                         <p className="text-sm text-red-600">{connectionForms.netlify.error}</p>
                       )}
 
-                    {/* Help Text */}
+                      {/* Help Text */}
                       <p className="text-xs text-muted-foreground">
-                      {connections.netlify.connected ? (
-                        "Your token is securely stored. Click disconnect to change it."
-                      ) : (
-                        <>Need a token? <a href="https://app.netlify.com/user/applications#personal-access-tokens" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Create one here</a></>
-                      )}
+                        {connections.netlify.connected ? (
+                          "Your token is securely stored. Click disconnect to change it."
+                        ) : (
+                          <>Need a token? <a href="https://app.netlify.com/user/applications#personal-access-tokens" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Create one here</a></>
+                        )}
                       </p>
-                    </div>
-                </div>
-
-                {/* Supabase Connection */}
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-green-500 rounded-full flex items-center justify-center">
-                        <SupabaseIcon className="h-4 w-4 text-white" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Supabase</p>
-                        <p className="text-sm text-muted-foreground">
-                          {connections.supabase.connected
-                            ? `${connections.supabase.projects?.length || 0} projects available`
-                            : "Connect your Supabase account for database operations"}
-                        </p>
-                      </div>
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    {/* Token Input - Always visible but disabled when connected */}
-                    <div className="flex gap-2">
-                      <Input
-                        type="password"
-                        placeholder={connections.supabase.connected ? "Token saved and secured" : "Enter Supabase Management API token (not anon/service_role key)"}
-                        value={connections.supabase.connected ? "••••••••••••••••••••••••••••••••" : connectionForms.supabase.token}
-                        onChange={(e) => setConnectionForms(prev => ({
-                          ...prev,
-                          supabase: { ...prev.supabase, token: e.target.value, error: '' }
-                        }))}
-                        disabled={connections.supabase.connected}
-                        className={connections.supabase.connected
-                          ? "bg-green-50 border-green-200 cursor-not-allowed"
-                          : connectionForms.supabase.error ? "border-red-500" : ""
-                        }
-                      />
-                  {connections.supabase.connected ? (
-                      <Button
-                          variant="destructive"
-                        onClick={() => handleDisconnect('supabase')}
-                        disabled={connections.supabase.loading}
-                      >
-                        {connections.supabase.loading ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  {/* Supabase Connection */}
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-green-500 rounded-full flex items-center justify-center">
+                          <SupabaseIcon className="h-4 w-4 text-white" />
+                        </div>
+                        <div>
+                          <p className="font-medium">Supabase</p>
+                          <p className="text-sm text-muted-foreground">
+                            {connections.supabase.connected
+                              ? `${connections.supabase.projects?.length || 0} projects available`
+                              : "Connect your Supabase account for database operations"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {/* Token Input - Always visible but disabled when connected */}
+                      <div className="flex gap-2">
+                        <Input
+                          type="password"
+                          placeholder={connections.supabase.connected ? "Token saved and secured" : "Enter Supabase Management API token (not anon/service_role key)"}
+                          value={connections.supabase.connected ? "••••••••••••••••••••••••••••••••" : connectionForms.supabase.token}
+                          onChange={(e) => setConnectionForms(prev => ({
+                            ...prev,
+                            supabase: { ...prev.supabase, token: e.target.value, error: '' }
+                          }))}
+                          disabled={connections.supabase.connected}
+                          className={connections.supabase.connected
+                            ? "bg-green-50 border-green-200 cursor-not-allowed"
+                            : connectionForms.supabase.error ? "border-red-500" : ""
+                          }
+                        />
+                        {connections.supabase.connected ? (
+                          <Button
+                            variant="destructive"
+                            onClick={() => handleDisconnect('supabase')}
+                            disabled={connections.supabase.loading}
+                          >
+                            {connections.supabase.loading ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <Unlink className="h-4 w-4 mr-2" />
+                            )}
+                            Disconnect
+                          </Button>
                         ) : (
-                          <Unlink className="h-4 w-4 mr-2" />
+                          <Button
+                            onClick={() => handleConnect('supabase')}
+                            disabled={connectionForms.supabase.isValidating || !connectionForms.supabase.token.trim()}
+                          >
+                            {connectionForms.supabase.isValidating ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              "Connect"
+                            )}
+                          </Button>
                         )}
-                        Disconnect
-                      </Button>
-                      ) : (
-                        <Button
-                          onClick={() => handleConnect('supabase')}
-                          disabled={connectionForms.supabase.isValidating || !connectionForms.supabase.token.trim()}
-                        >
-                          {connectionForms.supabase.isValidating ? (
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          ) : (
-                            "Connect"
-                          )}
-                        </Button>
+                      </div>
+
+                      {/* Connection Status */}
+                      {connections.supabase.connected && (
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span className="text-sm text-green-600 font-medium">Connected and secured</span>
+                        </div>
                       )}
-                      </div>
 
-                    {/* Connection Status */}
-                    {connections.supabase.connected && (
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span className="text-sm text-green-600 font-medium">Connected and secured</span>
-                      </div>
-                    )}
+                      {/* Project Selection - Only show when connected */}
+                      {connections.supabase.connected && connections.supabase.projects && connections.supabase.projects.length > 0 && (
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium">Select Project</Label>
+                          <select
+                            className="w-full p-2 border rounded-md text-sm bg-black text-white"
+                            value={connections.supabase.selectedProject?.id || ''}
+                            onChange={async (e) => {
+                              const selectedProject = connections.supabase.projects?.find(p => p.id === e.target.value)
+                              if (selectedProject && user?.id) {
+                                try {
+                                  // Get the access token
+                                  const tokens = await getDeploymentTokens(user.id)
+                                  const accessToken = tokens?.supabase
 
-                    {/* Project Selection - Only show when connected */}
-                    {connections.supabase.connected && connections.supabase.projects && connections.supabase.projects.length > 0 && (
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Select Project</Label>
-                        <select
-                          className="w-full p-2 border rounded-md text-sm"
-                          value={connections.supabase.selectedProject?.id || ''}
-                          onChange={async (e) => {
-                            const selectedProject = connections.supabase.projects?.find(p => p.id === e.target.value)
-                            if (selectedProject && user?.id) {
-                              try {
-                                // Get the access token
-                                const tokens = await getDeploymentTokens(user.id)
-                                const accessToken = tokens?.supabase
+                                  if (accessToken) {
+                                    // Use server-side API to fetch project details and API keys (avoids CORS issues)
+                                    try {
+                                      // Fetch API keys automatically using server-side API
+                                      const apiResponse = await fetch('/api/supabase/fetch-api-keys', {
+                                        method: 'POST',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify({
+                                          token: accessToken,
+                                          projectId: selectedProject.id
+                                        }),
+                                      })
 
-                                if (accessToken) {
-                                  // Use server-side API to fetch project details and API keys (avoids CORS issues)
-                                  try {
-                                    // Fetch API keys automatically using server-side API
-                                    const apiResponse = await fetch('/api/supabase/fetch-api-keys', {
-                                      method: 'POST',
-                                      headers: {
-                                        'Content-Type': 'application/json',
-                                      },
-                                      body: JSON.stringify({ 
-                                        token: accessToken, 
-                                        projectId: selectedProject.id 
-                                      }),
-                                    })
+                                      const apiResult = await apiResponse.json()
 
-                                    const apiResult = await apiResponse.json()
+                                      if (apiResponse.ok && apiResult.success) {
+                                        // Store project details with automatically fetched keys
+                                        await storeSupabaseProjectDetails(user.id, {
+                                          selectedProjectId: selectedProject.id,
+                                          selectedProjectName: selectedProject.name,
+                                          projectUrl: apiResult.projectUrl,
+                                          anonKey: apiResult.anonKey,
+                                          serviceRoleKey: apiResult.serviceRoleKey
+                                        })
 
-                                    if (apiResponse.ok && apiResult.success) {
-                                      // Store project details with automatically fetched keys
+                                        toast({
+                                          title: "Project Selected",
+                                          description: `Selected ${selectedProject.name}. API keys fetched automatically.`,
+                                        })
+                                      } else {
+                                        throw new Error(apiResult.error || 'Could not fetch API keys')
+                                      }
+                                    } catch (apiError) {
+                                      console.error("Error fetching API keys from API:", apiError)
+                                      // Fallback: store basic project info only
                                       await storeSupabaseProjectDetails(user.id, {
                                         selectedProjectId: selectedProject.id,
-                                        selectedProjectName: selectedProject.name,
-                                        projectUrl: apiResult.projectUrl,
-                                        anonKey: apiResult.anonKey,
-                                        serviceRoleKey: apiResult.serviceRoleKey
+                                        selectedProjectName: selectedProject.name
                                       })
 
                                       toast({
                                         title: "Project Selected",
-                                        description: `Selected ${selectedProject.name}. API keys fetched automatically.`,
+                                        description: `Selected ${selectedProject.name}. API keys could not be fetched automatically.`,
+                                        variant: "destructive"
                                       })
-                                    } else {
-                                      throw new Error(apiResult.error || 'Could not fetch API keys')
                                     }
-                                  } catch (apiError) {
-                                    console.error("Error fetching API keys from API:", apiError)
-                                    // Fallback: store basic project info only
-                                    await storeSupabaseProjectDetails(user.id, {
-                                      selectedProjectId: selectedProject.id,
-                                      selectedProjectName: selectedProject.name
-                                    })
+                                  }
+                                } catch (error: any) {
+                                  console.error("Error selecting project:", error)
+                                  toast({
+                                    title: "Error",
+                                    description: "Failed to select project. Please try again.",
+                                    variant: "destructive"
+                                  })
+                                }
+                              }
 
-                                    toast({
-                                      title: "Project Selected",
-                                      description: `Selected ${selectedProject.name}. API keys could not be fetched automatically.`,
-                                      variant: "destructive"
-                                    })
+                              setConnections(prev => ({
+                                ...prev,
+                                supabase: { ...prev.supabase, selectedProject }
+                              }))
+                            }}
+                          >
+                            <option value="">Select a project...</option>
+                            {connections.supabase.projects.map((project: any) => (
+                              <option key={project.id} value={project.id}>
+                                {project.name}
+                              </option>
+                            ))}
+                          </select>
+                          {connections.supabase.selectedProject && (
+                            <p className="text-xs text-muted-foreground">
+                              Selected: {connections.supabase.selectedProject.name}
+                              {(() => {
+                                // Check if API keys are available
+                                const checkKeys = async () => {
+                                  try {
+                                    const details = await getSupabaseProjectDetails(user?.id || '')
+                                    return details?.anonKey && details?.serviceRoleKey
+                                  } catch {
+                                    return false
                                   }
                                 }
-                              } catch (error: any) {
-                                console.error("Error selecting project:", error)
-                                toast({
-                                  title: "Error",
-                                  description: "Failed to select project. Please try again.",
-                                  variant: "destructive"
-                                })
-                              }
-                            }
+                                // This will be checked asynchronously
+                                return null
+                              })()}
+                            </p>
+                          )}
+                        </div>
+                      )}
 
-                            setConnections(prev => ({
-                              ...prev,
-                              supabase: { ...prev.supabase, selectedProject }
-                            }))
-                          }}
+                      {/* Create New Project Button */}
+                      {connections.supabase.connected && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleCreateSupabaseProject()}
+                          className="w-full"
                         >
-                          <option value="">Select a project...</option>
-                          {connections.supabase.projects.map((project: any) => (
-                            <option key={project.id} value={project.id}>
-                              {project.name}
-                            </option>
-                          ))}
-                        </select>
-                        {connections.supabase.selectedProject && (
-                          <p className="text-xs text-muted-foreground">
-                            Selected: {connections.supabase.selectedProject.name}
-                            {(() => {
-                              // Check if API keys are available
-                              const checkKeys = async () => {
-                                try {
-                                  const details = await getSupabaseProjectDetails(user?.id || '')
-                                  return details?.anonKey && details?.serviceRoleKey
-                                } catch {
-                                  return false
-                                }
-                              }
-                              // This will be checked asynchronously
-                              return null
-                            })()}
-                          </p>
-                        )}
-                      </div>
-                    )}
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create New Project
+                        </Button>
+                      )}
 
-                    {/* Create New Project Button */}
-                    {connections.supabase.connected && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleCreateSupabaseProject()}
-                        className="w-full"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create New Project
-                      </Button>
-                    )}
-
-                    {/* Error Message */}
+                      {/* Error Message */}
                       {connectionForms.supabase.error && (
                         <p className="text-sm text-red-600">{connectionForms.supabase.error}</p>
                       )}
 
-                    {/* Help Text */}
+                      {/* Help Text */}
                       <p className="text-xs text-muted-foreground">
-                      {connections.supabase.connected ? (
-                        "Your token is securely stored. API keys are fetched automatically when selecting a project."
-                      ) : (
-                        <>
-                          Enter your Supabase Management API token from{" "}
-                          <a href="https://supabase.com/dashboard/account/tokens" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
-                            supabase.com/dashboard/account/tokens
-                          </a>{" "}
-                          or use{" "}
-                          <a href="https://api.optimaai.cc/supabase-auth/login" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
-                            OAuth login
-                          </a>
-                        </>
-                      )}
+                        {connections.supabase.connected ? (
+                          "Your token is securely stored. API keys are fetched automatically when selecting a project."
+                        ) : (
+                          <>
+                            Enter your Supabase Management API token from{" "}
+                            <a href="https://supabase.com/dashboard/account/tokens" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                              supabase.com/dashboard/account/tokens
+                            </a>{" "}
+                            or use{" "}
+                            <a href="https://api.optimaai.cc/supabase-auth/login" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                              OAuth login
+                            </a>
+                          </>
+                        )}
                       </p>
-                    </div>
-                </div>
-
-                {/* Stripe Connection */}
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-purple-500 rounded-full flex items-center justify-center">
-                        <StripeIcon className="h-4 w-4 text-white" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Stripe</p>
-                        <p className="text-sm text-muted-foreground">
-                          {connections.stripe.connected
-                            ? "Connected for payment processing"
-                            : "Connect your Stripe account for payment operations"}
-                        </p>
-                      </div>
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    {/* Token Input - Always visible but disabled when connected */}
-                    <div className="flex gap-2">
-                      <Input
-                        type="password"
-                        placeholder={connections.stripe.connected ? "Secret key saved and secured" : "Enter Stripe Secret Key (sk_live_... or sk_test_...)"}
-                        value={connections.stripe.connected ? "••••••••••••••••••••••••••••••••" : connectionForms.stripe.token}
-                        onChange={(e) => setConnectionForms(prev => ({
-                          ...prev,
-                          stripe: { ...prev.stripe, token: e.target.value, error: '' }
-                        }))}
-                        disabled={connections.stripe.connected}
-                        className={connections.stripe.connected
-                          ? "bg-purple-50 border-purple-200 cursor-not-allowed"
-                          : connectionForms.stripe.error ? "border-red-500" : ""
-                        }
-                      />
-                  {connections.stripe.connected ? (
-                      <Button
-                          variant="destructive"
-                        onClick={() => handleDisconnect('stripe')}
-                        disabled={connections.stripe.loading}
-                      >
-                        {connections.stripe.loading ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  {/* Stripe Connection */}
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-purple-500 rounded-full flex items-center justify-center">
+                          <StripeIcon className="h-4 w-4 text-white" />
+                        </div>
+                        <div>
+                          <p className="font-medium">Stripe</p>
+                          <p className="text-sm text-muted-foreground">
+                            {connections.stripe.connected
+                              ? "Connected for payment processing"
+                              : "Connect your Stripe account for payment operations"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {/* Token Input - Always visible but disabled when connected */}
+                      <div className="flex gap-2">
+                        <Input
+                          type="password"
+                          placeholder={connections.stripe.connected ? "Secret key saved and secured" : "Enter Stripe Secret Key (sk_live_... or sk_test_...)"}
+                          value={connections.stripe.connected ? "••••••••••••••••••••••••••••••••" : connectionForms.stripe.token}
+                          onChange={(e) => setConnectionForms(prev => ({
+                            ...prev,
+                            stripe: { ...prev.stripe, token: e.target.value, error: '' }
+                          }))}
+                          disabled={connections.stripe.connected}
+                          className={connections.stripe.connected
+                            ? "bg-purple-50 border-purple-200 cursor-not-allowed"
+                            : connectionForms.stripe.error ? "border-red-500" : ""
+                          }
+                        />
+                        {connections.stripe.connected ? (
+                          <Button
+                            variant="destructive"
+                            onClick={() => handleDisconnect('stripe')}
+                            disabled={connections.stripe.loading}
+                          >
+                            {connections.stripe.loading ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <Unlink className="h-4 w-4 mr-2" />
+                            )}
+                            Disconnect
+                          </Button>
                         ) : (
-                          <Unlink className="h-4 w-4 mr-2" />
+                          <Button
+                            onClick={() => handleConnect('stripe')}
+                            disabled={connectionForms.stripe.isValidating || !connectionForms.stripe.token.trim()}
+                          >
+                            {connectionForms.stripe.isValidating ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              "Connect"
+                            )}
+                          </Button>
                         )}
-                        Disconnect
-                      </Button>
-                      ) : (
-                        <Button
-                          onClick={() => handleConnect('stripe')}
-                          disabled={connectionForms.stripe.isValidating || !connectionForms.stripe.token.trim()}
-                        >
-                          {connectionForms.stripe.isValidating ? (
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          ) : (
-                            "Connect"
-                          )}
-                        </Button>
+                      </div>
+
+                      {/* Connection Status */}
+                      {connections.stripe.connected && (
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span className="text-sm text-green-600 font-medium">Connected and secured</span>
+                        </div>
                       )}
-                      </div>
 
-                    {/* Connection Status */}
-                    {connections.stripe.connected && (
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span className="text-sm text-green-600 font-medium">Connected and secured</span>
-                      </div>
-                    )}
-
-                    {/* Error Message */}
+                      {/* Error Message */}
                       {connectionForms.stripe.error && (
                         <p className="text-sm text-red-600">{connectionForms.stripe.error}</p>
                       )}
 
-                    {/* Help Text */}
+                      {/* Help Text */}
                       <p className="text-xs text-muted-foreground">
-                      {connections.stripe.connected ? (
-                        "Your Stripe secret key is securely stored and encrypted."
-                      ) : (
-                        <>
-                          Enter your Stripe Secret Key from{" "}
-                          <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
-                            dashboard.stripe.com/apikeys
-                          </a>
-                        </>
-                      )}
+                        {connections.stripe.connected ? (
+                          "Your Stripe secret key is securely stored and encrypted."
+                        ) : (
+                          <>
+                            Enter your Stripe Secret Key from{" "}
+                            <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                              dashboard.stripe.com/apikeys
+                            </a>
+                          </>
+                        )}
                       </p>
                     </div>
-                </div>
-              </CardContent>
-            </Card>
+                  </div>
+                </CardContent>
+              </Card>
 
-            {/* Delete Account Card */}
-            <Card className="md:col-span-2 border-destructive">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-destructive">
-                  <Trash2 className="h-5 w-5" />
-                  Delete Account
-                </CardTitle>
-                <CardDescription>
-                  Permanently remove your account and all associated data
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
-                </p>
-                <div className="space-y-2">
-                  <Label htmlFor="deleteConfirmation">
-                    Type "DELETE MY ACCOUNT" to confirm
-                  </Label>
-                  <Input
-                    id="deleteConfirmation"
-                    value={deleteConfirmation}
-                    onChange={(e) => setDeleteConfirmation(e.target.value)}
-                    placeholder="DELETE MY ACCOUNT"
-                  />
-                </div>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button 
-                      variant="destructive" 
-                      disabled={deleteConfirmation !== "DELETE MY ACCOUNT"}
-                      className="w-full"
-                    >
-                      Delete Account
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction 
-                        onClick={handleDeleteAccount}
-                        disabled={isDeleting}
-                        className="bg-destructive hover:bg-destructive/90"
+              {/* Delete Account Card */}
+              <Card className="md:col-span-2 border-destructive">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-destructive">
+                    <Trash2 className="h-5 w-5" />
+                    Delete Account
+                  </CardTitle>
+                  <CardDescription>
+                    Permanently remove your account and all associated data
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
+                  </p>
+                  <div className="space-y-2">
+                    <Label htmlFor="deleteConfirmation">
+                      Type "DELETE MY ACCOUNT" to confirm
+                    </Label>
+                    <Input
+                      id="deleteConfirmation"
+                      value={deleteConfirmation}
+                      onChange={(e) => setDeleteConfirmation(e.target.value)}
+                      placeholder="DELETE MY ACCOUNT"
+                    />
+                  </div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="destructive"
+                        disabled={deleteConfirmation !== "DELETE MY ACCOUNT"}
+                        className="w-full"
                       >
-                        {isDeleting ? "Deleting..." : "Yes, delete my account"}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </CardContent>
-            </Card>
+                        Delete Account
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleDeleteAccount}
+                          disabled={isDeleting}
+                          className="bg-destructive hover:bg-destructive/90"
+                        >
+                          {isDeleting ? "Deleting..." : "Yes, delete my account"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
-      </div>
 
-      
-    </div>
+
+      </div>
     </div>
   )
 }

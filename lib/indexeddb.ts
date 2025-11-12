@@ -19,6 +19,14 @@ interface Workspace {
   netlifySiteId?: string
   netlifyDeploymentUrl?: string
   deploymentStatus: 'not_deployed' | 'in_progress' | 'deployed' | 'failed'
+  // Supabase project connection
+  supabaseProjectId?: string
+  supabaseProjectName?: string
+  supabaseProjectUrl?: string
+  supabaseAnonKey?: string
+  supabaseServiceRoleKey?: string
+  supabaseConnected?: boolean
+  supabaseConnectionUpdatedAt?: string
   createdAt: string
   updatedAt: string
 }

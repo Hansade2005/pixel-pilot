@@ -521,3 +521,143 @@ export async function getSupabaseProjectDetails(userId: string): Promise<{
     return null
   }
 }
+
+/**
+ * Connect a PixelPilot project to a Supabase project
+ */
+export async function connectPixelPilotToSupabaseProject(
+  userId: string,
+  pixelpilotProjectId: string,
+  supabaseProjectDetails: {
+    supabaseProjectId: string,
+    supabaseProjectName: string,
+    supabaseProjectUrl?: string,
+    supabaseAnonKey?: string,
+    supabaseServiceRoleKey?: string
+  }
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('supabase_projects')
+      .upsert({
+        pixelpilot_project_id: pixelpilotProjectId,
+        user_id: userId,
+        supabase_project_id: supabaseProjectDetails.supabaseProjectId,
+        supabase_project_name: supabaseProjectDetails.supabaseProjectName,
+        supabase_project_url: supabaseProjectDetails.supabaseProjectUrl,
+        supabase_anon_key: supabaseProjectDetails.supabaseAnonKey,
+        supabase_service_role_key: supabaseProjectDetails.supabaseServiceRoleKey,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'pixelpilot_project_id'
+      })
+
+    if (error) throw error
+
+    return true
+  } catch (error) {
+    console.error("Error connecting PixelPilot project to Supabase project:", error)
+    return false
+  }
+}
+
+/**
+ * Get Supabase project connection for a PixelPilot project
+ */
+export async function getSupabaseProjectForPixelPilotProject(
+  userId: string,
+  pixelpilotProjectId: string
+): Promise<{
+  supabaseProjectId: string,
+  supabaseProjectName: string,
+  supabaseProjectUrl?: string,
+  supabaseAnonKey?: string,
+  supabaseServiceRoleKey?: string,
+  connectedAt: string,
+  updatedAt: string
+} | null> {
+  try {
+    const { data, error } = await supabase
+      .from('supabase_projects')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('pixelpilot_project_id', pixelpilotProjectId)
+      .single()
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+      throw error
+    }
+
+    return data ? {
+      supabaseProjectId: data.supabase_project_id,
+      supabaseProjectName: data.supabase_project_name,
+      supabaseProjectUrl: data.supabase_project_url || undefined,
+      supabaseAnonKey: data.supabase_anon_key || undefined,
+      supabaseServiceRoleKey: data.supabase_service_role_key || undefined,
+      connectedAt: data.connected_at,
+      updatedAt: data.updated_at
+    } : null
+  } catch (error) {
+    console.error("Error retrieving Supabase project connection:", error)
+    return null
+  }
+}
+
+/**
+ * Disconnect a PixelPilot project from its Supabase project
+ */
+export async function disconnectPixelPilotFromSupabaseProject(
+  userId: string,
+  pixelpilotProjectId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('supabase_projects')
+      .delete()
+      .eq('user_id', userId)
+      .eq('pixelpilot_project_id', pixelpilotProjectId)
+
+    if (error) throw error
+
+    return true
+  } catch (error) {
+    console.error("Error disconnecting PixelPilot project from Supabase project:", error)
+    return false
+  }
+}
+
+/**
+ * List all Supabase project connections for a user
+ */
+export async function getAllSupabaseProjectConnections(
+  userId: string
+): Promise<Array<{
+  pixelpilotProjectId: string,
+  supabaseProjectId: string,
+  supabaseProjectName: string,
+  supabaseProjectUrl?: string,
+  connectedAt: string,
+  updatedAt: string
+}>> {
+  try {
+    const { data, error } = await supabase
+      .from('supabase_projects')
+      .select('pixelpilot_project_id, supabase_project_id, supabase_project_name, supabase_project_url, connected_at, updated_at')
+      .eq('user_id', userId)
+      .order('connected_at', { ascending: false })
+
+    if (error) throw error
+
+    return (data || []).map(item => ({
+      pixelpilotProjectId: item.pixelpilot_project_id,
+      supabaseProjectId: item.supabase_project_id,
+      supabaseProjectName: item.supabase_project_name,
+      supabaseProjectUrl: item.supabase_project_url || undefined,
+      connectedAt: item.connected_at,
+      updatedAt: item.updated_at
+    }))
+  } catch (error) {
+    console.error("Error retrieving Supabase project connections:", error)
+    return []
+  }
+}

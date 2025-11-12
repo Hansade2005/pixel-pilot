@@ -6,7 +6,10 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "test:supabase": "node test-supabase-management-api.js",
+    "test:api-routes": "node test-supabase-api-routes.js",
+    "test:all-apis": "node test-all-supabase-apis.js"
   },
   "dependencies": {
     "@ai-sdk/cohere": "^2.0.5",

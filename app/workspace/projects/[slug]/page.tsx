@@ -33,6 +33,7 @@ import { storageManager, type Workspace as Project, type Deployment, type Enviro
 import { createClient } from "@/lib/supabase/client"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
+import { SupabaseConnectionManager } from "@/components/supabase-connection-manager"
 import Link from "next/link"
 
 interface ProjectDetails extends Project {
@@ -505,7 +506,7 @@ export default function ProjectPage() {
             </div>
 
             {/* Project Details Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
               {/* Deployment Status */}
               <Card className="bg-gray-800 border-gray-700">
                 <CardHeader>
@@ -609,6 +610,12 @@ export default function ProjectPage() {
                   </Button>
                 </CardContent>
               </Card>
+
+              {/* Supabase Connection */}
+              <SupabaseConnectionManager
+                pixelpilotProjectId={project.id}
+                userId={currentUserId}
+              />
 
               {/* Environment Variables */}
               <Card className="bg-gray-800 border-gray-700">

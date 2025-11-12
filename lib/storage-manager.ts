@@ -22,6 +22,14 @@ export interface Workspace {
   netlifySiteId?: string
   netlifyDeploymentUrl?: string
   deploymentStatus: 'not_deployed' | 'in_progress' | 'deployed' | 'failed'
+  // Supabase project connection
+  supabaseProjectId?: string
+  supabaseProjectName?: string
+  supabaseProjectUrl?: string
+  supabaseAnonKey?: string
+  supabaseServiceRoleKey?: string
+  supabaseConnected?: boolean
+  supabaseConnectionUpdatedAt?: string
   createdAt: string
   updatedAt: string
 }
@@ -1167,7 +1175,7 @@ class InMemoryStorage implements StorageInterface {
 class IndexedDBStorage implements StorageInterface {
   private db: IDBDatabase | null = null
   private dbName = 'PixelPilotDB'
-  private version = 15 // Updated version to add Vercel promotions store
+  private version = 16 // Updated version to add Supabase project connection fields
 
   async init(): Promise<void> {
     if (this.db) return
