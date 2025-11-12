@@ -130,6 +130,11 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     }[type]
 
     setConsoleOutput(prev => [...prev, `[${timestamp}] ${typeIcon} [${typeLabel}] ${message}`])
+
+    // Update currentLog with server messages when preview is loading or recently ready
+    if (type === 'server' && (preview.isLoading || (preview.url && !preview.isLoading))) {
+      setCurrentLog(message)
+    }
   }
 
   useEffect(() => {
@@ -543,7 +548,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                         processId: msg.processId,
                       }
                       setPreview(newPreview)
-                      setCurrentLog("Server ready")
+                      // Don't set currentLog here - let console logs update it
                       addConsoleLog("✅ Server ready", 'server')
 
                       // Dispatch preview ready event
