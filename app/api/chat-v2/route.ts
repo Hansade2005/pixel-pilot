@@ -4877,6 +4877,1010 @@ ${conversationSummaryContext || ''}`
               };
             }
           }
+        }),
+
+        // SUPABASE MANAGEMENT TOOLS
+        supabase_list_projects: tool({
+          description: 'List all available Supabase projects for the authenticated user. Use this to discover and select Supabase projects to work with.',
+          inputSchema: z.object({}),
+          execute: async ({}, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Supabase project listing cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              // Get the user's Supabase access token from cloud-sync
+              const { getSupabaseAccessToken } = await import('@/lib/cloud-sync')
+              const token = await getSupabaseAccessToken()
+
+              if (!token) {
+                return {
+                  success: false,
+                  error: 'No Supabase access token found. Please connect your Supabase account in settings.',
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Call the Supabase list projects API
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/supabase/list-projects`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ token })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_list_projects'] = (toolExecutionTimes['supabase_list_projects'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                console.error('[ERROR] Supabase list projects failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to list Supabase projects: ${result.error || 'Unknown error'}`,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              console.log('[SUCCESS] Supabase projects listed:', { count: result.count });
+              return {
+                success: true,
+                message: `✅ Found ${result.count} Supabase project(s)`,
+                projects: result.projects,
+                count: result.count,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_list_projects'] = (toolExecutionTimes['supabase_list_projects'] || 0) + executionTime;
+              
+              console.error('[ERROR] Supabase list projects failed:', error);
+              return {
+                success: false,
+                error: `Failed to list Supabase projects: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        supabase_fetch_api_keys: tool({
+          description: 'Fetch API keys (anon and service role) for a specific Supabase project. Required before performing database operations on a Supabase project.',
+          inputSchema: z.object({
+            projectId: z.string().describe('The Supabase project ID to fetch API keys for')
+          }),
+          execute: async ({ projectId }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Supabase API key fetch cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                projectId,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              // Get the user's Supabase access token from cloud-sync
+              const { getSupabaseAccessToken } = await import('@/lib/cloud-sync')
+              const token = await getSupabaseAccessToken()
+
+              if (!token) {
+                return {
+                  success: false,
+                  error: 'No Supabase access token found. Please connect your Supabase account in settings.',
+                  projectId,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Call the Supabase fetch API keys API
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/supabase/fetch-api-keys`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ token, projectId })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_fetch_api_keys'] = (toolExecutionTimes['supabase_fetch_api_keys'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                console.error('[ERROR] Supabase fetch API keys failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to fetch API keys: ${result.error || 'Unknown error'}`,
+                  projectId,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              console.log('[SUCCESS] Supabase API keys fetched for project:', projectId);
+              return {
+                success: true,
+                message: `✅ Successfully fetched API keys for Supabase project "${projectId}"`,
+                projectId,
+                projectUrl: result.projectUrl,
+                anonKey: result.anonKey,
+                serviceRoleKey: result.serviceRoleKey,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_fetch_api_keys'] = (toolExecutionTimes['supabase_fetch_api_keys'] || 0) + executionTime;
+              
+              console.error('[ERROR] Supabase fetch API keys failed:', error);
+              return {
+                success: false,
+                error: `Failed to fetch API keys: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                projectId,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        supabase_execute_sql: tool({
+          description: 'Execute SQL queries on a Supabase project database. Supports CREATE, INSERT, UPDATE, DELETE operations (SELECT operations are not allowed for security). Use this for schema changes, data manipulation, and database administration.',
+          inputSchema: z.object({
+            projectId: z.string().describe('The Supabase project ID to execute SQL on'),
+            sql: z.string().describe('The SQL query to execute (CREATE, INSERT, UPDATE, DELETE only - SELECT not allowed)')
+          }),
+          execute: async ({ projectId, sql }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Supabase SQL execution cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                projectId,
+                sql,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              // Get the user's Supabase access token from cloud-sync
+              const { getSupabaseAccessToken } = await import('@/lib/cloud-sync')
+              const token = await getSupabaseAccessToken()
+
+              if (!token) {
+                return {
+                  success: false,
+                  error: 'No Supabase access token found. Please connect your Supabase account in settings.',
+                  projectId,
+                  sql,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Call the Supabase execute SQL API
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/supabase/execute-sql`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ token, projectId, sql })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_execute_sql'] = (toolExecutionTimes['supabase_execute_sql'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                console.error('[ERROR] Supabase SQL execution failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to execute SQL: ${result.error || 'Unknown error'}`,
+                  projectId,
+                  sql,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              console.log('[SUCCESS] Supabase SQL executed:', { projectId, operation: sql.split(' ')[0].toUpperCase() });
+              return {
+                success: true,
+                message: result.message || `✅ SQL executed successfully`,
+                projectId,
+                sql,
+                result: result.result,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_execute_sql'] = (toolExecutionTimes['supabase_execute_sql'] || 0) + executionTime;
+              
+              console.error('[ERROR] Supabase SQL execution failed:', error);
+              return {
+                success: false,
+                error: `Failed to execute SQL: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                projectId,
+                sql,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        supabase_list_tables: tool({
+          description: 'List all tables in a Supabase project database. Use this to discover available tables before performing operations.',
+          inputSchema: z.object({
+            projectId: z.string().describe('The Supabase project ID to list tables for')
+          }),
+          execute: async ({ projectId }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Supabase list tables cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                projectId,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              // Get the user's Supabase access token from cloud-sync
+              const { getSupabaseAccessToken } = await import('@/lib/cloud-sync')
+              const token = await getSupabaseAccessToken()
+
+              if (!token) {
+                return {
+                  success: false,
+                  error: 'No Supabase access token found. Please connect your Supabase account in settings.',
+                  projectId,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Call the Supabase list tables API
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/supabase/list-tables`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ token, projectId })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_list_tables'] = (toolExecutionTimes['supabase_list_tables'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                console.error('[ERROR] Supabase list tables failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to list tables: ${result.error || 'Unknown error'}`,
+                  projectId,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              console.log('[SUCCESS] Supabase tables listed:', { projectId, count: result.tables?.length || 0 });
+              return {
+                success: true,
+                message: `✅ Found ${result.tables?.length || 0} table(s) in Supabase project`,
+                projectId,
+                tables: result.tables || [],
+                count: result.tables?.length || 0,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_list_tables'] = (toolExecutionTimes['supabase_list_tables'] || 0) + executionTime;
+              
+              console.error('[ERROR] Supabase list tables failed:', error);
+              return {
+                success: false,
+                error: `Failed to list tables: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                projectId,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        supabase_read_table: tool({
+          description: 'Read data from a specific table in a Supabase project. Use this to inspect table contents and data.',
+          inputSchema: z.object({
+            projectId: z.string().describe('The Supabase project ID'),
+            tableName: z.string().describe('The name of the table to read from'),
+            limit: z.number().optional().describe('Maximum number of rows to return (default: 100, max: 1000)'),
+            select: z.string().optional().describe('Comma-separated list of columns to select (default: all columns)')
+          }),
+          execute: async ({ projectId, tableName, limit = 100, select }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Supabase read table cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                projectId,
+                tableName,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              // Get the user's Supabase access token from cloud-sync
+              const { getSupabaseAccessToken } = await import('@/lib/cloud-sync')
+              const token = await getSupabaseAccessToken()
+
+              if (!token) {
+                return {
+                  success: false,
+                  error: 'No Supabase access token found. Please connect your Supabase account in settings.',
+                  projectId,
+                  tableName,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Call the Supabase read table API
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/supabase/read-table`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ token, projectId, tableName, limit, select })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_read_table'] = (toolExecutionTimes['supabase_read_table'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                console.error('[ERROR] Supabase read table failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to read table: ${result.error || 'Unknown error'}`,
+                  projectId,
+                  tableName,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              console.log('[SUCCESS] Supabase table read:', { projectId, tableName, rowCount: result.data?.length || 0 });
+              return {
+                success: true,
+                message: `✅ Successfully read ${result.data?.length || 0} row(s) from table "${tableName}"`,
+                projectId,
+                tableName,
+                data: result.data || [],
+                columns: result.columns || [],
+                rowCount: result.data?.length || 0,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_read_table'] = (toolExecutionTimes['supabase_read_table'] || 0) + executionTime;
+              
+              console.error('[ERROR] Supabase read table failed:', error);
+              return {
+                success: false,
+                error: `Failed to read table: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                projectId,
+                tableName,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        supabase_create_table: tool({
+          description: 'Create a new table in a Supabase project database. Define columns, types, and constraints.',
+          inputSchema: z.object({
+            projectId: z.string().describe('The Supabase project ID'),
+            tableName: z.string().describe('Name of the table to create'),
+            columns: z.array(z.object({
+              name: z.string().describe('Column name'),
+              type: z.enum(['text', 'integer', 'bigint', 'boolean', 'date', 'timestamp', 'uuid', 'jsonb']).describe('Column data type'),
+              nullable: z.boolean().optional().describe('Whether the column can be null (default: true)'),
+              default: z.string().optional().describe('Default value for the column')
+            })).describe('Array of column definitions')
+          }),
+          execute: async ({ projectId, tableName, columns }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Supabase create table cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                projectId,
+                tableName,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              // Get the user's Supabase access token from cloud-sync
+              const { getSupabaseAccessToken } = await import('@/lib/cloud-sync')
+              const token = await getSupabaseAccessToken()
+
+              if (!token) {
+                return {
+                  success: false,
+                  error: 'No Supabase access token found. Please connect your Supabase account in settings.',
+                  projectId,
+                  tableName,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Call the Supabase create table API
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/supabase/create-table`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ token, projectId, tableName, columns })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_create_table'] = (toolExecutionTimes['supabase_create_table'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                console.error('[ERROR] Supabase create table failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to create table: ${result.error || 'Unknown error'}`,
+                  projectId,
+                  tableName,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              console.log('[SUCCESS] Supabase table created:', { projectId, tableName, columnCount: columns.length });
+              return {
+                success: true,
+                message: `✅ Successfully created table "${tableName}" with ${columns.length} column(s)`,
+                projectId,
+                tableName,
+                columns,
+                tableId: result.tableId,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_create_table'] = (toolExecutionTimes['supabase_create_table'] || 0) + executionTime;
+              
+              console.error('[ERROR] Supabase create table failed:', error);
+              return {
+                success: false,
+                error: `Failed to create table: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                projectId,
+                tableName,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        supabase_insert_data: tool({
+          description: 'Insert data into a Supabase table. Provide the table name and data to insert.',
+          inputSchema: z.object({
+            projectId: z.string().describe('The Supabase project ID'),
+            tableName: z.string().describe('Name of the table to insert data into'),
+            data: z.record(z.any()).describe('Data object to insert (key-value pairs matching table columns)')
+          }),
+          execute: async ({ projectId, tableName, data }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Supabase insert data cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                projectId,
+                tableName,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              // Get the user's Supabase access token from cloud-sync
+              const { getSupabaseAccessToken } = await import('@/lib/cloud-sync')
+              const token = await getSupabaseAccessToken()
+
+              if (!token) {
+                return {
+                  success: false,
+                  error: 'No Supabase access token found. Please connect your Supabase account in settings.',
+                  projectId,
+                  tableName,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Call the Supabase insert data API
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/supabase/insert-data`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ token, projectId, tableName, data })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_insert_data'] = (toolExecutionTimes['supabase_insert_data'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                console.error('[ERROR] Supabase insert data failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to insert data: ${result.error || 'Unknown error'}`,
+                  projectId,
+                  tableName,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              console.log('[SUCCESS] Supabase data inserted:', { projectId, tableName, recordId: result.recordId });
+              return {
+                success: true,
+                message: `✅ Successfully inserted data into table "${tableName}"`,
+                projectId,
+                tableName,
+                data,
+                recordId: result.recordId,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_insert_data'] = (toolExecutionTimes['supabase_insert_data'] || 0) + executionTime;
+              
+              console.error('[ERROR] Supabase insert data failed:', error);
+              return {
+                success: false,
+                error: `Failed to insert data: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                projectId,
+                tableName,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        supabase_update_data: tool({
+          description: 'Update data in a Supabase table. Specify the table, record ID, and data to update.',
+          inputSchema: z.object({
+            projectId: z.string().describe('The Supabase project ID'),
+            tableName: z.string().describe('Name of the table to update data in'),
+            recordId: z.string().describe('ID of the record to update'),
+            data: z.record(z.any()).describe('Data object with updated values (key-value pairs)')
+          }),
+          execute: async ({ projectId, tableName, recordId, data }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Supabase update data cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                projectId,
+                tableName,
+                recordId,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              // Get the user's Supabase access token from cloud-sync
+              const { getSupabaseAccessToken } = await import('@/lib/cloud-sync')
+              const token = await getSupabaseAccessToken()
+
+              if (!token) {
+                return {
+                  success: false,
+                  error: 'No Supabase access token found. Please connect your Supabase account in settings.',
+                  projectId,
+                  tableName,
+                  recordId,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Call the Supabase update data API
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/supabase/update-data`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ token, projectId, tableName, recordId, data })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_update_data'] = (toolExecutionTimes['supabase_update_data'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                console.error('[ERROR] Supabase update data failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to update data: ${result.error || 'Unknown error'}`,
+                  projectId,
+                  tableName,
+                  recordId,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              console.log('[SUCCESS] Supabase data updated:', { projectId, tableName, recordId });
+              return {
+                success: true,
+                message: `✅ Successfully updated record in table "${tableName}"`,
+                projectId,
+                tableName,
+                recordId,
+                data,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_update_data'] = (toolExecutionTimes['supabase_update_data'] || 0) + executionTime;
+              
+              console.error('[ERROR] Supabase update data failed:', error);
+              return {
+                success: false,
+                error: `Failed to update data: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                projectId,
+                tableName,
+                recordId,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        supabase_delete_data: tool({
+          description: 'Delete data from a Supabase table. Specify the table and record ID to delete.',
+          inputSchema: z.object({
+            projectId: z.string().describe('The Supabase project ID'),
+            tableName: z.string().describe('Name of the table to delete data from'),
+            recordId: z.string().describe('ID of the record to delete')
+          }),
+          execute: async ({ projectId, tableName, recordId }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Supabase delete data cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                projectId,
+                tableName,
+                recordId,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              // Get the user's Supabase access token from cloud-sync
+              const { getSupabaseAccessToken } = await import('@/lib/cloud-sync')
+              const token = await getSupabaseAccessToken()
+
+              if (!token) {
+                return {
+                  success: false,
+                  error: 'No Supabase access token found. Please connect your Supabase account in settings.',
+                  projectId,
+                  tableName,
+                  recordId,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Call the Supabase delete data API
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/supabase/delete-data`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ token, projectId, tableName, recordId })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_delete_data'] = (toolExecutionTimes['supabase_delete_data'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                console.error('[ERROR] Supabase delete data failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to delete data: ${result.error || 'Unknown error'}`,
+                  projectId,
+                  tableName,
+                  recordId,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              console.log('[SUCCESS] Supabase data deleted:', { projectId, tableName, recordId });
+              return {
+                success: true,
+                message: `✅ Successfully deleted record from table "${tableName}"`,
+                projectId,
+                tableName,
+                recordId,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_delete_data'] = (toolExecutionTimes['supabase_delete_data'] || 0) + executionTime;
+              
+              console.error('[ERROR] Supabase delete data failed:', error);
+              return {
+                success: false,
+                error: `Failed to delete data: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                projectId,
+                tableName,
+                recordId,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        supabase_drop_table: tool({
+          description: 'Drop (delete) a table from a Supabase project database. THIS IS DESTRUCTIVE and cannot be undone.',
+          inputSchema: z.object({
+            projectId: z.string().describe('The Supabase project ID'),
+            tableName: z.string().describe('Name of the table to drop')
+          }),
+          execute: async ({ projectId, tableName }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Supabase drop table cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                projectId,
+                tableName,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              // Get the user's Supabase access token from cloud-sync
+              const { getSupabaseAccessToken } = await import('@/lib/cloud-sync')
+              const token = await getSupabaseAccessToken()
+
+              if (!token) {
+                return {
+                  success: false,
+                  error: 'No Supabase access token found. Please connect your Supabase account in settings.',
+                  projectId,
+                  tableName,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Call the Supabase drop table API
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/supabase/drop-table`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ token, projectId, tableName })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_drop_table'] = (toolExecutionTimes['supabase_drop_table'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                console.error('[ERROR] Supabase drop table failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to drop table: ${result.error || 'Unknown error'}`,
+                  projectId,
+                  tableName,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              console.log('[SUCCESS] Supabase table dropped:', { projectId, tableName });
+              return {
+                success: true,
+                message: `✅ Successfully dropped table "${tableName}"`,
+                projectId,
+                tableName,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_drop_table'] = (toolExecutionTimes['supabase_drop_table'] || 0) + executionTime;
+              
+              console.error('[ERROR] Supabase drop table failed:', error);
+              return {
+                success: false,
+                error: `Failed to drop table: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                projectId,
+                tableName,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
         })
 
       }

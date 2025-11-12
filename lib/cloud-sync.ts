@@ -661,3 +661,34 @@ export async function getAllSupabaseProjectConnections(
     return []
   }
 }
+
+/**
+ * Get the Supabase Management API access token for the current user
+ * This is used by AI tools to authenticate with Supabase Management API
+ */
+export async function getSupabaseAccessToken(): Promise<string | null> {
+  try {
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      console.error("No authenticated user found")
+      return null
+    }
+
+    // Get the access token from user settings
+    const { data, error } = await supabase
+      .from('user_settings')
+      .select('supabase_access_token')
+      .eq('user_id', user.id)
+      .single()
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+      throw error
+    }
+
+    return data?.supabase_access_token || null
+  } catch (error) {
+    console.error("Error retrieving Supabase access token:", error)
+    return null
+  }
+}
