@@ -1369,6 +1369,15 @@ export default function TodoApp() {
             <WebPreviewNavigation>
               <div className="flex-1" />
               <WebPreviewDeviceSelector />
+              
+              <WebPreviewNavigationButton
+                onClick={openStackBlitz}
+                disabled={!project}
+                tooltip="Open in StackBlitz"
+              >
+                <Zap className="h-4 w-4" />
+              </WebPreviewNavigationButton>
+
               <WebPreviewUrl
                 onRefresh={refreshPreview}
                 onOpenExternal={openStackBlitz}
