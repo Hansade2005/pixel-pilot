@@ -1380,9 +1380,13 @@ export default function TodoApp() {
 
               <WebPreviewUrl
                 onRefresh={refreshPreview}
-                onOpenExternal={openStackBlitz}
+                onOpenExternal={() => {
+                  if (preview.url) {
+                    window.open(preview.url, '_blank')
+                  }
+                }}
                 refreshDisabled={!preview.url}
-                externalDisabled={!project}
+                externalDisabled={!preview.url}
               />
               <WebPreviewNavigationButton
                 onClick={createPreview}
