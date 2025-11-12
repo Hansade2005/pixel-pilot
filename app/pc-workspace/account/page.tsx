@@ -9,7 +9,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   User,
   Mail,
@@ -2154,10 +2153,11 @@ function AccountSettingsPageContent() {
                     {connections.supabase.connected && connections.supabase.projects && connections.supabase.projects.length > 0 && (
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Select Project</Label>
-                        <Select
+                        <select
+                          className="w-full p-2 border rounded-md text-sm"
                           value={connections.supabase.selectedProject?.id || ''}
-                          onValueChange={async (value) => {
-                            const selectedProject = connections.supabase.projects?.find(p => p.id === value)
+                          onChange={async (e) => {
+                            const selectedProject = connections.supabase.projects?.find(p => p.id === e.target.value)
                             if (selectedProject && user?.id) {
                               try {
                                 // Get the access token
@@ -2229,17 +2229,13 @@ function AccountSettingsPageContent() {
                             }))
                           }}
                         >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select a project..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {connections.supabase.projects.map((project: any) => (
-                              <SelectItem key={project.id} value={project.id}>
-                                {project.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          <option value="">Select a project...</option>
+                          {connections.supabase.projects.map((project: any) => (
+                            <option key={project.id} value={project.id}>
+                              {project.name}
+                            </option>
+                          ))}
+                        </select>
                         {connections.supabase.selectedProject && (
                           <p className="text-xs text-muted-foreground">
                             Selected: {connections.supabase.selectedProject.name}
