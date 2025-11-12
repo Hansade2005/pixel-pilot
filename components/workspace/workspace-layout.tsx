@@ -916,39 +916,41 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 {/* Right Panel - Code/Preview Area */}
                 <ResizablePanel defaultSize={60} minSize={30}>
                   <div className="h-full flex flex-col">
-                    {/* Tab Switcher with Preview Controls */}
-                    <div className="border-b border-border bg-card p-2 flex-shrink-0">
-                      <div className="flex items-center justify-between">
-                        <div className="flex space-x-1">
-                          <Button
-                            variant={activeTab === "code" ? "secondary" : "ghost"}
-                            size="sm"
-                            onClick={() => setActiveTab("code")}
-                            title="Code Editor"
-                          >
-                            <Code className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant={activeTab === "preview" ? "secondary" : "ghost"}
-                            size="sm"
-                            onClick={() => setActiveTab("preview")}
-                            title="Live Preview"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant={activeTab === "database" ? "secondary" : "ghost"}
-                            size="sm"
-                            onClick={() => setActiveTab("database")}
-                            title="Database"
-                          >
-                            <Database className="h-4 w-4" />
-                          </Button>
-                        </div>
+                    {/* Tab Switcher with Preview Controls - Hidden when in preview mode */}
+                    {activeTab !== "preview" && (
+                      <div className="border-b border-border bg-card p-2 flex-shrink-0">
+                        <div className="flex items-center justify-between">
+                          <div className="flex space-x-1">
+                            <Button
+                              variant={activeTab === "code" ? "secondary" : "ghost"}
+                              size="sm"
+                              onClick={() => setActiveTab("code")}
+                              title="Code Editor"
+                            >
+                              <Code className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setActiveTab("preview")}
+                              title="Live Preview"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant={activeTab === "database" ? "secondary" : "ghost"}
+                              size="sm"
+                              onClick={() => setActiveTab("database")}
+                              title="Database"
+                            >
+                              <Database className="h-4 w-4" />
+                            </Button>
+                          </div>
 
-                      
+
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Content Area */}
                     {activeTab === "code" ? (
