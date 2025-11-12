@@ -17,7 +17,8 @@ import {
   Terminal,
   Package,
   Trash2,
-  Copy
+  Copy,
+  Database
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { Workspace as Project } from "@/lib/storage-manager";
@@ -32,11 +33,12 @@ import {
   WebPreviewDeviceSelector,
   DEVICE_PRESETS
 } from "@/components/ai-elements/web-preview";
+import { DatabaseTab } from "./database-tab";
 
 interface CodePreviewPanelProps {
   project: Project | null;
-  activeTab: "code" | "preview";
-  onTabChange: (tab: "code" | "preview") => void;
+  activeTab: "code" | "preview" | "database";
+  onTabChange: (tab: "code" | "preview" | "database") => void;
   previewViewMode?: "desktop" | "mobile";
   syncedUrl?: string;
   onUrlChange?: (url: string) => void;
@@ -1331,8 +1333,8 @@ export default function TodoApp() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Tabs - Hidden on mobile */}
-      {!isMobile && (
+      {/* Tabs - Hidden on mobile and when in preview tab on desktop */}
+      {!isMobile && activeTab !== "preview" && (
         <div className="border-b border-border bg-card">
           <div className="flex items-center justify-between px-4 py-2">
             <div className="flex space-x-1">
@@ -1354,7 +1356,7 @@ export default function TodoApp() {
               </div>
             </div>
           </ScrollArea>
-        ) : (
+        ) : activeTab === "preview" ? (
           <WebPreview
             className="h-full"
             defaultUrl={syncedUrl || preview.url || ""}
@@ -1367,9 +1369,30 @@ export default function TodoApp() {
             }}
           >
             <WebPreviewNavigation>
+              {/* Tab switching buttons - only shown in preview tab */}
+              <WebPreviewNavigationButton
+                onClick={() => onTabChange("code")}
+                tooltip="Switch to Code View"
+              >
+                <Code className="h-4 w-4" />
+              </WebPreviewNavigationButton>
+              <WebPreviewNavigationButton
+                onClick={() => onTabChange("preview")}
+                disabled={true}
+                tooltip="Current: Preview View"
+              >
+                <Eye className="h-4 w-4" />
+              </WebPreviewNavigationButton>
+              <WebPreviewNavigationButton
+                onClick={() => onTabChange("database")}
+                tooltip="Switch to Database View"
+              >
+                <Database className="h-4 w-4" />
+              </WebPreviewNavigationButton>
+
               <div className="flex-1" />
               <WebPreviewDeviceSelector />
-              
+
               <WebPreviewNavigationButton
                 onClick={openStackBlitz}
                 disabled={!project}
@@ -1470,7 +1493,9 @@ export default function TodoApp() {
               })}
             />
           </WebPreview>
-        )}
+        ) : activeTab === "database" ? (
+          <DatabaseTab workspaceId={project?.id || ""} />
+        ) : null}
       </div>
 
     </div>
