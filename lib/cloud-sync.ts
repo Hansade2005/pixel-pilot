@@ -302,7 +302,8 @@ export async function storeDeploymentTokens(
     supabase?: string,
     supabase_project_url?: string,
     supabase_anon_key?: string,
-    supabase_service_role_key?: string
+    supabase_service_role_key?: string,
+    stripe?: string
   }
 ): Promise<boolean> {
   try {
@@ -320,6 +321,7 @@ export async function storeDeploymentTokens(
     if (tokens.supabase_project_url !== undefined) updateData.supabase_project_url = tokens.supabase_project_url
     if (tokens.supabase_anon_key !== undefined) updateData.supabase_anon_key = tokens.supabase_anon_key
     if (tokens.supabase_service_role_key !== undefined) updateData.supabase_service_role_key = tokens.supabase_service_role_key
+    if (tokens.stripe !== undefined) updateData.stripe_secret_key = tokens.stripe
 
     const { error } = await supabase
       .from('user_settings')
@@ -346,12 +348,13 @@ export async function getDeploymentTokens(userId: string): Promise<{
   supabase?: string,
   supabase_project_url?: string,
   supabase_anon_key?: string,
-  supabase_service_role_key?: string
+  supabase_service_role_key?: string,
+  stripe?: string
 } | null> {
   try {
     const { data, error } = await supabase
       .from('user_settings')
-      .select('github_token, vercel_token, netlify_token, supabase_token, supabase_project_url, supabase_anon_key, supabase_service_role_key')
+      .select('github_token, vercel_token, netlify_token, supabase_token, supabase_project_url, supabase_anon_key, supabase_service_role_key, stripe_secret_key')
       .eq('user_id', userId)
       .single()
 
@@ -366,7 +369,8 @@ export async function getDeploymentTokens(userId: string): Promise<{
       supabase: data.supabase_token || undefined,
       supabase_project_url: data.supabase_project_url || undefined,
       supabase_anon_key: data.supabase_anon_key || undefined,
-      supabase_service_role_key: data.supabase_service_role_key || undefined
+      supabase_service_role_key: data.supabase_service_role_key || undefined,
+      stripe: data.stripe_secret_key || undefined
     } : null
   } catch (error) {
     console.error("Error retrieving deployment tokens:", error)
@@ -383,7 +387,8 @@ export async function storeDeploymentConnectionStates(
     github_connected?: boolean,
     vercel_connected?: boolean,
     netlify_connected?: boolean,
-    supabase_connected?: boolean
+    supabase_connected?: boolean,
+    stripe_connected?: boolean
   }
 ): Promise<boolean> {
   try {
@@ -396,6 +401,7 @@ export async function storeDeploymentConnectionStates(
     if (states.vercel_connected !== undefined) updateData.vercel_connected = states.vercel_connected
     if (states.netlify_connected !== undefined) updateData.netlify_connected = states.netlify_connected
     if (states.supabase_connected !== undefined) updateData.supabase_connected = states.supabase_connected
+    if (states.stripe_connected !== undefined) updateData.stripe_connected = states.stripe_connected
 
     const { error } = await supabase
       .from('user_settings')
@@ -419,12 +425,13 @@ export async function getDeploymentConnectionStates(userId: string): Promise<{
   github_connected?: boolean,
   vercel_connected?: boolean,
   netlify_connected?: boolean,
-  supabase_connected?: boolean
+  supabase_connected?: boolean,
+  stripe_connected?: boolean
 } | null> {
   try {
     const { data, error } = await supabase
       .from('user_settings')
-      .select('github_connected, vercel_connected, netlify_connected, supabase_connected')
+      .select('github_connected, vercel_connected, netlify_connected, supabase_connected, stripe_connected')
       .eq('user_id', userId)
       .single()
 
@@ -436,7 +443,8 @@ export async function getDeploymentConnectionStates(userId: string): Promise<{
       github_connected: data.github_connected || false,
       vercel_connected: data.vercel_connected || false,
       netlify_connected: data.netlify_connected || false,
-      supabase_connected: data.supabase_connected || false
+      supabase_connected: data.supabase_connected || false,
+      stripe_connected: data.stripe_connected || false
     } : null
   } catch (error) {
     console.error("Error retrieving deployment connection states:", error)

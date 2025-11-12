@@ -1749,7 +1749,7 @@ ${conversationSummaryContext || ''}`
     console.log('[Chat-V2] Starting streamText with multi-step tooling')
 
     // Define all available tools
-    const allTools = {
+    const allTools: Record<string, any> = {
         // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
         write_file: tool({
           description: 'Create or update a file in the project. Use this tool to create new files or update existing ones with new content. This tool executes on the client-side IndexedDB.',
@@ -4880,6 +4880,125 @@ ${conversationSummaryContext || ''}`
         })
 
       }
+
+    // Add Stripe MCP tools if user has Stripe connected
+    if (user?.id) {
+      try {
+        const { getDeploymentConnectionStates } = await import('@/lib/cloud-sync')
+        const connectionStates = await getDeploymentConnectionStates(user.id)
+        
+        if (connectionStates?.stripe_connected) {
+          const { createStripeMCPClient } = await import('@/lib/mcp/stripe')
+          const stripeMCPClient = await createStripeMCPClient(user.id)
+          
+          // Add Stripe tools from MCP client
+          const stripeTools = await stripeMCPClient.tools()
+          
+          // Add each Stripe tool to allTools
+          for (const [toolName, toolDef] of Object.entries(stripeTools)) {
+            allTools[`stripe_${toolName}`] = tool({
+              description: toolDef.description || `Stripe ${toolName} tool`,
+              inputSchema: toolDef.inputSchema as any || z.object({}),
+              execute: async (args: any) => {
+                try {
+                  // MCP tool execute method expects 2 arguments
+                  return await (toolDef.execute as any)(args, {})
+                } catch (error) {
+                  console.error(`Stripe MCP tool ${toolName} error:`, error)
+                  return {
+                    success: false,
+                    error: `Stripe tool failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+                  }
+                }
+              }
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Failed to initialize Stripe MCP tools:', error)
+        // Continue without Stripe tools if initialization fails
+      }
+    }
+
+    // Add Supabase tools if user has Supabase connected
+    if (user?.id) {
+      try {
+        const { getDeploymentConnectionStates } = await import('@/lib/cloud-sync')
+        const connectionStates = await getDeploymentConnectionStates(user.id)
+        
+        if (connectionStates?.supabase_connected) {
+          const { getAvailableSupabaseTools, executeSupabaseTool } = await import('@/lib/supabase/tools-executor')
+          
+          // Get all Supabase tools
+          const supabaseTools = getAvailableSupabaseTools()
+          
+          // Add each Supabase tool to allTools
+          for (const toolDef of supabaseTools) {
+            // Convert AIToolParameter to Zod schema
+            const inputSchema: any = {}
+            for (const [paramName, paramDef] of Object.entries(toolDef.parameters)) {
+              let zodType: any
+              switch (paramDef.type) {
+                case 'string':
+                  zodType = z.string()
+                  if (paramDef.enum) {
+                    zodType = z.enum(paramDef.enum as [string, ...string[]])
+                  }
+                  break
+                case 'number':
+                  zodType = z.number()
+                  break
+                case 'boolean':
+                  zodType = z.boolean()
+                  break
+                case 'object':
+                  zodType = z.record(z.any())
+                  break
+                case 'array':
+                  zodType = z.array(z.any())
+                  break
+                default:
+                  zodType = z.any()
+              }
+              
+              if (!paramDef.required) {
+                zodType = zodType.optional()
+              }
+              
+              inputSchema[paramName] = zodType.describe(paramDef.description)
+            }
+            
+            allTools[toolDef.name] = tool({
+              description: toolDef.description,
+              inputSchema: z.object(inputSchema),
+              execute: async (args: any, { toolCallId }: any) => {
+                try {
+                  // Execute Supabase tool with user token
+                  const userToken = req.headers.get('authorization')?.replace('Bearer ', '')
+                  if (!userToken) {
+                    return {
+                      success: false,
+                      error: 'No authentication token provided for Supabase tool'
+                    }
+                  }
+                  
+                  return await executeSupabaseTool(toolDef.name, args, userToken)
+                } catch (error) {
+                  console.error(`Supabase tool ${toolDef.name} error:`, error)
+                  return {
+                    success: false,
+                    error: `Supabase tool failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+                  }
+                }
+              }
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Failed to initialize Supabase tools:', error)
+        // Continue without Supabase tools if initialization fails
+      }
+    }
 
     // Filter tools based on chat mode
     const readOnlyTools = ['read_file', 'grep_search', 'list_files', 'web_search', 'web_extract']

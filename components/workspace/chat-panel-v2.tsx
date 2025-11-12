@@ -29,6 +29,7 @@ import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
 import { FileSearchResult, FileLookupService } from "@/lib/file-lookup-service"
 import { createCheckpoint } from '@/lib/checkpoint-utils'
 import { getWorkspaceDatabaseId, getDatabaseIdFromUrl } from '@/lib/get-current-workspace'
+import { createClient } from '@/lib/supabase/client'
 
 // ExpandableUserMessage component for long user messages
 const ExpandableUserMessage = ({
@@ -334,6 +335,18 @@ interface AttachedUploadedFile {
   name: string
   content: string
   size: number
+}
+
+// Helper function to get the current access token
+async function getAccessToken(): Promise<string | null> {
+  try {
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.access_token || null
+  } catch (error) {
+    console.error('Failed to get access token:', error)
+    return null
+  }
 }
 
 interface ChatPanelV2Props {
@@ -984,9 +997,15 @@ export function ChatPanelV2({
 
       console.log('[ChatPanelV2][Continuation] 📤 Sending continuation request with token:', continuationState.continuationToken)
 
+      // Get access token for authentication
+      const accessToken = await getAccessToken()
+
       const response = await fetch('/api/chat-v2', {
      method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(accessToken && { 'Authorization': `Bearer ${accessToken}` })
+        },
         body: JSON.stringify(continuationPayload),
         signal: continuationController.signal
       })
@@ -1604,9 +1623,15 @@ export function ChatPanelV2({
 
       console.log('[ChatPanelV2][ClientTool] 📤 Sending tool result continuation request')
 
+      // Get access token for authentication
+      const accessToken = await getAccessToken()
+
           const response = await fetch('/api/chat-v2', {
   method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(accessToken && { 'Authorization': `Bearer ${accessToken}` })
+        },
         body: JSON.stringify(continuationPayload)
       })
 
@@ -1949,10 +1974,15 @@ export function ChatPanelV2({
       // Build project file tree on client-side with latest data
       const fileTree = await buildProjectFileTree()
 
+      // Get access token for authentication
+      const accessToken = await getAccessToken()
 
       const response = await fetch('/api/chat-v2', {
       method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(accessToken && { 'Authorization': `Bearer ${accessToken}` })
+        },
         body: JSON.stringify({
           messages: messagesToSend, // Send last 5 + new message
           id: project?.id, // Chat session ID for server-side storage

@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   User,
   Mail,
@@ -65,6 +66,13 @@ const SupabaseIcon = ({ className }: { className?: string }) => (
   <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className={className}>
     <title>Supabase</title>
     <path d="M21.362 9.354H12V.396a.396.396 0 0 0-.716-.233L2.724 9.355H.642A.643.643 0 0 0 0 10v4a.64.64 0 0 0 .643.643h2.724l8.56 9.192a.396.396 0 0 0 .716-.233V14.61h9.362a.643.643 0 0 0 .643-.643v-4a.643.643 0 0 0-.643-.643Z"/>
+  </svg>
+)
+
+const StripeIcon = ({ className }: { className?: string }) => (
+  <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className={className}>
+    <title>Stripe</title>
+    <path d="M13.976 9.15c-1.37 0-2.313.917-2.313 2.445 0 2.807 4.878 1.47 4.878 4.435 0 .871-.776 1.428-1.958 1.428-1.618 0-2.413-.854-2.413-2.165h-2.03c0 2.145 1.618 3.507 4.443 3.507 1.618 0 2.783-.661 2.783-2.445 0-2.806-4.878-1.47-4.878-4.435 0-.661.465-1.244 1.754-1.244 1.244 0 1.863.661 1.863 1.754h2.03c0-1.754-1.37-2.807-3.559-2.807zm7.024 8.85h2.03V6.22h-2.03v11.78z"/>
   </svg>
 )
 import { useToast } from "@/hooks/use-toast"
@@ -130,11 +138,13 @@ function AccountSettingsPageContent() {
     vercel: { connected: boolean; username: string; avatarUrl: string; loading: boolean };
     netlify: { connected: boolean; username: string; avatarUrl: string; loading: boolean };
     supabase: { connected: boolean; username: string; avatarUrl: string; loading: boolean; projects: any[]; selectedProject: any | null };
+    stripe: { connected: boolean; username: string; avatarUrl: string; loading: boolean };
   }>({
     github: { connected: false, username: '', avatarUrl: '', loading: false },
     vercel: { connected: false, username: '', avatarUrl: '', loading: false },
     netlify: { connected: false, username: '', avatarUrl: '', loading: false },
-    supabase: { connected: false, username: '', avatarUrl: '', loading: false, projects: [], selectedProject: null }
+    supabase: { connected: false, username: '', avatarUrl: '', loading: false, projects: [], selectedProject: null },
+    stripe: { connected: false, username: '', avatarUrl: '', loading: false }
   })
 
   // Connection form states
@@ -142,7 +152,8 @@ function AccountSettingsPageContent() {
     github: { token: '', isValidating: false, error: '' },
     vercel: { token: '', isValidating: false, error: '' },
     netlify: { token: '', isValidating: false, error: '' },
-    supabase: { token: '', anonKey: '', serviceRoleKey: '', isValidating: false, error: '' }
+    supabase: { token: '', anonKey: '', serviceRoleKey: '', isValidating: false, error: '' },
+    stripe: { token: '', isValidating: false, error: '' }
   })
   
   // Password change form state
@@ -390,7 +401,7 @@ function AccountSettingsPageContent() {
   }
 
   // Validate and connect to a provider
-  const handleConnect = async (provider: 'github' | 'vercel' | 'netlify' | 'supabase') => {
+  const handleConnect = async (provider: 'github' | 'vercel' | 'netlify' | 'supabase' | 'stripe') => {
     const token = connectionForms[provider].token
     if (!token.trim()) {
       setConnectionForms(prev => ({
@@ -848,12 +859,13 @@ function AccountSettingsPageContent() {
         github: { ...prev.github, loading: true },
         vercel: { ...prev.vercel, loading: true },
         netlify: { ...prev.netlify, loading: true },
-        supabase: { ...prev.supabase, loading: true }
+        supabase: { ...prev.supabase, loading: true },
+        stripe: { ...prev.stripe, loading: true }
       }))
 
       // Validate and fetch user data for each token
       const validateAndFetchUserData = async (
-        provider: 'github' | 'vercel' | 'netlify' | 'supabase'
+        provider: 'github' | 'vercel' | 'netlify' | 'supabase' | 'stripe'
       ) => {
         const token = tokens?.[provider]
         const isConnected = connectionStates?.[`${provider}_connected`] || false
@@ -914,6 +926,23 @@ function AccountSettingsPageContent() {
             const projects = validateResult.projects || []
             console.log('[SUPABASE] Token validation successful, found', projects.length, 'projects')
             userData = { name: 'Supabase User', projects }
+          } else if (provider === 'stripe') {
+            // Validate Stripe secret key by making a test API call
+            console.log('[STRIPE] Validating secret key...')
+            
+            const response = await fetch('https://api.stripe.com/v1/account', {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/x-www-form-urlencoded'
+              }
+            })
+            
+            if (!response.ok) {
+              throw new Error('Invalid Stripe secret key')
+            }
+            
+            userData = await response.json()
+            console.log('[STRIPE] Secret key validation successful')
           }
 
           return {
@@ -921,10 +950,12 @@ function AccountSettingsPageContent() {
             username: provider === 'github' ? userData.login :
                      provider === 'vercel' ? (userData.username || userData.name) :
                      provider === 'supabase' ? userData.name :
+                     provider === 'stripe' ? (userData.business_name || userData.email || 'Stripe Account') :
                      (userData.login || userData.email),
             avatarUrl: provider === 'github' ? userData.avatar_url :
                       provider === 'vercel' ? userData.avatar :
                       provider === 'supabase' ? '' :
+                      provider === 'stripe' ? '' :
                       userData.avatar_url,
             loading: false,
             projects: provider === 'supabase' ? userData.projects : undefined,
@@ -950,17 +981,19 @@ function AccountSettingsPageContent() {
 
       // Validate all tokens concurrently
       console.log('[CONNECTION_STATUS] Starting validation for all providers...')
-      const [githubStatus, vercelStatus, netlifyStatus, supabaseStatus] = await Promise.all([
+      const [githubStatus, vercelStatus, netlifyStatus, supabaseStatus, stripeStatus] = await Promise.all([
         validateAndFetchUserData('github'),
         validateAndFetchUserData('vercel'),
         validateAndFetchUserData('netlify'),
-        validateAndFetchUserData('supabase')
+        validateAndFetchUserData('supabase'),
+        validateAndFetchUserData('stripe')
       ])
       console.log('[CONNECTION_STATUS] Validation results:', {
         github: githubStatus.connected,
         vercel: vercelStatus.connected,
         netlify: netlifyStatus.connected,
-        supabase: supabaseStatus.connected
+        supabase: supabaseStatus.connected,
+        stripe: stripeStatus.connected
       })
 
       // Update connection status
@@ -975,7 +1008,8 @@ function AccountSettingsPageContent() {
             id: supabaseProjectDetails.selectedProjectId,
             name: supabaseProjectDetails.selectedProjectName
           } : supabaseStatus.selectedProject
-        }
+        },
+        stripe: stripeStatus
       })
       console.log('[CONNECTION_STATUS] UI state updated')
 
@@ -986,7 +1020,8 @@ function AccountSettingsPageContent() {
         github: { ...prev.github, loading: false },
         vercel: { ...prev.vercel, loading: false },
         netlify: { ...prev.netlify, loading: false },
-        supabase: { ...prev.supabase, loading: false }
+        supabase: { ...prev.supabase, loading: false },
+        stripe: { ...prev.stripe, loading: false }
       }))
     }
   }
@@ -1056,7 +1091,7 @@ function AccountSettingsPageContent() {
   }
 
   // Disconnect from a provider
-  const handleDisconnect = async (provider: 'github' | 'vercel' | 'netlify' | 'supabase') => {
+  const handleDisconnect = async (provider: 'github' | 'vercel' | 'netlify' | 'supabase' | 'stripe') => {
     if (!user?.id) {
       toast({
         title: "Error",
@@ -1143,7 +1178,7 @@ function AccountSettingsPageContent() {
 
   // Validate deployment token (you'll need to implement this)
   const validateDeploymentToken = async (
-    provider: 'github' | 'vercel' | 'netlify' | 'supabase',
+    provider: 'github' | 'vercel' | 'netlify' | 'supabase' | 'stripe',
     token: string
   ): Promise<boolean> => {
     // Implement token validation logic for each provider
@@ -1201,6 +1236,19 @@ function AccountSettingsPageContent() {
           
           const validateResult = await validateResponse.json()
           return validateResponse.ok && validateResult.valid
+        } catch {
+          return false
+        }
+      case 'stripe':
+        // Stripe secret key validation
+        try {
+          const response = await fetch('https://api.stripe.com/v1/account', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
+          })
+          return response.ok
         } catch {
           return false
         }
@@ -2106,11 +2154,10 @@ function AccountSettingsPageContent() {
                     {connections.supabase.connected && connections.supabase.projects && connections.supabase.projects.length > 0 && (
                       <div className="space-y-2">
                         <Label className="text-sm font-medium">Select Project</Label>
-                        <select
-                          className="w-full p-2 border rounded-md text-sm"
+                        <Select
                           value={connections.supabase.selectedProject?.id || ''}
-                          onChange={async (e) => {
-                            const selectedProject = connections.supabase.projects?.find(p => p.id === e.target.value)
+                          onValueChange={async (value) => {
+                            const selectedProject = connections.supabase.projects?.find(p => p.id === value)
                             if (selectedProject && user?.id) {
                               try {
                                 // Get the access token
@@ -2182,13 +2229,17 @@ function AccountSettingsPageContent() {
                             }))
                           }}
                         >
-                          <option value="">Select a project...</option>
-                          {connections.supabase.projects.map((project: any) => (
-                            <option key={project.id} value={project.id}>
-                              {project.name}
-                            </option>
-                          ))}
-                        </select>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select a project..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {connections.supabase.projects.map((project: any) => (
+                              <SelectItem key={project.id} value={project.id}>
+                                {project.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         {connections.supabase.selectedProject && (
                           <p className="text-xs text-muted-foreground">
                             Selected: {connections.supabase.selectedProject.name}
@@ -2241,6 +2292,97 @@ function AccountSettingsPageContent() {
                           or use{" "}
                           <a href="https://api.optimaai.cc/supabase-auth/login" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
                             OAuth login
+                          </a>
+                        </>
+                      )}
+                      </p>
+                    </div>
+                </div>
+
+                {/* Stripe Connection */}
+                <div className="p-4 border rounded-lg">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-purple-500 rounded-full flex items-center justify-center">
+                        <StripeIcon className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Stripe</p>
+                        <p className="text-sm text-muted-foreground">
+                          {connections.stripe.connected
+                            ? "Connected for payment processing"
+                            : "Connect your Stripe account for payment operations"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {/* Token Input - Always visible but disabled when connected */}
+                    <div className="flex gap-2">
+                      <Input
+                        type="password"
+                        placeholder={connections.stripe.connected ? "Secret key saved and secured" : "Enter Stripe Secret Key (sk_live_... or sk_test_...)"}
+                        value={connections.stripe.connected ? "••••••••••••••••••••••••••••••••" : connectionForms.stripe.token}
+                        onChange={(e) => setConnectionForms(prev => ({
+                          ...prev,
+                          stripe: { ...prev.stripe, token: e.target.value, error: '' }
+                        }))}
+                        disabled={connections.stripe.connected}
+                        className={connections.stripe.connected
+                          ? "bg-purple-50 border-purple-200 cursor-not-allowed"
+                          : connectionForms.stripe.error ? "border-red-500" : ""
+                        }
+                      />
+                  {connections.stripe.connected ? (
+                      <Button
+                          variant="destructive"
+                        onClick={() => handleDisconnect('stripe')}
+                        disabled={connections.stripe.loading}
+                      >
+                        {connections.stripe.loading ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Unlink className="h-4 w-4 mr-2" />
+                        )}
+                        Disconnect
+                      </Button>
+                      ) : (
+                        <Button
+                          onClick={() => handleConnect('stripe')}
+                          disabled={connectionForms.stripe.isValidating || !connectionForms.stripe.token.trim()}
+                        >
+                          {connectionForms.stripe.isValidating ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            "Connect"
+                          )}
+                        </Button>
+                      )}
+                      </div>
+
+                    {/* Connection Status */}
+                    {connections.stripe.connected && (
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span className="text-sm text-green-600 font-medium">Connected and secured</span>
+                      </div>
+                    )}
+
+                    {/* Error Message */}
+                      {connectionForms.stripe.error && (
+                        <p className="text-sm text-red-600">{connectionForms.stripe.error}</p>
+                      )}
+
+                    {/* Help Text */}
+                      <p className="text-xs text-muted-foreground">
+                      {connections.stripe.connected ? (
+                        "Your Stripe secret key is securely stored and encrypted."
+                      ) : (
+                        <>
+                          Enter your Stripe Secret Key from{" "}
+                          <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                            dashboard.stripe.com/apikeys
                           </a>
                         </>
                       )}
