@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Play, GitBranch, Share, Settings, Plus, Rocket, Upload, Database, Zap } from "lucide-react"
+import { Play, GitBranch, Share, Settings, Plus, Rocket, Upload, Database, Zap, Cloud } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import React, { useState, useEffect } from 'react'
@@ -68,6 +68,7 @@ export function ProjectHeader({
   const [selectedTemplate, setSelectedTemplate] = useState<'vite-react' | 'nextjs'>('vite-react')
   const [isCreating, setIsCreating] = useState(false)
   const [gitHubConnected, setGitHubConnected] = useState(false)
+  const [isBackingUp, setIsBackingUp] = useState(false)
 
   // GitHub push functionality
   const { pushToGitHub, checkGitHubConnection, isPushing } = useGitHubPush()
@@ -157,6 +158,38 @@ export function ProjectHeader({
         console.error('Push failed:', error)
       }
     })
+  }
+
+  const handleBackupToCloud = async () => {
+    if (!project || !user?.id) return
+
+    setIsBackingUp(true)
+    
+    try {
+      const { uploadBackupToCloud } = await import('@/lib/cloud-sync')
+      const success = await uploadBackupToCloud(user.id)
+      
+      if (!success) throw new Error("Backup failed")
+      
+      // Show success message
+      const { useToast } = await import('@/hooks/use-toast')
+      const { toast } = useToast()
+      toast({
+        title: "Backup Complete",
+        description: "Project backed up to cloud successfully"
+      })
+    } catch (error: any) {
+      console.error("Error creating backup:", error)
+      const { useToast } = await import('@/hooks/use-toast')
+      const { toast } = useToast()
+      toast({
+        title: "Backup Failed",
+        description: error.message || "Failed to create backup",
+        variant: "destructive"
+      })
+    } finally {
+      setIsBackingUp(false)
+    }
   }
 
   const handleCreateProject = async () => {
@@ -415,22 +448,25 @@ export function ProjectHeader({
           </Tooltip>
         </TooltipProvider>
         
+        
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button 
-                variant="outline" 
+                variant="outline"
                 size="sm" 
-                onClick={onSettings}
-                disabled={!project}
-                className="h-8 w-8 p-0 sm:w-auto sm:px-3"
+                onClick={handleBackupToCloud}
+                disabled={!project || isBackingUp}
+                className="h-8 w-8 p-0 sm:w-auto sm:px-3 bg-blue-600/10 border-blue-500 hover:bg-blue-600/20"
               >
-                <Settings className="h-4 w-4" />
-                <span className="hidden sm:inline ml-2">Settings</span>
+                <Cloud className={`h-4 w-4 text-blue-400 ${isBackingUp ? 'animate-pulse' : ''}`} />
+                <span className="hidden sm:inline ml-2 text-blue-400">
+                  {isBackingUp ? "Backing up..." : "Backup"}
+                </span>
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              <p>Project Settings</p>
+              <p>{isBackingUp ? "Creating cloud backup..." : "Backup project to cloud"}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -480,6 +516,7 @@ export function ProjectHeader({
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
+      
         
         <TooltipProvider>
           <Tooltip>

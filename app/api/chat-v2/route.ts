@@ -1321,11 +1321,11 @@ export async function POST(req: Request) {
       processedMessages = combinedMessages
         .map(msg => {
           // Truncate user messages to 1500 characters
-          if (msg.role === 'user' && msg.content && typeof msg.content === 'string' && msg.content.length > 1500) {
+          if (msg.role === 'user' && msg.content && typeof msg.content === 'string' && msg.content.length > 20500) {
             console.log(`[Chat-V2] Truncating user message from ${msg.content.length} to 1500 characters`)
             return {
               ...msg,
-              content: msg.content.substring(0, 1500) + '...'
+              content: msg.content.substring(0, 20500) + '...'
             }
           }
           return msg
@@ -1348,12 +1348,12 @@ export async function POST(req: Request) {
     if (!isContinuation) {
       processedMessages = messages
         .map(msg => {
-          // Truncate user messages to 1500 characters
-          if (msg.role === 'user' && msg.content && typeof msg.content === 'string' && msg.content.length > 1500) {
-            console.log(`[Chat-V2] Truncating user message from ${msg.content.length} to 1500 characters`)
+          // Truncate user messages to 3500 characters
+          if (msg.role === 'user' && msg.content && typeof msg.content === 'string' && msg.content.length > 20500) {
+            console.log(`[Chat-V2] Truncating user message from ${msg.content.length} to 3500 characters`)
             return {
               ...msg,
-              content: msg.content.substring(0, 1500) + '...'
+              content: msg.content.substring(0, 20500) + '...'
             }
           }
           return msg

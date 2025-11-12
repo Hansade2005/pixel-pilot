@@ -17,7 +17,7 @@ import { ProjectHeader } from "./project-header"
 import { FileExplorer } from "./file-explorer"
 import { CodeEditor } from "./code-editor"
 import { DatabaseTab } from "./database-tab"
-import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone, Database } from "lucide-react"
+import { Github, Globe, Rocket, Settings, PanelLeft, Code, FileText, Eye, Trash2, Copy, ArrowUp, ChevronDown, ChevronUp, Edit3, FolderOpen, X, Wrench, Check, AlertTriangle, Zap, Undo2, Redo2, MessageSquare, Plus, ExternalLink, RotateCcw, Play, Square, Monitor, Smartphone, Database, Cloud } from "lucide-react"
 import { storageManager } from "@/lib/storage-manager"
 import { useToast } from '@/hooks/use-toast'
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -96,6 +96,7 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
   const [openProjectHeaderDialog, setOpenProjectHeaderDialog] = useState(false)
   const [projectHeaderInitialName, setProjectHeaderInitialName] = useState("")
   const [projectHeaderInitialDescription, setProjectHeaderInitialDescription] = useState("")
+  const [isBackingUp, setIsBackingUp] = useState(false)
 
   // Initial prompt to auto-send to chat when project is created
   const [initialChatPrompt, setInitialChatPrompt] = useState<string | undefined>(undefined)
@@ -621,6 +622,34 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
     }
   }, [selectedFile, isMobile])
 
+  // Listen for AI stream completion to trigger automatic backup
+  React.useEffect(() => {
+    const handleAIStreamComplete = async (event: Event) => {
+      const customEvent = event as CustomEvent
+      console.log('[WorkspaceLayout] AI stream completed, triggering automatic backup')
+      
+      // Only backup if we have a selected project and user
+      if (selectedProject && user?.id) {
+        try {
+          // Trigger the backup function
+          await handleBackupToCloud()
+          console.log('[WorkspaceLayout] Automatic backup completed after AI stream')
+        } catch (error) {
+          console.error('[WorkspaceLayout] Automatic backup failed:', error)
+          // Don't show error toast for automatic backups to avoid spam
+        }
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('ai-stream-complete', handleAIStreamComplete)
+      
+      return () => {
+        window.removeEventListener('ai-stream-complete', handleAIStreamComplete)
+      }
+    }
+  }, [selectedProject, user?.id])
+
   // Clear chat function for mobile header
   const handleClearChat = async () => {
     if (!selectedProject) return
@@ -678,6 +707,34 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
         description: "Failed to push changes to GitHub. Please try again.",
         variant: "destructive"
       })
+    }
+  }
+
+  // Cloud backup handler for mobile header
+  const handleBackupToCloud = async () => {
+    if (!selectedProject || !user?.id) return
+
+    setIsBackingUp(true)
+    
+    try {
+      const { uploadBackupToCloud } = await import('@/lib/cloud-sync')
+      const success = await uploadBackupToCloud(user.id)
+      
+      if (!success) throw new Error("Backup failed")
+      
+      toast({
+        title: "Backup Complete",
+        description: "Project backed up to cloud successfully"
+      })
+    } catch (error: any) {
+      console.error("Error creating backup:", error)
+      toast({
+        title: "Backup Failed",
+        description: error.message || "Failed to create backup",
+        variant: "destructive"
+      })
+    } finally {
+      setIsBackingUp(false)
     }
   }
 
@@ -1252,6 +1309,16 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
                 variant="ghost"
                 size="sm"
                 className="h-8 w-8 p-0"
+                onClick={handleBackupToCloud}
+                disabled={!selectedProject || isBackingUp}
+                title={isBackingUp ? "Backing up..." : "Backup to Cloud"}
+              >
+                <Cloud className={`h-4 w-4 ${isBackingUp ? 'animate-pulse' : ''}`} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
                 onClick={() => {
                   if (selectedProject) {
                     router.push(`/workspace/${selectedProject.id}/database`)
@@ -1262,6 +1329,8 @@ export function WorkspaceLayout({ user, projects, newProjectId, initialPrompt }:
               >
                 <Database className="h-4 w-4" />
               </Button>
+             
+              
              
               <Button
                 variant="ghost"
