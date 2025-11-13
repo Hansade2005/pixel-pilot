@@ -678,7 +678,7 @@ export async function getSupabaseAccessToken(): Promise<string | null> {
     // Get the access token from user settings
     const { data, error } = await supabase
       .from('user_settings')
-      .select('supabase_access_token')
+      .select('supabase_token')
       .eq('user_id', user.id)
       .single()
 
@@ -686,7 +686,7 @@ export async function getSupabaseAccessToken(): Promise<string | null> {
       throw error
     }
 
-    return data?.supabase_access_token || null
+    return data?.supabase_token || null
   } catch (error) {
     console.error("Error retrieving Supabase access token:", error)
     return null
