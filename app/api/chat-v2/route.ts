@@ -1229,7 +1229,9 @@ export async function POST(req: Request) {
       continuationState, // New field for stream continuation
       // toolResult // New field for client-side tool results - DISABLED
       supabaseAccessToken, // Supabase access token from client
-      supabaseProjectDetails // Supabase project details from client
+      supabaseProjectDetails, // Supabase project details from client
+      supabase_projectId, // Extracted Supabase project ID to avoid conflicts
+      supabaseUserId // Authenticated Supabase user ID from client
     } = body
 
     // Handle client-side tool results - DISABLED
@@ -1395,7 +1397,13 @@ export async function POST(req: Request) {
       aiMode, 
       originalMessageCount: messages?.length || 0,
       processedMessageCount: processedMessages.length,
-      hasMessages: !!messages
+      hasMessages: !!messages,
+      hasSupabaseToken: !!supabaseAccessToken,
+      hasSupabaseProjectDetails: !!supabaseProjectDetails,
+      hasSupabaseUserId: !!supabaseUserId,
+      supabaseProjectId: supabaseProjectDetails?.supabaseProjectId,
+      supabase_projectId,
+      supabaseUserId
     })
 
     // Auth check
@@ -4917,8 +4925,8 @@ ${conversationSummaryContext || ''}`
                 }
               }
 
-              // Extract project ID from connected project details
-              const projectId = supabaseProjectDetails?.supabaseProjectId;
+              // Use the Supabase project ID from the request payload
+              const projectId = supabase_projectId;
 
               if (!projectId) {
                 return {
@@ -5023,8 +5031,8 @@ ${conversationSummaryContext || ''}`
                 }
               }
 
-              // Extract project ID from connected project details
-              const projectId = supabaseProjectDetails?.supabaseProjectId;
+              // Use the Supabase project ID from the request payload
+              const projectId = supabase_projectId;
 
               if (!projectId) {
                 return {
@@ -5126,8 +5134,8 @@ ${conversationSummaryContext || ''}`
                 }
               }
 
-              // Extract project ID from connected project details
-              const projectId = supabaseProjectDetails?.supabaseProjectId;
+              // Use the Supabase project ID from the request payload
+              const projectId = supabase_projectId;
 
               if (!projectId) {
                 return {
@@ -5232,8 +5240,8 @@ ${conversationSummaryContext || ''}`
                 }
               }
 
-              // Extract project ID from connected project details
-              const projectId = supabaseProjectDetails?.supabaseProjectId;
+              // Use the Supabase project ID from the request payload
+              const projectId = supabase_projectId;
 
               if (!projectId) {
                 return {
@@ -5347,8 +5355,8 @@ ${conversationSummaryContext || ''}`
                 }
               }
 
-              // Extract project ID from connected project details
-              const projectId = supabaseProjectDetails?.supabaseProjectId;
+              // Use the Supabase project ID from the request payload
+              const projectId = supabase_projectId;
 
               if (!projectId) {
                 return {
@@ -5456,8 +5464,8 @@ ${conversationSummaryContext || ''}`
                 }
               }
 
-              // Extract project ID from connected project details
-              const projectId = supabaseProjectDetails?.supabaseProjectId;
+              // Use the Supabase project ID from the request payload
+              const projectId = supabase_projectId;
 
               if (!projectId) {
                 return {
@@ -5568,8 +5576,8 @@ ${conversationSummaryContext || ''}`
                 }
               }
 
-              // Extract project ID from connected project details
-              const projectId = supabaseProjectDetails?.supabaseProjectId;
+              // Use the Supabase project ID from the request payload
+              const projectId = supabase_projectId;
 
               if (!projectId) {
                 return {
@@ -5682,8 +5690,8 @@ ${conversationSummaryContext || ''}`
                 }
               }
 
-              // Extract project ID from connected project details
-              const projectId = supabaseProjectDetails?.supabaseProjectId;
+              // Use the Supabase project ID from the request payload
+              const projectId = supabase_projectId;
 
               if (!projectId) {
                 return {
@@ -5792,8 +5800,8 @@ ${conversationSummaryContext || ''}`
                 }
               }
 
-              // Extract project ID from connected project details
-              const projectId = supabaseProjectDetails?.supabaseProjectId;
+              // Use the Supabase project ID from the request payload
+              const projectId = supabase_projectId;
 
               if (!projectId) {
                 return {

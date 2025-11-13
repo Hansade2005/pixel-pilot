@@ -1952,21 +1952,36 @@ export function ChatPanelV2({
       // Fetch Supabase access token and project details for the current PixelPilot project
       let supabaseAccessToken = null
       let supabaseProjectDetails = null
+      let supabaseUserId = null
 
       try {
         const { getSupabaseAccessToken, getSupabaseProjectForPixelPilotProject } = await import('@/lib/cloud-sync')
 
-        // Get the Supabase access token
-        supabaseAccessToken = await getSupabaseAccessToken()
+        // Get the authenticated user from Supabase session
+        const { createClient } = await import('@/lib/supabase/client')
+        const supabase = createClient()
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        
+        if (userError || !user) {
+          console.warn('[ChatPanelV2] No authenticated Supabase user found')
+        } else {
+          supabaseUserId = user.id
+          
+          // Get the Supabase access token using the authenticated userId
+          supabaseAccessToken = await getSupabaseAccessToken()
 
-        // Get Supabase project details for the current PixelPilot project
-        if (project?.id && project?.userId) {
-          supabaseProjectDetails = await getSupabaseProjectForPixelPilotProject(project.userId, project.id)
+          // Get Supabase project details for the current PixelPilot project using the authenticated userId
+          if (project?.id) {
+            supabaseProjectDetails = await getSupabaseProjectForPixelPilotProject(supabaseUserId, project.id)
+          }
         }
+        
         console.log(`[ChatPanelV2] Supabase data fetched:`, {
           hasToken: !!supabaseAccessToken,
           hasProjectDetails: !!supabaseProjectDetails,
-          projectId: supabaseProjectDetails?.supabaseProjectId
+          hasUserId: !!supabaseUserId,
+          projectId: supabaseProjectDetails?.supabaseProjectId,
+          tokenLength: supabaseAccessToken?.length
         })
       } catch (error) {
         console.warn('[ChatPanelV2] Failed to fetch Supabase data:', error)
@@ -1989,7 +2004,9 @@ export function ChatPanelV2({
           chatMode: isAskMode ? 'ask' : 'agent', // Pass the chat mode to the API
           // Add Supabase data to the payload
           supabaseAccessToken,
-          supabaseProjectDetails
+          supabaseProjectDetails,
+          supabase_projectId: supabaseProjectDetails?.supabaseProjectId, // Extract Supabase project ID to avoid conflicts
+          supabaseUserId // Pass the authenticated user ID
         }),
         signal: controller.signal
       })
