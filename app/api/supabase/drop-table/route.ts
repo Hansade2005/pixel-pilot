@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { executeManagementQuery } from '../../../../lib/supabase/management-api-utils'
 
 /**
- * Server-side API route to drop tables from Supabase projects
- * Provides a safe interface for DROP TABLE operations with confirmation
+ * Server-side API route to drop tables in a Supabase project
+ * Provides a safe interface for DROP TABLE operations
  */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { token, projectId, tableName, schema = 'public', cascade = false, confirmDrop = false } = body
+    const { token, projectId, tableName, schema = 'public', options = {} } = body
 
     if (!token || !projectId || !tableName) {
       return NextResponse.json(
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Validate table name (basic SQL injection prevention)
+    // Validate table name
     if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(tableName)) {
       return NextResponse.json(
         { error: 'Invalid table name format' },
@@ -32,99 +33,37 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Require explicit confirmation for DROP TABLE operations
-    if (!confirmDrop) {
-      return NextResponse.json(
-        { error: 'DROP TABLE operations require explicit confirmation. Set confirmDrop: true to proceed.' },
-        { status: 400 }
-      )
-    }
-
-    // Import the Supabase Management API on the server side
+    // Import the Supabase Management API dynamically (server-only)
     const { SupabaseManagementAPI } = await import('@dyad-sh/supabase-management-js')
     const client = new SupabaseManagementAPI({ accessToken: token })
 
     try {
-      console.log('[SUPABASE API] Dropping table:', tableName, 'from project:', projectId)
+      console.log('[SUPABASE API] Dropping table:', tableName, 'in project:', projectId)
 
-      // Verify table exists before dropping
-      const tableCheckSQL = `
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.tables
-          WHERE table_schema = '${schema.replace(/'/g, "''")}' AND table_name = '${tableName.replace(/'/g, "''")}'
-        ) as table_exists;
-      `
+      // Build the DROP TABLE SQL
+      let dropTableSQL = `DROP TABLE IF EXISTS "${schema}"."${tableName}"`
 
-      const tableCheck = await client.runQuery(projectId, tableCheckSQL)
+      // Add CASCADE or RESTRICT based on options
+      if (options.cascade === true) dropTableSQL += ' CASCADE'
+      else if (options.restrict === true) dropTableSQL += ' RESTRICT'
 
-      const tableCheckResult: any[] = Array.isArray(tableCheck) ? tableCheck : []
-      if (!tableCheckResult || !tableCheckResult[0]?.table_exists) {
-        return NextResponse.json(
-          { error: `Table '${tableName}' does not exist in schema '${schema}'` },
-          { status: 404 }
-        )
-      }
-
-      // Get table information before dropping (for reporting)
-      const tableInfoSQL = `
-        SELECT
-          pg_size_pretty(pg_total_relation_size(c.oid)) as size,
-          obj_description(c.oid, 'pg_class') as description
-        FROM pg_class c
-        LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
-        WHERE n.nspname = '${schema.replace(/'/g, "''")}' AND c.relname = '${tableName.replace(/'/g, "''")}' AND c.relkind = 'r';
-      `
-
-      const tableInfo = await client.runQuery(projectId, tableInfoSQL)
-      const tableInfoResult: any[] = Array.isArray(tableInfo) ? tableInfo : []
-      const tableSize = tableInfoResult && tableInfoResult[0] ? tableInfoResult[0].size : 'unknown'
-      const tableDescription = tableInfoResult && tableInfoResult[0] ? tableInfoResult[0].description : null
-
-      // Get row count before dropping
-      const countSQL = `SELECT COUNT(*) as row_count FROM "${schema}"."${tableName}"`
-      const countResult = await client.runQuery(projectId, countSQL)
-      const countResultArray: any[] = Array.isArray(countResult) ? countResult : []
-      const rowCount = countResultArray && countResultArray[0] ? parseInt(countResultArray[0].row_count) : 0
-
-      // Build the DROP TABLE statement
-      let dropTableSQL = `DROP TABLE`
-
-      if (!cascade) {
-        dropTableSQL += ` IF EXISTS`
-      }
-
-      dropTableSQL += ` "${schema}"."${tableName}"`
-
-      if (cascade) {
-        dropTableSQL += ` CASCADE`
-      } else {
-        dropTableSQL += ` RESTRICT`
-      }
+      dropTableSQL += ';'
 
       console.log('[SUPABASE API] Executing DROP TABLE:', dropTableSQL)
 
-      const result = await client.runQuery(projectId, dropTableSQL)
+      const result = await executeManagementQuery(client, projectId, dropTableSQL, 'DROP TABLE')
 
       console.log('[SUPABASE API] Table dropped successfully')
 
       return NextResponse.json({
         success: true,
-        operation: 'drop_table',
-        tableName: tableName,
-        schema: schema,
-        cascade: cascade,
-        tableInfo: {
-          size: tableSize,
-          rowCount: rowCount,
-          description: tableDescription
-        },
-        sql: dropTableSQL,
-        result: result
+        tableName,
+        schema,
+        message: `Table '${tableName}' dropped successfully`
       })
     } catch (error: any) {
       console.error('[SUPABASE API] Failed to drop table:', error)
 
-      // Provide specific error messages based on the error type
       let errorMessage = 'Failed to drop table'
 
       if (error.message?.toLowerCase().includes('unauthorized') ||
@@ -135,12 +74,9 @@ export async function POST(req: NextRequest) {
                  error.message?.toLowerCase().includes('404')) {
         errorMessage = 'Project not found or access denied'
       } else if (error.message?.toLowerCase().includes('does not exist')) {
-        errorMessage = `Table '${tableName}' does not exist in schema '${schema}'`
-      } else if (error.message?.toLowerCase().includes('cannot drop') ||
-                 error.message?.toLowerCase().includes('still referenced')) {
-        errorMessage = `Cannot drop table '${tableName}' because it is still referenced by other objects. Use cascade: true to force drop.`
+        errorMessage = `Table '${tableName}' does not exist`
       } else if (error.message?.toLowerCase().includes('permission')) {
-        errorMessage = `Permission denied to drop table '${tableName}'`
+        errorMessage = `Permission denied to drop table`
       } else if (error.message?.toLowerCase().includes('network') ||
                  error.message?.toLowerCase().includes('fetch')) {
         errorMessage = 'Network error while dropping table'

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { executeManagementQuery } from '../../../../lib/supabase/management-api-utils'
 
 /**
  * Server-side API route to create tables in a Supabase project
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest) {
 
     // Import the Supabase Management API on the server side
     const { SupabaseManagementAPI } = await import('@dyad-sh/supabase-management-js')
+    const { executeManagementQuery } = await import('@/lib/supabase/management-api-utils')
     const client = new SupabaseManagementAPI({ accessToken: token })
 
     try {
@@ -87,18 +89,16 @@ export async function POST(req: NextRequest) {
 
       console.log('[SUPABASE API] Executing CREATE TABLE:', createTableSQL)
 
-      const result = await client.runQuery(projectId, createTableSQL)
+      const result = await executeManagementQuery(client, projectId, createTableSQL, 'CREATE TABLE')
 
       console.log('[SUPABASE API] Table created successfully')
 
       return NextResponse.json({
         success: true,
-        operation: 'create_table',
-        tableName: tableName,
-        schema: schema,
+        tableName,
+        schema,
         columns: columns.length,
-        sql: createTableSQL,
-        result: result
+        message: `Table '${tableName}' created successfully`
       })
     } catch (error: any) {
       console.error('[SUPABASE API] Failed to create table:', error)

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { executeManagementQuery } from 
+ '@/lib/supabase/management-api-utils'
 
 /**
  * Server-side API route to insert data into Supabase tables
@@ -65,7 +67,7 @@ export async function POST(req: NextRequest) {
         ORDER BY ordinal_position;
       `
 
-      const columnInfo = await client.runQuery(projectId, columnInfoSQL)
+      const columnInfo = await executeManagementQuery(client, projectId, columnInfoSQL, 'GET COLUMN INFO')
 
       if (!columnInfo || columnInfo.length === 0) {
         return NextResponse.json(
@@ -87,12 +89,26 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Build the INSERT statement
+      // Build the INSERT statement with multiple VALUES
       const dataKeys = Object.keys(dataArray[0])
-      const placeholders = dataKeys.map((_, idx) => `$${idx + 1}`).join(', ')
+      let insertSQL = `INSERT INTO "${schema}"."${tableName}" (${dataKeys.map(k => `"${k}"`).join(', ')}) VALUES `
 
-      let insertSQL = `INSERT INTO "${schema}"."${tableName}" (${dataKeys.map(k => `"${k}"`).join(', ')})`
-      insertSQL += ` VALUES (${placeholders})`
+      // Build VALUES clauses
+      const valueClauses = dataArray.map(row => {
+        const values = dataKeys.map(key => {
+          const value = row[key]
+          if (typeof value === 'string') {
+            return `'${value.replace(/'/g, "''")}'`
+          } else if (value === null) {
+            return 'NULL'
+          } else {
+            return value
+          }
+        }).join(', ')
+        return `(${values})`
+      }).join(', ')
+
+      insertSQL += valueClauses
 
       // Add ON CONFLICT clause if specified
       if (onConflict && onConflict.target) {
@@ -109,45 +125,36 @@ export async function POST(req: NextRequest) {
 
       console.log('[SUPABASE API] Executing INSERT for', dataArray.length, 'rows')
 
-      // Execute inserts (one at a time for better error handling)
-      const results: any[] = []
-      for (let i = 0; i < dataArray.length; i++) {
-        const row = dataArray[i]
-        const values = dataKeys.map(key => {
-          const value = row[key]
-          if (typeof value === 'string') {
-            return `'${value.replace(/'/g, "''")}'`
-          } else if (value === null) {
-            return 'NULL'
-          } else {
-            return value
-          }
-        }).join(', ')
+      // Execute the single INSERT statement
+      try {
+        const result = await executeManagementQuery(client, projectId, insertSQL, 'INSERT DATA')
+        
+        console.log('[SUPABASE API] Insert operation completed successfully')
 
-        const insertSQLWithValues = `INSERT INTO "${schema}"."${tableName}" (${dataKeys.map(k => `"${k}"`).join(', ')}) VALUES (${values})`
-
-        try {
-          const result = await client.runQuery(projectId, insertSQLWithValues)
-          results.push({ row: i + 1, success: true, result })
-        } catch (rowError: any) {
-          results.push({ row: i + 1, success: false, error: rowError.message })
-        }
+        return NextResponse.json({
+          success: true,
+          operation: 'insert_data',
+          tableName: tableName,
+          schema: schema,
+          totalRows: dataArray.length,
+          successfulInserts: dataArray.length,
+          failedInserts: 0,
+          results: [{ row: 'all', success: true, result }]
+        })
+      } catch (error: any) {
+        console.error('[SUPABASE API] Insert operation failed:', error)
+        
+        return NextResponse.json({
+          success: false,
+          operation: 'insert_data',
+          tableName: tableName,
+          schema: schema,
+          totalRows: dataArray.length,
+          successfulInserts: 0,
+          failedInserts: dataArray.length,
+          results: [{ row: 'all', success: false, error: error.message }]
+        }, { status: 400 })
       }
-
-      const successfulInserts = results.filter(r => r.success).length
-
-      console.log('[SUPABASE API] Insert operation completed:', successfulInserts, 'successful,', results.length - successfulInserts, 'failed')
-
-      return NextResponse.json({
-        success: true,
-        operation: 'insert_data',
-        tableName: tableName,
-        schema: schema,
-        totalRows: dataArray.length,
-        successfulInserts: successfulInserts,
-        failedInserts: results.length - successfulInserts,
-        results: results
-      })
     } catch (error: any) {
       console.error('[SUPABASE API] Failed to insert data:', error)
 
