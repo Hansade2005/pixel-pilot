@@ -1949,6 +1949,29 @@ export function ChatPanelV2({
       // Build project file tree on client-side with latest data
       const fileTree = await buildProjectFileTree()
 
+      // Fetch Supabase access token and project details for the current PixelPilot project
+      let supabaseAccessToken = null
+      let supabaseProjectDetails = null
+
+      try {
+        const { getSupabaseAccessToken, getSupabaseProjectForPixelPilotProject } = await import('@/lib/cloud-sync')
+
+        // Get the Supabase access token
+        supabaseAccessToken = await getSupabaseAccessToken()
+
+        // Get Supabase project details for the current PixelPilot project
+        if (project?.id && project?.userId) {
+          supabaseProjectDetails = await getSupabaseProjectForPixelPilotProject(project.userId, project.id)
+        }
+        console.log(`[ChatPanelV2] Supabase data fetched:`, {
+          hasToken: !!supabaseAccessToken,
+          hasProjectDetails: !!supabaseProjectDetails,
+          projectId: supabaseProjectDetails?.supabaseProjectId
+        })
+      } catch (error) {
+        console.warn('[ChatPanelV2] Failed to fetch Supabase data:', error)
+        // Continue without Supabase data - tools will handle the missing token gracefully
+      }
 
       const response = await fetch('/api/chat-v2', {
       method: 'POST',
@@ -1963,7 +1986,10 @@ export function ChatPanelV2({
           files: projectFiles, // Keep raw files for tool operations (now refreshed)
           modelId: selectedModel,
           aiMode,
-          chatMode: isAskMode ? 'ask' : 'agent' // Pass the chat mode to the API
+          chatMode: isAskMode ? 'ask' : 'agent', // Pass the chat mode to the API
+          // Add Supabase data to the payload
+          supabaseAccessToken,
+          supabaseProjectDetails
         }),
         signal: controller.signal
       })
