@@ -454,34 +454,72 @@ const ToolActivityPanel = ({
       {isExpanded && (
         <div className="border-t border-border/50 bg-background/50">
           {/* Recent Operations */}
-          <div className="px-3 py-2 space-y-1.5">
+          <div className="px-3 py-2">
             <div className="text-xs font-medium text-muted-foreground mb-2">
               Recent Operations
             </div>
-            {recentOps.slice(0, showAll ? recentOps.length : 4).map((tool, idx) => (
-              <div
-                key={`${tool.toolCallId}-${idx}`}
-                className="flex items-center gap-2 text-xs py-1.5 px-2 rounded hover:bg-muted/50 transition-colors"
-              >
-                <div className={cn(
-                  "flex-shrink-0",
-                  tool.status === 'completed' && "text-green-600 dark:text-green-400",
-                  tool.status === 'failed' && "text-red-600 dark:text-red-400",
-                  tool.status === 'executing' && "text-blue-600 dark:text-blue-400"
-                )}>
-                  {getToolIcon(tool.toolName)}
-                </div>
-                <span className="flex-1 truncate">
-                  {getToolLabel(tool.toolName, tool.input)}
-                </span>
-                <div className="flex-shrink-0">
-                  {getStatusIcon(tool.status)}
-                </div>
+            
+            {/* Scrollable operations list */}
+            {!showAll ? (
+              // Show first 4 operations without scroll
+              <div className="space-y-1.5">
+                {recentOps.slice(0, 4).map((tool, idx) => (
+                  <div
+                    key={`${tool.toolCallId}-${idx}`}
+                    className="flex items-center gap-2 text-xs py-1.5 px-2 rounded hover:bg-muted/50 transition-colors"
+                  >
+                    <div className={cn(
+                      "flex-shrink-0",
+                      tool.status === 'completed' && "text-green-600 dark:text-green-400",
+                      tool.status === 'failed' && "text-red-600 dark:text-red-400",
+                      tool.status === 'executing' && "text-blue-600 dark:text-blue-400"
+                    )}>
+                      {getToolIcon(tool.toolName)}
+                    </div>
+                    <span className="flex-1 truncate">
+                      {getToolLabel(tool.toolName, tool.input)}
+                    </span>
+                    <div className="flex-shrink-0">
+                      {getStatusIcon(tool.status)}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            ) : (
+              // Show all operations with scrollable area
+              <div 
+                className="max-h-[300px] overflow-y-auto space-y-1.5"
+                style={{
+                  scrollBehavior: 'smooth',
+                  WebkitOverflowScrolling: 'touch'
+                }}
+              >
+                {recentOps.map((tool, idx) => (
+                  <div
+                    key={`${tool.toolCallId}-${idx}`}
+                    className="flex items-center gap-2 text-xs py-1.5 px-2 rounded hover:bg-muted/50 transition-colors"
+                  >
+                    <div className={cn(
+                      "flex-shrink-0",
+                      tool.status === 'completed' && "text-green-600 dark:text-green-400",
+                      tool.status === 'failed' && "text-red-600 dark:text-red-400",
+                      tool.status === 'executing' && "text-blue-600 dark:text-blue-400"
+                    )}>
+                      {getToolIcon(tool.toolName)}
+                    </div>
+                    <span className="flex-1 truncate">
+                      {getToolLabel(tool.toolName, tool.input)}
+                    </span>
+                    <div className="flex-shrink-0">
+                      {getStatusIcon(tool.status)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Grouped View Toggle */}
+          {/* View All / Show Less Toggle */}
           {totalOps > 4 && (
             <div className="px-3 pb-2">
               <button
