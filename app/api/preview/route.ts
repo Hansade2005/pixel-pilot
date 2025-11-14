@@ -326,7 +326,6 @@ async function handleStreamingPreview(req: Request) {
           send({ type: "log", message: "Starting dev server..." })
           const devServer = await sandbox.startDevServer({
             command: "npm run dev",
-            workingDirectory: "/project",
             port: 3000,
             timeoutMs: 0,
             envVars,
@@ -625,7 +624,6 @@ devDependencies:
       console.log('Starting development server with npm run dev...')
       const devServer = await sandbox.startDevServer({
         command: 'npm run dev',
-        workingDirectory: '/project',
         port: 3000,
         timeoutMs: 30000,
         envVars // Pass environment variables
@@ -872,7 +870,6 @@ export async function PUT(req: Request) {
           console.log('Restarting dev server...')
           const devServer = await sandbox.startDevServer({
             command: 'npm run dev',
-            workingDirectory: '/project',
             port: 3000,
             timeoutMs: 30000,
             envVars
