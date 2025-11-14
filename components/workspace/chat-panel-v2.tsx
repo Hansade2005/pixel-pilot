@@ -686,7 +686,7 @@ export function ChatPanelV2({
       // Skip in Ask mode since no file changes are made
       // In Agent mode, only dispatch if file modification tools were actually used
       const hasFileModifications = accumulatedToolInvocations.some(
-        (tool: any) => ['edit_file', 'write_file', 'delete_file'].includes(tool.toolName)
+        (tool: any) => ['edit_file', 'write_file', 'delete_file', 'client_replace_string_in_file'].includes(tool.toolName)
       )
 
       if (typeof window !== 'undefined' && !isAskMode && hasFileModifications) {
