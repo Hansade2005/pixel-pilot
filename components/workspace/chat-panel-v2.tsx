@@ -2301,26 +2301,8 @@ export function ChatPanelV2({
                     // handleClientToolResult(toolCall.toolName, errorResult, project?.id, assistantMessageId)
                   })
               } else {
-                // Server-side tool - track it with executing status, server will send tool-result later
-                console.log('[ChatPanelV2][DataStream] Server-side tool call, tracking:', parsed.toolName)
-                
-                const serverToolEntry = {
-                  toolName: parsed.toolName,
-                  toolCallId: parsed.toolCallId,
-                  input: parsed.args,
-                  status: 'executing' as 'executing' | 'completed' | 'failed'
-                }
-                
-                localToolCalls.push(serverToolEntry)
-                
-                // Track server-side tool call with executing status
-                setActiveToolCalls(prev => {
-                  const newMap = new Map(prev)
-                  const messageCalls = newMap.get(assistantMessageId) || []
-                  messageCalls.push(serverToolEntry)
-                  newMap.set(assistantMessageId, messageCalls)
-                  return newMap
-                })
+                // Server-side tool - just log it, it's already tracked above
+                console.log('[ChatPanelV2][DataStream] Server-side tool call tracked:', parsed.toolName)
               }
             } else if (parsed.type === 'tool-result') {
               // Tool result - these come from server-side tool executions
