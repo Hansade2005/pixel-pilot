@@ -118,6 +118,7 @@
     "@tailwindcss/postcss": "^4.1.9",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22",
+    "@types/pg": "^8.15.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",

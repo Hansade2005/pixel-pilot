@@ -1640,17 +1640,8 @@ Begin with a concise checklist  use check box emojis filled and unfilled.
 ## Tools
 - **Client-Side (IndexedDB)**: \`read_file\` (with line numbers), \`write_file\`, \`edit_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`, \`create_database\`
 - **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers),\`grep_search\`, \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync)
-- **Database Tools**: \`create_table\`, \`list_tables\`, \`read_table\`, \`delete_table\`, \`query_database\`, \`manipulate_table_data\`, \`manage_api_keys\`, \`supabase_create_table\`, \`supabase_insert_data\`, \`supabase_read_table\`, \`supabase_delete_data\`, \`supabase_drop_table\`, \`supabase_fetch_api_keys\`
 
-## PiPilot DB Integration
-For **authentication, database, or file storage**:
-- 📚 Review \`USER_AUTHENTICATION_README.md\` for authentication patterns
-- 📚 Review \`STORAGE_SYSTEM_IMPLEMENTATION.md\` for file storage
-- 📚 Reference \`EXTERNAL_APP_INTEGRATION_GUIDE.md\` for API integration
-- 🛠️ Strictly use documented patterns and endpoints
-- 🔑 **When setting up database or authentication, ALWAYS manage and setup API keys for the user** - Use the \`manage_api_keys\` tool to create secure API keys for external access and setup in .env.local
-
-### 🗄️ Database Automation Tools
+### 🗄️ PiPilot Database Tools (Builtin Database)
 **Complete database workflow in 7 simple steps:**
 1. **\`create_database\`** - Creates database with auto-generated users table (client-side)
 2. **\`create_table\`** - AI-powered schema generation from natural language descriptions
@@ -1659,7 +1650,7 @@ For **authentication, database, or file storage**:
 5. **\`delete_table\`** - Delete a table and all its records (destructive, requires confirmation)
 6. **\`query_database\`** - Advanced MySQL-like querying with auto-detection, filtering, sorting, pagination
 7. **\`manipulate_table_data\`** - Full CRUD operations (insert, update, delete) with bulk support
-8. **\`manage_api_keys\`** - Generate secure API keys for external database access  and setup in .env.local
+8. **\`manage_api_keys\`** - Generate secure API keys for external database access and setup in .env.local
 
 **Features:**
 - 🤖 **AI Schema Generation**: Describe your table needs, get optimized database schema
@@ -1667,10 +1658,30 @@ For **authentication, database, or file storage**:
 - 📋 **Table Discovery**: List all tables with schemas and record counts before operations
 - 📖 **Table Inspection**: Read detailed table structure and metadata
 - 🗑️ **Safe Deletion**: Delete tables with confirmation safeguards
-- 🚀 **MySQL-Like Syntax**: Familiar WHERE, ORDER BY, JOIN operations  
+- 🚀 **MySQL-Like Syntax**: Familiar WHERE, ORDER BY, JOIN operations
 - 📊 **Advanced Queries**: JSONB field querying, complex filtering, pagination
 - 🔐 **Secure Access**: API key management for external integrations
 - ⚡ **Bulk Operations**: Insert/update multiple records efficiently
+
+### 🟢 Supabase Database Tools (Remote PostgreSQL)
+**External Supabase project integration:**
+- **\`supabase_create_table\`** - Create tables in connected Supabase project
+- **\`supabase_read_table\`** - Read data from Supabase tables with filtering and pagination
+- **\`supabase_insert_data\`** - Insert new records into Supabase tables
+- **\`supabase_delete_data\`** - Delete records from Supabase tables
+- **\`supabase_drop_table\`** - Drop entire tables from Supabase project
+- **\`supabase_execute_sql\`** - Execute SQL for RLS operations (enable RLS, create policies)
+- **\`supabase_list_tables_rls\`** - List tables and check RLS status/policies
+- **\`supabase_fetch_api_keys\`** - Get Supabase API keys for the project
+
+**Features:**
+- 🔗 **External Integration**: Connect to existing Supabase projects
+- 🛡️ **RLS Support**: Create and manage Row Level Security policies
+- 📝 **Raw SQL**: Execute any SQL including DDL operations
+- 🔑 **API Key Management**: Automatic key retrieval and setup
+- ⚠️ **Safety First**: Dangerous operations require explicit confirmation
+
+**Schema Tracking**: Any \`supabase_schema.sql\` files in the project are for AI reference only. The AI can read table schemas directly using \`supabase_read_table\`, so manual schema file maintenance is not required.
 
 ### 🖼️ Image API
 Image generation: \`https://api.a0.dev/assets/image?text={description}&aspect=1:1&seed={seed}\`
@@ -4991,8 +5002,9 @@ ${conversationSummaryContext || ''}`
           }
         }),
 
+
         supabase_create_table: tool({
-          description: 'Create a new table in the connected Supabase project database. Define columns, types, and constraints. IMPORTANT: After creating a table, you MUST update the supabase_schema.sql file in the project root to document the table schema. Read the existing supabase_schema.sql file first, then append the new table definition to it. This helps maintain a complete record of your database schema for future reference and modifications.',
+          description: 'Create a new table in the connected Supabase project database. Define columns, types, and constraints. The AI can read table schemas directly using supabase_read_table, so manual schema file maintenance is not required.',
           inputSchema: z.object({
             tableName: z.string().describe('Name of the table to create'),
             columns: z.array(z.object({
@@ -5043,7 +5055,7 @@ ${conversationSummaryContext || ''}`
               if (!projectId) {
                 return {
                   success: false,
-                  error: 'No connected Supabase project found. Please connect a Supabase project to this PixelPilot project first.',
+                  error: 'No connected Supabase project found. Please connect a Supabase project to this PiPilot project first.',
                   tableName,
                   toolCallId,
                   executionTimeMs: Date.now() - toolStartTime,
@@ -5152,7 +5164,7 @@ ${conversationSummaryContext || ''}`
               if (!projectId) {
                 return {
                   success: false,
-                  error: 'No connected Supabase project found. Please connect a Supabase project to this PixelPilot project first.',
+                  error: 'No connected Supabase project found. Please connect a Supabase project to this PiPilot project first.',
                   tableName,
                   toolCallId,
                   executionTimeMs: Date.now() - toolStartTime,
@@ -5264,7 +5276,7 @@ ${conversationSummaryContext || ''}`
               if (!projectId) {
                 return {
                   success: false,
-                  error: 'No connected Supabase project found. Please connect a Supabase project to this PixelPilot project first.',
+                  error: 'No connected Supabase project found. Please connect a Supabase project to this PiPilot project first.',
                   tableName,
                   toolCallId,
                   executionTimeMs: Date.now() - toolStartTime,
@@ -5398,7 +5410,7 @@ ${conversationSummaryContext || ''}`
               if (!projectId) {
                 return {
                   success: false,
-                  error: 'No connected Supabase project found. Please connect a Supabase project to this PixelPilot project first.',
+                  error: 'No connected Supabase project found. Please connect a Supabase project to this PiPilot project first.',
                   tableName,
                   toolCallId,
                   executionTimeMs: Date.now() - toolStartTime,
@@ -5575,6 +5587,235 @@ ${conversationSummaryContext || ''}`
                 success: false,
                 error: `Failed to drop table: ${error instanceof Error ? error.message : 'Unknown error'}`,
                 tableName,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        supabase_execute_sql: tool({
+          description: 'Execute SQL queries for Row Level Security (RLS) operations on Supabase tables. PRIMARY USE: Enable RLS on tables and create RLS policies. Supports DDL operations like ALTER TABLE ENABLE ROW LEVEL SECURITY and CREATE POLICY statements. USE WITH CAUTION - SQL execution can modify your database structure.',
+          inputSchema: z.object({
+            sql: z.string().describe('The SQL query to execute (focus on RLS operations: ALTER TABLE ... ENABLE ROW LEVEL SECURITY, CREATE POLICY ...)'),
+            confirmDangerous: z.boolean().optional().describe('Set to true to confirm execution of potentially dangerous operations like DROP, TRUNCATE, or unconditional DELETE/UPDATE')
+          }),
+          execute: async ({ sql, confirmDangerous = false }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Supabase SQL execution cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                sql: sql.substring(0, 100) + (sql.length > 100 ? '...' : ''),
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              // Use the Supabase access token from the request payload
+              const token = supabaseAccessToken;
+
+              if (!token) {
+                return {
+                  success: false,
+                  error: 'No Supabase access token found. Please connect your Supabase account in settings.',
+                  sql: sql.substring(0, 100) + (sql.length > 100 ? '...' : ''),
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Use the Supabase project ID from the request payload
+              const projectId = supabase_projectId;
+
+              if (!projectId) {
+                return {
+                  success: false,
+                  error: 'No connected Supabase project found. Please connect a Supabase project to this PiPilot project first.',
+                  sql: sql.substring(0, 100) + (sql.length > 100 ? '...' : ''),
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Call the Supabase execute SQL API
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/supabase/execute-sql`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ token, projectId, sql, confirmDangerous })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_execute_sql'] = (toolExecutionTimes['supabase_execute_sql'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                console.error('[ERROR] Supabase execute SQL failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to execute SQL: ${result.error || 'Unknown error'}`,
+                  sql: sql.substring(0, 100) + (sql.length > 100 ? '...' : ''),
+                  details: result.details,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              console.log('[SUCCESS] Supabase SQL executed:', { projectId, command: result.result?.command, rowCount: result.result?.rowCount });
+              return {
+                success: true,
+                message: `✅ Successfully executed SQL query`,
+                sql: sql.substring(0, 100) + (sql.length > 100 ? '...' : ''),
+                result: result.result,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_execute_sql'] = (toolExecutionTimes['supabase_execute_sql'] || 0) + executionTime;
+
+              console.error('[ERROR] Supabase execute SQL failed:', error);
+              return {
+                success: false,
+                error: `Failed to execute SQL: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                sql: sql.substring(0, 100) + (sql.length > 100 ? '...' : ''),
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        supabase_list_tables_rls: tool({
+          description: 'List all tables in the connected Supabase project and check their RLS (Row Level Security) status and policies. Shows which tables have RLS enabled and what policies exist.  Use this to understand the current database structure and security setup',
+          inputSchema: z.object({
+            schema: z.string().optional().describe('Schema to list tables from (default: public)'),
+            includeRlsPolicies: z.boolean().optional().describe('Include detailed RLS policy information (default: true)')
+          }),
+          execute: async ({ schema = 'public', includeRlsPolicies = true }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Supabase list tables cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                schema,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              // Use the Supabase access token from the request payload
+              const token = supabaseAccessToken;
+
+              if (!token) {
+                return {
+                  success: false,
+                  error: 'No Supabase access token found. Please connect your Supabase account in settings.',
+                  schema,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Use the Supabase project ID from the request payload
+              const projectId = supabase_projectId;
+
+              if (!projectId) {
+                return {
+                  success: false,
+                  error: 'No connected Supabase project found. Please connect a Supabase project to this PiPilot project first.',
+                  schema,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Call the Supabase list tables RLS API
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/supabase/list-tables-rls`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ token, projectId, schema, includeRlsPolicies })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_list_tables_rls'] = (toolExecutionTimes['supabase_list_tables_rls'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                console.error('[ERROR] Supabase list tables RLS failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to list tables: ${result.error || 'Unknown error'}`,
+                  schema,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              console.log('[SUCCESS] Supabase tables and RLS policies listed:', {
+                projectId,
+                schema,
+                totalTables: result.total_tables,
+                tablesWithRls: result.tables_with_rls,
+                totalPolicies: result.total_policies
+              });
+
+              return {
+                success: true,
+                message: `✅ Found ${result.total_tables} tables, ${result.tables_with_rls} with RLS enabled, ${result.total_policies} policies`,
+                schema: result.schema,
+                tables: result.tables,
+                summary: {
+                  total_tables: result.total_tables,
+                  tables_with_rls: result.tables_with_rls,
+                  total_policies: result.total_policies
+                },
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_list_tables_rls'] = (toolExecutionTimes['supabase_list_tables_rls'] || 0) + executionTime;
+
+              console.error('[ERROR] Supabase list tables RLS failed:', error);
+              return {
+                success: false,
+                error: `Failed to list tables: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                schema,
                 toolCallId,
                 executionTimeMs: executionTime,
                 timeWarning: timeStatus.warningMessage
