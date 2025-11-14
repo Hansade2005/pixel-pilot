@@ -158,23 +158,7 @@ async function handleStreamingPreview(req: Request) {
           await sandbox.writeFiles(sandboxFiles)
           send({ type: "log", message: "Files written" })
 
-          // 🔹 Install dependencies
-          send({ type: "log", message: "Installing dependencies..." })
-          const installResult = await sandbox.installDependenciesRobust("/project", {
-            timeoutMs: 0,
-            envVars,
-            onStdout: (data) => send({ type: "log", message: data.trim() }),
-            onStderr: (data) => send({ type: "error", message: data.trim() }),
-          })
-
-          if (installResult.exitCode !== 0) {
-            send({ type: "error", message: "Dependency installation failed" })
-            throw new Error("Dependency installation failed")
-          }
-
-          send({ type: "log", message: "Dependencies installed successfully" })
-
-          // 🔹 Check for additional dependencies not in template
+          // 🔹 Check for additional dependencies not in template (skip base install since template is preinstalled)
           const projectPackageJsonFile = files.find((f: any) => f.path === 'package.json')
           if (projectPackageJsonFile) {
             try {
@@ -498,18 +482,7 @@ devDependencies:
         }
       }
       
-      // Install dependencies with no timeout (timeoutMs: 0) and environment variables
-      const installResult = await sandbox.installDependenciesRobust('/project', { timeoutMs: 0, envVars })
-      
-      if (installResult.exitCode !== 0) {
-        console.error('npm install failed:', installResult.stderr)
-        console.error('npm install stdout:', installResult.stdout)
-        throw new Error(`npm dependency installation failed with exit code ${installResult.exitCode}`)
-      }
-      
-      console.log('Dependencies installed successfully with npm')
-
-      // Check for additional dependencies not in template
+      // Check for additional dependencies not in template (skip base install since template is preinstalled)
       const projectPackageJsonFile = files.find(f => f.path === 'package.json')
       if (projectPackageJsonFile) {
         try {

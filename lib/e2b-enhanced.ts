@@ -723,20 +723,30 @@ export class EnhancedE2BSandbox {
       const templateDeps = templatePackageJson.dependencies || {}
       const templateDevDeps = templatePackageJson.devDependencies || {}
 
-      // Find missing dependencies (in project but not in template)
+      // Find missing dependencies (in project but not in template, or different versions)
       const missingDeps: string[] = []
       const missingDevDeps: string[] = []
 
+      // Helper function to compare versions (simple comparison, not semantic versioning)
+      const versionsMatch = (templateVersion: string, projectVersion: string): boolean => {
+        // Remove ^ and ~ prefixes for comparison
+        const cleanTemplate = templateVersion.replace(/^[~\^]/, '')
+        const cleanProject = projectVersion.replace(/^[~\^]/, '')
+        return cleanTemplate === cleanProject
+      }
+
       // Check regular dependencies
       for (const [dep, version] of Object.entries(projectDeps)) {
-        if (!(dep in templateDeps)) {
+        const templateVersion = (templateDeps as Record<string, string>)[dep]
+        if (!templateVersion || !versionsMatch(templateVersion, version as string)) {
           missingDeps.push(`${dep}@${version}`)
         }
       }
 
       // Check dev dependencies
       for (const [dep, version] of Object.entries(projectDevDeps)) {
-        if (!(dep in templateDevDeps)) {
+        const templateVersion = (templateDevDeps as Record<string, string>)[dep]
+        if (!templateVersion || !versionsMatch(templateVersion, version as string)) {
           missingDevDeps.push(`${dep}@${version}`)
         }
       }
