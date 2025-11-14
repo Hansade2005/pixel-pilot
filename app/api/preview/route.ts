@@ -299,14 +299,14 @@ async function handleStreamingPreview(req: Request) {
             // Install additional dependencies
             const installCommands = []
             if (additionalDeps.length > 0) {
-              installCommands.push(`npm install ${additionalDeps.join(' ')}`)
+              installCommands.push(`pnpm add ${additionalDeps.join(' ')}`)
             }
             if (additionalDevDeps.length > 0) {
-              installCommands.push(`npm install --save-dev ${additionalDevDeps.join(' ')}`)
+              installCommands.push(`pnpm add -D ${additionalDevDeps.join(' ')}`)
             }
 
             for (const command of installCommands) {
-              const installResult = await sandbox.executeCommand(`cd /project && ${command}`, {
+              const installResult = await sandbox.executeCommand(command, {
                 timeoutMs: 120000,
                 envVars
               })
@@ -598,14 +598,14 @@ devDependencies:
         // Install additional dependencies
         const installCommands = []
         if (additionalDeps.length > 0) {
-          installCommands.push(`npm install ${additionalDeps.join(' ')}`)
+          installCommands.push(`pnpm add ${additionalDeps.join(' ')}`)
         }
         if (additionalDevDeps.length > 0) {
-          installCommands.push(`npm install --save-dev ${additionalDevDeps.join(' ')}`)
+          installCommands.push(`pnpm add -D ${additionalDevDeps.join(' ')}`)
         }
 
         for (const command of installCommands) {
-          const installResult = await sandbox.executeCommand(`cd /project && ${command}`, {
+          const installResult = await sandbox.executeCommand(command, {
             timeoutMs: 120000,
             envVars
           })
@@ -845,14 +845,14 @@ export async function PUT(req: Request) {
           // Install additional dependencies
           const installCommands = []
           if (additionalDeps.length > 0) {
-            installCommands.push(`npm install ${additionalDeps.join(' ')}`)
+            installCommands.push(`pnpm add ${additionalDeps.join(' ')}`)
           }
           if (additionalDevDeps.length > 0) {
-            installCommands.push(`npm install --save-dev ${additionalDevDeps.join(' ')}`)
+            installCommands.push(`pnpm add -D ${additionalDevDeps.join(' ')}`)
           }
 
           for (const command of installCommands) {
-            const installResult = await sandbox.executeCommand(`cd /project && ${command}`, {
+            const installResult = await sandbox.executeCommand(command, {
               timeoutMs: 120000,
               envVars
             })
