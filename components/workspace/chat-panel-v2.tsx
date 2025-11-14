@@ -219,25 +219,31 @@ const ToolActivityPanel = ({
   
   if (!toolCalls || toolCalls.length === 0) return null
   
-  // Calculate statistics
-  const totalOps = toolCalls.length
-  const completedOps = toolCalls.filter(t => t.status === 'completed').length
-  const failedOps = toolCalls.filter(t => t.status === 'failed').length
-  const executingOps = toolCalls.filter(t => t.status === 'executing').length
-  const progressPercent = totalOps > 0 ? Math.round((completedOps / totalOps) * 100) : 0
+  // Helper functions - defined first to avoid temporal dead zone errors
+  const getToolCategory = (toolName: string): string => {
+    if (['write_file', 'edit_file', 'client_replace_string_in_file', 'delete_file'].includes(toolName)) {
+      return '✏️ File Operations'
+    }
+    if (['read_file', 'list_files', 'grep_search', 'semantic_code_navigator'].includes(toolName)) {
+      return '📖 Reading Files'
+    }
+    if (['create_database', 'create_table', 'supabase_create_table', 'query_database', 'supabase_execute_sql', 
+         'manipulate_table_data', 'supabase_insert_data', 'supabase_delete_data', 'list_tables', 
+         'supabase_list_tables_rls', 'read_table', 'supabase_read_table', 'delete_table', 'supabase_drop_table'].includes(toolName)) {
+      return '💾 Database Operations'
+    }
+    if (['add_package', 'remove_package'].includes(toolName)) {
+      return '📦 Package Management'
+    }
+    if (['web_search', 'web_extract'].includes(toolName)) {
+      return '🌐 Web Operations'
+    }
+    if (['manage_api_keys', 'supabase_fetch_api_keys'].includes(toolName)) {
+      return '🔑 API Management'
+    }
+    return '⚡ Other Operations'
+  }
   
-  // Group operations by type
-  const groupedOps = toolCalls.reduce((acc, tool) => {
-    const category = getToolCategory(tool.toolName)
-    if (!acc[category]) acc[category] = []
-    acc[category].push(tool)
-    return acc
-  }, {} as Record<string, typeof toolCalls>)
-  
-  // Get recent operations (last 4)
-  const recentOps = toolCalls.slice(-4).reverse()
-  
-  // Get tool icon helper
   const getToolIcon = (tool: string) => {
     switch (tool) {
       case 'write_file':
@@ -291,30 +297,6 @@ const ToolActivityPanel = ({
       default:
         return <Zap className="w-3.5 h-3.5" />
     }
-  }
-
-  const getToolCategory = (toolName: string): string => {
-    if (['write_file', 'edit_file', 'client_replace_string_in_file', 'delete_file'].includes(toolName)) {
-      return '✏️ File Operations'
-    }
-    if (['read_file', 'list_files', 'grep_search', 'semantic_code_navigator'].includes(toolName)) {
-      return '📖 Reading Files'
-    }
-    if (['create_database', 'create_table', 'supabase_create_table', 'query_database', 'supabase_execute_sql', 
-         'manipulate_table_data', 'supabase_insert_data', 'supabase_delete_data', 'list_tables', 
-         'supabase_list_tables_rls', 'read_table', 'supabase_read_table', 'delete_table', 'supabase_drop_table'].includes(toolName)) {
-      return '💾 Database Operations'
-    }
-    if (['add_package', 'remove_package'].includes(toolName)) {
-      return '📦 Package Management'
-    }
-    if (['web_search', 'web_extract'].includes(toolName)) {
-      return '🌐 Web Operations'
-    }
-    if (['manage_api_keys', 'supabase_fetch_api_keys'].includes(toolName)) {
-      return '🔑 API Management'
-    }
-    return '⚡ Other Operations'
   }
 
   const getToolLabel = (tool: string, args?: any) => {
@@ -395,6 +377,29 @@ const ToolActivityPanel = ({
     }
   }
 
+  // Filter out failed tool calls - only show executing and completed
+  const visibleToolCalls = toolCalls.filter(t => t.status !== 'failed')
+  
+  // If all operations failed, don't display the panel
+  if (visibleToolCalls.length === 0) return null
+  
+  // Calculate statistics (based on visible operations only)
+  const totalOps = visibleToolCalls.length
+  const completedOps = visibleToolCalls.filter(t => t.status === 'completed').length
+  const executingOps = visibleToolCalls.filter(t => t.status === 'executing').length
+  const progressPercent = totalOps > 0 ? Math.round((completedOps / totalOps) * 100) : 0
+  
+  // Group operations by type (only visible ones)
+  const groupedOps = visibleToolCalls.reduce((accumulator, tool) => {
+    const category = getToolCategory(tool.toolName)
+    if (!accumulator[category]) accumulator[category] = []
+    accumulator[category].push(tool)
+    return accumulator
+  }, {} as Record<string, typeof visibleToolCalls>)
+  
+  // Get recent operations (last 4, only visible ones)
+  const recentOps = visibleToolCalls.slice(-4).reverse()
+
   return (
     <div className="mb-3 rounded-lg border border-border/50 bg-muted/30 overflow-hidden">
       {/* Header - Always Visible */}
@@ -417,12 +422,6 @@ const ToolActivityPanel = ({
             <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
               <Loader2 className="w-3 h-3 animate-spin" />
               <span>{executingOps} running</span>
-            </div>
-          )}
-          {failedOps > 0 && (
-            <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
-              <AlertTriangle className="w-3 h-3" />
-              <span>{failedOps} failed</span>
             </div>
           )}
           {isExpanded ? (
