@@ -20,7 +20,7 @@ import {
   Link as LinkIcon, Loader2, ChevronDown, ChevronUp, StopCircle, Trash2, Plus,
   Copy, ArrowUp, Undo2, Redo2, Check, AlertTriangle, Zap, Package, PackageMinus,
   Search, Globe, Eye, FolderOpen, Settings, Edit3, CheckCircle2, XCircle,
-  Square, CornerDownLeft
+  Square, Database, CornerDownLeft, Table, Key, Code, Server
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Actions, Action } from '@/components/ai-elements/actions'
@@ -213,6 +213,8 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
         return <FileText className="w-3.5 h-3.5" />
       case 'edit_file':
         return <Edit3 className="w-3.5 h-3.5" />
+      case 'client_replace_string_in_file':
+        return <Edit3 className="w-3.5 h-3.5" />
       case 'read_file':
         return <Eye className="w-3.5 h-3.5" />
       case 'list_files':
@@ -223,6 +225,30 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
         return <Package className="w-3.5 h-3.5" />
       case 'remove_package':
         return <PackageMinus className="w-3.5 h-3.5" />
+      case 'create_database':
+        return <Database className="w-3.5 h-3.5" />
+      case 'create_table':
+      case 'supabase_create_table':
+        return <Table className="w-3.5 h-3.5" />
+      case 'query_database':
+      case 'supabase_execute_sql':
+        return <Code className="w-3.5 h-3.5" />
+      case 'manipulate_table_data':
+      case 'supabase_insert_data':
+      case 'supabase_delete_data':
+        return <Database className="w-3.5 h-3.5" />
+      case 'manage_api_keys':
+      case 'supabase_fetch_api_keys':
+        return <Key className="w-3.5 h-3.5" />
+      case 'list_tables':
+      case 'supabase_list_tables_rls':
+        return <Table className="w-3.5 h-3.5" />
+      case 'read_table':
+      case 'supabase_read_table':
+        return <Eye className="w-3.5 h-3.5" />
+      case 'delete_table':
+      case 'supabase_drop_table':
+        return <X className="w-3.5 h-3.5" />
       case 'grep_search':
       case 'semantic_code_navigator':
         return <Search className="w-3.5 h-3.5" />
@@ -242,6 +268,8 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
         return `Creating ${args?.path ? args.path.split('/').pop() : 'file'}`
       case 'edit_file':
         return `Editing ${args?.filePath ? args.filePath.split('/').pop() : 'file'}`
+      case 'client_replace_string_in_file':
+        return `Replacing text in ${args?.filePath ? args.filePath.split('/').pop() : 'file'}`
       case 'delete_file':
         return `Deleting ${args?.path ? args.path.split('/').pop() : 'file'}`
       case 'read_file':
@@ -252,6 +280,38 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
         return `Adding ${args?.packageName || 'package'}`
       case 'remove_package':
         return `Removing ${args?.packageName || 'package'}`
+      case 'create_database':
+        return `Creating database "${args?.name || 'main'}"`
+      case 'create_table':
+        return `Creating table "${args?.tableName || 'table'}"`
+      case 'supabase_create_table':
+        return `Creating Supabase table "${args?.tableName || 'table'}"`
+      case 'query_database':
+        return `Querying database`
+      case 'supabase_execute_sql':
+        return `Executing SQL on Supabase`
+      case 'manipulate_table_data':
+        return `Manipulating table data`
+      case 'supabase_insert_data':
+        return `Inserting data into Supabase table`
+      case 'supabase_delete_data':
+        return `Deleting data from Supabase table`
+      case 'manage_api_keys':
+        return `Managing API keys`
+      case 'supabase_fetch_api_keys':
+        return `Fetching Supabase API keys`
+      case 'list_tables':
+        return `Listing database tables`
+      case 'supabase_list_tables_rls':
+        return `Listing Supabase tables with RLS`
+      case 'read_table':
+        return `Reading table "${args?.tableName || 'table'}"`
+      case 'supabase_read_table':
+        return `Reading Supabase table "${args?.tableName || 'table'}"`
+      case 'delete_table':
+        return `Deleting table "${args?.tableName || 'table'}"`
+      case 'supabase_drop_table':
+        return `Dropping Supabase table "${args?.tableName || 'table'}"`
       case 'grep_search':
         return `Grep codebase for "${args?.query || 'pattern'}"`
       case 'semantic_code_navigator':
