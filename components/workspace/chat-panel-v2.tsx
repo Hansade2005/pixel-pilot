@@ -405,7 +405,7 @@ const ToolActivityPanel = ({
         <div className="flex items-center gap-2">
           <Zap className="w-4 h-4 text-primary" />
           <span className="text-sm font-medium">
-          PiPilot Activity
+          PiPilot's Activities
           </span>
           <span className="text-xs text-muted-foreground">
             {totalOps} operation{totalOps !== 1 ? 's' : ''}
