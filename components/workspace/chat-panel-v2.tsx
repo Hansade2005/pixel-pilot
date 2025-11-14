@@ -201,7 +201,323 @@ const ExpandableUserMessage = ({
   )
 }
 
-// Inline Tool Pill Component
+// Enhanced Tool Activity Component - Collapsible with Progress
+const ToolActivityPanel = ({ 
+  toolCalls,
+  isStreaming 
+}: { 
+  toolCalls: Array<{
+    toolName: string
+    toolCallId: string
+    input?: any
+    status: 'executing' | 'completed' | 'failed'
+  }>
+  isStreaming?: boolean
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+  
+  if (!toolCalls || toolCalls.length === 0) return null
+  
+  // Calculate statistics
+  const totalOps = toolCalls.length
+  const completedOps = toolCalls.filter(t => t.status === 'completed').length
+  const failedOps = toolCalls.filter(t => t.status === 'failed').length
+  const executingOps = toolCalls.filter(t => t.status === 'executing').length
+  const progressPercent = totalOps > 0 ? Math.round((completedOps / totalOps) * 100) : 0
+  
+  // Group operations by type
+  const groupedOps = toolCalls.reduce((acc, tool) => {
+    const category = getToolCategory(tool.toolName)
+    if (!acc[category]) acc[category] = []
+    acc[category].push(tool)
+    return acc
+  }, {} as Record<string, typeof toolCalls>)
+  
+  // Get recent operations (last 4)
+  const recentOps = toolCalls.slice(-4).reverse()
+  
+  // Get tool icon helper
+  const getToolIcon = (tool: string) => {
+    switch (tool) {
+      case 'write_file':
+        return <FileText className="w-3.5 h-3.5" />
+      case 'edit_file':
+        return <Edit3 className="w-3.5 h-3.5" />
+      case 'client_replace_string_in_file':
+        return <Edit3 className="w-3.5 h-3.5" />
+      case 'read_file':
+        return <Eye className="w-3.5 h-3.5" />
+      case 'list_files':
+        return <FolderOpen className="w-3.5 h-3.5" />
+      case 'delete_file':
+        return <X className="w-3.5 h-3.5" />
+      case 'add_package':
+        return <Package className="w-3.5 h-3.5" />
+      case 'remove_package':
+        return <PackageMinus className="w-3.5 h-3.5" />
+      case 'create_database':
+        return <Database className="w-3.5 h-3.5" />
+      case 'create_table':
+      case 'supabase_create_table':
+        return <Table className="w-3.5 h-3.5" />
+      case 'query_database':
+      case 'supabase_execute_sql':
+        return <Code className="w-3.5 h-3.5" />
+      case 'manipulate_table_data':
+      case 'supabase_insert_data':
+      case 'supabase_delete_data':
+        return <Database className="w-3.5 h-3.5" />
+      case 'manage_api_keys':
+      case 'supabase_fetch_api_keys':
+        return <Key className="w-3.5 h-3.5" />
+      case 'list_tables':
+      case 'supabase_list_tables_rls':
+        return <Table className="w-3.5 h-3.5" />
+      case 'read_table':
+      case 'supabase_read_table':
+        return <Eye className="w-3.5 h-3.5" />
+      case 'delete_table':
+      case 'supabase_drop_table':
+        return <X className="w-3.5 h-3.5" />
+      case 'grep_search':
+      case 'semantic_code_navigator':
+        return <Search className="w-3.5 h-3.5" />
+      case 'web_search':
+      case 'web_extract':
+        return <Globe className="w-3.5 h-3.5" />
+      case 'check_dev_errors':
+        return <Settings className="w-3.5 h-3.5" />
+      default:
+        return <Zap className="w-3.5 h-3.5" />
+    }
+  }
+
+  const getToolCategory = (toolName: string): string => {
+    if (['write_file', 'edit_file', 'client_replace_string_in_file', 'delete_file'].includes(toolName)) {
+      return '✏️ File Operations'
+    }
+    if (['read_file', 'list_files', 'grep_search', 'semantic_code_navigator'].includes(toolName)) {
+      return '📖 Reading Files'
+    }
+    if (['create_database', 'create_table', 'supabase_create_table', 'query_database', 'supabase_execute_sql', 
+         'manipulate_table_data', 'supabase_insert_data', 'supabase_delete_data', 'list_tables', 
+         'supabase_list_tables_rls', 'read_table', 'supabase_read_table', 'delete_table', 'supabase_drop_table'].includes(toolName)) {
+      return '💾 Database Operations'
+    }
+    if (['add_package', 'remove_package'].includes(toolName)) {
+      return '📦 Package Management'
+    }
+    if (['web_search', 'web_extract'].includes(toolName)) {
+      return '🌐 Web Operations'
+    }
+    if (['manage_api_keys', 'supabase_fetch_api_keys'].includes(toolName)) {
+      return '🔑 API Management'
+    }
+    return '⚡ Other Operations'
+  }
+
+  const getToolLabel = (tool: string, args?: any) => {
+    switch (tool) {
+      case 'write_file':
+        return `Creating ${args?.path ? args.path.split('/').pop() : 'file'}`
+      case 'edit_file':
+        return `Editing ${args?.filePath ? args.filePath.split('/').pop() : 'file'}`
+      case 'client_replace_string_in_file':
+        return `Replacing text in ${args?.filePath ? args.filePath.split('/').pop() : 'file'}`
+      case 'delete_file':
+        return `Deleting ${args?.path ? args.path.split('/').pop() : 'file'}`
+      case 'read_file':
+        return `Reading ${args?.path ? args.path.split('/').pop() : 'file'}`
+      case 'list_files':
+        return 'Listing files'
+      case 'add_package':
+        return `Adding ${args?.packageName || 'package'}`
+      case 'remove_package':
+        return `Removing ${args?.packageName || 'package'}`
+      case 'create_database':
+        return `Creating database "${args?.name || 'main'}"`
+      case 'create_table':
+        return `Creating table "${args?.tableName || 'table'}"`
+      case 'supabase_create_table':
+        return `Creating Supabase table "${args?.tableName || 'table'}"`
+      case 'query_database':
+        return `Querying database`
+      case 'supabase_execute_sql':
+        return `Executing SQL on Supabase`
+      case 'manipulate_table_data':
+        return `Manipulating table data`
+      case 'supabase_insert_data':
+        return `Inserting data into Supabase table`
+      case 'supabase_delete_data':
+        return `Deleting data from Supabase table`
+      case 'manage_api_keys':
+        return `Managing API keys`
+      case 'supabase_fetch_api_keys':
+        return `Fetching Supabase API keys`
+      case 'list_tables':
+        return `Listing database tables`
+      case 'supabase_list_tables_rls':
+        return `Listing Supabase tables with RLS`
+      case 'read_table':
+        return `Reading table "${args?.tableName || 'table'}"`
+      case 'supabase_read_table':
+        return `Reading Supabase table "${args?.tableName || 'table'}"`
+      case 'delete_table':
+        return `Deleting table "${args?.tableName || 'table'}"`
+      case 'supabase_drop_table':
+        return `Dropping Supabase table "${args?.tableName || 'table'}"`
+      case 'grep_search':
+        return `Grep codebase for "${args?.query || 'pattern'}"`
+      case 'semantic_code_navigator':
+        return `Search codebase for "${args?.query || 'query'}"`
+      case 'web_search':
+        return `Search web for "${args?.query || 'query'}"`
+      case 'web_extract':
+        return 'Extracting web content'
+      case 'check_dev_errors':
+        return 'Checking for errors'
+      default:
+        return tool
+    }
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'executing':
+        return <Loader2 className="w-3 h-3 animate-spin" />
+      case 'completed':
+        return <CheckCircle2 className="w-3 h-3" />
+      case 'failed':
+        return <XCircle className="w-3 h-3" />
+      default:
+        return null
+    }
+  }
+
+  return (
+    <div className="mb-3 rounded-lg border border-border/50 bg-muted/30 overflow-hidden">
+      {/* Header - Always Visible */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full px-3 py-2 flex items-center justify-between hover:bg-muted/50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Zap className="w-4 h-4 text-primary" />
+          <span className="text-sm font-medium">
+          PiPilot Activity
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {totalOps} operation{totalOps !== 1 ? 's' : ''}
+          </span>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {executingOps > 0 && (
+            <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              <span>{executingOps} running</span>
+            </div>
+          )}
+          {failedOps > 0 && (
+            <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+              <AlertTriangle className="w-3 h-3" />
+              <span>{failedOps} failed</span>
+            </div>
+          )}
+          {isExpanded ? (
+            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          )}
+        </div>
+      </button>
+
+      {/* Progress Bar */}
+      <div className="px-3 pb-2">
+        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-primary transition-all duration-300 ease-out"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+        <div className="flex justify-between items-center mt-1">
+          <span className="text-[10px] text-muted-foreground">
+            {completedOps}/{totalOps} completed
+          </span>
+          <span className="text-[10px] font-medium text-primary">
+            {progressPercent}%
+          </span>
+        </div>
+      </div>
+
+      {/* Expanded Content */}
+      {isExpanded && (
+        <div className="border-t border-border/50 bg-background/50">
+          {/* Recent Operations */}
+          <div className="px-3 py-2 space-y-1.5">
+            <div className="text-xs font-medium text-muted-foreground mb-2">
+              Recent Operations
+            </div>
+            {recentOps.slice(0, showAll ? recentOps.length : 4).map((tool, idx) => (
+              <div
+                key={`${tool.toolCallId}-${idx}`}
+                className="flex items-center gap-2 text-xs py-1.5 px-2 rounded hover:bg-muted/50 transition-colors"
+              >
+                <div className={cn(
+                  "flex-shrink-0",
+                  tool.status === 'completed' && "text-green-600 dark:text-green-400",
+                  tool.status === 'failed' && "text-red-600 dark:text-red-400",
+                  tool.status === 'executing' && "text-blue-600 dark:text-blue-400"
+                )}>
+                  {getToolIcon(tool.toolName)}
+                </div>
+                <span className="flex-1 truncate">
+                  {getToolLabel(tool.toolName, tool.input)}
+                </span>
+                <div className="flex-shrink-0">
+                  {getStatusIcon(tool.status)}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Grouped View Toggle */}
+          {totalOps > 4 && (
+            <div className="px-3 pb-2">
+              <button
+                onClick={() => setShowAll(!showAll)}
+                className="w-full text-xs text-primary hover:text-primary/80 py-1.5 px-2 rounded border border-primary/20 hover:bg-primary/5 transition-colors"
+              >
+                {showAll ? 'Show less' : `View all ${totalOps} operations`}
+              </button>
+            </div>
+          )}
+
+          {/* Grouped Summary */}
+          {showAll && Object.keys(groupedOps).length > 1 && (
+            <div className="border-t border-border/50 px-3 py-2 space-y-1">
+              <div className="text-xs font-medium text-muted-foreground mb-2">
+                Operations by Type
+              </div>
+              {Object.entries(groupedOps).map(([category, ops]) => (
+                <div
+                  key={category}
+                  className="flex items-center justify-between text-xs py-1 px-2 rounded hover:bg-muted/50 transition-colors"
+                >
+                  <span>{category}</span>
+                  <span className="text-muted-foreground">{ops.length}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Inline Tool Pill Component (kept for backward compatibility if needed elsewhere)
 const InlineToolPill = ({ toolName, input, status = 'executing' }: { 
   toolName: string, 
   input?: any, 
@@ -2833,23 +3149,17 @@ export function ChatPanelV2({
                   : "bg-transparent border-0"
               )}>
                 <div className="p-4 break-words overflow-wrap-anywhere">
-                  {/* Inline Tool Pills - Show before message content */}
+                  {/* Enhanced Tool Activity Panel - Show before message content */}
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id)
                     if (toolCalls && toolCalls.length > 0) {
-                      console.log(`[ChatPanelV2][Render] Rendering ${toolCalls.length} tool pills for message ${message.id}`)
+                      console.log(`[ChatPanelV2][Render] Rendering tool activity panel with ${toolCalls.length} operations for message ${message.id}`)
                     }
                     return toolCalls && toolCalls.length > 0 ? (
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {toolCalls.map((toolCall, idx) => (
-                          <InlineToolPill
-                            key={`${toolCall.toolCallId}-${idx}`}
-                            toolName={toolCall.toolName}
-                            input={toolCall.input}
-                            status={toolCall.status}
-                          />
-                        ))}
-                      </div>
+                      <ToolActivityPanel
+                        toolCalls={toolCalls}
+                        isStreaming={(isLoading && message.id === messages[messages.length - 1]?.id) || message.id === continuingMessageId}
+                      />
                     ) : null
                   })()}
                   
