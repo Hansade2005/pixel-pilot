@@ -793,7 +793,19 @@ export async function handleClientFileOperation(
 
       case 'add_package': {
         const { name: packageNames, version = 'latest', isDev = false } = toolCall.args;
-        console.log(`[ClientFileTool] add_package:`, { packageNames, version, isDev });
+        console.log(`[ClientFileTool] add_package received:`, { packageNames, version, isDev });
+        console.log(`[ClientFileTool] add_package toolCall.args:`, toolCall.args);
+
+        // More robust version handling
+        let finalVersion = 'latest';
+        if (version !== undefined && version !== null) {
+          // Convert to string if it's not already
+          const versionStr = String(version).trim();
+          if (versionStr && versionStr !== 'latest') {
+            finalVersion = versionStr;
+          }
+        }
+        console.log(`[ClientFileTool] add_package finalVersion:`, finalVersion);
 
         // Normalize package names to array
         let names: string[];
@@ -861,22 +873,9 @@ export async function handleClientFileOperation(
           const packageVersions: Record<string, string> = {};
 
           for (const packageName of names) {
-            let packageVersion: string;
-
-            if (version === 'latest') {
-              // Keep 'latest' as-is for npm/yarn to resolve
-              packageVersion = 'latest';
-            } else if (version && typeof version === 'string') {
-              // Use the exact version passed by AI (could be "1.2.3", "^1.2.3", "~1.2.3", etc.)
-              packageVersion = version;
-            } else {
-              // Fallback to latest if version is invalid
-              packageVersion = 'latest';
-            }
-
-            packageJson[depType][packageName] = packageVersion;
+            packageJson[depType][packageName] = finalVersion;
             addedPackages.push(packageName);
-            packageVersions[packageName] = packageVersion;
+            packageVersions[packageName] = finalVersion;
           }
 
           // Update package.json
