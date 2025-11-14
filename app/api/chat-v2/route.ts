@@ -836,6 +836,218 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
         }
       }
 
+      case 'client_replace_string_in_file': {
+        const { filePath, oldString, newString, useRegex = false, replaceAll = false, caseInsensitive = false } = input
+
+        // Validate inputs
+        if (!filePath || typeof filePath !== 'string') {
+          return {
+            success: false,
+            error: `Invalid file path provided`,
+            filePath,
+            toolCallId
+          }
+        }
+
+        if (oldString === undefined || oldString === null) {
+          return {
+            success: false,
+            error: `Invalid oldString provided`,
+            filePath,
+            toolCallId
+          }
+        }
+
+        if (newString === undefined || newString === null) {
+          return {
+            success: false,
+            error: `Invalid newString provided`,
+            filePath,
+            toolCallId
+          }
+        }
+
+        // Get the file from memory
+        const file = sessionFiles.get(filePath)
+        if (!file) {
+          return {
+            success: false,
+            error: `File not found: ${filePath}`,
+            filePath,
+            toolCallId
+          }
+        }
+
+        const originalContent = file.content || ''
+        const originalLines = originalContent.split('\n')
+        const originalLineCount = originalLines.length
+
+        // Create backup for potential rollback
+        const backupContent = originalContent
+
+        let newContent = originalContent
+        const appliedEdits = []
+        const failedEdits = []
+        let replacementCount = 0
+
+        try {
+          if (useRegex) {
+            // Handle regex replacement
+            const regexFlags = (replaceAll ? 'g' : '') + (caseInsensitive ? 'i' : '')
+            const regex = new RegExp(oldString, regexFlags)
+
+            if (regex.test(originalContent)) {
+              newContent = originalContent.replace(regex, newString)
+              replacementCount = replaceAll ? (originalContent.match(regex) || []).length : 1
+
+              appliedEdits.push({
+                type: 'regex',
+                pattern: oldString,
+                replacement: newString,
+                flags: regexFlags,
+                occurrences: replacementCount,
+                status: 'applied'
+              })
+            } else {
+              failedEdits.push({
+                type: 'regex',
+                pattern: oldString,
+                replacement: newString,
+                status: 'failed',
+                reason: 'Regex pattern not found in file content'
+              })
+            }
+          } else {
+            // Handle string replacement
+            const searchText = caseInsensitive ? oldString.toLowerCase() : oldString
+            const contentToSearch = caseInsensitive ? originalContent.toLowerCase() : originalContent
+
+            if (replaceAll) {
+              // Replace all occurrences
+              let occurrences = 0
+              const allMatches = []
+              let searchIndex = 0
+
+              while ((searchIndex = contentToSearch.indexOf(searchText, searchIndex)) !== -1) {
+                allMatches.push(searchIndex)
+                searchIndex += searchText.length
+                occurrences++
+              }
+
+              if (occurrences > 0) {
+                if (caseInsensitive) {
+                  // For case-insensitive replacement, we need to handle each occurrence individually
+                  let result = ''
+                  let lastIndex = 0
+                  for (const matchIndex of allMatches) {
+                    result += originalContent.substring(lastIndex, matchIndex) + newString
+                    lastIndex = matchIndex + oldString.length
+                  }
+                  result += originalContent.substring(lastIndex)
+                  newContent = result
+                } else {
+                  newContent = originalContent.replaceAll(oldString, newString)
+                }
+                replacementCount = occurrences
+
+                appliedEdits.push({
+                  type: 'string',
+                  search: oldString,
+                  replacement: newString,
+                  occurrences: replacementCount,
+                  positions: allMatches,
+                  caseInsensitive,
+                  status: 'applied'
+                })
+              } else {
+                failedEdits.push({
+                  type: 'string',
+                  search: oldString,
+                  replacement: newString,
+                  status: 'failed',
+                  reason: 'Search text not found in file content'
+                })
+              }
+            } else {
+              // Replace first occurrence only
+              const searchIndex = contentToSearch.indexOf(searchText)
+              if (searchIndex !== -1) {
+                if (caseInsensitive) {
+                  newContent = originalContent.substring(0, searchIndex) + newString + originalContent.substring(searchIndex + oldString.length)
+                } else {
+                  newContent = originalContent.replace(oldString, newString)
+                }
+                replacementCount = 1
+
+                appliedEdits.push({
+                  type: 'string',
+                  search: oldString,
+                  replacement: newString,
+                  occurrences: 1,
+                  position: searchIndex,
+                  caseInsensitive,
+                  status: 'applied'
+                })
+              } else {
+                failedEdits.push({
+                  type: 'string',
+                  search: oldString,
+                  replacement: newString,
+                  status: 'failed',
+                  reason: 'Search text not found in file content'
+                })
+              }
+            }
+          }
+
+          const newLines = newContent.split('\n')
+          const newLineCount = newLines.length
+
+          // Update the file in memory
+          if (appliedEdits.length > 0) {
+            file.content = newContent
+            file.size = newContent.length
+
+            return {
+              success: true,
+              message: `✅ File ${filePath} modified successfully (${replacementCount} replacement${replacementCount !== 1 ? 's' : ''}).`,
+              path: filePath,
+              originalContent,
+              newContent,
+              appliedEdits,
+              failedEdits,
+              stats: {
+                originalSize: originalContent.length,
+                newSize: newContent.length,
+                originalLines: originalLineCount,
+                newLines: newLineCount,
+                replacements: replacementCount
+              },
+              backupAvailable: true,
+              action: 'modified',
+              toolCallId
+            }
+          } else {
+            return {
+              success: false,
+              error: `Failed to apply replacement: ${failedEdits[0]?.reason || 'Unknown error'}`,
+              filePath,
+              appliedEdits,
+              failedEdits,
+              toolCallId
+            }
+          }
+        } catch (editError) {
+          console.error(`[CONSTRUCT_TOOL_RESULT] Client replace string error:`, editError)
+          return {
+            success: false,
+            error: `Replacement failed: ${editError instanceof Error ? editError.message : 'Unknown error'}`,
+            filePath,
+            toolCallId
+          }
+        }
+      }
+
       case 'delete_file': {
         const { path } = input
 
@@ -1638,7 +1850,7 @@ Begin with a concise checklist  use check box emojis filled and unfilled.
 3. **Excellence**: Deliver fully complete, market-ready products
 
 ## Tools
-- **Client-Side (IndexedDB)**: \`read_file\` (with line numbers), \`write_file\`, \`edit_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`, \`create_database\`
+- **Client-Side (IndexedDB)**: \`read_file\` (with line numbers), \`write_file\`, \`edit_file\`, \`client_replace_string_in_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`, \`create_database\`
 - **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers),\`grep_search\`, \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync)
 
 ### 🗄️ PiPilot Database Tools (Builtin Database)
@@ -1719,7 +1931,7 @@ Always use generous, relevant emojis! 🎉💥🔥 Make every interaction engagi
 - ⛔ NEVER use phrases like "Yes.", "Perfect.", "This is it.", "The answer is", "Final Answer", or similar internal monologue
 - ⛔ NEVER use LaTeX math formatting like \boxed{} or similar academic response patterns
 - ✅ Always respond directly and professionally without exposing your thinking process
-- 🔄 **CRITICAL**: If the \`edit_file\` tool fails more than 3 times consecutively on the same file, immediately switch to using the \`write_file\` tool to **recreate the entire file** with all the new changes incorporated. Do not continue trying to use \`edit_file\` on a problematic file.
+- 🔄 **CRITICAL**: If the \`edit_file\` tool fails more than 3 times consecutively on the same file, immediately switch to using the \`client_replace_string_in_file\` tool (preferred) or \`write_file\` tool to **recreate the entire file** with all the new changes incorporated. Do not continue trying to use \`edit_file\` on a problematic file.
 ## 🏅 Success Metrics
 - ✨ Flawless operation across all devices
 - 🎨 UI so beautiful, users share screenshots
@@ -1829,6 +2041,77 @@ ${conversationSummaryContext || ''}`
           execute: async ({ filePath, searchReplaceBlock, useRegex = false, replaceAll = false }, { toolCallId }) => {
             // Use the powerful constructor to get actual results
             return await constructToolResult('edit_file', { filePath, searchReplaceBlock, useRegex, replaceAll }, projectId, toolCallId)
+          }
+        }),
+
+        // CLIENT-SIDE TOOL: Powerful string replacement with advanced options
+        client_replace_string_in_file: tool({
+          description: 'CLIENT-SIDE: Powerful string replacement tool for editing files with advanced options. Supports regex patterns, multiple replacements, and exact string matching. This tool executes on the client-side IndexedDB and is more reliable than edit_file for complex replacements. Use this when edit_file fails or for precise string replacements.',
+          inputSchema: z.object({
+            filePath: z.string().describe('The file path relative to project root'),
+            oldString: z.string().describe('The exact string to replace (must match exactly including whitespace and indentation)'),
+            newString: z.string().describe('The new string to replace with'),
+            useRegex: z.boolean().optional().describe('Whether to treat oldString as regex pattern (default: false)'),
+            replaceAll: z.boolean().optional().describe('Whether to replace all occurrences (default: false, replaces first occurrence only)'),
+            caseInsensitive: z.boolean().optional().describe('Whether regex matching should be case insensitive (default: false)')
+          }),
+          execute: async ({ filePath, oldString, newString, useRegex = false, replaceAll = false, caseInsensitive = false }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Client replace string cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                filePath,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              // Validate inputs
+              if (!filePath || !oldString) {
+                return {
+                  success: false,
+                  error: 'filePath and oldString are required',
+                  filePath,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Use the powerful constructor to get actual results
+              return await constructToolResult('client_replace_string_in_file', {
+                filePath,
+                oldString,
+                newString,
+                useRegex,
+                replaceAll,
+                caseInsensitive
+              }, projectId, toolCallId)
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['client_replace_string_in_file'] = (toolExecutionTimes['client_replace_string_in_file'] || 0) + executionTime;
+
+              console.error('[ERROR] Client replace string in file failed:', error);
+              return {
+                success: false,
+                error: `Failed to replace string: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                filePath,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
           }
         }),
 

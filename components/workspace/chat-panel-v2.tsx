@@ -1093,6 +1093,7 @@ export function ChatPanelV2({
               const clientSideTools = [
                 'write_file', 
                 'edit_file', 
+                'client_replace_string_in_file',
                 'delete_file', 
                 'add_package', 
                 'remove_package',
@@ -1686,6 +1687,7 @@ export function ChatPanelV2({
               const clientSideTools = [
                 'write_file', 
                 'edit_file', 
+                'client_replace_string_in_file',
                 'delete_file', 
                 'add_package', 
                 'remove_package',
@@ -2153,6 +2155,7 @@ export function ChatPanelV2({
               const clientSideTools = [
                 'write_file', 
                 'edit_file', 
+                'client_replace_string_in_file',
                 'delete_file', 
                 'add_package', 
                 'remove_package',

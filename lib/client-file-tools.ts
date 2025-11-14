@@ -475,6 +475,262 @@ export async function handleClientFileOperation(
         break;
       }
 
+      case 'client_replace_string_in_file': {
+        const { filePath, oldString, newString, useRegex = false, replaceAll = false, caseInsensitive = false } = toolCall.args;
+        console.log(`[ClientFileTool] client_replace_string_in_file: ${filePath} (regex: ${useRegex}, replaceAll: ${replaceAll}, caseInsensitive: ${caseInsensitive})`);
+
+        if (!filePath || typeof filePath !== 'string') {
+          addToolResult({
+            tool: 'client_replace_string_in_file',
+            toolCallId: toolCall.toolCallId,
+            state: 'output-error',
+            errorText: 'Invalid file path provided'
+          });
+          return;
+        }
+
+        if (oldString === undefined || oldString === null) {
+          addToolResult({
+            tool: 'client_replace_string_in_file',
+            toolCallId: toolCall.toolCallId,
+            state: 'output-error',
+            errorText: 'Invalid oldString provided'
+          });
+          return;
+        }
+
+        if (newString === undefined || newString === null) {
+          addToolResult({
+            tool: 'client_replace_string_in_file',
+            toolCallId: toolCall.toolCallId,
+            state: 'output-error',
+            errorText: 'Invalid newString provided'
+          });
+          return;
+        }
+
+        // Read current file content
+        const existingFile = await storageManager.getFile(projectId, filePath);
+
+        if (!existingFile) {
+          addToolResult({
+            tool: 'client_replace_string_in_file',
+            toolCallId: toolCall.toolCallId,
+            state: 'output-error',
+            errorText: `File not found: ${filePath}. Use list_files to see available files.`
+          });
+          return;
+        }
+
+        const currentContent = existingFile.content || '';
+        const originalLines = currentContent.split('\n');
+        const originalLineCount = originalLines.length;
+
+        // Create backup for potential rollback
+        const backupContent = currentContent;
+
+        let modifiedContent = currentContent;
+        const appliedEdits = [];
+        const failedEdits = [];
+        let replacementCount = 0;
+
+        try {
+          if (useRegex) {
+            // Handle regex replacement
+            const regexFlags = (replaceAll ? 'g' : '') + (caseInsensitive ? 'i' : '');
+            const regex = new RegExp(oldString, regexFlags);
+
+            if (regex.test(currentContent)) {
+              modifiedContent = currentContent.replace(regex, newString);
+              replacementCount = replaceAll ? (currentContent.match(regex) || []).length : 1;
+
+              appliedEdits.push({
+                type: 'regex',
+                pattern: oldString,
+                replacement: newString,
+                flags: regexFlags,
+                occurrences: replacementCount,
+                status: 'applied'
+              });
+            } else {
+              failedEdits.push({
+                type: 'regex',
+                pattern: oldString,
+                replacement: newString,
+                status: 'failed',
+                reason: 'Regex pattern not found in file content'
+              });
+            }
+          } else {
+            // Handle string replacement
+            const searchText = caseInsensitive ? oldString.toLowerCase() : oldString;
+            const contentToSearch = caseInsensitive ? currentContent.toLowerCase() : currentContent;
+
+            if (replaceAll) {
+              // Replace all occurrences
+              let occurrences = 0;
+              const allMatches = [];
+              let searchIndex = 0;
+
+              while ((searchIndex = contentToSearch.indexOf(searchText, searchIndex)) !== -1) {
+                allMatches.push(searchIndex);
+                searchIndex += searchText.length;
+                occurrences++;
+              }
+
+              if (occurrences > 0) {
+                if (caseInsensitive) {
+                  // For case-insensitive replacement, we need to handle each occurrence individually
+                  let result = '';
+                  let lastIndex = 0;
+                  for (const matchIndex of allMatches) {
+                    result += currentContent.substring(lastIndex, matchIndex) + newString;
+                    lastIndex = matchIndex + oldString.length;
+                  }
+                  result += currentContent.substring(lastIndex);
+                  modifiedContent = result;
+                } else {
+                  modifiedContent = currentContent.replaceAll(oldString, newString);
+                }
+                replacementCount = occurrences;
+
+                appliedEdits.push({
+                  type: 'string',
+                  search: oldString,
+                  replacement: newString,
+                  occurrences: replacementCount,
+                  positions: allMatches,
+                  caseInsensitive,
+                  status: 'applied'
+                });
+              } else {
+                failedEdits.push({
+                  type: 'string',
+                  search: oldString,
+                  replacement: newString,
+                  status: 'failed',
+                  reason: 'Search text not found in file content'
+                });
+              }
+            } else {
+              // Replace first occurrence only
+              const searchIndex = contentToSearch.indexOf(searchText);
+              if (searchIndex !== -1) {
+                if (caseInsensitive) {
+                  modifiedContent = currentContent.substring(0, searchIndex) + newString + currentContent.substring(searchIndex + oldString.length);
+                } else {
+                  modifiedContent = currentContent.replace(oldString, newString);
+                }
+                replacementCount = 1;
+
+                appliedEdits.push({
+                  type: 'string',
+                  search: oldString,
+                  replacement: newString,
+                  occurrences: 1,
+                  position: searchIndex,
+                  caseInsensitive,
+                  status: 'applied'
+                });
+              } else {
+                failedEdits.push({
+                  type: 'string',
+                  search: oldString,
+                  replacement: newString,
+                  status: 'failed',
+                  reason: 'Search text not found in file content'
+                });
+              }
+            }
+          }
+
+          // Generate diff information
+          const generateDiff = (oldContent: string, newContent: string) => {
+            const oldLines = oldContent.split('\n');
+            const newLines = newContent.split('\n');
+            const diff = [];
+
+            const maxLines = Math.max(oldLines.length, newLines.length);
+            for (let i = 0; i < maxLines; i++) {
+              const oldLine = oldLines[i] || '';
+              const newLine = newLines[i] || '';
+
+              if (oldLine !== newLine) {
+                if (oldLine && !newLine) {
+                  diff.push({ line: i + 1, type: 'removed', content: oldLine });
+                } else if (!oldLine && newLine) {
+                  diff.push({ line: i + 1, type: 'added', content: newLine });
+                } else {
+                  diff.push({
+                    line: i + 1,
+                    type: 'modified',
+                    oldContent: oldLine,
+                    newContent: newLine
+                  });
+                }
+              }
+            }
+
+            return diff;
+          };
+
+          const diff = generateDiff(currentContent, modifiedContent);
+          const modifiedLines = modifiedContent.split('\n');
+          const newLineCount = modifiedLines.length;
+
+          // Save the modified content
+          if (appliedEdits.length > 0) {
+            await storageManager.updateFile(projectId, filePath, { content: modifiedContent });
+            console.log(`[ClientFileTool] Client replaced string in file: ${filePath} (${replacementCount} replacements)`);
+
+            addToolResult({
+              tool: 'client_replace_string_in_file',
+              toolCallId: toolCall.toolCallId,
+              output: {
+                success: true,
+                message: `✅ File ${filePath} modified successfully (${replacementCount} replacement${replacementCount !== 1 ? 's' : ''}).`,
+                path: filePath,
+                originalContent: currentContent,
+                newContent: modifiedContent,
+                appliedEdits,
+                failedEdits,
+                diff,
+                stats: {
+                  originalSize: currentContent.length,
+                  newSize: modifiedContent.length,
+                  originalLines: originalLineCount,
+                  newLines: newLineCount,
+                  replacements: replacementCount
+                },
+                backupAvailable: true,
+                action: 'modified'
+              }
+            });
+
+            // Trigger file refresh event
+            window.dispatchEvent(new CustomEvent('files-changed', {
+              detail: { projectId, forceRefresh: true }
+            }));
+          } else {
+            addToolResult({
+              tool: 'client_replace_string_in_file',
+              toolCallId: toolCall.toolCallId,
+              state: 'output-error',
+              errorText: `Failed to apply replacement: ${failedEdits[0]?.reason || 'Unknown error'}`
+            });
+          }
+        } catch (editError) {
+          console.error(`[ClientFileTool] Client replace string error:`, editError);
+          addToolResult({
+            tool: 'client_replace_string_in_file',
+            toolCallId: toolCall.toolCallId,
+            state: 'output-error',
+            errorText: `Replacement failed: ${editError instanceof Error ? editError.message : 'Unknown error'}`
+          });
+        }
+        break;
+      }
+
       case 'delete_file': {
         const { path } = toolCall.args;
         console.log(`[ClientFileTool] delete_file: ${path}`);
