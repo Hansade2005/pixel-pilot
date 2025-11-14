@@ -1640,7 +1640,7 @@ Begin with a concise checklist  use check box emojis filled and unfilled.
 ## Tools
 - **Client-Side (IndexedDB)**: \`read_file\` (with line numbers), \`write_file\`, \`edit_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`, \`create_database\`
 - **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers),\`grep_search\`, \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync)
-- **Database Tools**: \`create_table\`, \`list_tables\`, \`read_table\`, \`delete_table\`, \`query_database\`, \`manipulate_table_data\`, \`manage_api_keys\`
+- **Database Tools**: \`create_table\`, \`list_tables\`, \`read_table\`, \`delete_table\`, \`query_database\`, \`manipulate_table_data\`, \`manage_api_keys\`, \`supabase_create_table\`, \`supabase_insert_data\`, \`supabase_read_table\`, \`supabase_delete_data\`, \`supabase_drop_table\`, \`supabase_fetch_api_keys\`
 
 ## PiPilot DB Integration
 For **authentication, database, or file storage**:
@@ -5205,6 +5205,268 @@ ${conversationSummaryContext || ''}`
               return {
                 success: false,
                 error: `Failed to insert data: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                tableName,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+
+        supabase_delete_data: tool({
+          description: 'Delete data from a table in the connected Supabase project. Supports both single row deletion (by ID) and bulk deletion (by conditions).',
+          inputSchema: z.object({
+            tableName: z.string().describe('Name of the table to delete data from'),
+            deleteType: z.enum(['single', 'bulk']).describe('Type of delete operation'),
+            id: z.string().optional().describe('ID of the record to delete (required for single delete)'),
+            where: z.record(z.any()).optional().describe('WHERE conditions for bulk delete (key-value pairs)')
+          }),
+          execute: async ({ tableName, deleteType, id, where }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Supabase delete data cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                tableName,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              // Use the Supabase access token from the request payload
+              const token = supabaseAccessToken;
+
+              if (!token) {
+                return {
+                  success: false,
+                  error: 'No Supabase access token found. Please connect your Supabase account in settings.',
+                  tableName,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Use the Supabase project ID from the request payload
+              const projectId = supabase_projectId;
+
+              if (!projectId) {
+                return {
+                  success: false,
+                  error: 'No connected Supabase project found. Please connect a Supabase project to this PixelPilot project first.',
+                  tableName,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Prepare request payload based on delete type
+              let requestPayload: any = { token, projectId, tableName };
+
+              if (deleteType === 'single' && id) {
+                requestPayload.ids = [id];
+              } else if (deleteType === 'bulk' && where) {
+                requestPayload.where = where;
+              } else {
+                return {
+                  success: false,
+                  error: 'Invalid delete parameters. For single delete, provide "id". For bulk delete, provide "where" conditions.',
+                  tableName,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              // Call the Supabase delete data API
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/supabase/delete-data`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestPayload)
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_delete_data'] = (toolExecutionTimes['supabase_delete_data'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                console.error('[ERROR] Supabase delete data failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to delete data: ${result.error || 'Unknown error'}`,
+                  tableName,
+                  deleteType,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              console.log('[SUCCESS] Supabase data deleted:', { projectId, tableName, deleteType, totalDeleted: result.totalDeleted });
+              return {
+                success: true,
+                message: `✅ Successfully deleted ${result.totalDeleted} record(s) from table "${tableName}"`,
+                tableName,
+                deleteType,
+                totalDeleted: result.totalDeleted,
+                results: result.results,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_delete_data'] = (toolExecutionTimes['supabase_delete_data'] || 0) + executionTime;
+
+              console.error('[ERROR] Supabase delete data failed:', error);
+              return {
+                success: false,
+                error: `Failed to delete data: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                tableName,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        supabase_read_table: tool({
+          description: 'Read data from a table in the connected Supabase project. Supports both full table reads and filtered reads with WHERE conditions, ordering, and pagination.',
+          inputSchema: z.object({
+            tableName: z.string().describe('Name of the table to read data from'),
+            select: z.string().optional().describe('Columns to select (comma-separated, default: all columns)'),
+            where: z.record(z.any()).optional().describe('WHERE conditions for filtering (key-value pairs)'),
+            orderBy: z.record(z.string()).optional().describe('ORDER BY conditions (column-direction pairs, e.g. {"created_at": "desc"})'),
+            limit: z.number().optional().describe('Maximum number of records to return'),
+            offset: z.number().optional().describe('Number of records to skip (for pagination)'),
+            includeCount: z.boolean().optional().describe('Include total count of matching records')
+          }),
+          execute: async ({ tableName, select, where, orderBy, limit, offset, includeCount }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            // Check if we're approaching timeout
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Supabase read table cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                tableName,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              // Use the Supabase access token from the request payload
+              const token = supabaseAccessToken;
+
+              if (!token) {
+                return {
+                  success: false,
+                  error: 'No Supabase access token found. Please connect your Supabase account in settings.',
+                  tableName,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Use the Supabase project ID from the request payload
+              const projectId = supabase_projectId;
+
+              if (!projectId) {
+                return {
+                  success: false,
+                  error: 'No connected Supabase project found. Please connect a Supabase project to this PixelPilot project first.',
+                  tableName,
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              // Prepare request payload
+              const requestPayload: any = {
+                token,
+                projectId,
+                tableName
+              };
+
+              if (select) requestPayload.select = select;
+              if (where) requestPayload.where = where;
+              if (orderBy) requestPayload.orderBy = orderBy;
+              if (limit) requestPayload.limit = limit;
+              if (offset !== undefined) requestPayload.offset = offset;
+              if (includeCount !== undefined) requestPayload.includeCount = includeCount;
+
+              // Call the Supabase read table API
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/supabase/read-table`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestPayload)
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_read_table'] = (toolExecutionTimes['supabase_read_table'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                console.error('[ERROR] Supabase read table failed:', result);
+                return {
+                  success: false,
+                  error: `Failed to read table: ${result.error || 'Unknown error'}`,
+                  tableName,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              console.log('[SUCCESS] Supabase table read:', { projectId, tableName, recordCount: result.count });
+              return {
+                success: true,
+                message: `✅ Successfully read ${result.count} record(s) from table "${tableName}"`,
+                tableName,
+                data: result.data,
+                count: result.count,
+                totalCount: result.totalCount,
+                hasMore: result.hasMore,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['supabase_read_table'] = (toolExecutionTimes['supabase_read_table'] || 0) + executionTime;
+
+              console.error('[ERROR] Supabase read table failed:', error);
+              return {
+                success: false,
+                error: `Failed to read table: ${error instanceof Error ? error.message : 'Unknown error'}`,
                 tableName,
                 toolCallId,
                 executionTimeMs: executionTime,

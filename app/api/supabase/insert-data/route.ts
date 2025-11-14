@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { executeManagementQuery } from 
- '@/lib/supabase/management-api-utils'
 
 /**
- * Server-side API route to insert data into Supabase tables
+ * Server-side API route to insert data into Supabase tables using REST API
  * Provides a safe interface for INSERT operations with validation
  */
 export async function POST(req: NextRequest) {
@@ -26,14 +24,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Validate schema name
-    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(schema)) {
-      return NextResponse.json(
-        { error: 'Invalid schema name format' },
-        { status: 400 }
-      )
-    }
-
     // Ensure data is an array
     const dataArray = Array.isArray(data) ? data : [data]
 
@@ -52,98 +42,81 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Import the Supabase Management API on the server side
+    console.log('[SUPABASE API] Inserting data into:', tableName, 'rows:', dataArray.length)
+
+    // Use Supabase REST API instead of Management API
+    const supabaseUrl = `https://${projectId}.supabase.co`
+    let restApiUrl = `${supabaseUrl}/rest/v1/${tableName}`
+
+    // First, get the anon key from the management API
     const { SupabaseManagementAPI } = await import('@dyad-sh/supabase-management-js')
     const client = new SupabaseManagementAPI({ accessToken: token })
 
     try {
-      console.log('[SUPABASE API] Inserting data into:', tableName, 'rows:', dataArray.length)
+      // Get API keys to obtain service_role key (needed for server-side operations)
+      const apiKeys = await client.getProjectApiKeys(projectId)
 
-      // Get column information first to validate data
-      const columnInfoSQL = `
-        SELECT column_name, data_type, is_nullable
-        FROM information_schema.columns
-        WHERE table_schema = '${schema.replace(/'/g, "''")}' AND table_name = '${tableName.replace(/'/g, "''")}'
-        ORDER BY ordinal_position;
-      `
+      // Find the service_role key (has elevated permissions, bypasses RLS)
+      const serviceRoleKeyObj = apiKeys?.find((key: any) => key.name === 'service_role')
 
-      const columnInfo = await executeManagementQuery(client, projectId, columnInfoSQL, 'GET COLUMN INFO')
-
-      if (!columnInfo || columnInfo.length === 0) {
+      if (!serviceRoleKeyObj?.api_key) {
         return NextResponse.json(
-          { error: `Table '${tableName}' does not exist in schema '${schema}'` },
-          { status: 404 }
+          { error: 'Could not retrieve service_role key for REST API access' },
+          { status: 400 }
         )
       }
 
-      const columns: any[] = Array.isArray(columnInfo) ? columnInfo.map((col: any) => col.column_name) : []
+      const serviceRoleKey = serviceRoleKeyObj.api_key
 
-      // Validate that all data objects have the same keys and valid values
-      for (let i = 0; i < dataArray.length; i++) {
-        const row = dataArray[i]
-        if (typeof row !== 'object' || row === null) {
-          return NextResponse.json(
-            { error: `Invalid data format at row ${i + 1}` },
-            { status: 400 }
-          )
-        }
+      // Prepare headers for REST API using service_role key
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${serviceRoleKey}`,
+        'apikey': serviceRoleKey,
+        'Prefer': 'return=representation'
       }
 
-      // Build the INSERT statement with multiple VALUES
-      const dataKeys = Object.keys(dataArray[0])
-      let insertSQL = `INSERT INTO "${schema}"."${tableName}" (${dataKeys.map(k => `"${k}"`).join(', ')}) VALUES `
-
-      // Build VALUES clauses
-      const valueClauses = dataArray.map(row => {
-        const values = dataKeys.map(key => {
-          const value = row[key]
-          if (typeof value === 'string') {
-            return `'${value.replace(/'/g, "''")}'`
-          } else if (value === null) {
-            return 'NULL'
-          } else {
-            return value
-          }
-        }).join(', ')
-        return `(${values})`
-      }).join(', ')
-
-      insertSQL += valueClauses
-
-      // Add ON CONFLICT clause if specified
+      // Add upsert preference if onConflict is specified
       if (onConflict && onConflict.target) {
-        insertSQL += ` ON CONFLICT (${onConflict.target})`
         if (onConflict.action === 'DO NOTHING') {
-          insertSQL += ' DO NOTHING'
-        } else if (onConflict.action === 'DO UPDATE' && onConflict.set) {
-          const setClause = Object.entries(onConflict.set)
-            .map(([key, value]) => `"${key}" = '${String(value).replace(/'/g, "''")}'`)
-            .join(', ')
-          insertSQL += ` DO UPDATE SET ${setClause}`
+          headers['Prefer'] += ',resolution=ignore-duplicates'
+        } else if (onConflict.action === 'DO UPDATE') {
+          headers['Prefer'] += ',resolution=merge-duplicates'
         }
+
+        // Add on_conflict query parameter
+        const conflictTarget = Array.isArray(onConflict.target)
+          ? onConflict.target.join(',')
+          : onConflict.target
+        restApiUrl += `?on_conflict=${encodeURIComponent(conflictTarget)}`
       }
 
-      console.log('[SUPABASE API] Executing INSERT for', dataArray.length, 'rows')
+      console.log('[SUPABASE API] Executing REST API INSERT for', dataArray.length, 'rows')
 
-      // Execute the single INSERT statement
-      try {
-        const result = await executeManagementQuery(client, projectId, insertSQL, 'INSERT DATA')
-        
-        console.log('[SUPABASE API] Insert operation completed successfully')
+      // Execute the REST API request
+      const response = await fetch(restApiUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(dataArray.length === 1 ? dataArray[0] : dataArray)
+      })
 
-        return NextResponse.json({
-          success: true,
-          operation: 'insert_data',
-          tableName: tableName,
-          schema: schema,
-          totalRows: dataArray.length,
-          successfulInserts: dataArray.length,
-          failedInserts: 0,
-          results: [{ row: 'all', success: true, result }]
-        })
-      } catch (error: any) {
-        console.error('[SUPABASE API] Insert operation failed:', error)
-        
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('[SUPABASE API] REST API insert failed:', response.status, errorText)
+
+        let errorMessage = 'Failed to insert data via REST API'
+        if (response.status === 401) {
+          errorMessage = 'Unauthorized: Invalid API key'
+        } else if (response.status === 403) {
+          errorMessage = 'Forbidden: Insufficient permissions'
+        } else if (response.status === 404) {
+          errorMessage = `Table '${tableName}' not found`
+        } else if (response.status === 409) {
+          errorMessage = 'Conflict: Data constraint violation'
+        } else if (errorText) {
+          errorMessage = `Database error: ${errorText}`
+        }
+
         return NextResponse.json({
           success: false,
           operation: 'insert_data',
@@ -152,33 +125,45 @@ export async function POST(req: NextRequest) {
           totalRows: dataArray.length,
           successfulInserts: 0,
           failedInserts: dataArray.length,
-          results: [{ row: 'all', success: false, error: error.message }]
-        }, { status: 400 })
+          results: [{ row: 'all', success: false, error: errorMessage }]
+        }, { status: response.status })
       }
+
+      // Parse the response
+      const insertedData = await response.json()
+      const insertedCount = Array.isArray(insertedData) ? insertedData.length : 1
+
+      console.log('[SUPABASE API] Insert operation completed successfully via REST API')
+
+      return NextResponse.json({
+        success: true,
+        operation: 'insert_data',
+        tableName: tableName,
+        schema: schema,
+        totalRows: dataArray.length,
+        successfulInserts: insertedCount,
+        failedInserts: 0,
+        results: [{ row: 'all', success: true, data: insertedData }]
+      })
+
     } catch (error: any) {
-      console.error('[SUPABASE API] Failed to insert data:', error)
+      console.error('[SUPABASE API] Failed to insert data via REST API:', error)
 
       // Provide specific error messages based on the error type
-      let errorMessage = 'Failed to insert data'
+      let errorMessage = 'Failed to insert data via REST API'
 
       if (error.message?.toLowerCase().includes('unauthorized') ||
           error.message?.toLowerCase().includes('invalid') ||
-          error.message?.toLowerCase().includes('403')) {
-        errorMessage = 'Invalid or expired Supabase Management API token'
+          error.message?.toLowerCase().includes('401')) {
+        errorMessage = 'Invalid or expired Supabase API token'
       } else if (error.message?.toLowerCase().includes('not found') ||
                  error.message?.toLowerCase().includes('404')) {
         errorMessage = 'Project not found or access denied'
-      } else if (error.message?.toLowerCase().includes('does not exist')) {
-        errorMessage = `Table '${tableName}' does not exist in schema '${schema}'`
-      } else if (error.message?.toLowerCase().includes('violates')) {
-        errorMessage = `Data constraint violation: ${error.message}`
-      } else if (error.message?.toLowerCase().includes('permission')) {
-        errorMessage = `Permission denied to insert into table '${tableName}'`
       } else if (error.message?.toLowerCase().includes('network') ||
                  error.message?.toLowerCase().includes('fetch')) {
         errorMessage = 'Network error while inserting data'
       } else if (error.message) {
-        errorMessage = `Database error: ${error.message}`
+        errorMessage = `REST API error: ${error.message}`
       }
 
       return NextResponse.json(
