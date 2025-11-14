@@ -607,6 +607,190 @@ export class EnhancedE2BSandbox {
   }
 
   /**
+   * Install additional dependencies that are not preinstalled in the E2B template
+   * Compares project package.json with template dependencies and installs missing ones
+   */
+  async installAdditionalDependencies(
+    projectPackageJson: any,
+    workingDirectory: string = '/project',
+    options?: {
+      timeoutMs?: number,
+      envVars?: Record<string, string>,
+      onStdout?: (data: string) => void,
+      onStderr?: (data: string) => void
+    }
+  ): Promise<CommandResult | null> {
+    const timeoutMs = options?.timeoutMs || 0
+    const envVars = options?.envVars || {}
+    const onStdout = options?.onStdout || ((data: string) => console.log(`[pnpm Add] ${data}`))
+    const onStderr = options?.onStderr || ((data: string) => console.warn(`[pnpm Add Error] ${data}`))
+
+    console.log(`[${this.id}] Checking for additional dependencies to install...`)
+
+    try {
+      // Template package.json content (preinstalled dependencies in E2B template)
+      const templatePackageJson = {
+        "name": "vite-react-radix-fullstack",
+        "private": true,
+        "version": "1.0.0",
+        "type": "module",
+        "scripts": {
+          "dev": "vite",
+          "build": "tsc --noEmit || true && vite build",
+          "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+          "preview": "vite preview"
+        },
+        "dependencies": {
+          "react": "^18.2.0",
+          "react-dom": "^18.2.0",
+          "react-router-dom": "^6.28.0",
+          "@radix-ui/react-accordion": "1.2.2",
+          "@radix-ui/react-alert-dialog": "1.1.4",
+          "@radix-ui/react-aspect-ratio": "1.1.1",
+          "@radix-ui/react-avatar": "1.1.2",
+          "@radix-ui/react-checkbox": "1.1.3",
+          "@radix-ui/react-collapsible": "1.1.2",
+          "@radix-ui/react-context-menu": "2.2.4",
+          "@radix-ui/react-dialog": "1.1.4",
+          "@radix-ui/react-dropdown-menu": "2.1.4",
+          "@radix-ui/react-hover-card": "1.1.4",
+          "@radix-ui/react-label": "2.1.1",
+          "@radix-ui/react-menubar": "1.1.4",
+          "@radix-ui/react-navigation-menu": "1.2.3",
+          "@radix-ui/react-popover": "1.1.4",
+          "@radix-ui/react-progress": "1.1.1",
+          "@radix-ui/react-radio-group": "1.2.2",
+          "@radix-ui/react-scroll-area": "1.2.2",
+          "@radix-ui/react-select": "2.1.4",
+          "@radix-ui/react-separator": "1.1.1",
+          "@radix-ui/react-slider": "1.2.2",
+          "@radix-ui/react-slot": "1.1.1",
+          "@radix-ui/react-switch": "1.1.2",
+          "@radix-ui/react-tabs": "1.1.2",
+          "@radix-ui/react-toast": "1.2.4",
+          "@radix-ui/react-toggle": "1.1.1",
+          "@radix-ui/react-toggle-group": "1.1.1",
+          "@radix-ui/react-tooltip": "1.1.6",
+          "@radix-ui/react-icons": "^1.3.0",
+          "lucide-react": "^0.454.0",
+          "framer-motion": "^12.23.12",
+          "class-variance-authority": "^0.7.1",
+          "clsx": "^2.1.1",
+          "tailwind-merge": "^2.5.5",
+          "cmdk": "1.0.4",
+          "next-themes": "^0.4.6",
+          "react-hook-form": "^7.60.0",
+          "zod": "3.25.67",
+          "@hookform/resolvers": "^3.10.0",
+          "date-fns": "4.1.0",
+          "recharts": "2.15.4",
+          "sonner": "^1.7.4",
+          "react-day-picker": "9.8.0",
+          "input-otp": "1.4.1",
+          "vaul": "^0.9.9",
+          "embla-carousel-react": "8.5.1",
+          "react-resizable-panels": "^2.1.7",
+          "react-markdown": "^10.1.0",
+          "remark-gfm": "^4.0.1",
+          "@tanstack/react-table": "^8.20.5",
+          "@vercel/node": "^3.0.0",
+          "apexcharts": "^3.49.0",
+          "react-apexcharts": "^1.4.1"
+        },
+        "devDependencies": {
+          "@types/react": "^18.2.43",
+          "@types/react-dom": "^18.2.17",
+          "@typescript-eslint/eslint-plugin": "^6.14.0",
+          "@typescript-eslint/parser": "^6.14.0",
+          "@vitejs/plugin-react": "^4.2.1",
+          "autoprefixer": "^10.4.16",
+          "eslint": "^8.55.0",
+          "eslint-plugin-react-hooks": "^4.6.0",
+          "eslint-plugin-react-refresh": "^0.4.5",
+          "postcss": "^8.4.32",
+          "tailwindcss": "^3.3.6",
+          "typescript": "^5.2.2",
+          "vite": "^5.0.8",
+          "tailwindcss-animate": "^1.0.7"
+        }
+      }
+
+      console.log(`[${this.id}] Template package.json loaded with ${Object.keys(templatePackageJson.dependencies || {}).length} dependencies`)
+
+      // Get dependencies from project package.json
+      const projectDeps = projectPackageJson.dependencies || {}
+      const projectDevDeps = projectPackageJson.devDependencies || {}
+      const templateDeps = templatePackageJson.dependencies || {}
+      const templateDevDeps = templatePackageJson.devDependencies || {}
+
+      // Find missing dependencies (in project but not in template)
+      const missingDeps: string[] = []
+      const missingDevDeps: string[] = []
+
+      // Check regular dependencies
+      for (const [dep, version] of Object.entries(projectDeps)) {
+        if (!(dep in templateDeps)) {
+          missingDeps.push(`${dep}@${version}`)
+        }
+      }
+
+      // Check dev dependencies
+      for (const [dep, version] of Object.entries(projectDevDeps)) {
+        if (!(dep in templateDevDeps)) {
+          missingDevDeps.push(`${dep}@${version}`)
+        }
+      }
+
+      // If no missing dependencies, return null (nothing to install)
+      if (missingDeps.length === 0 && missingDevDeps.length === 0) {
+        console.log(`[${this.id}] No additional dependencies needed - all dependencies are preinstalled in template`)
+        return null
+      }
+
+      console.log(`[${this.id}] Found ${missingDeps.length} missing dependencies and ${missingDevDeps.length} missing dev dependencies`)
+
+      // Install missing dependencies in batches to avoid command length limits
+      const allMissingDeps = [...missingDeps, ...missingDevDeps]
+      const batchSize = 10
+
+      for (let i = 0; i < allMissingDeps.length; i += batchSize) {
+        const batch = allMissingDeps.slice(i, i + batchSize)
+        const isDev = i >= missingDeps.length // First batches are regular deps, rest are dev deps
+
+        console.log(`[${this.id}] Installing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(allMissingDeps.length / batchSize)}: ${batch.join(', ')}`)
+
+        const installCommand = isDev ? `pnpm add -D ${batch.join(' ')}` : `pnpm add ${batch.join(' ')}`
+
+        const result = await this.executeCommand(installCommand, {
+          workingDirectory,
+          timeoutMs,
+          onStdout,
+          onStderr,
+          envVars
+        })
+
+        if (result.exitCode !== 0) {
+          console.error(`[${this.id}] Failed to install batch: ${batch.join(', ')}`)
+          throw new Error(`Failed to install additional dependencies: ${batch.join(', ')}`)
+        }
+
+        console.log(`[${this.id}] Successfully installed batch: ${batch.join(', ')}`)
+      }
+
+      console.log(`[${this.id}] All additional dependencies installed successfully`)
+      return {
+        stdout: 'Additional dependencies installed successfully',
+        stderr: '',
+        exitCode: 0
+      }
+
+    } catch (error) {
+      console.error(`[${this.id}] Error installing additional dependencies:`, error)
+      throw error
+    }
+  }
+
+  /**
    * Enhanced cleanup
    */
   async terminate(): Promise<void> {

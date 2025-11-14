@@ -174,6 +174,35 @@ async function handleStreamingPreview(req: Request) {
 
           send({ type: "log", message: "Dependencies installed successfully" })
 
+          // 🔹 Check for additional dependencies not in template
+          const projectPackageJsonFile = files.find((f: any) => f.path === 'package.json')
+          if (projectPackageJsonFile) {
+            try {
+              const projectPackageJson = JSON.parse(projectPackageJsonFile.content)
+              send({ type: "log", message: "Checking for additional dependencies..." })
+              
+              const additionalDepsResult = await sandbox.installAdditionalDependencies(
+                projectPackageJson,
+                "/project",
+                {
+                  timeoutMs: 0,
+                  envVars,
+                  onStdout: (data) => send({ type: "log", message: data.trim() }),
+                  onStderr: (data) => send({ type: "error", message: data.trim() }),
+                }
+              )
+              
+              if (additionalDepsResult) {
+                send({ type: "log", message: "Additional dependencies installed successfully" })
+              } else {
+                send({ type: "log", message: "No additional dependencies needed" })
+              }
+            } catch (error) {
+              console.warn("Failed to check/install additional dependencies:", error)
+              send({ type: "log", message: "Continuing without additional dependencies (non-critical)" })
+            }
+          }
+
           // 🔹 Start dev server
           send({ type: "log", message: "Starting dev server..." })
           const devServer = await sandbox.startDevServer({
@@ -479,6 +508,30 @@ devDependencies:
       }
       
       console.log('Dependencies installed successfully with npm')
+
+      // Check for additional dependencies not in template
+      const projectPackageJsonFile = files.find(f => f.path === 'package.json')
+      if (projectPackageJsonFile) {
+        try {
+          const projectPackageJson = JSON.parse(projectPackageJsonFile.content)
+          console.log('Checking for additional dependencies...')
+          
+          const additionalDepsResult = await sandbox.installAdditionalDependencies(
+            projectPackageJson,
+            '/project',
+            { timeoutMs: 0, envVars }
+          )
+          
+          if (additionalDepsResult) {
+            console.log('Additional dependencies installed successfully')
+          } else {
+            console.log('No additional dependencies needed')
+          }
+        } catch (error) {
+          console.warn('Failed to check/install additional dependencies:', error)
+          console.log('Continuing without additional dependencies (non-critical)')
+        }
+      }
 
       // Start development server with enhanced monitoring and environment variables
       console.log('Starting development server with npm run dev...')
