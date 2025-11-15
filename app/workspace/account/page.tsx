@@ -56,7 +56,7 @@ import {
   storeSupabaseProjectDetails,
   getSupabaseProjectDetails
 } from "@/lib/cloud-sync"
-import { useCloudSync } from "@/hooks/use-cloud-sync"
+import { useSupabaseToken } from "@/hooks/use-supabase-token"
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -123,8 +123,8 @@ function AccountSettingsPageContent() {
   const [editingName, setEditingName] = useState("")
   const [isUpdatingName, setIsUpdatingName] = useState(false)
 
-  // Initialize auto cloud backup when user is available
-  const { triggerBackup, getSyncStatus } = useCloudSync(user?.id || null)
+  // Supabase token management
+  const { token: supabaseToken, isLoading: tokenLoading, isExpired: tokenExpired, error: tokenError, refreshToken: refreshSupabaseToken, lastRefresh } = useSupabaseToken()
 
   // Connection status states
   const [connections, setConnections] = useState<{
@@ -173,12 +173,17 @@ function AccountSettingsPageContent() {
   useEffect(() => {
     const handleOAuthCallback = async () => {
       const token = searchParams.get('token')
+      const refreshToken = searchParams.get('refreshToken')
+      const expiresIn = searchParams.get('expiresIn')
       const processed = searchParams.get('processed')
       
       console.log('[OAUTH] Current URL:', window.location.href)
       console.log('[OAUTH] handleOAuthCallback called:', { 
         hasToken: !!token, 
+        hasRefreshToken: !!refreshToken,
+        expiresIn: expiresIn,
         tokenLength: token?.length || 0,
+        refreshTokenLength: refreshToken?.length || 0,
         hasUser: !!user?.id, 
         userId: user?.id,
         processed: processed 
@@ -215,9 +220,17 @@ function AccountSettingsPageContent() {
           const projects = validateResult.projects || []
           console.log('[OAUTH] Token validation successful, found', projects.length, 'projects')
 
-          // Store the Supabase access token only after validation
-          console.log('[OAUTH] Storing token and connection state...')
-          const tokensToStore: any = { supabase: token }
+          // Store the Supabase access token, refresh token, and expiration time
+          console.log('[OAUTH] Storing token, refresh token, and expiration time...')
+          
+          // Calculate expiration timestamp
+          const expiresAt = expiresIn ? new Date(Date.now() + (parseInt(expiresIn) * 1000)).toISOString() : null
+          
+          const tokensToStore: any = { 
+            supabase: token,
+            supabase_refresh_token: refreshToken,
+            supabase_token_expires_at: expiresAt
+          }
           const success = await storeDeploymentTokens(user.id, tokensToStore)
           
           if (!success) {
@@ -2104,6 +2117,57 @@ function AccountSettingsPageContent() {
                       <div className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4 text-green-500" />
                         <span className="text-sm text-green-600 font-medium">Connected and secured</span>
+                      </div>
+                    )}
+
+                    {/* Token Status */}
+                    {connections.supabase.connected && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">Token Status</span>
+                          <div className="flex items-center gap-2">
+                            {tokenExpired ? (
+                              <>
+                                <AlertTriangle className="h-4 w-4 text-orange-500" />
+                                <span className="text-sm text-orange-600">Expires soon</span>
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                <span className="text-sm text-green-600">Valid</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {lastRefresh && (
+                          <div className="text-xs text-muted-foreground">
+                            Last refreshed: {lastRefresh.toLocaleString()}
+                          </div>
+                        )}
+
+                        {tokenExpired && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={refreshSupabaseToken}
+                            disabled={tokenLoading}
+                            className="w-full"
+                          >
+                            {tokenLoading ? (
+                              <Loader2 className="h-3 w-3 animate-spin mr-2" />
+                            ) : (
+                              <RefreshCw className="h-3 w-3 mr-2" />
+                            )}
+                            Refresh Token
+                          </Button>
+                        )}
+
+                        {tokenError && (
+                          <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                            {tokenError}
+                          </div>
+                        )}
                       </div>
                     )}
 

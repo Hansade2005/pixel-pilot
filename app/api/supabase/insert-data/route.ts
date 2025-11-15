@@ -1,18 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getSupabaseAccessToken } from '@/lib/cloud-sync'
 
 /**
  * Server-side API route to insert data into Supabase tables using REST API
  * Provides a safe interface for INSERT operations with validation
+ * Automatically retrieves and refreshes the user's Supabase Management API token
  */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { token, projectId, tableName, schema = 'public', data, onConflict } = body
+    const { projectId, tableName, schema = 'public', data, onConflict } = body
 
-    if (!token || !projectId || !tableName || !data) {
+    if (!projectId || !tableName || !data) {
       return NextResponse.json(
-        { error: 'Token, projectId, tableName, and data are required' },
+        { error: 'projectId, tableName, and data are required' },
         { status: 400 }
+      )
+    }
+
+    // Get the valid Supabase Management API token automatically
+    const token = await getSupabaseAccessToken()
+    if (!token) {
+      return NextResponse.json(
+        { error: 'No valid Supabase Management API token found. Please authenticate with Supabase first.' },
+        { status: 401 }
       )
     }
 

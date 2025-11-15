@@ -300,6 +300,8 @@ export async function storeDeploymentTokens(
     vercel?: string, 
     netlify?: string,
     supabase?: string,
+    supabase_refresh_token?: string,
+    supabase_token_expires_at?: string,
     supabase_project_url?: string,
     supabase_anon_key?: string,
     supabase_service_role_key?: string,
@@ -318,6 +320,8 @@ export async function storeDeploymentTokens(
     if (tokens.vercel !== undefined) updateData.vercel_token = tokens.vercel  
     if (tokens.netlify !== undefined) updateData.netlify_token = tokens.netlify
     if (tokens.supabase !== undefined) updateData.supabase_token = tokens.supabase
+    if (tokens.supabase_refresh_token !== undefined) updateData.supabase_refresh_token = tokens.supabase_refresh_token
+    if (tokens.supabase_token_expires_at !== undefined) updateData.supabase_token_expires_at = tokens.supabase_token_expires_at
     if (tokens.supabase_project_url !== undefined) updateData.supabase_project_url = tokens.supabase_project_url
     if (tokens.supabase_anon_key !== undefined) updateData.supabase_anon_key = tokens.supabase_anon_key
     if (tokens.supabase_service_role_key !== undefined) updateData.supabase_service_role_key = tokens.supabase_service_role_key
@@ -346,6 +350,8 @@ export async function getDeploymentTokens(userId: string): Promise<{
   vercel?: string, 
   netlify?: string,
   supabase?: string,
+  supabase_refresh_token?: string,
+  supabase_token_expires_at?: string,
   supabase_project_url?: string,
   supabase_anon_key?: string,
   supabase_service_role_key?: string,
@@ -354,7 +360,7 @@ export async function getDeploymentTokens(userId: string): Promise<{
   try {
     const { data, error } = await supabase
       .from('user_settings')
-      .select('github_token, vercel_token, netlify_token, supabase_token, supabase_project_url, supabase_anon_key, supabase_service_role_key, stripe_secret_key')
+      .select('github_token, vercel_token, netlify_token, supabase_token, supabase_refresh_token, supabase_token_expires_at, supabase_project_url, supabase_anon_key, supabase_service_role_key, stripe_secret_key')
       .eq('user_id', userId)
       .single()
 
@@ -367,6 +373,8 @@ export async function getDeploymentTokens(userId: string): Promise<{
       vercel: data.vercel_token || undefined,
       netlify: data.netlify_token || undefined,
       supabase: data.supabase_token || undefined,
+      supabase_refresh_token: data.supabase_refresh_token || undefined,
+      supabase_token_expires_at: data.supabase_token_expires_at || undefined,
       supabase_project_url: data.supabase_project_url || undefined,
       supabase_anon_key: data.supabase_anon_key || undefined,
       supabase_service_role_key: data.supabase_service_role_key || undefined,
@@ -663,8 +671,95 @@ export async function getAllSupabaseProjectConnections(
 }
 
 /**
+ * Check if Supabase access token is expired or about to expire
+ */
+export async function isSupabaseTokenExpired(userId: string): Promise<boolean> {
+  try {
+    const tokens = await getDeploymentTokens(userId)
+    if (!tokens?.supabase_token_expires_at) {
+      return true // Consider expired if no expiration time
+    }
+
+    const expiresAt = new Date(tokens.supabase_token_expires_at)
+    const now = new Date()
+
+    // Consider expired if less than 5 minutes remaining
+    return expiresAt.getTime() - now.getTime() < 5 * 60 * 1000
+  } catch (error) {
+    console.error("Error checking token expiration:", error)
+    return true // Consider expired on error
+  }
+}
+
+/**
+ * Refresh Supabase access token using the refresh token
+ */
+export async function refreshSupabaseToken(userId: string): Promise<boolean> {
+  try {
+    console.log(`[TOKEN-REFRESH] Starting token refresh for user ${userId}`)
+
+    const tokens = await getDeploymentTokens(userId)
+    if (!tokens?.supabase_refresh_token) {
+      console.error('[TOKEN-REFRESH] No refresh token available')
+      return false
+    }
+
+    // Call the Supabase Edge Function to refresh the token
+    const { data, error } = await supabase.functions.invoke('auto-refresh-tokens', {
+      body: { userId, forceRefresh: true }
+    })
+
+    if (error) {
+      console.error('[TOKEN-REFRESH] Edge function error:', error)
+      return false
+    }
+
+    if (!data.success) {
+      console.error('[TOKEN-REFRESH] Token refresh failed:', data.message)
+      return false
+    }
+
+    console.log(`[TOKEN-REFRESH] Token refresh successful for user ${userId}`)
+    return true
+
+  } catch (error) {
+    console.error('[TOKEN-REFRESH] Unexpected error:', error)
+    return false
+  }
+}
+
+/**
+ * Get a valid Supabase access token, refreshing if necessary
+ */
+export async function getValidSupabaseToken(userId: string): Promise<string | null> {
+  try {
+    // Check if current token is still valid
+    const isExpired = await isSupabaseTokenExpired(userId)
+
+    if (isExpired) {
+      console.log('[TOKEN-MANAGER] Token expired or about to expire, attempting refresh')
+      const refreshSuccess = await refreshSupabaseToken(userId)
+
+      if (!refreshSuccess) {
+        console.error('[TOKEN-MANAGER] Token refresh failed')
+        return null
+      }
+    }
+
+    // Get the (potentially refreshed) token
+    const tokens = await getDeploymentTokens(userId)
+    return tokens?.supabase || null
+
+  } catch (error) {
+    console.error('[TOKEN-MANAGER] Error getting valid token:', error)
+    return null
+  }
+}
+
+/**
  * Get the Supabase Management API access token for the current user
  * This is used by AI tools to authenticate with Supabase Management API
+ * Automatically refreshes the token if it's expired or about to expire
  */
 export async function getSupabaseAccessToken(): Promise<string | null> {
   try {
@@ -675,18 +770,8 @@ export async function getSupabaseAccessToken(): Promise<string | null> {
       return null
     }
 
-    // Get the access token from user settings
-    const { data, error } = await supabase
-      .from('user_settings')
-      .select('supabase_token')
-      .eq('user_id', user.id)
-      .single()
-
-    if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
-      throw error
-    }
-
-    return data?.supabase_token || null
+    // Get a valid (potentially refreshed) access token
+    return await getValidSupabaseToken(user.id)
   } catch (error) {
     console.error("Error retrieving Supabase access token:", error)
     return null

@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getSupabaseAccessToken } from '@/lib/cloud-sync'
 
 /**
  * Server-side API route to list available Supabase projects for the authenticated user
  * This allows users to select which Supabase project to connect to their PixelPilot project
+ * Automatically retrieves and refreshes the user's Supabase Management API token
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
-    const { token } = body
-
+    // Get the valid Supabase Management API token automatically
+    const token = await getSupabaseAccessToken()
     if (!token) {
       return NextResponse.json(
-        { error: 'Supabase Management API token is required' },
-        { status: 400 }
+        { error: 'No valid Supabase Management API token found. Please authenticate with Supabase first.' },
+        { status: 401 }
       )
     }
 

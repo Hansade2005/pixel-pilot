@@ -29,6 +29,7 @@ import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
 import { FileSearchResult, FileLookupService } from "@/lib/file-lookup-service"
 import { createCheckpoint } from '@/lib/checkpoint-utils'
 import { getWorkspaceDatabaseId, getDatabaseIdFromUrl } from '@/lib/get-current-workspace'
+import { useSupabaseToken } from '@/hooks/use-supabase-token'
 
 // ExpandableUserMessage component for long user messages
 const ExpandableUserMessage = ({
@@ -845,6 +846,9 @@ export function ChatPanelV2({
   
   // Chat mode state - true for Ask mode, false for Agent mode
   const [isAskMode, setIsAskMode] = useState(false)
+  
+  // Supabase token management - automatic refresh
+  const { token: supabaseToken, isLoading: tokenLoading, isExpired: tokenExpired, error: tokenError } = useSupabaseToken()
   
   // Tool invocations tracking for inline pills
   const [activeToolCalls, setActiveToolCalls] = useState<Map<string, Array<{
@@ -2365,12 +2369,12 @@ export function ChatPanelV2({
       const fileTree = await buildProjectFileTree()
 
       // Fetch Supabase access token and project details for the current PixelPilot project
-      let supabaseAccessToken = null
+      let supabaseAccessToken = supabaseToken // Use the hook's token
       let supabaseProjectDetails = null
       let supabaseUserId = null
 
       try {
-        const { getSupabaseAccessToken, getSupabaseProjectForPixelPilotProject } = await import('@/lib/cloud-sync')
+        const { getSupabaseProjectForPixelPilotProject } = await import('@/lib/cloud-sync')
 
         // Get the authenticated user from Supabase session
         const { createClient } = await import('@/lib/supabase/client')
@@ -2382,9 +2386,6 @@ export function ChatPanelV2({
         } else {
           supabaseUserId = user.id
           
-          // Get the Supabase access token using the authenticated userId
-          supabaseAccessToken = await getSupabaseAccessToken()
-
           // Get Supabase project details for the current PixelPilot project using the authenticated userId
           if (project?.id) {
             supabaseProjectDetails = await getSupabaseProjectForPixelPilotProject(supabaseUserId, project.id)
@@ -2396,7 +2397,9 @@ export function ChatPanelV2({
           hasProjectDetails: !!supabaseProjectDetails,
           hasUserId: !!supabaseUserId,
           projectId: supabaseProjectDetails?.supabaseProjectId,
-          tokenLength: supabaseAccessToken?.length
+          tokenLength: supabaseAccessToken?.length,
+          tokenExpired,
+          tokenError
         })
       } catch (error) {
         console.warn('[ChatPanelV2] Failed to fetch Supabase data:', error)

@@ -1,0 +1,6 @@
+supabase/
+.vercel/
+.next/
+node_modules/
+.git/
+.github/
