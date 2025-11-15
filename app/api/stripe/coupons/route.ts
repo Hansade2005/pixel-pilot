@@ -94,6 +94,57 @@ export async function POST(request: NextRequest) {
       }, { status: 201 })
     }
 
+    // Handle update action
+    if (action === 'update') {
+      const { id, name, metadata } = body
+
+      if (!id) {
+        return NextResponse.json(
+          { error: 'Coupon ID is required for update', success: false },
+          { status: 400 }
+        )
+      }
+
+      console.log('[STRIPE API] Updating coupon:', id)
+
+      const updateData: any = {}
+      if (name !== undefined) updateData.name = name
+      if (metadata !== undefined) updateData.metadata = metadata
+
+      const coupon = await stripe.coupons.update(id, updateData)
+
+      console.log('[STRIPE API] Successfully updated coupon:', coupon.id)
+
+      return NextResponse.json({
+        success: true,
+        coupon
+      })
+    }
+
+    // Handle delete action
+    if (action === 'delete') {
+      const { id } = body
+
+      if (!id) {
+        return NextResponse.json(
+          { error: 'Coupon ID is required for deletion', success: false },
+          { status: 400 }
+        )
+      }
+
+      console.log('[STRIPE API] Deleting coupon:', id)
+
+      const deleted = await stripe.coupons.del(id)
+
+      console.log('[STRIPE API] Successfully deleted coupon:', id)
+
+      return NextResponse.json({
+        success: true,
+        deleted: deleted.deleted,
+        id: deleted.id
+      })
+    }
+
     // Default action: list coupons
     console.log('[STRIPE API] Listing coupons')
 

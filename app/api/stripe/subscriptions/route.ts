@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     const stripe = createStripeClient(stripeKey)
 
     if (action === 'create') {
-      const { customer: customerId, items, payment_behavior, metadata } = body
+      const { customer: customerId, items, payment_behavior, metadata, trial_end } = body
 
       if (!customerId || !items || !Array.isArray(items) || items.length === 0) {
         return NextResponse.json(
@@ -54,7 +54,8 @@ export async function POST(request: NextRequest) {
         customer: customerId,
         items,
         ...(payment_behavior && { payment_behavior }),
-        ...(metadata && { metadata })
+        ...(metadata && { metadata }),
+        ...(trial_end && { trial_end })
       })
 
       console.log('[STRIPE API] Successfully created subscription:', subscription.id)
@@ -63,6 +64,70 @@ export async function POST(request: NextRequest) {
         success: true,
         subscription
       }, { status: 201 })
+    }
+
+    if (action === 'update') {
+      const { id, items, metadata, default_payment_method, proration_behavior, trial_end } = body
+
+      if (!id) {
+        return NextResponse.json(
+          { error: 'Subscription ID is required for update', success: false },
+          { status: 400 }
+        )
+      }
+
+      console.log('[STRIPE API] Updating subscription:', id)
+
+      const updateData: any = {}
+      if (items !== undefined) updateData.items = items
+      if (metadata !== undefined) updateData.metadata = metadata
+      if (default_payment_method !== undefined) updateData.default_payment_method = default_payment_method
+      if (proration_behavior !== undefined) updateData.proration_behavior = proration_behavior
+      if (trial_end !== undefined) updateData.trial_end = trial_end
+
+      const subscription = await stripe.subscriptions.update(id, updateData)
+
+      console.log('[STRIPE API] Successfully updated subscription:', subscription.id)
+
+      return NextResponse.json({
+        success: true,
+        subscription
+      })
+    }
+
+    if (action === 'cancel') {
+      const { id, cancel_at_period_end, prorate } = body
+
+      if (!id) {
+        return NextResponse.json(
+          { error: 'Subscription ID is required for cancellation', success: false },
+          { status: 400 }
+        )
+      }
+
+      console.log('[STRIPE API] Cancelling subscription:', id)
+
+      let subscription
+      if (cancel_at_period_end) {
+        // Schedule cancellation at period end
+        subscription = await stripe.subscriptions.update(id, {
+          cancel_at_period_end: true,
+          ...(prorate !== undefined && { prorate })
+        })
+      } else {
+        // Cancel immediately
+        subscription = await stripe.subscriptions.cancel(id, {
+          ...(prorate !== undefined && { prorate })
+        })
+      }
+
+      console.log('[STRIPE API] Successfully cancelled subscription:', subscription.id)
+
+      return NextResponse.json({
+        success: true,
+        subscription,
+        cancelled: true
+      })
     }
 
     // List subscriptions

@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     const stripe = createStripeClient(stripeKey)
 
     if (action === 'create') {
-      const { product: productId, currency, unit_amount, recurring, metadata } = body
+      const { product: productId, currency, unit_amount, recurring, metadata, nickname } = body
 
       if (!productId || !currency || unit_amount === undefined) {
         return NextResponse.json(
@@ -55,7 +55,8 @@ export async function POST(request: NextRequest) {
         currency,
         unit_amount,
         ...(recurring && { recurring }),
-        ...(metadata && { metadata })
+        ...(metadata && { metadata }),
+        ...(nickname && { nickname })
       })
 
       console.log('[STRIPE API] Successfully created price:', price.id)
@@ -64,6 +65,33 @@ export async function POST(request: NextRequest) {
         success: true,
         price
       }, { status: 201 })
+    }
+
+    if (action === 'update') {
+      const { id, active: isActive, metadata, nickname } = body
+
+      if (!id) {
+        return NextResponse.json(
+          { error: 'Price ID is required for update', success: false },
+          { status: 400 }
+        )
+      }
+
+      console.log('[STRIPE API] Updating price:', id)
+
+      const updateData: any = {}
+      if (isActive !== undefined) updateData.active = isActive
+      if (metadata !== undefined) updateData.metadata = metadata
+      if (nickname !== undefined) updateData.nickname = nickname
+
+      const price = await stripe.prices.update(id, updateData)
+
+      console.log('[STRIPE API] Successfully updated price:', price.id)
+
+      return NextResponse.json({
+        success: true,
+        price
+      })
     }
 
     // List prices

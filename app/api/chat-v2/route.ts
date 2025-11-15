@@ -1915,27 +1915,44 @@ Begin with a concise checklist  use check box emojis filled and unfilled.
 **Schema Tracking**: Any \`supabase_schema.sql\` files in the project are for AI reference only. The AI can read table schemas directly using \`supabase_read_table\`, so manual schema file maintenance is not required.
 
 ### 🔵 Stripe Payment Tools (Remote Payment Processing)
-**Stripe payment & subscription integration - 12 tools available:**
+**Complete Stripe CRUD integration - 26 tools available:**
 
 **Validation:**
 - **\`stripe_validate_key\`** - Validate Stripe API key and check account status
 
-**Products & Pricing:**
+**Products (Full CRUD):**
 - **\`stripe_list_products\`** - List all products with filtering options
 - **\`stripe_create_product\`** - Create new products for sale
+- **\`stripe_update_product\`** - Update product name, description, metadata, active status
+- **\`stripe_delete_product\`** - Delete products (must deactivate prices first)
+
+**Prices (CRU + Deactivate):**
 - **\`stripe_list_prices\`** - List pricing plans with product/active filtering
 - **\`stripe_create_price\`** - Create new prices (one-time or recurring)
+- **\`stripe_update_price\`** - Update metadata, active status, nickname (cannot change amount)
 
-**Customers:**
+**Customers (Full CRUD):**
 - **\`stripe_list_customers\`** - List customers with email filtering
 - **\`stripe_create_customer\`** - Create new customers with metadata
+- **\`stripe_update_customer\`** - Update email, name, address, payment method, etc.
+- **\`stripe_delete_customer\`** - Delete customers (GDPR compliance)
 
-**Payments:**
+**Payments (CRU + Cancel):**
 - **\`stripe_create_payment_intent\`** - Create payment intents for charging customers
+- **\`stripe_update_payment_intent\`** - Update amount, currency, customer before confirmation
+- **\`stripe_cancel_payment_intent\`** - Cancel payment intents before capture
 - **\`stripe_list_charges\`** - List all payment charges with customer filtering
 
-**Subscriptions:**
+**Subscriptions (RU + Cancel):**
 - **\`stripe_list_subscriptions\`** - List subscriptions with status/customer filtering
+- **\`stripe_update_subscription\`** - Update items, metadata, payment method, proration
+- **\`stripe_cancel_subscription\`** - Cancel immediately or at period end
+
+**Coupons (Full CRUD):**
+- **\`stripe_list_coupons\`** - List all discount coupons
+- **\`stripe_create_coupon\`** - Create percent-off or amount-off coupons
+- **\`stripe_update_coupon\`** - Update name and metadata
+- **\`stripe_delete_coupon\`** - Delete coupons completely
 
 **Refunds:**
 - **\`stripe_create_refund\`** - Create full or partial refunds for charges
@@ -1943,16 +1960,17 @@ Begin with a concise checklist  use check box emojis filled and unfilled.
 **Search:**
 - **\`stripe_search\`** - Advanced search across all Stripe resources (customers, charges, payment_intents, subscriptions, invoices, products, prices)
 
-**Features:**
-- 💳 **Payment Processing**: Full Stripe integration for payments & intents
-- 📦 **Product Management**: Create and manage sellable products
-- 💰 **Pricing Control**: Define one-time and recurring prices
-- 👥 **Customer Management**: Track, create, and manage customers
-- 🔄 **Subscriptions**: Monitor recurring billing and subscriptions
+**Capabilities:**
+- 💳 **Payment Processing**: Full payment lifecycle (create, update, cancel, refund)
+- 📦 **Product Management**: Complete CRUD for products & prices
+- 👥 **Customer Management**: Full CRUD for customer records
+- 🔄 **Subscription Handling**: Create, update, cancel recurring billing
+- 🎟️ **Coupon Management**: Full CRUD for discount codes
 - 💸 **Refunds**: Process full or partial refunds with reasons
 - 🔍 **Advanced Search**: Query any Stripe resource with powerful search syntax
 - 🔑 **API Key Security**: Automatic key retrieval from cloud sync
-- 🔄 **Subscription Handling**: Manage recurring billing
+- ✏️ **Full Updates**: Modify existing resources (products, customers, prices, subscriptions)
+- 🗑️ **Safe Deletion**: Remove resources with proper validation
 - 🔐 **Secure**: Uses Stripe API keys from cloud sync
 - ⚡ **Direct API**: Simple POST requests to refactored endpoints
 
@@ -7282,6 +7300,712 @@ ${conversationSummaryContext || ''}`
                 executionTimeMs: executionTime,
                 timeWarning: timeStatus.warningMessage
               };
+            }
+          }
+        }),
+
+        // ==================== COUPON TOOLS ====================
+
+        stripe_list_coupons: tool({
+          description: 'List all discount coupons from the Stripe account.',
+          inputSchema: z.object({
+            limit: z.number().optional().describe('Number of coupons to return (default: 10, max: 100)')
+          }),
+          execute: async ({ limit }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Stripe list coupons cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              const apiKey = stripeApiKey;
+
+              if (!apiKey) {
+                return {
+                  success: false,
+                  error: 'No Stripe API key found. Please connect your Stripe account in settings.',
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/coupons`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  stripeKey: apiKey,
+                  action: 'list',
+                  limit
+                })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_list_coupons'] = (toolExecutionTimes['stripe_list_coupons'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                return {
+                  success: false,
+                  error: `Failed to list coupons: ${result.error || 'Unknown error'}`,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              return {
+                success: true,
+                message: `✅ Found ${result.coupons.length} coupons`,
+                coupons: result.coupons,
+                has_more: result.has_more,
+                total_count: result.total_count,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_list_coupons'] = (toolExecutionTimes['stripe_list_coupons'] || 0) + executionTime;
+              
+              return {
+                success: false,
+                error: `Failed to list coupons: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        stripe_create_coupon: tool({
+          description: 'Create a discount coupon in Stripe. Coupons can be percent-off or amount-off.',
+          inputSchema: z.object({
+            duration: z.enum(['forever', 'once', 'repeating']).describe('How long the coupon lasts'),
+            percent_off: z.number().optional().describe('Percent discount (0-100, use this OR amount_off)'),
+            amount_off: z.number().optional().describe('Amount discount in cents (use this OR percent_off)'),
+            currency: z.string().optional().describe('Currency (required if amount_off is used)'),
+            duration_in_months: z.number().optional().describe('Months duration (required if duration is repeating)'),
+            name: z.string().optional().describe('Coupon display name'),
+            metadata: z.record(z.string()).optional().describe('Custom metadata')
+          }),
+          execute: async ({ duration, percent_off, amount_off, currency, duration_in_months, name, metadata }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Stripe create coupon cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              const apiKey = stripeApiKey;
+
+              if (!apiKey) {
+                return {
+                  success: false,
+                  error: 'No Stripe API key found. Please connect your Stripe account in settings.',
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/coupons`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  stripeKey: apiKey,
+                  action: 'create',
+                  duration,
+                  percent_off,
+                  amount_off,
+                  currency,
+                  duration_in_months,
+                  name,
+                  metadata
+                })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_create_coupon'] = (toolExecutionTimes['stripe_create_coupon'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                return {
+                  success: false,
+                  error: `Failed to create coupon: ${result.error || 'Unknown error'}`,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              return {
+                success: true,
+                message: `✅ Coupon created successfully${name ? ` (${name})` : ''}`,
+                coupon: result.coupon,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_create_coupon'] = (toolExecutionTimes['stripe_create_coupon'] || 0) + executionTime;
+              
+              return {
+                success: false,
+                error: `Failed to create coupon: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        // ==================== UPDATE TOOLS ====================
+
+        stripe_update_product: tool({
+          description: 'Update an existing product in Stripe. Can modify name, description, metadata, active status, etc.',
+          inputSchema: z.object({
+            id: z.string().describe('Product ID to update (starts with prod_)'),
+            name: z.string().optional().describe('New product name'),
+            description: z.string().optional().describe('New product description'),
+            active: z.boolean().optional().describe('Active status'),
+            metadata: z.record(z.string()).optional().describe('Custom metadata'),
+            images: z.array(z.string()).optional().describe('Array of image URLs'),
+            default_price: z.string().optional().describe('Default price ID')
+          }),
+          execute: async ({ id, name, description, active, metadata, images, default_price }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) throw new Error('Operation cancelled')
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Cancelled due to timeout: ${timeStatus.warningMessage}`,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              const apiKey = stripeApiKey;
+              if (!apiKey) {
+                return {
+                  success: false,
+                  error: 'No Stripe API key found. Please connect your Stripe account in settings.',
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/products`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stripeKey: apiKey, action: 'update', id, name, description, active, metadata, images, default_price })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_update_product'] = (toolExecutionTimes['stripe_update_product'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                return { success: false, error: `Failed to update product: ${result.error || 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+              }
+
+              return { success: true, message: `✅ Product updated successfully`, product: result.product, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_update_product'] = (toolExecutionTimes['stripe_update_product'] || 0) + executionTime;
+              return { success: false, error: `Failed to update product: ${error instanceof Error ? error.message : 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            }
+          }
+        }),
+
+        stripe_update_price: tool({
+          description: 'Update a price in Stripe. Can only modify metadata, active status, and nickname (cannot change amount or currency).',
+          inputSchema: z.object({
+            id: z.string().describe('Price ID to update (starts with price_)'),
+            active: z.boolean().optional().describe('Active status'),
+            metadata: z.record(z.string()).optional().describe('Custom metadata'),
+            nickname: z.string().optional().describe('Display nickname')
+          }),
+          execute: async ({ id, active, metadata, nickname }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) throw new Error('Operation cancelled')
+            if (timeStatus.isApproachingTimeout) {
+              return { success: false, error: `Cancelled due to timeout: ${timeStatus.warningMessage}`, toolCallId, executionTimeMs: Date.now() - toolStartTime, timeWarning: timeStatus.warningMessage }
+            }
+
+            try {
+              const apiKey = stripeApiKey;
+              if (!apiKey) {
+                return { success: false, error: 'No Stripe API key found. Please connect your Stripe account in settings.', toolCallId, executionTimeMs: Date.now() - toolStartTime, timeWarning: timeStatus.warningMessage }
+              }
+
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/prices`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stripeKey: apiKey, action: 'update', id, active, metadata, nickname })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_update_price'] = (toolExecutionTimes['stripe_update_price'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                return { success: false, error: `Failed to update price: ${result.error || 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+              }
+
+              return { success: true, message: `✅ Price updated successfully`, price: result.price, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_update_price'] = (toolExecutionTimes['stripe_update_price'] || 0) + executionTime;
+              return { success: false, error: `Failed to update price: ${error instanceof Error ? error.message : 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            }
+          }
+        }),
+
+        stripe_update_customer: tool({
+          description: 'Update an existing customer in Stripe. Can modify email, name, address, payment method, etc.',
+          inputSchema: z.object({
+            id: z.string().describe('Customer ID to update (starts with cus_)'),
+            email: z.string().optional().describe('New email address'),
+            name: z.string().optional().describe('New name'),
+            phone: z.string().optional().describe('New phone number'),
+            description: z.string().optional().describe('New description'),
+            metadata: z.record(z.string()).optional().describe('Custom metadata'),
+            address: z.object({ line1: z.string().optional(), line2: z.string().optional(), city: z.string().optional(), state: z.string().optional(), postal_code: z.string().optional(), country: z.string().optional() }).optional().describe('Billing address'),
+            shipping: z.object({ name: z.string(), address: z.object({ line1: z.string(), city: z.string(), country: z.string() }) }).optional().describe('Shipping address'),
+            default_payment_method: z.string().optional().describe('Default payment method ID')
+          }),
+          execute: async ({ id, email, name, phone, description, metadata, address, shipping, default_payment_method }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) throw new Error('Operation cancelled')
+            if (timeStatus.isApproachingTimeout) {
+              return { success: false, error: `Cancelled due to timeout: ${timeStatus.warningMessage}`, toolCallId, executionTimeMs: Date.now() - toolStartTime, timeWarning: timeStatus.warningMessage }
+            }
+
+            try {
+              const apiKey = stripeApiKey;
+              if (!apiKey) {
+                return { success: false, error: 'No Stripe API key found. Please connect your Stripe account in settings.', toolCallId, executionTimeMs: Date.now() - toolStartTime, timeWarning: timeStatus.warningMessage }
+              }
+
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/customers`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stripeKey: apiKey, action: 'update', id, email, name, phone, description, metadata, address, shipping, default_payment_method })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_update_customer'] = (toolExecutionTimes['stripe_update_customer'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                return { success: false, error: `Failed to update customer: ${result.error || 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+              }
+
+              return { success: true, message: `✅ Customer updated successfully`, customer: result.customer, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_update_customer'] = (toolExecutionTimes['stripe_update_customer'] || 0) + executionTime;
+              return { success: false, error: `Failed to update customer: ${error instanceof Error ? error.message : 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            }
+          }
+        }),
+
+        stripe_update_payment_intent: tool({
+          description: 'Update a payment intent before it is confirmed. Can modify amount, currency, customer, etc.',
+          inputSchema: z.object({
+            id: z.string().describe('Payment Intent ID to update (starts with pi_)'),
+            amount: z.number().optional().describe('New amount in cents'),
+            currency: z.string().optional().describe('New currency code'),
+            customer: z.string().optional().describe('New customer ID'),
+            payment_method: z.string().optional().describe('New payment method ID'),
+            description: z.string().optional().describe('New description'),
+            metadata: z.record(z.string()).optional().describe('Custom metadata')
+          }),
+          execute: async ({ id, amount, currency, customer, payment_method, description, metadata }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) throw new Error('Operation cancelled')
+            if (timeStatus.isApproachingTimeout) {
+              return { success: false, error: `Cancelled due to timeout: ${timeStatus.warningMessage}`, toolCallId, executionTimeMs: Date.now() - toolStartTime, timeWarning: timeStatus.warningMessage }
+            }
+
+            try {
+              const apiKey = stripeApiKey;
+              if (!apiKey) {
+                return { success: false, error: 'No Stripe API key found. Please connect your Stripe account in settings.', toolCallId, executionTimeMs: Date.now() - toolStartTime, timeWarning: timeStatus.warningMessage }
+              }
+
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/payment-intents`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stripeKey: apiKey, action: 'update', id, amount, currency, customer, payment_method, description, metadata })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_update_payment_intent'] = (toolExecutionTimes['stripe_update_payment_intent'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                return { success: false, error: `Failed to update payment intent: ${result.error || 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+              }
+
+              return { success: true, message: `✅ Payment intent updated successfully`, payment_intent: result.payment_intent, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_update_payment_intent'] = (toolExecutionTimes['stripe_update_payment_intent'] || 0) + executionTime;
+              return { success: false, error: `Failed to update payment intent: ${error instanceof Error ? error.message : 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            }
+          }
+        }),
+
+        stripe_update_subscription: tool({
+          description: 'Update an existing subscription. Can modify items, metadata, payment method, proration behavior, etc.',
+          inputSchema: z.object({
+            id: z.string().describe('Subscription ID to update (starts with sub_)'),
+            items: z.array(z.object({ id: z.string().optional(), price: z.string().optional(), quantity: z.number().optional(), deleted: z.boolean().optional() })).optional().describe('Subscription items to update/add/remove'),
+            metadata: z.record(z.string()).optional().describe('Custom metadata'),
+            default_payment_method: z.string().optional().describe('Default payment method ID'),
+            proration_behavior: z.enum(['create_prorations', 'none', 'always_invoice']).optional().describe('Proration behavior'),
+            trial_end: z.number().optional().describe('Trial end timestamp')
+          }),
+          execute: async ({ id, items, metadata, default_payment_method, proration_behavior, trial_end }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) throw new Error('Operation cancelled')
+            if (timeStatus.isApproachingTimeout) {
+              return { success: false, error: `Cancelled due to timeout: ${timeStatus.warningMessage}`, toolCallId, executionTimeMs: Date.now() - toolStartTime, timeWarning: timeStatus.warningMessage }
+            }
+
+            try {
+              const apiKey = stripeApiKey;
+              if (!apiKey) {
+                return { success: false, error: 'No Stripe API key found. Please connect your Stripe account in settings.', toolCallId, executionTimeMs: Date.now() - toolStartTime, timeWarning: timeStatus.warningMessage }
+              }
+
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/subscriptions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stripeKey: apiKey, action: 'update', id, items, metadata, default_payment_method, proration_behavior, trial_end })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_update_subscription'] = (toolExecutionTimes['stripe_update_subscription'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                return { success: false, error: `Failed to update subscription: ${result.error || 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+              }
+
+              return { success: true, message: `✅ Subscription updated successfully`, subscription: result.subscription, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_update_subscription'] = (toolExecutionTimes['stripe_update_subscription'] || 0) + executionTime;
+              return { success: false, error: `Failed to update subscription: ${error instanceof Error ? error.message : 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            }
+          }
+        }),
+
+        stripe_update_coupon: tool({
+          description: 'Update a coupon in Stripe. Can only modify name and metadata (cannot change discount amount or duration).',
+          inputSchema: z.object({
+            id: z.string().describe('Coupon ID to update'),
+            name: z.string().optional().describe('New display name'),
+            metadata: z.record(z.string()).optional().describe('Custom metadata')
+          }),
+          execute: async ({ id, name, metadata }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) throw new Error('Operation cancelled')
+            if (timeStatus.isApproachingTimeout) {
+              return { success: false, error: `Cancelled due to timeout: ${timeStatus.warningMessage}`, toolCallId, executionTimeMs: Date.now() - toolStartTime, timeWarning: timeStatus.warningMessage }
+            }
+
+            try {
+              const apiKey = stripeApiKey;
+              if (!apiKey) {
+                return { success: false, error: 'No Stripe API key found. Please connect your Stripe account in settings.', toolCallId, executionTimeMs: Date.now() - toolStartTime, timeWarning: timeStatus.warningMessage }
+              }
+
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/coupons`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stripeKey: apiKey, action: 'update', id, name, metadata })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_update_coupon'] = (toolExecutionTimes['stripe_update_coupon'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                return { success: false, error: `Failed to update coupon: ${result.error || 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+              }
+
+              return { success: true, message: `✅ Coupon updated successfully`, coupon: result.coupon, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_update_coupon'] = (toolExecutionTimes['stripe_update_coupon'] || 0) + executionTime;
+              return { success: false, error: `Failed to update coupon: ${error instanceof Error ? error.message : 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            }
+          }
+        }),
+
+        // ==================== DELETE/CANCEL TOOLS ====================
+
+        stripe_delete_product: tool({
+          description: 'Delete a product from Stripe. Note: All prices must be deactivated first.',
+          inputSchema: z.object({
+            id: z.string().describe('Product ID to delete (starts with prod_)')
+          }),
+          execute: async ({ id }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) throw new Error('Operation cancelled')
+            if (timeStatus.isApproachingTimeout) {
+              return { success: false, error: `Cancelled due to timeout: ${timeStatus.warningMessage}`, toolCallId, executionTimeMs: Date.now() - toolStartTime, timeWarning: timeStatus.warningMessage }
+            }
+
+            try {
+              const apiKey = stripeApiKey;
+              if (!apiKey) {
+                return { success: false, error: 'No Stripe API key found. Please connect your Stripe account in settings.', toolCallId, executionTimeMs: Date.now() - toolStartTime, timeWarning: timeStatus.warningMessage }
+              }
+
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/products`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stripeKey: apiKey, action: 'delete', id })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_delete_product'] = (toolExecutionTimes['stripe_delete_product'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                return { success: false, error: `Failed to delete product: ${result.error || 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+              }
+
+              return { success: true, message: `✅ Product deleted successfully`, deleted: result.deleted, id: result.id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_delete_product'] = (toolExecutionTimes['stripe_delete_product'] || 0) + executionTime;
+              return { success: false, error: `Failed to delete product: ${error instanceof Error ? error.message : 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            }
+          }
+        }),
+
+        stripe_delete_customer: tool({
+          description: 'Delete a customer from Stripe. This permanently removes all customer data (GDPR compliance).',
+          inputSchema: z.object({
+            id: z.string().describe('Customer ID to delete (starts with cus_)')
+          }),
+          execute: async ({ id }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) throw new Error('Operation cancelled')
+            if (timeStatus.isApproachingTimeout) {
+              return { success: false, error: `Cancelled due to timeout: ${timeStatus.warningMessage}`, toolCallId, executionTimeMs: Date.now() - toolStartTime, timeWarning: timeStatus.warningMessage }
+            }
+
+            try {
+              const apiKey = stripeApiKey;
+              if (!apiKey) {
+                return { success: false, error: 'No Stripe API key found. Please connect your Stripe account in settings.', toolCallId, executionTimeMs: Date.now() - toolStartTime, timeWarning: timeStatus.warningMessage }
+              }
+
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/customers`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stripeKey: apiKey, action: 'delete', id })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_delete_customer'] = (toolExecutionTimes['stripe_delete_customer'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                return { success: false, error: `Failed to delete customer: ${result.error || 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+              }
+
+              return { success: true, message: `✅ Customer deleted successfully`, deleted: result.deleted, id: result.id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_delete_customer'] = (toolExecutionTimes['stripe_delete_customer'] || 0) + executionTime;
+              return { success: false, error: `Failed to delete customer: ${error instanceof Error ? error.message : 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            }
+          }
+        }),
+
+        stripe_cancel_payment_intent: tool({
+          description: 'Cancel a payment intent before it is confirmed. Cannot cancel after successful payment.',
+          inputSchema: z.object({
+            id: z.string().describe('Payment Intent ID to cancel (starts with pi_)'),
+            cancellation_reason: z.enum(['duplicate', 'fraudulent', 'requested_by_customer', 'abandoned']).optional().describe('Reason for cancellation')
+          }),
+          execute: async ({ id, cancellation_reason }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) throw new Error('Operation cancelled')
+            if (timeStatus.isApproachingTimeout) {
+              return { success: false, error: `Cancelled due to timeout: ${timeStatus.warningMessage}`, toolCallId, executionTimeMs: Date.now() - toolStartTime, timeWarning: timeStatus.warningMessage }
+            }
+
+            try {
+              const apiKey = stripeApiKey;
+              if (!apiKey) {
+                return { success: false, error: 'No Stripe API key found. Please connect your Stripe account in settings.', toolCallId, executionTimeMs: Date.now() - toolStartTime, timeWarning: timeStatus.warningMessage }
+              }
+
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/payment-intents`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stripeKey: apiKey, action: 'cancel', id, cancellation_reason })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_cancel_payment_intent'] = (toolExecutionTimes['stripe_cancel_payment_intent'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                return { success: false, error: `Failed to cancel payment intent: ${result.error || 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+              }
+
+              return { success: true, message: `✅ Payment intent cancelled successfully`, payment_intent: result.payment_intent, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_cancel_payment_intent'] = (toolExecutionTimes['stripe_cancel_payment_intent'] || 0) + executionTime;
+              return { success: false, error: `Failed to cancel payment intent: ${error instanceof Error ? error.message : 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            }
+          }
+        }),
+
+        stripe_cancel_subscription: tool({
+          description: 'Cancel a subscription immediately or at the end of the current period.',
+          inputSchema: z.object({
+            id: z.string().describe('Subscription ID to cancel (starts with sub_)'),
+            cancel_at_period_end: z.boolean().optional().describe('If true, cancels at period end. If false, cancels immediately'),
+            prorate: z.boolean().optional().describe('Whether to prorate charges')
+          }),
+          execute: async ({ id, cancel_at_period_end, prorate }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) throw new Error('Operation cancelled')
+            if (timeStatus.isApproachingTimeout) {
+              return { success: false, error: `Cancelled due to timeout: ${timeStatus.warningMessage}`, toolCallId, executionTimeMs: Date.now() - toolStartTime, timeWarning: timeStatus.warningMessage }
+            }
+
+            try {
+              const apiKey = stripeApiKey;
+              if (!apiKey) {
+                return { success: false, error: 'No Stripe API key found. Please connect your Stripe account in settings.', toolCallId, executionTimeMs: Date.now() - toolStartTime, timeWarning: timeStatus.warningMessage }
+              }
+
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/subscriptions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stripeKey: apiKey, action: 'cancel', id, cancel_at_period_end, prorate })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_cancel_subscription'] = (toolExecutionTimes['stripe_cancel_subscription'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                return { success: false, error: `Failed to cancel subscription: ${result.error || 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+              }
+
+              return { success: true, message: `✅ Subscription ${cancel_at_period_end ? 'scheduled for cancellation at period end' : 'cancelled immediately'}`, subscription: result.subscription, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_cancel_subscription'] = (toolExecutionTimes['stripe_cancel_subscription'] || 0) + executionTime;
+              return { success: false, error: `Failed to cancel subscription: ${error instanceof Error ? error.message : 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            }
+          }
+        }),
+
+        stripe_delete_coupon: tool({
+          description: 'Delete a coupon from Stripe. This removes it completely from your account.',
+          inputSchema: z.object({
+            id: z.string().describe('Coupon ID to delete')
+          }),
+          execute: async ({ id }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) throw new Error('Operation cancelled')
+            if (timeStatus.isApproachingTimeout) {
+              return { success: false, error: `Cancelled due to timeout: ${timeStatus.warningMessage}`, toolCallId, executionTimeMs: Date.now() - toolStartTime, timeWarning: timeStatus.warningMessage }
+            }
+
+            try {
+              const apiKey = stripeApiKey;
+              if (!apiKey) {
+                return { success: false, error: 'No Stripe API key found. Please connect your Stripe account in settings.', toolCallId, executionTimeMs: Date.now() - toolStartTime, timeWarning: timeStatus.warningMessage }
+              }
+
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/coupons`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stripeKey: apiKey, action: 'delete', id })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_delete_coupon'] = (toolExecutionTimes['stripe_delete_coupon'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                return { success: false, error: `Failed to delete coupon: ${result.error || 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+              }
+
+              return { success: true, message: `✅ Coupon deleted successfully`, deleted: result.deleted, id: result.id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_delete_coupon'] = (toolExecutionTimes['stripe_delete_coupon'] || 0) + executionTime;
+              return { success: false, error: `Failed to delete coupon: ${error instanceof Error ? error.message : 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
             }
           }
         }),

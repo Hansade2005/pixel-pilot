@@ -69,6 +69,61 @@ export async function POST(request: NextRequest) {
       }, { status: 201 })
     }
 
+    // Handle update action
+    if (action === 'update') {
+      const { id, name, description, active: isActive, metadata, images, default_price } = body
+
+      if (!id) {
+        return NextResponse.json(
+          { error: 'Product ID is required for update', success: false },
+          { status: 400 }
+        )
+      }
+
+      console.log('[STRIPE API] Updating product:', id)
+
+      const updateData: any = {}
+      if (name !== undefined) updateData.name = name
+      if (description !== undefined) updateData.description = description
+      if (isActive !== undefined) updateData.active = isActive
+      if (metadata !== undefined) updateData.metadata = metadata
+      if (images !== undefined) updateData.images = images
+      if (default_price !== undefined) updateData.default_price = default_price
+
+      const product = await stripe.products.update(id, updateData)
+
+      console.log('[STRIPE API] Successfully updated product:', product.id)
+
+      return NextResponse.json({
+        success: true,
+        product
+      })
+    }
+
+    // Handle delete action
+    if (action === 'delete') {
+      const { id } = body
+
+      if (!id) {
+        return NextResponse.json(
+          { error: 'Product ID is required for deletion', success: false },
+          { status: 400 }
+        )
+      }
+
+      console.log('[STRIPE API] Deleting product:', id)
+
+      const deleted = await stripe.products.del(id)
+
+      console.log('[STRIPE API] Successfully deleted product:', id)
+
+      return NextResponse.json({
+        success: true,
+        deleted: deleted.deleted,
+        id: deleted.id
+      })
+    }
+
     // Default action: list products
     console.log('[STRIPE API] Listing products')
 

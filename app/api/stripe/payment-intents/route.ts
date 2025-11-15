@@ -73,6 +73,63 @@ export async function POST(request: NextRequest) {
       }, { status: 201 })
     }
 
+    // Handle update action
+    if (action === 'update') {
+      const { id, amount, currency, customer: customerId, payment_method, description, metadata } = body
+
+      if (!id) {
+        return NextResponse.json(
+          { error: 'Payment Intent ID is required for update', success: false },
+          { status: 400 }
+        )
+      }
+
+      console.log('[STRIPE API] Updating payment intent:', id)
+
+      const updateData: any = {}
+      if (amount !== undefined) updateData.amount = amount
+      if (currency !== undefined) updateData.currency = currency
+      if (customerId !== undefined) updateData.customer = customerId
+      if (payment_method !== undefined) updateData.payment_method = payment_method
+      if (description !== undefined) updateData.description = description
+      if (metadata !== undefined) updateData.metadata = metadata
+
+      const paymentIntent = await stripe.paymentIntents.update(id, updateData)
+
+      console.log('[STRIPE API] Successfully updated payment intent:', paymentIntent.id)
+
+      return NextResponse.json({
+        success: true,
+        payment_intent: paymentIntent
+      })
+    }
+
+    // Handle cancel action
+    if (action === 'cancel') {
+      const { id, cancellation_reason } = body
+
+      if (!id) {
+        return NextResponse.json(
+          { error: 'Payment Intent ID is required for cancellation', success: false },
+          { status: 400 }
+        )
+      }
+
+      console.log('[STRIPE API] Cancelling payment intent:', id)
+
+      const paymentIntent = await stripe.paymentIntents.cancel(id, {
+        ...(cancellation_reason && { cancellation_reason })
+      })
+
+      console.log('[STRIPE API] Successfully cancelled payment intent:', paymentIntent.id)
+
+      return NextResponse.json({
+        success: true,
+        payment_intent: paymentIntent,
+        cancelled: true
+      })
+    }
+
     // Default action: list payment intents
     console.log('[STRIPE API] Listing payment intents')
 

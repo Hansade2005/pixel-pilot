@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     // Handle different actions
     if (action === 'create') {
       // Create customer
-      const { email: customerEmail, name, phone, description, metadata } = body
+      const { email: customerEmail, name, phone, description, metadata, address, shipping } = body
 
       console.log('[STRIPE API] Creating customer')
 
@@ -41,7 +41,9 @@ export async function POST(request: NextRequest) {
         ...(name && { name }),
         ...(phone && { phone }),
         ...(description && { description }),
-        ...(metadata && { metadata })
+        ...(metadata && { metadata }),
+        ...(address && { address }),
+        ...(shipping && { shipping })
       })
 
       console.log('[STRIPE API] Successfully created customer:', customer.id)
@@ -50,6 +52,63 @@ export async function POST(request: NextRequest) {
         success: true,
         customer
       }, { status: 201 })
+    }
+
+    if (action === 'update') {
+      // Update customer
+      const { id, email: customerEmail, name, phone, description, metadata, address, shipping, default_payment_method } = body
+
+      if (!id) {
+        return NextResponse.json(
+          { error: 'Customer ID is required for update', success: false },
+          { status: 400 }
+        )
+      }
+
+      console.log('[STRIPE API] Updating customer:', id)
+
+      const updateData: any = {}
+      if (customerEmail !== undefined) updateData.email = customerEmail
+      if (name !== undefined) updateData.name = name
+      if (phone !== undefined) updateData.phone = phone
+      if (description !== undefined) updateData.description = description
+      if (metadata !== undefined) updateData.metadata = metadata
+      if (address !== undefined) updateData.address = address
+      if (shipping !== undefined) updateData.shipping = shipping
+      if (default_payment_method !== undefined) updateData.default_payment_method = default_payment_method
+
+      const customer = await stripe.customers.update(id, updateData)
+
+      console.log('[STRIPE API] Successfully updated customer:', customer.id)
+
+      return NextResponse.json({
+        success: true,
+        customer
+      })
+    }
+
+    if (action === 'delete') {
+      // Delete customer
+      const { id } = body
+
+      if (!id) {
+        return NextResponse.json(
+          { error: 'Customer ID is required for deletion', success: false },
+          { status: 400 }
+        )
+      }
+
+      console.log('[STRIPE API] Deleting customer:', id)
+
+      const deleted = await stripe.customers.del(id)
+
+      console.log('[STRIPE API] Successfully deleted customer:', id)
+
+      return NextResponse.json({
+        success: true,
+        deleted: deleted.deleted,
+        id: deleted.id
+      })
     }
 
     // Default action: list customers
