@@ -259,7 +259,24 @@ export default function ManagementPage() {
     const pastedText = e.clipboardData.getData('text').trim()
 
     // Check if pasted text contains KEY=VALUE pairs
-    const envPairs = pastedText.split('\n').filter(line => line.includes('='))
+    const envPairs = pastedText
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line && !line.startsWith('#') && line.includes('='))
+      .map(line => {
+        // Handle export statements
+        if (line.startsWith('export ')) {
+          return line.substring(7).trim()
+        }
+        return line
+      })
+
+    if (envPairs.length === 0) {
+      // No valid environment variables detected, allow normal paste
+      return
+    }
+
+    e.preventDefault() // Prevent default paste behavior
 
     if (envPairs.length === 1) {
       // Single environment variable - auto-fill current fields
@@ -276,8 +293,6 @@ export default function ManagementPage() {
         title: "Environment Variable Detected",
         description: `Auto-filled: ${key.trim()} = ${value.trim().substring(0, 20)}${value.trim().length > 20 ? '...' : ''}`,
       })
-
-      e.preventDefault() // Prevent default paste behavior
     } else if (envPairs.length > 1) {
       // Multiple environment variables - create them all
       if (!newEnvVar.selectedProjectId) {
@@ -288,8 +303,6 @@ export default function ManagementPage() {
         })
         return
       }
-
-      e.preventDefault() // Prevent default paste behavior
 
       try {
         let successCount = 0
