@@ -30,6 +30,7 @@ import { FileSearchResult, FileLookupService } from "@/lib/file-lookup-service"
 import { createCheckpoint } from '@/lib/checkpoint-utils'
 import { getWorkspaceDatabaseId, getDatabaseIdFromUrl } from '@/lib/get-current-workspace'
 import { useSupabaseToken } from '@/hooks/use-supabase-token'
+import { SupabaseConnectionCard } from './supabase-connection-card'
 
 // ExpandableUserMessage component for long user messages
 const ExpandableUserMessage = ({
@@ -2581,7 +2582,8 @@ export function ChatPanelV2({
                 'list_files',
                 'grep_search',
                 'semantic_code_navigator',
-                'create_database'
+                'create_database',
+                'request_supabase_connection'
               ]
               
               if (clientSideTools.includes(toolCall.toolName)) {
@@ -3207,6 +3209,39 @@ export function ChatPanelV2({
                         isStreaming={(isLoading && message.id === messages[messages.length - 1]?.id) || message.id === continuingMessageId}
                       />
                     ) : null
+                  })()}
+                  
+                  {/* Special Rendering: Supabase Connection Card */}
+                  {(() => {
+                    const toolCalls = activeToolCalls.get(message.id)
+                    const supabaseConnectionCalls = toolCalls?.filter(tc => 
+                      tc.toolName === 'request_supabase_connection' && tc.status === 'completed'
+                    )
+                    
+                    if (supabaseConnectionCalls && supabaseConnectionCalls.length > 0) {
+                      console.log(`[ChatPanelV2][Render] Rendering ${supabaseConnectionCalls.length} Supabase connection card(s)`)
+                      return (
+                        <div className="space-y-4 mb-4">
+                          {supabaseConnectionCalls.map((toolCall) => {
+                            // Try to extract data from the tool call input or result
+                            const input = toolCall.input || {}
+                            const title = input.title
+                            const description = input.description
+                            const labels = input.labels
+                            
+                            return (
+                              <SupabaseConnectionCard
+                                key={toolCall.toolCallId}
+                                title={title}
+                                description={description}
+                                labels={labels}
+                              />
+                            )
+                          })}
+                        </div>
+                      )
+                    }
+                    return null
                   })()}
                   
                   <MessageWithTools
