@@ -18,7 +18,7 @@ interface SupabaseConnectionCardProps {
 
 /**
  * Special rendering component for Supabase project connection
- * This is NOT a pill - it's a full-width card with CTAs
+ * This is NOT a pill - it's a compact card with CTAs
  */
 export function SupabaseConnectionCard({
   title = "Connect Your Supabase Project",
@@ -27,98 +27,96 @@ export function SupabaseConnectionCard({
   className
 }: SupabaseConnectionCardProps) {
   const {
-    connectAuth = "Connect Supabase Account",
-    manageProject = "Select & Connect Project"
+    connectAuth = "Connect Account",
+    manageProject = "Select Project"
   } = labels
 
   return (
     <Card className={cn(
-      "p-6 border-2 border-purple-500/20 bg-gradient-to-br from-purple-50/50 to-blue-50/50 dark:from-purple-950/20 dark:to-blue-950/20",
+      "border-purple-500/30 bg-gradient-to-br from-purple-500/5 to-blue-500/5",
+      "dark:from-purple-500/10 dark:to-blue-500/10",
       className
     )}>
-      <div className="flex items-start gap-4">
-        {/* Icon */}
-        <div className="flex-shrink-0">
-          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
-            <Database className="w-6 h-6 text-white" />
+      <div className="p-3 space-y-3">
+        {/* Header */}
+        <div className="flex items-start gap-2">
+          <div className="flex-shrink-0 mt-0.5">
+            <div className="w-7 h-7 rounded-md bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+              <Database className="w-3.5 h-3.5 text-white" />
+            </div>
           </div>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 space-y-4">
-          {/* Header */}
-          <div>
-            <h3 className="text-lg font-semibold text-foreground mb-1">
+          <div className="flex-1 min-w-0">
+            <h4 className="text-xs font-semibold text-foreground leading-tight">
               {title}
-            </h3>
-            <p className="text-sm text-muted-foreground">
+            </h4>
+            <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
               {description}
             </p>
           </div>
+        </div>
 
-          {/* Connection Steps */}
-          <div className="space-y-3">
-            {/* Step 1: Connect Account */}
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-white/50 dark:bg-black/20 border border-purple-200/50 dark:border-purple-800/50">
-              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-500 text-white text-xs font-bold">
-                1
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-foreground">
-                  Connect your account via Auth0 or manual token
-                </p>
-              </div>
-              <Button
-                size="sm"
-                className="bg-purple-500 hover:bg-purple-600 text-white"
-                onClick={() => {
-                  window.open('https://pipilot.dev/workspace/account', '_blank')
-                }}
-              >
-                <Key className="w-4 h-4 mr-2" />
-                {connectAuth}
-                <ExternalLink className="w-3 h-3 ml-2" />
-              </Button>
+        {/* Connection Steps */}
+        <div className="space-y-2">
+          {/* Step 1: Connect Account */}
+          <div className="flex items-center gap-2 p-2 rounded-md bg-purple-500/5 dark:bg-purple-500/10 border border-purple-500/20">
+            <div className="flex items-center justify-center w-4 h-4 rounded-full bg-purple-500 text-white text-[10px] font-bold flex-shrink-0">
+              1
             </div>
-
-            {/* Arrow */}
-            <div className="flex justify-center">
-              <ArrowRight className="w-5 h-5 text-muted-foreground" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-medium text-foreground leading-tight">
+                Connect via Auth0 or token
+              </p>
             </div>
-
-            {/* Step 2: Select Project */}
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-white/50 dark:bg-black/20 border border-blue-200/50 dark:border-blue-800/50">
-              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white text-xs font-bold">
-                2
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-foreground">
-                  View and connect your Supabase project
-                </p>
-              </div>
-              <Button
-                size="sm"
-                className="bg-blue-500 hover:bg-blue-600 text-white"
-                onClick={() => {
-                  window.open('https://pipilot.dev/workspace/management', '_blank')
-                }}
-              >
-                <Link className="w-4 h-4 mr-2" />
-                {manageProject}
-                <ExternalLink className="w-3 h-3 ml-2" />
-              </Button>
-            </div>
+            <Button
+              size="sm"
+              className="h-6 px-2 text-[10px] bg-purple-500 hover:bg-purple-600 text-white flex-shrink-0"
+              onClick={() => {
+                window.open('https://pipilot.dev/workspace/account', '_blank')
+              }}
+            >
+              <Key className="w-3 h-3 mr-1" />
+              {connectAuth}
+              <ExternalLink className="w-2.5 h-2.5 ml-1" />
+            </Button>
           </div>
 
-          {/* Footer note */}
-          <div className="flex items-start gap-2 text-xs text-muted-foreground pt-2 border-t border-purple-200/30 dark:border-purple-800/30">
-            <div className="w-4 h-4 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <Database className="w-2.5 h-2.5 text-purple-600 dark:text-purple-400" />
-            </div>
-            <p>
-              Once connected, I'll be able to help you manage your database schema, run queries, and deploy changes seamlessly.
-            </p>
+          {/* Arrow */}
+          <div className="flex justify-center">
+            <ArrowRight className="w-3 h-3 text-muted-foreground" />
           </div>
+
+          {/* Step 2: Select Project */}
+          <div className="flex items-center gap-2 p-2 rounded-md bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/20">
+            <div className="flex items-center justify-center w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] font-bold flex-shrink-0">
+              2
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-medium text-foreground leading-tight">
+                View and connect project
+              </p>
+            </div>
+            <Button
+              size="sm"
+              className="h-6 px-2 text-[10px] bg-blue-500 hover:bg-blue-600 text-white flex-shrink-0"
+              onClick={() => {
+                window.open('https://pipilot.dev/workspace/management', '_blank')
+              }}
+            >
+              <Link className="w-3 h-3 mr-1" />
+              {manageProject}
+              <ExternalLink className="w-2.5 h-2.5 ml-1" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Footer note */}
+        <div className="flex items-start gap-1.5 pt-2 border-t border-purple-500/10">
+          <div className="w-3 h-3 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <Database className="w-1.5 h-1.5 text-purple-600 dark:text-purple-400" />
+          </div>
+          <p className="text-[10px] text-muted-foreground leading-snug">
+            Once connected, I can manage your database, run queries, and deploy changes.
+          </p>
         </div>
       </div>
     </Card>
