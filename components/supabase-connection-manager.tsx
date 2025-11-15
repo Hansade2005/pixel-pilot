@@ -16,9 +16,8 @@ import {
   Loader2
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { createClient } from "@/lib/supabase/client"
-import { useSupabaseToken } from "@/hooks/use-supabase-token"
 import {
+  getDeploymentTokens,
   connectPixelPilotToSupabaseProject,
   getSupabaseProjectForPixelPilotProject,
   disconnectPixelPilotFromSupabaseProject
@@ -57,10 +56,6 @@ export function SupabaseConnectionManager({
   userId
 }: SupabaseConnectionManagerProps) {
   const { toast } = useToast()
-  
-  // Use the Supabase token hook for automatic token management
-  const { token: supabaseToken, isLoading: tokenLoading, isExpired: tokenExpired, error: tokenError } = useSupabaseToken()
-  
   const [isLoading, setIsLoading] = useState(true)
   const [isConnecting, setIsConnecting] = useState(false)
   const [isDisconnecting, setIsDisconnecting] = useState(false)
@@ -77,8 +72,9 @@ export function SupabaseConnectionManager({
     try {
       setIsLoading(true)
 
-      // Check if user has Supabase token using the hook
-      const hasToken = !!supabaseToken
+      // Check if user has Supabase token
+      const tokens = await getDeploymentTokens(userId)
+      const hasToken = !!tokens?.supabase
       setHasSupabaseToken(hasToken)
 
       if (hasToken) {
@@ -87,8 +83,8 @@ export function SupabaseConnectionManager({
         setCurrentConnection(connection)
 
         // Fetch available projects
-        if (supabaseToken) {
-          await fetchAvailableProjects(supabaseToken)
+        if (tokens.supabase) {
+          await fetchAvailableProjects(tokens.supabase)
         }
       }
     } catch (error) {
@@ -130,8 +126,9 @@ export function SupabaseConnectionManager({
 
     setIsConnecting(true)
     try {
-      // Get the access token from the hook
-      const accessToken = supabaseToken
+      // Get the access token
+      const tokens = await getDeploymentTokens(userId)
+      const accessToken = tokens?.supabase
 
       if (!accessToken) {
         throw new Error('No Supabase access token found')
