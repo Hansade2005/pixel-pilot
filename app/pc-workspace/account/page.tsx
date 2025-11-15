@@ -38,7 +38,6 @@ import {
   AlertTriangle,
   Plus
 } from "lucide-react"
-import { useSupabaseToken } from "@/hooks/use-supabase-token"
 
 // Custom SVG Icons
 const GitHubIcon = ({ className }: { className?: string }) => (
@@ -174,9 +173,6 @@ function AccountSettingsPageContent() {
 
   // Delete account form state
   const [deleteConfirmation, setDeleteConfirmation] = useState("")
-
-  // Supabase token management - automatic refresh
-  const { token: supabaseToken, isLoading: tokenLoading, isExpired: tokenExpired, error: tokenError, refreshToken: refreshSupabaseToken, lastRefresh } = useSupabaseToken()
 
   const supabase = createClient()
   const searchParams = useSearchParams()
