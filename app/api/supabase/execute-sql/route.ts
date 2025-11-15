@@ -1,30 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { executeManagementQuery } from '@/lib/supabase/management-api-utils'
-import { getSupabaseAccessToken } from '@/lib/cloud-sync'
 
 /**
  * Server-side API route to execute SQL queries on Supabase database
  * Supports DDL operations like creating RLS policies, enabling RLS, and other database schema changes
- * Automatically retrieves and refreshes the user's Supabase Management API token
  */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { projectId, sql, confirmDangerous = false } = body
+    const { token, projectId, sql, confirmDangerous = false } = body
 
-    if (!projectId || !sql) {
+    if (!token || !projectId || !sql) {
       return NextResponse.json(
-        { error: 'projectId and sql are required' },
+        { error: 'Token, projectId and sql are required' },
         { status: 400 }
-      )
-    }
-
-    // Get the valid Supabase Management API token automatically
-    const token = await getSupabaseAccessToken()
-    if (!token) {
-      return NextResponse.json(
-        { error: 'No valid Supabase Management API token found. Please authenticate with Supabase first.' },
-        { status: 401 }
       )
     }
 

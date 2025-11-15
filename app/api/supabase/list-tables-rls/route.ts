@@ -1,29 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSupabaseAccessToken } from '@/lib/cloud-sync'
 
 /**
  * Server-side API route to list tables and RLS policies using Supabase REST API
  * Uses https://api.supabase.com/v1/projects/{project_id}/database/query
- * Automatically retrieves and refreshes the user's Supabase Management API token
  */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { projectId, includeRlsPolicies = true, schema = 'public', tableName } = body
+    const { token, projectId, includeRlsPolicies = true, schema = 'public', tableName } = body
 
-    if (!projectId) {
+    if (!token || !projectId) {
       return NextResponse.json(
-        { error: 'projectId is required' },
+        { error: 'Token and projectId are required' },
         { status: 400 }
-      )
-    }
-
-    // Get the valid Supabase Management API token automatically
-    const token = await getSupabaseAccessToken()
-    if (!token) {
-      return NextResponse.json(
-        { error: 'No valid Supabase Management API token found. Please authenticate with Supabase first.' },
-        { status: 401 }
       )
     }
 

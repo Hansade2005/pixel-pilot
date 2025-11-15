@@ -1,30 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSupabaseAccessToken } from '@/lib/cloud-sync'
 
 /**
  * Server-side API route to delete data from Supabase tables using REST API
  * Supports both single row and bulk delete operations
  * Refactored to match the working test pattern
- * Automatically retrieves and refreshes the user's Supabase Management API token
  */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { projectId, tableName, schema = 'public', where, ids } = body
+    const { token, projectId, tableName, schema = 'public', where, ids } = body
 
-    if (!projectId || !tableName) {
+    if (!token || !projectId || !tableName) {
       return NextResponse.json(
-        { error: 'projectId and tableName are required' },
+        { error: 'Token, projectId and tableName are required' },
         { status: 400 }
-      )
-    }
-
-    // Get the valid Supabase Management API token automatically
-    const token = await getSupabaseAccessToken()
-    if (!token) {
-      return NextResponse.json(
-        { error: 'No valid Supabase Management API token found. Please authenticate with Supabase first.' },
-        { status: 401 }
       )
     }
 

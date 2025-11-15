@@ -1,29 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSupabaseAccessToken } from '@/lib/cloud-sync'
 
 /**
  * Server-side API route to fetch Supabase project API keys
  * This avoids CORS issues that occur when calling the Management API directly from the browser
- * Automatically retrieves and refreshes the user's Supabase Management API token
  */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { projectId } = body
+    const { token, projectId } = body
 
-    if (!projectId) {
+    if (!token || !projectId) {
       return NextResponse.json(
-        { error: 'projectId is required' },
+        { error: 'Token and projectId are required' },
         { status: 400 }
-      )
-    }
-
-    // Get the valid Supabase Management API token automatically
-    const token = await getSupabaseAccessToken()
-    if (!token) {
-      return NextResponse.json(
-        { error: 'No valid Supabase Management API token found. Please authenticate with Supabase first.' },
-        { status: 401 }
       )
     }
 

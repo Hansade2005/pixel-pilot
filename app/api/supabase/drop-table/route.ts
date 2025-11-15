@@ -1,30 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { executeManagementQuery } from '../../../../lib/supabase/management-api-utils'
-import { getSupabaseAccessToken } from '@/lib/cloud-sync'
 
 /**
  * Server-side API route to drop tables in a Supabase project
  * Provides a safe interface for DROP TABLE operations
- * Automatically retrieves and refreshes the user's Supabase Management API token
  */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { projectId, tableName, schema = 'public', options = {} } = body
+    const { token, projectId, tableName, schema = 'public', options = {} } = body
 
-    if (!projectId || !tableName) {
+    if (!token || !projectId || !tableName) {
       return NextResponse.json(
-        { error: 'projectId and tableName are required' },
+        { error: 'Token, projectId and tableName are required' },
         { status: 400 }
-      )
-    }
-
-    // Get the valid Supabase Management API token automatically
-    const token = await getSupabaseAccessToken()
-    if (!token) {
-      return NextResponse.json(
-        { error: 'No valid Supabase Management API token found. Please authenticate with Supabase first.' },
-        { status: 401 }
       )
     }
 
