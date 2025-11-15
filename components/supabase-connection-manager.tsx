@@ -337,20 +337,20 @@ export function SupabaseConnectionManager({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <Button
                 onClick={() => window.location.href = `/workspace/${pixelpilotProjectId}/database`}
-                className="bg-purple-600 hover:bg-purple-700 h-8 text-xs"
+                className="bg-purple-600 hover:bg-purple-700 h-7 text-[10px] px-2"
                 size="sm"
               >
-                <Database className="h-3 w-3 mr-1.5" />
-                Manage Database
+                <Database className="h-2.5 w-2.5 mr-1 flex-shrink-0" />
+                <span className="truncate">Manage Database</span>
               </Button>
               <Button
                 variant="outline"
                 onClick={() => window.open(currentConnection.supabaseProjectUrl, '_blank')}
-                className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-8 text-xs"
+                className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-7 text-[10px] px-2"
                 size="sm"
               >
-                <ExternalLink className="h-3 w-3 mr-1.5" />
-                Open Supabase
+                <ExternalLink className="h-2.5 w-2.5 mr-1 flex-shrink-0" />
+                <span className="truncate">Open Supabase</span>
               </Button>
             </div>
           </div>
