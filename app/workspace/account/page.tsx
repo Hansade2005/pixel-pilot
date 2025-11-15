@@ -1715,43 +1715,26 @@ function AccountSettingsPageContent() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {subscription && subscription.plan !== 'free' ? (
+                  {subscription && subscription.plan !== 'free' && subscription.stripeCustomerId ? (
                     <>
-                      {/* Payment Method */}
+                      {/* Payment Method - Only shown when Stripe customer exists */}
                       <div className="space-y-3">
                         <h4 className="text-sm font-medium">Payment Method</h4>
-                        <div className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-6 bg-blue-600 rounded flex items-center justify-center">
-                              <CreditCard className="h-3 w-3 text-white" />
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium">•••• •••• •••• 4242</p>
-                              <p className="text-xs text-muted-foreground">Expires 12/26</p>
-                            </div>
-                          </div>
-                          <Badge variant="secondary">Primary</Badge>
-                        </div>
-                        <Button variant="outline" size="sm">
-                          <CreditCard className="h-4 w-4 mr-2" />
-                          Update Payment Method
-                        </Button>
-                      </div>
-
-                      {/* Billing Address */}
-                      <div className="space-y-3">
-                        <h4 className="text-sm font-medium">Billing Address</h4>
-                        <div className="p-4 border rounded-lg">
-                          <p className="text-sm">John Doe</p>
-                          <p className="text-sm text-muted-foreground">
-                            123 Main Street<br />
-                            San Francisco, CA 94102<br />
-                            United States
+                        <div className="p-4 border rounded-lg bg-muted/30">
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Payment information is managed through Stripe
                           </p>
+                          <Button variant="outline" size="sm" asChild>
+                            <a 
+                              href={`https://billing.stripe.com/p/login/test_${subscription.stripeCustomerId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <CreditCard className="h-4 w-4 mr-2" />
+                              Manage Payment Methods
+                            </a>
+                          </Button>
                         </div>
-                        <Button variant="outline" size="sm">
-                          Update Billing Address
-                        </Button>
                       </div>
 
                       {/* Billing Preferences */}
@@ -1759,29 +1742,35 @@ function AccountSettingsPageContent() {
                         <h4 className="text-sm font-medium">Billing Preferences</h4>
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <span className="text-sm">Email receipts</span>
-                            <input type="checkbox" defaultChecked className="rounded" />
-                          </div>
-                          <div className="flex items-center justify-between">
                             <span className="text-sm">Auto-renewal</span>
                             <input
                               type="checkbox"
-                              defaultChecked={!subscription.cancelAtPeriodEnd}
+                              checked={!subscription.cancelAtPeriodEnd}
+                              disabled
                               className="rounded"
                             />
                           </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm">Usage alerts</span>
-                            <input type="checkbox" defaultChecked className="rounded" />
-                          </div>
                         </div>
+                        <p className="text-xs text-muted-foreground">
+                          Manage billing preferences in your{" "}
+                          <a 
+                            href="https://billing.stripe.com" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-500 hover:underline"
+                          >
+                            Stripe customer portal
+                          </a>
+                        </p>
                       </div>
                     </>
                   ) : (
                     <div className="text-center py-8">
                       <CreditCard className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                       <p className="text-muted-foreground mb-4">
-                        Billing information will be available once you subscribe to a plan
+                        {subscription && subscription.plan !== 'free' 
+                          ? "Billing information will be available once payment is processed"
+                          : "Billing information will be available once you subscribe to a paid plan"}
                       </p>
                       <Button asChild>
                         <a href="/pricing">Choose a Plan</a>
