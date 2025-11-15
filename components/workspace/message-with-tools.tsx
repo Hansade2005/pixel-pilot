@@ -6,6 +6,7 @@ import { ChainOfThought, ChainOfThoughtHeader, ChainOfThoughtContent, ChainOfTho
 import { Response } from '@/components/ai-elements/response'
 import { FileText, Edit3, X, Package, PackageMinus, Loader2, CheckCircle2, XCircle, BrainIcon, FileCode,FolderOpen,Search, FileImage, FileJson, FileType, Settings, Package as PackageIcon, File, Globe, Eye } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { SupabaseConnectionCard } from './supabase-connection-card'
 
 // Message type compatible with AI SDK v5
 interface MessageWithToolsProps {
@@ -412,6 +413,30 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
           <Response>
             {responseContent}
           </Response>
+        </div>
+      )}
+
+      {/* Special rendering for request_supabase_connection tool */}
+      {hasTools && toolInvocations?.some((tool: any) => 
+        tool.toolName === 'request_supabase_connection' && 
+        tool.state === 'result' && 
+        tool.result?.output?.requiresSpecialRendering
+      ) && (
+        <div className="mt-4">
+          {toolInvocations
+            ?.filter((tool: any) => 
+              tool.toolName === 'request_supabase_connection' && 
+              tool.state === 'result' && 
+              tool.result?.output?.requiresSpecialRendering
+            )
+            .map((tool: any) => (
+              <SupabaseConnectionCard
+                key={tool.toolCallId}
+                title={tool.result.output.title}
+                description={tool.result.output.description}
+                labels={tool.result.output.labels}
+              />
+            ))}
         </div>
       )}
 

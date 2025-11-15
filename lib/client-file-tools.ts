@@ -1111,6 +1111,28 @@ export async function handleClientFileOperation(
         break;
       }
 
+      case 'request_supabase_connection': {
+        const { title, description, labels } = toolCall.args;
+        console.log(`[ClientFileTool] request_supabase_connection`);
+
+        // This tool doesn't execute anything - it just returns data for special rendering
+        addToolResult({
+          tool: 'request_supabase_connection',
+          toolCallId: toolCall.toolCallId,
+          state: 'result',
+          output: {
+            success: true,
+            requiresSpecialRendering: true,
+            renderType: 'supabase-connection-card',
+            title: title || 'Connect Your Supabase Project',
+            description: description || 'To continue, please connect your Supabase account and select a project.',
+            labels: labels || {},
+            message: '⚠️ Supabase connection required - please follow the steps above'
+          }
+        });
+        break;
+      }
+
       default:
         console.warn(`[ClientFileTool] Unknown tool: ${toolCall.toolName}`);
     }

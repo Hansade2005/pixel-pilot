@@ -3985,6 +3985,28 @@ ${conversationSummaryContext || ''}`
           }
         }),
 
+        // CLIENT-SIDE TOOL: Request user to connect their Supabase project
+        request_supabase_connection: tool({
+          description: 'Request the user to connect their Supabase account and project. Use this when you need access to their Supabase project to perform database operations, schema changes, or deployments. This displays a special UI card (not a pill) with step-by-step instructions and CTA buttons.',
+          inputSchema: z.object({
+            title: z.string().optional().describe('Custom title for the connection card (default: "Connect Your Supabase Project")'),
+            description: z.string().optional().describe('Custom description explaining why connection is needed (default: "To continue, please connect your Supabase account and select a project.")'),
+            labels: z.object({
+              connectAuth: z.string().optional().describe('Label for the Auth0/token connection button (default: "Connect Supabase Account")'),
+              manageProject: z.string().optional().describe('Label for the project selection button (default: "Select & Connect Project")')
+            }).optional().describe('Custom labels for the action buttons')
+          }),
+          execute: async ({ title, description, labels }, { toolCallId }) => {
+            // This is a client-side UI tool - no actual execution needed
+            // The client will render a special SupabaseConnectionCard component
+            return await constructToolResult('request_supabase_connection', { 
+              title, 
+              description, 
+              labels 
+            }, projectId, toolCallId);
+          }
+        }),
+
         create_table: tool({
           description: 'Create a new table in the database. Can either use AI to generate optimal schema from description, or create table with predefined schema. Supports complex relationships, constraints, and indexes.',
           inputSchema: z.object({

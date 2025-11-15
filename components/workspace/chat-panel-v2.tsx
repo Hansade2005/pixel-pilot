@@ -1518,7 +1518,8 @@ export function ChatPanelV2({
                 'list_files',
                 'grep_search',
                 'semantic_code_navigator',
-                'create_database'
+                'create_database',
+                'request_supabase_connection'
               ]
               
               if (clientSideTools.includes(toolCall.toolName)) {
@@ -2112,7 +2113,8 @@ export function ChatPanelV2({
                 'list_files',
                 'grep_search',
                 'semantic_code_navigator',
-                'create_database'
+                'create_database',
+                'request_supabase_connection'
               ]
               
               if (clientSideTools.includes(toolCall.toolName)) {
