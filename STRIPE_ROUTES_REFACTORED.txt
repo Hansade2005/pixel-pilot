@@ -1,0 +1,238 @@
+// STRIPE API ROUTES - COMPLETE REFACTORED VERSIONS
+// Copy these to replace the existing route files
+
+// ========================================
+// invoices/route.ts
+// ========================================
+import { NextRequest, NextResponse } from 'next/server'
+import { createStripeClient, getPaginationParams } from '@/lib/stripe/stripe-api-utils'
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { stripeKey, action, limit, starting_after, customer, status } = body
+
+    if (!stripeKey) {
+      return NextResponse.json({ error: 'stripeKey is required', success: false }, { status: 400 })
+    }
+
+    const stripe = createStripeClient(stripeKey)
+
+    if (action === 'create') {
+      const { customer: customerId, auto_advance, collection_method, description, metadata } = body
+      if (!customerId) {
+        return NextResponse.json({ error: 'Customer is required', success: false }, { status: 400 })
+      }
+
+      const invoice = await stripe.invoices.create({
+        customer: customerId,
+        ...(auto_advance !== undefined && { auto_advance }),
+        ...(collection_method && { collection_method }),
+        ...(description && { description }),
+        ...(metadata && { metadata })
+      })
+
+      return NextResponse.json({ success: true, invoice }, { status: 201 })
+    }
+
+    const params: any = {
+      ...getPaginationParams(limit, starting_after),
+      ...(customer && { customer }),
+      ...(status && { status })
+    }
+
+    const invoices = await stripe.invoices.list(params)
+    return NextResponse.json({ success: true, invoices: invoices.data, has_more: invoices.has_more })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Failed to process invoices', success: false }, { status: error.statusCode || 500 })
+  }
+}
+
+// ========================================
+// payment-links/route.ts
+// ========================================
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { stripeKey, action, limit, starting_after, line_items, after_completion, metadata } = body
+
+    if (!stripeKey) {
+      return NextResponse.json({ error: 'stripeKey is required', success: false }, { status: 400 })
+    }
+
+    const stripe = createStripeClient(stripeKey)
+
+    if (action === 'create') {
+      if (!line_items || !Array.isArray(line_items) || line_items.length === 0) {
+        return NextResponse.json({ error: 'Line items are required', success: false }, { status: 400 })
+      }
+
+      const paymentLink = await stripe.paymentLinks.create({
+        line_items,
+        ...(after_completion && { after_completion }),
+        ...(metadata && { metadata })
+      })
+
+      return NextResponse.json({ success: true, payment_link: paymentLink }, { status: 201 })
+    }
+
+    const paymentLinks = await stripe.paymentLinks.list({
+      limit: limit && limit > 0 && limit <= 100 ? limit : 10,
+      ...(starting_after && { starting_after })
+    })
+
+    return NextResponse.json({ success: true, payment_links: paymentLinks.data, has_more: paymentLinks.has_more })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Failed to process payment links', success: false }, { status: error.statusCode || 500 })
+  }
+}
+
+// ========================================
+// charges/route.ts
+// ========================================
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { stripeKey, limit, starting_after, customer } = body
+
+    if (!stripeKey) {
+      return NextResponse.json({ error: 'stripeKey is required', success: false }, { status: 400 })
+    }
+
+    const stripe = createStripeClient(stripeKey)
+    const params: any = { ...getPaginationParams(limit, starting_after), ...(customer && { customer }) }
+    const charges = await stripe.charges.list(params)
+
+    return NextResponse.json({ success: true, charges: charges.data, has_more: charges.has_more })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Failed to list charges', success: false }, { status: error.statusCode || 500 })
+  }
+}
+
+// ========================================
+// refunds/route.ts
+// ========================================
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { stripeKey, action, limit, starting_after, charge, payment_intent, amount, reason, metadata } = body
+
+    if (!stripeKey) {
+      return NextResponse.json({ error: 'stripeKey is required', success: false }, { status: 400 })
+    }
+
+    const stripe = createStripeClient(stripeKey)
+
+    if (action === 'create') {
+      if (!charge && !payment_intent) {
+        return NextResponse.json({ error: 'Either charge or payment_intent is required', success: false }, { status: 400 })
+      }
+
+      const refund = await stripe.refunds.create({
+        ...(charge && { charge }),
+        ...(payment_intent && { payment_intent }),
+        ...(amount && { amount }),
+        ...(reason && { reason }),
+        ...(metadata && { metadata })
+      })
+
+      return NextResponse.json({ success: true, refund }, { status: 201 })
+    }
+
+    const refunds = await stripe.refunds.list({
+      limit: limit && limit > 0 && limit <= 100 ? limit : 10,
+      ...(starting_after && { starting_after }),
+      ...(charge && { charge })
+    })
+
+    return NextResponse.json({ success: true, refunds: refunds.data, has_more: refunds.has_more })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Failed to process refunds', success: false }, { status: error.statusCode || 500 })
+  }
+}
+
+// ========================================
+// coupons/route.ts
+// ========================================
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { stripeKey, action, limit, starting_after } = body
+
+    if (!stripeKey) {
+      return NextResponse.json({ error: 'stripeKey is required', success: false }, { status: 400 })
+    }
+
+    const stripe = createStripeClient(stripeKey)
+
+    if (action === 'create') {
+      const { duration, percent_off, amount_off, currency, duration_in_months, name, metadata } = body
+
+      if (!duration) {
+        return NextResponse.json({ error: 'Duration is required', success: false }, { status: 400 })
+      }
+
+      if (!percent_off && !amount_off) {
+        return NextResponse.json({ error: 'Either percent_off or amount_off is required', success: false }, { status: 400 })
+      }
+
+      const coupon = await stripe.coupons.create({
+        duration,
+        ...(percent_off && { percent_off }),
+        ...(amount_off && { amount_off }),
+        ...(currency && { currency }),
+        ...(duration_in_months && { duration_in_months }),
+        ...(name && { name }),
+        ...(metadata && { metadata })
+      })
+
+      return NextResponse.json({ success: true, coupon }, { status: 201 })
+    }
+
+    const coupons = await stripe.coupons.list(getPaginationParams(limit, starting_after))
+    return NextResponse.json({ success: true, coupons: coupons.data, has_more: coupons.has_more })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Failed to process coupons', success: false }, { status: error.statusCode || 500 })
+  }
+}
+
+// ========================================
+// search/route.ts
+// ========================================
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { stripeKey, resource, query, limit = 10 } = body
+
+    if (!stripeKey) {
+      return NextResponse.json({ error: 'stripeKey is required', success: false }, { status: 400 })
+    }
+
+    if (!resource || !query) {
+      return NextResponse.json({ error: 'Resource and query are required', success: false }, { status: 400 })
+    }
+
+    const validResources = ['customers', 'products', 'prices', 'subscriptions', 'invoices', 'payment_intents', 'charges']
+    if (!validResources.includes(resource)) {
+      return NextResponse.json({ error: `Invalid resource. Must be one of: ${validResources.join(', ')}`, success: false }, { status: 400 })
+    }
+
+    const stripe = createStripeClient(stripeKey)
+    let results: any
+
+    switch (resource) {
+      case 'customers': results = await stripe.customers.search({ query, limit }); break
+      case 'products': results = await stripe.products.search({ query, limit }); break
+      case 'prices': results = await stripe.prices.search({ query, limit }); break
+      case 'subscriptions': results = await stripe.subscriptions.search({ query, limit }); break
+      case 'invoices': results = await stripe.invoices.search({ query, limit }); break
+      case 'payment_intents': results = await stripe.paymentIntents.search({ query, limit }); break
+      case 'charges': results = await stripe.charges.search({ query, limit }); break
+      default: return NextResponse.json({ error: 'Unsupported resource type', success: false }, { status: 400 })
+    }
+
+    return NextResponse.json({ success: true, results: results.data, has_more: results.has_more })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Search failed', success: false }, { status: error.statusCode || 500 })
+  }
+}

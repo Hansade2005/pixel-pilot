@@ -2375,9 +2375,10 @@ export function ChatPanelV2({
       let supabaseAccessToken = supabaseToken // Use the hook's token
       let supabaseProjectDetails = null
       let supabaseUserId = null
+      let stripeApiKey = null // Stripe API key for payment operations
 
       try {
-        const { getSupabaseProjectForPixelPilotProject } = await import('@/lib/cloud-sync')
+        const { getSupabaseProjectForPixelPilotProject, getDeploymentTokens } = await import('@/lib/cloud-sync')
 
         // Get the authenticated user from Supabase session
         const { createClient } = await import('@/lib/supabase/client')
@@ -2393,20 +2394,30 @@ export function ChatPanelV2({
           if (project?.id) {
             supabaseProjectDetails = await getSupabaseProjectForPixelPilotProject(supabaseUserId, project.id)
           }
+
+          // Fetch Stripe API key from cloud sync
+          const deploymentTokens = await getDeploymentTokens(supabaseUserId)
+          if (deploymentTokens?.stripe) {
+            stripeApiKey = deploymentTokens.stripe
+            console.log('[ChatPanelV2] ✅ Stripe API key retrieved from cloud sync')
+          } else {
+            console.warn('[ChatPanelV2] ⚠️ No Stripe API key found in cloud sync')
+          }
         }
         
-        console.log(`[ChatPanelV2] Supabase data fetched:`, {
+        console.log(`[ChatPanelV2] Cloud sync data fetched:`, {
           hasToken: !!supabaseAccessToken,
           hasProjectDetails: !!supabaseProjectDetails,
           hasUserId: !!supabaseUserId,
           projectId: supabaseProjectDetails?.supabaseProjectId,
           tokenLength: supabaseAccessToken?.length,
           tokenExpired,
-          tokenError
+          tokenError,
+          hasStripeKey: !!stripeApiKey
         })
       } catch (error) {
-        console.warn('[ChatPanelV2] Failed to fetch Supabase data:', error)
-        // Continue without Supabase data - tools will handle the missing token gracefully
+        console.warn('[ChatPanelV2] Failed to fetch cloud sync data:', error)
+        // Continue without cloud sync data - tools will handle the missing tokens gracefully
       }
 
       const response = await fetch('/api/chat-v2', {
@@ -2427,7 +2438,9 @@ export function ChatPanelV2({
           supabaseAccessToken,
           supabaseProjectDetails,
           supabase_projectId: supabaseProjectDetails?.supabaseProjectId, // Extract Supabase project ID to avoid conflicts
-          supabaseUserId // Pass the authenticated user ID
+          supabaseUserId, // Pass the authenticated user ID
+          // Add Stripe API key to the payload
+          stripeApiKey // Pass Stripe API key from cloud sync for payment operations
         }),
         signal: controller.signal
       })
