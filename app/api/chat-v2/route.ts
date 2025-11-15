@@ -7,7 +7,7 @@ import { DEFAULT_CHAT_MODEL, getModelById } from '@/lib/ai-models'
 import { NextResponse } from 'next/server'
 import { getWorkspaceDatabaseId, workspaceHasDatabase, setWorkspaceDatabase } from '@/lib/get-current-workspace'
 import JSZip from 'jszip'
-import lz4 from 'lz4'
+import lz4 from 'lz4js'
 import unzipper from 'unzipper'
 import { Readable } from 'stream'
 
@@ -1472,7 +1472,7 @@ export async function POST(req: Request) {
       console.log(`[Chat-V2] 📦 Received ${compressedData.byteLength} bytes of compressed data`)
 
       // Step 1: LZ4 decompress
-      const decompressedData = lz4.decode(Buffer.from(compressedData))
+      const decompressedData = lz4.decompress(Buffer.from(compressedData))
       console.log(`[Chat-V2] 📦 LZ4 decompressed to ${decompressedData.length} bytes`)
 
       // Step 2: Unzip the data

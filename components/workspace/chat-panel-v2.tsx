@@ -32,7 +32,7 @@ import { getWorkspaceDatabaseId, getDatabaseIdFromUrl } from '@/lib/get-current-
 import { useSupabaseToken } from '@/hooks/use-supabase-token'
 import { SupabaseConnectionCard } from './supabase-connection-card'
 import { zipSync, strToU8 } from 'fflate'
-import { compress } from 'lz4-wasm'
+import { compress } from 'lz4js'
 
 // Compress project files using LZ4 + Zip for efficient transfer
 async function compressProjectFiles(
