@@ -231,14 +231,14 @@ export function SupabaseConnectionManager({
   if (isLoading) {
     return (
       <Card className="bg-gray-800 border-gray-700">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-white">
-            <Database className="h-5 w-5 text-purple-400" />
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center space-x-2 text-white text-sm">
+            <Database className="h-4 w-4 text-purple-400" />
             <span>Supabase Connection</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Skeleton className="h-20 w-full bg-gray-700" />
+          <Skeleton className="h-16 w-full bg-gray-700" />
         </CardContent>
       </Card>
     )
@@ -246,87 +246,90 @@ export function SupabaseConnectionManager({
 
   return (
     <Card className="bg-gray-800 border-gray-700">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between text-white">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center justify-between text-white text-sm">
           <div className="flex items-center space-x-2">
-            <Database className="h-5 w-5 text-purple-400" />
+            <Database className="h-4 w-4 text-purple-400" />
             <span>Supabase Connection</span>
           </div>
           {currentConnection && (
-            <Badge variant="outline" className="border-green-500 text-green-400">
+            <Badge variant="outline" className="border-green-500 text-green-400 text-[10px] h-5">
               Connected
             </Badge>
           )}
         </CardTitle>
-        <CardDescription className="text-gray-400">
+        <CardDescription className="text-gray-400 text-xs mt-1">
           Connect this PixelPilot project to a Supabase database for advanced database management
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3">
         {!hasSupabaseToken ? (
-          <div className="text-center py-6">
-            <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-white mb-2">Supabase Not Connected</h3>
-            <p className="text-gray-400 mb-4">
+          <div className="text-center py-4">
+            <AlertCircle className="h-8 w-8 text-yellow-500 mx-auto mb-3" />
+            <h3 className="text-sm font-medium text-white mb-1.5">Supabase Not Connected</h3>
+            <p className="text-gray-400 mb-3 text-xs">
               You need to connect your Supabase account first in the Account Settings.
             </p>
             <Button
               onClick={() => window.location.href = '/workspace/account'}
-              className="bg-purple-600 hover:bg-purple-700"
+              className="bg-purple-600 hover:bg-purple-700 h-8 text-xs"
+              size="sm"
             >
               Go to Account Settings
             </Button>
           </div>
         ) : currentConnection ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {/* Connected Project Info */}
-            <div className="p-4 bg-green-900/20 border border-green-700 rounded-lg">
+            <div className="p-3 bg-green-900/20 border border-green-700 rounded-lg">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center space-x-2">
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                  <span className="text-sm text-green-300 font-medium">Connected to Supabase</span>
+                  <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                  <span className="text-xs text-green-300 font-medium">Connected to Supabase</span>
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={disconnectFromSupabaseProject}
                   disabled={isDisconnecting}
-                  className="bg-red-900/20 border-red-700 text-red-400 hover:bg-red-900/40"
+                  className="bg-red-900/20 border-red-700 text-red-400 hover:bg-red-900/40 h-6 px-2 text-[10px]"
                 >
                   {isDisconnecting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-3 w-3 animate-spin" />
                   ) : (
-                    <Unlink className="h-4 w-4" />
+                    <>
+                      <Unlink className="h-3 w-3 mr-1" />
+                      Disconnect
+                    </>
                   )}
-                  Disconnect
                 </Button>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-400 text-sm">Project:</span>
-                  <span className="text-white text-sm font-medium">{currentConnection.supabaseProjectName}</span>
+                  <span className="text-gray-400 text-[11px]">Project:</span>
+                  <span className="text-white text-[11px] font-medium">{currentConnection.supabaseProjectName}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-400 text-sm">Project ID:</span>
-                  <span className="text-white text-sm font-mono">{currentConnection.supabaseProjectId}</span>
+                  <span className="text-gray-400 text-[11px]">Project ID:</span>
+                  <span className="text-white text-[11px] font-mono truncate ml-2">{currentConnection.supabaseProjectId}</span>
                 </div>
                 {currentConnection.supabaseProjectUrl && (
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-400 text-sm">URL:</span>
+                    <span className="text-gray-400 text-[11px]">URL:</span>
                     <a
                       href={currentConnection.supabaseProjectUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-400 hover:underline text-sm flex items-center"
+                      className="text-blue-400 hover:underline text-[11px] flex items-center truncate ml-2"
                     >
-                      {currentConnection.supabaseProjectUrl}
-                      <ExternalLink className="h-3 w-3 ml-1" />
+                      <span className="truncate">{currentConnection.supabaseProjectUrl}</span>
+                      <ExternalLink className="h-2.5 w-2.5 ml-1 flex-shrink-0" />
                     </a>
                   </div>
                 )}
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-400 text-sm">Connected:</span>
-                  <span className="text-white text-sm">
+                  <span className="text-gray-400 text-[11px]">Connected:</span>
+                  <span className="text-white text-[11px]">
                     {new Date(currentConnection.connectedAt).toLocaleDateString()}
                   </span>
                 </div>
@@ -334,31 +337,33 @@ export function SupabaseConnectionManager({
             </div>
 
             {/* Database Management Actions */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <Button
                 onClick={() => window.location.href = `/workspace/${pixelpilotProjectId}/database`}
-                className="bg-purple-600 hover:bg-purple-700"
+                className="bg-purple-600 hover:bg-purple-700 h-8 text-xs"
+                size="sm"
               >
-                <Database className="h-4 w-4 mr-2" />
+                <Database className="h-3 w-3 mr-1.5" />
                 Manage Database
               </Button>
               <Button
                 variant="outline"
                 onClick={() => window.open(currentConnection.supabaseProjectUrl, '_blank')}
-                className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                className="bg-gray-700 border-gray-600 text-white hover:bg-gray-600 h-8 text-xs"
+                size="sm"
               >
-                <ExternalLink className="h-4 w-4 mr-2" />
+                <ExternalLink className="h-3 w-3 mr-1.5" />
                 Open Supabase
               </Button>
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {/* Not Connected State */}
-            <div className="text-center py-6">
-              <Database className="h-12 w-12 text-gray-500 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-white mb-2">No Supabase Project Connected</h3>
-              <p className="text-gray-400 mb-4">
+            <div className="text-center py-4">
+              <Database className="h-8 w-8 text-gray-500 mx-auto mb-3" />
+              <h3 className="text-sm font-medium text-white mb-1.5">No Supabase Project Connected</h3>
+              <p className="text-gray-400 mb-3 text-xs">
                 Connect this PixelPilot project to a Supabase database to enable advanced database management features.
               </p>
             </div>
@@ -367,51 +372,52 @@ export function SupabaseConnectionManager({
             {!showProjectSelector ? (
               <Button
                 onClick={() => setShowProjectSelector(true)}
-                className="w-full bg-purple-600 hover:bg-purple-700"
+                className="w-full bg-purple-600 hover:bg-purple-700 h-8 text-xs"
                 disabled={availableProjects.length === 0}
+                size="sm"
               >
                 {availableProjects.length === 0 ? (
                   <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" />
                     Loading Projects...
                   </>
                 ) : (
                   <>
-                    <Database className="h-4 w-4 mr-2" />
+                    <Database className="h-3 w-3 mr-1.5" />
                     Connect Supabase Project
                   </>
                 )}
               </Button>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium text-white">Select Supabase Project</Label>
+                  <Label className="text-xs font-medium text-white">Select Supabase Project</Label>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowProjectSelector(false)}
-                    className="text-gray-400 hover:text-white"
+                    className="text-gray-400 hover:text-white h-6 px-2 text-[10px]"
                   >
                     Cancel
                   </Button>
                 </div>
 
-                <div className="max-h-60 overflow-y-auto space-y-2">
+                <div className="max-h-48 overflow-y-auto space-y-2">
                   {availableProjects.map((project) => (
                     <div
                       key={project.id}
-                      className="p-3 bg-gray-700 rounded-lg border border-gray-600 hover:border-purple-500 transition-colors"
+                      className="p-2.5 bg-gray-700 rounded-lg border border-gray-600 hover:border-purple-500 transition-colors"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <span className="text-white font-medium">{project.name}</span>
-                            <Badge variant="outline" className="text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-1.5 mb-1">
+                            <span className="text-white font-medium text-xs truncate">{project.name}</span>
+                            <Badge variant="outline" className="text-[10px] h-4 px-1">
                               {project.region}
                             </Badge>
                           </div>
-                          <div className="text-xs text-gray-400 space-y-1">
-                            <div>ID: {project.id}</div>
+                          <div className="text-[10px] text-gray-400 space-y-0.5">
+                            <div className="truncate">ID: {project.id}</div>
                             <div>Status: {project.status}</div>
                           </div>
                         </div>
@@ -419,10 +425,10 @@ export function SupabaseConnectionManager({
                           size="sm"
                           onClick={() => connectToSupabaseProject(project)}
                           disabled={isConnecting}
-                          className="bg-purple-600 hover:bg-purple-700"
+                          className="bg-purple-600 hover:bg-purple-700 h-6 px-2 text-[10px] flex-shrink-0"
                         >
                           {isConnecting ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <Loader2 className="h-3 w-3 animate-spin" />
                           ) : (
                             'Connect'
                           )}
@@ -433,7 +439,7 @@ export function SupabaseConnectionManager({
                 </div>
 
                 {availableProjects.length === 0 && (
-                  <div className="text-center py-4 text-gray-400">
+                  <div className="text-center py-3 text-gray-400 text-xs">
                     No Supabase projects found. Make sure you have projects in your Supabase account.
                   </div>
                 )}
