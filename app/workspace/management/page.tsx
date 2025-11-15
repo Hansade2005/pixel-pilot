@@ -1028,17 +1028,29 @@ export default function ManagementPage() {
                           {project.environmentVariables.map((envVar, index) => (
                             <div key={index} className="flex items-center justify-between p-2 bg-gray-700 rounded">
                               <div className="flex-1">
-                                <span className="font-medium text-white text-sm">{envVar.key}</span>
-                                <span className="text-xs text-gray-400 ml-2">({envVar.environment})</span>
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-white text-sm">{envVar.key}</span>
+                                  <span className="text-xs text-gray-400">({envVar.environment})</span>
+                                </div>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => deleteEnvironmentVariable(project.id, envVar.key, envVar.environment)}
-                                className="text-gray-400 hover:text-red-400 h-8 w-8 p-0"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              <div className="flex items-center space-x-2">
+                                {!envVar.isSecret && envVar.value && (
+                                  <span className="text-xs text-green-400 truncate max-w-32" title={envVar.value}>
+                                    {envVar.value.length > 20 ? `${envVar.value.substring(0, 20)}...` : envVar.value}
+                                  </span>
+                                )}
+                                <span className="text-xs text-gray-400">
+                                  {envVar.isSecret ? 'Secret' : 'Plain'}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => deleteEnvironmentVariable(project.id, envVar.key, envVar.environment)}
+                                  className="text-gray-400 hover:text-red-400 h-8 w-8 p-0"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
                           ))}
                         </div>
