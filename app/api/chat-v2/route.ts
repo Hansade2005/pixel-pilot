@@ -1371,6 +1371,23 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
         }
       }
 
+      case 'request_supabase_connection': {
+        const { title, description, labels } = input
+        console.log(`[CONSTRUCT_TOOL_RESULT] request_supabase_connection: Returning special rendering data`)
+        
+        // This tool doesn't execute anything - it just returns data for special rendering
+        return {
+          success: true,
+          requiresSpecialRendering: true,
+          renderType: 'supabase-connection-card',
+          title: title || 'Connect Your Supabase Project',
+          description: description || 'To continue, please connect your Supabase account and select a project.',
+          labels: labels || {},
+          message: '⚠️ Supabase connection required - please follow the steps above',
+          toolCallId
+        }
+      }
+
       default:
         console.log(`[CONSTRUCT_TOOL_RESULT] Unknown tool requested: ${toolName}`)
         return {

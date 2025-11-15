@@ -3194,12 +3194,16 @@ export function ChatPanelV2({
                   {/* Enhanced Tool Activity Panel - Show before message content */}
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id)
-                    if (toolCalls && toolCalls.length > 0) {
-                      console.log(`[ChatPanelV2][Render] Rendering tool activity panel with ${toolCalls.length} operations for message ${message.id}`)
+                    // Filter out tools with special rendering (like request_supabase_connection)
+                    const regularToolCalls = toolCalls?.filter(tc => 
+                      tc.toolName !== 'request_supabase_connection'
+                    )
+                    if (regularToolCalls && regularToolCalls.length > 0) {
+                      console.log(`[ChatPanelV2][Render] Rendering tool activity panel with ${regularToolCalls.length} operations for message ${message.id}`)
                     }
-                    return toolCalls && toolCalls.length > 0 ? (
+                    return regularToolCalls && regularToolCalls.length > 0 ? (
                       <ToolActivityPanel
-                        toolCalls={toolCalls}
+                        toolCalls={regularToolCalls}
                         isStreaming={(isLoading && message.id === messages[messages.length - 1]?.id) || message.id === continuingMessageId}
                       />
                     ) : null
