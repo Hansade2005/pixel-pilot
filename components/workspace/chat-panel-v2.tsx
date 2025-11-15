@@ -31,6 +31,51 @@ import { createCheckpoint } from '@/lib/checkpoint-utils'
 import { getWorkspaceDatabaseId, getDatabaseIdFromUrl } from '@/lib/get-current-workspace'
 import { useSupabaseToken } from '@/hooks/use-supabase-token'
 import { SupabaseConnectionCard } from './supabase-connection-card'
+import { zipSync, strToU8 } from 'fflate'
+import { compress } from 'lz4-wasm'
+
+// Compress project files using LZ4 + Zip for efficient transfer
+async function compressProjectFiles(
+  projectFiles: any[],
+  fileTree: string[],
+  messagesToSend: any[],
+  metadata: any
+): Promise<ArrayBuffer> {
+  console.log(`[Compression] Starting compression of ${projectFiles.length} files`)
+
+  // Create zip file data
+  const zipData: Record<string, Uint8Array> = {}
+
+  // Add files to zip
+  for (const file of projectFiles) {
+    if (file.path && file.content !== undefined) {
+      zipData[file.path] = strToU8(String(file.content))
+    }
+  }
+
+  // Add metadata file with file tree, messages, and other data
+  const fullMetadata = {
+    fileTree,
+    messages: messagesToSend,
+    ...metadata,
+    compressedAt: new Date().toISOString(),
+    fileCount: projectFiles.length
+  }
+  zipData['__metadata__.json'] = strToU8(JSON.stringify(fullMetadata))
+
+  // Create zip file
+  const zippedData = zipSync(zipData)
+  console.log(`[Compression] Created zip file: ${zippedData.length} bytes`)
+
+  // Compress with LZ4
+  const compressedData = await compress(zippedData)
+  console.log(`[Compression] LZ4 compressed to: ${compressedData.length} bytes`)
+
+  // Convert Uint8Array to ArrayBuffer
+  const arrayBuffer = new ArrayBuffer(compressedData.length)
+  new Uint8Array(arrayBuffer).set(compressedData)
+  return arrayBuffer
+}
 
 // ExpandableUserMessage component for long user messages
 const ExpandableUserMessage = ({
@@ -1392,8 +1437,7 @@ export function ChatPanelV2({
         projectId: project.id,
         project,
         databaseId, // Pass database ID from state (loaded from workspace)
-        files: projectFiles, // Use current project files
-        fileTree: await buildProjectFileTree(), // Rebuild file tree
+        // Don't send files/fileTree - they're already in continuationState.sessionStorage
         modelId: selectedModel,
         aiMode,
         chatMode: isAskMode ? 'ask' : 'agent', // Pass the chat mode to the API
@@ -2011,8 +2055,7 @@ export function ChatPanelV2({
         projectId,
         project: { id: projectId }, // Minimal project info
         databaseId, // Pass database ID from state (loaded from workspace)
-        files: projectFiles, // Current project files
-        fileTree: await buildProjectFileTree(), // Current file tree
+        // Don't send files/fileTree - they're already in continuationState if needed
         modelId: selectedModel,
         aiMode,
         chatMode: isAskMode ? 'ask' : 'agent', // Pass the chat mode to the API
@@ -2420,28 +2463,29 @@ export function ChatPanelV2({
         // Continue without cloud sync data - tools will handle the missing tokens gracefully
       }
 
+      // Compress project files for efficient transfer (only for initial requests, not continuations)
+      console.log(`[ChatPanelV2] 📦 Compressing ${projectFiles.length} project files...`)
+      const metadata = {
+        project,
+        databaseId,
+        supabaseAccessToken,
+        supabaseProjectDetails,
+        supabase_projectId: supabaseProjectDetails?.supabaseProjectId,
+        supabaseUserId,
+        stripeApiKey
+      }
+      const compressedData = await compressProjectFiles(projectFiles, fileTree, messagesToSend, metadata)
+
       const response = await fetch('/api/chat-v2', {
-      method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: messagesToSend, // Send last 5 + new message
-          id: project?.id, // Chat session ID for server-side storage
-          projectId: project?.id,
-          project,
-          databaseId, // Pass database ID from state (loaded from workspace)
-          fileTree, // Use client-built file tree instead of raw files
-          files: projectFiles, // Keep raw files for tool operations (now refreshed)
-          modelId: selectedModel,
-          aiMode,
-          chatMode: isAskMode ? 'ask' : 'agent', // Pass the chat mode to the API
-          // Add Supabase data to the payload
-          supabaseAccessToken,
-          supabaseProjectDetails,
-          supabase_projectId: supabaseProjectDetails?.supabaseProjectId, // Extract Supabase project ID to avoid conflicts
-          supabaseUserId, // Pass the authenticated user ID
-          // Add Stripe API key to the payload
-          stripeApiKey // Pass Stripe API key from cloud sync for payment operations
-        }),
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          // Send minimal metadata in headers for binary requests
+          'X-Model-Id': selectedModel,
+          'X-Ai-Mode': aiMode,
+          'X-Chat-Mode': isAskMode ? 'ask' : 'agent'
+        },
+        body: compressedData,
         signal: controller.signal
       })
 

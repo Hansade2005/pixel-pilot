@@ -6,6 +6,17 @@ import { getModel } from '@/lib/ai-providers'
 import { DEFAULT_CHAT_MODEL, getModelById } from '@/lib/ai-models'
 import { NextResponse } from 'next/server'
 import { getWorkspaceDatabaseId, workspaceHasDatabase, setWorkspaceDatabase } from '@/lib/get-current-workspace'
+import JSZip from 'jszip'
+import lz4 from 'lz4'
+import unzipper from 'unzipper'
+import { Readable } from 'stream'
+
+// Disable Next.js body parser for binary data handling
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+}
 
 // Get AI model by ID with fallback to default
 const getAIModel = (modelId?: string) => {
@@ -1443,15 +1454,73 @@ export async function POST(req: Request) {
     };
   };
 
+  // Initialize variables for file handling
+  let clientFiles: any[] = []
+  let clientFileTree: string[] = []
+  let extractedMetadata: any = {}
+
   try {
-    const body = await req.json()
+    // Check content-type to determine if this is compressed binary data or regular JSON
+    const contentType = req.headers.get('content-type') || ''
+    let body: any
+
+    if (contentType.includes('application/octet-stream')) {
+      // Handle compressed binary data (LZ4 + Zip)
+      console.log('[Chat-V2] 📦 Received compressed binary data, decompressing...')
+
+      const compressedData = await req.arrayBuffer()
+      console.log(`[Chat-V2] 📦 Received ${compressedData.byteLength} bytes of compressed data`)
+
+      // Step 1: LZ4 decompress
+      const decompressedData = lz4.decode(Buffer.from(compressedData))
+      console.log(`[Chat-V2] 📦 LZ4 decompressed to ${decompressedData.length} bytes`)
+
+      // Step 2: Unzip the data
+      const zip = new JSZip()
+      await zip.loadAsync(decompressedData)
+
+      // Extract files from zip
+      const extractedFiles: any[] = []
+      for (const [path, zipEntry] of Object.entries(zip.files)) {
+        if (!zipEntry.dir) {
+          const content = await zipEntry.async('text')
+          extractedFiles.push({
+            path,
+            content,
+            name: path.split('/').pop() || path,
+            type: path.split('.').pop() || 'text',
+            size: content.length
+          })
+        }
+      }
+
+      console.log(`[Chat-V2] 📦 Extracted ${extractedFiles.length} files from zip`)
+
+      // Parse metadata if present (for fileTree, etc.)
+      const metadataEntry = zip.file('__metadata__.json')
+      if (metadataEntry) {
+        const metadataContent = await metadataEntry.async('text')
+        extractedMetadata = JSON.parse(metadataContent)
+        clientFileTree = extractedMetadata.fileTree || []
+        console.log(`[Chat-V2] 📦 Loaded metadata: ${clientFileTree.length} file tree entries`)
+      }
+
+      clientFiles = extractedFiles
+    } else {
+      // Handle regular JSON data (backward compatibility)
+      console.log('[Chat-V2] 📄 Received JSON data (backward compatibility mode)')
+      body = await req.json()
+      clientFiles = body.files || []
+      clientFileTree = body.fileTree || []
+    }
+
+    // Continue with existing logic...
     let {
       messages = [], // Default to empty array if not provided
       projectId,
       project,
       databaseId, // Database ID from request payload
-      files = [], // Default to empty array
-      fileTree, // Client-built file tree
+      fileTree, // Client-built file tree (may be overridden by binary metadata)
       modelId,
       aiMode,
       chatMode = 'agent', // Default to 'agent' mode, can be 'ask' for read-only
@@ -1462,7 +1531,30 @@ export async function POST(req: Request) {
       supabase_projectId, // Extracted Supabase project ID to avoid conflicts
       supabaseUserId, // Authenticated Supabase user ID from client
       stripeApiKey // Stripe API key from client for payment operations
-    } = body
+    } = body || {}
+
+    // For binary requests, extract metadata from compressed data
+    if (contentType.includes('application/octet-stream')) {
+      // Use metadata extracted from compressed data
+      const metadata = extractedMetadata as any
+      messages = metadata.messages || []
+      projectId = metadata.project?.id || projectId
+      project = metadata.project || project
+      databaseId = metadata.databaseId || databaseId
+      modelId = req.headers.get('x-model-id') || modelId
+      aiMode = req.headers.get('x-ai-mode') || aiMode
+      chatMode = req.headers.get('x-chat-mode') || chatMode
+      supabaseAccessToken = metadata.supabaseAccessToken || supabaseAccessToken
+      supabaseProjectDetails = metadata.supabaseProjectDetails || supabaseProjectDetails
+      supabase_projectId = metadata.supabase_projectId || supabase_projectId
+      supabaseUserId = metadata.supabaseUserId || supabaseUserId
+      stripeApiKey = metadata.stripeApiKey || stripeApiKey
+    }
+
+    // Use fileTree from binary metadata if available, otherwise from JSON
+    if (clientFileTree.length > 0 && !fileTree) {
+      fileTree = clientFileTree
+    }
 
     // Handle client-side tool results - DISABLED
     /*
@@ -1539,7 +1631,7 @@ export async function POST(req: Request) {
         modelId = continuationState.sessionData.modelId || modelId
         aiMode = continuationState.sessionData.aiMode || aiMode
         fileTree = continuationState.sessionData.fileTree || fileTree
-        files = continuationState.sessionData.files || files
+        clientFiles = continuationState.sessionData.files || clientFiles
       }
 
       // Merge previous messages with current messages
@@ -1605,7 +1697,7 @@ export async function POST(req: Request) {
           messages: processedMessages, // Log processed messages
           projectId,
           project,
-          files,
+          files: clientFiles,
           fileTree,
           modelId,
           aiMode
@@ -1646,8 +1738,6 @@ export async function POST(req: Request) {
     }
 
     // Initialize in-memory project storage for this session
-    let clientFiles = files || []
-    let clientFileTree = fileTree || []
     console.log(`[DEBUG] Initializing in-memory storage with ${clientFiles.length} files and ${clientFileTree.length} tree entries for session ${projectId}`)
 
     // Create in-memory storage for this session
