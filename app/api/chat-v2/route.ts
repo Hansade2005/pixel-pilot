@@ -1915,19 +1915,43 @@ Begin with a concise checklist  use check box emojis filled and unfilled.
 **Schema Tracking**: Any \`supabase_schema.sql\` files in the project are for AI reference only. The AI can read table schemas directly using \`supabase_read_table\`, so manual schema file maintenance is not required.
 
 ### 🔵 Stripe Payment Tools (Remote Payment Processing)
-**Stripe payment & subscription integration:**
+**Stripe payment & subscription integration - 12 tools available:**
+
+**Validation:**
 - **\`stripe_validate_key\`** - Validate Stripe API key and check account status
+
+**Products & Pricing:**
 - **\`stripe_list_products\`** - List all products with filtering options
 - **\`stripe_create_product\`** - Create new products for sale
-- **\`stripe_list_prices\`** - List pricing plans with product filtering
+- **\`stripe_list_prices\`** - List pricing plans with product/active filtering
+- **\`stripe_create_price\`** - Create new prices (one-time or recurring)
+
+**Customers:**
 - **\`stripe_list_customers\`** - List customers with email filtering
-- **\`stripe_list_subscriptions\`** - List subscriptions with status filtering
+- **\`stripe_create_customer\`** - Create new customers with metadata
+
+**Payments:**
+- **\`stripe_create_payment_intent\`** - Create payment intents for charging customers
+- **\`stripe_list_charges\`** - List all payment charges with customer filtering
+
+**Subscriptions:**
+- **\`stripe_list_subscriptions\`** - List subscriptions with status/customer filtering
+
+**Refunds:**
+- **\`stripe_create_refund\`** - Create full or partial refunds for charges
+
+**Search:**
+- **\`stripe_search\`** - Advanced search across all Stripe resources (customers, charges, payment_intents, subscriptions, invoices, products, prices)
 
 **Features:**
-- 💳 **Payment Processing**: Full Stripe integration for payments
+- 💳 **Payment Processing**: Full Stripe integration for payments & intents
 - 📦 **Product Management**: Create and manage sellable products
 - 💰 **Pricing Control**: Define one-time and recurring prices
-- 👥 **Customer Management**: Track and manage customers
+- 👥 **Customer Management**: Track, create, and manage customers
+- 🔄 **Subscriptions**: Monitor recurring billing and subscriptions
+- 💸 **Refunds**: Process full or partial refunds with reasons
+- 🔍 **Advanced Search**: Query any Stripe resource with powerful search syntax
+- 🔑 **API Key Security**: Automatic key retrieval from cloud sync
 - 🔄 **Subscription Handling**: Manage recurring billing
 - 🔐 **Secure**: Uses Stripe API keys from cloud sync
 - ⚡ **Direct API**: Simple POST requests to refactored endpoints
@@ -6688,6 +6712,572 @@ ${conversationSummaryContext || ''}`
               return {
                 success: false,
                 error: `Failed to list subscriptions: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        stripe_create_price: tool({
+          description: 'Create a new price for a product in Stripe. Prices define how much and how often to charge for products.',
+          inputSchema: z.object({
+            product: z.string().describe('The product ID to create the price for'),
+            unit_amount: z.number().describe('Price amount in cents (e.g., 1000 = $10.00)'),
+            currency: z.string().describe('Three-letter ISO currency code (e.g., "usd", "eur")'),
+            recurring: z.object({
+              interval: z.enum(['day', 'week', 'month', 'year']).describe('Billing frequency'),
+              interval_count: z.number().optional().describe('Number of intervals between billings')
+            }).optional().describe('Recurring billing details for subscriptions')
+          }),
+          execute: async ({ product, unit_amount, currency, recurring }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Stripe create price cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              const apiKey = stripeApiKey;
+
+              if (!apiKey) {
+                return {
+                  success: false,
+                  error: 'No Stripe API key found. Please connect your Stripe account in settings.',
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/prices`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  stripeKey: apiKey,
+                  action: 'create',
+                  product,
+                  unit_amount,
+                  currency,
+                  recurring
+                })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_create_price'] = (toolExecutionTimes['stripe_create_price'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                return {
+                  success: false,
+                  error: `Failed to create price: ${result.error || 'Unknown error'}`,
+                  product,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              return {
+                success: true,
+                message: `✅ Price created successfully for ${currency.toUpperCase()} ${(unit_amount / 100).toFixed(2)}`,
+                price: result.price,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_create_price'] = (toolExecutionTimes['stripe_create_price'] || 0) + executionTime;
+              
+              return {
+                success: false,
+                error: `Failed to create price: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                product,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        stripe_create_customer: tool({
+          description: 'Create a new customer in Stripe. Customers allow you to track and charge the same person multiple times.',
+          inputSchema: z.object({
+            email: z.string().optional().describe('Customer email address'),
+            name: z.string().optional().describe('Customer full name'),
+            description: z.string().optional().describe('Additional description about the customer'),
+            metadata: z.record(z.string()).optional().describe('Custom metadata key-value pairs')
+          }),
+          execute: async ({ email, name, description, metadata }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Stripe create customer cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              const apiKey = stripeApiKey;
+
+              if (!apiKey) {
+                return {
+                  success: false,
+                  error: 'No Stripe API key found. Please connect your Stripe account in settings.',
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/customers`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  stripeKey: apiKey,
+                  action: 'create',
+                  email,
+                  name,
+                  description,
+                  metadata
+                })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_create_customer'] = (toolExecutionTimes['stripe_create_customer'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                return {
+                  success: false,
+                  error: `Failed to create customer: ${result.error || 'Unknown error'}`,
+                  email,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              return {
+                success: true,
+                message: `✅ Customer '${name || email}' created successfully`,
+                customer: result.customer,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_create_customer'] = (toolExecutionTimes['stripe_create_customer'] || 0) + executionTime;
+              
+              return {
+                success: false,
+                error: `Failed to create customer: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                email,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        stripe_create_payment_intent: tool({
+          description: 'Create a payment intent to collect payment from a customer. Payment intents track the lifecycle of a payment.',
+          inputSchema: z.object({
+            amount: z.number().describe('Amount to charge in cents (e.g., 1000 = $10.00)'),
+            currency: z.string().describe('Three-letter ISO currency code (e.g., "usd", "eur")'),
+            customer: z.string().optional().describe('Customer ID to associate with this payment'),
+            description: z.string().optional().describe('Description of the payment'),
+            metadata: z.record(z.string()).optional().describe('Custom metadata key-value pairs')
+          }),
+          execute: async ({ amount, currency, customer, description, metadata }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Stripe create payment intent cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              const apiKey = stripeApiKey;
+
+              if (!apiKey) {
+                return {
+                  success: false,
+                  error: 'No Stripe API key found. Please connect your Stripe account in settings.',
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/payment-intents`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  stripeKey: apiKey,
+                  action: 'create',
+                  amount,
+                  currency,
+                  customer,
+                  description,
+                  metadata
+                })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_create_payment_intent'] = (toolExecutionTimes['stripe_create_payment_intent'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                return {
+                  success: false,
+                  error: `Failed to create payment intent: ${result.error || 'Unknown error'}`,
+                  amount,
+                  currency,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              return {
+                success: true,
+                message: `✅ Payment intent created for ${currency.toUpperCase()} ${(amount / 100).toFixed(2)}`,
+                payment_intent: result.payment_intent,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_create_payment_intent'] = (toolExecutionTimes['stripe_create_payment_intent'] || 0) + executionTime;
+              
+              return {
+                success: false,
+                error: `Failed to create payment intent: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                amount,
+                currency,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        stripe_list_charges: tool({
+          description: 'List all charges from the Stripe account. Charges represent individual payment attempts.',
+          inputSchema: z.object({
+            limit: z.number().optional().describe('Number of charges to return (default: 10, max: 100)'),
+            customer: z.string().optional().describe('Filter by customer ID')
+          }),
+          execute: async ({ limit, customer }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Stripe list charges cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              const apiKey = stripeApiKey;
+
+              if (!apiKey) {
+                return {
+                  success: false,
+                  error: 'No Stripe API key found. Please connect your Stripe account in settings.',
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/charges`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  stripeKey: apiKey,
+                  limit,
+                  customer
+                })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_list_charges'] = (toolExecutionTimes['stripe_list_charges'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                return {
+                  success: false,
+                  error: `Failed to list charges: ${result.error || 'Unknown error'}`,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              return {
+                success: true,
+                message: `✅ Found ${result.charges.length} charges`,
+                charges: result.charges,
+                has_more: result.has_more,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_list_charges'] = (toolExecutionTimes['stripe_list_charges'] || 0) + executionTime;
+              
+              return {
+                success: false,
+                error: `Failed to list charges: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        stripe_create_refund: tool({
+          description: 'Create a refund for a charge or payment intent. Refunds return money to the customer.',
+          inputSchema: z.object({
+            charge: z.string().optional().describe('Charge ID to refund (starts with ch_)'),
+            payment_intent: z.string().optional().describe('Payment Intent ID to refund (starts with pi_)'),
+            amount: z.number().optional().describe('Amount to refund in cents (omit for full refund)'),
+            reason: z.enum(['duplicate', 'fraudulent', 'requested_by_customer']).optional().describe('Reason for the refund')
+          }),
+          execute: async ({ charge, payment_intent, amount, reason }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Stripe create refund cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              const apiKey = stripeApiKey;
+
+              if (!apiKey) {
+                return {
+                  success: false,
+                  error: 'No Stripe API key found. Please connect your Stripe account in settings.',
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              if (!charge && !payment_intent) {
+                return {
+                  success: false,
+                  error: 'Either charge or payment_intent must be provided',
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/refunds`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  stripeKey: apiKey,
+                  action: 'create',
+                  charge,
+                  payment_intent,
+                  amount,
+                  reason
+                })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_create_refund'] = (toolExecutionTimes['stripe_create_refund'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                return {
+                  success: false,
+                  error: `Failed to create refund: ${result.error || 'Unknown error'}`,
+                  charge,
+                  payment_intent,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              return {
+                success: true,
+                message: `✅ Refund created successfully${amount ? ` for ${result.refund.currency.toUpperCase()} ${(amount / 100).toFixed(2)}` : ' (full refund)'}`,
+                refund: result.refund,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_create_refund'] = (toolExecutionTimes['stripe_create_refund'] || 0) + executionTime;
+              
+              return {
+                success: false,
+                error: `Failed to create refund: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                charge,
+                payment_intent,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+            }
+          }
+        }),
+
+        stripe_search: tool({
+          description: 'Search Stripe resources using query syntax. Supports searching customers, charges, payment intents, subscriptions, etc.',
+          inputSchema: z.object({
+            resource: z.enum(['customers', 'charges', 'payment_intents', 'subscriptions', 'invoices', 'products', 'prices']).describe('Type of resource to search'),
+            query: z.string().describe('Search query (e.g., "email:\'john@example.com\'" or "status:\'succeeded\'")'),
+            limit: z.number().optional().describe('Number of results to return (default: 10, max: 100)')
+          }),
+          execute: async ({ resource, query, limit }, { abortSignal, toolCallId }) => {
+            const toolStartTime = Date.now();
+            const timeStatus = getTimeStatus();
+
+            if (abortSignal?.aborted) {
+              throw new Error('Operation cancelled')
+            }
+
+            if (timeStatus.isApproachingTimeout) {
+              return {
+                success: false,
+                error: `Stripe search cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+                toolCallId,
+                executionTimeMs: Date.now() - toolStartTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            try {
+              const apiKey = stripeApiKey;
+
+              if (!apiKey) {
+                return {
+                  success: false,
+                  error: 'No Stripe API key found. Please connect your Stripe account in settings.',
+                  toolCallId,
+                  executionTimeMs: Date.now() - toolStartTime,
+                  timeWarning: timeStatus.warningMessage
+                }
+              }
+
+              const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/stripe/search`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  stripeKey: apiKey,
+                  resource,
+                  query,
+                  limit
+                })
+              });
+
+              const result = await response.json();
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_search'] = (toolExecutionTimes['stripe_search'] || 0) + executionTime;
+
+              if (!response.ok || !result.success) {
+                return {
+                  success: false,
+                  error: `Failed to search ${resource}: ${result.error || 'Unknown error'}`,
+                  resource,
+                  query,
+                  toolCallId,
+                  executionTimeMs: executionTime,
+                  timeWarning: timeStatus.warningMessage
+                };
+              }
+
+              return {
+                success: true,
+                message: `✅ Found ${result.data.length} ${resource}`,
+                data: result.data,
+                has_more: result.has_more,
+                total_count: result.total_count,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              };
+
+            } catch (error) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['stripe_search'] = (toolExecutionTimes['stripe_search'] || 0) + executionTime;
+              
+              return {
+                success: false,
+                error: `Failed to search ${resource}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                resource,
+                query,
                 toolCallId,
                 executionTimeMs: executionTime,
                 timeWarning: timeStatus.warningMessage
