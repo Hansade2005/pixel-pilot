@@ -1869,12 +1869,12 @@ Begin with a concise checklist  use check box emojis filled and unfilled.
 3. **Excellence**: Deliver fully complete, market-ready products
 
 ## Tools
-- **Client-Side (IndexedDB)**: \`read_file\` (with line numbers), \`write_file\`, \`edit_file\`, \`client_replace_string_in_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`, \`create_database\`
+- **Client-Side**: \`read_file\` (with line numbers), \`write_file\`, \`edit_file\`, \`client_replace_string_in_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`, \`create_database\`[builtin PiPilot Rest API DB]
 - **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers),\`grep_search\`, \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync)
 
 ### 🗄️ PiPilot Database Tools (Builtin Database)
 **Complete database workflow in 7 simple steps:**
-1. **\`create_database\`** - Creates database with auto-generated users table (client-side)
+1. **\`create_database\`** - Creates database with auto-generated users table (Executes client-side)
 2. **\`create_table\`** - AI-powered schema generation from natural language descriptions
 3. **\`list_tables\`** - Discover all tables in a database with optional schema and record counts
 4. **\`read_table\`** - Get detailed table info, schema, structure, and statistics
