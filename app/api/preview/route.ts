@@ -229,39 +229,58 @@ async function handleStreamingPreview(req: Request) {
           await sandbox.writeFiles(sandboxFiles)
           send({ type: "log", message: "Files written" })
 
-          // 🔹 Check for additional dependencies (always install all for clean slate)
-          const projectPackageJsonFile = files.find((f: any) => f.path === 'package.json')
-          if (projectPackageJsonFile) {
-            try {
-              const projectPackageJson = JSON.parse(projectPackageJsonFile.content)
-              send({ type: "log", message: "Checking for additional dependencies..." })
-              
-              const additionalDepsResult = await sandbox.installAdditionalDependencies(
-                projectPackageJson,
-                "/project",
-                {
-                  timeoutMs: 0,
-                  envVars,
-                  onStdout: (data) => send({ type: "log", message: data.trim() }),
-                  onStderr: (data) => send({ type: "error", message: data.trim() }),
+          // 🔹 Install dependencies (simple and reliable like the old version)
+          send({ type: "log", message: "Installing dependencies..." })
+          const installResult = await sandbox.installDependenciesRobust("/project", {
+            timeoutMs: 0,
+            envVars,
+            onStdout: (data) => send({ type: "log", message: data.trim() }),
+            onStderr: (data) => send({ type: "error", message: data.trim() }),
+          })
+
+          if (installResult.exitCode !== 0) {
+            send({ type: "error", message: "Dependency installation failed" })
+            throw new Error("Dependency installation failed")
+          }
+
+          send({ type: "log", message: "Dependencies installed successfully" })
+
+          // 🔹 Determine the build and start command based on framework
+          let buildCommand = "npm run build && npm run preview" // Default to Vite
+          const hasNextConfig = files.some((f: any) => 
+            f.path === 'next.config.js' || 
+            f.path === 'next.config.mjs' || 
+            f.path === 'next.config.ts'
+          )
+          const hasViteConfig = files.some((f: any) => 
+            f.path === 'vite.config.js' || 
+            f.path === 'vite.config.ts' || 
+            f.path === 'vite.config.mjs'
+          )
+          
+          if (hasNextConfig) {
+            buildCommand = "npm run build && npm run start" // Next.js
+          } else if (hasViteConfig) {
+            buildCommand = "npm run build && npm run preview" // Vite
+          } else {
+            // Fallback to dependency check
+            const packageJsonFile = files.find((f: any) => f.path === 'package.json')
+            if (packageJsonFile) {
+              try {
+                const packageJson = JSON.parse(packageJsonFile.content)
+                if (packageJson.dependencies && packageJson.dependencies.next) {
+                  buildCommand = "npm run build && npm run start" // Next.js
                 }
-              )
-              
-              if (additionalDepsResult) {
-                send({ type: "log", message: "All project dependencies installed successfully" })
-              } else {
-                send({ type: "log", message: "No dependencies found in project" })
+              } catch (error) {
+                console.warn('[Preview] Failed to parse package.json, using default Vite command')
               }
-            } catch (error) {
-              console.warn("Failed to install dependencies:", error)
-              send({ type: "log", message: "Continuing with available dependencies (non-critical)" })
             }
           }
 
-          // 🔹 Start dev server
-          send({ type: "log", message: "Starting dev server..." })
+          // 🔹 Build and start production server
+          send({ type: "log", message: "Building and starting production server..." })
           const devServer = await sandbox.startDevServer({
-            command: "npm run dev",
+            command: buildCommand,
             workingDirectory: "/project",
             port: 3000,
             timeoutMs: 0,
@@ -272,7 +291,7 @@ async function handleStreamingPreview(req: Request) {
 
           send({
             type: "ready",
-            message: "Dev server running",
+            message: "Production server running",
             sandboxId: sandbox.id,
             url: devServer.url,
             processId: devServer.processId,
@@ -527,85 +546,60 @@ devDependencies:
         console.log(`Successfully wrote ${fileResult.successCount} files to sandbox`)
       }
 
-      // Install dependencies with enhanced tracking
-      console.log('Installing dependencies using robust npm installation...')
+      // Install dependencies with no timeout (simple and reliable like old version)
+      const installResult = await sandbox.installDependenciesRobust('/project', { timeoutMs: 0, envVars })
       
-      // Check sandbox health before starting installation
-      const isHealthy = await sandbox.checkHealth(envVars)
-      if (!isHealthy) {
-        throw new Error('Sandbox is not responsive, cannot proceed with dependency installation')
+      if (installResult.exitCode !== 0) {
+        console.error('npm install failed:', installResult.stderr)
+        console.error('npm install stdout:', installResult.stdout)
+        throw new Error(`npm dependency installation failed with exit code ${installResult.exitCode}`)
       }
       
-      // Check for special dependencies needed for vite.config.ts
-      const viteConfigFile = sandboxFiles.find(f => f.path.endsWith('vite.config.ts') || f.path.endsWith('vite.config.js'))
-      let additionalDeps = []
+      console.log('Dependencies installed successfully with npm')
+
+      // Determine the build and start command based on framework
+      let buildCommand = "npm run build && npm run preview" // Default to Vite
+      const hasNextConfig = files.some((f: any) => 
+        f.path === 'next.config.js' || 
+        f.path === 'next.config.mjs' || 
+        f.path === 'next.config.ts'
+      )
+      const hasViteConfig = files.some((f: any) => 
+        f.path === 'vite.config.js' || 
+        f.path === 'vite.config.ts' || 
+        f.path === 'vite.config.mjs'
+      )
       
-      if (viteConfigFile) {
-        console.log('Analyzing Vite configuration...')
-        const content = viteConfigFile.content
-        
-        // Check for common plugins
-        if (content.includes('vite-plugin-imagemin')) {
-          additionalDeps.push('vite-plugin-imagemin')
-        }
-        if (content.includes('vite-plugin-pwa')) {
-          additionalDeps.push('vite-plugin-pwa')
-        }
-        if (content.includes('@vitejs/plugin-legacy')) {
-          additionalDeps.push('@vitejs/plugin-legacy')
-        }
-        if (content.includes('vite-plugin-compression')) {
-          additionalDeps.push('vite-plugin-compression')
-        }
-        
-        if (additionalDeps.length > 0) {
-          console.log(`Installing additional dependencies: ${additionalDeps.join(', ')}`)
-          
+      if (hasNextConfig) {
+        buildCommand = "npm run build && npm run start" // Next.js
+      } else if (hasViteConfig) {
+        buildCommand = "npm run build && npm run preview" // Vite
+      } else {
+        // Fallback to dependency check
+        const packageJsonFile = files.find((f: any) => f.path === 'package.json')
+        if (packageJsonFile) {
           try {
-            await sandbox.executeCommand(`cd /project && npm install --save-dev ${additionalDeps.join(' ')}`, {
-              timeoutMs: 120000
-            })
+            const packageJson = JSON.parse(packageJsonFile.content)
+            if (packageJson.dependencies && packageJson.dependencies.next) {
+              buildCommand = "npm run build && npm run start" // Next.js
+            }
           } catch (error) {
-            console.warn('Failed to install additional dependencies:', error)
+            console.warn('[Preview] Failed to parse package.json, using default Vite command')
           }
-        }
-      }
-      
-      // Check for additional dependencies not in template (skip base install since template is preinstalled)
-      const projectPackageJsonFile = files.find(f => f.path === 'package.json')
-      if (projectPackageJsonFile) {
-        try {
-          const projectPackageJson = JSON.parse(projectPackageJsonFile.content)
-          console.log('Checking for additional dependencies...')
-          
-          const additionalDepsResult = await sandbox.installAdditionalDependencies(
-            projectPackageJson,
-            '/project',
-            { timeoutMs: 0, envVars }
-          )
-          
-          if (additionalDepsResult) {
-            console.log('Additional dependencies installed successfully')
-          } else {
-            console.log('No additional dependencies needed')
-          }
-        } catch (error) {
-          console.warn('Failed to check/install additional dependencies:', error)
-          console.log('Continuing without additional dependencies (non-critical)')
         }
       }
 
-      // Start development server with enhanced monitoring and environment variables
-      console.log('Starting development server with npm run dev...')
+      // Build and start production server with enhanced monitoring and environment variables
+      console.log('Building and starting production server...')
       const devServer = await sandbox.startDevServer({
-        command: 'npm run dev',
+        command: buildCommand,
         workingDirectory: '/project',
         port: 3000,
         timeoutMs: 30000,
         envVars // Pass environment variables
       })
       
-      console.log('Development server started successfully with npm run dev:', {
+      console.log('Production server started successfully:', {
         url: devServer.url,
         processId: devServer.processId
       })

@@ -5,7 +5,6 @@ import type { Workspace, File } from './storage-manager'
 
 
 
-import { createClient } from '@/lib/supabase/server'
 
 export class TemplateService {
   // Default Vite React + TypeScript + Tailwind CSS template files
