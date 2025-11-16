@@ -37,7 +37,7 @@ interface ProgressCallback {
  * @param files - Array of file objects with path and content
  * @param fileTree - Array of file paths for tree structure
  * @param metadata - Additional metadata to store
- * @param githubToken - GitHub OAuth token for API access
+ * @param githubToken - GitHub OAuth token for API access (optional - will fetch fresh if not provided)
  * @param onProgress - Optional callback for progress updates
  * @returns Repository information including URL and commit SHA
  */
@@ -45,7 +45,7 @@ export async function createTemporaryGitHubRepo(
   files: FileObject[],
   fileTree: string[],
   metadata: any,
-  githubToken: string,
+  githubToken?: string,
   onProgress?: ProgressCallback
 ): Promise<GitHubRepoResult> {
   const reportProgress = (stage: string, progress: number, message: string) => {
@@ -56,10 +56,51 @@ export async function createTemporaryGitHubRepo(
   try {
     reportProgress('init', 0, 'Initializing GitHub repository creation...')
 
-    // Initialize Octokit with user's token
+    // Fetch fresh GitHub token from cloud-sync (browser context)
+    let actualGithubToken = githubToken
+    if (!actualGithubToken || actualGithubToken.trim() === '' || actualGithubToken === 'stored') {
+      reportProgress('auth', 5, 'Fetching fresh GitHub token from cloud-sync...')
+      
+      const { createClient } = await import('@/lib/supabase/client')
+      const { getDeploymentTokens } = await import('@/lib/cloud-sync')
+      
+      const supabase = createClient()
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      if (userError || !user) {
+        throw new Error('User not authenticated. Please sign in to create GitHub repositories.')
+      }
+
+      const tokens = await getDeploymentTokens(user.id)
+      if (!tokens?.github) {
+        throw new Error('GitHub token not found. Please connect your GitHub account in settings.')
+      }
+
+      actualGithubToken = tokens.github
+      console.log('[GitHubTempRepo] ✅ Fresh GitHub token fetched from cloud-sync')
+    }
+
+    // Validate token
+    if (!actualGithubToken) {
+      throw new Error('GitHub token is required to create repositories')
+    }
+
+    console.log(`[GitHubTempRepo] Using GitHub token: ${actualGithubToken.substring(0, 10)}...`)
+
+    // Initialize Octokit with fresh token
     const octokit = new Octokit({
-      auth: githubToken,
+      auth: actualGithubToken,
     })
+
+    // Verify token is valid before proceeding
+    reportProgress('verify-auth', 5, 'Verifying GitHub authentication...')
+    try {
+      const { data: userData } = await octokit.rest.users.getAuthenticated()
+      console.log(`[GitHubTempRepo] ✅ Authenticated as: ${userData.login}`)
+    } catch (authError: any) {
+      console.error('[GitHubTempRepo] Authentication failed:', authError)
+      throw new Error(`GitHub authentication failed: ${authError.message}. Please reconnect your GitHub account.`)
+    }
 
     // Step 1: Generate unique repository name
     const uniqueId = crypto.randomUUID().slice(0, 8)
@@ -79,10 +120,8 @@ export async function createTemporaryGitHubRepo(
       
     reportProgress('create-repo', 20, `✅ Repository created: ${repoData.html_url}`)
 
-    // Step 3: Get authenticated user info
-    reportProgress('fetch-user', 25, 'Fetching user information...')
-    const { data: userData } = await octokit.rest.users.getAuthenticated()
-    const owner = userData.login
+    // Step 3: Get owner from repo data (we already verified auth above)
+    const owner = repoData.owner.login
     reportProgress('fetch-user', 30, `✅ User: ${owner}`)
 
     // Step 4: Get the initial commit from auto_init
@@ -176,9 +215,26 @@ export async function createTemporaryGitHubRepo(
 
     return result
 
-  } catch (error) {
-    reportProgress('error', 0, `❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    throw error
+  } catch (error: any) {
+    const errorMessage = error.message || 'Unknown error'
+    console.error('[GitHubTempRepo] Error details:', {
+      message: errorMessage,
+      status: error.status,
+      response: error.response?.data
+    })
+    
+    reportProgress('error', 0, `❌ Error: ${errorMessage}`)
+    
+    // Provide more specific error messages
+    if (error.status === 401 || errorMessage.includes('Bad credentials')) {
+      throw new Error('GitHub authentication failed. Please reconnect your GitHub account with the correct permissions.')
+    } else if (error.status === 403) {
+      throw new Error('GitHub API rate limit exceeded or insufficient permissions. Please try again later.')
+    } else if (error.status === 422) {
+      throw new Error('Invalid repository data. Please check your project files and try again.')
+    } else {
+      throw new Error(`Failed to create GitHub repository: ${errorMessage}`)
+    }
   }
 }
 

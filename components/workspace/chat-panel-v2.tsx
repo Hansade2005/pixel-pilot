@@ -80,47 +80,33 @@ async function compressProjectFiles(
   if (compressedData.length > SIZE_THRESHOLD) {
     console.log(`[Compression] 📦 Size ${(compressedData.length / 1024 / 1024).toFixed(2)}MB exceeds 1MB threshold, creating temporary GitHub repo...`)
     
-    // Get GitHub token from deployment tokens
-    const { createClient } = await import('@/lib/supabase/client')
-    const { getDeploymentTokens } = await import('@/lib/cloud-sync')
-    
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      console.warn('[Compression] ⚠️ User not authenticated, falling back to memory transfer')
-    } else {
-      // Get stored GitHub token
-      const tokens = await getDeploymentTokens(user.id)
-      if (!tokens?.github) {
-        console.warn('[Compression] ⚠️ GitHub token not found, falling back to memory transfer')
-      } else {
-        try {
-          // Create temporary GitHub repo directly from browser
-          const repoInfo = await createTemporaryGitHubRepo(
-            projectFiles,
-            fileTree,
-            fullMetadata,
-            tokens.github,
-            (stage, progress, message) => {
-              console.log(`[GitHub Upload] ${stage} (${progress}%): ${message}`)
-            }
-          )
-          
-          return { 
-            type: 'github', 
-            repoInfo: {
-              repoName: repoInfo.repoName,
-              repoUrl: repoInfo.repoUrl,
-              owner: repoInfo.owner,
-              commitSha: repoInfo.commitSha
-            }
-          }
-        } catch (error) {
-          console.error('[Compression] ❌ GitHub repo creation failed:', error)
-          console.warn('[Compression] ⚠️ Falling back to memory transfer')
+    try {
+      console.log('[Compression] 🚀 Starting GitHub repo creation (library will fetch fresh token automatically)')
+      
+      // Create temporary GitHub repo directly from browser
+      // Library handles fresh token fetching from cloud-sync automatically
+      const repoInfo = await createTemporaryGitHubRepo(
+        projectFiles,
+        fileTree,
+        fullMetadata,
+        undefined, // Library fetches fresh token automatically
+        (stage, progress, message) => {
+          console.log(`[GitHub Upload] ${stage} (${progress}%): ${message}`)
+        }
+      )
+      
+      return { 
+        type: 'github', 
+        repoInfo: {
+          repoName: repoInfo.repoName,
+          repoUrl: repoInfo.repoUrl,
+          owner: repoInfo.owner,
+          commitSha: repoInfo.commitSha
         }
       }
+    } catch (error) {
+      console.error('[Compression] ❌ GitHub repo creation failed:', error)
+      console.warn('[Compression] ⚠️ Falling back to memory transfer')
     }
   }
 
