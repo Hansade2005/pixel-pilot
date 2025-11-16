@@ -597,23 +597,18 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                     }
 
                     if (msg.type === "ready") {
-                      // Preview is ready
-                      const newPreview = {
+                      // Server is ready, but we'll wait for "Production server running" message
+                      // before actually loading the URL in the iframe
+                      addConsoleLog("✅ Server ready", 'server')
+                      
+                      // Store the preview data but keep loading state
+                      setPreview(prev => ({
+                        ...prev,
                         sandboxId: msg.sandboxId,
                         url: msg.url,
-                        isLoading: false,
                         processId: msg.processId,
-                      }
-                      setPreview(newPreview)
-                      // Don't set currentLog here - let console logs update it
-                      addConsoleLog("✅ Server ready", 'server')
-
-                      // Dispatch preview ready event
-                      if (typeof window !== 'undefined') {
-                        window.dispatchEvent(new CustomEvent('preview-ready', { 
-                          detail: { preview: newPreview } 
-                        }))
-                      }
+                        isLoading: true, // Keep loading until build completes
+                      }))
 
                       // Start E2B log streaming for runtime logs
                       startE2BLogStreaming(msg.sandboxId, msg.processId)
@@ -621,6 +616,31 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                       // Auto-open console when server is ready
                       setIsConsoleOpen(true)
                       // DON'T break here - keep the stream open for continuous logs
+                    }
+
+                    // Check for build completion and actual server start
+                    if (msg.type === "log" && 
+                        (msg.message.includes("Production server running") ||
+                         msg.message.includes("➜ Local:") ||
+                         msg.message.includes("Local:        http://") ||
+                         msg.message.includes("ready started server") ||
+                         msg.message.includes("Ready in") ||
+                         msg.message.includes("✓ Ready in") ||
+                         msg.message.includes("compiled successfully"))) {
+                      // Now the server is actually ready to serve content
+                      setPreview(prev => ({ ...prev, isLoading: false }))
+                      
+                      // Dispatch preview ready event NOW
+                      if (typeof window !== 'undefined' && preview.sandboxId && preview.url) {
+                        window.dispatchEvent(new CustomEvent('preview-ready', { 
+                          detail: { preview: { 
+                            sandboxId: preview.sandboxId,
+                            url: preview.url,
+                            processId: preview.processId,
+                            isLoading: false
+                          } } 
+                        }))
+                      }
                     }
 
                     if (msg.type === "heartbeat") {
