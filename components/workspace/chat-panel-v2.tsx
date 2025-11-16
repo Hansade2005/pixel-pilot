@@ -322,7 +322,7 @@ const ToolActivityPanel = ({
   
   // Helper functions - defined first to avoid temporal dead zone errors
   const getToolCategory = (toolName: string): string => {
-    if (['write_file', 'edit_file', 'client_replace_string_in_file', 'delete_file'].includes(toolName)) {
+    if (['write_file', 'edit_file', 'client_replace_string_in_file', 'delete_file', 'delete_folder'].includes(toolName)) {
       return '✏️ File Operations'
     }
     if (['read_file', 'list_files', 'grep_search', 'semantic_code_navigator'].includes(toolName)) {
@@ -358,6 +358,8 @@ const ToolActivityPanel = ({
       case 'list_files':
         return <FolderOpen className="w-3.5 h-3.5" />
       case 'delete_file':
+        return <X className="w-3.5 h-3.5" />
+      case 'delete_folder':
         return <X className="w-3.5 h-3.5" />
       case 'add_package':
         return <Package className="w-3.5 h-3.5" />
@@ -410,6 +412,8 @@ const ToolActivityPanel = ({
         return `Replacing text in ${args?.filePath ? args.filePath.split('/').pop() : 'file'}`
       case 'delete_file':
         return `Deleting ${args?.path ? args.path.split('/').pop() : 'file'}`
+      case 'delete_folder':
+        return `Deleting folder ${args?.path ? args.path.split('/').pop() : 'folder'}`
       case 'read_file':
         return `Reading ${args?.path ? args.path.split('/').pop() : 'file'}`
       case 'list_files':
@@ -675,6 +679,8 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
         return <FolderOpen className="w-3.5 h-3.5" />
       case 'delete_file':
         return <X className="w-3.5 h-3.5" />
+      case 'delete_folder':
+        return <X className="w-3.5 h-3.5" />
       case 'add_package':
         return <Package className="w-3.5 h-3.5" />
       case 'remove_package':
@@ -726,6 +732,8 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
         return `Replacing text in ${args?.filePath ? args.filePath.split('/').pop() : 'file'}`
       case 'delete_file':
         return `Deleting ${args?.path ? args.path.split('/').pop() : 'file'}`
+      case 'delete_folder':
+        return `Deleting folder ${args?.path ? args.path.split('/').pop() : 'folder'}`
       case 'read_file':
         return `Reading ${args?.path ? args.path.split('/').pop() : 'file'}`
       case 'list_files':
@@ -1610,7 +1618,8 @@ export function ChatPanelV2({
                 'write_file', 
                 'edit_file', 
                 'client_replace_string_in_file',
-                'delete_file', 
+                'delete_file',
+                'delete_folder', 
                 'add_package', 
                 'remove_package',
                 'read_file',
@@ -2204,7 +2213,8 @@ export function ChatPanelV2({
                 'write_file', 
                 'edit_file', 
                 'client_replace_string_in_file',
-                'delete_file', 
+                'delete_file',
+                'delete_folder', 
                 'add_package', 
                 'remove_package',
                 'read_file',
@@ -2686,7 +2696,8 @@ export function ChatPanelV2({
                 'write_file', 
                 'edit_file', 
                 'client_replace_string_in_file',
-                'delete_file', 
+                'delete_file',
+                'delete_folder', 
                 'add_package', 
                 'remove_package',
                 'read_file',

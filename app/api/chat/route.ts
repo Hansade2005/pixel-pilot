@@ -276,6 +276,9 @@ function inferPurposeFromTool(toolName: string, args: any, filePath: string): st
     case 'delete_file':
       return `Delete file: ${filePath}`
       
+    case 'delete_folder':
+      return `Delete folder: ${filePath}`
+      
     default:
       return `Update ${fileExt} file`
   }
@@ -305,6 +308,9 @@ function generateChangeSummary(toolName: string, filePath: string, args: any): s
       
     case 'delete_file':
       return `Delete ${fileName}`
+      
+    case 'delete_folder':
+      return `Delete folder ${fileName}`
       
     default:
       return `${toolName} ${fileName}`

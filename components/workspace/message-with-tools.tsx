@@ -274,6 +274,7 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
       case 'write_file': return FileText
       case 'edit_file': return Edit3
       case 'delete_file': return X
+      case 'delete_folder': return X
       case 'read_file': return Eye
       case 'list_files': return FolderOpen
       case 'add_package': return Package

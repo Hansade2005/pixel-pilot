@@ -1,6 +1,8 @@
 // Auto-execution service for XML tools during streaming
+import { file } from 'jszip'
 import { XMLToolCall } from './chat-panel'
 import { jsonToolParser, JsonToolCall } from './json-tool-parser'
+import type { File } from '@/lib/storage-manager'
 
 interface AutoExecutionOptions {
   projectId: string
@@ -43,7 +45,7 @@ class XMLToolAutoExecutor {
     // Only execute valid file operations and SQL operations (support both pilot and specs tool names)
     const validCommands = [
       'pilotwrite', 'pilotedit', 'pilotdelete',
-      'write_file', 'edit_file', 'delete_file',
+      'write_file', 'edit_file', 'delete_file', 'delete_folder',
       'execute_sql', 'add_package', 'remove_package'
     ]
     return validCommands.includes(toolCall.command)
@@ -247,6 +249,55 @@ class XMLToolAutoExecutor {
       }
     } catch (error) {
       throw new Error(`Failed to delete file ${toolCall.path}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  private async executeDeleteFolder(toolCall: XMLToolCall): Promise<any> {
+    if (!this.storageManager || !toolCall.path) {
+      throw new Error('Missing required parameters for delete_folder')
+    }
+
+    try {
+      // Get all files in the project
+      const allFiles = await this.storageManager.getFiles(this.options.projectId)
+      
+      // Find all files that are in this folder
+      const normalizedPath = toolCall.path.endsWith('/') ? toolCall.path : toolCall.path + '/'
+      const filesToDelete = allFiles.filter((file: File) => file.path.startsWith(normalizedPath))
+      
+      // Also check for the folder directory record itself
+      const folderRecord = allFiles.find((file: File) => file.path === toolCall.path && file.isDirectory)
+      if (folderRecord) {
+        filesToDelete.push(folderRecord)
+      }
+
+      if (filesToDelete.length === 0) {
+        throw new Error(`Folder not found or empty: ${toolCall.path}`)
+      }
+
+      // Delete all files in the folder
+      let deletedCount = 0
+      for (const file of filesToDelete) {
+        const result = await this.storageManager.deleteFile(this.options.projectId, file.path)
+        if (result) {
+          deletedCount++
+        }
+      }
+
+      // Emit files-changed event
+      window.dispatchEvent(new CustomEvent('files-changed', {
+        detail: { projectId: this.options.projectId }
+      }))
+
+      return {
+        success: true,
+        action: 'deleted',
+        path: toolCall.path,
+        filesDeleted: deletedCount,
+        message: `✅ Folder ${toolCall.path} deleted successfully (${deletedCount} files removed).`
+      }
+    } catch (error) {
+      throw new Error(`Failed to delete folder ${toolCall.path}: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -626,6 +677,46 @@ class XMLToolAutoExecutor {
           }
           
           return { message: `File ${toolCall.path} deleted successfully` }
+
+        case 'delete_folder':
+          if (!toolCall.path) {
+            throw new Error('delete_folder requires path')
+          }
+          
+          // Get all files in the project
+          const allFiles = await storageManager.getFiles(projectId)
+          
+          // Find all files that are in this folder
+          const normalizedPath = toolCall.path.endsWith('/') ? toolCall.path : toolCall.path + '/'
+          const filesToDelete = allFiles.filter(file => file.path.startsWith(normalizedPath))
+          
+          // Also check for the folder directory record itself
+          const folderRecord = allFiles.find(file => file.path === toolCall.path && file.isDirectory)
+          if (folderRecord) {
+            filesToDelete.push(folderRecord)
+          }
+
+          if (filesToDelete.length === 0) {
+            throw new Error(`Folder not found or empty: ${toolCall.path}`)
+          }
+
+          // Delete all files in the folder
+          let deletedCount = 0
+          for (const file of filesToDelete) {
+            const result = await storageManager.deleteFile(projectId, file.path)
+            if (result) {
+              deletedCount++
+            }
+          }
+          
+          // Emit files-changed event with projectId
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('files-changed', {
+              detail: { projectId: this.options.projectId }
+            }))
+          }
+          
+          return { message: `Folder ${toolCall.path} deleted successfully (${deletedCount} files removed)` }
 
         case 'add_package':
           if (!toolCall.args.name) {

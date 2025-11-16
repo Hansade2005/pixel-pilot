@@ -791,6 +791,86 @@ export async function handleClientFileOperation(
         break;
       }
 
+      case 'delete_folder': {
+        const { path } = toolCall.args;
+        console.log(`[ClientFileTool] delete_folder: ${path}`);
+
+        // Validate path
+        if (!path || typeof path !== 'string') {
+          addToolResult({
+            tool: 'delete_folder',
+            toolCallId: toolCall.toolCallId,
+            state: 'output-error',
+            errorText: 'Invalid folder path provided'
+          });
+          return;
+        }
+
+        // Normalize path to ensure it ends with /
+        const normalizedPath = path.endsWith('/') ? path : path + '/';
+
+        try {
+          // Get all files in the project
+          const allFiles = await storageManager.getFiles(projectId);
+          
+          // Find all files that are in this folder
+          const filesToDelete = allFiles.filter((file: any) => file.path.startsWith(normalizedPath));
+
+          // Also check for the folder directory record itself
+          const folderRecord = allFiles.find((file: any) => file.path === path && file.isDirectory);
+          if (folderRecord) {
+            filesToDelete.push(folderRecord);
+          }
+
+          if (filesToDelete.length === 0) {
+            addToolResult({
+              tool: 'delete_folder',
+              toolCallId: toolCall.toolCallId,
+              state: 'output-error',
+              errorText: `Folder not found or empty: ${path}`
+            });
+            return;
+          }
+
+          // Delete all files in the folder
+          let deletedCount = 0;
+          for (const file of filesToDelete) {
+            const result = await storageManager.deleteFile(projectId, file.path);
+            if (result) {
+              deletedCount++;
+            }
+          }
+
+          console.log(`[ClientFileTool] Deleted folder: ${path} (${deletedCount} files)`);
+          
+          addToolResult({
+            tool: 'delete_folder',
+            toolCallId: toolCall.toolCallId,
+            output: {
+              success: true,
+              message: `✅ Folder ${path} deleted successfully (${deletedCount} files removed).`,
+              path,
+              filesDeleted: deletedCount,
+              action: 'deleted'
+            }
+          });
+
+          // Trigger file refresh event
+          window.dispatchEvent(new CustomEvent('files-changed', {
+            detail: { projectId, forceRefresh: true }
+          }));
+        } catch (error) {
+          console.error(`[ClientFileTool] delete_folder failed:`, error);
+          addToolResult({
+            tool: 'delete_folder',
+            toolCallId: toolCall.toolCallId,
+            state: 'output-error',
+            errorText: `Failed to delete folder ${path}: ${error instanceof Error ? error.message : 'Unknown error'}`
+          });
+        }
+        break;
+      }
+
       case 'add_package': {
         const { name: packageNames, version = 'latest', isDev = false } = toolCall.args;
         console.log(`[ClientFileTool] add_package received:`, { packageNames, version, isDev });

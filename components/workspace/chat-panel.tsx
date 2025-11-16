@@ -513,7 +513,7 @@ export interface XMLToolCall {
   startTime?: number
   endTime?: number
   // Additional properties for pill rendering
-  command?: 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file' | 'execute_sql' | 'add_package' | 'remove_package'
+  command?: 'pilotwrite' | 'pilotedit' | 'pilotdelete' | 'write_file' | 'edit_file' | 'delete_file' | 'delete_folder' | 'execute_sql' | 'add_package' | 'remove_package'
   path?: string
   content?: string
 }
@@ -892,6 +892,7 @@ const JSONToolPill = ({
       case 'pilotedit': return 'Modified'
       case 'delete_file': 
       case 'pilotdelete': return 'Deleted'
+      case 'delete_folder': return 'Deleted'
       case 'add_package': return 'Added'
       case 'remove_package': return 'Removed'
       default: return 'Executed'
@@ -906,6 +907,7 @@ const JSONToolPill = ({
       case 'pilotedit': return 'File Modified'
       case 'delete_file': 
       case 'pilotdelete': return 'File Deleted'
+      case 'delete_folder': return 'Folder Deleted'
       case 'add_package': return 'Package Added'
       case 'remove_package': return 'Package Removed'
       default: return 'Tool Executed'
@@ -1209,7 +1211,7 @@ function validateXMLToolCall(toolCall: XMLToolCall): boolean {
   }
   
   // Ensure command is valid
-  const validCommands = ['pilotwrite', 'pilotedit', 'pilotdelete', 'write_file', 'edit_file', 'delete_file', 'add_package', 'remove_package']
+  const validCommands = ['pilotwrite', 'pilotedit', 'pilotdelete', 'write_file', 'edit_file', 'delete_file', 'delete_folder', 'add_package', 'remove_package']
   if (toolCall.command && !validCommands.includes(toolCall.command)) {
     return false
   }
@@ -1889,6 +1891,28 @@ async function executeClientSideTool(toolCall: XMLToolCall, projectId: string, t
           return { success: true, action: 'deleted', path: deleteFilePath, message: `File deleted: ${deleteFilePath}` }
         } else {
           throw new Error(`File not found: ${deleteFilePath}`)
+        }
+        
+      case 'delete_folder':
+        const { path: deleteFolderPath } = toolCall.args
+        // Get all files in the project
+        const allProjectFiles = await storageManager.getFiles(projectId)
+        // Find all files that are in this folder
+        const normalizedFolderPath = deleteFolderPath.endsWith('/') ? deleteFolderPath : deleteFolderPath + '/'
+        const filesInFolder = allProjectFiles.filter(file => file.path.startsWith(normalizedFolderPath))
+        // Also check for the folder directory record itself
+        const folderRecord = allProjectFiles.find(file => file.path === deleteFolderPath && file.isDirectory)
+        if (folderRecord) {
+          filesInFolder.push(folderRecord)
+        }
+        if (filesInFolder.length > 0) {
+          // Delete all files in the folder
+          for (const file of filesInFolder) {
+            await storageManager.deleteFile(projectId, file.path)
+          }
+          return { success: true, action: 'deleted', path: deleteFolderPath, filesDeleted: filesInFolder.length, message: `Folder deleted: ${deleteFolderPath} (${filesInFolder.length} files)` }
+        } else {
+          throw new Error(`Folder not found or empty: ${deleteFolderPath}`)
         }
         
       case 'read_file':

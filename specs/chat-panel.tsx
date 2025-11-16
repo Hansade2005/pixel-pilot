@@ -309,6 +309,7 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
       case 'read_file': return Eye
       case 'list_files': return FolderOpen
       case 'delete_file': return X
+      case 'delete_folder': return X
       case 'web_search': return Globe
       case 'web_extract': return FileSearch
       case 'search_knowledge': return BookOpen
@@ -328,6 +329,7 @@ const ToolPill = ({ toolCall, status = 'completed' }: { toolCall: any, status?: 
       case 'read_file': return 'Read'
       case 'list_files': return 'Listed'
       case 'delete_file': return 'Deleted'
+      case 'delete_folder': return 'Deleted'
       case 'web_search': return 'Searched'
       case 'web_extract': return 'Extracted'
       case 'search_knowledge': return 'Knowledge Searched'

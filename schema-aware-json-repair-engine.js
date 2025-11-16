@@ -33,6 +33,14 @@ export class SchemaAwareJSONRepairEngine extends AIJSONRepairEngine {
           path: { type: 'string' }
         }
       },
+      delete_folder: {
+        type: 'object',
+        required: ['tool', 'path'],
+        properties: {
+          tool: { type: 'string', enum: ['delete_folder'] },
+          path: { type: 'string' }
+        }
+      },
       edit_file: {
         type: 'object',
         required: ['tool', 'path'],
@@ -428,7 +436,7 @@ export class SchemaAwareJSONRepairEngine extends AIJSONRepairEngine {
    */
   isSupportedTool(toolName) {
     const supportedTools = [
-      'write_file', 'edit_file', 'delete_file',
+      'write_file', 'edit_file', 'delete_file', 'delete_folder',
       'read_file', 'list_files', 'create_directory',
       'pilotwrite', 'pilotedit', 'pilotdelete'
     ];

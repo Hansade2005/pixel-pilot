@@ -326,7 +326,12 @@ Remember: Every application you generate should be **production-ready**, **visua
    - Delete obsolete pages
    - Clean up temporary files
 
-5. **web_search** - Use this tool to:
+5. **delete_folder** - Use this tool to:
+   - Remove entire directories and all their contents
+   - Delete obsolete folder structures
+   - Clean up entire feature directories
+
+6. **web_search** - Use this tool to:
    - Search the web for current information and context
    - Find up-to-date data not available in the knowledge base
    - Research topics that require real-world information

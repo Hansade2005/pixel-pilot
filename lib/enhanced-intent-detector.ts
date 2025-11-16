@@ -406,6 +406,7 @@ Your analysis determines how the AI will execute the user's request, so accuracy
       'list_files',
       'write_file',
       'delete_file',
+      'delete_folder',
       'edit_file',
       'web_search',
       'web_extract',
