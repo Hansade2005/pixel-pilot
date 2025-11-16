@@ -1800,6 +1800,56 @@ export function ChatPanelV2({
     }
   }, [project?.id])
 
+  // GitHub temporary repo cleanup after AI streaming completes
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleAiStreamComplete = async (e: Event) => {
+      const customEvent = e as CustomEvent
+      console.log('[ChatPanelV2] AI streaming completed, checking for GitHub repo cleanup...')
+
+      try {
+        // Get pending cleanup repos
+        const { getPendingCleanupRepos, cleanupOldRepos } = await import('@/lib/github-temp-repo')
+        const pendingRepos = getPendingCleanupRepos()
+
+        if (pendingRepos.length > 0) {
+          console.log(`[ChatPanelV2] Found ${pendingRepos.length} pending GitHub repos for cleanup`)
+
+          // Get fresh GitHub token for cleanup
+          const { createClient } = await import('@/lib/supabase/client')
+          const { getDeploymentTokens } = await import('@/lib/cloud-sync')
+
+          const supabase = createClient()
+          const { data: { user } } = await supabase.auth.getUser()
+
+          if (user) {
+            const tokens = await getDeploymentTokens(user.id)
+            if (tokens?.github) {
+              console.log('[ChatPanelV2] Starting GitHub repo cleanup...')
+              const result = await cleanupOldRepos(tokens.github, 24) // 24 hours
+              console.log(`[ChatPanelV2] GitHub cleanup complete: ${result.deleted} deleted, ${result.failed} failed`)
+            } else {
+              console.warn('[ChatPanelV2] No GitHub token available for cleanup')
+            }
+          } else {
+            console.warn('[ChatPanelV2] User not authenticated, skipping GitHub cleanup')
+          }
+        } else {
+          console.log('[ChatPanelV2] No pending GitHub repos to cleanup')
+        }
+      } catch (error) {
+        console.error('[ChatPanelV2] Error during GitHub repo cleanup:', error)
+      }
+    }
+
+    window.addEventListener('ai-stream-complete', handleAiStreamComplete)
+
+    return () => {
+      window.removeEventListener('ai-stream-complete', handleAiStreamComplete)
+    }
+  }, [])
+
   const loadProjectFiles = async () => {
     try {
       if (!fileLookupServiceRef.current || !project?.id) return
