@@ -1826,8 +1826,8 @@ export function ChatPanelV2({
           if (user) {
             const tokens = await getDeploymentTokens(user.id)
             if (tokens?.github) {
-              console.log('[ChatPanelV2] Starting GitHub repo cleanup...')
-              const result = await cleanupOldRepos(tokens.github, 24) // 24 hours
+              console.log('[ChatPanelV2] Starting immediate GitHub repo cleanup after AI streaming...')
+              const result = await cleanupOldRepos(tokens.github, 0) // Clean up ALL pending repos immediately
               console.log(`[ChatPanelV2] GitHub cleanup complete: ${result.deleted} deleted, ${result.failed} failed`)
             } else {
               console.warn('[ChatPanelV2] No GitHub token available for cleanup')

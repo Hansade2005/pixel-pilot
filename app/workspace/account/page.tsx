@@ -1879,7 +1879,7 @@ function AccountSettingsPageContent() {
                         {connections.github.connected ? (
                           "Your token is securely stored. Click disconnect to change it."
                         ) : (
-                          <>Need a token? <a href="https://github.com/settings/tokens/new?description=Pipilot%20(repo%20workflow)&scopes=repo,workflow,user,delete_repo" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Create one here</a></>
+                          <>Need a token? <a href="https://github.com/settings/tokens/new?description=PixelPilot%20Git%20Operations&scopes=repo,workflow,user,delete_repo" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Create one here</a> (requires 'repo' scope for Git operations)</>
                         )}
                       </p>
                     </div>

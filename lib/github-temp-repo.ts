@@ -5,10 +5,15 @@
  * to store large codebases for AI processing. This avoids Vercel API
  * route timeouts by directly calling GitHub's REST API from the browser.
  *
+ * REQUIRED SCOPES: repo, workflow, user, delete_repo
+ * - 'repo' scope is required for Git operations (createTree, createCommit, etc.)
+ * - 'public_repo' scope is NOT sufficient for Git operations on public repos
+ * - 'delete_repo' scope is required for cleanup operations
+ *
  * ✔ No server load
  * ✔ Uses user's GitHub rate limits (5000 req/hr)
- * ✔ Public repos require ONLY `public_repo` scope
- * ✔ Temporary repos auto-delete after session or cleanup script
+ * ✔ Public repos for temporary storage
+ * ✔ Automatic cleanup after AI processing
  */
 
 import { Octokit } from '@octokit/rest'
@@ -63,13 +68,24 @@ export async function createTemporaryGitHubRepo(
       if (!tokens?.github) throw new Error('GitHub token missing.')
 
       actualGithubToken = tokens.github
+      console.log('[GitHubTempRepo] Token fetched successfully:', {
+        hasToken: !!actualGithubToken,
+        tokenLength: actualGithubToken?.length,
+        tokenPrefix: actualGithubToken?.substring(0, 10) + '...'
+      })
     }
 
     const octokit = new Octokit({ auth: actualGithubToken })
 
     // Validate GitHub token
     reportProgress('verify-auth', 5, 'Verifying GitHub authentication...')
-    await octokit.rest.users.getAuthenticated()
+    try {
+      const authUser = await octokit.rest.users.getAuthenticated()
+      console.log('[GitHubTempRepo] Token validation successful for user:', authUser.data.login)
+    } catch (authError: any) {
+      console.error('[GitHubTempRepo] Token validation failed:', authError.message)
+      throw new Error(`GitHub authentication failed: ${authError.message}`)
+    }
 
     // Generate unique repo name
     const uniqueId = crypto.randomUUID().slice(0, 8)
@@ -131,18 +147,70 @@ export async function createTemporaryGitHubRepo(
       content: f.content
     }))
 
-    const { data: createdTree } = await octokit.rest.git.createTree({
+    console.log('[GitHubTempRepo] Creating tree with params:', {
+      owner,
+      repo: repoName,
+      treeLength: tree.length,
+      baseTree: latestCommit.tree.sha,
+      hasToken: !!actualGithubToken
+    })
+
+    // Double-check token is still valid before tree creation
+    let currentOctokit = octokit
+    try {
+      console.log('[GitHubTempRepo] Re-verifying token before tree creation...')
+      await octokit.rest.users.getAuthenticated()
+      console.log('[GitHubTempRepo] Token still valid')
+    } catch (reAuthError: any) {
+      console.error('[GitHubTempRepo] Token became invalid before tree creation:', reAuthError.message)
+      
+      // Try fetching fresh token
+      console.log('[GitHubTempRepo] Attempting to fetch fresh token...')
+      try {
+        const { createClient } = await import('@/lib/supabase/client')
+        const { getDeploymentTokens } = await import('@/lib/cloud-sync')
+
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (user) {
+          const freshTokens = await getDeploymentTokens(user.id)
+          if (freshTokens?.github) {
+            actualGithubToken = freshTokens.github
+            console.log('[GitHubTempRepo] Fresh token fetched, using it for all operations')
+            
+            // Use fresh token for all remaining operations
+            currentOctokit = new Octokit({ auth: actualGithubToken })
+            
+            // Verify fresh token
+            await currentOctokit.rest.users.getAuthenticated()
+            console.log('[GitHubTempRepo] Fresh token verified')
+          } else {
+            throw new Error('No fresh GitHub token available')
+          }
+        } else {
+          throw new Error('User not authenticated for fresh token')
+        }
+      } catch (freshTokenError: any) {
+        console.error('[GitHubTempRepo] Fresh token approach failed:', freshTokenError.message)
+        throw new Error(`GitHub authentication failed: ${reAuthError.message}`)
+      }
+    }
+
+    const { data: createdTree } = await currentOctokit.rest.git.createTree({
       owner,
       repo: repoName,
       tree,
       base_tree: latestCommit.tree.sha
     })
 
+    console.log('[GitHubTempRepo] Tree created successfully:', createdTree.sha)
+
     reportProgress('create-tree', 70, 'Tree created.')
 
     // Create commit
     reportProgress('create-commit', 80, 'Creating commit...')
-    const { data: commit } = await octokit.rest.git.createCommit({
+    const { data: commit } = await currentOctokit.rest.git.createCommit({
       owner,
       repo: repoName,
       message: `🚀 PixelPilot Temporary Workspace Upload\nFiles: ${files.length}`,
@@ -152,7 +220,7 @@ export async function createTemporaryGitHubRepo(
     })
 
     // Update ref
-    await octokit.rest.git.updateRef({
+    await currentOctokit.rest.git.updateRef({
       owner,
       repo: repoName,
       ref: 'heads/main',
