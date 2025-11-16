@@ -6,6 +6,7 @@ import { getModel } from '@/lib/ai-providers'
 import { DEFAULT_CHAT_MODEL, getModelById } from '@/lib/ai-models'
 import { NextResponse } from 'next/server'
 import { getWorkspaceDatabaseId, workspaceHasDatabase, setWorkspaceDatabase } from '@/lib/get-current-workspace'
+import { filterMediaFiles } from '@/lib/utils'
 import JSZip from 'jszip'
 import lz4 from 'lz4js'
 import unzipper from 'unzipper'
@@ -81,6 +82,57 @@ const sessionProjectStorage = new Map<string, {
   fileTree: string[]
   files: Map<string, any>
 }>()
+
+// Extract files from compressed data (LZ4 + Zip)
+async function extractFromCompressedData(compressedData: ArrayBuffer): Promise<{
+  files: any[]
+  fileTree: string[]
+  metadata: any
+}> {
+  // Step 1: LZ4 decompress
+  const decompressedData = lz4.decompress(Buffer.from(compressedData))
+  console.log(`[Compression] LZ4 decompressed to ${decompressedData.length} bytes`)
+
+  // Step 2: Unzip the data
+  const zip = new JSZip()
+  await zip.loadAsync(decompressedData)
+
+  // Extract files from zip
+  const extractedFiles: any[] = []
+  for (const [path, zipEntry] of Object.entries(zip.files)) {
+    if (!zipEntry.dir) {
+      const content = await zipEntry.async('text')
+      extractedFiles.push({
+        path,
+        content,
+        name: path.split('/').pop() || path,
+        type: path.split('.').pop() || 'text',
+        size: content.length
+      })
+    }
+  }
+
+  console.log(`[Compression] Extracted ${extractedFiles.length} files from zip`)
+
+  // Filter out images, videos, and PDF files to reduce processing load
+  const filteredFiles = filterMediaFiles(extractedFiles)
+  console.log(`[Compression] Filtered to ${filteredFiles.length} files (removed ${extractedFiles.length - filteredFiles.length} media files)`)
+
+  // Parse metadata if present
+  let metadata = {}
+  const metadataEntry = zip.file('__metadata__.json')
+  if (metadataEntry) {
+    const metadataContent = await metadataEntry.async('text')
+    metadata = JSON.parse(metadataContent)
+    console.log(`[Compression] Loaded metadata: ${(metadata as any).fileTree?.length || 0} file tree entries`)
+  }
+
+  return {
+    files: filteredFiles,
+    fileTree: (metadata as any).fileTree || [],
+    metadata
+  }
+}
 
 // Database ID cache for projects (to avoid repeated lookups)
 const projectDatabaseCache = new Map<string, { databaseId: number | null, timestamp: number }>()
@@ -1466,46 +1518,17 @@ export async function POST(req: Request) {
 
     if (contentType.includes('application/octet-stream')) {
       // Handle compressed binary data (LZ4 + Zip)
-      console.log('[Chat-V2] 📦 Received compressed binary data, decompressing...')
+      console.log('[Chat-V2] 📦 Received compressed binary data, extracting...')
 
       const compressedData = await req.arrayBuffer()
       console.log(`[Chat-V2] 📦 Received ${compressedData.byteLength} bytes of compressed data`)
 
-      // Step 1: LZ4 decompress
-      const decompressedData = lz4.decompress(Buffer.from(compressedData))
-      console.log(`[Chat-V2] 📦 LZ4 decompressed to ${decompressedData.length} bytes`)
-
-      // Step 2: Unzip the data
-      const zip = new JSZip()
-      await zip.loadAsync(decompressedData)
-
-      // Extract files from zip
-      const extractedFiles: any[] = []
-      for (const [path, zipEntry] of Object.entries(zip.files)) {
-        if (!zipEntry.dir) {
-          const content = await zipEntry.async('text')
-          extractedFiles.push({
-            path,
-            content,
-            name: path.split('/').pop() || path,
-            type: path.split('.').pop() || 'text',
-            size: content.length
-          })
-        }
-      }
-
-      console.log(`[Chat-V2] 📦 Extracted ${extractedFiles.length} files from zip`)
-
-      // Parse metadata if present (for fileTree, etc.)
-      const metadataEntry = zip.file('__metadata__.json')
-      if (metadataEntry) {
-        const metadataContent = await metadataEntry.async('text')
-        extractedMetadata = JSON.parse(metadataContent)
-        clientFileTree = extractedMetadata.fileTree || []
-        console.log(`[Chat-V2] 📦 Loaded metadata: ${clientFileTree.length} file tree entries`)
-      }
-
-      clientFiles = extractedFiles
+      // Extract using LZ4 + Zip method
+      const extractedData = await extractFromCompressedData(compressedData)
+      clientFiles = extractedData.files
+      clientFileTree = extractedData.fileTree
+      extractedMetadata = extractedData.metadata
+      console.log(`[Chat-V2] 📦 Extracted ${clientFiles.length} files from compressed data`)
     } else {
       // Handle regular JSON data (backward compatibility)
       console.log('[Chat-V2] 📄 Received JSON data (backward compatibility mode)')

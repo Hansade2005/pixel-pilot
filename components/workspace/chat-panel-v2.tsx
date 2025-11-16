@@ -22,7 +22,7 @@ import {
   Search, Globe, Eye, FolderOpen, Settings, Edit3, CheckCircle2, XCircle,
   Square, Database, CornerDownLeft, Table, Key, Code, Server
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, filterMediaFiles } from '@/lib/utils'
 import { Actions, Action } from '@/components/ai-elements/actions'
 import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown"
 import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
@@ -43,11 +43,15 @@ async function compressProjectFiles(
 ): Promise<ArrayBuffer> {
   console.log(`[Compression] Starting compression of ${projectFiles.length} files`)
 
+  // Filter out images, videos, and PDF files to reduce payload size
+  const filteredFiles = filterMediaFiles(projectFiles)
+  console.log(`[Compression] Filtered to ${filteredFiles.length} files (removed ${projectFiles.length - filteredFiles.length} media files)`)
+
   // Create zip file data
   const zipData: Record<string, Uint8Array> = {}
 
   // Add files to zip
-  for (const file of projectFiles) {
+  for (const file of filteredFiles) {
     if (file.path && file.content !== undefined) {
       zipData[file.path] = strToU8(String(file.content))
     }
@@ -59,7 +63,57 @@ async function compressProjectFiles(
     messages: messagesToSend,
     ...metadata,
     compressedAt: new Date().toISOString(),
-    fileCount: projectFiles.length
+    fileCount: filteredFiles.length,
+    originalFileCount: projectFiles.length,
+    compressionType: 'lz4-zip'
+  }
+  zipData['__metadata__.json'] = strToU8(JSON.stringify(fullMetadata))
+
+  // Create zip file
+  const zippedData = zipSync(zipData)
+  console.log(`[Compression] Created zip file: ${zippedData.length} bytes`)
+
+  // Compress with LZ4
+  const compressedData = await compress(zippedData)
+  console.log(`[Compression] LZ4 compressed to: ${compressedData.length} bytes`)
+
+  // Convert Uint8Array to ArrayBuffer
+  const arrayBuffer = new ArrayBuffer(compressedData.length)
+  new Uint8Array(arrayBuffer).set(compressedData)
+  return arrayBuffer
+}
+
+// Fallback compression method (original LZ4 + Zip)
+async function compressProjectFilesFallback(
+  projectFiles: any[],
+  fileTree: string[],
+  messagesToSend: any[],
+  metadata: any
+): Promise<ArrayBuffer> {
+  console.log(`[Compression] Starting fallback compression of ${projectFiles.length} files`)
+
+  // Filter out images, videos, and PDF files to reduce payload size
+  const filteredFiles = filterMediaFiles(projectFiles)
+  console.log(`[Compression] Filtered to ${filteredFiles.length} files (removed ${projectFiles.length - filteredFiles.length} media files)`)
+
+  // Create zip file data
+  const zipData: Record<string, Uint8Array> = {}
+
+  // Add files to zip
+  for (const file of filteredFiles) {
+    if (file.path && file.content !== undefined) {
+      zipData[file.path] = strToU8(String(file.content))
+    }
+  }
+
+  // Add metadata file with file tree, messages, and other data
+  const fullMetadata = {
+    fileTree,
+    messages: messagesToSend,
+    ...metadata,
+    compressedAt: new Date().toISOString(),
+    fileCount: filteredFiles.length,
+    originalFileCount: projectFiles.length
   }
   zipData['__metadata__.json'] = strToU8(JSON.stringify(fullMetadata))
 

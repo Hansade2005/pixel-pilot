@@ -6,6 +6,9 @@ import {
   SandboxErrorType,
   type SandboxFile 
 } from '@/lib/e2b-enhanced'
+import { filterMediaFiles } from '@/lib/utils'
+import JSZip from 'jszip'
+import lz4 from 'lz4js'
 
 /**
  * Parse environment variables from .env file content
@@ -45,6 +48,56 @@ function parseEnvFile(content: string): Record<string, string> {
   return envVars
 }
 
+// Extract project files from compressed data (LZ4 + Zip)
+async function extractProjectFromCompressedData(compressedData: ArrayBuffer): Promise<{
+  projectId: string
+  files: any[]
+}> {
+  // Step 1: LZ4 decompress
+  const decompressedData = lz4.decompress(Buffer.from(compressedData))
+  console.log(`[Preview] LZ4 decompressed to ${decompressedData.length} bytes`)
+
+  // Step 2: Unzip the data
+  const zip = new JSZip()
+  await zip.loadAsync(decompressedData)
+
+  // Extract files from zip
+  const extractedFiles: any[] = []
+  for (const [path, zipEntry] of Object.entries(zip.files)) {
+    if (!zipEntry.dir) {
+      const content = await zipEntry.async('text')
+      extractedFiles.push({
+        path,
+        content,
+        name: path.split('/').pop() || path,
+        type: path.split('.').pop() || 'text',
+        size: content.length
+      })
+    }
+  }
+
+  console.log(`[Preview] Extracted ${extractedFiles.length} files from zip`)
+
+  // Filter out images, videos, and PDF files to reduce processing load
+  const filteredFiles = filterMediaFiles(extractedFiles)
+  console.log(`[Preview] Filtered to ${filteredFiles.length} files (removed ${extractedFiles.length - filteredFiles.length} media files)`)
+
+  // Parse metadata to get projectId
+  let projectId = `preview-${Date.now()}`
+  const metadataEntry = zip.file('__metadata__.json')
+  if (metadataEntry) {
+    const metadataContent = await metadataEntry.async('text')
+    const metadata = JSON.parse(metadataContent)
+    projectId = metadata.project?.id || metadata.projectId || projectId
+    console.log(`[Preview] Loaded metadata, projectId: ${projectId}`)
+  }
+
+  return {
+    projectId,
+    files: filteredFiles
+  }
+}
+
 export async function POST(req: Request) {
   // Check if client accepts streaming
   const acceptHeader = req.headers.get('accept') || ''
@@ -65,15 +118,33 @@ async function handleStreamingPreview(req: Request) {
       return new Response("E2B API key missing", { status: 500 })
     }
 
-    const { projectId, files } = await req.json()
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return new Response("Unauthorized", { status: 401 })
+
+    // Check content type to determine data format
+    const contentType = req.headers.get('content-type') || ''
+    let projectId: string
+    let files: any[]
+
+    if (contentType.includes('application/octet-stream')) {
+      // Handle compressed data (LZ4 + Zip)
+      console.log('[Preview] 📦 Received compressed binary data')
+      const compressedData = await req.arrayBuffer()
+      const extractedData = await extractProjectFromCompressedData(compressedData)
+      projectId = extractedData.projectId
+      files = extractedData.files
+    } else {
+      // Handle JSON format (backward compatibility)
+      console.log('[Preview] 📄 Received JSON data')
+      const { projectId: jsonProjectId, files: jsonFiles } = await req.json()
+      projectId = jsonProjectId
+      files = jsonFiles
+    }
 
     if (!projectId || !files?.length) {
       return new Response("Project ID and files are required", { status: 400 })
     }
-
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return new Response("Unauthorized", { status: 401 })
 
     const stream = new ReadableStream({
       async start(controller) {
