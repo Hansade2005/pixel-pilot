@@ -2250,7 +2250,7 @@ ${conversationSummaryContext || ''}`
 
         // SERVER-SIDE TOOL: Read operations need server-side execution to return fresh data
         read_file: tool({
-          description: 'Read the contents of a file with optional line number information or specific line ranges. Large files (>500KB) will be truncated to prevent response size issues. This tool executes on the server-side to ensure the AI sees the most current file content.',
+          description: 'Read the contents of a file using optional line-range parameters. Always retrieve specific sections when dealing with large files over 150 lines, reading them in smaller chunks. This tool runs server-side to ensure you access the most up-to-date file content. You may read a maximum of 150 lines per call to avoid exceeding your context window.If a file is too large to understand through sequential reads, consider using semantic_code_navigator to comprehend the code structure and meaning, or grep_search to locate specific patterns or references in the codebase.',
           inputSchema: z.object({
             path: z.string().describe('File path to read'),
             includeLineNumbers: z.boolean().optional().describe('Whether to include line numbers in the response (default: false)'),
