@@ -12,6 +12,8 @@
  * - Progress callbacks for UI updates
  */
 
+import { Octokit } from '@octokit/rest'
+
 interface FileObject {
   path: string
   content: string
@@ -54,61 +56,52 @@ export async function createTemporaryGitHubRepo(
   try {
     reportProgress('init', 0, 'Initializing GitHub repository creation...')
 
+    // Initialize Octokit with user's token
+    const octokit = new Octokit({
+      auth: githubToken,
+    })
+
     // Step 1: Generate unique repository name
     const uniqueId = crypto.randomUUID().slice(0, 8)
     const repoName = `pixelpilot-temp-${uniqueId}`
     reportProgress('create-repo', 10, `Creating repository: ${repoName}`)
 
-    // Step 2: Create GitHub repository
-    const createRepoResponse = await fetch('https://api.github.com/user/repos', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${githubToken}`,
-        'Accept': 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        name: repoName,
-        description: `🤖 PixelPilot Temporary Workspace - Created ${new Date().toISOString()}`,
-        private: true, // Always create private repos for security
-        auto_init: false, // We'll push files manually
-        has_issues: false,
-        has_projects: false,
-        has_wiki: false
-      })
+    // Step 2: Create GitHub repository with auto_init
+    const { data: repoData } = await octokit.rest.repos.createForAuthenticatedUser({
+      name: repoName,
+      description: `🤖 PixelPilot Temporary Workspace - Created ${new Date().toISOString()}`,
+      private: true, // Always create private repos for security
+      auto_init: true, // Initialize with README to get initial commit
+      has_issues: false,
+      has_projects: false,
+      has_wiki: false
     })
-
-    if (!createRepoResponse.ok) {
-      const errorData = await createRepoResponse.json()
-      throw new Error(`GitHub repo creation failed: ${errorData.message || createRepoResponse.statusText}`)
-    }
-
-    const repoData = await createRepoResponse.json()
+      
     reportProgress('create-repo', 20, `✅ Repository created: ${repoData.html_url}`)
 
-    // Step 3: Get authenticated user info for repo owner
+    // Step 3: Get authenticated user info
     reportProgress('fetch-user', 25, 'Fetching user information...')
-    const userResponse = await fetch('https://api.github.com/user', {
-      headers: {
-        'Authorization': `Bearer ${githubToken}`,
-        'Accept': 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28'
-      }
-    })
-
-    if (!userResponse.ok) {
-      throw new Error('Failed to get GitHub user info')
-    }
-
-    const userData = await userResponse.json()
+    const { data: userData } = await octokit.rest.users.getAuthenticated()
     const owner = userData.login
     reportProgress('fetch-user', 30, `✅ User: ${owner}`)
 
-    // Step 4: Prepare files for GitHub (convert to base64)
-    reportProgress('prepare-files', 35, `Preparing ${files.length} files for upload...`)
+    // Step 4: Get the initial commit from auto_init
+    reportProgress('prepare-files', 35, 'Preparing for file upload...')
+    const { data: ref } = await octokit.rest.git.getRef({
+      owner,
+      repo: repoName,
+      ref: 'heads/main',
+    })
+
+    const { data: latestCommit } = await octokit.rest.git.getCommit({
+      owner,
+      repo: repoName,
+      commit_sha: ref.object.sha,
+    })
+
+    // Step 5: Prepare all files including metadata
+    reportProgress('prepare-files', 40, `Preparing ${files.length} files for upload...`)
     
-    // Add metadata file to the collection
     const allFiles = [
       ...files,
       {
@@ -123,117 +116,49 @@ export async function createTemporaryGitHubRepo(
       }
     ]
 
-    // Step 5: Create blobs for each file (GitHub API requires this)
-    reportProgress('upload-blobs', 40, 'Uploading file blobs to GitHub...')
-    const blobShas: { path: string, sha: string }[] = []
-    const totalFiles = allFiles.length
+    // Step 6: Create tree with all files (using content, not blobs)
+    reportProgress('create-tree', 50, `Creating Git tree with ${allFiles.length} files...`)
     
-    for (let i = 0; i < allFiles.length; i++) {
-      const file = allFiles[i]
-      const progress = 40 + Math.floor((i / totalFiles) * 30) // 40-70%
-      
-      reportProgress('upload-blobs', progress, `Uploading ${file.path} (${i + 1}/${totalFiles})`)
-      
-      // Create blob for this file
-      const blobResponse = await fetch(`https://api.github.com/repos/${owner}/${repoName}/git/blobs`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${githubToken}`,
-          'Accept': 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          content: btoa(unescape(encodeURIComponent(file.content))), // UTF-8 safe base64 encoding
-          encoding: 'base64'
-        })
-      })
+    const tree = allFiles.map(file => ({
+      path: file.path.startsWith('/') ? file.path.slice(1) : file.path,
+      mode: '100644' as const,
+      type: 'blob' as const,
+      content: file.content
+    }))
 
-      if (!blobResponse.ok) {
-        const errorData = await blobResponse.json()
-        console.error(`[GitHubTempRepo] Failed to create blob for ${file.path}:`, errorData)
-        throw new Error(`Failed to upload ${file.path}: ${errorData.message}`)
+    const { data: createdTree } = await octokit.rest.git.createTree({
+      owner,
+      repo: repoName,
+      tree,
+      base_tree: latestCommit.tree.sha, // Use the existing tree as base
+    })
+
+    reportProgress('create-tree', 70, `✅ Git tree created with ${allFiles.length} files`)
+
+    // Step 7: Create commit
+    reportProgress('create-commit', 80, 'Creating initial commit...')
+    const { data: commit } = await octokit.rest.git.createCommit({
+      owner,
+      repo: repoName,
+      message: `🚀 Initial commit: PixelPilot temporary workspace\n\n- ${files.length} project files\n- Created: ${new Date().toISOString()}\n- Auto-generated for AI processing`,
+      tree: createdTree.sha,
+      parents: [ref.object.sha], // Reference the existing commit
+      author: {
+        name: 'PixelPilot Bot',
+        email: 'bot@pixelpilot.dev'
       }
-
-      const blobData = await blobResponse.json()
-      blobShas.push({ path: file.path, sha: blobData.sha })
-    }
-
-    reportProgress('upload-blobs', 70, `✅ Uploaded ${totalFiles} files`)
-
-    // Step 6: Create a tree with all file blobs
-    reportProgress('create-tree', 75, 'Creating Git tree structure...')
-    const createTreeResponse = await fetch(`https://api.github.com/repos/${owner}/${repoName}/git/trees`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${githubToken}`,
-        'Accept': 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        tree: blobShas.map(({ path, sha }) => ({
-          path,
-          mode: '100644', // Regular file
-          type: 'blob',
-          sha
-        }))
-      })
     })
 
-    if (!createTreeResponse.ok) {
-      const errorData = await createTreeResponse.json()
-      throw new Error(`Failed to create git tree: ${errorData.message}`)
-    }
-
-    const treeData = await createTreeResponse.json()
-    reportProgress('create-tree', 80, '✅ Git tree created')
-
-    // Step 7: Create initial commit
-    reportProgress('create-commit', 85, 'Creating initial commit...')
-    const createCommitResponse = await fetch(`https://api.github.com/repos/${owner}/${repoName}/git/commits`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${githubToken}`,
-        'Accept': 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        message: `🚀 Initial commit: PixelPilot temporary workspace\n\n- ${files.length} project files\n- Created: ${new Date().toISOString()}\n- Auto-generated for AI processing`,
-        tree: treeData.sha,
-        parents: [] // Initial commit has no parents
-      })
-    })
-
-    if (!createCommitResponse.ok) {
-      const errorData = await createCommitResponse.json()
-      throw new Error(`Failed to create initial commit: ${errorData.message}`)
-    }
-
-    const commitData = await createCommitResponse.json()
     reportProgress('create-commit', 90, '✅ Commit created')
 
-    // Step 8: Create main branch reference
+    // Step 8: Update main branch reference
     reportProgress('update-ref', 95, 'Updating main branch...')
-    const createRefResponse = await fetch(`https://api.github.com/repos/${owner}/${repoName}/git/refs`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${githubToken}`,
-        'Accept': 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        ref: 'refs/heads/main',
-        sha: commitData.sha
-      })
+    await octokit.rest.git.updateRef({
+      owner,
+      repo: repoName,
+      ref: 'heads/main',
+      sha: commit.sha,
     })
-
-    if (!createRefResponse.ok) {
-      const errorData = await createRefResponse.json()
-      throw new Error(`Failed to create main branch: ${errorData.message}`)
-    }
 
     reportProgress('complete', 100, '✅ Repository ready!')
 
@@ -242,7 +167,7 @@ export async function createTemporaryGitHubRepo(
       repoUrl: repoData.html_url,
       repoApiUrl: repoData.url,
       owner,
-      commitSha: commitData.sha,
+      commitSha: commit.sha,
       createdAt: new Date().toISOString()
     }
 
@@ -270,22 +195,26 @@ export async function deleteTemporaryGitHubRepo(
 ): Promise<void> {
   console.log(`[GitHubTempRepo] 🗑️ Deleting repository: ${owner}/${repoName}`)
 
-  const deleteResponse = await fetch(`https://api.github.com/repos/${owner}/${repoName}`, {
-    method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${githubToken}`,
-      'Accept': 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28'
-    }
+  const octokit = new Octokit({
+    auth: githubToken,
   })
 
-  if (!deleteResponse.ok && deleteResponse.status !== 404) {
-    const errorData = await deleteResponse.json().catch(() => ({}))
-    throw new Error(`Failed to delete repository: ${errorData.message || deleteResponse.statusText}`)
-  }
+  try {
+    await octokit.rest.repos.delete({
+      owner,
+      repo: repoName,
+    })
 
-  console.log(`[GitHubTempRepo] ✅ Repository deleted: ${owner}/${repoName}`)
-  removeRepoFromCleanup(repoName)
+    console.log(`[GitHubTempRepo] ✅ Repository deleted: ${owner}/${repoName}`)
+    removeRepoFromCleanup(repoName)
+  } catch (error: any) {
+    if (error.status === 404) {
+      console.log(`[GitHubTempRepo] ℹ️ Repository already deleted: ${owner}/${repoName}`)
+      removeRepoFromCleanup(repoName)
+    } else {
+      throw new Error(`Failed to delete repository: ${error.message}`)
+    }
+  }
 }
 
 /**
