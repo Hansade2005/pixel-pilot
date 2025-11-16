@@ -326,12 +326,17 @@ export class EnhancedE2BSandbox {
     onStderr?: (data: string) => void
   }): Promise<{ processId: string; url: string }> {
     // Default to npm for development server
-    const command = options?.command || 'npm run dev'
+    let command = options?.command || 'npm run dev'
     const workingDir = options?.workingDirectory || '/project'
     const port = options?.port || 3000
     const timeout = options?.timeoutMs || 30000
     const onStdout = options?.onStdout || ((data: string) => console.log(`[Dev Server] ${data}`))
     const onStderr = options?.onStderr || ((data: string) => console.error(`[Dev Server Error] ${data}`))
+
+    // Modify command to include port for Vite preview
+    if (command.includes('npm run preview') || command.includes('vite preview')) {
+      command = command.replace('vite preview', `vite preview --port ${port}`)
+    }
 
     try {
       // Start the development server using @e2b/code-interpreter API
@@ -355,8 +360,13 @@ export class EnhancedE2BSandbox {
       
       // Add environment variables if provided
       if (options?.envVars) {
-        processOptions.envs = options.envVars
+        processOptions.envs = { ...options.envVars }
+      } else {
+        processOptions.envs = {}
       }
+      
+      // Always set PORT environment variable for server commands
+      processOptions.envs.PORT = port.toString()
       
       if (this.container.commands && typeof this.container.commands.start === 'function') {
         // Use the correct @e2b/code-interpreter API

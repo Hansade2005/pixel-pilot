@@ -200,7 +200,7 @@ async function handleStreamingPreview(req: Request) {
               scripts: {
                 dev: 'vite',
                 build: 'tsc && vite build',
-                preview: 'vite preview',
+                preview: 'vite preview --port 3000',
                 lint: 'eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0'
               },
               dependencies: {
@@ -246,7 +246,7 @@ async function handleStreamingPreview(req: Request) {
           send({ type: "log", message: "Dependencies installed successfully" })
 
           // 🔹 Determine the build and start command based on framework
-          let buildCommand = "npm run build && npm run preview" // Default to Vite
+          let buildCommand = "npm run build && PORT=3000 npm run preview" // Default to Vite
           const hasNextConfig = files.some((f: any) => 
             f.path === 'next.config.js' || 
             f.path === 'next.config.mjs' || 
@@ -258,22 +258,43 @@ async function handleStreamingPreview(req: Request) {
             f.path === 'vite.config.mjs'
           )
           
-          if (hasNextConfig) {
-            buildCommand = "npm run build && npm run start" // Next.js
-          } else if (hasViteConfig) {
-            buildCommand = "npm run build && npm run preview" // Vite
-          } else {
-            // Fallback to dependency check
-            const packageJsonFile = files.find((f: any) => f.path === 'package.json')
-            if (packageJsonFile) {
-              try {
-                const packageJson = JSON.parse(packageJsonFile.content)
-                if (packageJson.dependencies && packageJson.dependencies.next) {
-                  buildCommand = "npm run build && npm run start" // Next.js
-                }
-              } catch (error) {
-                console.warn('[Preview] Failed to parse package.json, using default Vite command')
+          const packageJsonFile = files.find((f: any) => f.path === 'package.json')
+          let packageJson: any = null
+          if (packageJsonFile) {
+            try {
+              packageJson = JSON.parse(packageJsonFile.content)
+            } catch (error) {
+              console.warn('[Preview] Failed to parse package.json, using default commands')
+            }
+          }
+
+          if (hasNextConfig || (packageJson?.dependencies?.next)) {
+            // Next.js project
+            if (packageJson?.scripts?.start) {
+              // Check if start script already has port specification
+              const startScript = packageJson.scripts.start
+              if (!startScript.includes('--port') && !startScript.includes('PORT=')) {
+                // Use PORT environment variable since Next.js respects it
+                buildCommand = `npm run build && PORT=3000 npm run start`
+              } else {
+                buildCommand = "npm run build && npm run start"
               }
+            } else {
+              buildCommand = "npm run build && PORT=3000 npm run start"
+            }
+          } else if (hasViteConfig || packageJson?.scripts?.preview) {
+            // Vite project
+            if (packageJson?.scripts?.preview) {
+              // Check if preview script already has port specification
+              const previewScript = packageJson.scripts.preview
+              if (!previewScript.includes('--port') && !previewScript.includes('PORT=')) {
+                // Modify the preview script to include port
+                buildCommand = `npm run build && npm run preview -- --port 3000`
+              } else {
+                buildCommand = "npm run build && npm run preview"
+              }
+            } else {
+              buildCommand = "npm run build && PORT=3000 npm run preview"
             }
           }
 
@@ -558,7 +579,7 @@ devDependencies:
       console.log('Dependencies installed successfully with npm')
 
       // Determine the build and start command based on framework
-      let buildCommand = "npm run build && npm run preview" // Default to Vite
+      let buildCommand = "npm run build && PORT=3000 npm run preview" // Default to Vite
       const hasNextConfig = files.some((f: any) => 
         f.path === 'next.config.js' || 
         f.path === 'next.config.mjs' || 
@@ -570,22 +591,43 @@ devDependencies:
         f.path === 'vite.config.mjs'
       )
       
-      if (hasNextConfig) {
-        buildCommand = "npm run build && npm run start" // Next.js
-      } else if (hasViteConfig) {
-        buildCommand = "npm run build && npm run preview" // Vite
-      } else {
-        // Fallback to dependency check
-        const packageJsonFile = files.find((f: any) => f.path === 'package.json')
-        if (packageJsonFile) {
-          try {
-            const packageJson = JSON.parse(packageJsonFile.content)
-            if (packageJson.dependencies && packageJson.dependencies.next) {
-              buildCommand = "npm run build && npm run start" // Next.js
-            }
-          } catch (error) {
-            console.warn('[Preview] Failed to parse package.json, using default Vite command')
+      const packageJsonFile = files.find((f: any) => f.path === 'package.json')
+      let packageJson: any = null
+      if (packageJsonFile) {
+        try {
+          packageJson = JSON.parse(packageJsonFile.content)
+        } catch (error) {
+          console.warn('[Preview] Failed to parse package.json, using default commands')
+        }
+      }
+
+      if (hasNextConfig || (packageJson?.dependencies?.next)) {
+        // Next.js project
+        if (packageJson?.scripts?.start) {
+          // Check if start script already has port specification
+          const startScript = packageJson.scripts.start
+          if (!startScript.includes('--port') && !startScript.includes('PORT=')) {
+            // Use PORT environment variable since Next.js respects it
+            buildCommand = `npm run build && PORT=3000 npm run start`
+          } else {
+            buildCommand = "npm run build && npm run start"
           }
+        } else {
+          buildCommand = "npm run build && PORT=3000 npm run start"
+        }
+      } else if (hasViteConfig || packageJson?.scripts?.preview) {
+        // Vite project
+        if (packageJson?.scripts?.preview) {
+          // Check if preview script already has port specification
+          const previewScript = packageJson.scripts.preview
+          if (!previewScript.includes('--port') && !previewScript.includes('PORT=')) {
+            // Use npm run with port argument
+            buildCommand = `npm run build && npm run preview -- --port 3000`
+          } else {
+            buildCommand = "npm run build && npm run preview"
+          }
+        } else {
+          buildCommand = "npm run build && PORT=3000 npm run preview"
         }
       }
 

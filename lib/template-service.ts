@@ -21,7 +21,7 @@ export class TemplateService {
     "dev": "vite",
     "build": "tsc --noEmit || true && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview --port 3000"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -5352,7 +5352,7 @@ This setup provides a complete, production-ready authentication system for your 
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next start --port 3000",
     "lint": "next lint"
   },
   "dependencies": {
