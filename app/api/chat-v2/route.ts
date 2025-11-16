@@ -1460,95 +1460,11 @@ export async function POST(req: Request) {
   let extractedMetadata: any = {}
 
   try {
-    // Check content-type to determine request type
+    // Check content-type to determine if this is compressed binary data or regular JSON
     const contentType = req.headers.get('content-type') || ''
-    const isGitHubRepo = req.headers.get('x-github-repo') === 'true'
     let body: any
 
-    if (isGitHubRepo) {
-      // Handle GitHub repository requests
-      console.log('[Chat-V2] 📦 Received GitHub repo request, fetching files...')
-      
-      body = await req.json()
-      const { githubRepo, githubToken } = body
-      
-      if (!githubRepo || !githubToken) {
-        return NextResponse.json(
-          { error: 'Missing GitHub repo information or token' },
-          { status: 400 }
-        )
-      }
-
-      // Fetch files from GitHub repository
-      const { repoUrl, repoName } = githubRepo
-      const [owner, repo] = repoUrl.replace('https://github.com/', '').split('/')
-      
-      console.log(`[Chat-V2] 📦 Fetching files from GitHub repo: ${owner}/${repo}`)
-      
-      // Get repository contents recursively
-      const fetchGitHubFiles = async (path = '', files: any[] = []): Promise<any[]> => {
-        const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`
-        const response = await fetch(apiUrl, {
-          headers: {
-            'Authorization': `Bearer ${githubToken}`,
-            'Accept': 'application/vnd.github+json',
-            'X-GitHub-Api-Version': '2022-11-28'
-          }
-        })
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch GitHub contents: ${response.statusText}`)
-        }
-
-        const contents = await response.json()
-        
-        for (const item of contents) {
-          if (item.type === 'file') {
-            // Fetch file content
-            const fileResponse = await fetch(item.download_url)
-            if (fileResponse.ok) {
-              const content = await fileResponse.text()
-              files.push({
-                path: item.path,
-                content,
-                name: item.name,
-                type: item.name.split('.').pop() || 'text',
-                size: content.length
-              })
-            }
-          } else if (item.type === 'dir') {
-            // Recursively fetch directory contents
-            await fetchGitHubFiles(item.path, files)
-          }
-        }
-        
-        return files
-      }
-
-      clientFiles = await fetchGitHubFiles()
-      console.log(`[Chat-V2] 📦 Fetched ${clientFiles.length} files from GitHub repo`)
-
-      // Try to load metadata from __pixelpilot_metadata.json if it exists
-      const metadataFile = clientFiles.find(f => f.path === '__pixelpilot_metadata.json')
-      if (metadataFile) {
-        try {
-          extractedMetadata = JSON.parse(metadataFile.content)
-          clientFileTree = extractedMetadata.fileTree || []
-          console.log(`[Chat-V2] 📦 Loaded metadata from GitHub repo: ${clientFileTree.length} file tree entries`)
-          
-          // Remove metadata file from clientFiles since it's internal
-          const metadataIndex = clientFiles.indexOf(metadataFile)
-          if (metadataIndex > -1) {
-            clientFiles.splice(metadataIndex, 1)
-          }
-        } catch (error) {
-          console.warn('[Chat-V2] ⚠️ Failed to parse metadata from GitHub repo:', error)
-        }
-      }
-
-      console.log(`[Chat-V2] 📦 GitHub repo processing complete: ${clientFiles.length} project files ready for session storage`)
-
-    } else if (contentType.includes('application/octet-stream')) {
+    if (contentType.includes('application/octet-stream')) {
       // Handle compressed binary data (LZ4 + Zip)
       console.log('[Chat-V2] 📦 Received compressed binary data, decompressing...')
 
@@ -1633,24 +1549,9 @@ export async function POST(req: Request) {
       supabase_projectId = metadata.supabase_projectId || supabase_projectId
       supabaseUserId = metadata.supabaseUserId || supabaseUserId
       stripeApiKey = metadata.stripeApiKey || stripeApiKey
-    } else if (isGitHubRepo) {
-      // For GitHub repo requests, extract metadata from request body
-      const metadata = extractedMetadata as any
-      messages = body.messages || []
-      projectId = body.project?.id || projectId
-      project = body.project || project
-      databaseId = body.databaseId || databaseId
-      modelId = req.headers.get('x-model-id') || body.modelId || modelId
-      aiMode = req.headers.get('x-ai-mode') || body.aiMode || aiMode
-      chatMode = req.headers.get('x-chat-mode') || body.chatMode || chatMode
-      supabaseAccessToken = body.supabaseAccessToken || supabaseAccessToken
-      supabaseProjectDetails = body.supabaseProjectDetails || supabaseProjectDetails
-      supabase_projectId = body.supabase_projectId || supabase_projectId
-      supabaseUserId = body.supabaseUserId || supabaseUserId
-      stripeApiKey = body.stripeApiKey || stripeApiKey
     }
 
-    // Use fileTree from binary metadata, GitHub metadata, or JSON
+    // Use fileTree from binary metadata if available, otherwise from JSON
     if (clientFileTree.length > 0 && !fileTree) {
       fileTree = clientFileTree
     }
@@ -1872,9 +1773,6 @@ export async function POST(req: Request) {
       console.log(`[DEBUG] Restored ${sessionFiles.size} files from continuation state`)
     } else {
       // Normal initialization
-      const sourceType = isGitHubRepo ? 'GitHub repo' : (contentType.includes('application/octet-stream') ? 'compressed binary' : 'JSON')
-      console.log(`[Chat-V2] 📦 Initializing session storage from ${sourceType} with ${clientFiles.length} files`)
-      
       if (clientFiles.length > 0) {
         for (const file of clientFiles) {
           if (file.path && !file.isDirectory) {
@@ -1946,9 +1844,7 @@ export async function POST(req: Request) {
       files: sessionFiles
     })
 
-    const sourceType = isGitHubRepo ? 'GitHub repo' : (contentType.includes('application/octet-stream') ? 'compressed binary' : 'JSON')
-    console.log(`[Chat-V2] ✅ Session storage initialized from ${sourceType}: ${sessionFiles.size} files, ${clientFileTree.length} tree entries`)
-    console.log(`[DEBUG] In-memory storage ready for AI tools - Project: ${projectId}`)
+    console.log(`[DEBUG] In-memory storage initialized: ${sessionFiles.size} files ready for AI tools`)
 
     // Build project context from session data
     const sessionData = sessionProjectStorage.get(projectId)

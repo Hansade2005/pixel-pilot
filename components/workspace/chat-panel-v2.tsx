@@ -33,9 +33,6 @@ import { useSupabaseToken } from '@/hooks/use-supabase-token'
 import { SupabaseConnectionCard } from './supabase-connection-card'
 import { zipSync, strToU8 } from 'fflate'
 import { compress } from 'lz4js'
-import { createTemporaryGitHubRepo } from '@/lib/github-temp-repo'
-
-// Removed server-side createTemporaryGitHubRepo function - now using client-side library
 
 // Compress project files using LZ4 + Zip for efficient transfer
 async function compressProjectFiles(
@@ -43,7 +40,7 @@ async function compressProjectFiles(
   fileTree: string[],
   messagesToSend: any[],
   metadata: any
-): Promise<{ type: 'memory' | 'github', data?: ArrayBuffer, repoInfo?: any }> {
+): Promise<ArrayBuffer> {
   console.log(`[Compression] Starting compression of ${projectFiles.length} files`)
 
   // Create zip file data
@@ -74,49 +71,10 @@ async function compressProjectFiles(
   const compressedData = await compress(zippedData)
   console.log(`[Compression] LZ4 compressed to: ${compressedData.length} bytes`)
 
-  // Check size threshold (1MB = 1024 * 1024 bytes)
-  const SIZE_THRESHOLD = 1 * 1024 * 1024 // 1MB
-  
-  if (compressedData.length > SIZE_THRESHOLD) {
-    console.log(`[Compression] 📦 Size ${(compressedData.length / 1024 / 1024).toFixed(2)}MB exceeds 1MB threshold, creating temporary GitHub repo...`)
-    
-    try {
-      console.log('[Compression] 🚀 Starting GitHub repo creation (library will fetch fresh token automatically)')
-      
-      // Create temporary GitHub repo directly from browser
-      // Library handles fresh token fetching from cloud-sync automatically
-      const repoInfo = await createTemporaryGitHubRepo(
-        projectFiles,
-        fileTree,
-        fullMetadata,
-        undefined, // Library fetches fresh token automatically
-        (stage, progress, message) => {
-          console.log(`[GitHub Upload] ${stage} (${progress}%): ${message}`)
-        }
-      )
-      
-      return { 
-        type: 'github', 
-        repoInfo: {
-          repoName: repoInfo.repoName,
-          repoUrl: repoInfo.repoUrl,
-          owner: repoInfo.owner,
-          commitSha: repoInfo.commitSha
-        }
-      }
-    } catch (error) {
-      console.error('[Compression] ❌ GitHub repo creation failed:', error)
-      console.warn('[Compression] ⚠️ Falling back to memory transfer')
-    }
-  }
-
-  // Use memory transfer for small files or GitHub fallback
-  console.log(`[Compression] 📁 Size ${(compressedData.length / 1024 / 1024).toFixed(2)}MB under threshold, using memory transfer`)
-  
   // Convert Uint8Array to ArrayBuffer
   const arrayBuffer = new ArrayBuffer(compressedData.length)
   new Uint8Array(arrayBuffer).set(compressedData)
-  return { type: 'memory', data: arrayBuffer }
+  return arrayBuffer
 }
 
 // ExpandableUserMessage component for long user messages
@@ -1800,56 +1758,6 @@ export function ChatPanelV2({
     }
   }, [project?.id])
 
-  // GitHub temporary repo cleanup after AI streaming completes
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    const handleAiStreamComplete = async (e: Event) => {
-      const customEvent = e as CustomEvent
-      console.log('[ChatPanelV2] AI streaming completed, checking for GitHub repo cleanup...')
-
-      try {
-        // Get pending cleanup repos
-        const { getPendingCleanupRepos, cleanupOldRepos } = await import('@/lib/github-temp-repo')
-        const pendingRepos = getPendingCleanupRepos()
-
-        if (pendingRepos.length > 0) {
-          console.log(`[ChatPanelV2] Found ${pendingRepos.length} pending GitHub repos for cleanup`)
-
-          // Get fresh GitHub token for cleanup
-          const { createClient } = await import('@/lib/supabase/client')
-          const { getDeploymentTokens } = await import('@/lib/cloud-sync')
-
-          const supabase = createClient()
-          const { data: { user } } = await supabase.auth.getUser()
-
-          if (user) {
-            const tokens = await getDeploymentTokens(user.id)
-            if (tokens?.github) {
-              console.log('[ChatPanelV2] Starting immediate GitHub repo cleanup after AI streaming...')
-              const result = await cleanupOldRepos(tokens.github, 0) // Clean up ALL pending repos immediately
-              console.log(`[ChatPanelV2] GitHub cleanup complete: ${result.deleted} deleted, ${result.failed} failed`)
-            } else {
-              console.warn('[ChatPanelV2] No GitHub token available for cleanup')
-            }
-          } else {
-            console.warn('[ChatPanelV2] User not authenticated, skipping GitHub cleanup')
-          }
-        } else {
-          console.log('[ChatPanelV2] No pending GitHub repos to cleanup')
-        }
-      } catch (error) {
-        console.error('[ChatPanelV2] Error during GitHub repo cleanup:', error)
-      }
-    }
-
-    window.addEventListener('ai-stream-complete', handleAiStreamComplete)
-
-    return () => {
-      window.removeEventListener('ai-stream-complete', handleAiStreamComplete)
-    }
-  }, [])
-
   const loadProjectFiles = async () => {
     try {
       if (!fileLookupServiceRef.current || !project?.id) return
@@ -2511,7 +2419,6 @@ export function ChatPanelV2({
       let supabaseProjectDetails = null
       let supabaseUserId = null
       let stripeApiKey = null // Stripe API key for payment operations
-      let githubToken = null // GitHub token for repo operations
 
       try {
         const { getSupabaseProjectForPixelPilotProject, getDeploymentTokens } = await import('@/lib/cloud-sync')
@@ -2531,19 +2438,13 @@ export function ChatPanelV2({
             supabaseProjectDetails = await getSupabaseProjectForPixelPilotProject(supabaseUserId, project.id)
           }
 
-          // Fetch deployment tokens from cloud sync
+          // Fetch Stripe API key from cloud sync
           const deploymentTokens = await getDeploymentTokens(supabaseUserId)
           if (deploymentTokens?.stripe) {
             stripeApiKey = deploymentTokens.stripe
             console.log('[ChatPanelV2] ✅ Stripe API key retrieved from cloud sync')
           } else {
             console.warn('[ChatPanelV2] ⚠️ No Stripe API key found in cloud sync')
-          }
-          if (deploymentTokens?.github) {
-            githubToken = deploymentTokens.github
-            console.log('[ChatPanelV2] ✅ GitHub token retrieved from cloud sync')
-          } else {
-            console.warn('[ChatPanelV2] ⚠️ No GitHub token found in cloud sync')
           }
         }
         
@@ -2573,58 +2474,20 @@ export function ChatPanelV2({
         supabaseUserId,
         stripeApiKey
       }
-      const compressionResult = await compressProjectFiles(projectFiles, fileTree, messagesToSend, metadata)
+      const compressedData = await compressProjectFiles(projectFiles, fileTree, messagesToSend, metadata)
 
-      let response: Response
-
-      if (compressionResult.type === 'github') {
-        // Send GitHub repo info via JSON
-        console.log('[Chat] 📦 Using GitHub repo for large codebase')
-        response = await fetch('/api/chat-v2', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            // Include GitHub repo info in headers for server processing
-            'X-Model-Id': selectedModel,
-            'X-Ai-Mode': aiMode,
-            'X-Chat-Mode': isAskMode ? 'ask' : 'agent',
-            'X-GitHub-Repo': 'true'
-          },
-          body: JSON.stringify({
-            messages: messagesToSend,
-            projectId: project.id,
-            project,
-            databaseId,
-            modelId: selectedModel,
-            aiMode,
-            chatMode: isAskMode ? 'ask' : 'agent',
-            githubRepo: compressionResult.repoInfo,
-            githubToken, // Pass GitHub token for fetching files on backend
-            supabaseAccessToken,
-            supabaseProjectDetails,
-            supabase_projectId: supabaseProjectDetails?.supabaseProjectId,
-            supabaseUserId,
-            stripeApiKey,
-            metadata
-          }),
-          signal: controller.signal
-        })
-      } else {
-        // Send compressed binary data (original flow)
-        console.log('[Chat] 📁 Using memory transfer for small codebase')
-        response = await fetch('/api/chat-v2', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/octet-stream',
-            // Send minimal metadata in headers for binary requests
-            'X-Model-Id': selectedModel,
-            'X-Ai-Mode': aiMode,
-            'X-Chat-Mode': isAskMode ? 'ask' : 'agent'
-          },
-          body: compressionResult.data,
-          signal: controller.signal
-        })
-      }
+      const response = await fetch('/api/chat-v2', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          // Send minimal metadata in headers for binary requests
+          'X-Model-Id': selectedModel,
+          'X-Ai-Mode': aiMode,
+          'X-Chat-Mode': isAskMode ? 'ask' : 'agent'
+        },
+        body: compressedData,
+        signal: controller.signal
+      })
 
       if (!response.ok) {
         throw new Error('Failed to send message')
