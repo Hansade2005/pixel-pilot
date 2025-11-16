@@ -324,8 +324,26 @@ async function handleRegularPreview(req: Request) {
       }, { status: 500 })
     }
 
-    const { projectId, files } = await req.json()
-    
+    // Check content type to determine data format
+    const contentType = req.headers.get('content-type') || ''
+    let projectId: string
+    let files: any[]
+
+    if (contentType.includes('application/octet-stream')) {
+      // Handle compressed data (LZ4 + Zip)
+      console.log('[Preview] 📦 Received compressed binary data for regular preview')
+      const compressedData = await req.arrayBuffer()
+      const extractedData = await extractProjectFromCompressedData(compressedData)
+      projectId = extractedData.projectId
+      files = extractedData.files
+    } else {
+      // Handle JSON format (backward compatibility)
+      console.log('[Preview] 📄 Received JSON data for regular preview')
+      const { projectId: jsonProjectId, files: jsonFiles } = await req.json()
+      projectId = jsonProjectId
+      files = jsonFiles
+    }
+
     if (!projectId) {
       return Response.json({ error: 'Project ID is required' }, { status: 400 })
     }

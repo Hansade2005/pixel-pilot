@@ -5,6 +5,9 @@ import { toast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { storageManager, type Workspace as Project } from "@/lib/storage-manager"
 import { getDeploymentTokens } from "@/lib/cloud-sync"
+import { compress } from 'lz4js'
+import { zipSync, strToU8 } from 'fflate'
+import { filterUnwantedFiles } from "@/lib/utils"
 
 interface PushState {
   isPushing: boolean
@@ -233,6 +236,55 @@ export function useGitHubPush() {
     error: null
   })
 
+  // Compress project files using LZ4 + Zip for efficient transfer
+  const compressProjectFiles = async (
+    projectFiles: any[],
+    fileTree: string[],
+    messagesToSend: any[],
+    metadata: any
+  ): Promise<ArrayBuffer> => {
+    console.log(`[Compression] Starting compression of ${projectFiles.length} files`)
+
+    // Filter out images, videos, PDF files, scripts folders, test folders, and unwanted files to reduce payload size
+    const filteredFiles = filterUnwantedFiles(projectFiles)
+    console.log(`[Compression] Filtered to ${filteredFiles.length} files (removed ${projectFiles.length - filteredFiles.length} unwanted files)`)
+
+    // Create zip file data
+    const zipData: Record<string, Uint8Array> = {}
+
+    // Add files to zip
+    for (const file of filteredFiles) {
+      if (file.path && file.content !== undefined) {
+        zipData[file.path] = strToU8(String(file.content))
+      }
+    }
+
+    // Add metadata file with file tree, messages, and other data
+    const fullMetadata = {
+      fileTree,
+      messages: messagesToSend,
+      ...metadata,
+      compressedAt: new Date().toISOString(),
+      fileCount: filteredFiles.length,
+      originalFileCount: projectFiles.length,
+      compressionType: 'lz4-zip'
+    }
+    zipData['__metadata__.json'] = strToU8(JSON.stringify(fullMetadata))
+
+    // Create zip file
+    const zippedData = zipSync(zipData)
+    console.log(`[Compression] Created zip file: ${zippedData.length} bytes`)
+
+    // Compress with LZ4
+    const compressedData = await compress(zippedData)
+    console.log(`[Compression] LZ4 compressed to: ${compressedData.length} bytes`)
+
+    // Convert Uint8Array to ArrayBuffer
+    const arrayBuffer = new ArrayBuffer(compressedData.length)
+    new Uint8Array(arrayBuffer).set(compressedData)
+    return arrayBuffer
+  }
+
   /**
    * Check if a project has GitHub connection set up
    */
@@ -349,19 +401,24 @@ export function useGitHubPush() {
         ? await generateCommitMessageFromChat(lastMessage)
         : "Update project files from PixelPilot"
 
+      // Compress the project files for efficient transfer
+      const compressedData = await compressProjectFiles(projectFiles, [], [], {
+        projectId: project.id,
+        githubToken: tokens.github,
+        repoName: repoInfo.split('/')[1],
+        mode: 'push', // This tells the API to push to existing repo
+        existingRepo: repoInfo,
+        commitMessage,
+      })
+
       // Push to GitHub using the deployment API
       const pushResponse = await fetch('/api/deploy/github', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: project.id,
-          githubToken: tokens.github,
-          repoName: repoInfo.split('/')[1],
-          files: projectFiles,
-          mode: 'push', // This tells the API to push to existing repo
-          existingRepo: repoInfo,
-          commitMessage,
-        })
+        headers: { 
+          'Content-Type': 'application/octet-stream',
+          'X-Compressed': 'true'
+        },
+        body: compressedData,
       })
 
       if (!pushResponse.ok) {

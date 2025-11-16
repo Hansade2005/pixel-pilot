@@ -1,9 +1,118 @@
 import { Octokit } from '@octokit/rest'
 import { createClient } from '@/lib/supabase/server'
+import JSZip from 'jszip'
+import lz4 from 'lz4js'
+
+// Extract project files from compressed data (LZ4 + Zip)
+async function extractProjectFromCompressedData(compressedData: ArrayBuffer): Promise<{
+  projectId: string
+  githubToken: string
+  repoName: string
+  repoDescription?: string
+  files: any[]
+  mode: string
+  existingRepo?: string
+  commitMessage: string
+}> {
+  // Step 1: LZ4 decompress
+  const decompressedData = lz4.decompress(Buffer.from(compressedData))
+  console.log(`[GitHub Deploy] LZ4 decompressed to ${decompressedData.length} bytes`)
+
+  // Step 2: Unzip the data
+  const zip = new JSZip()
+  await zip.loadAsync(decompressedData)
+
+  // Extract files from zip
+  const extractedFiles: any[] = []
+  for (const [path, zipEntry] of Object.entries(zip.files)) {
+    if (!zipEntry.dir && path !== '__metadata__.json') {
+      const content = await zipEntry.async('text')
+      extractedFiles.push({
+        path,
+        content,
+        name: path.split('/').pop() || path,
+        type: path.split('.').pop() || 'text',
+        size: content.length
+      })
+    }
+  }
+
+  console.log(`[GitHub Deploy] Extracted ${extractedFiles.length} files from zip`)
+
+  // Parse metadata to get deployment info
+  let projectId = `deploy-${Date.now()}`
+  let githubToken = ''
+  let repoName = ''
+  let repoDescription = ''
+  let mode = 'create'
+  let existingRepo: string | undefined
+  let commitMessage = 'Update project files'
+
+  const metadataEntry = zip.file('__metadata__.json')
+  if (metadataEntry) {
+    const metadataContent = await metadataEntry.async('text')
+    const metadata = JSON.parse(metadataContent)
+    projectId = metadata.projectId || projectId
+    githubToken = metadata.githubToken || githubToken
+    repoName = metadata.repoName || repoName
+    repoDescription = metadata.repoDescription || repoDescription
+    mode = metadata.mode || mode
+    existingRepo = metadata.existingRepo
+    commitMessage = metadata.commitMessage || commitMessage
+    console.log(`[GitHub Deploy] Loaded metadata, projectId: ${projectId}, mode: ${mode}`)
+  }
+
+  return {
+    projectId,
+    githubToken,
+    repoName,
+    repoDescription,
+    files: extractedFiles,
+    mode,
+    existingRepo,
+    commitMessage
+  }
+}
 
 export async function POST(req: Request) {
   try {
-    const { projectId, githubToken, repoName, repoDescription, files, mode, existingRepo, commitMessage } = await req.json()
+    // Check content type to determine data format
+    const contentType = req.headers.get('content-type') || ''
+    let projectId: string
+    let githubToken: string
+    let repoName: string
+    let repoDescription: string | undefined
+    let files: any[]
+    let mode: string
+    let existingRepo: string | undefined
+    let commitMessage: string
+
+    if (contentType.includes('application/octet-stream')) {
+      // Handle compressed data (LZ4 + Zip)
+      console.log('[GitHub Deploy] 📦 Received compressed binary data')
+      const compressedData = await req.arrayBuffer()
+      const extractedData = await extractProjectFromCompressedData(compressedData)
+      projectId = extractedData.projectId
+      githubToken = extractedData.githubToken
+      repoName = extractedData.repoName
+      repoDescription = extractedData.repoDescription
+      files = extractedData.files
+      mode = extractedData.mode
+      existingRepo = extractedData.existingRepo
+      commitMessage = extractedData.commitMessage
+    } else {
+      // Handle JSON format (backward compatibility)
+      console.log('[GitHub Deploy] 📄 Received JSON data')
+      const jsonData = await req.json()
+      projectId = jsonData.projectId
+      githubToken = jsonData.githubToken
+      repoName = jsonData.repoName
+      repoDescription = jsonData.repoDescription
+      files = jsonData.files
+      mode = jsonData.mode
+      existingRepo = jsonData.existingRepo
+      commitMessage = jsonData.commitMessage
+    }
     
     // Get user from Supabase
     const supabase = await createClient()

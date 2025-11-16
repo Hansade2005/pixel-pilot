@@ -134,6 +134,9 @@ import { storageManager, type Workspace as Project, type Deployment, type Enviro
 import { createClient } from "@/lib/supabase/client"
 import { getDeploymentTokens } from "@/lib/cloud-sync"
 import { useGitHubPush } from "@/hooks/use-github-push"
+import { compress } from 'lz4js'
+import { zipSync, strToU8 } from 'fflate'
+import { filterUnwantedFiles } from "@/lib/utils"
 // Plan limit checking functions
 async function checkPlanLimits(userId: string, operation: string, platform: string) {
   try {
@@ -280,6 +283,55 @@ const generateValidRepoName = (input: string): string => {
   if (name.length > 100) name = name.substring(0, 100)
 
   return name
+}
+
+// Compress project files using LZ4 + Zip for efficient transfer
+async function compressProjectFiles(
+  projectFiles: any[],
+  fileTree: string[],
+  messagesToSend: any[],
+  metadata: any
+): Promise<ArrayBuffer> {
+  console.log(`[Compression] Starting compression of ${projectFiles.length} files`)
+
+  // Filter out images, videos, PDF files, scripts folders, test folders, and unwanted files to reduce payload size
+  const filteredFiles = filterUnwantedFiles(projectFiles)
+  console.log(`[Compression] Filtered to ${filteredFiles.length} files (removed ${projectFiles.length - filteredFiles.length} unwanted files)`)
+
+  // Create zip file data
+  const zipData: Record<string, Uint8Array> = {}
+
+  // Add files to zip
+  for (const file of filteredFiles) {
+    if (file.path && file.content !== undefined) {
+      zipData[file.path] = strToU8(String(file.content))
+    }
+  }
+
+  // Add metadata file with file tree, messages, and other data
+  const fullMetadata = {
+    fileTree,
+    messages: messagesToSend,
+    ...metadata,
+    compressedAt: new Date().toISOString(),
+    fileCount: filteredFiles.length,
+    originalFileCount: projectFiles.length,
+    compressionType: 'lz4-zip'
+  }
+  zipData['__metadata__.json'] = strToU8(JSON.stringify(fullMetadata))
+
+  // Create zip file
+  const zippedData = zipSync(zipData)
+  console.log(`[Compression] Created zip file: ${zippedData.length} bytes`)
+
+  // Compress with LZ4
+  const compressedData = await compress(zippedData)
+  console.log(`[Compression] LZ4 compressed to: ${compressedData.length} bytes`)
+
+  // Convert Uint8Array to ArrayBuffer
+  const arrayBuffer = new ArrayBuffer(compressedData.length)
+  new Uint8Array(arrayBuffer).set(compressedData)
+  return arrayBuffer
 }
 
 export default function DeploymentClient() {
@@ -1237,21 +1289,26 @@ EXAMPLES:
       // Load project files
       const projectFiles = await storageManager.getFiles(selectedProject.id)
 
+      // Compress the project files for efficient transfer
+      const compressedData = await compressProjectFiles(projectFiles, [], [], { 
+        projectId: selectedProject.id,
+        repoName: githubForm.deploymentMode === 'new' ? githubForm.repoName : repoName,
+        repoDescription: githubForm.deploymentMode === 'new' ? githubForm.repoDescription : '',
+        mode: githubForm.deploymentMode === 'new' ? 'create' : 
+              githubForm.deploymentMode === 'existing' ? 'existing' : 'push',
+        existingRepo: githubForm.deploymentMode === 'existing' ? repoData.fullName : undefined,
+        commitMessage: githubForm.commitMessage || 'Update project files',
+        githubToken: storedTokens.github
+      })
+
       // Deploy code to the repository
       const deployResponse = await fetch('/api/deploy/github', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: selectedProject.id,
-          githubToken: storedTokens.github,
-          repoName: githubForm.deploymentMode === 'new' ? githubForm.repoName : repoName,
-          repoDescription: githubForm.deploymentMode === 'new' ? githubForm.repoDescription : '',
-          files: projectFiles,
-          mode: githubForm.deploymentMode === 'new' ? 'create' : 
-                githubForm.deploymentMode === 'existing' ? 'existing' : 'push',
-          existingRepo: githubForm.deploymentMode === 'existing' ? repoData.fullName : undefined,
-          commitMessage: githubForm.commitMessage || 'Update project files',
-        })
+        headers: { 
+          'Content-Type': 'application/octet-stream',
+          'X-Compressed': 'true'
+        },
+        body: compressedData,
       })
 
       if (!deployResponse.ok) {

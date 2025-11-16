@@ -24,6 +24,8 @@ import { useToast } from "@/hooks/use-toast";
 import type { Workspace as Project } from "@/lib/storage-manager";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { filterUnwantedFiles } from "@/lib/utils";
+import { compress } from 'lz4js'
+import { zipSync, strToU8 } from 'fflate'
 import {
   WebPreview,
   WebPreviewNavigation,
@@ -35,6 +37,55 @@ import {
   DEVICE_PRESETS
 } from "@/components/ai-elements/web-preview";
 import { DatabaseTab } from "./database-tab";
+
+// Compress project files using LZ4 + Zip for efficient transfer
+async function compressProjectFiles(
+  projectFiles: any[],
+  fileTree: string[],
+  messagesToSend: any[],
+  metadata: any
+): Promise<ArrayBuffer> {
+  console.log(`[Compression] Starting compression of ${projectFiles.length} files`)
+
+  // Filter out images, videos, PDF files, scripts folders, test folders, and unwanted files to reduce payload size
+  const filteredFiles = filterUnwantedFiles(projectFiles)
+  console.log(`[Compression] Filtered to ${filteredFiles.length} files (removed ${projectFiles.length - filteredFiles.length} unwanted files)`)
+
+  // Create zip file data
+  const zipData: Record<string, Uint8Array> = {}
+
+  // Add files to zip
+  for (const file of filteredFiles) {
+    if (file.path && file.content !== undefined) {
+      zipData[file.path] = strToU8(String(file.content))
+    }
+  }
+
+  // Add metadata file with file tree, messages, and other data
+  const fullMetadata = {
+    fileTree,
+    messages: messagesToSend,
+    ...metadata,
+    compressedAt: new Date().toISOString(),
+    fileCount: filteredFiles.length,
+    originalFileCount: projectFiles.length,
+    compressionType: 'lz4-zip'
+  }
+  zipData['__metadata__.json'] = strToU8(JSON.stringify(fullMetadata))
+
+  // Create zip file
+  const zippedData = zipSync(zipData)
+  console.log(`[Compression] Created zip file: ${zippedData.length} bytes`)
+
+  // Compress with LZ4
+  const compressedData = await compress(zippedData)
+  console.log(`[Compression] LZ4 compressed to: ${compressedData.length} bytes`)
+
+  // Convert Uint8Array to ArrayBuffer
+  const arrayBuffer = new ArrayBuffer(compressedData.length)
+  new Uint8Array(arrayBuffer).set(compressedData)
+  return arrayBuffer
+}
 
 interface CodePreviewPanelProps {
   project: Project | null;
@@ -474,17 +525,18 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       const filteredFiles = filterUnwantedFiles(files)
       console.log(`[CodePreviewPanel] Filtered files for preview: ${filteredFiles.length} of ${files.length} (removed ${files.length - filteredFiles.length} unwanted files)`)
 
+      // Compress the project files for efficient transfer
+      const compressedData = await compressProjectFiles(filteredFiles, [], [], { project })
+
       // Create a streaming request with EventSource-like handling
       const response = await fetch('/api/preview', {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/octet-stream',
           'Accept': 'text/event-stream', // Request streaming response
+          'X-Compressed': 'true'
         },
-        body: JSON.stringify({ 
-          projectId: project.id,
-          files: filteredFiles 
-        }),
+        body: compressedData,
       })
 
       if (!response.ok) {
