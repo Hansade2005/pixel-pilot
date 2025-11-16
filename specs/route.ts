@@ -2937,6 +2937,9 @@ ${shouldUseAutonomousPlanning ? `
 - **FORBIDDEN**: Recursive file reading or exploring directory structures
 - **FORBIDDEN**: Reading files in src/components/ui (shadcn/ui components are pre-built)
 - **FORBIDDEN**: Reading config files (vite.config.js, tsconfig.json, etc.)
+- **CRITICAL**: NEVER read files with >150 lines without specifying line ranges (startLine/endLine)
+- **ENFORCED**: Maximum 150 lines per read_file call - system will reject larger requests
+- **ALTERNATIVES**: Use semantic_code_navigator for large file understanding, grep_search for patterns
 - **LIMITED**: Maximum 2 files per request, only the most critical ones
 - **STRATEGIC**: Only read files immediately before modifying them
 - **VERIFICATION**: Only read files after modification to verify changes

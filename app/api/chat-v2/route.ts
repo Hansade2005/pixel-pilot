@@ -1,5 +1,4 @@
 import { streamText, tool, stepCountIs } from 'ai'
-import { createTelemetry_log, updateTelemetry_log } from '@/app/actions/telemetry'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { getModel } from '@/lib/ai-providers'
@@ -657,6 +656,43 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           }
 
           content = lines.slice(startIndex, endIndex + 1).join('\n')
+        }
+
+        // ENFORCE 150-LINE LIMIT: Never read more than 150 lines at once to prevent system bloat
+        const allLines = fullContent.split('\n')
+        const totalLines = allLines.length
+
+        // If no specific range provided and file has more than 150 lines, require range specification
+        if ((actualStartLine === undefined || actualStartLine <= 0) && totalLines > 150) {
+          return {
+            success: false,
+            error: `File ${path} has ${totalLines} lines (>150 limit). Use startLine/endLine or lineRange parameters to read specific sections. For large files, use semantic_code_navigator to understand structure or grep_search for specific patterns.`,
+            path,
+            totalLines,
+            maxAllowedLines: 150,
+            suggestion: 'Use semantic_code_navigator for understanding file structure, or specify line ranges like "startLine: 1, endLine: 50"',
+            toolCallId
+          }
+        }
+
+        // If range provided, enforce maximum 150 lines per read
+        if (actualStartLine !== undefined && actualStartLine > 0) {
+          const lines = fullContent.split('\n')
+          const startIndex = actualStartLine - 1
+          const endIndex = actualEndLine ? Math.min(actualEndLine - 1, lines.length - 1) : lines.length - 1
+          const requestedLines = endIndex - startIndex + 1
+
+          if (requestedLines > 150) {
+            return {
+              success: false,
+              error: `Requested range (${requestedLines} lines) exceeds 150-line limit. Split into smaller chunks or use semantic_code_navigator for understanding.`,
+              path,
+              requestedLines,
+              maxAllowedLines: 150,
+              suggestion: 'Break large reads into 150-line chunks, or use semantic_code_navigator',
+              toolCallId
+            }
+          }
         }
 
         // Check for large files and truncate if necessary to prevent response size issues
@@ -1771,31 +1807,6 @@ export async function POST(req: Request) {
         .slice(-6)
     }
 
-    // Telemetry logging: log every input sent to the model API
-    try {
-      await createTelemetry_log({
-        request_id: requestId,
-        model_api_id: crypto.randomUUID(), // Placeholder - should reference actual model_api.id
-        input_data: {
-          messages: processedMessages, // Log processed messages
-          projectId,
-          project,
-          files: clientFiles,
-          fileTree,
-          modelId,
-          aiMode
-        },
-        metadata: {
-          userAgent: req.headers.get('user-agent'),
-          ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip'),
-          timestamp: new Date().toISOString()
-        },
-        status: 'pending'
-      })
-    } catch (telemetryError) {
-      console.error('[Telemetry] Failed to log input:', telemetryError)
-    }
-
     console.log('[Chat-V2] Request received:', { 
       projectId, 
       modelId, 
@@ -2045,6 +2056,13 @@ Begin with a concise checklist  use check box emojis filled and unfilled.
 - **Client-Side**: \`read_file\` (with line numbers), \`write_file\`, \`edit_file\`, \`client_replace_string_in_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`, \`create_database\`[builtin PiPilot Rest API DB]
 - **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers),\`grep_search\`, \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync)
 
+### ⚠️ CRITICAL FILE READING RULE ⚠️
+**NEVER read files with more than 150 lines without specifying line ranges!**
+- Files >150 lines: **MUST** use \`startLine\` \`endLine\` or \`lineRange\` parameters
+- Large files: Use \`semantic_code_navigator\` for understanding structure
+- Search patterns: Use \`grep_search\` for finding specific code
+- **VIOLATION CAUSES SYSTEM BREAKDOWN** - Always respect this limit!
+
 ### 🗄️ PiPilot Database Tools (Builtin Database)
 **Complete database workflow in 7 simple steps:**
 1. **\`create_database\`** - Creates database with auto-generated users table (Executes client-side)
@@ -2250,13 +2268,13 @@ ${conversationSummaryContext || ''}`
 
         // SERVER-SIDE TOOL: Read operations need server-side execution to return fresh data
         read_file: tool({
-          description: 'Read the contents of a file using optional line-range parameters. Always retrieve specific sections when dealing with large files over 150 lines, reading them in smaller chunks. This tool runs server-side to ensure you access the most up-to-date file content. You may read a maximum of 150 lines per call to avoid exceeding your context window.If a file is too large to understand through sequential reads, consider using semantic_code_navigator to comprehend the code structure and meaning, or grep_search to locate specific patterns or references in the codebase.',
+          description: '🚨 CRITICAL: NEVER read files >150 lines without line ranges! 🚨 Read the contents of a file using MANDATORY line-range parameters for files over 150 lines. Files ≤150 lines can be read fully. For large files: use semantic_code_navigator to understand structure, or grep_search for patterns. VIOLATION BREAKS SYSTEM - always specify ranges for large files!',
           inputSchema: z.object({
             path: z.string().describe('File path to read'),
             includeLineNumbers: z.boolean().optional().describe('Whether to include line numbers in the response (default: false)'),
-            startLine: z.number().optional().describe('Starting line number (1-indexed) to read from'),
-            endLine: z.number().optional().describe('Ending line number (1-indexed) to read to. If not provided, reads from startLine to end of file'),
-            lineRange: z.string().optional().describe('Line range in format "start-end" (e.g., "654-661"). Overrides startLine and endLine if provided')
+            startLine: z.number().optional().describe('REQUIRED for files >150 lines: Starting line number (1-indexed) to read from'),
+            endLine: z.number().optional().describe('REQUIRED for files >150 lines: Ending line number (1-indexed) to read to. Maximum 150 lines per read'),
+            lineRange: z.string().optional().describe('Line range in format "start-end" (e.g., "654-661"). REQUIRED for files >150 lines. Max 150 lines')
           }),
           execute: async ({ path, includeLineNumbers, startLine, endLine, lineRange }, { toolCallId }) => {
             // Use the powerful constructor to get actual results from in-memory store
@@ -8216,14 +8234,6 @@ ${conversationSummaryContext || ''}`
       stopWhen: stepCountIs(60),
       onFinish: ({ response }) => {
         console.log(`[Chat-V2] Finished with ${response.messages.length} messages`)
-        
-        // Update telemetry with success status
-        updateTelemetry_log(requestId, {
-          status: 'success',
-          response_time_ms: Date.now() - startTime
-        }).catch(telemetryError => {
-          console.error('[Telemetry] Failed to update success status:', telemetryError)
-        })
       }
     })
 
@@ -8383,18 +8393,6 @@ ${conversationSummaryContext || ''}`
     clearTimeout(requestTimeoutId);
     
     console.error('[Chat-V2] Error:', error)
-    
-    // Update telemetry with error status
-    try {
-      const endTime = Date.now()
-      await updateTelemetry_log(requestId, {
-        status: 'error',
-        error_message: error.message || 'Internal server error',
-        response_time_ms: endTime - startTime
-      })
-    } catch (telemetryError) {
-      console.error('[Telemetry] Failed to update error status:', telemetryError)
-    }
     
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
