@@ -158,7 +158,7 @@ async function handleStreamingPreview(req: Request) {
           await sandbox.writeFiles(sandboxFiles)
           send({ type: "log", message: "Files written" })
 
-          // 🔹 Check for additional dependencies not in template (skip base install since template is preinstalled)
+          // 🔹 Check for additional dependencies (always install all for clean slate)
           const projectPackageJsonFile = files.find((f: any) => f.path === 'package.json')
           if (projectPackageJsonFile) {
             try {
@@ -177,13 +177,13 @@ async function handleStreamingPreview(req: Request) {
               )
               
               if (additionalDepsResult) {
-                send({ type: "log", message: "Additional dependencies installed successfully" })
+                send({ type: "log", message: "All project dependencies installed successfully" })
               } else {
-                send({ type: "log", message: "No additional dependencies needed" })
+                send({ type: "log", message: "No dependencies found in project" })
               }
             } catch (error) {
-              console.warn("Failed to check/install additional dependencies:", error)
-              send({ type: "log", message: "Continuing without additional dependencies (non-critical)" })
+              console.warn("Failed to install dependencies:", error)
+              send({ type: "log", message: "Continuing with available dependencies (non-critical)" })
             }
           }
 
