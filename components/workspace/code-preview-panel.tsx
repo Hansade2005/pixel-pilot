@@ -23,7 +23,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import type { Workspace as Project } from "@/lib/storage-manager";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { filterMediaFiles } from "@/lib/utils";
+import { filterUnwantedFiles } from "@/lib/utils";
 import {
   WebPreview,
   WebPreviewNavigation,
@@ -470,9 +470,9 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
         throw new Error('No files found in project')
       }
 
-      // Filter out images, videos, and PDF files to reduce payload size
-      const filteredFiles = filterMediaFiles(files)
-      console.log(`[CodePreviewPanel] Filtered files for preview: ${filteredFiles.length} of ${files.length} (removed ${files.length - filteredFiles.length} media files)`)
+      // Filter out images, videos, PDF files, scripts folders, test folders, and unwanted files to reduce payload size
+      const filteredFiles = filterUnwantedFiles(files)
+      console.log(`[CodePreviewPanel] Filtered files for preview: ${filteredFiles.length} of ${files.length} (removed ${files.length - filteredFiles.length} unwanted files)`)
 
       // Create a streaming request with EventSource-like handling
       const response = await fetch('/api/preview', {
@@ -695,9 +695,9 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       const JSZip = await loadJSZip()
       const zip = new JSZip()
       
-      // Filter out images, videos, and PDF files to reduce export size
-      const filteredFiles = filterMediaFiles(files)
-      console.log(`[CodePreviewPanel] Filtered files for export: ${filteredFiles.length} of ${files.length} (removed ${files.length - filteredFiles.length} media files)`)
+      // Filter out images, videos, PDF files, scripts folders, test folders, and unwanted files to reduce export size
+      const filteredFiles = filterUnwantedFiles(files)
+      console.log(`[CodePreviewPanel] Filtered files for export: ${filteredFiles.length} of ${files.length} (removed ${files.length - filteredFiles.length} unwanted files)`)
       
       // Add files to zip
       filteredFiles.forEach(file => {

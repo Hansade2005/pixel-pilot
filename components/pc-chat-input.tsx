@@ -21,7 +21,7 @@ import {
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-import { filterMediaFiles } from "@/lib/utils"
+import { filterUnwantedFiles } from "@/lib/utils"
 import {
   Select,
   SelectContent,
@@ -477,9 +477,9 @@ export function PcChatInput({ onAuthRequired, onProjectCreated }: ChatInputProps
 
       console.log(`📝 Creating ${filesToCreate.length} files in workspace ${workspaceId}`)
 
-      // Filter out images, videos, and PDF files to reduce storage and processing load
-      const filteredFiles = filterMediaFiles(filesToCreate)
-      console.log(`📝 Filtered to ${filteredFiles.length} files (removed ${filesToCreate.length - filteredFiles.length} media files)`)
+      // Filter out images, videos, PDF files, scripts folders, test folders, and unwanted files to reduce storage and processing load
+      const filteredFiles = filterUnwantedFiles(filesToCreate)
+      console.log(`📝 Filtered to ${filteredFiles.length} files (removed ${filesToCreate.length - filteredFiles.length} unwanted files)`)
 
       // Create files in storage manager
       for (const file of filteredFiles) {

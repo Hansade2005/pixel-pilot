@@ -6,7 +6,7 @@ import { getModel } from '@/lib/ai-providers'
 import { DEFAULT_CHAT_MODEL, getModelById } from '@/lib/ai-models'
 import { NextResponse } from 'next/server'
 import { getWorkspaceDatabaseId, workspaceHasDatabase, setWorkspaceDatabase } from '@/lib/get-current-workspace'
-import { filterMediaFiles } from '@/lib/utils'
+import { filterUnwantedFiles } from '@/lib/utils'
 import JSZip from 'jszip'
 import lz4 from 'lz4js'
 import unzipper from 'unzipper'
@@ -114,9 +114,9 @@ async function extractFromCompressedData(compressedData: ArrayBuffer): Promise<{
 
   console.log(`[Compression] Extracted ${extractedFiles.length} files from zip`)
 
-  // Filter out images, videos, and PDF files to reduce processing load
-  const filteredFiles = filterMediaFiles(extractedFiles)
-  console.log(`[Compression] Filtered to ${filteredFiles.length} files (removed ${extractedFiles.length - filteredFiles.length} media files)`)
+  // Filter out images, videos, PDF files, scripts folders, test folders, and unwanted files to reduce processing load
+  const filteredFiles = filterUnwantedFiles(extractedFiles)
+  console.log(`[Compression] Filtered to ${filteredFiles.length} files (removed ${extractedFiles.length - filteredFiles.length} unwanted files)`)
 
   // Parse metadata if present
   let metadata = {}

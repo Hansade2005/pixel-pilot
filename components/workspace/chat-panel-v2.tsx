@@ -22,7 +22,7 @@ import {
   Search, Globe, Eye, FolderOpen, Settings, Edit3, CheckCircle2, XCircle,
   Square, Database, CornerDownLeft, Table, Key, Code, Server
 } from 'lucide-react'
-import { cn, filterMediaFiles } from '@/lib/utils'
+import { cn, filterUnwantedFiles } from '@/lib/utils'
 import { Actions, Action } from '@/components/ai-elements/actions'
 import { FileAttachmentDropdown } from "@/components/ui/file-attachment-dropdown"
 import { FileAttachmentBadge } from "@/components/ui/file-attachment-badge"
@@ -43,9 +43,9 @@ async function compressProjectFiles(
 ): Promise<ArrayBuffer> {
   console.log(`[Compression] Starting compression of ${projectFiles.length} files`)
 
-  // Filter out images, videos, and PDF files to reduce payload size
-  const filteredFiles = filterMediaFiles(projectFiles)
-  console.log(`[Compression] Filtered to ${filteredFiles.length} files (removed ${projectFiles.length - filteredFiles.length} media files)`)
+  // Filter out images, videos, PDF files, scripts folders, test folders, and unwanted files to reduce payload size
+  const filteredFiles = filterUnwantedFiles(projectFiles)
+  console.log(`[Compression] Filtered to ${filteredFiles.length} files (removed ${projectFiles.length - filteredFiles.length} unwanted files)`)
 
   // Create zip file data
   const zipData: Record<string, Uint8Array> = {}
@@ -92,9 +92,9 @@ async function compressProjectFilesFallback(
 ): Promise<ArrayBuffer> {
   console.log(`[Compression] Starting fallback compression of ${projectFiles.length} files`)
 
-  // Filter out images, videos, and PDF files to reduce payload size
-  const filteredFiles = filterMediaFiles(projectFiles)
-  console.log(`[Compression] Filtered to ${filteredFiles.length} files (removed ${projectFiles.length - filteredFiles.length} media files)`)
+  // Filter out images, videos, PDF files, scripts folders, test folders, and unwanted files to reduce payload size
+  const filteredFiles = filterUnwantedFiles(projectFiles)
+  console.log(`[Compression] Filtered to ${filteredFiles.length} files (removed ${projectFiles.length - filteredFiles.length} unwanted files)`)
 
   // Create zip file data
   const zipData: Record<string, Uint8Array> = {}

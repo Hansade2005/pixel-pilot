@@ -6,7 +6,7 @@ import {
   SandboxErrorType,
   type SandboxFile 
 } from '@/lib/e2b-enhanced'
-import { filterMediaFiles } from '@/lib/utils'
+import { filterUnwantedFiles } from '@/lib/utils'
 import JSZip from 'jszip'
 import lz4 from 'lz4js'
 
@@ -78,9 +78,9 @@ async function extractProjectFromCompressedData(compressedData: ArrayBuffer): Pr
 
   console.log(`[Preview] Extracted ${extractedFiles.length} files from zip`)
 
-  // Filter out images, videos, and PDF files to reduce processing load
-  const filteredFiles = filterMediaFiles(extractedFiles)
-  console.log(`[Preview] Filtered to ${filteredFiles.length} files (removed ${extractedFiles.length - filteredFiles.length} media files)`)
+  // Filter out images, videos, PDF files, scripts folders, test folders, and unwanted files to reduce processing load
+  const filteredFiles = filterUnwantedFiles(extractedFiles)
+  console.log(`[Preview] Filtered to ${filteredFiles.length} files (removed ${extractedFiles.length - filteredFiles.length} unwanted files)`)
 
   // Parse metadata to get projectId
   let projectId = `preview-${Date.now()}`
