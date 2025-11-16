@@ -435,7 +435,11 @@ async function buildOptimizedProjectContext(projectId: string, sessionData: any,
       // Add root files first
       const rootFiles = sortedFiles.filter((file: any) => !file.path.includes('/'))
       rootFiles.forEach((file: any) => {
-        builtFileTree.push(file.path)
+        const content = file.content || ''
+        const lines = content.split('\n').length
+        const size = file.size || content.length
+        const sizeFormatted = size < 1024 ? `${size}B` : size < 1024 * 1024 ? `${(size / 1024).toFixed(1)}KB` : `${(size / (1024 * 1024)).toFixed(1)}MB`
+        builtFileTree.push(`${file.path} (${lines} lines, ${sizeFormatted})`)
       })
 
       // Add directories and their files
@@ -451,7 +455,11 @@ async function buildOptimizedProjectContext(projectId: string, sessionData: any,
         })
 
         dirFiles.forEach((file: any) => {
-          builtFileTree.push(file.path)
+          const content = file.content || ''
+          const lines = content.split('\n').length
+          const size = file.size || content.length
+          const sizeFormatted = size < 1024 ? `${size}B` : size < 1024 * 1024 ? `${(size / 1024).toFixed(1)}KB` : `${(size / (1024 * 1024)).toFixed(1)}MB`
+          builtFileTree.push(`${file.path} (${lines} lines, ${sizeFormatted})`)
         })
       })
 
@@ -480,7 +488,9 @@ ${projectType === 'nextjs' ? `## Next.js Project Structure
 
 # Current Project Structure
 ${finalFileTree.join('\n')}
----`
+---
+
+**File Information**: Each file entry includes line count and size to help you decide whether to read the entire file or read it line-by-line for large files. When it's too large, you should use grep_search or semantic_code_navigator to read it`
 
     console.log(`[CONTEXT] Built file tree with ${finalFileTree.length} files`) 
     return context
@@ -1142,6 +1152,56 @@ const constructToolResult = async (toolName: string, input: any, projectId: stri
           success: true,
           message: `✅ File ${path} deleted successfully.`,
           path,
+          action: 'deleted',
+          toolCallId
+        }
+      }
+
+      case 'delete_folder': {
+        const { path } = input
+
+        // Validate path
+        if (!path || typeof path !== 'string') {
+          return {
+            success: false,
+            error: `Invalid folder path provided`,
+            path,
+            toolCallId
+          }
+        }
+
+        // Normalize path to ensure it ends with /
+        const normalizedPath = path.endsWith('/') ? path : path + '/'
+
+        // Find all files that are in this folder
+        const filesToDelete: string[] = []
+        for (const filePath of sessionFiles.keys()) {
+          if (filePath.startsWith(normalizedPath)) {
+            filesToDelete.push(filePath)
+          }
+        }
+
+        if (filesToDelete.length === 0) {
+          return {
+            success: false,
+            error: `Folder not found or empty: ${path}`,
+            path,
+            toolCallId
+          }
+        }
+
+        // Delete all files in the folder
+        for (const filePath of filesToDelete) {
+          sessionFiles.delete(filePath)
+        }
+
+        console.log(`[CONSTRUCT_TOOL_RESULT] delete_folder: Deleted ${filesToDelete.length} files from ${path}`)
+
+        return {
+          success: true,
+          message: `✅ Folder ${path} deleted successfully (${filesToDelete.length} files removed).`,
+          path,
+          filesDeleted: filesToDelete.length,
           action: 'deleted',
           toolCallId
         }
@@ -2213,6 +2273,18 @@ ${conversationSummaryContext || ''}`
           execute: async ({ path }, { toolCallId }) => {
             // Use the powerful constructor to get actual results
             return await constructToolResult('delete_file', { path }, projectId, toolCallId)
+          }
+        }),
+
+        // CLIENT-SIDE TOOL: Executed on frontend IndexedDB
+        delete_folder: tool({
+          description: 'Delete a folder and all its contents from the project. Use this tool to remove entire directories that are no longer needed. This tool executes on the client-side IndexedDB.',
+          inputSchema: z.object({
+            path: z.string().describe('The folder path relative to project root to delete')
+          }),
+          execute: async ({ path }, { toolCallId }) => {
+            // Use the powerful constructor to get actual results
+            return await constructToolResult('delete_folder', { path }, projectId, toolCallId)
           }
         }),
 
