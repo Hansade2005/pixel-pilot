@@ -586,6 +586,29 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                     if (msg.type === "log") {
                       setCurrentLog(msg.message)
                       addConsoleLog(msg.message, 'server')
+                      
+                      // Update custom status messages for better UX
+                      if (msg.message.includes("Installing dependencies")) {
+                        setCurrentLog("📦 Installing dependencies...")
+                      } else if (msg.message.includes("Dependencies installed")) {
+                        setCurrentLog("✅ Dependencies installed")
+                      } else if (msg.message.includes("Building and starting")) {
+                        setCurrentLog("🔨 Building production bundle...")
+                      } else if (msg.message.includes("vite") && msg.message.includes("building")) {
+                        setCurrentLog("⚡ Building with Vite...")
+                      } else if (msg.message.includes("next build")) {
+                        setCurrentLog("▲ Building with Next.js...")
+                      } else if (msg.message.includes("transforming")) {
+                        setCurrentLog("🔄 Transforming modules...")
+                      } else if (msg.message.includes("rendering chunks")) {
+                        setCurrentLog("📦 Bundling chunks...")
+                      } else if (msg.message.includes("computing gzip")) {
+                        setCurrentLog("🗜️ Optimizing bundle size...")
+                      } else if (msg.message.includes("preview") && msg.message.includes("vite-react-app")) {
+                        setCurrentLog("🚀 Starting preview server...")
+                      } else if (msg.message.includes("Starting...")) {
+                        setCurrentLog("🚀 Starting Next.js server...")
+                      }
                     }
 
                     if (msg.type === "error") {
@@ -600,6 +623,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                       // Server is ready, but we'll wait for "Production server running" message
                       // before actually loading the URL in the iframe
                       addConsoleLog("✅ Server ready", 'server')
+                      setCurrentLog("🔨 Building production bundle...")
                       
                       // Store the preview data but keep loading state
                       setPreview(prev => ({
@@ -619,27 +643,35 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                     }
 
                     // Check for build completion and actual server start
-                    if (msg.type === "log" && 
-                        (msg.message.includes("Production server running") ||
-                         msg.message.includes("➜ Local:") ||
-                         msg.message.includes("Local:        http://") ||
-                         msg.message.includes("ready started server") ||
-                         msg.message.includes("Ready in") ||
-                         msg.message.includes("✓ Ready in") ||
-                         msg.message.includes("compiled successfully"))) {
-                      // Now the server is actually ready to serve content
-                      setPreview(prev => ({ ...prev, isLoading: false }))
+                    if (msg.type === "log") {
+                      // Vite detection - very specific
+                      const isViteReady = msg.message.includes("➜ Local: http://localhost:")
                       
-                      // Dispatch preview ready event NOW
-                      if (typeof window !== 'undefined' && preview.sandboxId && preview.url) {
-                        window.dispatchEvent(new CustomEvent('preview-ready', { 
-                          detail: { preview: { 
-                            sandboxId: preview.sandboxId,
-                            url: preview.url,
-                            processId: preview.processId,
-                            isLoading: false
-                          } } 
-                        }))
+                      // Next.js detection - must have the dash prefix which appears when server actually starts
+                      const isNextReady = (
+                        msg.message.includes("- Local:") && msg.message.includes("http://localhost:") ||
+                        msg.message.includes("- Network:") && msg.message.includes("http://")
+                      )
+                      
+                      // Generic detection for custom servers
+                      const isGenericReady = msg.message.includes("Production server running")
+                      
+                      if (isViteReady || isNextReady || isGenericReady) {
+                        // Now the server is actually ready to serve content
+                        setCurrentLog("🎉 Preview ready! Loading application...")
+                        setPreview(prev => ({ ...prev, isLoading: false }))
+                        
+                        // Dispatch preview ready event NOW
+                        if (typeof window !== 'undefined' && preview.sandboxId && preview.url) {
+                          window.dispatchEvent(new CustomEvent('preview-ready', { 
+                            detail: { preview: { 
+                              sandboxId: preview.sandboxId,
+                              url: preview.url,
+                              processId: preview.processId,
+                              isLoading: false
+                            } } 
+                          }))
+                        }
                       }
                     }
 
