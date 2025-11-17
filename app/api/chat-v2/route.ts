@@ -8270,7 +8270,17 @@ Supports:
 - 📊 Data Export (CSV/Excel) → Supabase storage
 - 🔍 Data Analysis – pandas, numpy, yfinance, etc.
 
-Result format (Markdown Template):
+⚠️ **CRITICAL FILE SAVING INSTRUCTIONS** ⚠️
+- **ALWAYS use explicit file paths** - Do NOT rely on current working directory
+- **Charts**: Use \`plt.savefig('/pipilot/filename.png')\` followed by \`plt.close()\`
+- **PDFs**: Use \`with PdfPages('/pipilot/filename.pdf') as pdf:\` or \`plt.savefig('/pipilot/filename.pdf')\`
+- **DOCX**: Use \`doc.save('/pipilot/filename.docx')\`
+- **CSV/Excel**: Use \`df.to_csv('/pipilot/filename.csv')\` or \`df.to_excel('/pipilot/filename.xlsx')\`
+- **Multiple files**: Save each file with unique names in /pipilot/ directory
+- **plt.show()**: Will be captured automatically as additional PNG files
+- **NEVER use relative paths** - Always use absolute paths starting with /pipilot/
+
+Result must be Markdown formatted for proper display:
 ## 📊 Report Generation Complete
 
 ### 📈 Generated Files
@@ -8292,7 +8302,7 @@ Result format (Markdown Template):
 **Note:** All files are stored in Supabase 'documents' bucket with permanent public URLs. Files are automatically deleted after 5 minutes via scheduled cleanup.`
 ,
         inputSchema: z.object({
-          code: z.string().describe('Python code to execute in E2B sandbox. Should include data analysis, visualization (matplotlib/seaborn), and file generation (PDF, DOCX, PNG). Use plt.savefig() for charts, PdfPages for PDFs, and Document() for DOCX files.')
+          code: z.string().describe('Python code to execute in E2B sandbox. ⚠️ CRITICAL: All file outputs MUST use absolute paths starting with /pipilot/ - Charts: plt.savefig(\'/pipilot/filename.png\'); CSVs: df.to_csv(\'/pipilot/filename.csv\'); PDFs: plt.savefig(\'/pipilot/filename.pdf\'); DOCX: doc.save(\'/pipilot/filename.docx\'). Always call plt.close() after charts. Matplotlib plt.show() results are captured automatically as additional PNG files.')
         }),
         execute: async ({ code }, { abortSignal, toolCallId }) => {
           const toolStartTime = Date.now();

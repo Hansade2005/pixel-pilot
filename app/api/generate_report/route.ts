@@ -100,12 +100,29 @@ export async function POST(req: NextRequest) {
     // --------------------------
     // RUN PYTHON CODE
     // --------------------------
-    const result = await sandbox.runCode(code);
+    // Prepend code to create pipilot directory and ensure files are saved there
+    const enhancedCode = `
+import os
+os.makedirs('/pipilot', exist_ok=True)
+os.chdir('/pipilot')
+${code}
+`;
+
+    const result = await sandbox.runCode(enhancedCode);
 
     // --------------------------
-    // LIST ALL GENERATED FILES
+    // LIST GENERATED FILES FROM PIPILOT DIRECTORY ONLY
     // --------------------------
-    const files = await sandbox.files.list("/");
+    const files = await sandbox.files.list("/pipilot");
+
+    // Filter out any system files (safety check)
+    const userFiles = files.filter(file =>
+      file.type === "file" &&
+      !file.name.startsWith('.') &&
+      !file.name.endsWith('.e2b') &&
+      file.name !== 'requirements.txt' &&
+      file.name !== 'Pipfile'
+    );
 
     // --------------------------
     // UPLOAD FILES TO SUPABASE & GENERATE DOWNLOAD URLS
@@ -113,7 +130,7 @@ export async function POST(req: NextRequest) {
     const downloads: Record<string, string> = {};
     const uploadResults: Array<{fileName: string, success: boolean, url?: string, error?: string}> = [];
 
-    for (const file of files) {
+    for (const file of userFiles) {
       if (file.type === "file") {
         try {
           // Read file content from sandbox
@@ -188,6 +205,93 @@ export async function POST(req: NextRequest) {
             success: false,
             error: error instanceof Error ? error.message : 'Unknown error'
           });
+        }
+      }
+    }
+
+    // --------------------------
+    // PROCESS MATPLOTLIB RESULTS (FALLBACK FOR plt.show())
+    // --------------------------
+    if (result.results && result.results.length > 0) {
+      console.log(`📊 Processing ${result.results.length} Matplotlib results...`);
+
+      for (let i = 0; i < result.results.length; i++) {
+        const executionResult = result.results[i];
+
+        if (executionResult.png) {
+          try {
+            // Convert base64 to buffer
+            const imageBuffer = Buffer.from(executionResult.png, 'base64');
+
+            // Generate unique filename for the chart
+            const timestamp = Date.now();
+            const randomId = Math.random().toString(36).substring(2, 15);
+            const fileName = `${timestamp}_${randomId}_chart_${i + 1}.png`;
+
+            // Upload to Supabase documents bucket
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('documents')
+              .upload(fileName, imageBuffer, {
+                cacheControl: '3600',
+                upsert: false,
+                contentType: 'image/png'
+              });
+
+            if (uploadError) {
+              console.error(`Failed to upload Matplotlib chart ${i + 1}:`, uploadError);
+              uploadResults.push({
+                fileName: `chart_${i + 1}.png`,
+                success: false,
+                error: uploadError.message
+              });
+              continue;
+            }
+
+            // Generate public download URL
+            const { data: urlData } = supabase.storage
+              .from('documents')
+              .getPublicUrl(fileName);
+
+            const publicUrl = urlData.publicUrl;
+
+            // Record file metadata in database for cleanup tracking
+            const fileMetadata = {
+              file_name: fileName,
+              original_name: `chart_${i + 1}.png`,
+              bucket_name: 'documents',
+              file_size: imageBuffer.length,
+              mime_type: 'image/png',
+              public_url: publicUrl,
+              uploaded_at: new Date().toISOString(),
+              expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(), // 5 minutes from now
+              created_by: 'generate_report_api'
+            };
+
+            const { error: dbError } = await supabaseAdmin
+              .from('temp_file_uploads')
+              .insert(fileMetadata);
+
+            if (dbError) {
+              console.error(`Failed to record Matplotlib chart metadata:`, dbError);
+            }
+
+            downloads[`chart_${i + 1}.png`] = publicUrl;
+            uploadResults.push({
+              fileName: `chart_${i + 1}.png`,
+              success: true,
+              url: publicUrl
+            });
+
+            console.log(`✅ Uploaded Matplotlib chart ${i + 1} to Supabase: ${publicUrl}`);
+
+          } catch (error) {
+            console.error(`Failed to process Matplotlib result ${i + 1}:`, error);
+            uploadResults.push({
+              fileName: `chart_${i + 1}.png`,
+              success: false,
+              error: error instanceof Error ? error.message : 'Unknown error'
+            });
+          }
         }
       }
     }
