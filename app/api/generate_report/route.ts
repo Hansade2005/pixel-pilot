@@ -45,42 +45,40 @@ export async function POST(req: NextRequest) {
     });
 
     // --------------------------
-      // --------------------------
-      // RUN PYTHON CODE
-      // --------------------------
-      const result = await sandbox.runCode(code);
+    // RUN PYTHON CODE
+    // --------------------------
+    const result = await sandbox.runCode(code);
 
-      // --------------------------
-      // LIST ALL GENERATED FILES
-      // --------------------------
-      const files = await sandbox.files.list("/");
+    // --------------------------
+    // LIST ALL GENERATED FILES
+    // --------------------------
+    const files = await sandbox.files.list("/");
 
-      // --------------------------
-      // GENERATE DOWNLOAD URLS
-      // --------------------------
-      const downloads: Record<string, string> = {};
+    // --------------------------
+    // GENERATE DOWNLOAD URLS
+    // --------------------------
+    const downloads: Record<string, string> = {};
 
-      for (const file of files) {
-        if (file.type === "file") {
-          const url = await sandbox.downloadUrl(file.path, {
-            useSignatureExpiration: 300_000, // 5-minute signed link for user downloads
-          });
-          downloads[file.path] = url;
-        }
+    for (const file of files) {
+      if (file.type === "file") {
+        const url = await sandbox.downloadUrl(file.path, {
+          useSignatureExpiration: 300_000, // 5-minute signed link for user downloads
+        });
+        downloads[file.path] = url;
       }
+    }
 
-      // --------------------------
-      // RETURN RESULTS + DOWNLOADS
-      // --------------------------
-      return NextResponse.json({
-        success: true,
-        text: result.text,
-        logs: result.logs,
-        error: result.error,
-        results: result.results,
-        downloads, // includes chart.png, report.pdf, report.docx, etc.
-      });
-      // --------------------------
+    // --------------------------
+    // RETURN RESULTS + DOWNLOADS
+    // --------------------------
+    return NextResponse.json({
+      success: true,
+      text: result.text,
+      logs: result.logs,
+      error: result.error,
+      results: result.results,
+      downloads, // includes chart.png, report.pdf, report.docx, etc.
+    });
   } catch (error) {
     console.error("E2B Sandbox Error:", error);
     return NextResponse.json(
