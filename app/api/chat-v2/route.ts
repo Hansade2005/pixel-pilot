@@ -8260,31 +8260,36 @@ ${conversationSummaryContext || ''}`
       }),
 
       generate_report: tool({
-        description:`📊 PiPilot Data Visualization & Report Generator Run Python code in a secure sandbox to create charts and multi-format documents. Additional packages can be installed using !pip install.
+        description:`📊 PiPilot Data Visualization & Report Generator Run Python code in a secure sandbox to create charts and multi-format documents. Files are automatically uploaded to Supabase storage and public download links are provided.
 Pre-installed libraries: jupyter, numpy, pandas, matplotlib, seaborn, plotly (not supported yet)
 
 Supports:
-- 📈 Charts (PNG) – Matplotlib/Seaborn
-- 📄 PDF Reports – Multi-page documents with charts/tables
-- 📝 Word Documents (DOCX) – Formatted with images
-- 📊 Data Export (CSV/Excel)
+- 📈 Charts (PNG) – Matplotlib/Seaborn → Supabase storage
+- 📄 PDF Reports – Multi-page documents with charts/tables → Supabase storage
+- 📝 Word Documents (DOCX) – Formatted with images → Supabase storage
+- 📊 Data Export (CSV/Excel) → Supabase storage
 - 🔍 Data Analysis – pandas, numpy, yfinance, etc.
 
 Result format (Markdown Template):
 ## 📊 Report Generation Complete
 
 ### 📈 Generated Files
-| Type | Name | Download |
-|------|------|---------|
-| 📊 Chart | \`chart.png\` | [Download](download_url) |
-| 📄 PDF | \`report.pdf\` | [Download](download_url) |
-| 📝 DOCX | \`report.docx\` | [Download](download_url) |
+| Type | Name | Download Link |
+|------|------|---------------|
+| 📊 Chart | \`chart.png\` | [Download](https://dlunpilhklsgvkegnnlp.supabase.co/storage/v1/object/public/documents/...) |
+| 📄 PDF | \`report.pdf\` | [Download](https://dlunpilhklsgvkegnnlp.supabase.co/storage/v1/object/public/documents/...) |
+| 📝 DOCX | \`report.docx\` | [Download](https://dlunpilhklsgvkegnnlp.supabase.co/storage/v1/object/public/documents/...) |
+
 ### 📋 Execution Summary
 - **Status:** ✅ Success
 - **Files Generated:** 3
+- **Files Uploaded:** 3/3 to Supabase
+- **Storage:** documents bucket
+- **Auto-Cleanup:** Files deleted after 5 minutes
 - **Execution Time:** X sec
 - **Sandbox Output:** [results]
-Note: Download links expire in 10 seconds.`
+
+**Note:** All files are stored in Supabase 'documents' bucket with permanent public URLs. Files are automatically deleted after 5 minutes via scheduled cleanup.`
 ,
         inputSchema: z.object({
           code: z.string().describe('Python code to execute in E2B sandbox. Should include data analysis, visualization (matplotlib/seaborn), and file generation (PDF, DOCX, PNG). Use plt.savefig() for charts, PdfPages for PDFs, and Document() for DOCX files.')
@@ -8330,6 +8335,7 @@ Note: Download links expire in 10 seconds.`
               error: result.error,
               results: result.results,
               downloads: result.downloads,
+              uploadResults: result.uploadResults,
               // Enhanced formatting data for AI presentation
               formattedResults: {
                 fileCount: Object.keys(result.downloads || {}).length,
@@ -8345,7 +8351,8 @@ Note: Download links expire in 10 seconds.`
                   }
                 }),
                 downloadLinks: result.downloads || {},
-                executionTime: executionTime
+                executionTime: executionTime,
+                uploadResults: result.uploadResults || []
               },
               toolCallId,
               executionTimeMs: executionTime,
