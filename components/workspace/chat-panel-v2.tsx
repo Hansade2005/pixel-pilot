@@ -20,7 +20,7 @@ import {
   Link as LinkIcon, Loader2, ChevronDown, ChevronUp, StopCircle, Trash2, Plus,
   Copy, ArrowUp, Undo2, Redo2, Check, AlertTriangle, Zap, Package, PackageMinus,
   Search, Globe, Eye, FolderOpen, Settings, Edit3, CheckCircle2, XCircle,
-  Square, Database, CornerDownLeft, Table, Key, Code, Server
+  Square, Database, CornerDownLeft, Table, Key, Code, Server, BarChart3
 } from 'lucide-react'
 import { cn, filterUnwantedFiles } from '@/lib/utils'
 import { Actions, Action } from '@/components/ai-elements/actions'
@@ -203,7 +203,7 @@ const ExpandableUserMessage = ({
         </Action>
       );
     }
-    
+
     return (
       <Action tooltip="Revert to this version" onClick={handleRevert}>
         <Undo2 className="w-4 h-4" />
@@ -303,10 +303,10 @@ const ExpandableUserMessage = ({
 }
 
 // Enhanced Tool Activity Component - Collapsible with Progress
-const ToolActivityPanel = ({ 
+const ToolActivityPanel = ({
   toolCalls,
-  isStreaming 
-}: { 
+  isStreaming
+}: {
   toolCalls: Array<{
     toolName: string
     toolCallId: string
@@ -317,9 +317,9 @@ const ToolActivityPanel = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false)
   const [showAll, setShowAll] = useState(false)
-  
+
   if (!toolCalls || toolCalls.length === 0) return null
-  
+
   // Helper functions - defined first to avoid temporal dead zone errors
   const getToolCategory = (toolName: string): string => {
     if (['write_file', 'edit_file', 'client_replace_string_in_file', 'delete_file', 'delete_folder'].includes(toolName)) {
@@ -328,9 +328,9 @@ const ToolActivityPanel = ({
     if (['read_file', 'list_files', 'grep_search', 'semantic_code_navigator'].includes(toolName)) {
       return '📖 Reading Files'
     }
-    if (['create_database', 'create_table', 'supabase_create_table', 'query_database', 'supabase_execute_sql', 
-         'manipulate_table_data', 'supabase_insert_data', 'supabase_delete_data', 'list_tables', 
-         'supabase_list_tables_rls', 'read_table', 'supabase_read_table', 'delete_table', 'supabase_drop_table'].includes(toolName)) {
+    if (['create_database', 'create_table', 'supabase_create_table', 'query_database', 'supabase_execute_sql',
+      'manipulate_table_data', 'supabase_insert_data', 'supabase_delete_data', 'list_tables',
+      'supabase_list_tables_rls', 'read_table', 'supabase_read_table', 'delete_table', 'supabase_drop_table'].includes(toolName)) {
       return '💾 Database Operations'
     }
     if (['add_package', 'remove_package'].includes(toolName)) {
@@ -342,10 +342,12 @@ const ToolActivityPanel = ({
     if (['manage_api_keys', 'supabase_fetch_api_keys'].includes(toolName)) {
       return '🔑 API Management'
     }
+    if (['generate_report'].includes(toolName)) {
+      return '📊 Data Visualization'
+    }
     return '⚡ Other Operations'
-  }
-  
-  const getToolIcon = (tool: string) => {
+  } 
+   const getToolIcon = (tool: string) => {
     switch (tool) {
       case 'write_file':
         return <FileText className="w-3.5 h-3.5" />
@@ -397,6 +399,8 @@ const ToolActivityPanel = ({
         return <Globe className="w-3.5 h-3.5" />
       case 'check_dev_errors':
         return <Settings className="w-3.5 h-3.5" />
+      case 'generate_report':
+        return <BarChart3 className="w-3.5 h-3.5" />
       default:
         return <Zap className="w-3.5 h-3.5" />
     }
@@ -464,6 +468,8 @@ const ToolActivityPanel = ({
         return 'Extracting web content'
       case 'check_dev_errors':
         return 'Checking for errors'
+      case 'generate_report':
+        return 'Generating data visualization report'
       default:
         return tool
     }
@@ -484,16 +490,16 @@ const ToolActivityPanel = ({
 
   // Filter out failed tool calls - only show executing and completed
   const visibleToolCalls = toolCalls.filter(t => t.status !== 'failed')
-  
+
   // If all operations failed, don't display the panel
   if (visibleToolCalls.length === 0) return null
-  
+
   // Calculate statistics (based on visible operations only)
   const totalOps = visibleToolCalls.length
   const completedOps = visibleToolCalls.filter(t => t.status === 'completed').length
   const executingOps = visibleToolCalls.filter(t => t.status === 'executing').length
   const progressPercent = totalOps > 0 ? Math.round((completedOps / totalOps) * 100) : 0
-  
+
   // Group operations by type (only visible ones)
   const groupedOps = visibleToolCalls.reduce((accumulator, tool) => {
     const category = getToolCategory(tool.toolName)
@@ -501,7 +507,7 @@ const ToolActivityPanel = ({
     accumulator[category].push(tool)
     return accumulator
   }, {} as Record<string, typeof visibleToolCalls>)
-  
+
   // Get recent operations (last 4, only visible ones)
   const recentOps = visibleToolCalls.slice(-4).reverse()
 
@@ -515,13 +521,13 @@ const ToolActivityPanel = ({
         <div className="flex items-center gap-2">
           <Zap className="w-4 h-4 text-primary" />
           <span className="text-sm font-medium">
-          PiPilot's Activities
+            PiPilot's Activities
           </span>
           <span className="text-xs text-muted-foreground">
             {totalOps} operation{totalOps !== 1 ? 's' : ''}
           </span>
         </div>
-        
+
         <div className="flex items-center gap-2">
           {executingOps > 0 && (
             <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
@@ -540,7 +546,7 @@ const ToolActivityPanel = ({
       {/* Progress Bar */}
       <div className="px-3 pb-2">
         <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-          <div 
+          <div
             className="h-full bg-primary transition-all duration-300 ease-out"
             style={{ width: `${progressPercent}%` }}
           />
@@ -563,7 +569,7 @@ const ToolActivityPanel = ({
             <div className="text-xs font-medium text-muted-foreground mb-2">
               Recent Operations
             </div>
-            
+
             {/* Scrollable operations list */}
             {!showAll ? (
               // Show first 4 operations without scroll
@@ -592,7 +598,7 @@ const ToolActivityPanel = ({
               </div>
             ) : (
               // Show all operations with scrollable area
-              <div 
+              <div
                 className="max-h-[300px] overflow-y-auto space-y-1.5"
                 style={{
                   scrollBehavior: 'smooth',
@@ -660,10 +666,10 @@ const ToolActivityPanel = ({
 }
 
 // Inline Tool Pill Component (kept for backward compatibility if needed elsewhere)
-const InlineToolPill = ({ toolName, input, status = 'executing' }: { 
-  toolName: string, 
-  input?: any, 
-  status?: 'executing' | 'completed' | 'failed' 
+const InlineToolPill = ({ toolName, input, status = 'executing' }: {
+  toolName: string,
+  input?: any,
+  status?: 'executing' | 'completed' | 'failed'
 }) => {
   const getToolIcon = (tool: string) => {
     switch (tool) {
@@ -717,6 +723,8 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
         return <Globe className="w-3.5 h-3.5" />
       case 'check_dev_errors':
         return <Settings className="w-3.5 h-3.5" />
+      case 'generate_report':
+        return <BarChart3 className="w-3.5 h-3.5" />
       default:
         return <Zap className="w-3.5 h-3.5" />
     }
@@ -784,6 +792,8 @@ const InlineToolPill = ({ toolName, input, status = 'executing' }: {
         return 'Extracting web content'
       case 'check_dev_errors':
         return 'Checking for errors'
+      case 'generate_report':
+        return 'Generating data visualization report'
       default:
         return tool
     }
@@ -914,24 +924,24 @@ export function ChatPanelV2({
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([])
   const [attachedUploadedFiles, setAttachedUploadedFiles] = useState<AttachedUploadedFile[]>([])
   const [attachedUrls, setAttachedUrls] = useState<AttachedUrl[]>([])
-  
+
   // @ command file attachment dropdown state
   const [showFileDropdown, setShowFileDropdown] = useState(false)
   const [fileQuery, setFileQuery] = useState("")
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 })
   const [atCommandStartIndex, setAtCommandStartIndex] = useState(-1)
-  
+
   // Checkpoint/restore state
   const [restoreMessageId, setRestoreMessageId] = useState<string | null>(null)
   const [showRevertDialog, setShowRevertDialog] = useState(false)
   const [revertMessageId, setRevertMessageId] = useState<string | null>(null)
   const [isReverting, setIsReverting] = useState(false)
-  
+
   // UI state
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
   const [showUrlDialog, setShowUrlDialog] = useState(false)
   const [urlInput, setUrlInput] = useState('')
-  
+
   // Speech-to-text state (Web Speech API real-time implementation)
   const [isRecording, setIsRecording] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
@@ -951,13 +961,13 @@ export function ChatPanelV2({
   const [isLoading, setIsLoading] = useState(false)
   const [continuingMessageId, setContinuingMessageId] = useState<string | null>(null)
   const [isContinuationInProgress, setIsContinuationInProgress] = useState(false)
-  
+
   // Chat mode state - true for Ask mode, false for Agent mode
   const [isAskMode, setIsAskMode] = useState(false)
-  
+
   // Supabase token management - automatic refresh
   const { token: supabaseToken, isLoading: tokenLoading, isExpired: tokenExpired, error: tokenError } = useSupabaseToken()
-  
+
   // Tool invocations tracking for inline pills
   const [activeToolCalls, setActiveToolCalls] = useState<Map<string, Array<{
     toolName: string
@@ -991,12 +1001,12 @@ export function ChatPanelV2({
         // Method 1: Try to get from URL parameters (most accurate for current context)
         // This handles cases like ?newProject=xxx&projectId=xxx correctly
         let dbId = await getDatabaseIdFromUrl();
-        
+
         // Method 2: If URL method fails, fall back to project.id
         if (!dbId && project?.id) {
           dbId = await getWorkspaceDatabaseId(project.id);
         }
-        
+
         // Update database ID if we found one (or clear it if not found)
         if (dbId !== databaseId) {
           setDatabaseId(dbId);
@@ -1104,14 +1114,14 @@ export function ChatPanelV2({
       // Get start time from the message metadata (more reliable than Map)
       const messageInState = messages.find(m => m.id === assistantMessageId)
       const startTime = messageInState?.metadata?.startTime
-      
+
       console.log(`[ChatPanelV2] 🔍 Looking up start time from message:`, {
         assistantMessageId,
         foundMessage: !!messageInState,
         startTime,
         hasStartTime: startTime !== undefined
       })
-      
+
       // Calculate duration from start time
       const elapsedSeconds = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0
 
@@ -1198,7 +1208,7 @@ export function ChatPanelV2({
     const viewportHeight = window.innerHeight;
     const spaceAbove = rect.top;
     const spaceBelow = viewportHeight - rect.bottom;
-    
+
     let top: number;
     if (spaceAbove >= dropdownHeight + 16) {
       top = rect.top - dropdownHeight - 8;
@@ -1207,26 +1217,26 @@ export function ChatPanelV2({
     } else {
       top = Math.max(16, rect.top - dropdownHeight - 8);
     }
-    
+
     const left = rect.left;
     return { top, left };
   };
 
   const handleFileSelect = (file: FileSearchResult) => {
     if (!textareaRef.current) return;
-    
+
     const textarea = textareaRef.current;
     const cursorPos = textarea.selectionStart;
     const atCommand = detectAtCommand(input, cursorPos);
-    
+
     if (atCommand) {
       const before = input.substring(0, atCommand.startIndex);
       const after = input.substring(atCommand.endIndex);
       const replacement = `@${file.name}`;
-      
+
       setInput(before + replacement + after);
       setAttachedFiles(prev => [...prev, file]);
-      
+
       setTimeout(() => {
         if (textareaRef.current) {
           const newCursorPos = before.length + replacement.length;
@@ -1235,7 +1245,7 @@ export function ChatPanelV2({
         }
       }, 0);
     }
-    
+
     closeFileDropdown();
   };
 
@@ -1248,22 +1258,22 @@ export function ChatPanelV2({
   // Checkpoint handlers
   const handleRevertToCheckpoint = async (messageId: string) => {
     if (!project || isReverting) return
-    
+
     if (restoreMessageId === messageId) {
       await handleRestoreForMessage(messageId);
       return;
     }
-    
+
     setRevertMessageId(messageId)
     setShowRevertDialog(true)
   }
 
   const handleRestoreForMessage = async (messageId: string) => {
     if (!project) return
-    
+
     try {
       const { isRestoreAvailableForMessage, restorePreRevertState } = await import('@/lib/checkpoint-utils')
-      
+
       if (!isRestoreAvailableForMessage(project.id, messageId)) {
         toast({
           title: "Restore Unavailable",
@@ -1273,15 +1283,15 @@ export function ChatPanelV2({
         setRestoreMessageId(null)
         return
       }
-      
+
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
-      
+
       const chatSessions = await storageManager.getChatSessions(project.userId)
-      const activeSession = chatSessions.find((session: any) => 
+      const activeSession = chatSessions.find((session: any) =>
         session.workspaceId === project.id && session.isActive
       )
-      
+
       if (!activeSession) {
         toast({
           title: "Restore Failed",
@@ -1290,18 +1300,18 @@ export function ChatPanelV2({
         })
         return
       }
-      
+
       const success = await restorePreRevertState(project.id, activeSession.id, messageId)
-      
+
       if (success) {
         await loadMessages()
-        
-        window.dispatchEvent(new CustomEvent('files-changed', { 
-          detail: { projectId: project.id, forceRefresh: true } 
+
+        window.dispatchEvent(new CustomEvent('files-changed', {
+          detail: { projectId: project.id, forceRefresh: true }
         }))
-        
+
         setRestoreMessageId(null)
-        
+
         toast({
           title: "Restored Successfully",
           description: "Files and messages have been restored to their previous state."
@@ -1341,7 +1351,7 @@ export function ChatPanelV2({
     try {
       // Remove message from UI immediately for better UX
       setMessages(prev => prev.filter(msg => msg.id !== messageId))
-      
+
       // Remove tool calls for this message
       setActiveToolCalls(prev => {
         const newMap = new Map(prev)
@@ -1409,7 +1419,7 @@ export function ChatPanelV2({
     setTimeout(() => {
       // Create a synthetic form event to trigger handleEnhancedSubmit
       const syntheticEvent = {
-        preventDefault: () => {},
+        preventDefault: () => { },
       } as React.FormEvent
 
       handleEnhancedSubmit(syntheticEvent)
@@ -1482,10 +1492,10 @@ export function ChatPanelV2({
       setMessages(prev => prev.map(msg =>
         msg.id === originalAssistantMessageId
           ? {
-              ...msg,
-              content: accumulatedContent, // Remove thinking indicator
-              reasoning: accumulatedReasoning
-            }
+            ...msg,
+            content: accumulatedContent, // Remove thinking indicator
+            reasoning: accumulatedReasoning
+          }
           : msg
       ))
 
@@ -1509,7 +1519,7 @@ export function ChatPanelV2({
       console.log('[ChatPanelV2][Continuation] 📤 Sending continuation request with token:', continuationState.continuationToken)
 
       const response = await fetch('/api/chat-v2', {
-     method: 'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(continuationPayload),
         signal: continuationController.signal
@@ -1527,7 +1537,7 @@ export function ChatPanelV2({
       let continuationAccumulatedContent = ''
       let continuationAccumulatedReasoning = ''
       let lineBuffer = ''
-      
+
       // Track tool calls locally during continuation to avoid React state race conditions
       const continuationLocalToolCalls: Array<{
         toolName: string
@@ -1603,9 +1613,9 @@ export function ChatPanelV2({
                 input: toolCall.args,
                 status: 'executing' as 'executing' | 'completed' | 'failed'
               }
-              
+
               continuationLocalToolCalls.push(toolCallEntry)
-              
+
               setActiveToolCalls(prev => {
                 const newMap = new Map(prev)
                 const messageCalls = newMap.get(originalAssistantMessageId) || []
@@ -1615,12 +1625,12 @@ export function ChatPanelV2({
               })
 
               const clientSideTools = [
-                'write_file', 
-                'edit_file', 
+                'write_file',
+                'edit_file',
                 'client_replace_string_in_file',
                 'delete_file',
-                'delete_folder', 
-                'add_package', 
+                'delete_folder',
+                'add_package',
                 'remove_package',
                 'read_file',
                 'list_files',
@@ -1629,21 +1639,21 @@ export function ChatPanelV2({
                 'create_database',
                 'request_supabase_connection'
               ]
-              
+
               if (clientSideTools.includes(toolCall.toolName)) {
                 const { handleClientFileOperation } = await import('@/lib/client-file-tools')
 
                 const addToolResult = (result: any) => {
                   console.log('[ChatPanelV2][Continuation][ClientTool] ✅ Continuation tool completed:', result.tool)
-                  
+
                   const newStatus = result.errorText ? 'failed' : 'completed'
-                  
+
                   // Update local tracking
                   const localTool = continuationLocalToolCalls.find(call => call.toolCallId === toolCall.toolCallId)
                   if (localTool) {
                     localTool.status = newStatus
                   }
-                  
+
                   // Update tool status in state for UI
                   setActiveToolCalls(prev => {
                     const newMap = new Map(prev)
@@ -1661,13 +1671,13 @@ export function ChatPanelV2({
                 handleClientFileOperation(toolCall, project.id, addToolResult)
                   .catch(error => {
                     console.error('[ChatPanelV2][Continuation][ClientTool] ❌ Tool execution error:', error)
-                    
+
                     // Update local tracking
                     const localTool = continuationLocalToolCalls.find(call => call.toolCallId === toolCall.toolCallId)
                     if (localTool) {
                       localTool.status = 'failed'
                     }
-                    
+
                     // Update tool status to failed in state
                     setActiveToolCalls(prev => {
                       const newMap = new Map(prev)
@@ -1684,15 +1694,15 @@ export function ChatPanelV2({
               }
             } else if (parsed.type === 'tool-result') {
               console.log('[ChatPanelV2][Continuation][DataStream] Tool result received:', parsed.toolName)
-              
+
               const resultStatus = parsed.result?.error ? 'failed' : 'completed'
-              
+
               // Update local tracking
               const localTool = continuationLocalToolCalls.find(call => call.toolCallId === parsed.toolCallId)
               if (localTool) {
                 localTool.status = resultStatus
               }
-              
+
               // Update tool status to completed or failed for server-side tools
               setActiveToolCalls(prev => {
                 const newMap = new Map(prev)
@@ -1719,11 +1729,11 @@ export function ChatPanelV2({
 
       // Use local tool tracking instead of state (avoids React state race conditions)
       const toolInvocationsForMessage = continuationLocalToolCalls
-      
-      console.log(`[ChatPanelV2][Continuation][Save] Preparing to save ${toolInvocationsForMessage.length} tool invocations:`, 
+
+      console.log(`[ChatPanelV2][Continuation][Save] Preparing to save ${toolInvocationsForMessage.length} tool invocations:`,
         toolInvocationsForMessage.map(t => ({ name: t.toolName, status: t.status }))
       )
-      
+
       // Convert to the format expected by the database
       const toolInvocationsData = toolInvocationsForMessage.map(tool => ({
         toolName: tool.toolName,
@@ -1731,10 +1741,10 @@ export function ChatPanelV2({
         args: tool.input,
         // Both 'completed' and 'failed' should have state='result'
         state: (tool.status === 'completed' || tool.status === 'failed') ? 'result' : 'call',
-        result: tool.status === 'completed' 
-          ? { success: true } 
-          : (tool.status === 'failed' 
-            ? { error: 'Tool execution failed' } 
+        result: tool.status === 'completed'
+          ? { success: true }
+          : (tool.status === 'failed'
+            ? { error: 'Tool execution failed' }
             : undefined)
       }))
 
@@ -1767,10 +1777,10 @@ export function ChatPanelV2({
       setMessages(prev => prev.map(msg =>
         msg.id === originalAssistantMessageId
           ? {
-              ...msg,
-              content: accumulatedContent, // Remove thinking indicator
-              reasoning: accumulatedReasoning
-            }
+            ...msg,
+            content: accumulatedContent, // Remove thinking indicator
+            reasoning: accumulatedReasoning
+          }
           : msg
       ))
 
@@ -1827,7 +1837,7 @@ export function ChatPanelV2({
 
       await fileLookupServiceRef.current.initialize(project.id)
       await fileLookupServiceRef.current.refreshFiles()
-      
+
       // Get files from the lookup service
       const files = fileLookupServiceRef.current['files'] || []
       setProjectFiles(files)
@@ -1868,10 +1878,10 @@ export function ChatPanelV2({
         }
         // Exclude node_modules, .git, build outputs
         if (path.includes('node_modules') ||
-            path.includes('.git/') ||
-            path.includes('dist/') ||
-            path.includes('build/') ||
-            path.includes('.next/')) {
+          path.includes('.git/') ||
+          path.includes('dist/') ||
+          path.includes('build/') ||
+          path.includes('.next/')) {
           return false
         }
         return true
@@ -1936,7 +1946,7 @@ export function ChatPanelV2({
 
       // Get chat sessions for this user
       const chatSessions = await storageManager.getChatSessions(project.userId)
-      
+
       // Find the active chat session for this project
       const activeSession = chatSessions.find((session: any) =>
         session.workspaceId === project.id && session.isActive
@@ -1944,10 +1954,10 @@ export function ChatPanelV2({
 
       if (activeSession) {
         console.log(`[ChatPanelV2] Found active chat session: ${activeSession.id}`)
-        
+
         // Load messages for this session
         const storedMessages = await storageManager.getMessages(activeSession.id)
-        
+
         // Convert stored messages to the format expected by the UI
         const uiMessages = storedMessages.map((msg: any) => {
           const uiMessage = {
@@ -1974,7 +1984,7 @@ export function ChatPanelV2({
 
         console.log(`[ChatPanelV2] Loaded ${uiMessages.length} messages from database`)
         setMessages(uiMessages)
-        
+
         // Populate activeToolCalls for loaded messages
         const toolCallsMap = new Map<string, Array<{
           toolName: string
@@ -1982,7 +1992,7 @@ export function ChatPanelV2({
           input?: any
           status: 'executing' | 'completed' | 'failed'
         }>>()
-        
+
         uiMessages.forEach((msg: any) => {
           if (msg.toolInvocations && msg.toolInvocations.length > 0) {
             console.log(`[ChatPanelV2] Restoring tool pills for message ${msg.id}:`, {
@@ -1994,11 +2004,11 @@ export function ChatPanelV2({
                 hasError: inv.result?.error
               }))
             })
-            
+
             const toolCalls = msg.toolInvocations.map((inv: any) => {
               // Determine status based on state and result
               let status: 'executing' | 'completed' | 'failed' = 'completed' // Default to completed for loaded messages
-              
+
               if (inv.state === 'result') {
                 // Tool has explicit result state
                 if (inv.result?.error) {
@@ -2019,7 +2029,7 @@ export function ChatPanelV2({
                   status = 'completed'
                 }
               }
-              
+
               return {
                 toolName: inv.toolName,
                 toolCallId: inv.toolCallId,
@@ -2027,12 +2037,12 @@ export function ChatPanelV2({
                 status
               }
             })
-            
+
             console.log(`[ChatPanelV2] Setting ${toolCalls.length} tool pills for message ${msg.id}`)
             toolCallsMap.set(msg.id, toolCalls)
           }
         })
-        
+
         console.log(`[ChatPanelV2] Total messages with tool pills: ${toolCallsMap.size}`)
         setActiveToolCalls(toolCallsMap)
       } else {
@@ -2051,10 +2061,10 @@ export function ChatPanelV2({
     const autoFillAndSend = async () => {
       if (initialPrompt && project && messages.length === 0 && !isLoading) {
         console.log(`[ChatPanelV2] Auto-filling input with initial prompt`)
-        
+
         // Set the input message (auto-fill the input box)
         setInput(initialPrompt)
-        
+
         // Wait 3 seconds then simulate user clicking the send button
         setTimeout(() => {
           console.log(`[ChatPanelV2] Auto-clicking send button after 3 second delay`)
@@ -2491,12 +2501,12 @@ export function ChatPanelV2({
         const { createClient } = await import('@/lib/supabase/client')
         const supabase = createClient()
         const { data: { user }, error: userError } = await supabase.auth.getUser()
-        
+
         if (userError || !user) {
           console.warn('[ChatPanelV2] No authenticated Supabase user found')
         } else {
           supabaseUserId = user.id
-          
+
           // Get Supabase project details for the current PixelPilot project using the authenticated userId
           if (project?.id) {
             supabaseProjectDetails = await getSupabaseProjectForPixelPilotProject(supabaseUserId, project.id)
@@ -2511,7 +2521,7 @@ export function ChatPanelV2({
             console.warn('[ChatPanelV2] ⚠️ No Stripe API key found in cloud sync')
           }
         }
-        
+
         console.log(`[ChatPanelV2] Cloud sync data fetched:`, {
           hasToken: !!supabaseAccessToken,
           hasProjectDetails: !!supabaseProjectDetails,
@@ -2565,7 +2575,7 @@ export function ChatPanelV2({
       let accumulatedContent = ''
       let accumulatedReasoning = ''
       let lineBuffer = '' // Buffer for incomplete lines across chunks
-      
+
       // Track tool calls locally during this stream to avoid React state race conditions
       const localToolCalls: Array<{
         toolName: string
@@ -2582,15 +2592,15 @@ export function ChatPanelV2({
         }
 
         const chunk = decoder.decode(value, { stream: true })
-        
+
         // Add chunk to buffer and split by newlines
         // Important: Don't trim individual lines yet - metadata might span multiple chunks
         lineBuffer += chunk
         const lines = lineBuffer.split('\n')
-        
+
         // Keep the last incomplete line in the buffer
         lineBuffer = lines.pop() || ''
-        
+
         // Process complete lines
         const completeLines = lines.filter(line => line.trim())
 
@@ -2598,22 +2608,22 @@ export function ChatPanelV2({
           try {
             // Remove SSE "data: " prefix if present
             const jsonString = line.startsWith('data: ') ? line.slice(6) : line
-            
+
             // Skip empty lines or SSE comments
             if (!jsonString || jsonString.startsWith(':')) {
               continue
             }
-            
+
             // Parse AI SDK v5 stream protocol
             // Format: {"type":"0","value":"text"} or {"type":"tool-call",...}
             const parsed = JSON.parse(jsonString)
-            
+
             // Skip server-internal chunks that shouldn't be exposed to client
             if (parsed.type === 'start-step' || parsed.type === 'reasoning-start') {
               console.log('[ChatPanelV2][DataStream] Skipping server-internal chunk:', parsed.type)
               continue
             }
-            
+
             console.log('[ChatPanelV2][DataStream] Parsed stream part:', parsed)
 
             // Handle different stream part types
@@ -2666,7 +2676,7 @@ export function ChatPanelV2({
                 args: parsed.input, // AI SDK sends 'input' not 'args'
                 dynamic: false // We don't use dynamic tools
               }
-              
+
               console.log('[ChatPanelV2][ClientTool] 🔧 Tool call received:', {
                 toolName: toolCall.toolName,
                 toolCallId: toolCall.toolCallId,
@@ -2680,9 +2690,9 @@ export function ChatPanelV2({
                 input: toolCall.args,
                 status: 'executing' as 'executing' | 'completed' | 'failed'
               }
-              
+
               localToolCalls.push(toolCallEntry)
-              
+
               setActiveToolCalls(prev => {
                 const newMap = new Map(prev)
                 const messageCalls = newMap.get(assistantMessageId) || []
@@ -2693,12 +2703,12 @@ export function ChatPanelV2({
 
               // Check if this is a client-side tool (both read and write operations)
               const clientSideTools = [
-                'write_file', 
-                'edit_file', 
+                'write_file',
+                'edit_file',
                 'client_replace_string_in_file',
                 'delete_file',
-                'delete_folder', 
-                'add_package', 
+                'delete_folder',
+                'add_package',
                 'remove_package',
                 'read_file',
                 'list_files',
@@ -2707,13 +2717,13 @@ export function ChatPanelV2({
                 'create_database',
                 'request_supabase_connection'
               ]
-              
+
               if (clientSideTools.includes(toolCall.toolName)) {
                 console.log('[ChatPanelV2][ClientTool] ⚡ Executing client-side tool:', toolCall.toolName)
-                
+
                 // Execute the tool on client-side IndexedDB immediately
                 const { handleClientFileOperation } = await import('@/lib/client-file-tools')
-                
+
                 // Define addToolResult function - this sends the result back to the AI
                 const addToolResult = (result: any) => {
                   console.log('[ChatPanelV2][ClientTool] ✅ Client-side tool completed:', {
@@ -2722,16 +2732,16 @@ export function ChatPanelV2({
                     success: !result.errorText,
                     output: result.output
                   })
-                  
+
                   // Update tool status to completed or failed (both local and state)
                   const newStatus = result.errorText ? 'failed' : 'completed'
-                  
+
                   // Update local tracking
                   const localTool = localToolCalls.find(call => call.toolCallId === toolCall.toolCallId)
                   if (localTool) {
                     localTool.status = newStatus
                   }
-                  
+
                   // Update state for UI
                   setActiveToolCalls(prev => {
                     const newMap = new Map(prev)
@@ -2744,23 +2754,23 @@ export function ChatPanelV2({
                     newMap.set(assistantMessageId, updatedCalls)
                     return newMap
                   })
-                  
+
                   // For client-side tools, we need to send the result back to continue the conversation
                   // Create a continuation request with the tool result
                   // handleClientToolResult(toolCall.toolName, result, project?.id, assistantMessageId)
                 }
-                
+
                 // Execute the tool asynchronously (don't await - per AI SDK docs)
                 handleClientFileOperation(toolCall, project?.id, addToolResult)
                   .catch(error => {
                     console.error('[ChatPanelV2][ClientTool] ❌ Tool execution error:', error)
-                    
+
                     // Update tool status to failed (both local and state)
                     const localTool = localToolCalls.find(call => call.toolCallId === toolCall.toolCallId)
                     if (localTool) {
                       localTool.status = 'failed'
                     }
-                    
+
                     setActiveToolCalls(prev => {
                       const newMap = new Map(prev)
                       const messageCalls = newMap.get(assistantMessageId) || []
@@ -2772,7 +2782,7 @@ export function ChatPanelV2({
                       newMap.set(assistantMessageId, updatedCalls)
                       return newMap
                     })
-                    
+
                     // Send error result back
                     const errorResult = {
                       tool: toolCall.toolName,
@@ -2792,15 +2802,15 @@ export function ChatPanelV2({
                 toolName: parsed.toolName,
                 toolCallId: parsed.toolCallId
               })
-              
+
               const resultStatus = parsed.result?.error ? 'failed' : 'completed'
-              
+
               // Update local tracking
               const localTool = localToolCalls.find(call => call.toolCallId === parsed.toolCallId)
               if (localTool) {
                 localTool.status = resultStatus
               }
-              
+
               // Update tool status to completed or failed for server-side tools
               setActiveToolCalls(prev => {
                 const newMap = new Map(prev)
@@ -2832,14 +2842,14 @@ export function ChatPanelV2({
         hasProject: !!project,
         localToolCallsCount: localToolCalls.length
       })
-      
+
       // Use local tool tracking instead of state (avoids React state race conditions)
       const toolInvocationsForMessage = localToolCalls
-      
-      console.log(`[ChatPanelV2][Save] Preparing to save ${toolInvocationsForMessage.length} tool invocations:`, 
+
+      console.log(`[ChatPanelV2][Save] Preparing to save ${toolInvocationsForMessage.length} tool invocations:`,
         toolInvocationsForMessage.map(t => ({ name: t.toolName, status: t.status }))
       )
-      
+
       // Convert to the format expected by the database
       const toolInvocationsData = toolInvocationsForMessage.map(tool => ({
         toolName: tool.toolName,
@@ -2848,9 +2858,9 @@ export function ChatPanelV2({
         state: tool.status === 'completed' ? 'result' : 'call',
         result: tool.status === 'completed' ? { success: true } : (tool.status === 'failed' ? { error: 'Tool execution failed' } : undefined)
       }))
-      
+
       console.log(`[ChatPanelV2][Save] Tool invocations data for database:`, toolInvocationsData)
-      
+
       // Save assistant message to database after streaming completes
       if (accumulatedContent.trim() || toolInvocationsData.length > 0) {
         await saveAssistantMessageAfterStreaming(
@@ -3166,7 +3176,7 @@ export function ChatPanelV2({
       reader.onload = async (event) => {
         const base64 = event.target?.result as string
         const imageId = Date.now().toString() + Math.random()
-        
+
         // Add image with processing flag
         setAttachedImages((prev: AttachedImage[]) => [...prev, {
           id: imageId,
@@ -3189,14 +3199,14 @@ export function ChatPanelV2({
           })
 
           const { description } = await response.json()
-          
+
           // Update with description
-          setAttachedImages((prev: AttachedImage[]) => prev.map((img: AttachedImage) => 
+          setAttachedImages((prev: AttachedImage[]) => prev.map((img: AttachedImage) =>
             img.id === imageId ? { ...img, description, isProcessing: false } : img
           ))
         } catch (error) {
           console.error('Error describing image:', error)
-          setAttachedImages((prev: AttachedImage[]) => prev.map((img: AttachedImage) => 
+          setAttachedImages((prev: AttachedImage[]) => prev.map((img: AttachedImage) =>
             img.id === imageId ? { ...img, isProcessing: false } : img
           ))
         }
@@ -3215,8 +3225,8 @@ export function ChatPanelV2({
     for (const file of Array.from(files)) {
       const reader = new FileReader()
       reader.onload = (event) => {
-          const content = event.target?.result as string
-          setAttachedUploadedFiles((prev: AttachedUploadedFile[]) => [...prev, {
+        const content = event.target?.result as string
+        setAttachedUploadedFiles((prev: AttachedUploadedFile[]) => [...prev, {
           id: Date.now().toString() + Math.random(),
           name: file.name,
           content,
@@ -3272,7 +3282,7 @@ export function ChatPanelV2({
       ))
     } catch (error) {
       console.error('Error fetching URL:', error)
-      setAttachedUrls((prev: AttachedUrl[]) => prev.map((url: AttachedUrl) => 
+      setAttachedUrls((prev: AttachedUrl[]) => prev.map((url: AttachedUrl) =>
         url.id === urlId ? { ...url, isProcessing: false } : url
       ))
     }
@@ -3309,7 +3319,7 @@ export function ChatPanelV2({
                 />
               </div>
             ) : (
-           <Card className={cn("w-full",
+              <Card className={cn("w-full",
                 message.reasoning || message.content || (message.toolInvocations && message.toolInvocations.length > 0)
                   ? "bg-muted"
                   : "bg-transparent border-0"
@@ -3319,7 +3329,7 @@ export function ChatPanelV2({
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id)
                     // Filter out tools with special rendering (like request_supabase_connection)
-                    const regularToolCalls = toolCalls?.filter(tc => 
+                    const regularToolCalls = toolCalls?.filter(tc =>
                       tc.toolName !== 'request_supabase_connection'
                     )
                     if (regularToolCalls && regularToolCalls.length > 0) {
@@ -3332,14 +3342,14 @@ export function ChatPanelV2({
                       />
                     ) : null
                   })()}
-                  
+
                   {/* Special Rendering: Supabase Connection Card */}
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id)
-                    const supabaseConnectionCalls = toolCalls?.filter(tc => 
+                    const supabaseConnectionCalls = toolCalls?.filter(tc =>
                       tc.toolName === 'request_supabase_connection' && tc.status === 'completed'
                     )
-                    
+
                     if (supabaseConnectionCalls && supabaseConnectionCalls.length > 0) {
                       console.log(`[ChatPanelV2][Render] Rendering ${supabaseConnectionCalls.length} Supabase connection card(s)`)
                       return (
@@ -3350,7 +3360,7 @@ export function ChatPanelV2({
                             const title = input.title
                             const description = input.description
                             const labels = input.labels
-                            
+
                             return (
                               <SupabaseConnectionCard
                                 key={toolCall.toolCallId}
@@ -3365,7 +3375,7 @@ export function ChatPanelV2({
                     }
                     return null
                   })()}
-                  
+
                   <MessageWithTools
                     message={message}
                     projectId={project?.id}
@@ -3403,9 +3413,9 @@ export function ChatPanelV2({
 
       {/* Input Area - Fixed at bottom */}
       <div className={`border-t bg-background p-4 ${isMobile
-          ? 'fixed bottom-12 left-0 right-0 p-4 z-[60] border-b'
-          : 'p-4'
-      }`}>
+        ? 'fixed bottom-12 left-0 right-0 p-4 z-[60] border-b'
+        : 'p-4'
+        }`}>
         {/* Attachments Display */}
         {(attachedFiles.length > 0 || attachedImages.length > 0 || attachedUploadedFiles.length > 0 || attachedUrls.length > 0) && (
           <div className="mb-2 flex flex-wrap gap-2">
@@ -3459,7 +3469,7 @@ export function ChatPanelV2({
               onChange={(e) => {
                 const newValue = e.target.value
                 setInput(newValue)
-                
+
                 // Lightweight synchronous @ command detection (only if @ is present)
                 if (textareaRef.current && project && newValue.includes('@')) {
                   const atCommand = detectAtCommand(newValue, e.target.selectionStart)
@@ -3479,7 +3489,7 @@ export function ChatPanelV2({
                   // Close dropdown if no @ in text
                   closeFileDropdown();
                 }
-                
+
                 // Trigger height adjustment
                 setTimeout(() => {
                   if (textareaRef.current) {
@@ -3587,10 +3597,10 @@ export function ChatPanelV2({
                 // Handle image pasting (existing logic)
                 for (let i = 0; i < items.length; i++) {
                   const item = items[i]
-                  
+
                   if (item.type.indexOf('image') !== -1) {
                     e.preventDefault()
-                    
+
                     // Check total attachment limit
                     const totalAttachments = attachedImages.length + attachedUploadedFiles.length + attachedUrls.length
                     if (totalAttachments >= 2) {
@@ -3645,8 +3655,8 @@ export function ChatPanelV2({
                         const data = await response.json()
 
                         // Update image with description
-                        setAttachedImages(prev => prev.map(img => 
-                          img.id === imageId 
+                        setAttachedImages(prev => prev.map(img =>
+                          img.id === imageId
                             ? { ...img, description: data.description, isProcessing: false }
                             : img
                         ))
@@ -3869,19 +3879,19 @@ export function ChatPanelV2({
               <button
                 onClick={async () => {
                   if (!project || !revertMessageId) return
-                  
+
                   setIsReverting(true)
                   setShowRevertDialog(false)
-                  
+
                   try {
                     const { storageManager } = await import('@/lib/storage-manager')
                     await storageManager.init()
-                    
+
                     const chatSessions = await storageManager.getChatSessions(project.userId)
-                    const activeSession = chatSessions.find((session: any) => 
+                    const activeSession = chatSessions.find((session: any) =>
                       session.workspaceId === project.id && session.isActive
                     )
-                    
+
                     if (!activeSession) {
                       toast({
                         title: "Revert Failed",
@@ -3890,15 +3900,15 @@ export function ChatPanelV2({
                       })
                       return
                     }
-                     
+
                     // Capture state before revert
                     const { capturePreRevertState, getCheckpoints, deleteMessagesAfter, restoreCheckpoint } = await import('@/lib/checkpoint-utils')
                     await capturePreRevertState(project.id, activeSession.id, revertMessageId)
-                    
+
                     // Find checkpoint for this message
                     const checkpoints = await getCheckpoints(project.id)
                     const checkpoint = checkpoints.find(cp => cp.messageId === revertMessageId)
-                    
+
                     if (!checkpoint) {
                       toast({
                         title: "Revert Failed",
@@ -3907,39 +3917,39 @@ export function ChatPanelV2({
                       })
                       return
                     }
-                    
+
                     // Delete messages after this point
                     const allMessages = await storageManager.getMessages(activeSession.id)
                     const targetMessage = allMessages.find(msg => msg.id === revertMessageId)
-                    
+
                     if (targetMessage) {
                       // Clear all messages that came after this message (including AI responses)
                       const messageIndex = messages.findIndex(msg => msg.id === revertMessageId)
                       if (messageIndex !== -1) {
                         setMessages(prev => prev.slice(0, messageIndex + 1))
                       }
-                      
+
                       // Set the reverted message content in input for editing
                       const revertedMessage = messages.find(msg => msg.id === revertMessageId)
                       if (revertedMessage) {
                         setInput(revertedMessage.content)
                       }
-                      
+
                       await deleteMessagesAfter(activeSession.id, targetMessage.createdAt)
                     }
-                    
+
                     // Restore files
                     const success = await restoreCheckpoint(checkpoint.id)
-                    
+
                     if (success) {
                       await loadMessages()
-                      
-                      window.dispatchEvent(new CustomEvent('files-changed', { 
-                        detail: { projectId: project.id, forceRefresh: true } 
+
+                      window.dispatchEvent(new CustomEvent('files-changed', {
+                        detail: { projectId: project.id, forceRefresh: true }
                       }))
-                      
+
                       setRestoreMessageId(revertMessageId)
-                      
+
                       toast({
                         title: "Reverted Successfully",
                         description: "Files and messages have been restored. You can undo this action for 5 minutes."
