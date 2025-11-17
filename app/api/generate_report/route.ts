@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       timeoutMs: sandboxTimeout,
     });
 
-    try {
+    // --------------------------
       // --------------------------
       // RUN PYTHON CODE
       // --------------------------
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       for (const file of files) {
         if (file.type === "file") {
           const url = await sandbox.downloadUrl(file.path, {
-            useSignatureExpiration: 10_000, // 10-second signed link
+            useSignatureExpiration: 300_000, // 5-minute signed link for user downloads
           });
           downloads[file.path] = url;
         }
@@ -80,12 +80,7 @@ export async function POST(req: NextRequest) {
         results: result.results,
         downloads, // includes chart.png, report.pdf, report.docx, etc.
       });
-    } finally {
       // --------------------------
-      // CLEANUP: KILL SANDBOX
-      // --------------------------
-      await sandbox.kill();
-    }
   } catch (error) {
     console.error("E2B Sandbox Error:", error);
     return NextResponse.json(
