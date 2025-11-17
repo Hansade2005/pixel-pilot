@@ -2179,6 +2179,41 @@ Image generation: \`https://api.a0.dev/assets/image?text={description}&aspect=1:
 - \`seed\`: For stable output
 - \`aspect\`: 1:1 or specify as needed
 - **Usage**: Use URL in HTML \`<img src=...>\` tags
+
+### 📊 Generate Report Tool (E2B Sandbox)
+**Advanced data visualization and document generation:**
+- **\`generate_report\`** - Execute Python code in secure E2B sandbox to create professional reports
+  - 📈 **PNG Charts**: matplotlib/seaborn visualizations saved as high-quality images
+  - 📄 **PDF Reports**: Multi-page documents with embedded charts and tables
+  - 📝 **DOCX Documents**: Formatted Word documents with images and structured content
+  - 📊 **CSV/Excel**: Data export and analysis files
+  - 🔍 **Data Analysis**: pandas, numpy, yfinance, and scientific computing libraries
+
+**AI Formatting Instructions:**
+When using \`generate_report\`, present results using this exact markdown structure:
+
+## 📊 Report Generation Complete
+
+### 📈 Generated Files
+| Document Type | File Name | Download Link |
+|---------------|-----------|---------------|
+| 📊 Chart | \`chart.png\` | [Download Chart](download_url) |
+| 📄 PDF Report | \`report.pdf\` | [Download PDF](download_url) |
+| 📝 Word Document | \`report.docx\` | [Download DOCX](download_url) |
+
+### 📋 Execution Summary
+- **Status**: ✅ Success
+- **Files Generated**: X documents
+- **Execution Time**: X seconds
+- **Sandbox Output**: [execution results]
+
+### 🔗 Direct Download Links
+- **Chart (PNG)**: [chart.png](download_url)
+- **PDF Report**: [report.pdf](download_url)
+- **Word Document**: [report.docx](download_url)
+
+**Note**: Download links are temporary and expire in 10 seconds.
+
 _Note_: 
 - **IndexedDB** = Browser storage for PROJECT FILES (your code/file tree) - managed automatically
 - **PiPilot DB** = Server-side REST API DATABASE (for data storage, tables, authentication) - separate system
@@ -8220,6 +8255,112 @@ ${conversationSummaryContext || ''}`
             const executionTime = Date.now() - toolStartTime;
             toolExecutionTimes['stripe_delete_coupon'] = (toolExecutionTimes['stripe_delete_coupon'] || 0) + executionTime;
             return { success: false, error: `Failed to delete coupon: ${error instanceof Error ? error.message : 'Unknown error'}`, id, toolCallId, executionTimeMs: executionTime, timeWarning: timeStatus.warningMessage };
+          }
+        }
+      }),
+
+      generate_report: tool({
+        description:`📊 PiPilot Data Visualization & Report Generator Run Python code in a secure sandbox to create charts and multi-format documents. Additional packages can be installed using !pip install.
+Pre-installed libraries: jupyter, numpy, pandas, matplotlib, seaborn, plotly (not supported yet)
+
+Supports:
+- 📈 Charts (PNG) – Matplotlib/Seaborn
+- 📄 PDF Reports – Multi-page documents with charts/tables
+- 📝 Word Documents (DOCX) – Formatted with images
+- 📊 Data Export (CSV/Excel)
+- 🔍 Data Analysis – pandas, numpy, yfinance, etc.
+
+Result format (Markdown Template):
+## 📊 Report Generation Complete
+
+### 📈 Generated Files
+| Type | Name | Download |
+|------|------|---------|
+| 📊 Chart | \`chart.png\` | [Download](download_url) |
+| 📄 PDF | \`report.pdf\` | [Download](download_url) |
+| 📝 DOCX | \`report.docx\` | [Download](download_url) |
+### 📋 Execution Summary
+- **Status:** ✅ Success
+- **Files Generated:** 3
+- **Execution Time:** X sec
+- **Sandbox Output:** [results]
+Note: Download links expire in 10 seconds.`
+,
+        inputSchema: z.object({
+          code: z.string().describe('Python code to execute in E2B sandbox. Should include data analysis, visualization (matplotlib/seaborn), and file generation (PDF, DOCX, PNG). Use plt.savefig() for charts, PdfPages for PDFs, and Document() for DOCX files.')
+        }),
+        execute: async ({ code }, { abortSignal, toolCallId }) => {
+          const toolStartTime = Date.now();
+          const timeStatus = getTimeStatus();
+
+          if (abortSignal?.aborted) {
+            return { success: false, error: 'Tool execution was aborted', toolCallId, executionTimeMs: 0 };
+          }
+
+          // Check if we're approaching timeout
+          if (timeStatus.isApproachingTimeout) {
+            return { success: false, error: timeStatus.warningMessage, toolCallId, executionTimeMs: 0 };
+          }
+
+          try {
+            // Make HTTP request to generate_report API
+            const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/generate_report`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: new URLSearchParams({
+                code: code
+              })
+            });
+
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+
+            const executionTime = Date.now() - toolStartTime;
+            toolExecutionTimes['generate_report'] = (toolExecutionTimes['generate_report'] || 0) + executionTime;
+
+            return {
+              success: result.success,
+              text: result.text,
+              logs: result.logs,
+              error: result.error,
+              results: result.results,
+              downloads: result.downloads,
+              // Enhanced formatting data for AI presentation
+              formattedResults: {
+                fileCount: Object.keys(result.downloads || {}).length,
+                fileTypes: Object.keys(result.downloads || {}).map(path => {
+                  const ext = path.split('.').pop()?.toLowerCase();
+                  switch(ext) {
+                    case 'png': return '📊 Chart';
+                    case 'pdf': return '📄 PDF Report';
+                    case 'docx': return '📝 Word Document';
+                    case 'csv': return '📊 CSV Data';
+                    case 'xlsx': return '📊 Excel Spreadsheet';
+                    default: return '📄 Document';
+                  }
+                }),
+                downloadLinks: result.downloads || {},
+                executionTime: executionTime
+              },
+              toolCallId,
+              executionTimeMs: executionTime,
+              timeWarning: timeStatus.warningMessage
+            };
+          } catch (error) {
+            const executionTime = Date.now() - toolStartTime;
+            toolExecutionTimes['generate_report'] = (toolExecutionTimes['generate_report'] || 0) + executionTime;
+            return {
+              success: false,
+              error: `Failed to generate report: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              toolCallId,
+              executionTimeMs: executionTime,
+              timeWarning: timeStatus.warningMessage
+            };
           }
         }
       }),
