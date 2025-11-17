@@ -8260,24 +8260,37 @@ ${conversationSummaryContext || ''}`
       }),
 
       generate_report: tool({
-        description:`📊 PiPilot Data Visualization & Report Generator Run Python code in a secure sandbox to create charts and multi-format documents. Files are automatically uploaded to Supabase storage and public download links are provided.
-Pre-installed libraries: jupyter, numpy, pandas, matplotlib, seaborn, plotly (not supported yet)
+        description:`📊 PiPilot Data Visualization & Professional Document Generator Run Python code in a secure sandbox to create comprehensive charts, reports, and multi-format documents. Files are automatically uploaded to Supabase storage and public download links are provided.
+Pre-installed libraries: jupyter, numpy, pandas, matplotlib, seaborn, plotly (not supported yet), reportlab, python-docx, openpyxl  needs to be installed and used  for advanced document generation.
 
 Supports:
 - 📈 Charts (PNG) – Matplotlib/Seaborn → Supabase storage
-- 📄 PDF Reports – Multi-page documents with charts/tables → Supabase storage
+- 📄 Professional PDFs – Multi-page documents with advanced layouts → Supabase storage
 - 📝 Word Documents (DOCX) – Formatted with images → Supabase storage
 - 📊 Data Export (CSV/Excel) → Supabase storage
 - 🔍 Data Analysis – pandas, numpy, yfinance, etc.
 
+🎨 **PDF Capabilities:**
+• **Business Documents:** Pitch decks, business plans, investor briefs, marketing reports, company profiles
+• **Technical Documents:** Architecture diagrams, API docs, developer guides, system design walkthroughs, SOPs
+• **Academic/Research:** Essays, research summaries, documentation with charts/tables
+• **Reports & Analytics:** Invoice PDFs, financial summaries, dashboards, analytics reports, usage reports
+• **Long-form Content:** Ebooks, whitepapers, guides, checklists, tutorials
+• **Design Documents:** CVs/resumes, portfolios, templates
+
+📊 **PDF Elements Supported:**
+• **Text:** Titles, subtitles, paragraphs, bullet lists, numbered lists, blockquotes, code blocks, footnotes
+• **Visuals:** Charts (bar/line/pie/area/scatter), data tables, images (PNG/JPG), icons, logos, diagrams, QR codes
+• **Layout:** Multi-page content, columns, colored headers, dividers, margins, page numbers, headers/footers
+• **Styling:** Custom fonts (including CJK), brand colors, bold/italic/underline, line spacing, background colors
+
 ⚠️ **CRITICAL FILE SAVING INSTRUCTIONS** ⚠️
 - **ALWAYS use explicit file paths** - Do NOT rely on current working directory
 - **Charts**: Use \`plt.savefig('/pipilot/filename.png')\` followed by \`plt.close()\`
-- **PDFs**: Use \`with PdfPages('/pipilot/filename.pdf') as pdf:\` or \`plt.savefig('/pipilot/filename.pdf')\`
+- **PDFs**: Use reportlab for advanced PDFs: \`from reportlab.pdfgen import canvas\` or \`from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table\`
 - **DOCX**: Use \`doc.save('/pipilot/filename.docx')\`
 - **CSV/Excel**: Use \`df.to_csv('/pipilot/filename.csv')\` or \`df.to_excel('/pipilot/filename.xlsx')\`
 - **Multiple files**: Save each file with unique names in /pipilot/ directory
-- **plt.show()**: Will be captured automatically as additional PNG files
 - **NEVER use relative paths** - Always use absolute paths starting with /pipilot/
 
 Result must be Markdown formatted for proper display:
@@ -8302,7 +8315,7 @@ Result must be Markdown formatted for proper display:
 **Note:** All files are stored in Supabase 'documents' bucket with permanent public URLs. Files are automatically deleted after 5 minutes via scheduled cleanup.`
 ,
         inputSchema: z.object({
-          code: z.string().describe('Python code to execute in E2B sandbox. ⚠️ CRITICAL: All file outputs MUST use absolute paths starting with /pipilot/ - Charts: plt.savefig(\'/pipilot/filename.png\'); CSVs: df.to_csv(\'/pipilot/filename.csv\'); PDFs: plt.savefig(\'/pipilot/filename.pdf\'); DOCX: doc.save(\'/pipilot/filename.docx\'). Always call plt.close() after charts. Matplotlib plt.show() results are captured automatically as additional PNG files.')
+          code: z.string().describe('Python code to execute in E2B sandbox. ⚠️ CRITICAL: All file outputs MUST use absolute paths starting with /pipilot/ - Charts: plt.savefig(\'/pipilot/filename.png\'); CSVs: df.to_csv(\'/pipilot/filename.csv\'); PDFs: plt.savefig(\'/pipilot/filename.pdf\'); DOCX: doc.save(\'/pipilot/filename.docx\'). Always call plt.close() after charts.')
         }),
         execute: async ({ code }, { abortSignal, toolCallId }) => {
           const toolStartTime = Date.now();
