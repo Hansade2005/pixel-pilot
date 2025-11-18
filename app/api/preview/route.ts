@@ -43,16 +43,21 @@ INSTRUCTIONS:
 - Use "${basePath}" as the base path for all assets
 - Do not change any other content
 - Preserve all HTML structure, attributes, and formatting
-- Return ONLY the fixed HTML content, no explanations
+- Return ONLY the fixed HTML content with NO markdown formatting, NO code blocks, NO explanations
+- Do NOT wrap the output in \`\`\`html or any other markdown syntax
 
 EXAMPLE:
 Input: <link href="/assets/style.css">
-Output: <link href="./assets/style.css">
-
-FIXED HTML:`
+Output: <link href="./assets/style.css">`
     })
 
-    return result.text.trim()
+    // Clean the response by removing any markdown code blocks
+    let cleanedResult = result.text.trim()
+    
+    // Remove markdown code block wrappers if present
+    cleanedResult = cleanedResult.replace(/^```html\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '')
+    
+    return cleanedResult
   } catch (error) {
     console.warn('[Vite Hosting] AI HTML processing failed, falling back to regex:', error)
     // Fallback to regex if AI fails
