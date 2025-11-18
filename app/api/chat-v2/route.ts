@@ -8209,7 +8209,7 @@ ${conversationSummaryContext || ''}`
 
       generate_report: tool({
         description:`📊 PiPilot Data Visualization & Professional Document Generator Run Python code in a secure sandbox to create comprehensive charts, reports, and multi-format documents. Files are automatically uploaded to Supabase storage and public download links are provided.
-Pre-installed libraries: jupyter, numpy, pandas, matplotlib, seaborn, plotly (not supported yet), reportlab, python-docx, openpyxl  needs to be installed and used  for advanced document generation.
+Pre-installed libraries: jupyter, numpy, pandas, matplotlib, seaborn, plotly (not supported yet), reportlab, python-docx and  openpyxl(needs to be installed and used  for advanced document generation).
 
 Supports:
 - 📈 Charts (PNG) – Matplotlib/Seaborn → Supabase storage

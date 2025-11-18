@@ -634,6 +634,10 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                         setCurrentLog("🗜️ Optimizing bundle size...")
                       } else if (msg.message.includes("preview") || msg.message.includes("start")) {
                         setCurrentLog("🚀 Starting production server...")
+                      } else if (msg.message.includes("next dev") || msg.message.includes("pnpm dev") || msg.message.includes("npm run dev")) {
+                        setCurrentLog("🚀 Starting Next.js development server...")
+                      } else if (msg.message.includes("compiled successfully") || msg.message.includes("ready")) {
+                        setCurrentLog("✅ Next.js dev server ready...")
                       }
                       
                       // Vite detection - very specific
