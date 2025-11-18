@@ -1,0 +1,54 @@
+import { NextResponse, NextRequest } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+// Supabase configuration for documents storage
+const SUPABASE_CONFIG = {
+  URL: "https://dlunpilhklsgvkegnnlp.supabase.co",
+  ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsdW5waWxoa2xzZ3ZrZWdubmxwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwNTA0MTksImV4cCI6MjA3MDYyNjQxOX0.rhLN_bhvH9IWPkyHiohrOQbY9D34RSeSLzURhAyZPds",
+};
+
+// Serves files from Supabase Storage bucket "documents" with SPA fallback
+export async function GET(request: NextRequest, { params }: { params: { path: string[] } }) {
+  try {
+    const path = params.path || [];
+    const joinedPath = Array.isArray(path) && path.length > 0 ? path.join('/') : 'index.html';
+
+    const supabase = createClient(SUPABASE_CONFIG.URL, SUPABASE_CONFIG.ANON_KEY);
+
+    const storagePath = `testsite/${joinedPath}`;
+    const { data, error } = await supabase.storage.from('documents').download(storagePath);
+
+    // If file not found and looks like SPA route, fallback to index.html
+    if (error) {
+      const fallback = await supabase.storage.from('documents').download('testsite/index.html');
+      if (!fallback.error) {
+        const indexBuffer = await fallback.data.arrayBuffer();
+        return new NextResponse(Buffer.from(indexBuffer), {
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        });
+      }
+      return new NextResponse('Not found', { status: 404 });
+    }
+
+    const arrayBuffer = await data.arrayBuffer();
+    const contentType = detectContentType(joinedPath);
+    return new NextResponse(Buffer.from(arrayBuffer), {
+      headers: { 'Content-Type': contentType },
+    });
+  } catch (e) {
+    return new NextResponse(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`, { status: 500 });
+  }
+}
+
+function detectContentType(path: string) {
+  const lower = path.toLowerCase();
+  if (lower.endsWith('.html')) return 'text/html; charset=utf-8';
+  if (lower.endsWith('.css')) return 'text/css; charset=utf-8';
+  if (lower.endsWith('.js')) return 'application/javascript; charset=utf-8';
+  if (lower.endsWith('.json')) return 'application/json; charset=utf-8';
+  if (lower.endsWith('.svg')) return 'image/svg+xml';
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  return 'application/octet-stream';
+}

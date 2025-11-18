@@ -10,6 +10,66 @@ import { filterUnwantedFiles } from '@/lib/utils'
 import JSZip from 'jszip'
 import lz4 from 'lz4js'
 
+// Function to upload built Vite files to Supabase storage
+async function uploadViteBuildToSupabase(sandbox: any, projectId: string, supabase: any) {
+  try {
+    console.log('[Vite Hosting] Starting upload of built files...')
+    
+    // List files in the dist directory
+    const distFiles = await sandbox.listDir('/project/dist')
+    console.log(`[Vite Hosting] Found ${distFiles.length} files in dist directory`)
+    
+    // Upload each file to Supabase storage
+    for (const file of distFiles) {
+      if (file.is_file) {
+        try {
+          // Read file content from sandbox
+          const fileContent = await sandbox.readFile(`/project/dist/${file.name}`)
+          
+          // Determine content type
+          const contentType = getContentType(file.name)
+          
+          // Upload to Supabase storage
+          const { data, error } = await supabase.storage
+            .from('sites')
+            .upload(`${projectId}/files/${file.name}`, fileContent, {
+              contentType,
+              upsert: true
+            })
+          
+          if (error) {
+            console.error(`[Vite Hosting] Error uploading ${file.name}:`, error)
+          } else {
+            console.log(`[Vite Hosting] Uploaded ${file.name}`)
+          }
+        } catch (fileError) {
+          console.error(`[Vite Hosting] Error processing ${file.name}:`, fileError)
+        }
+      }
+    }
+    
+    console.log('[Vite Hosting] Upload completed')
+    return true
+  } catch (error) {
+    console.error('[Vite Hosting] Upload failed:', error)
+    return false
+  }
+}
+
+// Helper function to determine content type
+function getContentType(fileName: string): string {
+  const lower = fileName.toLowerCase()
+  if (lower.endsWith('.html')) return 'text/html; charset=utf-8'
+  if (lower.endsWith('.css')) return 'text/css; charset=utf-8'
+  if (lower.endsWith('.js')) return 'application/javascript; charset=utf-8'
+  if (lower.endsWith('.json')) return 'application/json; charset=utf-8'
+  if (lower.endsWith('.svg')) return 'image/svg+xml'
+  if (lower.endsWith('.png')) return 'image/png'
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg'
+  if (lower.endsWith('.webp')) return 'image/webp'
+  return 'application/octet-stream'
+}
+
 /**
  * Parse environment variables from .env file content
  * @param content The content of the .env file
@@ -614,19 +674,46 @@ devDependencies:
           buildCommand = `${packageManager} run dev`
         }
       } else if (hasViteConfig || packageJson?.scripts?.preview) {
-        // Vite project
-        if (packageJson?.scripts?.preview) {
-          // Check if preview script already has port specification
-          const previewScript = packageJson.scripts.preview
-          if (!previewScript.includes('--port') && !previewScript.includes('PORT=')) {
-            // Use npm run with port argument
-            buildCommand = `${packageManager} run build && ${packageManager} run preview -- --port 3000`
-          } else {
-            buildCommand = `${packageManager} run build && ${packageManager} run preview`
-          }
-        } else {
-          buildCommand = `${packageManager} run build && PORT=3000 ${packageManager} run preview`
+        // Vite project - build and host on Supabase storage
+        console.log('[Preview] Detected Vite project, will build and host on Supabase')
+        
+        // Build the project first
+        const buildCommand = `${packageManager} run build`
+        console.log(`[Preview] Building Vite project with: ${buildCommand}`)
+        const buildResult = await sandbox.executeCommand(buildCommand, {
+          workingDirectory: '/project',
+          timeoutMs: 300000, // 5 minutes for build
+          envVars,
+          onStdout: (data) => console.log(`[Preview] Build stdout: ${data.trim()}`),
+          onStderr: (data) => console.error(`[Preview] Build stderr: ${data.trim()}`)
+        })
+        
+        if (buildResult.exitCode !== 0) {
+          console.error('[Preview] Build failed:', buildResult.stderr)
+          throw new Error(`Vite build failed: ${buildResult.stderr}`)
         }
+        
+        console.log('[Preview] Build completed successfully')
+        
+        // Upload built files to Supabase
+        const supabase = await createClient()
+        const uploadSuccess = await uploadViteBuildToSupabase(sandbox, projectId, supabase)
+        
+        if (!uploadSuccess) {
+          throw new Error('Failed to upload built files to hosting')
+        }
+        
+        // Return hosted URL instead of sandbox URL
+        const hostedUrl = `/sites/${projectId}/index.html`
+        
+        console.log(`[Preview] Vite project hosted at: ${hostedUrl}`)
+        
+        return Response.json({
+          sandboxId: sandbox.id,
+          url: hostedUrl,
+          processId: null, // No process for hosted version
+          hosted: true // Flag to indicate this is hosted
+        })
       }
 
       // Build and start production server with enhanced monitoring and environment variables
