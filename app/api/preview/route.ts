@@ -42,8 +42,8 @@ async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supa
           
           // Upload to Supabase storage
           const { data, error } = await supabase.storage
-            .from('sites')
-            .upload(`${projectSlug}/files/${file.name}`, content, {
+            .from('documents')
+            .upload(`sites/${projectSlug}/files/${file.name}`, content, {
               contentType,
               upsert: true
             })
@@ -391,7 +391,7 @@ async function handleStreamingPreview(req: Request) {
             }
             
             // Return hosted URL instead of sandbox URL
-            const hostedUrl = `/sites/${projectSlug}/index.html`
+            const hostedUrl = `https://pipilot.dev/sites/${projectSlug}/index.html`
             
             send({ type: "log", message: `Vite project hosted at: ${hostedUrl}` })
             
