@@ -41,6 +41,30 @@ export async function middleware(request: NextRequest) {
     })
   }
 
+  // Handle multi-tenant subdomain routing
+  const hostname = request.headers.get('host') || '';
+  const subdomain = getSubdomain(hostname);
+
+  // If we have a subdomain, rewrite to the sites route
+  if (subdomain) {
+    const url = request.nextUrl.clone();
+
+    // For root requests to subdomains, explicitly serve index.html
+    const originalPath = request.nextUrl.pathname;
+    const targetPath = originalPath === '/' ? `/sites/${subdomain}/index.html` : `/sites/${subdomain}${originalPath}`;
+
+    url.pathname = targetPath;
+
+    console.log(`[Multi-tenant] Rewriting ${hostname}${originalPath} → ${targetPath}`);
+
+    const rewriteResponse = NextResponse.rewrite(url);
+    rewriteResponse.headers.set('Access-Control-Allow-Origin', '*')
+    rewriteResponse.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+    rewriteResponse.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+
+    return rewriteResponse;
+  }
+
   // Create a response object to mutate
   let response = NextResponse.next({
     request: {

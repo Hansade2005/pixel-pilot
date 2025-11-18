@@ -1,27 +1,14 @@
 {
   "rewrites": [
     {
-      "source": "/(.*)",
-      "destination": "/sites/:subdomain/$1",
-      "has": [
-        {
-          "type": "host",
-          "value": "(?<subdomain>[^.]+)\\.pipilot\\.dev"
-        }
-      ]
-    },
-    {
       "source": "/sites/:siteId",
       "destination": "/sites/:siteId/index.html"
     },
     {
       "source": "/sites/:siteId/",
       "destination": "/sites/:siteId/index.html"
-    },
-    {
-      "source": "/sites/:siteId/(.*)",
-      "destination": "/sites/:siteId/index.html"
-    }
+    }, 
+   { "source": "/sites/:siteId/(.*)", "destination": "/sites/:siteId/index.html" }
   ],
   "headers": [
     {
