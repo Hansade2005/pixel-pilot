@@ -184,22 +184,22 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
     setConsoleOutput(prev => [...prev, `[${timestamp}] ${typeIcon} [${typeLabel}] ${message}`])
 
     // Update currentLog with server messages when preview is loading or recently ready
-    if (type === 'server' && (preview?.isLoading || (preview?.url && !preview?.isLoading))) {
+    if (type === 'server' && (preview.isLoading || (preview.url && !preview.isLoading))) {
       setCurrentLog(message)
     }
   }
 
   useEffect(() => {
-    if (preview?.url) {
-      setCustomUrl(preview?.url)
+    if (preview.url) {
+      setCustomUrl(preview.url)
       // Dispatch URL change event
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('preview-url-changed', { 
-          detail: { url: preview?.url } 
+          detail: { url: preview.url } 
         }))
       }
     }
-  }, [preview?.url])
+  }, [preview.url])
 
   // Auto-scroll console to bottom when new output arrives
   useEffect(() => {
@@ -467,7 +467,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   // Cleanup sandbox, stream, background process, log interval, and EventSource on unmount only
   useEffect(() => {
     return () => {
-      if (preview?.sandboxId) {
+      if (preview.sandboxId) {
         cleanupSandbox()
       }
       // Close stream reader if it exists
@@ -597,54 +597,27 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                     }
 
                     if (msg.type === "ready") {
-                      // Check if this is a hosted preview (Vite build uploaded to Supabase)
-                      const isHosted = msg.hosted === true;
+                      // Server is ready, but we'll wait for "Production server running" message
+                      // before actually loading the URL in the iframe
+                      addConsoleLog("✅ Server ready", 'server')
                       
-                      if (isHosted) {
-                        // For hosted previews, the URL is immediately available
-                        addConsoleLog("✅ Vite project hosted and ready!", 'server')
-                        
-                        setPreview(prev => ({
-                          ...prev,
-                          sandboxId: msg.sandboxId,
-                          url: msg.url,
-                          processId: msg.processId,
-                          isLoading: false, // Mark as not loading since it's ready
-                        }))
-                        
-                        setCurrentLog("🎉 Hosted preview ready!")
-                        
-                        // Dispatch preview ready event immediately for hosted previews
-                        if (typeof window !== 'undefined') {
-                          window.dispatchEvent(new CustomEvent('preview-ready', { 
-                            detail: { url: msg.url, hosted: true } 
-                          }))
-                        }
-                        
-                        // Auto-open console for hosted previews too
-                        setIsConsoleOpen(true)
-                      } else {
-                        // For regular server previews, wait for actual server start
-                        addConsoleLog("✅ Server ready", 'server')
-                        
-                        // Store the preview data but keep loading state
-                        setPreview(prev => ({
-                          ...prev,
-                          sandboxId: msg.sandboxId,
-                          url: msg.url,
-                          processId: msg.processId,
-                          isLoading: true, // Keep loading until build completes
-                        }))
+                      // Store the preview data but keep loading state
+                      setPreview(prev => ({
+                        ...prev,
+                        sandboxId: msg.sandboxId,
+                        url: msg.url,
+                        processId: msg.processId,
+                        isLoading: true, // Keep loading until build completes
+                      }))
 
-                        // Set custom loading message for the build phase
-                        setCurrentLog("🏗️ Building production bundle...")
+                      // Set custom loading message for the build phase
+                      setCurrentLog("🏗️ Building production bundle...")
 
-                        // Start E2B log streaming for runtime logs
-                        startE2BLogStreaming(msg.sandboxId, msg.processId)
+                      // Start E2B log streaming for runtime logs
+                      startE2BLogStreaming(msg.sandboxId, msg.processId)
 
-                        // Auto-open console when server is ready
-                        setIsConsoleOpen(true)
-                      }
+                      // Auto-open console when server is ready
+                      setIsConsoleOpen(true)
                       // DON'T break here - keep the stream open for continuous logs
                     }
 
@@ -685,12 +658,12 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                         setPreview(prev => ({ ...prev, isLoading: false }))
                         
                         // Dispatch preview ready event NOW
-                        if (typeof window !== 'undefined' && preview?.sandboxId && preview?.url) {
+                        if (typeof window !== 'undefined' && preview.sandboxId && preview.url) {
                           window.dispatchEvent(new CustomEvent('preview-ready', { 
                             detail: { preview: { 
-                              sandboxId: preview?.sandboxId,
-                              url: preview?.url,
-                              processId: preview?.processId,
+                              sandboxId: preview.sandboxId,
+                              url: preview.url,
+                              processId: preview.processId,
                               isLoading: false
                             } } 
                           }))
@@ -735,7 +708,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   }
 
   const cleanupSandbox = async () => {
-    if (!preview?.sandboxId) return
+    if (!preview.sandboxId) return
 
     // Close the stream reader if it exists
     if (streamReader) {
@@ -747,7 +720,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       await fetch('/api/preview', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sandboxId: preview?.sandboxId }),
+        body: JSON.stringify({ sandboxId: preview.sandboxId }),
       })
     } catch (error) {
       console.error('Error cleaning up sandbox:', error)
@@ -772,7 +745,7 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
   }
 
   const refreshPreview = () => {
-    if (preview?.url) {
+    if (preview.url) {
       // Force iframe reload
       const iframe = document.querySelector('#preview-iframe') as HTMLIFrameElement
       if (iframe) {
@@ -1501,7 +1474,7 @@ export default function TodoApp() {
         ) : activeTab === "preview" ? (
           <WebPreview
             className="h-full"
-            defaultUrl={syncedUrl || preview?.url || ""}
+            defaultUrl={syncedUrl || preview.url || ""}
             defaultDevice={previewViewMode === 'mobile' ? DEVICE_PRESETS.find(d => d.name === 'iPhone 12/13') || null : null}
             onUrlChange={(url) => {
               setCustomUrl(url)
@@ -1546,24 +1519,24 @@ export default function TodoApp() {
               <WebPreviewUrl
                 onRefresh={refreshPreview}
                 onOpenExternal={() => {
-                  if (preview?.url) {
+                  if (preview.url) {
                     window.open(preview.url, '_blank')
                   }
                 }}
-                refreshDisabled={!preview?.url}
-                externalDisabled={!preview?.url}
+                refreshDisabled={!preview.url}
+                externalDisabled={!preview.url}
               />
               <WebPreviewNavigationButton
                 onClick={createPreview}
-                disabled={!project || preview?.isLoading}
+                disabled={!project || preview.isLoading}
                 tooltip="Start Preview"
               >
                 <Play className="h-4 w-4" />
               </WebPreviewNavigationButton>
-              {preview?.sandboxId && (
+              {preview.sandboxId && (
                 <WebPreviewNavigationButton
                   onClick={cleanupSandbox}
-                  disabled={!preview?.sandboxId}
+                  disabled={!preview.sandboxId}
                   tooltip="Stop Preview"
                 >
                   <Square className="h-4 w-4" />
@@ -1572,7 +1545,7 @@ export default function TodoApp() {
             </WebPreviewNavigation>
 
             <div className="flex-1 min-h-0">
-              {preview?.isLoading ? (
+              {preview.isLoading ? (
                 <div className="h-full flex items-center justify-center">
                   <div className="text-center p-8">
                     <div className="relative w-24 h-24 mx-auto mb-6">
@@ -1589,7 +1562,7 @@ export default function TodoApp() {
                     </p>
                   </div>
                 </div>
-              ) : preview?.url ? (
+              ) : preview.url ? (
                 <WebPreviewBody
                   className="h-full"
                   src={preview.url}
@@ -1607,7 +1580,7 @@ export default function TodoApp() {
                     <p className="text-muted-foreground mb-4">Click "Start Preview" to see your app running</p>
                     <Button
                       onClick={createPreview}
-                      disabled={!project || preview?.isLoading}
+                      disabled={!project || preview.isLoading}
                       className="rounded-full px-6"
                     >
                       <Play className="h-4 w-4 mr-2" />
