@@ -9,6 +9,19 @@ import {
 import { filterUnwantedFiles } from '@/lib/utils'
 import JSZip from 'jszip'
 import lz4 from 'lz4js'
+import { createClient as createExternalClient } from '@supabase/supabase-js'
+
+// External Supabase configuration for file uploads (same as upload-test-site.js)
+const EXTERNAL_SUPABASE_CONFIG = {
+  URL: 'https://dlunpilhklsgvkegnnlp.supabase.co',
+  SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsdW5waWxoa2xzZ3ZrZWdubmxwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTA1MDQxOSwiZXhwIjoyMDcwNjI2NDE5fQ.k-2OJ4p3hr9feR4ks54OQM2HhOhaVJ3pUK-20tGJwpo'
+}
+
+// Create external Supabase client for file uploads
+const externalSupabase = createExternalClient(
+  EXTERNAL_SUPABASE_CONFIG.URL, 
+  EXTERNAL_SUPABASE_CONFIG.SERVICE_ROLE_KEY
+)
 
 // Function to upload built Vite files to Supabase storage
 // Helper function to recursively collect all files from a directory
@@ -409,8 +422,7 @@ async function handleStreamingPreview(req: Request) {
             send({ type: "log", message: "Build completed successfully" })
             
             // Upload built files to Supabase
-            const supabase = await createClient()
-            const uploadSuccess = await uploadViteBuildToSupabase(sandbox, projectSlug, supabase)
+            const uploadSuccess = await uploadViteBuildToSupabase(sandbox, projectSlug, externalSupabase)
             
             if (!uploadSuccess) {
               send({ type: "error", message: "Failed to upload built files to hosting" })
@@ -790,8 +802,7 @@ devDependencies:
         console.log('[Preview] Build completed successfully')
         
         // Upload built files to Supabase
-        const supabase = await createClient()
-        const uploadSuccess = await uploadViteBuildToSupabase(sandbox, projectSlug, supabase)
+        const uploadSuccess = await uploadViteBuildToSupabase(sandbox, projectSlug, externalSupabase)
         
         if (!uploadSuccess) {
           throw new Error('Failed to upload built files to hosting')

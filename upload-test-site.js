@@ -6,6 +6,13 @@ const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3Mi
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+function getContentType(fileName) {
+  if (fileName.endsWith('.html')) return 'text/html';
+  if (fileName.endsWith('.css')) return 'text/css';
+  if (fileName.endsWith('.js')) return 'application/javascript';
+  return 'text/plain';
+}
+
 async function uploadFile(bucket, filePath, fileName) {
   const fileContent = fs.readFileSync(filePath);
   const { data, error } = await supabase.storage
@@ -24,11 +31,38 @@ async function uploadFile(bucket, filePath, fileName) {
   return data;
 }
 
-function getContentType(fileName) {
-  if (fileName.endsWith('.html')) return 'text/html';
-  if (fileName.endsWith('.css')) return 'text/css';
-  if (fileName.endsWith('.js')) return 'application/javascript';
-  return 'text/plain';
+async function downloadFile(bucket, fileName) {
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .download(`testsite/${fileName}`);
+
+  if (error) {
+    console.error(`Error downloading ${fileName}:`, error);
+    return null;
+  }
+
+  console.log(`Downloaded ${fileName}:`, data.size, 'bytes');
+  return data;
+}
+
+async function testFileDownload(bucket, fileName) {
+  console.log(`\n--- Testing download of ${fileName} ---`);
+  const downloadedData = await downloadFile(bucket, fileName);
+  
+  if (downloadedData) {
+    // Convert to text for small files to verify content
+    const text = await downloadedData.text();
+    console.log(`Content preview (${fileName}):`, text.substring(0, 100) + (text.length > 100 ? '...' : ''));
+    
+    // Also test getting public URL
+    const { data: urlData } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(`testsite/${fileName}`);
+    
+    console.log(`Public URL (${fileName}):`, urlData.publicUrl);
+    return true;
+  }
+  return false;
 }
 
 async function main() {
@@ -40,11 +74,17 @@ async function main() {
     { path: './testsite/script.js', name: 'script.js' }
   ];
 
+  console.log('--- Starting file upload tests ---');
   for (const file of files) {
     await uploadFile(bucket, file.path, file.name);
   }
 
-  console.log('All files uploaded successfully.');
+  console.log('\n--- Starting file download tests ---');
+  for (const file of files) {
+    await testFileDownload(bucket, file.name);
+  }
+
+  console.log('\nAll upload and download tests completed successfully.');
 }
 
 main();
