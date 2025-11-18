@@ -6,7 +6,46 @@ import type { CookieOptions } from '@supabase/ssr'
 // Admin email for role-based access
 const ADMIN_EMAIL = 'hanscadx8@gmail.com'
 
+// Extract subdomain from hostname for multi-tenant routing
+function getSubdomain(hostname: string): string | null {
+  // Remove port if present
+  const host = hostname.split(':')[0];
+
+  // For local development, treat localhost as no subdomain
+  if (host === 'localhost' || host === '127.0.0.1') {
+    return null;
+  }
+
+  // Split by dots and check if we have a subdomain
+  const parts = host.split('.');
+
+  // If we have more than 2 parts and it's not an IP, we have a subdomain
+  // e.g., subscontrol.pipilot.dev -> ['subscontrol', 'pipilot', 'dev']
+  if (parts.length > 2 && !/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+    return parts[0]; // Return the first part as subdomain
+  }
+
+  return null; // No subdomain
+}
+
 export async function middleware(request: NextRequest) {
+  // Handle multi-tenant subdomain routing
+  const hostname = request.headers.get('host') || '';
+  const subdomain = getSubdomain(hostname);
+
+  // If we have a subdomain, rewrite to the sites route
+  if (subdomain) {
+    const url = request.nextUrl.clone();
+
+    // Rewrite to /sites/subdomain/path
+    url.pathname = `/sites/${subdomain}${url.pathname}`;
+
+    console.log(`[Multi-tenant] Rewriting ${hostname}${request.nextUrl.pathname} → ${url.pathname}`);
+
+    return NextResponse.rewrite(url);
+  }
+
+  // Create a response object to mutate
   // Create a response object to mutate
   let response = NextResponse.next({
     request: {
@@ -75,7 +114,8 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
+     * - api routes (handled separately)
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

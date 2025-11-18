@@ -7,16 +7,53 @@ const SUPABASE_CONFIG = {
   SERVICE_ROLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsdW5waWxoa2xzZ3ZrZWdubmxwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NTA1MDQxOSwiZXhwIjoyMDcwNjI2NDE5fQ.k-2OJ4p3hr9feR4ks54OQM2HhOhaVJ3pUK-20tGJwpo",
 };
 
+// Extract subdomain from hostname for multi-tenant routing
+function getSubdomain(hostname: string): string | null {
+  // Remove port if present
+  const host = hostname.split(':')[0];
+  
+  // For local development, treat localhost as no subdomain
+  if (host === 'localhost' || host === '127.0.0.1') {
+    return null;
+  }
+  
+  // Split by dots and check if we have a subdomain
+  const parts = host.split('.');
+  
+  // If we have more than 2 parts and it's not an IP, we have a subdomain
+  // e.g., subscontrol.pipilot.dev -> ['subscontrol', 'pipilot', 'dev']
+  if (parts.length > 2 && !/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+    return parts[0]; // Return the first part as subdomain
+  }
+  
+  return null; // No subdomain
+}
+
 // Serves files from Supabase Storage bucket "sites" with SPA fallback
 export async function GET(request: NextRequest, { params }: { params: { path: string[] } }) {
   try {
+    const hostname = request.headers.get('host') || '';
     const path = params.path || [];
-    if (path.length === 0) {
-      return new NextResponse('Site ID required', { status: 400 });
+    
+    // Extract subdomain for multi-tenant routing
+    const subdomain = getSubdomain(hostname);
+    
+    let siteId: string;
+    let filePath: string[];
+    
+    if (subdomain) {
+      // Multi-tenant subdomain mode: subdomain.pipilot.dev/path
+      siteId = subdomain;
+      filePath = path; // Use the path as-is
+    } else {
+      // Legacy slug mode: pipilot.dev/sites/siteId/path
+      if (path.length === 0) {
+        return new NextResponse('Site ID required', { status: 400 });
+      }
+      siteId = path[0];
+      filePath = path.slice(1);
     }
-
-    const siteId = path[0];
-    const filePath = path.slice(1);
+    
     const joinedPath = filePath.join('/') || 'index.html';
 
     const supabase = createClient(SUPABASE_CONFIG.URL, SUPABASE_CONFIG.SERVICE_ROLE_KEY);

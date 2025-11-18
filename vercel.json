@@ -9,6 +9,17 @@
       "destination": "/sites/:siteId/index.html"
     }
   ],
+  "headers": [
+    {
+      "source": "/sites/(.*)",
+      "headers": [
+        {
+          "key": "X-Multi-Tenant",
+          "value": "true"
+        }
+      ]
+    }
+  ],
   "crons": [
     {
       "path": "/api/cron/send-notifications",
