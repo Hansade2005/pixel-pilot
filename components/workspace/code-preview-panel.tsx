@@ -597,27 +597,54 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                     }
 
                     if (msg.type === "ready") {
-                      // Server is ready, but we'll wait for "Production server running" message
-                      // before actually loading the URL in the iframe
-                      addConsoleLog("✅ Server ready", 'server')
+                      // Check if this is a hosted preview (Vite build uploaded to Supabase)
+                      const isHosted = msg.hosted === true;
                       
-                      // Store the preview data but keep loading state
-                      setPreview(prev => ({
-                        ...prev,
-                        sandboxId: msg.sandboxId,
-                        url: msg.url,
-                        processId: msg.processId,
-                        isLoading: true, // Keep loading until build completes
-                      }))
+                      if (isHosted) {
+                        // For hosted previews, the URL is immediately available
+                        addConsoleLog("✅ Vite project hosted and ready!", 'server')
+                        
+                        setPreview(prev => ({
+                          ...prev,
+                          sandboxId: msg.sandboxId,
+                          url: msg.url,
+                          processId: msg.processId,
+                          isLoading: false, // Mark as not loading since it's ready
+                        }))
+                        
+                        setCurrentLog("🎉 Hosted preview ready!")
+                        
+                        // Dispatch preview ready event immediately for hosted previews
+                        if (typeof window !== 'undefined') {
+                          window.dispatchEvent(new CustomEvent('preview-ready', { 
+                            detail: { url: msg.url, hosted: true } 
+                          }))
+                        }
+                        
+                        // Auto-open console for hosted previews too
+                        setIsConsoleOpen(true)
+                      } else {
+                        // For regular server previews, wait for actual server start
+                        addConsoleLog("✅ Server ready", 'server')
+                        
+                        // Store the preview data but keep loading state
+                        setPreview(prev => ({
+                          ...prev,
+                          sandboxId: msg.sandboxId,
+                          url: msg.url,
+                          processId: msg.processId,
+                          isLoading: true, // Keep loading until build completes
+                        }))
 
-                      // Set custom loading message for the build phase
-                      setCurrentLog("🏗️ Building production bundle...")
+                        // Set custom loading message for the build phase
+                        setCurrentLog("🏗️ Building production bundle...")
 
-                      // Start E2B log streaming for runtime logs
-                      startE2BLogStreaming(msg.sandboxId, msg.processId)
+                        // Start E2B log streaming for runtime logs
+                        startE2BLogStreaming(msg.sandboxId, msg.processId)
 
-                      // Auto-open console when server is ready
-                      setIsConsoleOpen(true)
+                        // Auto-open console when server is ready
+                        setIsConsoleOpen(true)
+                      }
                       // DON'T break here - keep the stream open for continuous logs
                     }
 

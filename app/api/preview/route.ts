@@ -484,7 +484,7 @@ async function handleStreamingPreview(req: Request) {
             }
             
             // Return hosted URL instead of sandbox URL
-            const hostedUrl = `https://pipilot.dev/sites/${projectSlug}/index.html`
+            const hostedUrl = `https://${projectSlug}.pipilot.dev/`
             
             send({ type: "log", message: `Vite project hosted at: ${hostedUrl}` })
             
@@ -863,7 +863,7 @@ devDependencies:
         }
         
         // Return hosted URL instead of sandbox URL
-        const hostedUrl = `https://pipilot.dev/sites/${projectSlug}/index.html`
+        const hostedUrl = `https://${projectSlug}.pipilot.dev/`
         
         console.log(`[Preview] Vite project hosted at: ${hostedUrl}`)
         
