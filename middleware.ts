@@ -70,7 +70,6 @@ export async function middleware(request: NextRequest) {
   }
 
   // Create a response object to mutate
-  // Create a response object to mutate
   let response = NextResponse.next({
     request: {
       headers: request.headers,
