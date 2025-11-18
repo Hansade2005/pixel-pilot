@@ -16,12 +16,16 @@ function getSubdomain(hostname: string): string | null {
     return null;
   }
 
+  // Only apply subdomain routing for pipilot.dev domains
+  if (!host.endsWith('pipilot.dev')) {
+    return null;
+  }
+
   // Split by dots and check if we have a subdomain
   const parts = host.split('.');
 
-  // If we have more than 2 parts and it's not an IP, we have a subdomain
-  // e.g., subscontrol.pipilot.dev -> ['subscontrol', 'pipilot', 'dev']
-  if (parts.length > 2 && !/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+  // If we have more than 2 parts, we have a subdomain
+  if (parts.length > 2) {
     return parts[0]; // Return the first part as subdomain
   }
 
@@ -29,6 +33,18 @@ function getSubdomain(hostname: string): string | null {
 }
 
 export async function middleware(request: NextRequest) {
+  // Handle CORS preflight requests
+  if (request.method === 'OPTIONS') {
+    return new NextResponse(null, {
+      status: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
+    })
+  }
+
   // Handle multi-tenant subdomain routing
   const hostname = request.headers.get('host') || '';
   const subdomain = getSubdomain(hostname);
@@ -45,7 +61,12 @@ export async function middleware(request: NextRequest) {
 
     console.log(`[Multi-tenant] Rewriting ${hostname}${originalPath} → ${targetPath}`);
 
-    return NextResponse.rewrite(url);
+    const rewriteResponse = NextResponse.rewrite(url);
+    rewriteResponse.headers.set('Access-Control-Allow-Origin', '*')
+    rewriteResponse.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+    rewriteResponse.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+
+    return rewriteResponse;
   }
 
   // Create a response object to mutate
@@ -106,6 +127,11 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Add CORS headers to all responses
+  response.headers.set('Access-Control-Allow-Origin', '*')
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+
   return response
 }
 
@@ -117,8 +143,7 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
-     * - api routes (handled separately)
      */
-    '/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
