@@ -15,16 +15,27 @@ async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supa
   try {
     console.log('[Vite Hosting] Starting upload of built files...')
     
-    // List files in the dist directory
-    const distFiles = await sandbox.files.list('/project/dist')
-    console.log(`[Vite Hosting] Found ${distFiles.length} files in dist directory`)
+    // Access the underlying E2B sandbox container (same as generate_report route)
+    const e2bSandbox = sandbox.container || sandbox
     
-    // Upload each file to Supabase storage
-    for (const file of distFiles) {
-      if (file.type === 'file') {
+    // List files in the dist directory using E2B files API (same as generate_report)
+    const files = await e2bSandbox.files.list("/project/dist")
+    
+    // Filter out directories and system files
+    const userFiles = files.filter((file: any) =>
+      file.type === "file" &&
+      !file.name.startsWith('.') &&
+      file.name !== '.gitkeep'
+    )
+    
+    console.log(`[Vite Hosting] Found ${userFiles.length} files in dist directory`)
+    
+    // Upload each file to Supabase storage (same approach as generate_report)
+    for (const file of userFiles) {
+      if (file.type === "file") {
         try {
-          // Read file content from sandbox
-          const fileContent = await sandbox.files.read(file.path)
+          // Read file content from sandbox (same as generate_report)
+          const content = await e2bSandbox.files.read(file.path)
           
           // Determine content type
           const contentType = getContentType(file.name)
@@ -32,7 +43,7 @@ async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supa
           // Upload to Supabase storage
           const { data, error } = await supabase.storage
             .from('sites')
-            .upload(`${projectSlug}/files/${file.name}`, fileContent, {
+            .upload(`${projectSlug}/files/${file.name}`, content, {
               contentType,
               upsert: true
             })
