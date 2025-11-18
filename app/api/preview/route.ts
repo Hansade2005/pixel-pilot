@@ -300,16 +300,11 @@ async function handleStreamingPreview(req: Request) {
 
           // 🔹 Build and start production server
           send({ type: "log", message: "Building and starting production server..." })
-          
-          // Use longer timeout for Next.js projects since they need to build first
-          const isNextJs = hasNextConfig || (packageJson?.dependencies?.next)
-          const serverTimeout = isNextJs ? 0 : 0 // No timeout for streaming (let it run until ready)
-          
           const devServer = await sandbox.startDevServer({
             command: buildCommand,
             workingDirectory: "/project",
             port: 3000,
-            timeoutMs: serverTimeout,
+            timeoutMs: 0,
             envVars,
             onStdout: (data) => send({ type: "log", message: data.trim() }),
             onStderr: (data) => send({ type: "error", message: data.trim() }),
@@ -638,16 +633,11 @@ devDependencies:
 
       // Build and start production server with enhanced monitoring and environment variables
       console.log('Building and starting production server...')
-      
-      // Use longer timeout for Next.js projects since they need to build first
-      const isNextJs = hasNextConfig || (packageJson?.dependencies?.next)
-      const serverTimeout = isNextJs ? 120000 : 30000 // 2 minutes for Next.js, 30 seconds for others
-      
       const devServer = await sandbox.startDevServer({
         command: buildCommand,
         workingDirectory: '/project',
         port: 3000,
-        timeoutMs: serverTimeout,
+        timeoutMs: 0,
         envVars // Pass environment variables
       })
       

@@ -630,32 +630,23 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                         setCurrentLog("⚙️ Transforming modules...")
                       } else if (msg.message.includes("rendering chunks") || msg.message.includes("Generating static pages")) {
                         setCurrentLog("📦 Rendering chunks...")
-                      } else if (msg.message.includes("computing gzip size") || msg.message.includes("Finalizing page optimization") || msg.message.includes("Collecting build traces")) {
-                        setCurrentLog("🏗️ Finalizing build...")
+                      } else if (msg.message.includes("computing gzip size") || msg.message.includes("Finalizing page optimization")) {
+                        setCurrentLog("🗜️ Optimizing bundle size...")
                       } else if (msg.message.includes("preview") || msg.message.includes("start")) {
                         setCurrentLog("🚀 Starting production server...")
                       }
                       
-                      // Regex-based server readiness detection for more robust matching
-
-                      // Vite detection - matches "➜ Local: http://localhost:3000" or similar
-                      const viteReadyRegex = /➜\s+Local:\s+http:\/\/localhost:\d+/
-                      const isViteReady = viteReadyRegex.test(msg.message)
-
-                      // Next.js detection - multiple patterns for build completion and server ready
-                      const nextServerReadyRegex = /- Local:\s+http:\/\/localhost:\d+/
-                      const nextBuildCompleteRegex = /✓?\s*Ready in\s+\d+(\.\d+)?s/
-                      const nextCompilingRegex = /✓?\s*Compiled successfully in\s+\d+(\.\d+)?s/
-
+                      // Vite detection - very specific
+                      const isViteReady = msg.message.includes("➜ Local: http://localhost:")
+                      
+                      // Next.js detection - must have the dash prefix which appears when server actually starts
                       const isNextReady = (
-                        nextServerReadyRegex.test(msg.message) ||     // Primary: "- Local: http://localhost:3000"
-                        nextBuildCompleteRegex.test(msg.message) ||   // Secondary: "✓ Ready in 2.3s" or "Ready in 2.3s"
-                        nextCompilingRegex.test(msg.message)          // Tertiary: "✓ Compiled successfully in 2.3s"
+                        msg.message.includes("- Local:") && msg.message.includes("http://localhost:") ||
+                        msg.message.includes("- Network:") && msg.message.includes("http://")
                       )
-
-                      // Generic detection for custom servers - more flexible pattern
-                      const genericReadyRegex = /Production server running|Server listening|Server started|App listening/i
-                      const isGenericReady = genericReadyRegex.test(msg.message)
+                      
+                      // Generic detection for custom servers
+                      const isGenericReady = msg.message.includes("Production server running")
                       
                       if (isViteReady || isNextReady || isGenericReady) {
                         // Now the server is actually ready to serve content
