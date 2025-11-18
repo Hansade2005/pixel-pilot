@@ -69,8 +69,14 @@ export function filterUnwantedFiles(files: any[]): any[] {
       return false
     }
 
-    // Filter out all .md files except README.md
-    if (extension === 'md' && fileName !== 'readme.md') {
+    // Filter out all .md files except specific important documentation files
+    const importantMdFiles = [
+      'readme.md',
+      'external_app_integration_guide.md',
+      'storage_system_implementation.md',
+      'user_authentication_readme.md'
+    ]
+    if (extension === 'md' && !importantMdFiles.includes(fileName)) {
       return false
     }
 
