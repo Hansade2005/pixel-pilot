@@ -342,51 +342,97 @@ async function handleStreamingPreview(req: Request) {
               buildCommand = `${packageManager} run dev`
             }
           } else if (hasViteConfig || packageJson?.scripts?.preview) {
-            // Vite project
-            if (packageJson?.scripts?.preview) {
-              // Check if preview script already has port specification
-              const previewScript = packageJson.scripts.preview
-              if (!previewScript.includes('--port') && !previewScript.includes('PORT=')) {
-                // Modify the preview script to include port
-                buildCommand = `${packageManager} run build && ${packageManager} run preview -- --port 3000`
-              } else {
-                buildCommand = `${packageManager} run build && ${packageManager} run preview`
-              }
-            } else {
-              buildCommand = `${packageManager} run build && PORT=3000 ${packageManager} run preview`
+            // Vite project - build and host on Supabase storage
+            send({ type: "log", message: "Detected Vite project, will build and host on Supabase" })
+            
+            // Build the project first
+            const buildCommand = `${packageManager} run build`
+            send({ type: "log", message: `Building Vite project with: ${buildCommand}` })
+            const buildResult = await sandbox.executeCommand(buildCommand, {
+              workingDirectory: '/project',
+              timeoutMs: 300000, // 5 minutes for build
+              envVars,
+              onStdout: (data) => send({ type: "log", message: data.trim() }),
+              onStderr: (data) => send({ type: "error", message: data.trim() })
+            })
+            
+            if (buildResult.exitCode !== 0) {
+              send({ type: "error", message: `Vite build failed: ${buildResult.stderr}` })
+              throw new Error(`Vite build failed: ${buildResult.stderr}`)
             }
-          }
+            
+            send({ type: "log", message: "Build completed successfully" })
+            
+            // Upload built files to Supabase
+            const supabase = await createClient()
+            const uploadSuccess = await uploadViteBuildToSupabase(sandbox, projectId, supabase)
+            
+            if (!uploadSuccess) {
+              send({ type: "error", message: "Failed to upload built files to hosting" })
+              throw new Error('Failed to upload built files to hosting')
+            }
+            
+            // Return hosted URL instead of sandbox URL
+            const hostedUrl = `/sites/${projectId}/index.html`
+            
+            send({ type: "log", message: `Vite project hosted at: ${hostedUrl}` })
+            
+            send({
+              type: "ready",
+              message: "Vite project hosted successfully",
+              sandboxId: sandbox.id,
+              url: hostedUrl,
+              processId: null,
+              hosted: true
+            })
 
-          // 🔹 Build and start production server
-          send({ type: "log", message: "Building and starting production server..." })
-          const devServer = await sandbox.startDevServer({
-            command: buildCommand,
-            workingDirectory: "/project",
-            port: 3000,
-            timeoutMs: 0,
-            envVars,
-            onStdout: (data) => send({ type: "log", message: data.trim() }),
-            onStderr: (data) => send({ type: "error", message: data.trim() }),
-          })
+            // Keep-alive heartbeat for hosted projects too
+            const hostedHeartbeat = setInterval(() => {
+              send({ type: "heartbeat", message: "alive" })
+            }, 30000)
 
-          send({
-            type: "ready",
-            message: "Production server running",
-            sandboxId: sandbox.id,
-            url: devServer.url,
-            processId: devServer.processId,
-          })
+            const hostedOriginalClose = controller.close.bind(controller)
+            controller.close = () => {
+              isClosed = true
+              clearInterval(hostedHeartbeat)
+              hostedOriginalClose()
+            }
+            
+            // Exit the function early for hosted projects
+            controller.close()
+            return
+          } else {
+            // 🔹 Build and start production server
+            send({ type: "log", message: "Building and starting production server..." })
+            const devServer = await sandbox.startDevServer({
+              command: buildCommand,
+              workingDirectory: "/project",
+              port: 3000,
+              timeoutMs: 0,
+              envVars,
+              onStdout: (data) => send({ type: "log", message: data.trim() }),
+              onStderr: (data) => send({ type: "error", message: data.trim() }),
+            })
 
-          // 🔹 Keep-alive heartbeat
-          const heartbeat = setInterval(() => {
-            send({ type: "heartbeat", message: "alive" })
-          }, 30000)
+            send({
+              type: "ready",
+              message: "Production server running",
+              sandboxId: sandbox.id,
+              url: devServer.url,
+              processId: devServer.processId,
+            })
 
-          const originalClose = controller.close.bind(controller)
-          controller.close = () => {
-            isClosed = true
-            clearInterval(heartbeat)
-            originalClose()
+            // 🔹 Keep-alive heartbeat
+            const heartbeat = setInterval(() => {
+              send({ type: "heartbeat", message: "alive" })
+            }, 30000)
+
+            const originalClose = controller.close.bind(controller)
+            controller.close = () => {
+              isClosed = true
+              clearInterval(heartbeat)
+              originalClose()
+            }
           }
         } catch (err) {
           send({
