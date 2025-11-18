@@ -11,6 +11,31 @@ import JSZip from 'jszip'
 import lz4 from 'lz4js'
 
 // Function to upload built Vite files to Supabase storage
+// Helper function to recursively collect all files from a directory
+async function collectAllFiles(e2bSandbox: any, dirPath: string): Promise<any[]> {
+  const allFiles: any[] = []
+  
+  async function collectFromDirectory(currentPath: string) {
+    try {
+      const items = await e2bSandbox.files.list(currentPath)
+      
+      for (const item of items) {
+        if (item.type === 'file' && !item.name.startsWith('.') && item.name !== '.gitkeep') {
+          allFiles.push(item)
+        } else if (item.type === 'dir' && !item.name.startsWith('.')) {
+          // Recursively collect from subdirectories
+          await collectFromDirectory(`${currentPath}/${item.name}`)
+        }
+      }
+    } catch (error) {
+      console.warn(`[Vite Hosting] Could not list directory ${currentPath}:`, error)
+    }
+  }
+  
+  await collectFromDirectory(dirPath)
+  return allFiles
+}
+
 async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supabase: any) {
   try {
     console.log('[Vite Hosting] Starting upload of built files...')
@@ -18,21 +43,23 @@ async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supa
     // Access the underlying E2B sandbox container (same as generate_report route)
     const e2bSandbox = sandbox.container || sandbox
     
-    // List files in the dist directory using E2B files API (same as generate_report)
-    const files = await e2bSandbox.files.list("/project/dist")
-    
-    // Filter out directories and system files
-    const userFiles = files.filter((file: any) =>
-      file.type === "file" &&
-      !file.name.startsWith('.') &&
-      file.name !== '.gitkeep'
-    )
+    // Recursively collect all files from the dist directory
+    const userFiles = await collectAllFiles(e2bSandbox, "/project/dist")
     
     console.log(`[Vite Hosting] Found ${userFiles.length} files in dist directory`)
+    
+    // Log the files and their relative paths for debugging
+    userFiles.forEach((file: any) => {
+      const relativePath = file.path.replace('/project/dist/', '')
+      console.log(`[Vite Hosting] Will upload: ${file.path} → sites/${projectSlug}/${relativePath}`)
+    })
     
     // Upload each file to Supabase storage (same approach as generate_report)
     for (const file of userFiles) {
       if (file.type === "file") {
+        // Extract relative path from /project/dist/ to preserve directory structure
+        const relativePath = file.path.replace('/project/dist/', '')
+        
         try {
           // Read file content from sandbox (same as generate_report)
           const content = await e2bSandbox.files.read(file.path)
@@ -40,21 +67,21 @@ async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supa
           // Determine content type
           const contentType = getContentType(file.name)
           
-          // Upload to Supabase storage
+          // Upload to Supabase storage preserving directory structure
           const { data, error } = await supabase.storage
             .from('documents')
-            .upload(`sites/${projectSlug}/files/${file.name}`, content, {
+            .upload(`sites/${projectSlug}/${relativePath}`, content, {
               contentType,
               upsert: true
             })
           
           if (error) {
-            console.error(`[Vite Hosting] Error uploading ${file.name}:`, error)
+            console.error(`[Vite Hosting] Error uploading ${relativePath}:`, error)
           } else {
-            console.log(`[Vite Hosting] Uploaded ${file.name}`)
+            console.log(`[Vite Hosting] Uploaded ${relativePath}`)
           }
         } catch (fileError) {
-          console.error(`[Vite Hosting] Error processing ${file.name}:`, fileError)
+          console.error(`[Vite Hosting] Error processing ${relativePath}:`, fileError)
         }
       }
     }
