@@ -1,4 +1,14 @@
 {
+  "rewrites": [
+    {
+      "source": "/sites/:siteId",
+      "destination": "/sites/:siteId/index.html"
+    },
+    {
+      "source": "/sites/:siteId/",
+      "destination": "/sites/:siteId/index.html"
+    }
+  ],
   "crons": [
     {
       "path": "/api/cron/send-notifications",

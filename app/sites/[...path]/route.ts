@@ -17,22 +17,15 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
 
     const siteId = path[0];
     const filePath = path.slice(1);
-    const joinedPath = filePath.length > 0 ? filePath.join('/') : 'index.html';
+    const joinedPath = filePath.join('/') || 'index.html';
 
     const supabase = createClient(SUPABASE_CONFIG.URL, SUPABASE_CONFIG.SERVICE_ROLE_KEY);
 
     const storagePath = `sites/${siteId}/${joinedPath}`;
     const { data, error } = await supabase.storage.from('documents').download(storagePath);
 
-    // If file not found and looks like SPA route, fallback to index.html
+    // If file not found, return 404 (no SPA fallback - let Vercel rewrites handle it)
     if (error) {
-      const fallback = await supabase.storage.from('documents').download(`sites/${siteId}/index.html`);
-      if (!fallback.error) {
-        const indexBuffer = await fallback.data.arrayBuffer();
-        return new NextResponse(Buffer.from(indexBuffer), {
-          headers: { 'Content-Type': 'text/html; charset=utf-8' },
-        });
-      }
       return new NextResponse('Not found', { status: 404 });
     }
 
