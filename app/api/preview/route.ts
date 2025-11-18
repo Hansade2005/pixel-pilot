@@ -11,20 +11,20 @@ import JSZip from 'jszip'
 import lz4 from 'lz4js'
 
 // Function to upload built Vite files to Supabase storage
-async function uploadViteBuildToSupabase(sandbox: any, projectId: string, supabase: any) {
+async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supabase: any) {
   try {
     console.log('[Vite Hosting] Starting upload of built files...')
     
     // List files in the dist directory
-    const distFiles = await sandbox.listDir('/project/dist')
+    const distFiles = await sandbox.files.list('/project/dist')
     console.log(`[Vite Hosting] Found ${distFiles.length} files in dist directory`)
     
     // Upload each file to Supabase storage
     for (const file of distFiles) {
-      if (file.is_file) {
+      if (file.type === 'file') {
         try {
           // Read file content from sandbox
-          const fileContent = await sandbox.readFile(`/project/dist/${file.name}`)
+          const fileContent = await sandbox.files.read(file.path)
           
           // Determine content type
           const contentType = getContentType(file.name)
@@ -32,7 +32,7 @@ async function uploadViteBuildToSupabase(sandbox: any, projectId: string, supaba
           // Upload to Supabase storage
           const { data, error } = await supabase.storage
             .from('sites')
-            .upload(`${projectId}/files/${file.name}`, fileContent, {
+            .upload(`${projectSlug}/files/${file.name}`, fileContent, {
               contentType,
               upsert: true
             })
@@ -111,6 +111,7 @@ function parseEnvFile(content: string): Record<string, string> {
 // Extract project files from compressed data (LZ4 + Zip)
 async function extractProjectFromCompressedData(compressedData: ArrayBuffer): Promise<{
   projectId: string
+  projectSlug: string
   files: any[]
 }> {
   // Step 1: LZ4 decompress
@@ -142,18 +143,21 @@ async function extractProjectFromCompressedData(compressedData: ArrayBuffer): Pr
   const filteredFiles = filterUnwantedFiles(extractedFiles)
   console.log(`[Preview] Filtered to ${filteredFiles.length} files (removed ${extractedFiles.length - filteredFiles.length} unwanted files)`)
 
-  // Parse metadata to get projectId
+  // Parse metadata to get projectId and projectSlug
   let projectId = `preview-${Date.now()}`
+  let projectSlug = projectId // fallback to projectId if no slug
   const metadataEntry = zip.file('__metadata__.json')
   if (metadataEntry) {
     const metadataContent = await metadataEntry.async('text')
     const metadata = JSON.parse(metadataContent)
     projectId = metadata.project?.id || metadata.projectId || projectId
-    console.log(`[Preview] Loaded metadata, projectId: ${projectId}`)
+    projectSlug = metadata.project?.slug || metadata.project?.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || projectId
+    console.log(`[Preview] Loaded metadata, projectId: ${projectId}, projectSlug: ${projectSlug}`)
   }
 
   return {
     projectId,
+    projectSlug,
     files: filteredFiles
   }
 }
@@ -185,6 +189,7 @@ async function handleStreamingPreview(req: Request) {
     // Check content type to determine data format
     const contentType = req.headers.get('content-type') || ''
     let projectId: string
+    let projectSlug: string
     let files: any[]
 
     if (contentType.includes('application/octet-stream')) {
@@ -193,12 +198,14 @@ async function handleStreamingPreview(req: Request) {
       const compressedData = await req.arrayBuffer()
       const extractedData = await extractProjectFromCompressedData(compressedData)
       projectId = extractedData.projectId
+      projectSlug = extractedData.projectSlug
       files = extractedData.files
     } else {
       // Handle JSON format (backward compatibility)
       console.log('[Preview] 📄 Received JSON data')
-      const { projectId: jsonProjectId, files: jsonFiles } = await req.json()
+      const { projectId: jsonProjectId, projectSlug: jsonProjectSlug, files: jsonFiles } = await req.json()
       projectId = jsonProjectId
+      projectSlug = jsonProjectSlug || projectId // fallback to projectId
       files = jsonFiles
     }
 
@@ -365,7 +372,7 @@ async function handleStreamingPreview(req: Request) {
             
             // Upload built files to Supabase
             const supabase = await createClient()
-            const uploadSuccess = await uploadViteBuildToSupabase(sandbox, projectId, supabase)
+            const uploadSuccess = await uploadViteBuildToSupabase(sandbox, projectSlug, supabase)
             
             if (!uploadSuccess) {
               send({ type: "error", message: "Failed to upload built files to hosting" })
@@ -373,7 +380,7 @@ async function handleStreamingPreview(req: Request) {
             }
             
             // Return hosted URL instead of sandbox URL
-            const hostedUrl = `/sites/${projectId}/index.html`
+            const hostedUrl = `/sites/${projectSlug}/index.html`
             
             send({ type: "log", message: `Vite project hosted at: ${hostedUrl}` })
             
@@ -472,6 +479,7 @@ async function handleRegularPreview(req: Request) {
     // Check content type to determine data format
     const contentType = req.headers.get('content-type') || ''
     let projectId: string
+    let projectSlug: string
     let files: any[]
 
     if (contentType.includes('application/octet-stream')) {
@@ -480,12 +488,14 @@ async function handleRegularPreview(req: Request) {
       const compressedData = await req.arrayBuffer()
       const extractedData = await extractProjectFromCompressedData(compressedData)
       projectId = extractedData.projectId
+      projectSlug = extractedData.projectSlug
       files = extractedData.files
     } else {
       // Handle JSON format (backward compatibility)
       console.log('[Preview] 📄 Received JSON data for regular preview')
-      const { projectId: jsonProjectId, files: jsonFiles } = await req.json()
+      const { projectId: jsonProjectId, projectSlug: jsonProjectSlug, files: jsonFiles } = await req.json()
       projectId = jsonProjectId
+      projectSlug = jsonProjectSlug || projectId // fallback to projectId
       files = jsonFiles
     }
 
@@ -743,14 +753,14 @@ devDependencies:
         
         // Upload built files to Supabase
         const supabase = await createClient()
-        const uploadSuccess = await uploadViteBuildToSupabase(sandbox, projectId, supabase)
+        const uploadSuccess = await uploadViteBuildToSupabase(sandbox, projectSlug, supabase)
         
         if (!uploadSuccess) {
           throw new Error('Failed to upload built files to hosting')
         }
         
         // Return hosted URL instead of sandbox URL
-        const hostedUrl = `/sites/${projectId}/index.html`
+        const hostedUrl = `/sites/${projectSlug}/index.html`
         
         console.log(`[Preview] Vite project hosted at: ${hostedUrl}`)
         
