@@ -636,14 +636,26 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                         setCurrentLog("🚀 Starting production server...")
                       }
                       
-                      // Vite detection - very specific
-                      const isViteReady = msg.message.includes("➜ Local: http://localhost:")
-                      
-                      // Next.js detection - very specific, matches exact server ready message
-                      const isNextReady = msg.message.includes("- Local: http://localhost:")
-                      
-                      // Generic detection for custom servers
-                      const isGenericReady = msg.message.includes("Production server running")
+                      // Regex-based server readiness detection for more robust matching
+
+                      // Vite detection - matches "➜ Local: http://localhost:3000" or similar
+                      const viteReadyRegex = /➜\s+Local:\s+http:\/\/localhost:\d+/
+                      const isViteReady = viteReadyRegex.test(msg.message)
+
+                      // Next.js detection - multiple patterns for build completion and server ready
+                      const nextServerReadyRegex = /- Local:\s+http:\/\/localhost:\d+/
+                      const nextBuildCompleteRegex = /✓?\s*Ready in\s+\d+(\.\d+)?s/
+                      const nextCompilingRegex = /✓?\s*Compiled successfully in\s+\d+(\.\d+)?s/
+
+                      const isNextReady = (
+                        nextServerReadyRegex.test(msg.message) ||     // Primary: "- Local: http://localhost:3000"
+                        nextBuildCompleteRegex.test(msg.message) ||   // Secondary: "✓ Ready in 2.3s" or "Ready in 2.3s"
+                        nextCompilingRegex.test(msg.message)          // Tertiary: "✓ Compiled successfully in 2.3s"
+                      )
+
+                      // Generic detection for custom servers - more flexible pattern
+                      const genericReadyRegex = /Production server running|Server listening|Server started|App listening/i
+                      const isGenericReady = genericReadyRegex.test(msg.message)
                       
                       if (isViteReady || isNextReady || isGenericReady) {
                         // Now the server is actually ready to serve content
