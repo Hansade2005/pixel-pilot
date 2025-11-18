@@ -37,10 +37,13 @@ export async function middleware(request: NextRequest) {
   if (subdomain) {
     const url = request.nextUrl.clone();
 
-    // Rewrite to /sites/subdomain/path
-    url.pathname = `/sites/${subdomain}${url.pathname}`;
+    // For root requests to subdomains, explicitly serve index.html
+    const originalPath = request.nextUrl.pathname;
+    const targetPath = originalPath === '/' ? `/sites/${subdomain}/index.html` : `/sites/${subdomain}${originalPath}`;
 
-    console.log(`[Multi-tenant] Rewriting ${hostname}${request.nextUrl.pathname} → ${url.pathname}`);
+    url.pathname = targetPath;
+
+    console.log(`[Multi-tenant] Rewriting ${hostname}${originalPath} → ${targetPath}`);
 
     return NextResponse.rewrite(url);
   }

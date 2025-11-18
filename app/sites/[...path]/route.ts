@@ -44,14 +44,19 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
     if (subdomain) {
       // Multi-tenant subdomain mode: subdomain.pipilot.dev/path
       siteId = subdomain;
-      filePath = path; // Use the path as-is
+      // For subdomains, the path might start with the siteId due to middleware rewrite
+      // Remove the siteId from the beginning if it matches
+      filePath = path[0] === subdomain ? path.slice(1) : path;
     } else {
       // Legacy slug mode: pipilot.dev/sites/siteId/path
-      if (path.length === 0) {
+      if (path.length === 0 || path[0] !== 'sites') {
+        return new NextResponse('Invalid path format', { status: 400 });
+      }
+      if (path.length < 2) {
         return new NextResponse('Site ID required', { status: 400 });
       }
-      siteId = path[0];
-      filePath = path.slice(1);
+      siteId = path[1]; // path[0] is 'sites', path[1] is the siteId
+      filePath = path.slice(2); // Everything after siteId
     }
     
     const joinedPath = filePath.join('/') || 'index.html';
