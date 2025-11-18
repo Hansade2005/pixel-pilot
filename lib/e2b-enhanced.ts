@@ -447,9 +447,36 @@ export class EnhancedE2BSandbox {
           { timeoutMs: 5000, envVars }
         )
 
+        // Check if Next.js is running by looking for the process
+        const nextCheck = await this.executeCommand(
+          `ps aux | grep -v grep | grep "next" || echo "NO_NEXT"`,
+          { timeoutMs: 5000, envVars }
+        )
+
+        // For Next.js, add additional readiness checks to prevent premature detection
+        let nextSpecificReady = false
+        if (!nextCheck.stdout.includes('NO_NEXT')) {
+          // If Next.js process is found, do additional checks
+          // Check if Next.js has actually started the server (not just building)
+          const nextServerCheck = await this.executeCommand(
+            `ps aux | grep -v grep | grep "next.*start\\|next.*dev" || echo "NO_NEXT_SERVER"`,
+            { timeoutMs: 3000, envVars }
+          )
+
+          // Also check if we can get a proper HTTP response (not just connection)
+          const nextHttpCheck = await this.executeCommand(
+            `curl -s --max-time 3 http://localhost:${port} | grep -q "<!doctype html" && echo "HTML_READY" || echo "NOT_HTML_READY"`,
+            { timeoutMs: 5000, envVars }
+          )
+
+          nextSpecificReady = !nextServerCheck.stdout.includes('NO_NEXT_SERVER') &&
+                             nextHttpCheck.stdout.includes('HTML_READY')
+        }
+
         const isReady = (!curlResult.stdout.includes('NOT_READY') && curlResult.exitCode === 0) ||
-                       (netstatResult.stdout.includes(`:${port}`) && !netstatResult.stdout.includes('NOT_LISTENING')) ||
-                       (!viteCheck.stdout.includes('NO_VITE'))
+                       (netstatResult.stdout.includes(`:${port}`) && !netstatResult.stdout.includes('NOT_LISTENING') && (!nextCheck.stdout.includes('NO_NEXT') ? nextSpecificReady : true)) ||
+                       (!viteCheck.stdout.includes('NO_VITE')) ||
+                       nextSpecificReady
 
         if (isReady) {
           console.log(`[${this.id}] Server ready on port ${port}`)
