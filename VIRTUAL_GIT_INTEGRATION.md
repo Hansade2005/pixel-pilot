@@ -444,7 +444,7 @@ await git.push({
 - **Instant Preview**: See changes reflected immediately
 - **Collaborative Coding**: Multiple users can work on the same project
 - **Backup & Recovery**: All work automatically backed up to Git
-- **Cross-Device Sync**: Work seamlessly across different devices
+- **Cross-Device Sync**: Work seamlessly across different devices.
 
 ### 4. **Advanced Features**
 - **AI-Powered Commit Messages**: Generate meaningful commit messages
