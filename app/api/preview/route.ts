@@ -10,6 +10,8 @@ import { filterUnwantedFiles } from '@/lib/utils'
 import JSZip from 'jszip'
 import lz4 from 'lz4js'
 import { createClient as createExternalClient } from '@supabase/supabase-js'
+import { generateText } from 'ai'
+import { getModel } from '@/lib/ai-providers'
 
 // External Supabase configuration for file uploads (same as upload-test-site.js)
 const EXTERNAL_SUPABASE_CONFIG = {
@@ -22,6 +24,45 @@ const externalSupabase = createExternalClient(
   EXTERNAL_SUPABASE_CONFIG.URL, 
   EXTERNAL_SUPABASE_CONFIG.SERVICE_ROLE_KEY
 )
+
+// AI-powered HTML asset path fixer
+export async function fixHtmlAssetPaths(htmlContent: string, basePath: string = './'): Promise<string> {
+  try {
+    const codestralModel = getModel('codestral-latest')
+    
+    const result = await generateText({
+      model: codestralModel,
+      temperature: 0.1, // Low temperature for precise, deterministic fixes
+      prompt: `You are an expert HTML processor. Your task is to fix asset paths in HTML files that will be served from a subdirectory.
+
+INPUT HTML:
+${htmlContent}
+
+INSTRUCTIONS:
+- Replace all absolute paths (starting with "/") in href and src attributes with relative paths
+- Use "${basePath}" as the base path for all assets
+- Do not change any other content
+- Preserve all HTML structure, attributes, and formatting
+- Return ONLY the fixed HTML content, no explanations
+
+EXAMPLE:
+Input: <link href="/assets/style.css">
+Output: <link href="./assets/style.css">
+
+FIXED HTML:`
+    })
+
+    return result.text.trim()
+  } catch (error) {
+    console.warn('[Vite Hosting] AI HTML processing failed, falling back to regex:', error)
+    // Fallback to regex if AI fails
+    return htmlContent
+      .replace(/href="\/([^"]*)"/g, `href="${basePath}$1"`)
+      .replace(/src="\/([^"]*)"/g, `src="${basePath}$1"`)
+      .replace(/href=\s*"\/([^"]*)"/g, `href="${basePath}$1"`)
+      .replace(/src=\s*"\/([^"]*)"/g, `src="${basePath}$1"`)
+  }
+}
 
 // Function to upload built Vite files to Supabase storage
 // Helper function to recursively collect all files from a directory
@@ -77,13 +118,12 @@ async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supa
           // Read file content from sandbox (same as generate_report)
           const content = await e2bSandbox.files.read(file.path)
           
-          // Fix asset paths in HTML files to work from subdirectory
+          // Process HTML files to fix asset paths using AI
           let processedContent = content
           if (relativePath.endsWith('.html')) {
-            // Replace absolute paths with relative paths for assets
-            processedContent = content
-              .replace(/href="\/([^"]*)"/g, `href="./$1"`)
-              .replace(/src="\/([^"]*)"/g, `src="./$1"`)
+            console.log(`[Vite Hosting] Processing HTML file ${relativePath} with AI...`)
+            processedContent = await fixHtmlAssetPaths(content, './')
+            console.log(`[Vite Hosting] AI processed HTML file ${relativePath}`)
           }
           
           // Determine content type
