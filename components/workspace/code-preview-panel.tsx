@@ -639,14 +639,8 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
                       // Vite detection - very specific
                       const isViteReady = msg.message.includes("➜ Local: http://localhost:")
                       
-                      // Next.js detection - must have the dash prefix which appears when server actually starts
-                      const isNextReady = (
-                        msg.message.includes("- Local:") && msg.message.includes("http://localhost:") ||
-                        msg.message.includes("- Network:") && msg.message.includes("http://") ||
-                        msg.message.includes("Ready - http://localhost:") ||
-                        (msg.message.includes("http://localhost:") && (msg.message.includes("ready") || msg.message.includes("started"))) ||
-                        msg.message.includes("✓ Ready in")
-                      )
+                      // Next.js detection - very specific, matches exact server ready message
+                      const isNextReady = msg.message.includes("- Local: http://localhost:")
                       
                       // Generic detection for custom servers
                       const isGenericReady = msg.message.includes("Production server running")
