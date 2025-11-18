@@ -1,7 +1,7 @@
 // Test script for Pipilot authentication system
 async function testPipilotAuth() {
-  const API_KEY = 'YOUR_API_KEY_HERE'; // Replace with your actual API key
-  const DATABASE_ID = '15';
+  const API_KEY = 'sk_live_f2fd3ee237925d751e294a9ac6fed3bf80b4cb98139f802aeede067e4125ebb9'; // Replace with your actual API key
+  const DATABASE_ID = '22';
 
   // Test credentials
   let testEmail = '';

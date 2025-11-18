@@ -68,10 +68,20 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
     const supabase = createClient(SUPABASE_CONFIG.URL, SUPABASE_CONFIG.SERVICE_ROLE_KEY);
 
     const storagePath = `sites/${siteId}/${joinedPath}`;
-    const { data, error } = await supabase.storage.from('documents').download(storagePath);
+    let { data, error } = await supabase.storage.from('documents').download(storagePath);
 
-    // If file not found, return 404 (no SPA fallback - let Vercel rewrites handle it)
-    if (error) {
+    // SPA fallback: if file not found and it's not index.html, try index.html
+    if (error && joinedPath !== 'index.html') {
+      const fallbackPath = `sites/${siteId}/index.html`;
+      const fallbackResult = await supabase.storage.from('documents').download(fallbackPath);
+      if (!fallbackResult.error) {
+        data = fallbackResult.data;
+        error = null;
+      }
+    }
+
+    // If file not found, return 404
+    if (error || !data) {
       return new NextResponse('Not found', { status: 404 });
     }
 
