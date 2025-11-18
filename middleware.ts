@@ -16,16 +16,12 @@ function getSubdomain(hostname: string): string | null {
     return null;
   }
 
-  // Only apply subdomain routing for pipilot.dev domains
-  if (!host.endsWith('pipilot.dev')) {
-    return null;
-  }
-
   // Split by dots and check if we have a subdomain
   const parts = host.split('.');
 
-  // If we have more than 2 parts, we have a subdomain
-  if (parts.length > 2) {
+  // If we have more than 2 parts and it's not an IP, we have a subdomain
+  // e.g., subscontrol.pipilot.dev -> ['subscontrol', 'pipilot', 'dev']
+  if (parts.length > 2 && !/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
     return parts[0]; // Return the first part as subdomain
   }
 
@@ -69,6 +65,7 @@ export async function middleware(request: NextRequest) {
     return rewriteResponse;
   }
 
+  // Create a response object to mutate
   // Create a response object to mutate
   let response = NextResponse.next({
     request: {
