@@ -77,13 +77,22 @@ async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supa
           // Read file content from sandbox (same as generate_report)
           const content = await e2bSandbox.files.read(file.path)
           
+          // Fix asset paths in HTML files to work from subdirectory
+          let processedContent = content
+          if (relativePath.endsWith('.html')) {
+            // Replace absolute paths with relative paths for assets
+            processedContent = content
+              .replace(/href="\/([^"]*)"/g, `href="./$1"`)
+              .replace(/src="\/([^"]*)"/g, `src="./$1"`)
+          }
+          
           // Determine content type
           const contentType = getContentType(file.name)
           
           // Upload to Supabase storage preserving directory structure
           const { data, error } = await supabase.storage
             .from('documents')
-            .upload(`sites/${projectSlug}/${relativePath}`, content, {
+            .upload(`sites/${projectSlug}/${relativePath}`, processedContent, {
               contentType,
               upsert: true
             })
@@ -809,7 +818,7 @@ devDependencies:
         }
         
         // Return hosted URL instead of sandbox URL
-        const hostedUrl = `/sites/${projectSlug}/index.html`
+        const hostedUrl = `https://pipilot.dev/sites/${projectSlug}/index.html`
         
         console.log(`[Preview] Vite project hosted at: ${hostedUrl}`)
         
