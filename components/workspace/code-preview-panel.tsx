@@ -618,6 +618,24 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
 
                       // Auto-open console when server is ready
                       setIsConsoleOpen(true)
+
+                      // For hosted previews (subdomain URLs), mark as ready immediately since no localhost server logs will appear
+                      if (msg.url && !msg.url.includes('localhost')) {
+                        setCurrentLog("✅ Preview ready!")
+                        setPreview(prev => ({ ...prev, isLoading: false }))
+                        
+                        // Dispatch preview ready event for hosted URLs
+                        if (typeof window !== 'undefined' && preview.sandboxId && preview.url) {
+                          window.dispatchEvent(new CustomEvent('preview-ready', { 
+                            detail: { preview: { 
+                              sandboxId: preview.sandboxId,
+                              url: preview.url,
+                              processId: preview.processId,
+                              isLoading: false
+                            } } 
+                          }))
+                        }
+                      }
                       // DON'T break here - keep the stream open for continuous logs
                     }
 
