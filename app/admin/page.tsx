@@ -243,7 +243,9 @@ export default function AdminPanel() {
               key={item.id}
               className="cursor-pointer hover:shadow-md transition-shadow"
               onClick={() => {
-                if (item.id === 'users') {
+                if (item.id === 'domains') {
+                  router.push('/admin/domains')
+                } else if (item.id === 'users') {
                   router.push('/admin/users')
                 } else if (item.id === 'billing') {
                   router.push('/admin/billing')

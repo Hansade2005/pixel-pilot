@@ -25,6 +25,165 @@ const externalSupabase = createExternalClient(
   EXTERNAL_SUPABASE_CONFIG.SERVICE_ROLE_KEY
 )
 
+// AI-powered domain availability checker and name generator
+export async function checkDomainAvailability(desiredSlug: string, externalSupabase: any): Promise<{ available: boolean, finalSlug: string }> {
+  try {
+    // Check if the desired slug is available
+    const { data: existingSite } = await externalSupabase
+      .from('sites')
+      .select('project_slug')
+      .eq('project_slug', desiredSlug)
+      .eq('is_active', true)
+      .single();
+
+    if (!existingSite) {
+      // Domain is available
+      return { available: true, finalSlug: desiredSlug };
+    }
+
+    // Domain not available, generate AI-powered unique name
+    console.log(`[Domain Check] ${desiredSlug} not available, generating AI name...`);
+
+    const codestralModel = getModel('codestral-latest');
+
+    const result = await generateText({
+      model: codestralModel,
+      temperature: 0.7, // Creative temperature for name generation
+      prompt: `You are a creative naming expert. Generate a unique, memorable project slug that's similar in theme to "${desiredSlug}" but completely different.
+
+REQUIREMENTS:
+- Must be 3-5 words maximum
+- Use hyphens between words (kebab-case)
+- Should be related to technology, creativity, or development
+- Must be professional and appropriate
+- Avoid common words like "app", "project", "site"
+- Make it unique and brandable
+
+EXAMPLES for input "taskmanager":
+- quantum-task-forge
+- nebula-workspace
+- pixel-command-center
+- code-craft-studio
+
+INPUT: ${desiredSlug}
+OUTPUT: Only return the slug, nothing else.`
+    });
+
+    let aiSlug = result.text.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+
+    // Ensure it's not empty and has reasonable length
+    if (!aiSlug || aiSlug.length < 3) {
+      aiSlug = `${desiredSlug}-${Math.random().toString(36).substring(2, 8)}`;
+    }
+
+    // Double-check the AI-generated slug isn't taken (rare but possible)
+    const { data: checkAiSlug } = await externalSupabase
+      .from('sites')
+      .select('project_slug')
+      .eq('project_slug', aiSlug)
+      .eq('is_active', true)
+      .single();
+
+    if (checkAiSlug) {
+      // Add random suffix if AI slug is also taken
+      aiSlug = `${aiSlug}-${Math.random().toString(36).substring(2, 5)}`;
+    }
+
+    console.log(`[Domain Check] Generated unique slug: ${aiSlug}`);
+    return { available: false, finalSlug: aiSlug };
+
+  } catch (error) {
+    console.error('[Domain Check] Error:', error);
+    // Fallback: add random suffix
+    const fallbackSlug = `${desiredSlug}-${Math.random().toString(36).substring(2, 8)}`;
+    return { available: false, finalSlug: fallbackSlug };
+  }
+}
+
+// Function to create site tracking record
+export async function createSiteRecord(
+  projectSlug: string,
+  originalSlug: string | null,
+  authUserId: string,
+  authUsername: string,
+  externalSupabase: any
+): Promise<void> {
+  try {
+    const { error } = await externalSupabase
+      .from('sites')
+      .insert({
+        project_slug: projectSlug,
+        original_slug: originalSlug,
+        auth_user_id: authUserId,
+        auth_username: authUsername,
+        created_at: new Date().toISOString(),
+        metadata: {
+          source: 'pipilot-preview',
+          version: '1.0'
+        }
+      });
+
+    if (error) {
+      console.error('[Site Tracking] Error creating site record:', error);
+      throw error;
+    }
+
+    console.log(`[Site Tracking] Created record for ${projectSlug} by ${authUsername}`);
+  } catch (error) {
+    console.error('[Site Tracking] Failed to create site record:', error);
+    // Don't throw - site creation should continue even if tracking fails
+  }
+}
+
+// Function to track site view
+export async function trackSiteView(siteSlug: string, externalSupabase: any, request?: Request): Promise<void> {
+  try {
+    // Use RPC function to increment view count
+    const { error } = await externalSupabase.rpc('increment_site_views', {
+      site_slug: siteSlug
+    });
+
+    if (error) {
+      console.error('[View Tracking] Error incrementing views:', error);
+    }
+
+    // Optional: Track detailed view analytics
+    if (request) {
+      const userAgent = request.headers.get('user-agent') || '';
+      const referrer = request.headers.get('referer') || '';
+
+      // Simple device detection
+      let deviceType = 'desktop';
+      if (userAgent.includes('Mobile') || userAgent.includes('Android')) {
+        deviceType = 'mobile';
+      } else if (userAgent.includes('Tablet') || userAgent.includes('iPad')) {
+        deviceType = 'tablet';
+      }
+
+      // Note: In production, you'd want to anonymize IP properly
+      // This is just for demonstration
+      const ipHash = 'anonymous'; // You'd hash the real IP
+
+      await externalSupabase
+        .from('site_views')
+        .insert({
+          site_id: (await externalSupabase
+            .from('sites')
+            .select('id')
+            .eq('project_slug', siteSlug)
+            .single()).data?.id,
+          user_agent: userAgent.substring(0, 500), // Limit length
+          referrer: referrer,
+          ip_hash: ipHash,
+          device_type: deviceType
+        });
+    }
+  } catch (error) {
+    console.error('[View Tracking] Error:', error);
+    // Don't throw - view tracking failure shouldn't break site serving
+  }
+}
+
 // AI-powered HTML asset path fixer
 export async function fixHtmlAssetPaths(htmlContent: string, basePath: string = './'): Promise<string> {
   try {
@@ -66,6 +225,128 @@ Output: <link href="./assets/style.css">`
       .replace(/src="\/([^"]*)"/g, `src="${basePath}$1"`)
       .replace(/href=\s*"\/([^"]*)"/g, `href="${basePath}$1"`)
       .replace(/src=\s*"\/([^"]*)"/g, `src="${basePath}$1"`)
+  }
+}
+
+// AI-powered SEO metadata enhancer for HTML files
+export async function addSEOMetadata(htmlContent: string, projectSlug: string): Promise<string> {
+  try {
+    const codestralModel = getModel('codestral-latest')
+
+    const result = await generateText({
+      model: codestralModel,
+      temperature: 0.1, // Low temperature for precise, deterministic metadata
+      prompt: `You are an expert SEO and HTML metadata specialist. Your task is to enhance HTML files with comprehensive SEO metadata.
+
+INPUT HTML:
+${htmlContent}
+
+PROJECT INFO:
+- Project Slug: ${projectSlug}
+- Platform: PiPilot (Canada's First Agentic Vibe Coding Platform)
+- Base URL: https://pipilot.dev
+
+REQUIRED METADATA TO ADD/UPDATE:
+
+1. FAVICON SETUP:
+   - <link rel="icon" href="https://pipilot.dev/icons/icon-192x192.png" type="image/png">
+   - <link rel="apple-touch-icon" href="https://pipilot.dev/icons/icon-180x180.png">
+   - <link rel="shortcut icon" href="https://pipilot.dev/icons/icon-96x96.png">
+
+2. OPEN GRAPH METADATA:
+   - <meta property="og:title" content="PiPilot - ${projectSlug} | AI App Builder">
+   - <meta property="og:description" content="Built with PiPilot - Canada's First Agentic Vibe Coding Platform. Create apps 10x faster with AI-powered development.">
+   - <meta property="og:image" content="https://pipilot.dev/og_image.png">
+   - <meta property="og:image:alt" content="PiPilot - AI App Builder Platform">
+   - <meta property="og:url" content="https://pipilot.dev/sites/${projectSlug}">
+   - <meta property="og:type" content="website">
+   - <meta property="og:site_name" content="PiPilot">
+
+3. TWITTER CARD METADATA:
+   - <meta name="twitter:card" content="summary_large_image">
+   - <meta name="twitter:title" content="PiPilot - ${projectSlug}">
+   - <meta name="twitter:description" content="Built with PiPilot - Canada's leading AI coding platform. Superior to Lovable, Bolt, v0, and Replit.">
+   - <meta name="twitter:image" content="https://pipilot.dev/og_image2.png">
+   - <meta name="twitter:site" content="@pipilotdev">
+
+4. GENERAL SEO METADATA:
+   - <meta name="description" content="Built with PiPilot - Canada's First Agentic Vibe Coding Platform. Experience AI-powered app development with agentic vibe coding.">
+   - <meta name="keywords" content="PiPilot, AI app builder, agentic coding, Canadian tech, app development, no-code AI, ${projectSlug}">
+   - <meta name="author" content="PiPilot Team">
+   - <meta name="robots" content="index, follow">
+   - <meta name="language" content="en-CA">
+   - <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+5. ADDITIONAL SEO BOOSTERS:
+   - <meta name="theme-color" content="#000000">
+   - <meta name="msapplication-TileColor" content="#000000">
+   - <link rel="canonical" href="https://pipilot.dev/sites/${projectSlug}">
+
+INSTRUCTIONS:
+- Add all metadata to the <head> section
+- If <head> doesn't exist, create it after <html> or at the top
+- Preserve all existing metadata and content
+- Do not duplicate existing meta tags - update them if they exist
+- Return ONLY the enhanced HTML content with NO explanations
+- Do NOT wrap in markdown code blocks
+- Ensure proper HTML structure and formatting
+
+EXAMPLE OUTPUT STRUCTURE:
+<html>
+<head>
+  <!-- Existing content -->
+  <title>Existing Title</title>
+  <!-- New SEO metadata -->
+  <meta name="description" content="...">
+  <meta property="og:title" content="...">
+  <!-- etc -->
+</head>
+<body>
+  <!-- Existing content -->
+</body>
+</html>`
+    })
+
+    // Clean the response
+    let cleanedResult = result.text.trim()
+    cleanedResult = cleanedResult.replace(/^```html\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '')
+
+    return cleanedResult
+  } catch (error) {
+    console.warn('[SEO Enhancement] AI metadata processing failed, falling back to manual injection:', error)
+
+    // Fallback: Manually inject essential metadata
+    const metadataToInject = `
+  <!-- PiPilot SEO Metadata -->
+  <meta name="description" content="Built with PiPilot - Canada's First Agentic Vibe Coding Platform. Experience AI-powered app development.">
+  <meta name="keywords" content="PiPilot, AI app builder, agentic coding, ${projectSlug}">
+  <meta name="author" content="PiPilot Team">
+  <meta name="robots" content="index, follow">
+  <meta name="language" content="en-CA">
+  <meta name="theme-color" content="#000000">
+  <meta property="og:title" content="PiPilot - ${projectSlug} | AI App Builder">
+  <meta property="og:description" content="Built with PiPilot - Canada's First Agentic Vibe Coding Platform. Create apps 10x faster with AI.">
+  <meta property="og:image" content="https://pipilot.dev/og_image.png">
+  <meta property="og:url" content="https://pipilot.dev/sites/${projectSlug}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PiPilot">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PiPilot - ${projectSlug}">
+  <meta name="twitter:description" content="Built with PiPilot - Canada's leading AI coding platform.">
+  <meta name="twitter:image" content="https://pipilot.dev/og_image2.png">
+  <link rel="icon" href="https://pipilot.dev/icons/icon-192x192.png" type="image/png">
+  <link rel="apple-touch-icon" href="https://pipilot.dev/icons/icon-180x180.png">
+  <link rel="canonical" href="https://pipilot.dev/sites/${projectSlug}">
+`
+
+    // Inject metadata into head section
+    if (htmlContent.includes('<head>')) {
+      return htmlContent.replace('<head>', '<head>' + metadataToInject)
+    } else if (htmlContent.includes('<html>')) {
+      return htmlContent.replace('<html>', '<html><head>' + metadataToInject + '</head>')
+    } else {
+      return '<html><head>' + metadataToInject + '</head><body>' + htmlContent + '</body></html>'
+    }
   }
 }
 
@@ -123,12 +404,18 @@ async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supa
           // Read file content from sandbox (same as generate_report)
           const content = await e2bSandbox.files.read(file.path)
           
-          // Process HTML files to fix asset paths using AI
+          // Process HTML files to fix asset paths and add SEO metadata
           let processedContent = content
           if (relativePath.endsWith('.html')) {
             console.log(`[Vite Hosting] Processing HTML file ${relativePath} with AI...`)
+            
+            // First fix asset paths
             processedContent = await fixHtmlAssetPaths(content, './')
-            console.log(`[Vite Hosting] AI processed HTML file ${relativePath}`)
+            
+            // Then add comprehensive SEO metadata
+            processedContent = await addSEOMetadata(processedContent, projectSlug)
+            
+            console.log(`[Vite Hosting] AI processed and SEO enhanced HTML file ${relativePath}`)
           }
           
           // Determine content type
@@ -585,6 +872,8 @@ async function handleRegularPreview(req: Request) {
     let projectId: string
     let projectSlug: string
     let files: any[]
+    let authUserId: string | undefined
+    let authUsername: string | undefined
 
     if (contentType.includes('application/octet-stream')) {
       // Handle compressed data (LZ4 + Zip)
@@ -594,13 +883,24 @@ async function handleRegularPreview(req: Request) {
       projectId = extractedData.projectId
       projectSlug = extractedData.projectSlug
       files = extractedData.files
+      // For compressed data, we'll need to get auth info differently or make it optional
+      authUserId = undefined
+      authUsername = undefined
     } else {
       // Handle JSON format (backward compatibility)
       console.log('[Preview] 📄 Received JSON data for regular preview')
-      const { projectId: jsonProjectId, projectSlug: jsonProjectSlug, files: jsonFiles } = await req.json()
+      const { 
+        projectId: jsonProjectId, 
+        projectSlug: jsonProjectSlug, 
+        files: jsonFiles,
+        authUserId: parsedAuthUserId,
+        authUsername: parsedAuthUsername 
+      } = await req.json()
       projectId = jsonProjectId
       projectSlug = jsonProjectSlug || projectId // fallback to projectId
       files = jsonFiles
+      authUserId = parsedAuthUserId
+      authUsername = parsedAuthUsername
     }
 
     if (!projectId) {
@@ -615,15 +915,32 @@ async function handleRegularPreview(req: Request) {
       return Response.json({ error: 'No files provided for preview' }, { status: 400 })
     }
 
-    // Get user from Supabase
-    const supabase = await createClient()
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    
-    if (userError || !user) {
-      return new Response('Unauthorized', { status: 401 })
+    // Validate auth info from frontend (required for JSON, optional for compressed)
+    if (contentType.includes('application/json') && (!authUserId || !authUsername)) {
+      return Response.json({ 
+        error: 'Auth information required', 
+        details: 'authUserId and authUsername must be provided from frontend for JSON requests' 
+      }, { status: 400 })
     }
 
-    console.log(`Creating preview for project ${projectId} with ${files.length} files`)
+    console.log(`Creating preview for project ${projectId} with ${files.length} files${authUsername ? ` by user ${authUsername}` : ''}`)
+
+    // 🔍 Check domain availability and generate unique slug if needed
+    console.log(`[Domain Check] Checking availability for: ${projectSlug}`)
+    const domainCheck = await checkDomainAvailability(projectSlug, externalSupabase)
+    const finalSlug = domainCheck.finalSlug
+    const originalSlug = domainCheck.available ? null : projectSlug
+
+    if (!domainCheck.available) {
+      console.log(`[Domain Check] "${projectSlug}" not available, using "${finalSlug}"`)
+    }
+
+    console.log(`[Domain Check] Final slug: ${finalSlug}`)
+
+    // Create site tracking record if we have auth info
+    if (authUserId && authUsername) {
+      await createSiteRecord(finalSlug, originalSlug, authUserId, authUsername, externalSupabase)
+    }
 
     // Parse environment variables from .env.local file if it exists
     let envVars: Record<string, string> = {}
@@ -856,20 +1173,22 @@ devDependencies:
         console.log('[Preview] Build completed successfully')
         
         // Upload built files to Supabase
-        const uploadSuccess = await uploadViteBuildToSupabase(sandbox, projectSlug, externalSupabase)
+        const uploadSuccess = await uploadViteBuildToSupabase(sandbox, finalSlug, externalSupabase)
         
         if (!uploadSuccess) {
           throw new Error('Failed to upload built files to hosting')
         }
         
         // Return hosted URL instead of sandbox URL
-        const hostedUrl = `https://${projectSlug}.pipilot.dev/`
+        const hostedUrl = `https://${finalSlug}.pipilot.dev/`
         
         console.log(`[Preview] Vite project hosted at: ${hostedUrl}`)
         
         return Response.json({
           sandboxId: sandbox.id,
           url: hostedUrl,
+          finalSlug: finalSlug,
+          originalSlug: originalSlug,
           processId: null, // No process for hosted version
           hosted: true // Flag to indicate this is hosted
         })

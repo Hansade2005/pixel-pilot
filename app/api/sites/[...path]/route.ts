@@ -1,5 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createClient as createExternalClient } from '@supabase/supabase-js'
+import { trackSiteView } from '@/app/api/preview/route'
 
 // Supabase configuration for sites storage
 const SUPABASE_CONFIG = {
@@ -92,6 +94,14 @@ export async function GET(request: NextRequest) {
         const fallback = await supabase.storage.from('documents').download(`sites/${siteId}/index.html`);
         if (!fallback.error) {
           const indexBuffer = await fallback.data.arrayBuffer();
+          
+          // Track view for SPA fallback
+          const externalSupabase = createExternalClient(
+            SUPABASE_CONFIG.URL, 
+            SUPABASE_CONFIG.SERVICE_ROLE_KEY
+          );
+          await trackSiteView(siteId, externalSupabase, request);
+          
           return new NextResponse(Buffer.from(indexBuffer), {
             headers: { 
               'Content-Type': 'text/html; charset=utf-8',
@@ -105,6 +115,16 @@ export async function GET(request: NextRequest) {
 
     const arrayBuffer = await data.arrayBuffer();
     const contentType = detectContentType(filePath);
+    
+    // Track view for HTML files (page loads)
+    if (contentType.includes('html')) {
+      // Create external Supabase client for tracking
+      const externalSupabase = createExternalClient(
+        SUPABASE_CONFIG.URL, 
+        SUPABASE_CONFIG.SERVICE_ROLE_KEY
+      );
+      await trackSiteView(siteId, externalSupabase, request);
+    }
     
     // Set appropriate cache headers
     const cacheControl = contentType.includes('html')

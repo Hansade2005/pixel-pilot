@@ -26,6 +26,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { filterUnwantedFiles } from "@/lib/utils";
 import { compress } from 'lz4js'
 import { zipSync, strToU8 } from 'fflate'
+import { createClient } from "@/lib/supabase/client";
 import {
   WebPreview,
   WebPreviewNavigation,
@@ -510,8 +511,18 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       streamReader.cancel()
       setStreamReader(null)
     }
-    
+
     try {
+      // Get current user for auth information
+      const supabase = createClient()
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      if (userError || !user) {
+        throw new Error('Authentication required. Please sign in to create previews.')
+      }
+
+      const authUserId = user.id
+      const authUsername = user.user_metadata?.full_name || user.email?.split('@')[0] || 'anonymous'
       // Fetch files from IndexedDB client-side
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
@@ -526,7 +537,11 @@ export const CodePreviewPanel = forwardRef<CodePreviewPanelRef, CodePreviewPanel
       console.log(`[CodePreviewPanel] Filtered files for preview: ${filteredFiles.length} of ${files.length} (removed ${files.length - filteredFiles.length} unwanted files)`)
 
       // Compress the project files for efficient transfer
-      const compressedData = await compressProjectFiles(filteredFiles, [], [], { project })
+      const compressedData = await compressProjectFiles(filteredFiles, [], [], { 
+        project,
+        authUserId,
+        authUsername
+      })
 
       // Create a streaming request with EventSource-like handling
       const response = await fetch('/api/preview', {
