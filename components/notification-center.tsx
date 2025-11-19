@@ -319,13 +319,6 @@ export const NotificationCenter = memo(function NotificationCenter() {
     </DropdownMenu>
   );
 });
-    loadNotifications();
-  }, []);
-
-  // Load user preferences
-  useEffect(() => {
-    loadPreferences();
-  }, []);
 
   const loadNotifications = useCallback(async () => {
     try {
