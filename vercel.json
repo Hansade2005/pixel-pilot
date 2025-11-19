@@ -7,8 +7,15 @@
     {
       "source": "/sites/:siteId/",
       "destination": "/sites/:siteId/index.html"
-    }, 
-   { "source": "/sites/:siteId/(.*)", "destination": "/sites/:siteId/index.html" }
+    },
+    {
+      "source": "/sites/:siteId/(.*\\.(js|css|png|jpg|jpeg|gif|webp|svg|woff|woff2|ico|json|txt|xml|map))",
+      "destination": "/sites/:siteId/$1"
+    },
+    {
+      "source": "/sites/:siteId/(.*)",
+      "destination": "/sites/:siteId/index.html"
+    }
   ],
   "headers": [
     {
@@ -17,6 +24,51 @@
         {
           "key": "X-Multi-Tenant",
           "value": "true"
+        }
+      ]
+    },
+    {
+      "source": "/sites/(.*\\.js)",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/javascript"
+        }
+      ]
+    },
+    {
+      "source": "/sites/(.*\\.css)",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/css"
+        }
+      ]
+    },
+    {
+      "source": "/sites/(.*\\.(png|jpg|jpeg|gif|webp|svg|ico))",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "image/$2"
+        }
+      ]
+    },
+    {
+      "source": "/sites/(.*\\.(woff|woff2))",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "font/$2"
+        }
+      ]
+    },
+    {
+      "source": "/sites/(.*\\.json)",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/json"
         }
       ]
     }
