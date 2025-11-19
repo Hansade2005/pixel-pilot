@@ -14,18 +14,25 @@ export function OneSignalProvider() {
     // OneSignal is now initialized directly in the head script
     // This provider just handles additional setup and event listeners
     if (typeof window !== 'undefined' && window.OneSignal) {
-      // Optional: Set up additional event listeners
-      window.OneSignal.on('subscriptionChange', function(isSubscribed: boolean) {
-        console.log('OneSignal subscription changed:', isSubscribed);
-      });
+      // Set up event listeners using the correct OneSignal API
+      try {
+        // Check if OneSignal.Notifications is available
+        if (window.OneSignal.Notifications) {
+          window.OneSignal.Notifications.addEventListener('subscriptionChange', function(isSubscribed: boolean) {
+            console.log('OneSignal subscription changed:', isSubscribed);
+          });
 
-      window.OneSignal.on('notificationDisplay', function(event: any) {
-        console.log('OneSignal notification displayed:', event);
-      });
+          window.OneSignal.Notifications.addEventListener('foregroundWillDisplay', function(event: any) {
+            console.log('OneSignal notification will display:', event);
+          });
 
-      window.OneSignal.on('notificationDismiss', function(event: any) {
-        console.log('OneSignal notification dismissed:', event);
-      });
+          window.OneSignal.Notifications.addEventListener('dismiss', function(event: any) {
+            console.log('OneSignal notification dismissed:', event);
+          });
+        }
+      } catch (error) {
+        console.warn('OneSignal event listeners setup failed:', error);
+      }
     }
   }, []);
 

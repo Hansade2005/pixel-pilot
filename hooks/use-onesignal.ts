@@ -64,13 +64,15 @@ export function useOneSignal(): OneSignalHook {
         setIsSupported(true);
 
         // Check if user is subscribed
-        const isSubscribed = await window.OneSignal.getSubscription();
+        const isSubscribed = await window.OneSignal.Notifications.getSubscription();
         setIsSubscribed(isSubscribed);
 
-        // Listen for subscription changes
-        window.OneSignal.on('subscriptionChange', (isSubscribed: boolean) => {
-          setIsSubscribed(isSubscribed);
-        });
+        // Listen for subscription changes using the correct API
+        if (window.OneSignal.Notifications) {
+          window.OneSignal.Notifications.addEventListener('subscriptionChange', (isSubscribed: boolean) => {
+            setIsSubscribed(isSubscribed);
+          });
+        }
       } catch (error) {
         console.error('Error checking OneSignal status:', error);
       } finally {
@@ -86,8 +88,8 @@ export function useOneSignal(): OneSignalHook {
 
     try {
       setIsLoading(true);
-      await window.OneSignal.showSlidedownPrompt();
-      const isSubscribed = await window.OneSignal.getSubscription();
+      await window.OneSignal.Notifications.requestPermission();
+      const isSubscribed = await window.OneSignal.Notifications.getSubscription();
       setIsSubscribed(isSubscribed);
       return isSubscribed;
     } catch (error) {
@@ -103,7 +105,7 @@ export function useOneSignal(): OneSignalHook {
 
     try {
       setIsLoading(true);
-      await window.OneSignal.setSubscription(false);
+      await window.OneSignal.Notifications.setSubscription(false);
       setIsSubscribed(false);
       return true;
     } catch (error) {
@@ -115,20 +117,28 @@ export function useOneSignal(): OneSignalHook {
   }, []);
 
   const sendTestNotification = useCallback(async (): Promise<void> => {
-    if (!window.OneSignal) return;
+    // OneSignal Web SDK doesn't support sending notifications from client-side
+    // This is only available via REST API from server-side
+    console.log('Test notification: OneSignal Web SDK does not support client-side notification sending. Use REST API for server-side notifications.');
 
+    // Fallback: try to show a browser notification if permission granted
     try {
-      await window.OneSignal.sendSelfNotification(
-        'Test Notification',
-        'This is a test notification from PiPilot!',
-        'https://pipilot.dev',
-        {
-          icon: '/logo.png',
-          badge: '/logo.png'
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('Test Notification', {
+          body: 'This is a test notification from PiPilot!',
+          icon: '/logo.png'
+        });
+      } else if ('Notification' in window && Notification.permission === 'default') {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          new Notification('Test Notification', {
+            body: 'This is a test notification from PiPilot!',
+            icon: '/logo.png'
+          });
         }
-      );
+      }
     } catch (error) {
-      console.error('Error sending test notification:', error);
+      console.error('Error showing browser notification:', error);
     }
   }, []);
 
