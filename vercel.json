@@ -5,7 +5,7 @@
       "destination": "/api/sites/:siteId"
     },
     {
-      "source": "/sites/:siteId/(.*)",
+      "source": "/sites/:siteId/:path*",
       "destination": "/api/sites/:siteId/:path*"
     }
   ],
