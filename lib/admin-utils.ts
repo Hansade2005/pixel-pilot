@@ -101,12 +101,5 @@ export const ADMIN_MENU_ITEMS = [
     icon: 'Settings',
     href: '/admin/system',
     permission: ADMIN_PERMISSIONS.SYSTEM_MANAGEMENT
-  },
-  {
-    id: 'super-admin',
-    label: 'Super Admin',
-    icon: 'Shield',
-    href: '/admin/super-admin',
-    permission: ADMIN_PERMISSIONS.SUPER_ADMIN
   }
 ]

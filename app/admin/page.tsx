@@ -21,7 +21,7 @@ import {
   DollarSign,
   Activity,
   UserPlus,
-  Zap,
+  Zap, Download, RefreshCw,
   Webhook
 } from "lucide-react"
 
@@ -193,7 +193,7 @@ export default function AdminPanel() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading admin panel...</p>
@@ -207,22 +207,46 @@ export default function AdminPanel() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Admin Header */}
-      <div className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Shield className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-                <p className="text-sm text-muted-foreground">System overview and management</p>
-              </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+      {/* Clean Header */}
+      <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b border-slate-200/50 dark:border-slate-700/50">
+        <div className="container mx-auto px-6 py-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-lg">
+              <Shield className="h-5 w-5 text-white" />
             </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Admin Dashboard</h1>
+              <p className="text-sm text-slate-600 dark:text-slate-400">System overview and management</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 mt-4">
+            <Badge className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800">
+              <CheckCircle className="h-3 w-3 mr-1" />
+              Admin Access
+            </Badge>
+            <span className="text-sm text-slate-600 dark:text-slate-400 hidden md:inline">
+              {user?.email}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-6 py-8">
+        {/* Horizontal Action Bar */}
+        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 mb-8">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              {/* System Health Indicator */}
+              <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh Data
+              </Button>
+              <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700">
+                <Download className="h-4 w-4 mr-2" />
+                Export Report
+              </Button>
+            </div>
+            <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${
                   stats?.systemHealth === 'healthy' ? 'bg-green-500' :
@@ -230,126 +254,87 @@ export default function AdminPanel() {
                 }`} />
                 <span className="text-sm font-medium capitalize">{stats?.systemHealth || 'Unknown'}</span>
               </div>
-              <Badge variant="secondary" className="bg-green-100 text-green-800">
-                <CheckCircle className="h-3 w-3 mr-1" />
-                Admin Access
-              </Badge>
-              <span className="text-sm text-muted-foreground hidden md:inline">
-                {user.email}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-4 py-6">
-        {/* Quick Actions Bar */}
-        <div className="mb-6">
-          <div className="flex flex-wrap gap-3">
-            {ADMIN_MENU_ITEMS.filter(item => hasAdminPermission(user, item.permission)).map((item) => (
-              <Button
-                key={item.id}
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (item.id === 'domains') router.push('/admin/domains')
-                  else if (item.id === 'users') router.push('/admin/users')
-                  else if (item.id === 'billing') router.push('/admin/billing')
-                  else if (item.id === 'analytics') router.push('/admin/analytics')
-                  else if (item.id === 'email') router.push('/admin/email')
-                  else if (item.id === 'system') router.push('/admin/system')
-                  else if (item.id === 'super-admin') router.push('/admin/super-admin')
-                }}
-                className="flex items-center gap-2 hover:bg-primary/5"
-              >
-                <BarChart3 className="h-4 w-4" />
-                {item.label}
+              <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700">
+                <Settings className="h-4 w-4 mr-2" />
+                System Settings
               </Button>
-            ))}
+            </div>
           </div>
         </div>
 
         {/* Primary KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Revenue KPI - Most Important */}
-          <Card className="relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-green-500/10 to-green-600/10 rounded-bl-3xl" />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-              <DollarSign className="h-5 w-5 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-green-600">
-                {stats?.subscriptionSystemEnabled ? `$${stats?.totalRevenue || 0}` : '$0'}
+          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-green-100 text-sm font-medium">Total Revenue</p>
+                  <p className="text-3xl font-bold">{stats?.subscriptionSystemEnabled ? `$${stats?.totalRevenue || 0}` : '$0'}</p>
+                  <p className="text-green-200 text-xs mt-1">
+                    <TrendingUp className="h-3 w-3 inline mr-1" />
+                    {stats?.subscriptionSystemEnabled
+                      ? `+$${stats?.monthlyRevenue || 0} this month`
+                      : 'Free mode active'
+                    }
+                  </p>
+                </div>
+                <DollarSign className="h-8 w-8 text-green-200" />
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {stats?.subscriptionSystemEnabled
-                  ? `+$${stats?.monthlyRevenue || 0} this month`
-                  : 'Free mode active'
-                }
-              </p>
             </CardContent>
           </Card>
 
           {/* Users KPI */}
-          <Card className="relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-blue-500/10 to-blue-600/10 rounded-bl-3xl" />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Users</CardTitle>
-              <Users className="h-5 w-5 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-blue-600">{stats?.activeUsers || 0}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                of {stats?.totalUsers || 0} total users
-              </p>
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-100 text-sm font-medium">Active Users</p>
+                  <p className="text-3xl font-bold">{stats?.activeUsers || 0}</p>
+                  <p className="text-blue-200 text-xs mt-1">
+                    <UserPlus className="h-3 w-3 inline mr-1" />
+                    Total: {stats?.totalUsers || 0}
+                  </p>
+                </div>
+                <Users className="h-8 w-8 text-blue-200" />
+              </div>
             </CardContent>
           </Card>
 
           {/* Subscriptions KPI */}
-          <Card className="relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-purple-500/10 to-purple-600/10 rounded-bl-3xl" />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Subscriptions</CardTitle>
-              <CreditCard className="h-5 w-5 text-purple-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-purple-600">
-                {stats?.subscriptionSystemEnabled ? (stats?.activeSubscriptions || 0) : 'N/A'}
+          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-purple-100 text-sm font-medium">Subscriptions</p>
+                  <p className="text-3xl font-bold">{stats?.subscriptionSystemEnabled ? (stats?.activeSubscriptions || 0) : 'N/A'}</p>
+                  <p className="text-purple-200 text-xs mt-1">
+                    <CreditCard className="h-3 w-3 inline mr-1" />
+                    {stats?.subscriptionSystemEnabled
+                      ? `${stats?.totalSubscriptions || 0} total`
+                      : 'Free mode'
+                    }
+                  </p>
+                </div>
+                <CreditCard className="h-8 w-8 text-purple-200" />
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {stats?.subscriptionSystemEnabled
-                  ? `${stats?.totalSubscriptions || 0} total`
-                  : 'Free mode'
-                }
-              </p>
             </CardContent>
           </Card>
 
           {/* System Health KPI */}
-          <Card className="relative overflow-hidden">
-            <div className={`absolute top-0 right-0 w-16 h-16 rounded-bl-3xl ${
-              stats?.systemHealth === 'healthy' ? 'bg-gradient-to-br from-green-500/10 to-green-600/10' :
-              stats?.systemHealth === 'warning' ? 'bg-gradient-to-br from-yellow-500/10 to-yellow-600/10' :
-              'bg-gradient-to-br from-red-500/10 to-red-600/10'
-            }`} />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">System Status</CardTitle>
-              <Activity className={`h-5 w-5 ${
-                stats?.systemHealth === 'healthy' ? 'text-green-600' :
-                stats?.systemHealth === 'warning' ? 'text-yellow-600' : 'text-red-600'
-              }`} />
-            </CardHeader>
-            <CardContent>
-              <div className={`text-3xl font-bold capitalize ${
-                stats?.systemHealth === 'healthy' ? 'text-green-600' :
-                stats?.systemHealth === 'warning' ? 'text-yellow-600' : 'text-red-600'
-              }`}>
-                {stats?.systemHealth || 'Unknown'}
+          <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-orange-100 text-sm font-medium">System Status</p>
+                  <p className="text-3xl font-bold capitalize">{stats?.systemHealth || 'Unknown'}</p>
+                  <p className="text-orange-200 text-xs mt-1">
+                    <Activity className="h-3 w-3 inline mr-1" />
+                    All systems operational
+                  </p>
+                </div>
+                <Activity className="h-8 w-8 text-orange-200" />
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                All systems operational
-              </p>
             </CardContent>
           </Card>
         </div>
@@ -572,4 +557,4 @@ export default function AdminPanel() {
       </div>
     </div>
   )
-}
+} 

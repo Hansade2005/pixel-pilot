@@ -20,21 +20,40 @@ interface Notification {
   id: string;
   title: string;
   message: string;
+  body?: string;
   type: string;
   url?: string;
   image_url?: string;
+  icon?: string;
   priority: number;
   is_read: boolean;
+  read?: boolean;
   read_at?: string;
   expires_at?: string;
   created_at: string;
+}
+
+interface NotificationPreferences {
+  push_enabled: boolean;
+  email_enabled: boolean;
+  morning_reminders: boolean;
+  project_reminders: boolean;
+  tips_and_features: boolean;
+  achievement_notifications: boolean;
 }
 
 export const NotificationCenter = memo(function NotificationCenter() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
-  const [preferences, setPreferences] = useState<any>(null);
+  const [preferences, setPreferences] = useState<NotificationPreferences>({
+    push_enabled: false,
+    email_enabled: true,
+    morning_reminders: true,
+    project_reminders: true,
+    tips_and_features: true,
+    achievement_notifications: true,
+  });
   const [showSettings, setShowSettings] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -75,6 +94,19 @@ export const NotificationCenter = memo(function NotificationCenter() {
     }
   }, [supabase]);
 
+  // Load preferences
+  const loadPreferences = useCallback(async () => {
+    try {
+      const response = await fetch('/api/notifications/preferences');
+      if (response.ok) {
+        const data = await response.json();
+        setPreferences(data);
+      }
+    } catch (error) {
+      console.error('Error loading preferences:', error);
+    }
+  }, []);
+
   // Mark notification as read
   const markAsRead = useCallback(async (notificationId: string) => {
     try {
@@ -91,14 +123,14 @@ export const NotificationCenter = memo(function NotificationCenter() {
         return;
       }
 
-      setNotifications(prev =>
+      setNotifications((prev: Notification[]) =>
         prev.map(n =>
           n.id === notificationId
-            ? { ...n, is_read: true, read_at: new Date().toISOString() }
+            ? { ...n, is_read: true, read: true, read_at: new Date().toISOString() }
             : n
         )
       );
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      setUnreadCount((prev: number) => Math.max(0, prev - 1));
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
@@ -124,17 +156,60 @@ export const NotificationCenter = memo(function NotificationCenter() {
         return;
       }
 
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true, read_at: new Date().toISOString() })));
+      setNotifications((prev: Notification[]) => 
+        prev.map(n => ({ ...n, is_read: true, read: true, read_at: new Date().toISOString() }))
+      );
       setUnreadCount(0);
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
     }
   }, [supabase]);
 
+  // Handle notification click
+  const handleNotificationClick = useCallback((notification: Notification) => {
+    if (!notification.is_read && !notification.read) {
+      markAsRead(notification.id);
+    }
+    if (notification.url) {
+      window.location.href = notification.url;
+    }
+    setIsOpen(false);
+  }, [markAsRead]);
+
+  // Handle toggle preference
+  const handleTogglePreference = useCallback(async (key: string, value: boolean) => {
+    try {
+      const updated = { ...preferences, [key]: value };
+      
+      // Optimistically update UI
+      startTransition(() => {
+        setPreferences(updated);
+      });
+
+      const response = await fetch('/api/notifications/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update preferences');
+      }
+
+      toast.success('Preferences updated');
+    } catch (error) {
+      console.error('Error updating preferences:', error);
+      toast.error('Failed to update preferences');
+      // Revert on error
+      loadPreferences();
+    }
+  }, [preferences, startTransition]);
+
   // Load notifications on mount
   useEffect(() => {
     loadNotifications();
-  }, [loadNotifications]);
+    loadPreferences();
+  }, [loadNotifications, loadPreferences]);
 
   // Set up real-time subscription for new notifications
   useEffect(() => {
@@ -154,12 +229,12 @@ export const NotificationCenter = memo(function NotificationCenter() {
           },
           (payload) => {
             const newNotification = payload.new as Notification;
-            setNotifications(prev => [newNotification, ...prev]);
-            setUnreadCount(prev => prev + 1);
+            setNotifications((prev: Notification[]) => [newNotification, ...prev]);
+            setUnreadCount((prev: number) => prev + 1);
 
             // Show toast notification
             toast(newNotification.title, {
-              description: newNotification.message,
+              description: newNotification.message || newNotification.body,
               action: newNotification.url ? {
                 label: 'View',
                 onClick: () => window.open(newNotification.url, '_blank'),
@@ -202,245 +277,7 @@ export const NotificationCenter = memo(function NotificationCenter() {
     return `${Math.floor(diffInSeconds / 86400)}d ago`;
   };
 
-  return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          {unreadCount > 0 && (
-            <Badge
-              variant="destructive"
-              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
-            >
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </Badge>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 max-h-96 overflow-y-auto">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h4 className="font-semibold">Notifications</h4>
-          <div className="flex items-center space-x-2">
-            {unreadCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={markAllAsRead}
-                disabled={isPending}
-              >
-                Mark all read
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowSettings(!showSettings)}
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        {showSettings ? (
-          <div className="p-4 space-y-4">
-            <h5 className="font-medium">Notification Settings</h5>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Push Notifications</span>
-                <Switch
-                  checked={preferences?.push_enabled ?? false}
-                  onCheckedChange={(checked) =>
-                    setPreferences(prev => ({ ...prev, push_enabled: checked }))
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Email Notifications</span>
-                <Switch
-                  checked={preferences?.email_enabled ?? true}
-                  onCheckedChange={(checked) =>
-                    setPreferences(prev => ({ ...prev, email_enabled: checked }))
-                  }
-                />
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="max-h-80 overflow-y-auto">
-            {notifications.length === 0 ? (
-              <div className="p-4 text-center text-muted-foreground">
-                <BellOff className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>No notifications yet</p>
-              </div>
-            ) : (
-              notifications.map((notification) => (
-                <DropdownMenuItem
-                  key={notification.id}
-                  className={`p-4 cursor-pointer ${!notification.is_read ? 'bg-muted/50' : ''}`}
-                  onClick={() => {
-                    if (!notification.is_read) {
-                      markAsRead(notification.id);
-                    }
-                    if (notification.url) {
-                      window.open(notification.url, '_blank');
-                    }
-                  }}
-                >
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-start justify-between">
-                      <p className="text-sm font-medium leading-none">
-                        {notification.title}
-                      </p>
-                      <div className="flex items-center space-x-1">
-                        <Badge
-                          variant="secondary"
-                          className={`text-xs ${getTypeColor(notification.type)}`}
-                        >
-                          {notification.type}
-                        </Badge>
-                        {!notification.is_read && (
-                          <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                        )}
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {notification.message}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatTimeAgo(notification.created_at)}
-                    </p>
-                  </div>
-                </DropdownMenuItem>
-              ))
-            )}
-          </div>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-});
-
-  const loadNotifications = useCallback(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // For now, create mock notifications
-      // In production, this would fetch from notification_queue table
-      const mockNotifications: Notification[] = [
-        {
-          id: '1',
-          title: '🌅 Good Morning!',
-          body: 'Ready to build something amazing today?',
-          icon: '/icons/icon-192x192.png',
-          url: '/workspace',
-          read: false,
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          title: '💡 Pro Tip',
-          body: 'Use AI autocomplete to code 10x faster!',
-          icon: '/icons/icon-192x192.png',
-          url: '/docs/tips',
-          read: false,
-          created_at: new Date(Date.now() - 3600000).toISOString()
-        }
-      ];
-
-      setNotifications(mockNotifications);
-      setUnreadCount(mockNotifications.filter(n => !n.read).length);
-    } catch (error) {
-      console.error('Error loading notifications:', error);
-    }
-  }, [supabase]);
-
-  const loadPreferences = useCallback(async () => {
-    try {
-      const response = await fetch('/api/notifications/preferences');
-      if (response.ok) {
-        const data = await response.json();
-        setPreferences(data);
-      }
-    } catch (error) {
-      console.error('Error loading preferences:', error);
-    }
-  }, []);
-
-  const handleEnableNotifications = useCallback(async () => {
-    const success = await subscribe();
-    if (success) {
-      toast.success('🔔 Notifications enabled!');
-      await sendTestNotification();
-    } else {
-      toast.error('Failed to enable notifications');
-    }
-  }, [subscribe, sendTestNotification]);
-
-  const handleDisableNotifications = useCallback(async () => {
-    const success = await unsubscribe();
-    if (success) {
-      toast.success('Notifications disabled');
-    } else {
-      toast.error('Failed to disable notifications');
-    }
-  }, [unsubscribe]);
-
-  const handleMarkAsRead = useCallback(async (notificationId: string) => {
-    startTransition(() => {
-      setNotifications(prev =>
-        prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
-      );
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    });
-  }, []);
-
-  const handleMarkAllAsRead = useCallback(() => {
-    startTransition(() => {
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-      setUnreadCount(0);
-    });
-  }, []);
-
-  const handleNotificationClick = useCallback((notification: Notification) => {
-    if (!notification.read) {
-      handleMarkAsRead(notification.id);
-    }
-    if (notification.url) {
-      window.location.href = notification.url;
-    }
-    setIsOpen(false);
-  }, [handleMarkAsRead]);
-
-  const handleTogglePreference = useCallback(async (key: string, value: boolean) => {
-    try {
-      const updated = { ...preferences, [key]: value };
-      
-      // Optimistically update UI
-      startTransition(() => {
-        setPreferences(updated);
-      });
-
-      const response = await fetch('/api/notifications/preferences', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated)
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update preferences');
-      }
-
-      toast.success('Preferences updated');
-    } catch (error) {
-      console.error('Error updating preferences:', error);
-      toast.error('Failed to update preferences');
-      // Revert on error
-      loadPreferences();
-    }
-  }, [preferences, loadPreferences]);
-
-  if (!isSupported) {
+  if (!oneSignalSupported) {
     return (
       <button className="text-white hover:text-gray-300 transition-colors relative">
         <BellOff className="w-5 h-5" />
@@ -478,7 +315,7 @@ export const NotificationCenter = memo(function NotificationCenter() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={handleMarkAllAsRead}
+                    onClick={markAllAsRead}
                     className="h-7 text-xs"
                   >
                     <Check className="w-3 h-3 mr-1" />
@@ -511,15 +348,15 @@ export const NotificationCenter = memo(function NotificationCenter() {
                   <DropdownMenuItem
                     key={notification.id}
                     className={`p-4 cursor-pointer ${
-                      !notification.read ? 'bg-indigo-500/5' : ''
+                      !notification.is_read && !notification.read ? 'bg-indigo-500/5' : ''
                     }`}
                     onClick={() => handleNotificationClick(notification)}
                   >
                     <div className="flex gap-3 w-full">
                       <div className="flex-shrink-0">
-                        {notification.icon ? (
+                        {notification.icon || notification.image_url ? (
                           <img
-                            src={notification.icon}
+                            src={notification.icon || notification.image_url}
                             alt=""
                             className="w-10 h-10 rounded-lg"
                           />
@@ -534,15 +371,15 @@ export const NotificationCenter = memo(function NotificationCenter() {
                           <h4 className="text-sm font-medium text-white truncate">
                             {notification.title}
                           </h4>
-                          {!notification.read && (
+                          {!notification.is_read && !notification.read && (
                             <div className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0 mt-1" />
                           )}
                         </div>
                         <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">
-                          {notification.body}
+                          {notification.message || notification.body}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
-                          {new Date(notification.created_at).toLocaleString()}
+                          {formatTimeAgo(notification.created_at)}
                         </p>
                       </div>
                     </div>
@@ -585,71 +422,67 @@ export const NotificationCenter = memo(function NotificationCenter() {
                 </div>
               )}
 
-              <div className="space-y-4">
-                <>
-                  <DropdownMenuSeparator className="bg-gray-700" />
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-white">Morning Reminders</p>
-                      <p className="text-xs text-gray-400">Daily motivation at 9 AM</p>
-                    </div>
-                    <Switch
-                      checked={preferences.morning_reminders}
-                      onCheckedChange={(checked) => handleTogglePreference('morning_reminders', checked)}
-                    />
-                  </div>
+              <DropdownMenuSeparator className="bg-gray-700" />
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-white">Morning Reminders</p>
+                  <p className="text-xs text-gray-400">Daily motivation at 9 AM</p>
+                </div>
+                <Switch
+                  checked={preferences.morning_reminders}
+                  onCheckedChange={(checked) => handleTogglePreference('morning_reminders', checked)}
+                />
+              </div>
 
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-white">Project Reminders</p>
-                    <Switch
-                      checked={preferences.project_reminders}
-                      onCheckedChange={(checked) => handleTogglePreference('project_reminders', checked)}
-                    />
-                  </div>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-white">Project Reminders</p>
+                <Switch
+                  checked={preferences.project_reminders}
+                  onCheckedChange={(checked) => handleTogglePreference('project_reminders', checked)}
+                />
+              </div>
 
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-white">Tips & Features</p>
-                    <Switch
-                      checked={preferences.tips_and_features}
-                      onCheckedChange={(checked) => handleTogglePreference('tips_and_features', checked)}
-                    />
-                  </div>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-white">Tips & Features</p>
+                <Switch
+                  checked={preferences.tips_and_features}
+                  onCheckedChange={(checked) => handleTogglePreference('tips_and_features', checked)}
+                />
+              </div>
 
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-white">Achievements</p>
-                    <Switch
-                      checked={preferences.achievement_notifications}
-                      onCheckedChange={(checked) => handleTogglePreference('achievement_notifications', checked)}
-                    />
-                  </div>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-white">Achievements</p>
+                <Switch
+                  checked={preferences.achievement_notifications}
+                  onCheckedChange={(checked) => handleTogglePreference('achievement_notifications', checked)}
+                />
+              </div>
 
-                  <DropdownMenuSeparator className="bg-gray-700" />
+              <DropdownMenuSeparator className="bg-gray-700" />
 
-                  {oneSignalSupported && oneSignalSubscribed && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={sendOneSignalTest}
-                      className="w-full"
-                    >
-                      Send Test Push Notification
-                    </Button>
-                  )}
-
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setShowSettings(false);
-                      window.location.href = '/settings/notifications';
-                    }}
-                    className="w-full mt-2"
-                  >
-                    Advanced Settings & Preview
-                  </Button>
-                </>
+              {oneSignalSupported && oneSignalSubscribed && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={sendOneSignalTest}
+                  className="w-full"
+                >
+                  Send Test Push Notification
+                </Button>
               )}
+
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setShowSettings(false);
+                  window.location.href = '/settings/notifications';
+                }}
+                className="w-full mt-2"
+              >
+                Advanced Settings & Preview
+              </Button>
             </div>
           </>
         )}

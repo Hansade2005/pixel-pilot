@@ -18,6 +18,7 @@ import {
   BarChart3,
   TrendingUp,
   Users,
+  Shield,
   Eye,
   Calendar,
   Search,
@@ -30,6 +31,7 @@ import {
   CheckCircle,
   Clock, Activity,
   Smartphone,
+  Settings,
   Monitor,
   Tablet
 } from "lucide-react"
@@ -286,7 +288,7 @@ export default function AdminDomainsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
         <div className="text-center">
           <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
           <p className="text-muted-foreground">Loading domain management...</p>
@@ -296,94 +298,128 @@ export default function AdminDomainsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push('/admin')}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span>Back to Admin</span>
-              </Button>
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <Globe className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-foreground">Domain Management</h1>
-                  <p className="text-muted-foreground">Monitor and manage hosted sites and analytics</p>
-                </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+      {/* Clean Header */}
+      <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b border-slate-200/50 dark:border-slate-700/50">
+        <div className="container mx-auto px-6 py-6">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/admin')}
+              className="hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Admin
+            </Button>
+            <div className="h-8 w-px bg-slate-200 dark:bg-slate-700"></div>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg">
+                <Globe className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Domain Management</h1>
+                <p className="text-sm text-slate-600 dark:text-slate-400">Monitor and manage deployed sites</p>
               </div>
             </div>
-            <Button onClick={loadDomainData} className="flex items-center gap-2">
-              <RefreshCw className="h-4 w-4" />
-              <span>Refresh Data</span>
-            </Button>
+          </div>
+          <div className="flex items-center gap-3 mt-4">
+            <Badge className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800">
+              <Shield className="h-3 w-3 mr-1" />
+              Admin Access
+            </Badge>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-6 py-8">
+        {/* Horizontal Action Bar */}
+        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 mb-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button variant="outline" size="sm" onClick={loadDomainData} className="border-slate-200 dark:border-slate-700">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh Data
+              </Button>
+              <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700">
+                <Download className="h-4 w-4 mr-2" />
+                Export Report
+              </Button>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700">
+                <Settings className="h-4 w-4 mr-2" />
+                Configure
+              </Button>
+            </div>
+          </div>
+        </div>
         {/* Stats Overview */}
         {stats && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Sites</CardTitle>
-                <Globe className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.totalSites}</div>
-                <p className="text-xs text-muted-foreground">
-                  {stats.activeSites} active
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Views</CardTitle>
-                <Eye className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.totalViews.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">
-                  Avg {stats.avgViewsPerSite} per site
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Top Performer</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {stats.topPerformingSites[0]?.total_views || 0}
+            <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-blue-100 text-sm font-medium">Total Sites</p>
+                    <p className="text-3xl font-bold">{stats.totalSites}</p>
+                    <p className="text-blue-200 text-xs mt-1">
+                      <Globe className="h-3 w-3 inline mr-1" />
+                      {stats.activeSites} active
+                    </p>
+                  </div>
+                  <Globe className="h-8 w-8 text-blue-200" />
                 </div>
-                <p className="text-xs text-muted-foreground truncate">
-                  {stats.topPerformingSites[0]?.project_slug || 'No data'}
-                </p>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Recent Activity</CardTitle>
-                <Activity className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.recentActivity.length}</div>
-                <p className="text-xs text-muted-foreground">
-                  Sites viewed this week
-                </p>
+            <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0 shadow-lg">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-green-100 text-sm font-medium">Total Views</p>
+                    <p className="text-3xl font-bold">{stats.totalViews.toLocaleString()}</p>
+                    <p className="text-green-200 text-xs mt-1">
+                      <Eye className="h-3 w-3 inline mr-1" />
+                      Avg {stats.avgViewsPerSite} per site
+                    </p>
+                  </div>
+                  <Eye className="h-8 w-8 text-green-200" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0 shadow-lg">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-purple-100 text-sm font-medium">Top Performer</p>
+                    <p className="text-3xl font-bold">
+                      {stats.topPerformingSites[0]?.total_views || 0}
+                    </p>
+                    <p className="text-purple-200 text-xs mt-1 truncate">
+                      <TrendingUp className="h-3 w-3 inline mr-1" />
+                      {stats.topPerformingSites[0]?.project_slug || 'No data'}
+                    </p>
+                  </div>
+                  <TrendingUp className="h-8 w-8 text-purple-200" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white border-0 shadow-lg">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-orange-100 text-sm font-medium">Recent Activity</p>
+                    <p className="text-3xl font-bold">{stats.recentActivity.length}</p>
+                    <p className="text-orange-200 text-xs mt-1">
+                      <Activity className="h-3 w-3 inline mr-1" />
+                      Sites viewed this week
+                    </p>
+                  </div>
+                  <Activity className="h-8 w-8 text-orange-200" />
+                </div>
               </CardContent>
             </Card>
           </div>
