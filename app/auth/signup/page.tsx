@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { Github } from "lucide-react"
+import { isEmailValidForSignup } from "@/lib/email-validation"
 
 export default function SignupPage() {
   const [email, setEmail] = useState("")
@@ -28,6 +28,12 @@ export default function SignupPage() {
     setError(null)
 
     try {
+      // Validate email before signup
+      const emailValidation = await isEmailValidForSignup(email)
+      if (!emailValidation.valid) {
+        throw new Error(emailValidation.reason || "Invalid email address")
+      }
+
       const { error } = await supabase.auth.signUp({
         email,
         password,

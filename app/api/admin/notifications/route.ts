@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { checkAdminAccess } from '@/lib/admin-utils';
 import { triggerUserNotification } from '@/lib/pusher';
+import { sendOneSignalNotification } from '@/lib/onesignal';
+import { createNotificationImage } from '@/lib/notification-images';
 
 export async function GET(request: NextRequest) {
   try {
@@ -180,6 +182,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No users found for the selected audience' }, { status: 400 });
     }
 
+    // Generate image URL if not provided
+    let finalImageUrl = imageUrl;
+    if (!finalImageUrl) {
+      try {
+        finalImageUrl = createNotificationImage(title, message, type);
+        console.log('Generated notification image:', finalImageUrl);
+      } catch (error) {
+        console.error('Error generating notification image:', error);
+        // Continue without image if generation fails
+      }
+    }
+
     // Create admin notification
     const { data: adminNotification, error: adminError } = await supabase
       .from('admin_notifications')
@@ -190,7 +204,7 @@ export async function POST(request: NextRequest) {
         target_audience: targetAudience,
         specific_user_ids: specificUserIds || [],
         url,
-        image_url: imageUrl,
+        image_url: finalImageUrl,
         priority: priority || 1,
         expires_at: expiresAt,
         sent_by: user.id
@@ -211,7 +225,7 @@ export async function POST(request: NextRequest) {
       message,
       type,
       url,
-      image_url: imageUrl,
+      image_url: finalImageUrl,
       priority: priority || 1,
       expires_at: expiresAt
     }));
@@ -232,7 +246,7 @@ export async function POST(request: NextRequest) {
           message,
           type,
           url,
-          image_url: imageUrl,
+          image_url: finalImageUrl,
           priority: priority || 1,
           created_at: new Date().toISOString()
         };
@@ -243,6 +257,17 @@ export async function POST(request: NextRequest) {
       // Trigger notifications asynchronously (don't wait for completion)
       Promise.all(notificationPromises).catch(error => {
         console.error('Error triggering Pusher notifications:', error);
+      });
+
+      // Send push notifications via OneSignal (asynchronously)
+      sendOneSignalNotification({
+        title,
+        message,
+        url,
+        imageUrl: finalImageUrl,
+        segments: ['Subscribed Users'] // Send to all subscribed users
+      }).catch(error => {
+        console.error('Error sending OneSignal notifications:', error);
       });
     }
 

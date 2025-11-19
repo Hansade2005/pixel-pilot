@@ -37,6 +37,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { createNotificationImage } from "@/lib/notification-images"
 import {
   Bell,
   Send,
@@ -349,6 +350,40 @@ export default function AdminNotificationsPage() {
                   className="col-span-3"
                   placeholder="https://..."
                 />
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="imageUrl" className="text-right pt-2">Image (optional)</Label>
+                <div className="col-span-3 space-y-2">
+                  <Input
+                    id="imageUrl"
+                    value={formData.imageUrl}
+                    onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                    placeholder="https://... or leave empty for auto-generated"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Leave empty to auto-generate an AI image based on your notification content
+                  </p>
+                  {formData.title && formData.message && (
+                    <div className="border rounded-lg p-3 bg-muted/50">
+                      <p className="text-sm font-medium mb-2">Preview (auto-generated if empty):</p>
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={formData.imageUrl || createNotificationImage(formData.title, formData.message, formData.type)}
+                          alt="Notification preview"
+                          className="w-16 h-16 rounded-lg object-cover border"
+                          onError={(e) => {
+                            // Fallback to a default image if the generated one fails
+                            e.currentTarget.src = '/logo.png';
+                          }}
+                        />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{formData.title}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{formData.message}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="priority" className="text-right">Priority</Label>
