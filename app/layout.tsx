@@ -6,6 +6,7 @@ import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { ThemeProvider } from "@/components/theme-provider"
 import { ServiceWorkerProvider } from "@/components/service-worker-provider"
+import { OneSignalProvider } from "@/components/onesignal-provider"
 
 // const poppins = Poppins({
 //   subsets: ['latin'],
@@ -91,9 +92,24 @@ export default function RootLayout({
         <meta name="theme-color" content="#6366f1" />
         <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180x180.png" />
+        {/* OneSignal SDK */}
+        <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.OneSignalDeferred = window.OneSignalDeferred || [];
+              OneSignalDeferred.push(async function(OneSignal) {
+                await OneSignal.init({
+                  appId: "${process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID || '074baec0-7042-4faf-a337-674711dd90ad'}",
+                });
+              });
+            `,
+          }}
+        />
       </head>
       <body className="dark:bg-gray-900 dark:text-white font-sans">
         <ServiceWorkerProvider />
+        <OneSignalProvider />
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

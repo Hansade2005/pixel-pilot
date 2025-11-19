@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Bell, Eye, Send, Settings, Clock, Star } from 'lucide-react';
-import { usePushNotifications } from '@/hooks/use-push-notifications';
+import { useOneSignal } from '@/hooks/use-onesignal';
 import { toast } from 'sonner';
 import { NOTIFICATION_TEMPLATES } from '@/lib/notification-templates';
 
@@ -20,15 +20,15 @@ export default function NotificationSettingsPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const {
-    isSupported,
-    isSubscribed,
-    subscribe,
-    unsubscribe,
-    sendTestNotification
-  } = usePushNotifications();
-
   const supabase = createClient();
+
+  const {
+    isSupported: oneSignalSupported,
+    isSubscribed: oneSignalSubscribed,
+    subscribe: subscribeOneSignal,
+    unsubscribe: unsubscribeOneSignal,
+    sendTestNotification: sendOneSignalTest
+  } = useOneSignal();
 
   useEffect(() => {
     loadPreferences();
@@ -76,12 +76,32 @@ export default function NotificationSettingsPage() {
   };
 
   const handleSendPreview = async () => {
-    if (!selectedTemplate || !isSubscribed) return;
+    if (!selectedTemplate) return;
 
     try {
-      await sendTestNotification();
-      toast.success('Preview notification sent!');
+      if (oneSignalSubscribed) {
+        await sendOneSignalTest();
+        toast.success('Push notification sent!');
+      } else {
+        // Fallback to database preview if push notifications aren't enabled
+        const response = await fetch('/api/notifications/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: selectedTemplate.title,
+            message: selectedTemplate.message,
+            type: selectedTemplate.type
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to send preview');
+        }
+
+        toast.success('Database notification sent!');
+      }
     } catch (error) {
+      console.error('Error sending preview:', error);
       toast.error('Failed to send preview');
     }
   };
@@ -141,29 +161,31 @@ export default function NotificationSettingsPage() {
         <TabsContent value="preferences" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Push Notifications</CardTitle>
+              <CardTitle>Browser Push Notifications</CardTitle>
               <CardDescription>
-                {isSubscribed 
-                  ? 'You are subscribed to push notifications' 
-                  : 'Enable push notifications to receive updates'}
+                {oneSignalSubscribed
+                  ? 'You are subscribed to push notifications'
+                  : 'Enable push notifications to receive updates in your browser'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {!isSubscribed && isSupported ? (
-                <Button onClick={subscribe} className="w-full">
-                  <Bell className="w-4 h-4 mr-2" />
-                  Enable Push Notifications
-                </Button>
-              ) : isSubscribed ? (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge className="bg-green-500">Active</Badge>
-                    <span className="text-sm text-gray-400">Notifications enabled</span>
+              {oneSignalSupported ? (
+                oneSignalSubscribed ? (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-green-500">Active</Badge>
+                      <span className="text-sm text-gray-400">Push notifications enabled</span>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={unsubscribeOneSignal}>
+                      Disable
+                    </Button>
                   </div>
-                  <Button variant="outline" size="sm" onClick={unsubscribe}>
-                    Disable
+                ) : (
+                  <Button onClick={subscribeOneSignal} className="w-full">
+                    <Bell className="w-4 h-4 mr-2" />
+                    Enable Push Notifications
                   </Button>
-                </div>
+                )
               ) : (
                 <div className="text-sm text-gray-400">
                   Push notifications are not supported in your browser
@@ -380,18 +402,11 @@ export default function NotificationSettingsPage() {
 
                 <Button
                   onClick={handleSendPreview}
-                  disabled={!isSubscribed}
                   className="w-full mt-4"
                 >
                   <Send className="w-4 h-4 mr-2" />
-                  Send This Notification Now
+                  Send Test Notification
                 </Button>
-
-                {!isSubscribed && (
-                  <p className="text-xs text-gray-400 text-center mt-2">
-                    Enable push notifications to send test notifications
-                  </p>
-                )}
               </CardContent>
             </Card>
           )}

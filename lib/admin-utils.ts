@@ -89,6 +89,13 @@ export const ADMIN_MENU_ITEMS = [
     permission: ADMIN_PERMISSIONS.EMAIL_MANAGEMENT
   },
   {
+    id: 'notifications',
+    label: 'Notifications',
+    icon: 'Bell',
+    href: '/admin/notifications',
+    permission: ADMIN_PERMISSIONS.EMAIL_MANAGEMENT
+  },
+  {
     id: 'system',
     label: 'System Settings',
     icon: 'Settings',

@@ -13,16 +13,20 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Bell, BellOff, Settings, Check, X } from 'lucide-react';
-import { usePushNotifications } from '@/hooks/use-push-notifications';
 import { toast } from 'sonner';
+import { useOneSignal } from '@/hooks/use-onesignal';
 
 interface Notification {
   id: string;
   title: string;
-  body: string;
-  icon?: string;
+  message: string;
+  type: string;
   url?: string;
-  read: boolean;
+  image_url?: string;
+  priority: number;
+  is_read: boolean;
+  read_at?: string;
+  expires_at?: string;
   created_at: string;
 }
 
@@ -33,21 +37,288 @@ export const NotificationCenter = memo(function NotificationCenter() {
   const [preferences, setPreferences] = useState<any>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [isPending, startTransition] = useTransition();
-  
-  const {
-    isSupported,
-    isSubscribed,
-    isLoading,
-    permission,
-    subscribe,
-    unsubscribe,
-    sendTestNotification
-  } = usePushNotifications();
 
   const supabase = useMemo(() => createClient(), []);
 
-  // Load notifications
+  // OneSignal integration
+  const {
+    isSupported: oneSignalSupported,
+    isSubscribed: oneSignalSubscribed,
+    isLoading: oneSignalLoading,
+    subscribe: subscribeOneSignal,
+    unsubscribe: unsubscribeOneSignal,
+    sendTestNotification: sendOneSignalTest
+  } = useOneSignal();
+
+  // Load notifications from database
+  const loadNotifications = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('user_notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.error('Error loading notifications:', error);
+        return;
+      }
+
+      setNotifications(data || []);
+      setUnreadCount(data?.filter(n => !n.is_read).length || 0);
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    }
+  }, [supabase]);
+
+  // Mark notification as read
+  const markAsRead = useCallback(async (notificationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_notifications')
+        .update({
+          is_read: true,
+          read_at: new Date().toISOString()
+        })
+        .eq('id', notificationId);
+
+      if (error) {
+        console.error('Error marking notification as read:', error);
+        return;
+      }
+
+      setNotifications(prev =>
+        prev.map(n =>
+          n.id === notificationId
+            ? { ...n, is_read: true, read_at: new Date().toISOString() }
+            : n
+        )
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  }, [supabase]);
+
+  // Mark all as read
+  const markAllAsRead = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from('user_notifications')
+        .update({
+          is_read: true,
+          read_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id)
+        .eq('is_read', false);
+
+      if (error) {
+        console.error('Error marking all notifications as read:', error);
+        return;
+      }
+
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true, read_at: new Date().toISOString() })));
+      setUnreadCount(0);
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    }
+  }, [supabase]);
+
+  // Load notifications on mount
   useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
+
+  // Set up real-time subscription for new notifications
+  useEffect(() => {
+    const setupRealtimeSubscription = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const channel = supabase
+        .channel('user_notifications')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'user_notifications',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            const newNotification = payload.new as Notification;
+            setNotifications(prev => [newNotification, ...prev]);
+            setUnreadCount(prev => prev + 1);
+
+            // Show toast notification
+            toast(newNotification.title, {
+              description: newNotification.message,
+              action: newNotification.url ? {
+                label: 'View',
+                onClick: () => window.open(newNotification.url, '_blank'),
+              } : undefined,
+            });
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    };
+
+    setupRealtimeSubscription();
+  }, [supabase]);
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'info': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+      case 'success': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      case 'warning': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+      case 'error': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      case 'announcement': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
+      case 'feature': return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300';
+      case 'maintenance': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300';
+      case 'security': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
+    }
+  };
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    return `${Math.floor(diffInSeconds / 86400)}d ago`;
+  };
+
+  return (
+    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="relative">
+          <Bell className="h-5 w-5" />
+          {unreadCount > 0 && (
+            <Badge
+              variant="destructive"
+              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+            >
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </Badge>
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80 max-h-96 overflow-y-auto">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h4 className="font-semibold">Notifications</h4>
+          <div className="flex items-center space-x-2">
+            {unreadCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={markAllAsRead}
+                disabled={isPending}
+              >
+                Mark all read
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowSettings(!showSettings)}
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {showSettings ? (
+          <div className="p-4 space-y-4">
+            <h5 className="font-medium">Notification Settings</h5>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Push Notifications</span>
+                <Switch
+                  checked={preferences?.push_enabled ?? false}
+                  onCheckedChange={(checked) =>
+                    setPreferences(prev => ({ ...prev, push_enabled: checked }))
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Email Notifications</span>
+                <Switch
+                  checked={preferences?.email_enabled ?? true}
+                  onCheckedChange={(checked) =>
+                    setPreferences(prev => ({ ...prev, email_enabled: checked }))
+                  }
+                />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="max-h-80 overflow-y-auto">
+            {notifications.length === 0 ? (
+              <div className="p-4 text-center text-muted-foreground">
+                <BellOff className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>No notifications yet</p>
+              </div>
+            ) : (
+              notifications.map((notification) => (
+                <DropdownMenuItem
+                  key={notification.id}
+                  className={`p-4 cursor-pointer ${!notification.is_read ? 'bg-muted/50' : ''}`}
+                  onClick={() => {
+                    if (!notification.is_read) {
+                      markAsRead(notification.id);
+                    }
+                    if (notification.url) {
+                      window.open(notification.url, '_blank');
+                    }
+                  }}
+                >
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-start justify-between">
+                      <p className="text-sm font-medium leading-none">
+                        {notification.title}
+                      </p>
+                      <div className="flex items-center space-x-1">
+                        <Badge
+                          variant="secondary"
+                          className={`text-xs ${getTypeColor(notification.type)}`}
+                        >
+                          {notification.type}
+                        </Badge>
+                        {!notification.is_read && (
+                          <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {notification.message}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatTimeAgo(notification.created_at)}
+                    </p>
+                  </div>
+                </DropdownMenuItem>
+              ))
+            )}
+          </div>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+});
     loadNotifications();
   }, []);
 
@@ -232,47 +503,6 @@ export const NotificationCenter = memo(function NotificationCenter() {
               </div>
             </div>
 
-            {/* Enable/Disable Section */}
-            {!isSubscribed && permission !== 'denied' && (
-              <div className="p-4 bg-indigo-500/10 border-b border-gray-700">
-                <div className="flex items-start gap-3">
-                  <Bell className="w-5 h-5 text-indigo-400 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-white mb-1">
-                      Enable Push Notifications
-                    </p>
-                    <p className="text-xs text-gray-400 mb-3">
-                      Get timely reminders and updates about your projects
-                    </p>
-                    <Button
-                      size="sm"
-                      onClick={handleEnableNotifications}
-                      disabled={isLoading}
-                      className="w-full bg-indigo-600 hover:bg-indigo-700"
-                    >
-                      {isLoading ? 'Enabling...' : 'Enable Notifications'}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {permission === 'denied' && (
-              <div className="p-4 bg-yellow-500/10 border-b border-gray-700">
-                <div className="flex items-start gap-3">
-                  <BellOff className="w-5 h-5 text-yellow-400 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-white mb-1">
-                      Notifications Blocked
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      Enable notifications in your browser settings to receive updates
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Notifications List */}
             <div className="max-h-[300px] overflow-y-auto">
               {notifications.length === 0 ? (
@@ -344,24 +574,25 @@ export const NotificationCenter = memo(function NotificationCenter() {
             </div>
 
             <div className="p-4 space-y-4 max-h-[400px] overflow-y-auto">
-              {isSubscribed && (
+              {oneSignalSupported && (
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-white">Push Notifications</p>
-                    <p className="text-xs text-gray-400">Receive browser notifications</p>
+                    <p className="text-sm font-medium text-white">Browser Push Notifications</p>
+                    <p className="text-xs text-gray-400">Receive push notifications in your browser</p>
                   </div>
                   <Button
                     size="sm"
-                    variant="outline"
-                    onClick={handleDisableNotifications}
+                    variant={oneSignalSubscribed ? "outline" : "default"}
+                    onClick={oneSignalSubscribed ? unsubscribeOneSignal : subscribeOneSignal}
+                    disabled={oneSignalLoading}
                     className="text-xs"
                   >
-                    Disable
+                    {oneSignalLoading ? '...' : oneSignalSubscribed ? 'Disable' : 'Enable'}
                   </Button>
                 </div>
               )}
 
-              {preferences && (
+              <div className="space-y-4">
                 <>
                   <DropdownMenuSeparator className="bg-gray-700" />
                   
@@ -402,15 +633,16 @@ export const NotificationCenter = memo(function NotificationCenter() {
 
                   <DropdownMenuSeparator className="bg-gray-700" />
 
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={sendTestNotification}
-                    disabled={!isSubscribed}
-                    className="w-full"
-                  >
-                    Send Test Notification
-                  </Button>
+                  {oneSignalSupported && oneSignalSubscribed && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={sendOneSignalTest}
+                      className="w-full"
+                    >
+                      Send Test Push Notification
+                    </Button>
+                  )}
 
                   <Button
                     size="sm"

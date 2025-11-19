@@ -1,0 +1,12 @@
+Incoming Email Templates
+Unique Email Template Email Address
+9jz02ci0pcjt12mio0e51a4bq3nz621f@templates.onesignal.email
+
+
+Generate New Email Address
+Forwarded Email Templates
+Add email templates to your app by simply sending any email to this unique address. After creating a new email template in this way you can immediately view it in the dashboard, edit any necessary links and resources, and start using it right away.
+
+If you are using an email from an external source it is strongly recommended that you change any existing links and images to point to new resources you host instead.
+
+NOTE: only HTML emails are currently accepted - text-only emails should be created manually in the dashboard via copy and paste.
