@@ -125,19 +125,21 @@ export async function POST(request: NextRequest) {
     } else if (targetAudience.startsWith('plan_')) {
       const plan = targetAudience.replace('plan_', '');
       const { data: users, error: usersError } = await supabase
-        .from('user_settings')
+        .from('profiles')
         .select(`
-          user_id,
-          profiles!user_settings_user_id_fkey(id, email, full_name)
+          id,
+          email,
+          full_name,
+          user_settings!inner(subscription_plan)
         `)
-        .eq('subscription_plan', plan);
+        .eq('user_settings.subscription_plan', plan);
 
       if (usersError) {
         console.error('Error fetching plan users:', usersError);
         return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
       }
 
-      targetUsers = users?.map(u => u.profiles).filter(Boolean) || [];
+      targetUsers = users || [];
     } else if (targetAudience === 'active_users') {
       // Users active in last 30 days
       const thirtyDaysAgo = new Date();
@@ -195,20 +197,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Create admin notification
+    const notificationData: any = {
+      title,
+      message,
+      type,
+      target_audience: targetAudience,
+      specific_user_ids: specificUserIds || [],
+      url,
+      image_url: finalImageUrl,
+      priority: priority || 1,
+      sent_by: user.id
+    };
+
+    // Only add expires_at if it's provided and not empty
+    if (expiresAt && expiresAt.trim() !== '') {
+      notificationData.expires_at = expiresAt;
+    }
+
     const { data: adminNotification, error: adminError } = await supabase
       .from('admin_notifications')
-      .insert({
-        title,
-        message,
-        type,
-        target_audience: targetAudience,
-        specific_user_ids: specificUserIds || [],
-        url,
-        image_url: finalImageUrl,
-        priority: priority || 1,
-        expires_at: expiresAt,
-        sent_by: user.id
-      })
+      .insert(notificationData)
       .select()
       .single();
 
@@ -218,17 +226,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Create user notifications for each target user
-    const userNotifications = targetUsers.map(user => ({
-      user_id: user.id,
-      admin_notification_id: adminNotification.id,
-      title,
-      message,
-      type,
-      url,
-      image_url: finalImageUrl,
-      priority: priority || 1,
-      expires_at: expiresAt
-    }));
+    const userNotifications = targetUsers.map(user => {
+      const notification: any = {
+        user_id: user.id,
+        admin_notification_id: adminNotification.id,
+        title,
+        message,
+        type,
+        url,
+        image_url: finalImageUrl,
+        priority: priority || 1
+      };
+
+      // Only add expires_at if it's provided and not empty
+      if (expiresAt && expiresAt.trim() !== '') {
+        notification.expires_at = expiresAt;
+      }
+
+      return notification;
+    });
 
     const { error: userNotificationsError } = await supabase
       .from('user_notifications')
