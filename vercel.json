@@ -28,7 +28,7 @@
       ]
     },
     {
-      "source": "/sites/(.*\\.js)",
+      "source": "/sites/**/*.js",
       "headers": [
         {
           "key": "Content-Type",
@@ -37,7 +37,7 @@
       ]
     },
     {
-      "source": "/sites/(.*\\.css)",
+      "source": "/sites/**/*.css",
       "headers": [
         {
           "key": "Content-Type",
@@ -46,25 +46,88 @@
       ]
     },
     {
-      "source": "/sites/(.*\\.(png|jpg|jpeg|gif|webp|svg|ico))",
+      "source": "/sites/**/*.png",
       "headers": [
         {
           "key": "Content-Type",
-          "value": "image/$2"
+          "value": "image/png"
         }
       ]
     },
     {
-      "source": "/sites/(.*\\.(woff|woff2))",
+      "source": "/sites/**/*.jpg",
       "headers": [
         {
           "key": "Content-Type",
-          "value": "font/$2"
+          "value": "image/jpeg"
         }
       ]
     },
     {
-      "source": "/sites/(.*\\.json)",
+      "source": "/sites/**/*.jpeg",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "image/jpeg"
+        }
+      ]
+    },
+    {
+      "source": "/sites/**/*.gif",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "image/gif"
+        }
+      ]
+    },
+    {
+      "source": "/sites/**/*.webp",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "image/webp"
+        }
+      ]
+    },
+    {
+      "source": "/sites/**/*.svg",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "source": "/sites/**/*.ico",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "image/x-icon"
+        }
+      ]
+    },
+    {
+      "source": "/sites/**/*.woff",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "font/woff"
+        }
+      ]
+    },
+    {
+      "source": "/sites/**/*.woff2",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "font/woff2"
+        }
+      ]
+    },
+    {
+      "source": "/sites/**/*.json",
       "headers": [
         {
           "key": "Content-Type",
