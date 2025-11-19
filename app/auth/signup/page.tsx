@@ -12,6 +12,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { isEmailValidForSignup } from "@/lib/email-validation"
+import {Github} from "lucide-react"
 
 export default function SignupPage() {
   const [email, setEmail] = useState("")
