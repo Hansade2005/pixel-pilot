@@ -46,7 +46,19 @@ import {
   Receipt,
   RefreshCw,
   Calendar,
-  Shield
+  Shield,
+  Users,
+  Activity,
+  PieChart,
+  BarChart3,
+  Download,
+  Settings,
+  Eye,
+  Target,
+  Zap,
+  Globe,
+  Clock,
+  LineChart
 } from "lucide-react"
 
 interface SubscriptionData {
@@ -204,30 +216,30 @@ export default function AdminBillingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Admin Header */}
-      <div className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+      {/* Modern Dashboard Header */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white border-b border-slate-700">
+        <div className="container mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => router.push('/admin')}
-                className="mr-2"
+                className="text-slate-300 hover:text-white hover:bg-slate-700"
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Shield className="h-6 w-6 text-primary" />
+              <div className="p-3 bg-slate-700/50 rounded-xl">
+                <CreditCard className="h-7 w-7 text-blue-400" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold">Billing Management</h1>
-                <p className="text-sm text-muted-foreground">Manage subscriptions, payments, and revenue</p>
+                <h1 className="text-3xl font-bold">Billing Management</h1>
+                <p className="text-slate-300 mt-1">Monitor subscriptions, revenue, and payment processing</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <Badge variant="secondary" className="bg-green-100 text-green-800">
+              <Badge className="bg-green-500/20 text-green-300 border-green-500/30">
                 <CheckCircle className="h-3 w-3 mr-1" />
                 Admin Access
               </Badge>
@@ -236,198 +248,370 @@ export default function AdminBillingPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        {/* Search and Filters */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search subscriptions by email, name, or plan..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
+      <div className="container mx-auto px-6 py-8">
+        {/* Horizontal Action Bar */}
+        <div className="flex items-center justify-between mb-8 p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search subscriptions by email, name, or plan..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+              />
+            </div>
+            <Button variant="outline" className="border-slate-200 dark:border-slate-700">
+              <Filter className="h-4 w-4 mr-2" />
+              Filter
+            </Button>
           </div>
-          <Button variant="outline">
-            <Filter className="h-4 w-4 mr-2" />
-            Filter
-          </Button>
-          <Button variant="outline" onClick={loadSubscriptions}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" onClick={loadSubscriptions} className="border-slate-200 dark:border-slate-700">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+            <Button className="bg-blue-600 hover:bg-blue-700">
+              <Download className="h-4 w-4 mr-2" />
+              Export Report
+            </Button>
+          </div>
         </div>
 
-        {/* Revenue Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
-                  <DollarSign className="h-4 w-4 text-green-600" />
-                </div>
+        {/* Primary KPI Cards */}
+        <div className="grid grid-cols-4 gap-6 mb-8">
+          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-2xl font-bold">${calculateRevenue()}</p>
-                  <p className="text-xs text-muted-foreground">Monthly Revenue</p>
+                  <p className="text-green-100 text-sm font-medium">Monthly Revenue</p>
+                  <p className="text-3xl font-bold">${calculateRevenue()}</p>
+                  <p className="text-green-200 text-xs mt-1">
+                    <TrendingUp className="h-3 w-3 inline mr-1" />
+                    +8% from last month
+                  </p>
                 </div>
+                <DollarSign className="h-8 w-8 text-green-200" />
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-100 text-sm font-medium">Active Subscriptions</p>
+                  <p className="text-3xl font-bold">{subscriptions.length}</p>
+                  <p className="text-blue-200 text-xs mt-1">
+                    <Activity className="h-3 w-3 inline mr-1" />
+                    {subscriptions.filter(s => s.subscription_status === 'active').length} active
+                  </p>
+                </div>
+                <CreditCard className="h-8 w-8 text-blue-200" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-purple-100 text-sm font-medium">Annual Revenue</p>
+                  <p className="text-3xl font-bold">${Math.round(calculateRevenue() * 12)}</p>
+                  <p className="text-purple-200 text-xs mt-1">
+                    <Target className="h-3 w-3 inline mr-1" />
+                    Projected earnings
+                  </p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-purple-200" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-red-100 text-sm font-medium">Past Due</p>
+                  <p className="text-3xl font-bold">
+                    {subscriptions.filter(s => s.subscription_status === 'past_due').length}
+                  </p>
+                  <p className="text-red-200 text-xs mt-1">
+                    <AlertTriangle className="h-3 w-3 inline mr-1" />
+                    Requires attention
+                  </p>
+                </div>
+                <AlertTriangle className="h-8 w-8 text-red-200" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Secondary Metrics */}
+        <div className="grid grid-cols-4 gap-4 mb-8">
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                  <CreditCard className="h-4 w-4 text-blue-600" />
+                  <Users className="h-4 w-4 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{subscriptions.length}</p>
-                  <p className="text-xs text-muted-foreground">Active Subscriptions</p>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                    {subscriptions.filter(s => s.subscription_status === 'trialing').length}
+                  </p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Trial Users</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
+                  <Zap className="h-4 w-4 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                    {subscriptions.filter(s => s.cancel_at_period_end).length}
+                  </p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Cancelling Soon</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
-                  <TrendingUp className="h-4 w-4 text-purple-600" />
+                  <Globe className="h-4 w-4 text-purple-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">
-                    ${Math.round(calculateRevenue() * 12)}
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                    {Math.round(subscriptions.reduce((acc, sub) => acc + sub.deployments_this_month, 0) / Math.max(subscriptions.length, 1))}
                   </p>
-                  <p className="text-xs text-muted-foreground">Annual Revenue</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Avg Deployments</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg">
-                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                  <Clock className="h-4 w-4 text-yellow-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">
-                    {subscriptions.filter(s => s.subscription_status === 'past_due').length}
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                    {Math.round(subscriptions.reduce((acc, sub) => acc + sub.github_pushes_this_month, 0) / Math.max(subscriptions.length, 1))}
                   </p>
-                  <p className="text-xs text-muted-foreground">Past Due</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Avg GitHub Pushes</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Subscriptions Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Active Subscriptions ({filteredSubscriptions.length})</CardTitle>
-            <CardDescription>
-              Monitor and manage all paid subscriptions
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Plan</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Usage</TableHead>
-                  <TableHead>Next Billing</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSubscriptions.map((subscription) => (
-                  <TableRow key={subscription.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{subscription.user_name || 'No name'}</p>
-                        <p className="text-sm text-muted-foreground">{subscription.user_email}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>{getPlanBadge(subscription.subscription_plan)}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        {getStatusBadge(subscription.subscription_status)}
-                        {subscription.cancel_at_period_end && (
-                          <Badge variant="outline" className="text-xs">
-                            Cancels at period end
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        <div className="text-xs text-muted-foreground">
-                          Deployments: {subscription.deployments_this_month}/{subscription.subscription_plan === 'pro' ? 10 : 5}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          GitHub: {subscription.github_pushes_this_month}/2
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">
-                          {subscription.subscription_end_date
-                            ? new Date(subscription.subscription_end_date).toLocaleDateString()
-                            : 'N/A'
-                          }
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => {
-                            setSelectedSubscription(subscription)
-                            setShowSubscriptionDialog(true)
-                          }}>
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Receipt className="h-4 w-4 mr-2" />
-                            View Invoices
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-yellow-600">
-                            <AlertTriangle className="h-4 w-4 mr-2" />
-                            Pause Subscription
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">
-                            <XCircle className="h-4 w-4 mr-2" />
-                            Cancel Subscription
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+        <div className="grid grid-cols-12 gap-8">
+          {/* Main Content */}
+          <div className="col-span-8">
+            {/* Enhanced Subscriptions Table */}
+            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 shadow-sm">
+              <CardHeader className="border-b border-slate-200 dark:border-slate-700">
+                <CardTitle className="text-xl text-slate-900 dark:text-white flex items-center gap-2">
+                  <CreditCard className="h-6 w-6" />
+                  Active Subscriptions ({filteredSubscriptions.length})
+                </CardTitle>
+                <CardDescription className="text-slate-600 dark:text-slate-400">
+                  Monitor and manage all paid subscriptions across all plans
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <TableHead className="text-slate-900 dark:text-white font-semibold">Customer</TableHead>
+                        <TableHead className="text-slate-900 dark:text-white font-semibold">Plan</TableHead>
+                        <TableHead className="text-slate-900 dark:text-white font-semibold">Status</TableHead>
+                        <TableHead className="text-slate-900 dark:text-white font-semibold">Usage</TableHead>
+                        <TableHead className="text-slate-900 dark:text-white font-semibold">Next Billing</TableHead>
+                        <TableHead className="text-slate-900 dark:text-white font-semibold">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredSubscriptions.map((subscription) => (
+                        <TableRow key={subscription.id} className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                          <TableCell>
+                            <div>
+                              <p className="font-medium text-slate-900 dark:text-white">{subscription.user_name || 'No name'}</p>
+                              <p className="text-sm text-slate-600 dark:text-slate-400">{subscription.user_email}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>{getPlanBadge(subscription.subscription_plan)}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              {getStatusBadge(subscription.subscription_status)}
+                              {subscription.cancel_at_period_end && (
+                                <Badge variant="outline" className="text-xs border-red-200 text-red-700 dark:border-red-800 dark:text-red-300">
+                                  Cancels at period end
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              <div className="text-xs text-slate-600 dark:text-slate-400">
+                                Deployments: {subscription.deployments_this_month}/{subscription.subscription_plan === 'pro' ? 10 : 5}
+                              </div>
+                              <div className="text-xs text-slate-600 dark:text-slate-400">
+                                GitHub: {subscription.github_pushes_this_month}/2
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-slate-400" />
+                              <span className="text-sm text-slate-900 dark:text-white">
+                                {subscription.subscription_end_date
+                                  ? new Date(subscription.subscription_end_date).toLocaleDateString()
+                                  : 'N/A'
+                                }
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="hover:bg-slate-100 dark:hover:bg-slate-800">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="border-slate-200 dark:border-slate-700">
+                                <DropdownMenuItem onClick={() => {
+                                  setSelectedSubscription(subscription)
+                                  setShowSubscriptionDialog(true)
+                                }} className="hover:bg-slate-100 dark:hover:bg-slate-800">
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="hover:bg-slate-100 dark:hover:bg-slate-800">
+                                  <Receipt className="h-4 w-4 mr-2" />
+                                  View Invoices
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20">
+                                  <AlertTriangle className="h-4 w-4 mr-2" />
+                                  Pause Subscription
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
+                                  <XCircle className="h-4 w-4 mr-2" />
+                                  Cancel Subscription
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
 
-            {filteredSubscriptions.length === 0 && (
-              <div className="text-center py-8">
-                <CreditCard className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No active subscriptions found</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {searchQuery ? 'Try adjusting your search terms' : 'Subscriptions will appear here when users upgrade'}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                {filteredSubscriptions.length === 0 && (
+                  <div className="text-center py-12">
+                    <CreditCard className="h-16 w-16 text-slate-400 mx-auto mb-4" />
+                    <p className="text-slate-600 dark:text-slate-400 text-lg font-medium">No active subscriptions found</p>
+                    <p className="text-sm text-slate-500 mt-2">
+                      {searchQuery ? 'Try adjusting your search terms' : 'Subscriptions will appear here when users upgrade from free plans'}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Billing Activity Sidebar */}
+          <div className="col-span-4">
+            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 shadow-sm sticky top-8">
+              <CardHeader className="border-b border-slate-200 dark:border-slate-700">
+                <CardTitle className="text-lg text-slate-900 dark:text-white flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Billing Insights
+                </CardTitle>
+                <CardDescription className="text-slate-600 dark:text-slate-400">
+                  Key metrics and trends
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 space-y-4">
+                {/* Insights */}
+                <div className="p-3 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-900 dark:text-green-100">Revenue Growth</span>
+                  </div>
+                  <p className="text-xs text-green-800 dark:text-green-200">
+                    Monthly recurring revenue increased by 8% this month, driven by Pro plan upgrades.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Activity className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-900 dark:text-blue-100">High Engagement</span>
+                  </div>
+                  <p className="text-xs text-blue-800 dark:text-blue-200">
+                    {subscriptions.filter(s => s.subscription_status === 'active').length} active subscriptions with consistent usage patterns.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-yellow-50 dark:bg-yellow-900/10 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                    <span className="text-sm font-medium text-yellow-900 dark:text-yellow-100">Attention Needed</span>
+                  </div>
+                  <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                    {subscriptions.filter(s => s.cancel_at_period_end).length} subscriptions set to cancel. Consider retention outreach.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-purple-50 dark:bg-purple-900/10 rounded-lg border border-purple-200 dark:border-purple-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="h-4 w-4 text-purple-600" />
+                    <span className="text-sm font-medium text-purple-900 dark:text-purple-100">Conversion Success</span>
+                  </div>
+                  <p className="text-xs text-purple-800 dark:text-purple-200">
+                    Teams plan showing strong adoption with {subscriptions.filter(s => s.subscription_plan === 'teams').length} active subscriptions.
+                  </p>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-6">
+                  <h4 className="text-sm font-medium text-slate-900 dark:text-white mb-3">Quick Actions</h4>
+                  <div className="space-y-2">
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <Download className="h-4 w-4 mr-2" />
+                      Export Revenue Report
+                    </Button>
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Configure Billing
+                    </Button>
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <AlertTriangle className="h-4 w-4 mr-2" />
+                      Send Payment Reminders
+                    </Button>
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <BarChart3 className="h-4 w-4 mr-2" />
+                      View Analytics
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
         {/* Subscription Details Dialog */}
         <Dialog open={showSubscriptionDialog} onOpenChange={setShowSubscriptionDialog}>

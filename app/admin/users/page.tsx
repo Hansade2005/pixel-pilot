@@ -60,7 +60,15 @@ import {
   TrendingDown,
   Eye,
   Edit,
-  Trash2
+  Trash2,
+  Activity,
+  Clock,
+  DollarSign,
+  BarChart3,
+  Settings,
+  Plus,
+  RefreshCw,
+  UserCog
 } from "lucide-react"
 
 interface UserData {
@@ -278,7 +286,7 @@ export default function AdminUsersPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading user management...</p>
@@ -288,31 +296,35 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Admin Header */}
-      <div className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+      {/* Clean Header */}
+      <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b border-slate-200/50 dark:border-slate-700/50">
+        <div className="container mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => router.push('/admin')}
-                className="mr-2"
+                className="hover:bg-slate-100 dark:hover:bg-slate-800"
               >
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Admin
               </Button>
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Shield className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold">User Management</h1>
-                <p className="text-sm text-muted-foreground">Manage system users and their subscriptions</p>
+              <div className="h-8 w-px bg-slate-200 dark:bg-slate-700"></div>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg">
+                  <Users className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900 dark:text-white">User Management</h1>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Monitor and manage user accounts across the platform</p>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <Badge variant="secondary" className="bg-green-100 text-green-800">
-                <CheckCircle className="h-3 w-3 mr-1" />
+            <div className="flex items-center gap-3">
+              <Badge className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800">
+                <Shield className="h-3 w-3 mr-1" />
                 Admin Access
               </Badge>
             </div>
@@ -320,157 +332,219 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        {/* Search and Filters */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search users by email or name..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
+      <div className="container mx-auto px-6 py-8">
+        {/* Horizontal Action Bar */}
+        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 mb-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Search users by email or name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 w-80 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                />
+              </div>
+              <select
+                value={planFilter}
+                onChange={(e) => setPlanFilter(e.target.value)}
+                className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
+              >
+                <option value="all">All Plans</option>
+                <option value="free">Free</option>
+                <option value="pro">Pro</option>
+                <option value="teams">Teams</option>
+                <option value="enterprise">Enterprise</option>
+              </select>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="trialing">Trial</option>
+                <option value="past_due">Past Due</option>
+                <option value="canceled">Canceled</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700">
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+              <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700">
+                <Upload className="h-4 w-4 mr-2" />
+                Import
+              </Button>
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Add User
+              </Button>
+            </div>
           </div>
-          <Button variant="outline">
-            <Filter className="h-4 w-4 mr-2" />
-            Filter
-          </Button>
-          <Button>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Add User
-          </Button>
         </div>
 
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card>
+        {/* Primary KPI Cards */}
+        <div className="grid grid-cols-4 gap-6 mb-8">
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-100 text-sm font-medium">Total Users</p>
+                  <p className="text-3xl font-bold">{users.length.toLocaleString()}</p>
+                  <p className="text-blue-200 text-xs mt-1">
+                    <TrendingUp className="h-3 w-3 inline mr-1" />
+                    +12% this month
+                  </p>
+                </div>
+                <Users className="h-8 w-8 text-blue-200" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-green-100 text-sm font-medium">Active Subscribers</p>
+                  <p className="text-3xl font-bold">
+                    {users.filter(u => u.subscriptionStatus === 'active').length.toLocaleString()}
+                  </p>
+                  <p className="text-green-200 text-xs mt-1">
+                    <TrendingUp className="h-3 w-3 inline mr-1" />
+                    +8% this month
+                  </p>
+                </div>
+                <UserCheck className="h-8 w-8 text-green-200" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-purple-100 text-sm font-medium">Paid Users</p>
+                  <p className="text-3xl font-bold">
+                    {users.filter(u => u.subscriptionPlan !== 'free').length.toLocaleString()}
+                  </p>
+                  <p className="text-purple-200 text-xs mt-1">
+                    <TrendingUp className="h-3 w-3 inline mr-1" />
+                    +15% this month
+                  </p>
+                </div>
+                <Crown className="h-8 w-8 text-purple-200" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-orange-100 text-sm font-medium">Monthly Deployments</p>
+                  <p className="text-3xl font-bold">
+                    {users.reduce((sum, u) => sum + u.deploymentsThisMonth, 0).toLocaleString()}
+                  </p>
+                  <p className="text-orange-200 text-xs mt-1">
+                    <Activity className="h-3 w-3 inline mr-1" />
+                    Active usage
+                  </p>
+                </div>
+                <Zap className="h-8 w-8 text-orange-200" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Secondary Metrics */}
+        <div className="grid grid-cols-4 gap-4 mb-8">
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                  <Shield className="h-4 w-4 text-blue-600" />
+                  <UserCheck className="h-4 w-4 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{users.length}</p>
-                  <p className="text-xs text-muted-foreground">Total Users</p>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                    {users.filter(u => u.subscriptionPlan === 'pro').length}
+                  </p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Pro Users</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
                   <CheckCircle className="h-4 w-4 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">
-                    {users.filter(u => u.subscriptionStatus === 'active').length}
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                    {users.filter(u => u.emailConfirmed).length}
                   </p>
-                  <p className="text-xs text-muted-foreground">Active Subscribers</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Verified Emails</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
-                  <CreditCard className="h-4 w-4 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {users.filter(u => u.subscriptionPlan !== 'free').length}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Paid Users</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg">
-                  <Zap className="h-4 w-4 text-yellow-600" />
+                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">
-                    {users.reduce((sum, u) => sum + u.deploymentsThisMonth, 0)}
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                    {users.filter(u => u.subscriptionStatus === 'past_due').length}
                   </p>
-                  <p className="text-xs text-muted-foreground">Deployments (Month)</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Past Due</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-red-100 dark:bg-red-900/20 rounded-lg">
+                  <UserX className="h-4 w-4 text-red-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                    {users.filter(u => u.subscriptionStatus === 'canceled').length}
+                  </p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Canceled</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Quick Actions Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Total Users
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{users.length}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Crown className="h-4 w-4 text-yellow-500" />
-                Pro Users
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {users.filter(u => u.subscriptionPlan === 'pro').length}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <UserCheck className="h-4 w-4 text-green-500" />
-                Active
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {users.filter(u => u.subscriptionStatus === 'active').length}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-red-500" />
-                Past Due
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {users.filter(u => u.subscriptionStatus === 'past_due').length}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Users Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Users ({filteredUsers.length})</CardTitle>
-            <CardDescription>
-              Manage user accounts, subscriptions, and access levels with powerful bulk operations
-            </CardDescription>
+        <div className="grid grid-cols-12 gap-8">
+          {/* Main Content */}
+          <div className="col-span-8">
+            {/* Users Table */}
+            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 shadow-sm">
+              <CardHeader className="border-b border-slate-200 dark:border-slate-700">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg text-slate-900 dark:text-white">Users ({filteredUsers.length})</CardTitle>
+                    <CardDescription className="text-slate-600 dark:text-slate-400">
+                      Manage user accounts, subscriptions, and access levels
+                    </CardDescription>
+                  </div>
+                  <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700">
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh
+                  </Button>
+                </div>
 
             {/* Bulk Actions Toolbar */}
             {selectedUsers.size > 0 && (
@@ -938,8 +1012,114 @@ export default function AdminUsersPage() {
             </Table>
           </CardContent>
         </Card>
+          </div>
 
-        {/* User Details Dialog */}
+          {/* Activity Feed Sidebar */}
+          <div className="col-span-4">
+            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 shadow-sm sticky top-8">
+              <CardHeader className="border-b border-slate-200 dark:border-slate-700">
+                <CardTitle className="text-lg text-slate-900 dark:text-white flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Recent Activity
+                </CardTitle>
+                <CardDescription className="text-slate-600 dark:text-slate-400">
+                  Latest user actions and system events
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 space-y-4">
+                {/* Activity Items */}
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
+                    <UserPlus className="h-4 w-4 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">New user registered</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">john.doe@example.com joined 2 minutes ago</p>
+                  </div>
+                  <span className="text-xs text-slate-500">2m</span>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+                    <TrendingUp className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">User upgraded</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">sarah.smith upgraded to Pro plan</p>
+                  </div>
+                  <span className="text-xs text-slate-500">15m</span>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
+                    <Zap className="h-4 w-4 text-purple-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">Deployment completed</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">alex.wilson deployed 3 sites</p>
+                  </div>
+                  <span className="text-xs text-slate-500">1h</span>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg">
+                    <Mail className="h-4 w-4 text-yellow-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">Email verification</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">mike.jones verified their email</p>
+                  </div>
+                  <span className="text-xs text-slate-500">2h</span>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-red-100 dark:bg-red-900/20 rounded-lg">
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">Payment failed</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">Payment retry for emily.davis</p>
+                  </div>
+                  <span className="text-xs text-slate-500">4h</span>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
+                    <Settings className="h-4 w-4 text-orange-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">Profile updated</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">david.brown updated their profile</p>
+                  </div>
+                  <span className="text-xs text-slate-500">6h</span>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-6">
+                  <h4 className="text-sm font-medium text-slate-900 dark:text-white mb-3">Quick Actions</h4>
+                  <div className="space-y-2">
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700">
+                      <UserCog className="h-4 w-4 mr-2" />
+                      Bulk User Import
+                    </Button>
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700">
+                      <Mail className="h-4 w-4 mr-2" />
+                      Send Newsletter
+                    </Button>
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700">
+                      <BarChart3 className="h-4 w-4 mr-2" />
+                      View Analytics
+                    </Button>
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700">
+                      <Settings className="h-4 w-4 mr-2" />
+                      User Settings
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
         <Dialog open={showUserDialog} onOpenChange={setShowUserDialog}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>

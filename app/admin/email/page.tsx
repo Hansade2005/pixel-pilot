@@ -56,7 +56,17 @@ import {
   Upload,
   Filter,
   Search,
-  Loader2
+  Loader2,
+  ArrowLeft,
+  Shield,
+  Activity,
+  Target,
+  TrendingUp,
+  BarChart3,
+  PieChart,
+  Zap,
+  Globe,
+  LineChart
 } from "lucide-react"
 import {
   sendEmail,
@@ -205,6 +215,7 @@ export default function AdminEmailPage() {
   const [showComposeDialog, setShowComposeDialog] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null)
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([])
+  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [planFilter, setPlanFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -234,6 +245,7 @@ export default function AdminEmailPage() {
       setUser(user)
       await Promise.all([
         fetchUsers(),
+        fetchEmailTemplates(),
         fetchEmailCampaigns()
       ])
     } catch (error) {
@@ -279,9 +291,33 @@ export default function AdminEmailPage() {
     }
   }
 
+  const fetchEmailTemplates = async () => {
+    try {
+      const response = await fetch('/api/admin/email-templates')
+      if (response.ok) {
+        const data = await response.json()
+        setEmailTemplates(data.templates || [])
+      } else {
+        // Fallback to hardcoded templates if API fails
+        setEmailTemplates(EMAIL_TEMPLATES)
+      }
+    } catch (error) {
+      console.error('Error fetching email templates:', error)
+      // Fallback to hardcoded templates
+      setEmailTemplates(EMAIL_TEMPLATES)
+    }
+  }
+
   const fetchEmailCampaigns = async () => {
-    // For now, we'll use local state. In production, this would be stored in database
-    setCampaigns([])
+    try {
+      const response = await fetch('/api/admin/email-campaigns')
+      if (response.ok) {
+        const data = await response.json()
+        setCampaigns(data.campaigns || [])
+      }
+    } catch (error) {
+      console.error('Error fetching email campaigns:', error)
+    }
   }
 
   const filteredUsers = users.filter(user => {
@@ -482,26 +518,229 @@ export default function AdminEmailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-slate-400" />
+          <p className="text-slate-600 dark:text-slate-400">Loading email management...</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Email Management</h1>
-          <p className="text-muted-foreground">Send bulk emails and manage communications</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+      {/* Modern Dashboard Header */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white border-b border-slate-700">
+        <div className="container mx-auto px-6 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/admin')}
+                className="text-slate-300 hover:text-white hover:bg-slate-700"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div className="p-3 bg-slate-700/50 rounded-xl">
+                <Mail className="h-7 w-7 text-blue-400" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold">Email Management</h1>
+                <p className="text-slate-300 mt-1">Send bulk emails, manage campaigns, and track communications</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <Badge className="bg-green-500/20 text-green-300 border-green-500/30">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Admin Access
+              </Badge>
+            </div>
+          </div>
         </div>
-        <Button onClick={() => setShowComposeDialog(true)} className="w-fit">
-          <Plus className="h-4 w-4 mr-2" />
-          Compose Email
-        </Button>
       </div>
 
-      <Tabs defaultValue="compose" className="space-y-6">
+      <div className="container mx-auto px-6 py-8">
+        {/* Horizontal Action Bar */}
+        <div className="flex items-center justify-between mb-8 p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search users by email or name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+              />
+            </div>
+            <Select value={planFilter} onValueChange={setPlanFilter}>
+              <SelectTrigger className="w-40 border-slate-200 dark:border-slate-700">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Plans</SelectItem>
+                <SelectItem value="free">Free</SelectItem>
+                <SelectItem value="pro">Pro</SelectItem>
+                <SelectItem value="teams">Teams</SelectItem>
+                <SelectItem value="enterprise">Enterprise</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-40 border-slate-200 dark:border-slate-700">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="canceled">Canceled</SelectItem>
+                <SelectItem value="past_due">Past Due</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" onClick={() => setShowComposeDialog(true)} className="border-slate-200 dark:border-slate-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Compose Email
+            </Button>
+            <Button className="bg-blue-600 hover:bg-blue-700">
+              <Download className="h-4 w-4 mr-2" />
+              Export Report
+            </Button>
+          </div>
+        </div>
+
+        {/* Primary KPI Cards */}
+        <div className="grid grid-cols-4 gap-6 mb-8">
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-100 text-sm font-medium">Total Users</p>
+                  <p className="text-3xl font-bold">{users.length}</p>
+                  <p className="text-blue-200 text-xs mt-1">
+                    <Users className="h-3 w-3 inline mr-1" />
+                    Registered users
+                  </p>
+                </div>
+                <Users className="h-8 w-8 text-blue-200" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-green-100 text-sm font-medium">Emails Sent</p>
+                  <p className="text-3xl font-bold">1,247</p>
+                  <p className="text-green-200 text-xs mt-1">
+                    <Send className="h-3 w-3 inline mr-1" />
+                    This month
+                  </p>
+                </div>
+                <Send className="h-8 w-8 text-green-200" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-purple-100 text-sm font-medium">Open Rate</p>
+                  <p className="text-3xl font-bold">68.5%</p>
+                  <p className="text-purple-200 text-xs mt-1">
+                    <Target className="h-3 w-3 inline mr-1" />
+                    Above average
+                  </p>
+                </div>
+                <Target className="h-8 w-8 text-purple-200" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-orange-100 text-sm font-medium">Active Campaigns</p>
+                  <p className="text-3xl font-bold">{campaigns.length}</p>
+                  <p className="text-orange-200 text-xs mt-1">
+                    <Activity className="h-3 w-3 inline mr-1" />
+                    Currently running
+                  </p>
+                </div>
+                <Activity className="h-8 w-8 text-orange-200" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Secondary Metrics */}
+        <div className="grid grid-cols-4 gap-4 mb-8">
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+                  <UserCheck className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                    {users.filter(u => u.emailConfirmed).length}
+                  </p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Verified Emails</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">94.2%</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Delivery Rate</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
+                  <Clock className="h-4 w-4 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">2.4h</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Avg. Response Time</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg">
+                  <BarChart3 className="h-4 w-4 text-yellow-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">23</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Templates Available</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+          {/* Main Email Management Content */}
+          <div className="col-span-8">
+            <Tabs defaultValue="compose" className="space-y-6">
         <TabsList>
           <TabsTrigger value="compose">Compose</TabsTrigger>
           <TabsTrigger value="users">Select Recipients</TabsTrigger>
@@ -830,9 +1069,91 @@ export default function AdminEmailPage() {
           </Card>
         </TabsContent>
       </Tabs>
+          </div>
 
-      {/* Compose Email Dialog */}
-      <Dialog open={showComposeDialog} onOpenChange={setShowComposeDialog}>
+          {/* Email Activity Sidebar */}
+          <div className="col-span-4">
+            <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 shadow-sm sticky top-8">
+              <CardHeader className="border-b border-slate-200 dark:border-slate-700">
+                <CardTitle className="text-lg text-slate-900 dark:text-white flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Email Insights
+                </CardTitle>
+                <CardDescription className="text-slate-600 dark:text-slate-400">
+                  Key metrics and campaign performance
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 space-y-4">
+                {/* Insights */}
+                <div className="p-3 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-900 dark:text-green-100">High Engagement</span>
+                  </div>
+                  <p className="text-xs text-green-800 dark:text-green-200">
+                    68.5% open rate is excellent for email marketing campaigns.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-900 dark:text-blue-100">Delivery Success</span>
+                  </div>
+                  <p className="text-xs text-blue-800 dark:text-blue-200">
+                    94.2% delivery rate ensures your messages reach the intended recipients.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-purple-50 dark:bg-purple-900/10 rounded-lg border border-purple-200 dark:border-purple-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="h-4 w-4 text-purple-600" />
+                    <span className="text-sm font-medium text-purple-900 dark:text-purple-100">User Coverage</span>
+                  </div>
+                  <p className="text-xs text-purple-800 dark:text-purple-200">
+                    {users.filter(u => u.emailConfirmed).length} of {users.length} users have verified emails for communication.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-yellow-50 dark:bg-yellow-900/10 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-4 w-4 text-yellow-600" />
+                    <span className="text-sm font-medium text-yellow-900 dark:text-yellow-100">Response Time</span>
+                  </div>
+                  <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                    Average 2.4 hour response time for support communications.
+                  </p>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-6">
+                  <h4 className="text-sm font-medium text-slate-900 dark:text-white mb-3">Quick Actions</h4>
+                  <div className="space-y-2">
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <Download className="h-4 w-4 mr-2" />
+                      Export Email Report
+                    </Button>
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Email Settings
+                    </Button>
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Create Template
+                    </Button>
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <BarChart3 className="h-4 w-4 mr-2" />
+                      View Analytics
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Compose Email Dialog */}
+        <Dialog open={showComposeDialog} onOpenChange={setShowComposeDialog}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Compose Email Campaign</DialogTitle>

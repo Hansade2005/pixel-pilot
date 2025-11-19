@@ -30,7 +30,8 @@ export const ADMIN_PERMISSIONS = {
   SYSTEM_MANAGEMENT: 'system_management',
   EXPORT_DATA: 'export_data',
   SUPER_ADMIN: 'super_admin',
-  DOMAIN_MANAGEMENT: 'domain_management'
+  DOMAIN_MANAGEMENT: 'domain_management',
+  EMAIL_MANAGEMENT: 'email_management'
 }
 
 export function hasAdminPermission(user: any, permission: string): boolean {
@@ -79,6 +80,13 @@ export const ADMIN_MENU_ITEMS = [
     icon: 'BarChart3',
     href: '/admin/analytics',
     permission: ADMIN_PERMISSIONS.VIEW_ANALYTICS
+  },
+  {
+    id: 'email',
+    label: 'Email Campaigns',
+    icon: 'Mail',
+    href: '/admin/email',
+    permission: ADMIN_PERMISSIONS.EMAIL_MANAGEMENT
   },
   {
     id: 'system',

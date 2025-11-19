@@ -286,43 +286,50 @@ export default function AdminDomainsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-gray-600">Loading domain management...</p>
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading domain management...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push('/admin')}
-              className="flex items-center space-x-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span>Back to Admin</span>
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Domain Management</h1>
-              <p className="text-gray-600">Monitor and manage hosted sites and analytics</p>
+      <div className="border-b bg-card">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/admin')}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>Back to Admin</span>
+              </Button>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Globe className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-foreground">Domain Management</h1>
+                  <p className="text-muted-foreground">Monitor and manage hosted sites and analytics</p>
+                </div>
+              </div>
             </div>
+            <Button onClick={loadDomainData} className="flex items-center gap-2">
+              <RefreshCw className="h-4 w-4" />
+              <span>Refresh Data</span>
+            </Button>
           </div>
-          <Button onClick={loadDomainData} className="flex items-center space-x-2">
-            <RefreshCw className="h-4 w-4" />
-            <span>Refresh Data</span>
-          </Button>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="container mx-auto px-4 py-8">
         {/* Stats Overview */}
         {stats && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -402,7 +409,7 @@ export default function AdminDomainsPage() {
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="flex-1">
                     <div className="relative">
-                      <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
                         placeholder="Search by slug or username..."
                         value={searchTerm}
@@ -460,14 +467,14 @@ export default function AdminDomainsPage() {
                           <div>
                             <div className="font-medium">{site.project_slug}</div>
                             {site.original_slug && site.original_slug !== site.project_slug && (
-                              <div className="text-sm text-gray-500">from: {site.original_slug}</div>
+                              <div className="text-sm text-muted-foreground">from: {site.original_slug}</div>
                             )}
                           </div>
                         </TableCell>
                         <TableCell>{site.auth_username}</TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-1">
-                            <Eye className="h-4 w-4 text-gray-400" />
+                            <Eye className="h-4 w-4 text-muted-foreground" />
                             <span>{site.total_views.toLocaleString()}</span>
                           </div>
                         </TableCell>
@@ -541,17 +548,17 @@ export default function AdminDomainsPage() {
                     {stats?.topPerformingSites.slice(0, 5).map((site, index) => (
                       <div key={site.id} className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-sm font-medium">
+                          <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-sm font-medium">
                             {index + 1}
                           </div>
                           <div>
                             <div className="font-medium">{site.project_slug}</div>
-                            <div className="text-sm text-gray-500">{site.auth_username}</div>
+                            <div className="text-sm text-muted-foreground">{site.auth_username}</div>
                           </div>
                         </div>
                         <div className="text-right">
                           <div className="font-medium">{site.total_views.toLocaleString()}</div>
-                          <div className="text-sm text-gray-500">views</div>
+                          <div className="text-sm text-muted-foreground">views</div>
                         </div>
                       </div>
                     ))}
@@ -575,7 +582,7 @@ export default function AdminDomainsPage() {
                         </div>
                         <div className="text-right">
                           <div className="font-medium">{count.toLocaleString()}</div>
-                          <div className="text-sm text-gray-500">
+                          <div className="text-sm text-muted-foreground">
                             {((count / Object.values(stats.deviceBreakdown).reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%
                           </div>
                         </div>
@@ -597,10 +604,10 @@ export default function AdminDomainsPage() {
                       <div key={site.id} className="flex items-center justify-between">
                         <div>
                           <div className="font-medium">{site.project_slug}</div>
-                          <div className="text-sm text-gray-500">{site.auth_username}</div>
+                          <div className="text-sm text-muted-foreground">{site.auth_username}</div>
                         </div>
                         <div className="text-right">
-                          <div className="text-sm text-gray-500">
+                          <div className="text-sm text-muted-foreground">
                             {site.last_viewed_at ? formatDate(site.last_viewed_at) : 'Unknown'}
                           </div>
                         </div>
@@ -624,12 +631,12 @@ export default function AdminDomainsPage() {
                       .map(([country, count]) => (
                       <div key={country} className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
-                          <Globe className="h-4 w-4 text-gray-400" />
+                          <Globe className="h-4 w-4 text-muted-foreground" />
                           <span>{country === 'unknown' ? 'Unknown' : country.toUpperCase()}</span>
                         </div>
                         <div className="text-right">
                           <div className="font-medium">{count.toLocaleString()}</div>
-                          <div className="text-sm text-gray-500">
+                          <div className="text-sm text-muted-foreground">
                             {((count / Object.values(stats.countryBreakdown).reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%
                           </div>
                         </div>
@@ -655,23 +662,23 @@ export default function AdminDomainsPage() {
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
-                        <div className="text-sm text-gray-500">Total Views</div>
+                        <div className="text-sm text-muted-foreground">Total Views</div>
                         <div className="text-2xl font-bold">{selectedSite.total_views.toLocaleString()}</div>
                       </div>
                       <div>
-                        <div className="text-sm text-gray-500">Status</div>
+                        <div className="text-sm text-muted-foreground">Status</div>
                         <Badge variant={selectedSite.is_active ? "default" : "secondary"}>
                           {selectedSite.is_active ? "Active" : "Inactive"}
                         </Badge>
                       </div>
                       <div>
-                        <div className="text-sm text-gray-500">Last Viewed</div>
+                        <div className="text-sm text-muted-foreground">Last Viewed</div>
                         <div className="text-sm">
                           {selectedSite.last_viewed_at ? formatDate(selectedSite.last_viewed_at) : "Never"}
                         </div>
                       </div>
                       <div>
-                        <div className="text-sm text-gray-500">Original Slug</div>
+                        <div className="text-sm text-muted-foreground">Original Slug</div>
                         <div className="text-sm">
                           {selectedSite.original_slug || selectedSite.project_slug}
                         </div>
@@ -722,9 +729,9 @@ export default function AdminDomainsPage() {
               <Card>
                 <CardContent className="flex items-center justify-center py-12">
                   <div className="text-center">
-                    <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Site Selected</h3>
-                    <p className="text-gray-500">Select a site from the Sites Management tab to view detailed analytics.</p>
+                    <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-foreground mb-2">No Site Selected</h3>
+                    <p className="text-muted-foreground">Select a site from the Sites Management tab to view detailed analytics.</p>
                   </div>
                 </CardContent>
               </Card>

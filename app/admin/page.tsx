@@ -3,11 +3,10 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { checkAdminAccess, checkSuperAdminAccess, ADMIN_MENU_ITEMS, hasAdminPermission, ADMIN_PERMISSIONS } from "@/lib/admin-utils"
+import { checkAdminAccess, ADMIN_MENU_ITEMS, hasAdminPermission } from "@/lib/admin-utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import {
@@ -218,213 +217,330 @@ export default function AdminPanel() {
                 <Shield className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold">Admin Panel</h1>
-                <p className="text-sm text-muted-foreground">System management and analytics</p>
+                <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+                <p className="text-sm text-muted-foreground">System overview and management</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
+              {/* System Health Indicator */}
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${
+                  stats?.systemHealth === 'healthy' ? 'bg-green-500' :
+                  stats?.systemHealth === 'warning' ? 'bg-yellow-500' : 'bg-red-500'
+                }`} />
+                <span className="text-sm font-medium capitalize">{stats?.systemHealth || 'Unknown'}</span>
+              </div>
               <Badge variant="secondary" className="bg-green-100 text-green-800">
                 <CheckCircle className="h-3 w-3 mr-1" />
                 Admin Access
               </Badge>
-              <span className="text-sm text-muted-foreground">
-                Welcome, {user.email}
+              <span className="text-sm text-muted-foreground hidden md:inline">
+                {user.email}
               </span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-          {ADMIN_MENU_ITEMS.filter(item => hasAdminPermission(user, item.permission)).map((item) => (
-            <Card
-              key={item.id}
-              className="cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => {
-                if (item.id === 'domains') {
-                  router.push('/admin/domains')
-                } else if (item.id === 'users') {
-                  router.push('/admin/users')
-                } else if (item.id === 'billing') {
-                  router.push('/admin/billing')
-                } else if (item.id === 'analytics') {
-                  router.push('/admin/analytics')
-                } else if (item.id === 'system') {
-                  router.push('/admin/system')
-                } else if (item.id === 'super-admin') {
-                  router.push('/admin/super-admin')
-                }
-              }}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary/10 rounded-lg">
-                    {/* Icon would be rendered based on item.icon */}
-                    <BarChart3 className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">{item.label}</p>
-                    <p className="text-xs text-muted-foreground">Manage system</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+      <div className="container mx-auto px-4 py-6">
+        {/* Quick Actions Bar */}
+        <div className="mb-6">
+          <div className="flex flex-wrap gap-3">
+            {ADMIN_MENU_ITEMS.filter(item => hasAdminPermission(user, item.permission)).map((item) => (
+              <Button
+                key={item.id}
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (item.id === 'domains') router.push('/admin/domains')
+                  else if (item.id === 'users') router.push('/admin/users')
+                  else if (item.id === 'billing') router.push('/admin/billing')
+                  else if (item.id === 'analytics') router.push('/admin/analytics')
+                  else if (item.id === 'email') router.push('/admin/email')
+                  else if (item.id === 'system') router.push('/admin/system')
+                  else if (item.id === 'super-admin') router.push('/admin/super-admin')
+                }}
+                className="flex items-center gap-2 hover:bg-primary/5"
+              >
+                <BarChart3 className="h-4 w-4" />
+                {item.label}
+              </Button>
+            ))}
+          </div>
         </div>
 
-        {/* System Overview */}
+        {/* Primary KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.totalUsers || 0}</div>
-              <p className="text-xs text-muted-foreground">
-                +{stats?.activeUsers || 0} active today
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
+          {/* Revenue KPI - Most Important */}
+          <Card className="relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-green-500/10 to-green-600/10 rounded-bl-3xl" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <DollarSign className="h-5 w-5 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-3xl font-bold text-green-600">
                 {stats?.subscriptionSystemEnabled ? `$${stats?.totalRevenue || 0}` : '$0'}
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground mt-1">
                 {stats?.subscriptionSystemEnabled
                   ? `+$${stats?.monthlyRevenue || 0} this month`
-                  : 'Free mode - no subscription charges'
+                  : 'Free mode active'
                 }
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          {/* Users KPI */}
+          <Card className="relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-blue-500/10 to-blue-600/10 rounded-bl-3xl" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Subscriptions</CardTitle>
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+              <Users className="h-5 w-5 text-blue-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-3xl font-bold text-blue-600">{stats?.activeUsers || 0}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                of {stats?.totalUsers || 0} total users
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Subscriptions KPI */}
+          <Card className="relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-purple-500/10 to-purple-600/10 rounded-bl-3xl" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Subscriptions</CardTitle>
+              <CreditCard className="h-5 w-5 text-purple-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-purple-600">
                 {stats?.subscriptionSystemEnabled ? (stats?.activeSubscriptions || 0) : 'N/A'}
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground mt-1">
                 {stats?.subscriptionSystemEnabled
-                  ? `of ${stats?.totalSubscriptions || 0} total`
-                  : 'Free mode - no paid subscriptions'
+                  ? `${stats?.totalSubscriptions || 0} total`
+                  : 'Free mode'
                 }
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          {/* System Health KPI */}
+          <Card className="relative overflow-hidden">
+            <div className={`absolute top-0 right-0 w-16 h-16 rounded-bl-3xl ${
+              stats?.systemHealth === 'healthy' ? 'bg-gradient-to-br from-green-500/10 to-green-600/10' :
+              stats?.systemHealth === 'warning' ? 'bg-gradient-to-br from-yellow-500/10 to-yellow-600/10' :
+              'bg-gradient-to-br from-red-500/10 to-red-600/10'
+            }`} />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">System Health</CardTitle>
-              <Activity className={`h-4 w-4 ${
-                stats?.systemHealth === 'healthy' ? 'text-green-500' :
-                stats?.systemHealth === 'warning' ? 'text-yellow-500' : 'text-red-500'
+              <CardTitle className="text-sm font-medium">System Status</CardTitle>
+              <Activity className={`h-5 w-5 ${
+                stats?.systemHealth === 'healthy' ? 'text-green-600' :
+                stats?.systemHealth === 'warning' ? 'text-yellow-600' : 'text-red-600'
               }`} />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold capitalize">{stats?.systemHealth || 'Unknown'}</div>
-              <p className="text-xs text-muted-foreground">
+              <div className={`text-3xl font-bold capitalize ${
+                stats?.systemHealth === 'healthy' ? 'text-green-600' :
+                stats?.systemHealth === 'warning' ? 'text-yellow-600' : 'text-red-600'
+              }`}>
+                {stats?.systemHealth || 'Unknown'}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
                 All systems operational
               </p>
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Webhook Status</CardTitle>
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${
-                  webhookStatus?.health?.status === 'healthy' ? 'bg-green-500' :
-                  webhookStatus?.health?.status === 'warning' ? 'bg-yellow-500' :
-                  webhookStatus?.health?.status === 'error' ? 'bg-red-500' :
-                  'bg-gray-500'
-                }`} />
-                <Webhook className={`h-4 w-4 ${
-                  webhookStatus?.health?.status === 'healthy' ? 'text-green-500' :
-                  webhookStatus?.health?.status === 'warning' ? 'text-yellow-500' :
-                  webhookStatus?.health?.status === 'error' ? 'text-red-500' :
-                  'text-muted-foreground'
-                }`} />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {webhookStatus?.health?.successRate !== undefined
-                  ? `${webhookStatus.health.successRate}%`
-                  : 'Unknown'
-                }
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {webhookStatus?.statistics?.lastHour || 0} events/hour
-              </p>
-            </CardContent>
-          </Card>
         </div>
 
-        {/* Recent Activity & Alerts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recent Activity */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5" />
-                Recent Activity
-              </CardTitle>
-              <CardDescription>Latest system events and user actions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <div className="flex-1">
+        {/* Secondary Metrics & Activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* System Metrics */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Deployment & Activity Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-orange-500" />
+                    Deployments
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats?.deploymentCount || 0}</div>
+                  <p className="text-xs text-muted-foreground">Total deployments</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <UserPlus className="h-4 w-4 text-indigo-500" />
+                    GitHub Pushes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats?.githubPushCount || 0}</div>
+                  <p className="text-xs text-muted-foreground">Repository updates</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <Webhook className={`h-4 w-4 ${
+                      webhookStatus?.health?.status === 'healthy' ? 'text-green-500' :
+                      webhookStatus?.health?.status === 'warning' ? 'text-yellow-500' :
+                      webhookStatus?.health?.status === 'error' ? 'text-red-500' :
+                      'text-muted-foreground'
+                    }`} />
+                    Webhooks
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {webhookStatus?.health?.successRate !== undefined
+                      ? `${webhookStatus.health.successRate}%`
+                      : 'N/A'
+                    }
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {webhookStatus?.statistics?.lastHour || 0} events/hour
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* System Settings Panel */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  System Configuration
+                </CardTitle>
+                <CardDescription>
+                  Global system settings and subscription management
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Subscription System Toggle */}
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <Label htmlFor="subscription-toggle" className="text-base font-medium">
+                          Subscription System
+                        </Label>
+                        <Badge variant={systemSettings?.subscriptionSystemEnabled ? "default" : "secondary"}>
+                          {systemSettings?.subscriptionSystemEnabled ? "Active" : "Disabled"}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {systemSettings?.subscriptionSystemEnabled
+                          ? "Users are charged for subscriptions and usage"
+                          : "Free usage mode: All users get unlimited access"
+                        }
+                      </p>
+                    </div>
+                    <Switch
+                      id="subscription-toggle"
+                      checked={systemSettings?.subscriptionSystemEnabled || false}
+                      onCheckedChange={toggleSubscriptionSystem}
+                      disabled={settingsLoading}
+                    />
+                  </div>
+
+                  {/* Mode Status Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 border rounded-lg bg-gradient-to-br from-background to-muted/20">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Shield className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium">Current Mode</span>
+                      </div>
+                      <p className="text-lg font-semibold">
+                        {systemSettings?.subscriptionSystemEnabled ? "Paid Mode" : "Free Mode"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {systemSettings?.subscriptionSystemEnabled
+                          ? "Revenue generation active"
+                          : "User growth focused"
+                        }
+                      </p>
+                    </div>
+
+                    <div className="p-4 border rounded-lg bg-gradient-to-br from-background to-muted/20">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Activity className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium">Last Updated</span>
+                      </div>
+                      <p className="text-lg font-semibold">
+                        {systemSettings ? new Date(systemSettings.lastUpdated).toLocaleDateString() : 'Never'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        by {systemSettings?.updatedBy || 'system'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Activity Feed Sidebar */}
+          <div className="space-y-6">
+            {/* Recent Activity */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Activity className="h-4 w-4" />
+                  Recent Activity
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">New user registration</p>
                     <p className="text-xs text-muted-foreground">2 minutes ago</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <div className="flex-1">
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">Subscription upgrade</p>
                     <p className="text-xs text-muted-foreground">5 minutes ago</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Payment failed</p>
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2"></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">Payment processing</p>
                     <p className="text-xs text-muted-foreground">10 minutes ago</p>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full mt-2"></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">Site deployment</p>
+                    <p className="text-xs text-muted-foreground">15 minutes ago</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-          {/* System Alerts */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5" />
-                System Alerts
-              </CardTitle>
-              <CardDescription>Important notifications and warnings</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
+            {/* System Alerts */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <AlertCircle className="h-4 w-4" />
+                  System Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
                 <div className="p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
                   <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
                     <div>
                       <p className="text-sm font-medium text-green-800 dark:text-green-200">
                         All systems operational
@@ -438,152 +554,20 @@ export default function AdminPanel() {
 
                 <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                   <div className="flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-blue-600" />
+                    <TrendingUp className="h-4 w-4 text-blue-600 flex-shrink-0" />
                     <div>
                       <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                        Revenue target met
+                        Performance optimal
                       </p>
                       <p className="text-xs text-blue-600 dark:text-blue-400">
-                        15% above monthly goal
+                        Response time: &lt;100ms
                       </p>
                     </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* System Settings */}
-        <div id="system-settings" className="mt-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                System Settings
-              </CardTitle>
-              <CardDescription>
-                Control global system behavior and subscription management
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {/* Subscription System Toggle */}
-                <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="subscription-toggle" className="text-base font-medium">
-                        Subscription System
-                      </Label>
-                      <Badge variant={systemSettings?.subscriptionSystemEnabled ? "default" : "secondary"}>
-                        {systemSettings?.subscriptionSystemEnabled ? "Active" : "Disabled"}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {systemSettings?.subscriptionSystemEnabled
-                        ? "Users are charged for subscriptions and usage. Normal subscription system active."
-                        : "Free usage mode: All users get unlimited access. No subscription charges applied."
-                      }
-                    </p>
-                    {systemSettings && (
-                      <p className="text-xs text-muted-foreground">
-                        Last updated: {new Date(systemSettings.lastUpdated).toLocaleString()} by {systemSettings.updatedBy}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Switch
-                      id="subscription-toggle"
-                      checked={systemSettings?.subscriptionSystemEnabled || false}
-                      onCheckedChange={toggleSubscriptionSystem}
-                      disabled={settingsLoading}
-                    />
-                  </div>
-                </div>
-
-                {/* System Status */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-4 border rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Shield className="h-4 w-4 text-green-500" />
-                      <span className="text-sm font-medium">Current Mode</span>
-                    </div>
-                    <p className="text-lg font-semibold">
-                      {systemSettings?.subscriptionSystemEnabled ? "Paid Mode" : "Free Mode"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {systemSettings?.subscriptionSystemEnabled
-                        ? "Subscription charges active"
-                        : "Unlimited usage for all users"
-                      }
-                    </p>
-                  </div>
-
-                  <div className="p-4 border rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Activity className="h-4 w-4 text-blue-500" />
-                      <span className="text-sm font-medium">Impact</span>
-                    </div>
-                    <p className="text-lg font-semibold">
-                      {systemSettings?.subscriptionSystemEnabled ? "Revenue Generation" : "User Growth"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {systemSettings?.subscriptionSystemEnabled
-                        ? "Users pay for usage"
-                        : "Users get free unlimited access"
-                      }
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="mt-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Common administrative tasks</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Button
-                  variant="outline"
-                  className="h-20 flex-col gap-2"
-                  onClick={() => alert('Add User functionality coming soon!')}
-                >
-                  <UserPlus className="h-6 w-6" />
-                  <span className="text-xs">Add User</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-20 flex-col gap-2"
-                  onClick={() => router.push('/admin/billing')}
-                >
-                  <CreditCard className="h-6 w-6" />
-                  <span className="text-xs">Process Refund</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-20 flex-col gap-2"
-                  onClick={() => router.push('/admin/system')}
-                >
-                  <Settings className="h-6 w-6" />
-                  <span className="text-xs">System Config</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-20 flex-col gap-2"
-                  onClick={() => router.push('/admin/analytics')}
-                >
-                  <BarChart3 className="h-6 w-6" />
-                  <span className="text-xs">View Reports</span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>
