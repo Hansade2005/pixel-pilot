@@ -228,6 +228,66 @@ Output: <link href="./assets/style.css">`
   }
 }
 
+// AI-powered JavaScript asset path fixer for JS/TS files
+export async function fixJsAssetPaths(jsContent: string, basePath: string = './', filePath: string = ''): Promise<string> {
+  try {
+    const codestralModel = getModel('codestral-latest')
+
+    const result = await generateText({
+      model: codestralModel,
+      temperature: 0.1, // Low temperature for precise, deterministic fixes
+      prompt: `You are an expert JavaScript processor. Your task is to fix asset paths in JavaScript/TypeScript files that will be served from a subdirectory.
+
+FILE CONTEXT:
+- File Path: ${filePath}
+- Base Path for Assets: ${basePath}
+- This file will be served from a subdirectory, so absolute paths need to be converted to relative paths
+
+INPUT JAVASCRIPT:
+${jsContent}
+
+INSTRUCTIONS:
+- Replace all absolute paths (starting with "/") in import statements with relative paths
+- Replace all absolute paths (starting with "/") in require() calls with relative paths
+- Replace all absolute paths (starting with "/") in fetch() calls with relative paths
+- Replace all absolute paths (starting with "/") in any other asset references with relative paths
+- Use "${basePath}" as the base path for all assets
+- Consider the file's location (${filePath}) when calculating relative paths
+- Do not change any other content
+- Preserve all JavaScript structure, syntax, and formatting
+- Return ONLY the fixed JavaScript content with NO markdown formatting, NO code blocks, NO explanations
+- Do NOT wrap the output in \`\`\`js or any other markdown syntax
+
+EXAMPLES:
+Input: import styles from '/assets/style.css'
+Output: import styles from './assets/style.css'
+
+Input: require('/utils/helper.js')
+Output: require('./utils/helper.js')
+
+Input: fetch('/api/data.json')
+Output: fetch('./api/data.json')`
+    })
+
+    // Clean the response by removing any markdown code blocks
+    let cleanedResult = result.text.trim()
+
+    // Remove markdown code block wrappers if present
+    cleanedResult = cleanedResult.replace(/^```(?:js|javascript|typescript|ts)?\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '')
+
+    return cleanedResult
+  } catch (error) {
+    console.warn('[Vite Hosting] AI JS processing failed, falling back to regex:', error)
+    // Fallback to regex if AI fails - handle common patterns
+    return jsContent
+      .replace(/import\s+.*?\s+from\s+['"]\/([^'"]*)['"]/g, (match, path) => match.replace(`'/${path}'`, `'${basePath}${path}'`).replace(`"/${path}"`, `"${basePath}${path}"`))
+      .replace(/require\s*\(\s*['"]\/([^'"]*)['"]\s*\)/g, (match, path) => match.replace(`'/${path}'`, `'${basePath}${path}'`).replace(`"/${path}"`, `"${basePath}${path}"`))
+      .replace(/fetch\s*\(\s*['"]\/([^'"]*)['"]\s*\)/g, (match, path) => match.replace(`'/${path}'`, `'${basePath}${path}'`).replace(`"/${path}"`, `"${basePath}${path}"`))
+      // Handle other common absolute path patterns
+      .replace(/['"]\/([^'"]*\.(?:css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot))['"]/g, (match, path) => match.replace(`'/${path}'`, `'${basePath}${path}'`).replace(`"/${path}"`, `"${basePath}${path}"`))
+  }
+}
+
 // AI-powered SEO metadata enhancer for HTML files
 export async function addSEOMetadata(htmlContent: string, projectSlug: string): Promise<string> {
   try {
@@ -258,7 +318,7 @@ REQUIRED METADATA TO ADD/UPDATE:
    - <meta property="og:description" content="Built with PiPilot - Canada's First Agentic Vibe Coding Platform. Create apps 10x faster with AI-powered development.">
    - <meta property="og:image" content="https://pipilot.dev/og_image.png">
    - <meta property="og:image:alt" content="PiPilot - AI App Builder Platform">
-   - <meta property="og:url" content="https://pipilot.dev/sites/${projectSlug}">
+   - <meta property="og:url" content="https://${projectSlug}.pipilot.dev">
    - <meta property="og:type" content="website">
    - <meta property="og:site_name" content="PiPilot">
 
@@ -280,7 +340,7 @@ REQUIRED METADATA TO ADD/UPDATE:
 5. ADDITIONAL SEO BOOSTERS:
    - <meta name="theme-color" content="#000000">
    - <meta name="msapplication-TileColor" content="#000000">
-   - <link rel="canonical" href="https://pipilot.dev/sites/${projectSlug}">
+   - <link rel="canonical" href="https://${projectSlug}.pipilot.dev">
 
 INSTRUCTIONS:
 - Add all metadata to the <head> section
@@ -327,7 +387,7 @@ EXAMPLE OUTPUT STRUCTURE:
   <meta property="og:title" content="PiPilot - ${projectSlug} | AI App Builder">
   <meta property="og:description" content="Built with PiPilot - Canada's First Agentic Vibe Coding Platform. Create apps 10x faster with AI.">
   <meta property="og:image" content="https://pipilot.dev/og_image.png">
-  <meta property="og:url" content="https://pipilot.dev/sites/${projectSlug}">
+  <meta property="og:url" content="https://${projectSlug}.pipilot.dev">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="PiPilot">
   <meta name="twitter:card" content="summary_large_image">
@@ -336,7 +396,7 @@ EXAMPLE OUTPUT STRUCTURE:
   <meta name="twitter:image" content="https://pipilot.dev/og_image2.png">
   <link rel="icon" href="https://pipilot.dev/icons/icon-192x192.png" type="image/png">
   <link rel="apple-touch-icon" href="https://pipilot.dev/icons/icon-180x180.png">
-  <link rel="canonical" href="https://pipilot.dev/sites/${projectSlug}">
+  <link rel="canonical" href="https://${projectSlug}.pipilot.dev">
 `
 
     // Inject metadata into head section
@@ -416,6 +476,13 @@ async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supa
             processedContent = await addSEOMetadata(processedContent, projectSlug)
             
             console.log(`[Vite Hosting] AI processed and SEO enhanced HTML file ${relativePath}`)
+          } else if (relativePath.endsWith('.js') || relativePath.endsWith('.ts')) {
+            console.log(`[Vite Hosting] Processing JS/TS file ${relativePath} with AI...`)
+            
+            // Fix asset paths in JavaScript/TypeScript files
+            processedContent = await fixJsAssetPaths(content, './', relativePath)
+            
+            console.log(`[Vite Hosting] AI processed JS/TS file ${relativePath}`)
           }
           
           // Determine content type
@@ -505,6 +572,7 @@ async function extractProjectFromCompressedData(compressedData: ArrayBuffer): Pr
   projectId: string
   projectSlug: string
   files: any[]
+  metadata?: any
 }> {
   // Step 1: LZ4 decompress
   const decompressedData = lz4.decompress(Buffer.from(compressedData))
@@ -538,10 +606,11 @@ async function extractProjectFromCompressedData(compressedData: ArrayBuffer): Pr
   // Parse metadata to get projectId and projectSlug
   let projectId = `preview-${Date.now()}`
   let projectSlug = projectId // fallback to projectId if no slug
+  let metadata: any = undefined
   const metadataEntry = zip.file('__metadata__.json')
   if (metadataEntry) {
     const metadataContent = await metadataEntry.async('text')
-    const metadata = JSON.parse(metadataContent)
+    metadata = JSON.parse(metadataContent)
     projectId = metadata.project?.id || metadata.projectId || projectId
     projectSlug = metadata.project?.slug || metadata.project?.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || projectId
     console.log(`[Preview] Loaded metadata, projectId: ${projectId}, projectSlug: ${projectSlug}`)
@@ -550,7 +619,8 @@ async function extractProjectFromCompressedData(compressedData: ArrayBuffer): Pr
   return {
     projectId,
     projectSlug,
-    files: filteredFiles
+    files: filteredFiles,
+    metadata
   }
 }
 
@@ -583,6 +653,8 @@ async function handleStreamingPreview(req: Request) {
     let projectId: string
     let projectSlug: string
     let files: any[]
+    let authUserId: string | undefined
+    let authUsername: string | undefined
 
     if (contentType.includes('application/octet-stream')) {
       // Handle compressed data (LZ4 + Zip)
@@ -592,17 +664,45 @@ async function handleStreamingPreview(req: Request) {
       projectId = extractedData.projectId
       projectSlug = extractedData.projectSlug
       files = extractedData.files
+      // Extract auth info from metadata if available
+      authUserId = extractedData.metadata?.authUserId
+      authUsername = extractedData.metadata?.authUsername
     } else {
       // Handle JSON format (backward compatibility)
       console.log('[Preview] 📄 Received JSON data')
-      const { projectId: jsonProjectId, projectSlug: jsonProjectSlug, files: jsonFiles } = await req.json()
+      const { 
+        projectId: jsonProjectId, 
+        projectSlug: jsonProjectSlug, 
+        files: jsonFiles,
+        authUserId: parsedAuthUserId,
+        authUsername: parsedAuthUsername 
+      } = await req.json()
       projectId = jsonProjectId
       projectSlug = jsonProjectSlug || projectId // fallback to projectId
       files = jsonFiles
+      authUserId = parsedAuthUserId
+      authUsername = parsedAuthUsername
     }
 
     if (!projectId || !files?.length) {
       return new Response("Project ID and files are required", { status: 400 })
+    }
+
+    // 🔍 Check domain availability and generate unique slug if needed
+    console.log(`[Domain Check] Checking availability for: ${projectSlug}`)
+    const domainCheck = await checkDomainAvailability(projectSlug, externalSupabase)
+    const finalSlug = domainCheck.finalSlug
+    const originalSlug = domainCheck.available ? null : projectSlug
+
+    if (!domainCheck.available) {
+      console.log(`[Domain Check] "${projectSlug}" not available, using "${finalSlug}"`)
+    }
+
+    console.log(`[Domain Check] Final slug: ${finalSlug}`)
+
+    // Create site tracking record if we have auth info
+    if (authUserId && authUsername) {
+      await createSiteRecord(finalSlug, originalSlug, authUserId, authUsername, externalSupabase)
     }
 
     const stream = new ReadableStream({
@@ -762,16 +862,16 @@ async function handleStreamingPreview(req: Request) {
             
             send({ type: "log", message: "Build completed successfully" })
             
-            // Upload built files to Supabase
-            const uploadSuccess = await uploadViteBuildToSupabase(sandbox, projectSlug, externalSupabase)
+            // Upload built files to Supabase using the final slug
+            const uploadSuccess = await uploadViteBuildToSupabase(sandbox, finalSlug, externalSupabase)
             
             if (!uploadSuccess) {
               send({ type: "error", message: "Failed to upload built files to hosting" })
               throw new Error('Failed to upload built files to hosting')
             }
             
-            // Return hosted URL instead of sandbox URL
-            const hostedUrl = `https://${projectSlug}.pipilot.dev/`
+            // Return hosted URL with final slug
+            const hostedUrl = `https://${finalSlug}.pipilot.dev/`
             
             send({ type: "log", message: `Vite project hosted at: ${hostedUrl}` })
             
@@ -780,6 +880,8 @@ async function handleStreamingPreview(req: Request) {
               message: "Vite project hosted successfully",
               sandboxId: sandbox.id,
               url: hostedUrl,
+              finalSlug: finalSlug,
+              originalSlug: originalSlug,
               processId: null,
               hosted: true
             })
@@ -883,9 +985,9 @@ async function handleRegularPreview(req: Request) {
       projectId = extractedData.projectId
       projectSlug = extractedData.projectSlug
       files = extractedData.files
-      // For compressed data, we'll need to get auth info differently or make it optional
-      authUserId = undefined
-      authUsername = undefined
+      // Extract auth info from metadata if available
+      authUserId = extractedData.metadata?.authUserId
+      authUsername = extractedData.metadata?.authUsername
     } else {
       // Handle JSON format (backward compatibility)
       console.log('[Preview] 📄 Received JSON data for regular preview')
