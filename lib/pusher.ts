@@ -1,19 +1,47 @@
 import Pusher from 'pusher';
 import PusherClient from 'pusher-js';
 
-// Server-side Pusher instance
-export const pusher = new Pusher({
-  appId: process.env.PUSHER_APP_ID!,
-  key: process.env.PUSHER_KEY!,
-  secret: process.env.PUSHER_SECRET!,
-  cluster: process.env.PUSHER_CLUSTER!,
-  useTLS: true,
-});
+// Server-side Pusher instance - lazy initialization
+let pusherInstance: Pusher | null = null;
 
-// Client-side Pusher instance
-export const pusherClient = new PusherClient(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
-  cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-});
+export const getPusherInstance = (): Pusher => {
+  if (!pusherInstance) {
+    const appId = process.env.PUSHER_APP_ID || '1926644';
+    const key = process.env.PUSHER_KEY || 'c9b3f58fb0218b34f286';
+    const secret = process.env.PUSHER_SECRET || '8eadfe463bdd2e0d0f06';
+    const cluster = process.env.PUSHER_CLUSTER || 'eu';
+
+    pusherInstance = new Pusher({
+      appId,
+      key,
+      secret,
+      cluster,
+      useTLS: true,
+    });
+  }
+  return pusherInstance;
+};
+
+// For backward compatibility
+export const pusher = getPusherInstance();
+
+// Client-side Pusher instance - lazy initialization
+let pusherClientInstance: PusherClient | null = null;
+
+export const getPusherClient = (): PusherClient => {
+  if (!pusherClientInstance) {
+    const key = process.env.NEXT_PUBLIC_PUSHER_KEY || 'c9b3f58fb0218b34f286';
+    const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'eu';
+
+    pusherClientInstance = new PusherClient(key, {
+      cluster,
+    });
+  }
+  return pusherClientInstance;
+};
+
+// For backward compatibility
+export const pusherClient = getPusherClient();
 
 // Helper function to trigger notifications
 export const triggerNotification = async (
@@ -22,6 +50,7 @@ export const triggerNotification = async (
   data: any
 ) => {
   try {
+    const pusher = getPusherInstance();
     await pusher.trigger(channel, event, data);
   } catch (error) {
     console.error('Error triggering Pusher event:', error);
