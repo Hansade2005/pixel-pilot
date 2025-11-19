@@ -47,21 +47,38 @@ export async function GET(request: NextRequest) {
   try {
     const hostname = request.headers.get('host') || '';
     const url = new URL(request.url);
-    const path = url.pathname.slice(1); // Remove leading slash
-
+    
+    // Parse the path - it will be /api/sites/siteId/path
+    const pathSegments = url.pathname.split('/').filter(Boolean);
+    // pathSegments = ['api', 'sites', 'siteId', ...rest]
+    
     // Extract subdomain for multi-tenant routing
     const subdomain = getSubdomain(hostname);
 
-    if (!subdomain) {
-      // No subdomain - serve main app or redirect to sites
-      return NextResponse.redirect(new URL('/sites', request.url));
+    let siteId: string;
+    let filePath: string;
+
+    if (subdomain) {
+      // Multi-tenant mode: subdomain.pipilot.dev/path -> serve from sites/subdomain/path
+      siteId = subdomain;
+      // Path after /api/sites/siteId
+      const pathIndex = pathSegments.indexOf('sites');
+      if (pathIndex >= 0 && pathSegments[pathIndex + 1] === siteId) {
+        filePath = pathSegments.slice(pathIndex + 2).join('/') || 'index.html';
+      } else {
+        filePath = pathSegments.slice(pathIndex + 1).join('/') || 'index.html';
+      }
+    } else {
+      // Direct API access: /api/sites/siteId/path
+      const pathIndex = pathSegments.indexOf('sites');
+      if (pathIndex < 0 || pathSegments.length < pathIndex + 2) {
+        return NextResponse.redirect(new URL('/sites', request.url));
+      }
+      siteId = pathSegments[pathIndex + 1];
+      filePath = pathSegments.slice(pathIndex + 2).join('/') || 'index.html';
     }
 
-    // Multi-tenant mode: subdomain.pipilot.dev/path -> serve from sites/subdomain/path
-    const siteId = subdomain;
-    const filePath = path || 'index.html';
-
-    console.log(`[Multi-tenant] Serving ${siteId}/${filePath} for ${hostname}`);
+    console.log(`[Multi-tenant API] Serving ${siteId}/${filePath} for ${hostname}`);
 
     const supabase = createClient(SUPABASE_CONFIG.URL, SUPABASE_CONFIG.SERVICE_ROLE_KEY);
     const storagePath = `sites/${siteId}/${filePath}`;
@@ -69,13 +86,17 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.storage.from('documents').download(storagePath);
 
     if (error) {
-      // Try index.html for SPA routing
+      // SPA fallback: Try index.html for non-existent routes
       if (filePath !== 'index.html') {
+        console.log(`[SPA Fallback] ${storagePath} not found, serving index.html`);
         const fallback = await supabase.storage.from('documents').download(`sites/${siteId}/index.html`);
         if (!fallback.error) {
           const indexBuffer = await fallback.data.arrayBuffer();
           return new NextResponse(Buffer.from(indexBuffer), {
-            headers: { 'Content-Type': 'text/html; charset=utf-8' },
+            headers: { 
+              'Content-Type': 'text/html; charset=utf-8',
+              'Cache-Control': 'public, max-age=0, must-revalidate',
+            },
           });
         }
       }
@@ -84,10 +105,20 @@ export async function GET(request: NextRequest) {
 
     const arrayBuffer = await data.arrayBuffer();
     const contentType = detectContentType(filePath);
+    
+    // Set appropriate cache headers
+    const cacheControl = contentType.includes('html')
+      ? 'public, max-age=0, must-revalidate'
+      : 'public, max-age=31536000, immutable';
+
     return new NextResponse(Buffer.from(arrayBuffer), {
-      headers: { 'Content-Type': contentType },
+      headers: { 
+        'Content-Type': contentType,
+        'Cache-Control': cacheControl,
+      },
     });
   } catch (e) {
+    console.error('[Multi-tenant API Error]', e);
     return new NextResponse(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`, { status: 500 });
   }
 }

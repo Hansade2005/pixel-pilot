@@ -2,11 +2,11 @@
   "rewrites": [
     {
       "source": "/sites/:siteId",
-      "destination": "/sites/:siteId/index.html"
+      "destination": "/api/sites/:siteId"
     },
     {
-      "source": "/sites/:siteId/",
-      "destination": "/sites/:siteId/index.html"
+      "source": "/sites/:siteId/(.*)",
+      "destination": "/api/sites/:siteId/:path*"
     }
   ],
   "headers": [

@@ -52,35 +52,63 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
       // Remove the siteId from the beginning if it matches
       filePath = path[0] === subdomain ? path.slice(1) : path;
     } else {
-      // Legacy slug mode: pipilot.dev/sites/siteId/path
-      if (path.length === 0 || path[0] !== 'sites') {
-        return new NextResponse('Invalid path format', { status: 400 });
-      }
-      if (path.length < 2) {
+      // Direct /sites/siteId/path access
+      if (path.length === 0) {
         return new NextResponse('Site ID required', { status: 400 });
       }
-      siteId = path[1]; // path[0] is 'sites', path[1] is the siteId
-      filePath = path.slice(2); // Everything after siteId
+      siteId = path[0]; // First segment is the siteId
+      filePath = path.slice(1); // Everything after siteId
     }
     
     const joinedPath = filePath.join('/') || 'index.html';
 
+    console.log(`[Sites Route] Serving ${siteId}/${joinedPath} for ${hostname}`);
+
     const supabase = createClient(SUPABASE_CONFIG.URL, SUPABASE_CONFIG.SERVICE_ROLE_KEY);
 
+    // Try to fetch the requested file
     const storagePath = `sites/${siteId}/${joinedPath}`;
     const { data, error } = await supabase.storage.from('documents').download(storagePath);
 
-    // If file not found, return 404 (no SPA fallback - let Vercel rewrites handle it)
     if (error) {
-      return new NextResponse('Not found', { status: 404 });
+      // SPA fallback: If file not found and it's not already index.html, try index.html
+      if (joinedPath !== 'index.html') {
+        console.log(`[SPA Fallback] ${storagePath} not found, falling back to index.html`);
+        const fallbackPath = `sites/${siteId}/index.html`;
+        const { data: fallbackData, error: fallbackError } = await supabase.storage
+          .from('documents')
+          .download(fallbackPath);
+        
+        if (!fallbackError && fallbackData) {
+          const fallbackBuffer = await fallbackData.arrayBuffer();
+          return new NextResponse(Buffer.from(fallbackBuffer), {
+            headers: { 
+              'Content-Type': 'text/html; charset=utf-8',
+              'Cache-Control': 'public, max-age=0, must-revalidate',
+            },
+          });
+        }
+      }
+      // If even index.html is not found, return 404
+      return new NextResponse(`Site not found: ${siteId}`, { status: 404 });
     }
 
     const arrayBuffer = await data.arrayBuffer();
     const contentType = detectContentType(joinedPath);
+    
+    // Set appropriate cache headers
+    const cacheControl = contentType.includes('html')
+      ? 'public, max-age=0, must-revalidate'
+      : 'public, max-age=31536000, immutable';
+
     return new NextResponse(Buffer.from(arrayBuffer), {
-      headers: { 'Content-Type': contentType },
+      headers: { 
+        'Content-Type': contentType,
+        'Cache-Control': cacheControl,
+      },
     });
   } catch (e) {
+    console.error('[Sites Route Error]', e);
     return new NextResponse(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`, { status: 500 });
   }
 }
