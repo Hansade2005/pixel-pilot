@@ -516,6 +516,30 @@ export default function AdminEmailPage() {
     }
   }
 
+  const handleExportEmailReport = () => {
+    // Export email campaign report
+    // For now, just show an alert
+    alert('Exporting email report... This feature is not yet implemented. Please check back later.')
+  }
+
+  const handleEmailSettings = () => {
+    // Navigate to email settings
+    // For now, just show an alert
+    alert('Opening email settings... This feature is not yet implemented. Please check back later.')
+  }
+
+  const handleCreateTemplate = () => {
+    // Navigate to create email template
+    // For now, just show an alert
+    alert('Creating email template... This feature is not yet implemented. Please check back later.')
+  }
+
+  const handleViewAnalytics = () => {
+    // Navigate to email analytics dashboard
+    // For now, just show an alert
+    alert('Viewing email analytics... This feature is not yet implemented. Please check back later.')
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
@@ -1129,19 +1153,19 @@ export default function AdminEmailPage() {
                 <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-6">
                   <h4 className="text-sm font-medium text-slate-900 dark:text-white mb-3">Quick Actions</h4>
                   <div className="space-y-2">
-                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={handleExportEmailReport}>
                       <Download className="h-4 w-4 mr-2" />
                       Export Email Report
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={handleEmailSettings}>
                       <Settings className="h-4 w-4 mr-2" />
                       Email Settings
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={handleCreateTemplate}>
                       <FileText className="h-4 w-4 mr-2" />
                       Create Template
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={handleViewAnalytics}>
                       <BarChart3 className="h-4 w-4 mr-2" />
                       View Analytics
                     </Button>

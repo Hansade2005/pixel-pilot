@@ -158,6 +158,76 @@ export default function AdminBillingPage() {
     }
   }
 
+  const handleFilter = () => {
+    // For now, just show an alert
+    alert('Advanced filtering is not yet implemented. Please use the search box for basic filtering.')
+  }
+
+  const handleExportBillingReport = async () => {
+    try {
+      const reportData = {
+        generatedAt: new Date().toISOString(),
+        subscriptions: subscriptions,
+        totalSubscriptions: subscriptions.length,
+        activeSubscriptions: subscriptions.filter(sub => sub.subscription_status === 'active' || sub.subscription_status === 'trialing').length
+      }
+
+      const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `billing-report-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Error exporting billing report:', error)
+    }
+  }
+
+  const handleExportRevenueReport = () => {
+    // Export revenue report
+    // For now, just show an alert
+    alert('Exporting revenue report... This feature is not yet implemented. Please check back later.')
+  }
+
+  const handleConfigureBilling = () => {
+    // Configure billing settings
+    // For now, just show an alert
+    alert('Configuring billing settings... This feature is not yet implemented. Please check back later.')
+  }
+
+  const handleSendPaymentReminders = () => {
+    // Send payment reminders
+    // For now, just show an alert
+    alert('Sending payment reminders... This feature is not yet implemented. Please check back later.')
+  }
+
+  const handleViewBillingAnalytics = () => {
+    // View billing analytics
+    // For now, just show an alert
+    alert('Viewing billing analytics... This feature is not yet implemented. Please check back later.')
+  }
+
+  const handleViewInvoices = () => {
+    // View user invoices
+    // For now, just show an alert
+    alert('Viewing invoices... This feature is not yet implemented. Please check back later.')
+  }
+
+  const handleUpdatePaymentMethod = () => {
+    // Update payment method
+    // For now, just show an alert
+    alert('Updating payment method... This feature is not yet implemented. Please check back later.')
+  }
+
+  const handleSendBillingNotification = () => {
+    // Send billing notification
+    // For now, just show an alert
+    alert('Sending billing notification... This feature is not yet implemented. Please check back later.')
+  }
+
   const filteredSubscriptions = subscriptions.filter(sub =>
     sub.user_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (sub.user_name && sub.user_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -261,7 +331,7 @@ export default function AdminBillingPage() {
                 className="pl-9 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
               />
             </div>
-            <Button variant="outline" className="border-slate-200 dark:border-slate-700">
+            <Button variant="outline" onClick={handleFilter} className="border-slate-200 dark:border-slate-700">
               <Filter className="h-4 w-4 mr-2" />
               Filter
             </Button>
@@ -271,7 +341,7 @@ export default function AdminBillingPage() {
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
-            <Button className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleExportBillingReport} className="bg-blue-600 hover:bg-blue-700">
               <Download className="h-4 w-4 mr-2" />
               Export Report
             </Button>
@@ -590,19 +660,19 @@ export default function AdminBillingPage() {
                 <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-6">
                   <h4 className="text-sm font-medium text-slate-900 dark:text-white mb-3">Quick Actions</h4>
                   <div className="space-y-2">
-                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={handleExportRevenueReport}>
                       <Download className="h-4 w-4 mr-2" />
                       Export Revenue Report
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={handleConfigureBilling}>
                       <Settings className="h-4 w-4 mr-2" />
                       Configure Billing
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={handleSendPaymentReminders}>
                       <AlertTriangle className="h-4 w-4 mr-2" />
                       Send Payment Reminders
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={handleViewBillingAnalytics}>
                       <BarChart3 className="h-4 w-4 mr-2" />
                       View Analytics
                     </Button>
@@ -732,15 +802,15 @@ export default function AdminBillingPage() {
 
                 {/* Action Buttons */}
                 <div className="flex gap-2">
-                  <Button variant="outline" className="flex-1">
+                  <Button variant="outline" className="flex-1" onClick={handleViewInvoices}>
                     <Receipt className="h-4 w-4 mr-2" />
                     View Invoices
                   </Button>
-                  <Button variant="outline" className="flex-1">
+                  <Button variant="outline" className="flex-1" onClick={handleUpdatePaymentMethod}>
                     <CreditCard className="h-4 w-4 mr-2" />
                     Update Payment Method
                   </Button>
-                  <Button variant="outline" className="flex-1">
+                  <Button variant="outline" className="flex-1" onClick={handleSendBillingNotification}>
                     <AlertTriangle className="h-4 w-4 mr-2" />
                     Send Notification
                   </Button>

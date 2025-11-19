@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       .from('admin_notifications')
       .select(`
         *,
-        sent_by_profile:profiles!admin_notifications_sent_by_fkey(email, full_name)
+        profiles!admin_notifications_sent_by_fkey(email, full_name)
       `, { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);

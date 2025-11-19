@@ -165,6 +165,38 @@ export default function AdminUsersPage() {
     }
   }
 
+  const handleExportUsers = async () => {
+    try {
+      const reportData = {
+        generatedAt: new Date().toISOString(),
+        users: users,
+        totalUsers: users.length
+      }
+
+      const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `users-report-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Error exporting users report:', error)
+    }
+  }
+
+  const handleImportUsers = () => {
+    // For now, just show an alert
+    alert('User import functionality is not yet implemented. Please check back later.')
+  }
+
+  const handleAddUser = () => {
+    // For now, just show an alert
+    alert('Add user functionality is not yet implemented. Please check back later.')
+  }
+
   // Bulk selection functions
   const handleSelectAll = () => {
     if (selectedUsers.size === filteredUsers.length) {
@@ -239,6 +271,52 @@ export default function AdminUsersPage() {
     } finally {
       setBulkActionLoading(false)
     }
+  }
+
+  const handleRefreshUsers = async () => {
+    await loadUsers()
+  }
+
+  const handleBulkUserImport = () => {
+    // Navigate to bulk user import
+    // For now, just show an alert
+    alert('Bulk user import feature is not yet implemented. Please check back later.')
+  }
+
+  const handleSendNewsletter = () => {
+    // Navigate to send newsletter
+    // For now, just show an alert
+    alert('Send newsletter feature is not yet implemented. Please check back later.')
+  }
+
+  const handleViewUserAnalytics = () => {
+    // Navigate to user analytics dashboard
+    // For now, just show an alert
+    alert('User analytics feature is not yet implemented. Please check back later.')
+  }
+
+  const handleUserSettings = () => {
+    // Navigate to user settings
+    // For now, just show an alert
+    alert('User settings feature is not yet implemented. Please check back later.')
+  }
+
+  const handleSendMessage = () => {
+    // Send message to user
+    // For now, just show an alert
+    alert('Send message feature is not yet implemented. Please check back later.')
+  }
+
+  const handleManageSubscription = () => {
+    // Manage user subscription
+    // For now, just show an alert
+    alert('Manage subscription feature is not yet implemented. Please check back later.')
+  }
+
+  const handleUserSettingsDialog = () => {
+    // Open user settings dialog
+    // For now, just show an alert
+    alert('User settings dialog is not yet implemented. Please check back later.')
   }
 
   // Enhanced filtering
@@ -371,15 +449,15 @@ export default function AdminUsersPage() {
               </select>
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700">
+              <Button variant="outline" size="sm" onClick={handleExportUsers} className="border-slate-200 dark:border-slate-700">
                 <Download className="h-4 w-4 mr-2" />
                 Export
               </Button>
-              <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700">
+              <Button variant="outline" size="sm" onClick={handleImportUsers} className="border-slate-200 dark:border-slate-700">
                 <Upload className="h-4 w-4 mr-2" />
                 Import
               </Button>
-              <Button className="bg-blue-600 hover:bg-blue-700">
+              <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleAddUser}>
                 <UserPlus className="h-4 w-4 mr-2" />
                 Add User
               </Button>
@@ -540,7 +618,7 @@ export default function AdminUsersPage() {
                       Manage user accounts, subscriptions, and access levels
                     </CardDescription>
                   </div>
-                  <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700">
+                  <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700" onClick={handleRefreshUsers}>
                     <RefreshCw className="h-4 w-4 mr-2" />
                     Refresh
                   </Button>
@@ -1098,19 +1176,19 @@ export default function AdminUsersPage() {
                 <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-6">
                   <h4 className="text-sm font-medium text-slate-900 dark:text-white mb-3">Quick Actions</h4>
                   <div className="space-y-2">
-                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700">
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700" onClick={handleBulkUserImport}>
                       <UserCog className="h-4 w-4 mr-2" />
                       Bulk User Import
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700">
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700" onClick={handleSendNewsletter}>
                       <Mail className="h-4 w-4 mr-2" />
                       Send Newsletter
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700">
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700" onClick={handleViewUserAnalytics}>
                       <BarChart3 className="h-4 w-4 mr-2" />
                       View Analytics
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700">
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700" onClick={handleUserSettings}>
                       <Settings className="h-4 w-4 mr-2" />
                       User Settings
                     </Button>
@@ -1262,15 +1340,15 @@ export default function AdminUsersPage() {
 
                 {/* Action Buttons */}
                 <div className="flex gap-2">
-                  <Button variant="outline" className="flex-1">
+                  <Button variant="outline" className="flex-1" onClick={handleSendMessage}>
                     <Mail className="h-4 w-4 mr-2" />
                     Send Message
                   </Button>
-                  <Button variant="outline" className="flex-1">
+                  <Button variant="outline" className="flex-1" onClick={handleManageSubscription}>
                     <CreditCard className="h-4 w-4 mr-2" />
                     Manage Subscription
                   </Button>
-                  <Button variant="outline" className="flex-1">
+                  <Button variant="outline" className="flex-1" onClick={handleUserSettingsDialog}>
                     <Shield className="h-4 w-4 mr-2" />
                     User Settings
                   </Button>

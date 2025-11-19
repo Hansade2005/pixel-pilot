@@ -45,12 +45,22 @@ interface SystemSettings {
   updatedBy: string
 }
 
+interface RecentActivity {
+  id: string
+  type: 'user_registration' | 'subscription' | 'deployment' | 'notification'
+  title: string
+  description: string
+  timestamp: string
+  color: string
+}
+
 export default function AdminPanel() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<SystemStats | null>(null)
   const [webhookStatus, setWebhookStatus] = useState<any>(null)
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null)
+  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([])
   const [settingsLoading, setSettingsLoading] = useState(false)
   const router = useRouter()
   const supabase = createClient()
@@ -75,6 +85,9 @@ export default function AdminPanel() {
 
       setUser(user)
       const statsData = await loadSystemStats()
+
+      // Load recent activities
+      await loadRecentActivities()
 
       // Load webhook status
       try {
@@ -121,32 +134,42 @@ export default function AdminPanel() {
     }
   }
 
-  const loadSystemSettings = async () => {
+  const loadRecentActivities = async () => {
     try {
-      const response = await fetch('/api/admin/system-settings')
+      const response = await fetch('/api/admin/recent-activities')
       if (response.ok) {
         const data = await response.json()
-        const subscriptionSetting = data.settings?.subscription_system_enabled
-
-        if (subscriptionSetting) {
-          setSystemSettings({
-            subscriptionSystemEnabled: subscriptionSetting.enabled,
-            freeModeDescription: subscriptionSetting.description || 'Free usage mode',
-            lastUpdated: subscriptionSetting.updated_at,
-            updatedBy: subscriptionSetting.updated_by
-          })
-        } else {
-          // Default settings if none exist
-          setSystemSettings({
-            subscriptionSystemEnabled: true,
-            freeModeDescription: 'Subscription system is active',
-            lastUpdated: new Date().toISOString(),
-            updatedBy: user?.email || 'system'
-          })
-        }
+        setRecentActivities(data)
       }
     } catch (error) {
-      console.error('Error loading system settings:', error)
+      console.error('Error loading recent activities:', error)
+      // Set empty array on error
+      setRecentActivities([])
+    }
+  }
+
+  const handleExportReport = async () => {
+    try {
+      // Generate a comprehensive admin report
+      const reportData = {
+        generatedAt: new Date().toISOString(),
+        stats: stats,
+        recentActivities: recentActivities,
+        systemSettings: systemSettings
+      }
+
+      // Create and download JSON report
+      const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `admin-report-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Error exporting report:', error)
     }
   }
 
@@ -237,11 +260,11 @@ export default function AdminPanel() {
         <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 mb-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700">
+              <Button variant="outline" size="sm" onClick={loadSystemStats} className="border-slate-200 dark:border-slate-700">
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh Data
               </Button>
-              <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700">
+              <Button variant="outline" size="sm" onClick={handleExportReport} className="border-slate-200 dark:border-slate-700">
                 <Download className="h-4 w-4 mr-2" />
                 Export Report
               </Button>
@@ -254,7 +277,7 @@ export default function AdminPanel() {
                 }`} />
                 <span className="text-sm font-medium capitalize">{stats?.systemHealth || 'Unknown'}</span>
               </div>
-              <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700">
+              <Button variant="outline" size="sm" onClick={() => router.push('/admin/system')} className="border-slate-200 dark:border-slate-700">
                 <Settings className="h-4 w-4 mr-2" />
                 System Settings
               </Button>
@@ -483,34 +506,30 @@ export default function AdminPanel() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">New user registration</p>
-                    <p className="text-xs text-muted-foreground">2 minutes ago</p>
+                {recentActivities.length > 0 ? (
+                  recentActivities.map((activity) => (
+                    <div key={activity.id} className="flex items-start gap-3">
+                      <div className={`w-2 h-2 rounded-full mt-2 ${
+                        activity.color === 'green' ? 'bg-green-500' :
+                        activity.color === 'blue' ? 'bg-blue-500' :
+                        activity.color === 'yellow' ? 'bg-yellow-500' :
+                        activity.color === 'purple' ? 'bg-purple-500' :
+                        'bg-gray-500'
+                      }`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{activity.title}</p>
+                        <p className="text-xs text-muted-foreground">{activity.description}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(activity.timestamp).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-muted-foreground">No recent activity</p>
                   </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">Subscription upgrade</p>
-                    <p className="text-xs text-muted-foreground">5 minutes ago</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2"></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">Payment processing</p>
-                    <p className="text-xs text-muted-foreground">10 minutes ago</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full mt-2"></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">Site deployment</p>
-                    <p className="text-xs text-muted-foreground">15 minutes ago</p>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
 

@@ -144,6 +144,34 @@ export default function AdminDomainsPage() {
     }
   }
 
+  const handleExportReport = async () => {
+    try {
+      const reportData = {
+        generatedAt: new Date().toISOString(),
+        sites: sites,
+        stats: stats,
+        siteViews: siteViews
+      }
+
+      const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `domains-report-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Error exporting domains report:', error)
+    }
+  }
+
+  const handleConfigure = () => {
+    // Navigate to system settings for domain configuration
+    router.push('/admin/system')
+  }
+
   const calculateStats = (sitesData: SiteData[], viewsData: SiteView[]) => {
     const totalSites = sitesData.length
     const activeSites = sitesData.filter(site => site.is_active).length
@@ -341,13 +369,13 @@ export default function AdminDomainsPage() {
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh Data
               </Button>
-              <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700">
+              <Button variant="outline" size="sm" onClick={handleExportReport} className="border-slate-200 dark:border-slate-700">
                 <Download className="h-4 w-4 mr-2" />
                 Export Report
               </Button>
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700">
+              <Button variant="outline" size="sm" onClick={handleConfigure} className="border-slate-200 dark:border-slate-700">
                 <Settings className="h-4 w-4 mr-2" />
                 Configure
               </Button>

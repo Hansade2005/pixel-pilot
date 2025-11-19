@@ -1257,6 +1257,19 @@ function AccountSettingsPageContent() {
   }
 
 
+  const handleViewDetailedUsage = () => {
+    // Navigate to detailed usage analytics
+    // For now, just show an alert
+    alert('Detailed usage analytics feature is not yet implemented. Please check back later.')
+  }
+
+  const handleDownloadAllInvoices = () => {
+    // Download all user invoices
+    // For now, just show an alert
+    alert('Download all invoices feature is not yet implemented. Please check back later.')
+  }
+
+
   if (loading) {
     return (
       <div className="min-h-screen relative overflow-hidden">
@@ -1664,7 +1677,7 @@ function AccountSettingsPageContent() {
                     </div>
                   </div>
 
-                  <Button variant="outline" className="w-full">
+                  <Button variant="outline" className="w-full" onClick={handleViewDetailedUsage}>
                     <Settings className="h-4 w-4 mr-2" />
                     View Detailed Usage
                   </Button>
@@ -1696,7 +1709,7 @@ function AccountSettingsPageContent() {
                     </div>
                   </div>
 
-                  <Button variant="outline" className="w-full mt-4">
+                  <Button variant="outline" className="w-full mt-4" onClick={handleDownloadAllInvoices}>
                     <Download className="h-4 w-4 mr-2" />
                     Download All Invoices
                   </Button>

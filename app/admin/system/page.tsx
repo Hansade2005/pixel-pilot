@@ -76,6 +76,57 @@ export default function AdminSystemPage() {
     }
   }
 
+  const handleExportSystemReport = async () => {
+    try {
+      const reportData = {
+        generatedAt: new Date().toISOString(),
+        systemHealth: systemHealth
+      }
+
+      const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `system-report-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Error exporting system report:', error)
+    }
+  }
+
+  const handleAdvancedConfig = () => {
+    // Navigate to advanced system configuration
+    // For now, just show an alert
+    alert('Advanced system configuration is not yet implemented. Please check back later.')
+  }
+
+  const handleRunDiagnostics = () => {
+    // Run system diagnostics
+    // For now, just show an alert
+    alert('Running system diagnostics... This feature is not yet implemented. Please check back later.')
+  }
+
+  const handleGenerateReport = () => {
+    // Generate a comprehensive system report
+    // For now, just show an alert
+    alert('Generating comprehensive system report... This feature is not yet implemented. Please check back later.')
+  }
+
+  const handleViewLogs = () => {
+    // Navigate to system logs view
+    // For now, just show an alert
+    alert('Viewing system logs... This feature is not yet implemented. Please check back later.')
+  }
+
+  const handlePerformanceMetrics = () => {
+    // Navigate to performance metrics dashboard
+    // For now, just show an alert
+    alert('Viewing performance metrics... This feature is not yet implemented. Please check back later.')
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
@@ -140,11 +191,11 @@ export default function AdminSystemPage() {
               <RefreshCw className="h-4 w-4 mr-2" />
               Health Check
             </Button>
-            <Button variant="outline" className="border-slate-200 dark:border-slate-700">
+            <Button variant="outline" className="border-slate-200 dark:border-slate-700" onClick={handleExportSystemReport}>
               <Download className="h-4 w-4 mr-2" />
               System Report
             </Button>
-            <Button className="bg-blue-600 hover:bg-blue-700">
+            <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleAdvancedConfig}>
               <Settings className="h-4 w-4 mr-2" />
               Advanced Config
             </Button>
@@ -459,19 +510,19 @@ export default function AdminSystemPage() {
                 <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-6">
                   <h4 className="text-sm font-medium text-slate-900 dark:text-white mb-3">Quick Actions</h4>
                   <div className="space-y-2">
-                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={handleRunDiagnostics}>
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Run Diagnostics
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={handleGenerateReport}>
                       <Download className="h-4 w-4 mr-2" />
                       Generate Report
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={handleViewLogs}>
                       <Eye className="h-4 w-4 mr-2" />
                       View Logs
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800" onClick={handlePerformanceMetrics}>
                       <BarChart3 className="h-4 w-4 mr-2" />
                       Performance Metrics
                     </Button>

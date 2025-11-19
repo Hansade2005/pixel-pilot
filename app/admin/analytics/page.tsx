@@ -88,6 +88,53 @@ export default function AdminAnalyticsPage() {
     }
   }
 
+  const handleRefreshData = () => {
+    loadAnalyticsData()
+  }
+
+  const handleExportReport = async () => {
+    try {
+      const reportData = {
+        generatedAt: new Date().toISOString(),
+        stats: stats,
+        analyticsData: analyticsData
+      }
+
+      const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `analytics-report-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Error exporting analytics report:', error)
+    }
+  }
+
+  const handleConfigure = () => {
+    // Open analytics configuration dialog or navigate to settings
+    router.push('/admin/system')
+  }
+
+  const handleExportFullReport = () => {
+    handleExportReport()
+  }
+
+  const handleConfigureAlerts = () => {
+    alert('Alert configuration is not yet implemented. Please check back later.')
+  }
+
+  const handleViewDetailedAnalytics = () => {
+    alert('Detailed analytics view is not yet implemented. Please check back later.')
+  }
+
+  const handleCustomDashboard = () => {
+    alert('Custom dashboard is not yet implemented. Please check back later.')
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
@@ -148,17 +195,17 @@ export default function AdminAnalyticsPage() {
                   <option>Last year</option>
                 </select>
               </div>
-              <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700">
+              <Button variant="outline" size="sm" onClick={handleRefreshData} className="border-slate-200 dark:border-slate-700">
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh Data
               </Button>
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700">
+              <Button variant="outline" size="sm" onClick={handleExportReport} className="border-slate-200 dark:border-slate-700">
                 <Download className="h-4 w-4 mr-2" />
                 Export Report
               </Button>
-              <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700">
+              <Button variant="outline" size="sm" onClick={handleConfigure} className="border-slate-200 dark:border-slate-700">
                 <Settings className="h-4 w-4 mr-2" />
                 Configure
               </Button>
@@ -483,19 +530,19 @@ export default function AdminAnalyticsPage() {
                 <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-6">
                   <h4 className="text-sm font-medium text-slate-900 dark:text-white mb-3">Quick Actions</h4>
                   <div className="space-y-2">
-                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700">
+                    <Button variant="outline" size="sm" onClick={handleExportFullReport} className="w-full justify-start border-slate-200 dark:border-slate-700">
                       <Download className="h-4 w-4 mr-2" />
                       Export Full Report
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700">
+                    <Button variant="outline" size="sm" onClick={handleConfigureAlerts} className="w-full justify-start border-slate-200 dark:border-slate-700">
                       <Settings className="h-4 w-4 mr-2" />
                       Configure Alerts
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700">
+                    <Button variant="outline" size="sm" onClick={handleViewDetailedAnalytics} className="w-full justify-start border-slate-200 dark:border-slate-700">
                       <Eye className="h-4 w-4 mr-2" />
                       View Detailed Analytics
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-start border-slate-200 dark:border-slate-700">
+                    <Button variant="outline" size="sm" onClick={handleCustomDashboard} className="w-full justify-start border-slate-200 dark:border-slate-700">
                       <BarChart3 className="h-4 w-4 mr-2" />
                       Custom Dashboard
                     </Button>
