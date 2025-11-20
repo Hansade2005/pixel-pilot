@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { checkAdminAccess } from '@/lib/admin-utils';
 import { triggerUserNotification } from '@/lib/pusher';
 import { sendOneSignalNotification } from '@/lib/onesignal';
@@ -141,47 +142,68 @@ export async function POST(request: NextRequest) {
 
       targetUsers = users || [];
     } else if (targetAudience === 'active_users') {
-      // Users active in last 30 days
+      // Users active in last 30 days (based on usage records)
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const { data: users, error: usersError } = await supabase
-        .from('user_engagement_scores')
-        .select(`
-          user_id,
-          profiles!user_engagement_scores_user_id_fkey(id, email, full_name)
-        `)
-        .gte('last_active_at', thirtyDaysAgo.toISOString());
+      const { data: activeUserIds, error: activeError } = await supabase
+        .from('usage_records')
+        .select('user_id')
+        .gte('created_at', thirtyDaysAgo.toISOString());
 
-      if (usersError) {
-        console.error('Error fetching active users:', usersError);
+      if (activeError) {
+        console.error('Error fetching active user IDs:', activeError);
         return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
       }
 
-      targetUsers = users?.map(u => u.profiles).filter(Boolean) || [];
+      // Get unique user IDs
+      const uniqueUserIds = [...new Set(activeUserIds?.map(record => record.user_id) || [])];
+
+      if (uniqueUserIds.length === 0) {
+        targetUsers = [];
+      } else {
+        const { data: users, error: usersError } = await supabase
+          .from('profiles')
+          .select('id, email, full_name')
+          .in('id', uniqueUserIds);
+
+        if (usersError) {
+          console.error('Error fetching active users:', usersError);
+          return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
+        }
+
+        targetUsers = users || [];
+      }
     } else if (targetAudience === 'inactive_users') {
       // Users inactive for more than 30 days
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const { data: users, error: usersError } = await supabase
-        .from('user_engagement_scores')
-        .select(`
-          user_id,
-          profiles!user_engagement_scores_user_id_fkey(id, email, full_name)
-        `)
-        .lt('last_active_at', thirtyDaysAgo.toISOString());
+      // Get all users
+      const { data: allUsers, error: allUsersError } = await supabase
+        .from('profiles')
+        .select('id, email, full_name');
 
-      if (usersError) {
-        console.error('Error fetching inactive users:', usersError);
+      if (allUsersError) {
+        console.error('Error fetching all users:', allUsersError);
         return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
       }
 
-      targetUsers = users?.map(u => u.profiles).filter(Boolean) || [];
-    }
+      // Get active user IDs
+      const { data: activeUserIds, error: activeError } = await supabase
+        .from('usage_records')
+        .select('user_id')
+        .gte('created_at', thirtyDaysAgo.toISOString());
 
-    if (targetUsers.length === 0) {
-      return NextResponse.json({ error: 'No users found for the selected audience' }, { status: 400 });
+      if (activeError) {
+        console.error('Error fetching active user IDs:', activeError);
+        return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
+      }
+
+      const activeUserIdSet = new Set(activeUserIds?.map(record => record.user_id) || []);
+
+      // Filter out active users
+      targetUsers = allUsers?.filter(user => !activeUserIdSet.has(user.id)) || [];
     }
 
     // Generate image URL if not provided
@@ -246,7 +268,7 @@ export async function POST(request: NextRequest) {
       return notification;
     });
 
-    const { error: userNotificationsError } = await supabase
+    const { error: userNotificationsError } = await createAdminClient()
       .from('user_notifications')
       .insert(userNotifications);
 
@@ -274,7 +296,6 @@ export async function POST(request: NextRequest) {
       Promise.all(notificationPromises).catch(error => {
         console.error('Error triggering Pusher notifications:', error);
       });
-
       // Send push notifications via OneSignal (asynchronously)
       sendOneSignalNotification({
         title,
