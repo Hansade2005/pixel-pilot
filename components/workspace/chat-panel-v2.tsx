@@ -2550,12 +2550,19 @@ export function ChatPanelV2({
       }
       const compressedData = await compressProjectFiles(projectFiles, fileTree, messagesToSend, metadata)
 
+      // For initial prompt, force use grok-4-1-fast-non-reasoning model
+      // Subsequent requests follow user/default model selection
+      const isInitialPrompt = messages.length === 1 // Only user message exists
+      const modelToUse = isInitialPrompt ? 'grok-4-1-fast-non-reasoning' : selectedModel
+
+      console.log(`[ChatPanelV2] Using model: ${modelToUse} (${isInitialPrompt ? 'initial prompt override' : 'user selection'})`)
+
       const response = await fetch('/api/chat-v2', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/octet-stream',
           // Send minimal metadata in headers for binary requests
-          'X-Model-Id': selectedModel,
+          'X-Model-Id': modelToUse,
           'X-Ai-Mode': aiMode,
           'X-Chat-Mode': isAskMode ? 'ask' : 'agent'
         },
