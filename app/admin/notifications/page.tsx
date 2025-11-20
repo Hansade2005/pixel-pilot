@@ -784,13 +784,26 @@ export default function AdminNotificationsPage() {
       {/* Floating AI Assistant */}
       <FloatingAIAssistant
         onContentGenerated={(content) => {
+          // Validate and clean the content before applying
+          const validatedContent = {
+            title: String(content.title || '').trim().substring(0, 60),
+            message: String(content.message || '').trim().substring(0, 200)
+          };
+
           setFormData(prev => ({
             ...prev,
-            title: content.title,
-            message: content.message
+            title: validatedContent.title,
+            message: validatedContent.message
           }));
+
           // Open the create notification dialog
           setShowCreateDialog(true);
+
+          // Show success message
+          toast({
+            title: "Content Applied",
+            description: "AI-generated content has been applied to the notification form.",
+          });
         }}
       />
     </div>

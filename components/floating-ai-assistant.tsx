@@ -54,9 +54,25 @@ export function FloatingAIAssistant({ onContentGenerated }: FloatingAIAssistantP
         throw new Error('Invalid response format from API');
       }
 
+      // Validate and clean the content
       const content = data.content;
-      console.log('Generated content:', content);
-      setGeneratedContent(content);
+      if (!content.title || !content.message) {
+        throw new Error('Generated content is missing title or message');
+      }
+
+      // Clean and validate the content
+      const cleanedContent = {
+        title: String(content.title).trim().substring(0, 60), // Limit to 60 chars
+        message: String(content.message).trim().substring(0, 200) // Limit to 200 chars
+      };
+
+      // Ensure we have valid content after cleaning
+      if (!cleanedContent.title || !cleanedContent.message) {
+        throw new Error('Generated content became empty after cleaning');
+      }
+
+      console.log('Cleaned generated content:', cleanedContent);
+      setGeneratedContent(cleanedContent);
 
       // Auto-focus the textarea for easy editing
       setTimeout(() => {
@@ -77,7 +93,22 @@ export function FloatingAIAssistant({ onContentGenerated }: FloatingAIAssistantP
 
   const handleUseContent = () => {
     if (generatedContent && onContentGenerated) {
-      onContentGenerated(generatedContent);
+      // Final validation before using content
+      const finalContent = {
+        title: String(generatedContent.title || '').trim(),
+        message: String(generatedContent.message || '').trim()
+      };
+
+      if (!finalContent.title || !finalContent.message) {
+        toast({
+          title: "Error",
+          description: "Content is incomplete. Please ensure both title and message are filled.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      onContentGenerated(finalContent);
       setIsOpen(false);
       setPrompt('');
       setGeneratedContent(null);

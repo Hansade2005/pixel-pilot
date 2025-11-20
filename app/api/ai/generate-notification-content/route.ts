@@ -55,12 +55,26 @@ Example format:
           throw new Error('Invalid response format: missing title or message');
         }
 
+        // Clean and validate the content
+        const cleanedContent = {
+          title: String(content.title).trim().substring(0, 60), // Limit to 60 chars as specified
+          message: String(content.message).trim().substring(0, 200) // Limit to 200 chars as specified
+        };
+
+        // Basic sanitization - remove any potentially harmful characters
+        cleanedContent.title = cleanedContent.title.replace(/[<>\"'&]/g, '');
+        cleanedContent.message = cleanedContent.message.replace(/[<>\"'&]/g, '');
+
+        // Ensure we have valid content after cleaning
+        if (!cleanedContent.title || !cleanedContent.message) {
+          throw new Error('Generated content became empty after cleaning');
+        }
+
+        console.log(`Successfully generated content with model ${modelId}:`, cleanedContent);
+
         return NextResponse.json({
           success: true,
-          content: {
-            title: content.title,
-            message: content.message
-          }
+          content: cleanedContent
         });
 
       } catch (modelError) {
