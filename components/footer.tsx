@@ -52,13 +52,22 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-gray-800 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
-          <div className="flex items-center space-x-4 mb-4 md:mb-0">
-            <Logo variant="icon" size="sm" />
-            <span className="text-gray-400 text-sm">EN</span>
-          </div>
-          <div className="text-gray-400 text-sm">
-            © 2025 PiPilot. All rights reserved.
+        <div className="border-t border-gray-800 mt-8 pt-8 pb-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="flex items-center space-x-4">
+              <Logo variant="icon" size="sm" />
+              <span className="text-gray-400 text-sm">EN</span>
+            </div>
+            
+            <div className="flex items-center">
+              <a href="https://www.producthunt.com/products/pipilot?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-pipilot" target="_blank" rel="noopener noreferrer">
+                <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1040549&theme=light&t=1763663329258" alt="PiPilot - Build full apps and websites just by chatting with AI. | Product Hunt" style={{width: '250px', height: '54px'}} width="250" height="54" />
+              </a>
+            </div>
+            
+            <div className="text-gray-400 text-sm">
+              © 2025 PiPilot. All rights reserved.
+            </div>
           </div>
         </div>
       </div>

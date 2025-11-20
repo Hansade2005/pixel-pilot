@@ -1,0 +1,6 @@
+Pricing
+
+Free ($0/month): 3 projects, 150 credits, 1 domain
+Starter ( $10/month): 20 projects, 800 credits, 5 private projects, 5 domains
+Pro ( $19/month): 50 projects, 2,000 credits, 20 private projects, 20 domains
+Growth ( $39/month): 100 projects, 5,000 credits, 50 private projects, 50 domains

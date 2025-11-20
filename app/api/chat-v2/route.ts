@@ -4199,6 +4199,248 @@ ${conversationSummaryContext || ''}`
         }
       }),
 
+      node_machine: tool({
+        description: '🧪 Node.js Test Machine - Execute any command in sandbox environment with full project context. Automatically writes all project files to sandbox (like check_dev_errors). Perfect for running test scripts, API tests, simulations, npm commands, or any helpful Node.js operations. Use write_file tool first to create test files in /test/ folder, then run commands here.',
+        inputSchema: z.object({
+          command: z.string().describe('Command to execute (e.g., "node test/my-test.js", "npm test", "curl http://localhost:3000/api/test", custom commands)'),
+          timeoutSeconds: z.number().optional().describe('Execution timeout in seconds (default: 60)'),
+          envVars: z.record(z.string()).optional().describe('Environment variables to set during execution'),
+          workingDirectory: z.string().optional().describe('Working directory for command execution (default: /project)')
+        }),
+        execute: async ({ command, timeoutSeconds = 60, envVars = {}, workingDirectory = "/project" }, { abortSignal, toolCallId }) => {
+          const toolStartTime = Date.now();
+          const timeStatus = getTimeStatus();
+
+          if (abortSignal?.aborted) {
+            throw new Error('Operation cancelled')
+          }
+
+          // Check if we're approaching timeout
+          if (timeStatus.isApproachingTimeout) {
+            return {
+              success: false,
+              error: `Node machine execution cancelled due to timeout warning: ${timeStatus.warningMessage}`,
+              toolCallId,
+              executionTimeMs: Date.now() - toolStartTime,
+              timeWarning: timeStatus.warningMessage
+            }
+          }
+
+          try {
+            const e2bApiKey = process.env.E2B_API_KEY
+            if (!e2bApiKey) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['node_machine'] = (toolExecutionTimes['node_machine'] || 0) + executionTime;
+
+              return {
+                success: false,
+                error: 'E2B API key not configured',
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            // Get all files from in-memory session store (latest state)
+            const sessionData = sessionProjectStorage.get(projectId)
+            if (!sessionData) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['node_machine'] = (toolExecutionTimes['node_machine'] || 0) + executionTime;
+
+              return {
+                success: false,
+                error: `Session storage not found for project ${projectId}`,
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            const { files: sessionFiles } = sessionData
+            const allFiles = Array.from(sessionFiles.values())
+
+            if (!allFiles || allFiles.length === 0) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['node_machine'] = (toolExecutionTimes['node_machine'] || 0) + executionTime;
+
+              return {
+                success: false,
+                error: 'No files found in project session',
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            // Import E2B functions
+            const {
+              createEnhancedSandbox
+            } = await import('@/lib/e2b-enhanced')
+
+            const logs: string[] = []
+            const errors: string[] = []
+
+            const sandbox = await createEnhancedSandbox({
+              template: "pipilot",
+              timeoutMs: timeoutSeconds * 1000,
+              env: envVars
+            })
+
+            logs.push('Node.js sandbox created successfully')
+
+            // Prepare files for sandbox (exactly like check_dev_errors)
+            const sandboxFiles: any[] = allFiles
+              .filter(file => file.content && !file.isDirectory)
+              .map(file => ({
+                path: `/project/${file.path}`,
+                content: file.content,
+              }))
+
+            // Ensure package.json exists (like check_dev_errors)
+            const hasPackageJson = allFiles.some(f => f.path === 'package.json')
+            if (!hasPackageJson) {
+              const packageJson = {
+                name: 'node-test-app',
+                version: '0.1.0',
+                private: true,
+                packageManager: 'pnpm@8.15.0',
+                scripts: {
+                  test: 'node test/test.js',
+                  start: 'node index.js'
+                },
+                dependencies: {
+                  'node-fetch': '^2.7.0'
+                },
+                devDependencies: {
+                  'jest': '^29.7.0'
+                }
+              }
+              sandboxFiles.push({
+                path: '/project/package.json',
+                content: JSON.stringify(packageJson, null, 2)
+              })
+            }
+
+            // Write files to sandbox
+            await sandbox.writeFiles(sandboxFiles)
+            logs.push(`Project files written to sandbox (${sandboxFiles.length} files)`)
+
+            // Install dependencies (like check_dev_errors)
+            const installResult = await sandbox.installDependenciesRobust("/project", {
+              timeoutMs: 60000, // 1 minute for installation
+              envVars: {},
+              onStdout: (data: string) => logs.push(`[INSTALL] ${data.trim()}`),
+              onStderr: (data: string) => {
+                errors.push(`[INSTALL ERROR] ${data.trim()}`)
+                logs.push(`[INSTALL ERROR] ${data.trim()}`)
+              },
+            })
+
+            if (installResult.exitCode !== 0) {
+              const executionTime = Date.now() - toolStartTime;
+              toolExecutionTimes['node_machine'] = (toolExecutionTimes['node_machine'] || 0) + executionTime;
+
+              return {
+                success: false,
+                error: 'Dependency installation failed',
+                command,
+                logs,
+                errors,
+                exitCode: installResult.exitCode,
+                stdout: installResult.stdout || '',
+                stderr: installResult.stderr || '',
+                toolCallId,
+                executionTimeMs: executionTime,
+                timeWarning: timeStatus.warningMessage
+              }
+            }
+
+            logs.push('Dependencies installed successfully')
+
+            // Execute the command
+            logs.push(`Executing command: ${command}`)
+            const commandResult = await sandbox.executeCommand(command, {
+              timeoutMs: timeoutSeconds * 1000,
+              envVars,
+              workingDirectory,
+              onStdout: (data: string) => logs.push(`[COMMAND] ${data.trim()}`),
+              onStderr: (data: string) => {
+                errors.push(`[COMMAND ERROR] ${data.trim()}`)
+                logs.push(`[COMMAND ERROR] ${data.trim()}`)
+              },
+            })
+
+            const executionTime = Date.now() - toolStartTime;
+            toolExecutionTimes['node_machine'] = (toolExecutionTimes['node_machine'] || 0) + executionTime;
+
+            return {
+              success: commandResult.exitCode === 0,
+              command,
+              exitCode: commandResult.exitCode,
+              stdout: commandResult.stdout || '',
+              stderr: commandResult.stderr || '',
+              logs,
+              errors: errors.length > 0 ? errors : undefined,
+              toolCallId,
+              executionTimeMs: executionTime,
+              timeWarning: timeStatus.warningMessage
+            }
+          } catch (error) {
+            const executionTime = Date.now() - toolStartTime;
+            toolExecutionTimes['node_machine'] = (toolExecutionTimes['node_machine'] || 0) + executionTime;
+
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+            console.error(`[ERROR] node_machine failed for command ${command}:`, error)
+
+            // Extract detailed error information from SandboxError
+            let detailedError = errorMessage
+            let stdout = ''
+            let stderr = ''
+            let exitCode = null
+
+            if (error && typeof error === 'object') {
+              // Check if it's a SandboxError with result details
+              const sandboxError = error as any
+              if (sandboxError.result) {
+                const result = sandboxError.result
+                exitCode = result.exitCode || null
+                stdout = result.stdout || ''
+                stderr = result.stderr || ''
+
+                // Build detailed error message with full logs
+                detailedError = `Command execution failed: exit status ${exitCode || 'unknown'}\n\nSTDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`
+              } else if (sandboxError.originalError && sandboxError.originalError.result) {
+                // Handle nested error structure
+                const result = sandboxError.originalError.result
+                exitCode = result.exitCode || null
+                stdout = result.stdout || ''
+                stderr = result.stderr || ''
+
+                detailedError = `Command execution failed: exit status ${exitCode || 'unknown'}\n\nSTDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`
+              }
+            }
+
+            return {
+              success: false,
+              error: `Failed to execute command: ${detailedError}`,
+              command,
+              exitCode,
+              stdout,
+              stderr,
+              fullErrorDetails: {
+                errorMessage,
+                exitCode,
+                stdout,
+                stderr
+              },
+              toolCallId,
+              executionTimeMs: executionTime,
+              timeWarning: timeStatus.warningMessage
+            }
+          }
+        }
+      }),
+
       list_files: tool({
         description: 'List all files and directories in the project with their structure and metadata.',
         inputSchema: z.object({

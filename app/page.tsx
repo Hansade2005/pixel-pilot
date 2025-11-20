@@ -225,6 +225,13 @@ export default function LandingPage() {
           <p className="mb-6 text-center text-lg leading-tight text-white/65 md:text-xl">
             Create apps and websites by chatting with AI
           </p>
+          
+          {/* Product Hunt Badge */}
+          <div className="flex justify-center mb-8">
+            <a href="https://www.producthunt.com/products/pipilot?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-pipilot" target="_blank" rel="noopener noreferrer" className="hover:opacity-80 transition-opacity">
+              <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1040549&theme=light&t=1763663329258" alt="PiPilot - Build full apps and websites just by chatting with AI. | Product Hunt" style={{width: '250px', height: '54px'}} width="250" height="54" />
+            </a>
+          </div>
         </div>
 
         {/* Chat Input Section */}
