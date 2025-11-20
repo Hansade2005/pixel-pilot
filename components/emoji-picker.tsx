@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Smile } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 interface EmojiPickerProps {
   onEmojiSelect: (emoji: string) => void;
@@ -103,22 +104,30 @@ export function EmojiPicker({ onEmojiSelect, isOpen, onClose, triggerRef }: Emoj
 
   if (!isOpen) return null;
 
-  return (
+  const triggerRect = triggerRef.current?.getBoundingClientRect();
+  const pickerStyle = {
+    position: 'fixed' as const,
+    top: triggerRect ? triggerRect.bottom + 5 : 0,
+    left: triggerRect ? Math.max(10, Math.min(triggerRect.left, window.innerWidth - 320)) : 0, // Keep within viewport bounds
+    zIndex: 9999,
+  };
+
+  return createPortal(
     <div
       ref={pickerRef}
-      className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-3 w-80 max-h-64 overflow-hidden"
-      style={{
-        top: triggerRef.current ? triggerRef.current.getBoundingClientRect().bottom + 5 : 0,
-        left: triggerRef.current ? triggerRef.current.getBoundingClientRect().left : 0,
-      }}
+      className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 w-80 max-h-64 overflow-hidden"
+      style={pickerStyle}
     >
       {/* Category tabs */}
       <div className="flex space-x-1 mb-3 border-b pb-2">
         {Object.keys(emojiCategories).map((category) => (
           <button
             key={category}
-            onClick={() => setSelectedCategory(category as keyof typeof emojiCategories)}
-            className={`px-2 py-1 text-xs rounded ${
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedCategory(category as keyof typeof emojiCategories);
+            }}
+            className={`px-2 py-1 text-xs rounded transition-colors duration-150 ${
               selectedCategory === category
                 ? 'bg-blue-100 text-blue-700'
                 : 'text-gray-600 hover:bg-gray-100'
@@ -147,13 +156,16 @@ export function EmojiPicker({ onEmojiSelect, isOpen, onClose, triggerRef }: Emoj
       </div>
 
       {/* Emoji grid */}
-      <div className="max-h-32 overflow-y-auto">
+      <div className="max-h-32 overflow-y-auto transition-opacity duration-150">
         <div className="grid grid-cols-8 gap-1">
           {emojiCategories[selectedCategory].map((emoji, index) => (
             <button
-              key={index}
-              onClick={() => handleEmojiClick(emoji)}
-              className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded text-lg transition-colors"
+              key={`${selectedCategory}-${index}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEmojiClick(emoji);
+              }}
+              className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded text-lg transition-all duration-100 hover:scale-110"
               title={`Click to insert ${emoji}`}
             >
               {emoji}
@@ -161,7 +173,8 @@ export function EmojiPicker({ onEmojiSelect, isOpen, onClose, triggerRef }: Emoj
           ))}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
