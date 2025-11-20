@@ -38,6 +38,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { createNotificationImage } from "@/lib/notification-images"
+import { FloatingAIAssistant } from "@/components/floating-ai-assistant"
 import {
   Bell,
   Send,
@@ -62,7 +63,12 @@ import {
   Globe,
   LineChart,
   Eye,
-  EyeOff
+  EyeOff,
+  Trash2,
+  RotateCcw,
+  MoreHorizontal,
+  CheckSquare,
+  Square
 } from "lucide-react"
 
 interface AdminNotification {
@@ -98,6 +104,8 @@ export default function AdminNotificationsPage() {
   const [stats, setStats] = useState<NotificationStats>({ total: 0, read: 0, unread: 0 })
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 0 })
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [selectedNotifications, setSelectedNotifications] = useState<string[]>([])
+  const [bulkDeleting, setBulkDeleting] = useState(false)
   const [sending, setSending] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('all')
@@ -224,6 +232,137 @@ export default function AdminNotificationsPage() {
       })
     } finally {
       setSending(false)
+    }
+  }
+
+  const handleDeleteNotification = async (notificationId: string) => {
+    if (!confirm('Are you sure you want to delete this notification? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/admin/notifications/${notificationId}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Notification deleted successfully",
+        })
+        await loadNotifications()
+      } else {
+        const error = await response.json()
+        toast({
+          title: "Error",
+          description: error.error || "Failed to delete notification",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Error deleting notification:', error)
+      toast({
+        title: "Error",
+        description: "Failed to delete notification",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedNotifications.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please select notifications to delete",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (!confirm(`Are you sure you want to delete ${selectedNotifications.length} notification(s)? This action cannot be undone.`)) {
+      return
+    }
+
+    setBulkDeleting(true)
+    try {
+      const response = await fetch('/api/admin/notifications/bulk-delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ notificationIds: selectedNotifications }),
+      })
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: `${selectedNotifications.length} notification(s) deleted successfully`,
+        })
+        setSelectedNotifications([])
+        await loadNotifications()
+      } else {
+        const error = await response.json()
+        toast({
+          title: "Error",
+          description: error.error || "Failed to delete notifications",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Error bulk deleting notifications:', error)
+      toast({
+        title: "Error",
+        description: "Failed to delete notifications",
+        variant: "destructive"
+      })
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
+  const handleResendNotification = async (notificationId: string) => {
+    try {
+      const response = await fetch(`/api/admin/notifications/${notificationId}/resend`, {
+        method: 'POST',
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toast({
+          title: "Success",
+          description: `Notification resent to ${data.recipientsCount} users`,
+        })
+      } else {
+        const error = await response.json()
+        toast({
+          title: "Error",
+          description: error.error || "Failed to resend notification",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Error resending notification:', error)
+      toast({
+        title: "Error",
+        description: "Failed to resend notification",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleSelectNotification = (notificationId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedNotifications(prev => [...prev, notificationId])
+    } else {
+      setSelectedNotifications(prev => prev.filter(id => id !== notificationId))
+    }
+  }
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedNotifications(notifications.map(n => n.id))
+    } else {
+      setSelectedNotifications([])
     }
   }
 
@@ -489,17 +628,45 @@ export default function AdminNotificationsPage() {
                 <SelectItem value="security">Security</SelectItem>
               </SelectContent>
             </Select>
+            {selectedNotifications.length > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting}
+              >
+                {bulkDeleting ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4 mr-2" />
+                )}
+                Delete ({selectedNotifications.length})
+              </Button>
+            )}
           </div>
 
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">
+                  <button
+                    onClick={() => handleSelectAll(selectedNotifications.length !== notifications.length)}
+                    className="flex items-center justify-center"
+                  >
+                    {selectedNotifications.length === notifications.length && notifications.length > 0 ? (
+                      <CheckSquare className="h-4 w-4" />
+                    ) : (
+                      <Square className="h-4 w-4" />
+                    )}
+                  </button>
+                </TableHead>
                 <TableHead>Title</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Audience</TableHead>
                 <TableHead>Sent By</TableHead>
                 <TableHead>Sent At</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="w-24">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -512,6 +679,18 @@ export default function AdminNotificationsPage() {
                 )
                 .map((notification) => (
                   <TableRow key={notification.id}>
+                    <TableCell>
+                      <button
+                        onClick={() => handleSelectNotification(notification.id, !selectedNotifications.includes(notification.id))}
+                        className="flex items-center justify-center"
+                      >
+                        {selectedNotifications.includes(notification.id) ? (
+                          <CheckSquare className="h-4 w-4" />
+                        ) : (
+                          <Square className="h-4 w-4" />
+                        )}
+                      </button>
+                    </TableCell>
                     <TableCell className="font-medium">
                       <div>
                         <div className="font-semibold">{notification.title}</div>
@@ -537,6 +716,27 @@ export default function AdminNotificationsPage() {
                       <Badge variant={notification.is_active ? "default" : "secondary"}>
                         {notification.is_active ? 'Active' : 'Expired'}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleResendNotification(notification.id)}
+                          title="Resend notification"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteNotification(notification.id)}
+                          className="text-destructive hover:text-destructive"
+                          title="Delete notification"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -582,6 +782,19 @@ export default function AdminNotificationsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Floating AI Assistant */}
+      <FloatingAIAssistant
+        onContentGenerated={(content) => {
+          setFormData(prev => ({
+            ...prev,
+            title: content.title,
+            message: content.message
+          }));
+          // Open the create notification dialog
+          setShowCreateDialog(true);
+        }}
+      />
     </div>
   )
 }
