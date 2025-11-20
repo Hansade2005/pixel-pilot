@@ -1740,17 +1740,6 @@ export async function POST(req: Request) {
     // Process messages for non-continuation requests
     if (!isContinuation) {
       processedMessages = messages
-        .map(msg => {
-          // Truncate user messages to 3500 characters
-          if (msg.role === 'user' && msg.content && typeof msg.content === 'string' && msg.content.length > 20500) {
-            console.log(`[Chat-V2] Truncating user message from ${msg.content.length} to 3500 characters`)
-            return {
-              ...msg,
-              content: msg.content.substring(0, 20500) + '...'
-            }
-          }
-          return msg
-        })
         // Keep only the last 3 pairs of messages (user + assistant exchanges = 6 messages max)
         .slice(-6)
     }
@@ -1943,6 +1932,46 @@ export async function POST(req: Request) {
       // Continue without history on error
     }
 
+    // Build dynamic context content for xAI prompt caching optimization
+    const dynamicContext = `${projectContext}${conversationSummaryContext ? '\n\n' + conversationSummaryContext : ''}`.trim()
+
+    // Process messages for non-continuation requests with dynamic context
+    if (!isContinuation) {
+      if (messages.length === 0 && dynamicContext) {
+        // No messages yet, create first user message with dynamic context
+        processedMessages = [{
+          role: 'user',
+          content: dynamicContext
+        }]
+        console.log(`[Chat-V2] Created first user message with dynamic context (${dynamicContext.length} chars)`)
+      } else {
+        processedMessages = messages
+          .map((msg, index) => {
+            // Prepend dynamic context to the first user message
+            if (msg.role === 'user' && index === 0 && dynamicContext) {
+              const combinedContent = `${dynamicContext}\n\n${msg.content}`
+              console.log(`[Chat-V2] Prepended dynamic context (${dynamicContext.length} chars) to first user message`)
+              return {
+                ...msg,
+                content: combinedContent
+              }
+            }
+
+            // Truncate user messages to 3500 characters (but not the first one we just modified)
+            if (msg.role === 'user' && msg.content && typeof msg.content === 'string' && msg.content.length > 20500 && index > 0) {
+              console.log(`[Chat-V2] Truncating user message from ${msg.content.length} to 3500 characters`)
+              return {
+                ...msg,
+                content: msg.content.substring(0, 20500) + '...'
+              }
+            }
+            return msg
+          })
+          // Keep only the last 3 pairs of messages (user + assistant exchanges = 6 messages max)
+          .slice(-6)
+      }
+    }
+
     // Build system prompt based on chat mode
     const isNextJS = true // We're using Next.js
     let systemPrompt = chatMode === 'ask' ? `
@@ -1979,10 +2008,7 @@ You are PiPilot in Ask Mode - a knowledgeable assistant focused on answering que
 In Ask Mode, I'm your knowledgeable companion who can help you understand, learn, and plan - but I won't make changes to your project. Think of me as a senior developer pair programming with you, providing insights and guidance while you maintain full control over your codebase.
 
 Always use generous, relevant emojis! 🎉💥🔥 Make every interaction engaging and educational! 🌟
-
-${projectContext}
-
-${conversationSummaryContext || ''}` : `
+` : `
 # 🚀 PiPilot AI: Elite Web Architect & Bug Hunter
 ## Role
 You are the expert full-stack architect—a digital superhero with over 15 years of deep, professional experience. Your mission: deliver clean, innovative, market-dominating products with elite code quality, delightful UX, and thorough error handling.
@@ -1997,8 +2023,11 @@ You are the expert full-stack architect—a digital superhero with over 15 years
 Begin with a concise checklist  use check box emojis filled and unfilled. 
 ## Core Directives
 1. **Quality**: Ensure sparkling clean code ✨
-2. **Innovation**: Innovate UI/UX that's uniquely creative 🏆
+2. **Innovation**: Innovate UI/UX that\'s uniquely creative 🏆
 3. **Excellence**: Deliver fully complete, market-ready products
+
+## Autonomous Tool Usage
+**You have full access to 50+ tools** that you can use autonomously to complete user requests. **Never ask permission** - use tools proactively to analyze, build, test, and report changes. **All tasks are done by you** - user only provides requirements.
 
 ## Tools
 - **Client-Side File Operations**: \`read_file\` (with line numbers), \`write_file\`, \`edit_file\`, \`client_replace_string_in_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`
@@ -2186,6 +2215,15 @@ _Note_:
 - **Complete Ecosystem** 🌐: Build onboarding, retention, and full flows
 
 Always use generous, relevant emojis! 🎉💥🔥 Make every interaction engaging and uplifting! 🌟
+## 🎨 Design Quality Requirements
+- **Build Checks**: For Vite projects, always use the check dev errors tool to run in build mode  after changes to verify compilation
+- **Color Combinations**: Use harmonious color palettes (avoid clashing colors like red/green for text)
+- **Complete Implementation**: Deliver fully functional features, not just placeholders or partial implementations
+- **Performance**: Optimize images, lazy load components, minimize bundle size
+- **Accessibility**: Include proper ARIA labels, keyboard navigation, screen reader support
+- **Responsive Design**: Test on multiple screen sizes, ensure mobile-first approach
+- **Error Handling**: Implement proper error boundaries and user-friendly error messages
+- **Loading States**: Add skeleton loaders and progress indicators for better UX
 ## 🚫 Critical Non-Negotiables
 - ❌ No HTML comments in TypeScript/JSX files
 - 📚 Always study existing code before making changes
