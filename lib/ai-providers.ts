@@ -291,6 +291,8 @@ const modelProviders: Record<string, any> = {
   'grok-3-mini-fast': xaiProvider('grok-3-mini-fast'),
   'grok-3-latest': xaiProvider('grok-3-latest'),
   'grok-4-fast-non-reasoning': xaiProvider('grok-4-fast-non-reasoning'),
+  'grok-4-1-fast-non-reasoning': xaiProvider('grok-4-1-fast-non-reasoning'),
+  'grok-4-1-fast-reasoning': xaiProvider('grok-4-1-fast-reasoning'),
 
   // OpenRouter Claude Models
   'claude-sonnet-4.5': openrouterProviderWithReasoning('anthropic/claude-sonnet-4.5'),

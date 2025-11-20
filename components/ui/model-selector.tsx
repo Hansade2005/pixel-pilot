@@ -50,6 +50,9 @@ export function ModelSelector({
     ['qwen3-next-80b-thinking', 'PiPilot Qwen3 80B Think'],
     ['phi-4-multimodal', 'PiPilot Phi-4 Multimodal'],
     ['deepseek-chat-v3.1', 'PiPilot DeepSeek V3.1'],
+    // New Grok 4.1 Models
+    ['grok-4-1-fast-non-reasoning', 'PiPilot Grok 4.1 Fast'],
+    ['grok-4-1-fast-reasoning', 'PiPilot Grok 4.1 Fast Reason'],
     // Claude models
     ['claude-sonnet-4.5', 'PiPilot Claude Sonnet 4.5'],
     ['claude-sonnet-4', 'PiPilot Claude Sonnet 4'],
@@ -84,6 +87,9 @@ export function ModelSelector({
       'grok-3-mini', 
       'pipilot-pro', 
       'pipilot-ultra',
+      // New Grok 4.1 Models
+      'grok-4-1-fast-non-reasoning',
+      'grok-4-1-fast-reasoning',
       // OpenRouter Advanced Models
       'deepseek-v3.2-exp',
       'grok-4-fast-reasoning',

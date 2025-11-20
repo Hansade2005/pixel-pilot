@@ -179,6 +179,18 @@ export const chatModels: Array<ChatModel> = [
     description: 'xAI Grok 4 fast model optimized for speed without reasoning',
     provider: 'xai',
   },
+  {
+    id: 'grok-4-1-fast-non-reasoning',
+    name: 'Grok 4.1 Fast Non-Reasoning',
+    description: 'xAI Grok 4.1 fast model optimized for speed without reasoning capabilities',
+    provider: 'xai',
+  },
+  {
+    id: 'grok-4-1-fast-reasoning',
+    name: 'Grok 4.1 Fast Reasoning',
+    description: 'xAI Grok 4.1 fast model with advanced reasoning capabilities',
+    provider: 'xai',
+  },
 
   // OpenRouter Claude Models
   {
