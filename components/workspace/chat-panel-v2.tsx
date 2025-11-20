@@ -2552,7 +2552,7 @@ export function ChatPanelV2({
 
       // For initial prompt, force use grok-4-1-fast-non-reasoning model
       // Subsequent requests follow user/default model selection
-      const isInitialPrompt = messages.length === 1 // Only user message exists
+      const isInitialPrompt = messages.length === 0 // No previous messages (first prompt)
       const modelToUse = isInitialPrompt ? 'grok-4-1-fast-non-reasoning' : selectedModel
 
       console.log(`[ChatPanelV2] Using model: ${modelToUse} (${isInitialPrompt ? 'initial prompt override' : 'user selection'})`)
