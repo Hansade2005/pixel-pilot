@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageCircle, Send, X, Loader2, Sparkles } from 'lucide-react';
 import { generateText } from 'ai';
 import { getModel } from '@/lib/ai-providers';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 
 interface FloatingAIAssistantProps {
   onContentGenerated?: (content: { title: string; message: string }) => void;
@@ -19,16 +19,24 @@ export function FloatingAIAssistant({ onContentGenerated }: FloatingAIAssistantP
   const [prompt, setPrompt] = useState('');
   const [generatedContent, setGeneratedContent] = useState<{ title: string; message: string } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { toast } = useToast();
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
-      toast.error('Please enter a prompt for content generation');
+      toast({
+        title: "Error",
+        description: "Please enter a prompt for content generation",
+        variant: "destructive"
+      });
       return;
     }
 
+    console.log('Starting content generation with prompt:', prompt);
     setIsGenerating(true);
     try {
+      console.log('Getting codestral model...');
       const codestralModel = getModel('codestral-latest');
+      console.log('Model obtained:', codestralModel);
 
       const systemPrompt = `You are an expert content creator for admin notifications. Generate engaging, professional notification content based on the user's request.
 
@@ -46,13 +54,18 @@ The content should be suitable for user notifications and follow these guideline
 Example format:
 {"title": "New Feature Available!", "message": "We've added exciting new features to enhance your experience. Check them out now!"}`;
 
+      console.log('Calling generateText...');
       const result = await generateText({
         model: codestralModel,
         prompt: `${systemPrompt}\n\nUser request: ${prompt}`,
         temperature: 0.7,
       });
 
+      console.log('Generated result:', result);
+      console.log('Result text:', result.text);
+
       const content = JSON.parse(result.text);
+      console.log('Parsed content:', content);
       setGeneratedContent(content);
 
       // Auto-focus the textarea for easy editing
@@ -62,7 +75,11 @@ Example format:
 
     } catch (error) {
       console.error('Error generating content:', error);
-      toast.error('Failed to generate content. Please try again.');
+      toast({
+        title: "Error",
+        description: `Failed to generate content: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -74,7 +91,10 @@ Example format:
       setIsOpen(false);
       setPrompt('');
       setGeneratedContent(null);
-      toast.success('Content applied to notification');
+      toast({
+        title: "Success",
+        description: "Content applied to notification",
+      });
     }
   };
 

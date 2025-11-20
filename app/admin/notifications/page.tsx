@@ -322,7 +322,7 @@ export default function AdminNotificationsPage() {
 
   const handleResendNotification = async (notificationId: string) => {
     try {
-      const response = await fetch(`/api/admin/notifications/${notificationId}/resend`, {
+      const response = await fetch(`/api/admin/notifications/${notificationId}`, {
         method: 'POST',
       })
 
