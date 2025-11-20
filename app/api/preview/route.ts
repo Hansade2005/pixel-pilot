@@ -228,65 +228,8 @@ Output: <link href="./assets/style.css">`
   }
 }
 
-// AI-powered JavaScript asset path fixer for JS/TS files
-export async function fixJsAssetPaths(jsContent: string, basePath: string = './', filePath: string = ''): Promise<string> {
-  try {
-    const codestralModel = getModel('codestral-latest')
-
-    const result = await generateText({
-      model: codestralModel,
-      temperature: 0.1, // Low temperature for precise, deterministic fixes
-      prompt: `You are an expert JavaScript processor. Your task is to fix asset paths in JavaScript/TypeScript files that will be served from a subdirectory.
-
-FILE CONTEXT:
-- File Path: ${filePath}
-- Base Path for Assets: ${basePath}
-- This file will be served from a subdirectory, so absolute paths need to be converted to relative paths
-
-INPUT JAVASCRIPT:
-${jsContent}
-
-INSTRUCTIONS:
-- Replace all absolute paths (starting with "/") in import statements with relative paths
-- Replace all absolute paths (starting with "/") in require() calls with relative paths
-- Replace all absolute paths (starting with "/") in fetch() calls with relative paths
-- Replace all absolute paths (starting with "/") in any other asset references with relative paths
-- Use "${basePath}" as the base path for all assets
-- Consider the file's location (${filePath}) when calculating relative paths
-- Do not change any other content
-- Preserve all JavaScript structure, syntax, and formatting
-- Return ONLY the fixed JavaScript content with NO markdown formatting, NO code blocks, NO explanations
-- Do NOT wrap the output in \`\`\`js or any other markdown syntax
-
-EXAMPLES:
-Input: import styles from '/assets/style.css'
-Output: import styles from './assets/style.css'
-
-Input: require('/utils/helper.js')
-Output: require('./utils/helper.js')
-
-Input: fetch('/api/data.json')
-Output: fetch('./api/data.json')`
-    })
-
-    // Clean the response by removing any markdown code blocks
-    let cleanedResult = result.text.trim()
-
-    // Remove markdown code block wrappers if present
-    cleanedResult = cleanedResult.replace(/^```(?:js|javascript|typescript|ts)?\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '')
-
-    return cleanedResult
-  } catch (error) {
-    console.warn('[Vite Hosting] AI JS processing failed, falling back to regex:', error)
-    // Fallback to regex if AI fails - handle common patterns
-    return jsContent
-      .replace(/import\s+.*?\s+from\s+['"]\/([^'"]*)['"]/g, (match, path) => match.replace(`'/${path}'`, `'${basePath}${path}'`).replace(`"/${path}"`, `"${basePath}${path}"`))
-      .replace(/require\s*\(\s*['"]\/([^'"]*)['"]\s*\)/g, (match, path) => match.replace(`'/${path}'`, `'${basePath}${path}'`).replace(`"/${path}"`, `"${basePath}${path}"`))
-      .replace(/fetch\s*\(\s*['"]\/([^'"]*)['"]\s*\)/g, (match, path) => match.replace(`'/${path}'`, `'${basePath}${path}'`).replace(`"/${path}"`, `"${basePath}${path}"`))
-      // Handle other common absolute path patterns
-      .replace(/['"]\/([^'"]*\.(?:css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot))['"]/g, (match, path) => match.replace(`'/${path}'`, `'${basePath}${path}'`).replace(`"/${path}"`, `"${basePath}${path}"`))
-  }
-}
+// AI-powered JavaScript asset path fixer for JS/TS files - REMOVED
+// This function has been removed to disable JS assets processing
 
 // AI-powered SEO metadata enhancer for HTML files
 export async function addSEOMetadata(htmlContent: string, projectSlug: string): Promise<string> {
@@ -477,12 +420,14 @@ async function uploadViteBuildToSupabase(sandbox: any, projectSlug: string, supa
             
             console.log(`[Vite Hosting] AI processed and SEO enhanced HTML file ${relativePath}`)
           } else if (relativePath.endsWith('.js') || relativePath.endsWith('.ts')) {
-            console.log(`[Vite Hosting] Processing JS/TS file ${relativePath} with AI...`)
-            
-            // Fix asset paths in JavaScript/TypeScript files
-            processedContent = await fixJsAssetPaths(content, './', relativePath)
-            
-            console.log(`[Vite Hosting] AI processed JS/TS file ${relativePath}`)
+            console.log(`[Vite Hosting] Skipping JS/TS file ${relativePath} (JS assets processing disabled)`)
+
+            // JS assets processing has been disabled
+            // processedContent = await fixJsAssetPaths(content, './', relativePath)
+
+            processedContent = content // Use original content without processing
+
+            console.log(`[Vite Hosting] JS/TS file ${relativePath} left unprocessed`)
           }
           
           // Determine content type

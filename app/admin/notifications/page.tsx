@@ -705,9 +705,7 @@ export default function AdminNotificationsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>{getAudienceLabel(notification.target_audience)}</TableCell>
-                    <TableCell>
-                      {notification.sent_by_profile?.full_name || notification.sent_by_profile?.email || 'Unknown'}
-                    </TableCell>
+                    <TableCell>Admin</TableCell>
                     <TableCell>
                       {new Date(notification.sent_at).toLocaleDateString()} at{' '}
                       {new Date(notification.sent_at).toLocaleTimeString()}
