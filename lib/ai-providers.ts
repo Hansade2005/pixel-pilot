@@ -150,6 +150,12 @@ const xaiProvider = createXai({
   apiKey: process.env.XAI_API_KEY || 'xai-your-api-key-here',
 });
 
+const minimaxProvider = createOpenAICompatible({
+  name: 'minimax',
+  baseURL: 'https://api.minimax.io/v1',
+  apiKey: process.env.MINIMAX_API_KEY || 'your-minimax-api-key',
+});
+
 const openrouterProvider = createOpenAICompatible({
   name: 'openrouter',
   baseURL: 'https://openrouter.ai/api/v1',
@@ -277,6 +283,9 @@ const modelProviders: Record<string, any> = {
   'gpt-4.1-nano': openaiProvider('gpt-4.1-nano'),
   'gpt-5-nano': openaiProvider('gpt-5-nano'),
   'gpt-4.1-mini': openaiProvider('gpt-4.1-mini'),
+
+  // MiniMax Models (OpenAI Compatible)
+  'minimax-m2': minimaxProvider('MiniMax-M2'),
 
   // Cohere Models (v2 compatible with AI SDK 5 - confirmed working)
   'command-r-plus': cohereProvider('command-r-plus-04-2024'),

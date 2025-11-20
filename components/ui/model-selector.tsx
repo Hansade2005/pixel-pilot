@@ -56,6 +56,8 @@ export function ModelSelector({
     // Claude models
     ['claude-sonnet-4.5', 'PiPilot Claude Sonnet 4.5'],
     ['claude-sonnet-4', 'PiPilot Claude Sonnet 4'],
+    // MiniMax models
+    ['minimax-m2', 'PiPilot MiniMax M2'],
   ])
   
   const filteredModels = chatModels.filter(model => displayNameMap.has(model.id))
@@ -103,7 +105,9 @@ export function ModelSelector({
       'deepseek-chat-v3.1',
       // Claude models
       'claude-sonnet-4.5',
-      'claude-sonnet-4'
+      'claude-sonnet-4',
+      // MiniMax models
+      'minimax-m2'
     ];
   } else {
     // Fallback for pro inactive or other cases

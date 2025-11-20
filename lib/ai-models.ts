@@ -116,6 +116,14 @@ export const chatModels: Array<ChatModel> = [
     provider: 'openai',
   },
 
+  // MiniMax Models (OpenAI Compatible)
+  {
+    id: 'minimax-m2',
+    name: 'MiniMax M2',
+    description: 'MiniMax M2 model via OpenAI-compatible endpoint',
+    provider: 'minimax',
+  },
+
   // Cohere Models (v2 compatible - confirmed working)
   {
     id: 'command-r-plus',
