@@ -5,8 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageCircle, Send, X, Loader2, Sparkles } from 'lucide-react';
-import { generateText } from 'ai';
-import { getModel } from '@/lib/ai-providers';
 import { useToast } from '@/hooks/use-toast';
 
 interface FloatingAIAssistantProps {
@@ -34,38 +32,30 @@ export function FloatingAIAssistant({ onContentGenerated }: FloatingAIAssistantP
     console.log('Starting content generation with prompt:', prompt);
     setIsGenerating(true);
     try {
-      console.log('Getting codestral model...');
-      const codestralModel = getModel('codestral-latest');
-      console.log('Model obtained:', codestralModel);
+      console.log('Calling AI content generation API...');
 
-      const systemPrompt = `You are an expert content creator for admin notifications. Generate engaging, professional notification content based on the user's request.
-
-Return your response as a JSON object with exactly two fields:
-- "title": A concise, attention-grabbing title (max 60 characters)
-- "message": A detailed, engaging message body (max 200 characters)
-
-The content should be suitable for user notifications and follow these guidelines:
-- Title should be clear and actionable
-- Message should be informative and encourage engagement
-- Use friendly, professional tone
-- Keep it concise but impactful
-- Avoid spam-like language
-
-Example format:
-{"title": "New Feature Available!", "message": "We've added exciting new features to enhance your experience. Check them out now!"}`;
-
-      console.log('Calling generateText...');
-      const result = await generateText({
-        model: codestralModel,
-        prompt: `${systemPrompt}\n\nUser request: ${prompt}`,
-        temperature: 0.7,
+      const response = await fetch('/api/ai/generate-notification-content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt }),
       });
 
-      console.log('Generated result:', result);
-      console.log('Result text:', result.text);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      }
 
-      const content = JSON.parse(result.text);
-      console.log('Parsed content:', content);
+      const data = await response.json();
+      console.log('API response:', data);
+
+      if (!data.success || !data.content) {
+        throw new Error('Invalid response format from API');
+      }
+
+      const content = data.content;
+      console.log('Generated content:', content);
       setGeneratedContent(content);
 
       // Auto-focus the textarea for easy editing
