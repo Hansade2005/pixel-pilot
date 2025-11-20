@@ -39,6 +39,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { createNotificationImage } from "@/lib/notification-images"
 import { FloatingAIAssistant } from "@/components/floating-ai-assistant"
+import { EmojiPicker, useEmojiPicker } from "@/components/emoji-picker"
 import {
   Bell,
   Send,
@@ -123,6 +124,18 @@ export default function AdminNotificationsPage() {
     priority: 1,
     expiresAt: ''
   })
+
+  // Emoji picker state
+  const {
+    isEmojiPickerOpen,
+    activeField,
+    titleRef,
+    messageRef,
+    openEmojiPicker,
+    closeEmojiPicker,
+    insertEmoji,
+    handleInputChange,
+  } = useEmojiPicker()
 
   const { toast } = useToast()
   const router = useRouter()
@@ -426,24 +439,46 @@ export default function AdminNotificationsPage() {
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="title" className="text-right">Title</Label>
-                <Input
-                  id="title"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="col-span-3"
-                  placeholder="Notification title"
-                />
+                <div className="col-span-3 relative">
+                  <Input
+                    ref={titleRef}
+                    id="title"
+                    value={formData.title}
+                    onChange={(e) => handleInputChange('title', e.target.value, (value) => setFormData({ ...formData, title: value }))}
+                    className="pr-10"
+                    placeholder="Notification title (type @ for emojis)"
+                  />
+                  {isEmojiPickerOpen && activeField === 'title' && (
+                    <EmojiPicker
+                      onEmojiSelect={insertEmoji}
+                      isOpen={isEmojiPickerOpen}
+                      onClose={closeEmojiPicker}
+                      triggerRef={titleRef}
+                    />
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="message" className="text-right">Message</Label>
-                <Textarea
-                  id="message"
-                  value={formData.message}
-                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                  className="col-span-3"
-                  placeholder="Notification message"
-                  rows={3}
-                />
+                <div className="col-span-3 relative">
+                  <Textarea
+                    ref={messageRef}
+                    id="message"
+                    value={formData.message}
+                    onChange={(e) => handleInputChange('message', e.target.value, (value) => setFormData({ ...formData, message: value }))}
+                    className="pr-10"
+                    placeholder="Notification message (type @ for emojis)"
+                    rows={3}
+                  />
+                  {isEmojiPickerOpen && activeField === 'message' && (
+                    <EmojiPicker
+                      onEmojiSelect={insertEmoji}
+                      isOpen={isEmojiPickerOpen}
+                      onClose={closeEmojiPicker}
+                      triggerRef={messageRef}
+                    />
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="type" className="text-right">Type</Label>
