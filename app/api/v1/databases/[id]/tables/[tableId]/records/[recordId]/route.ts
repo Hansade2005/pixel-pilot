@@ -73,13 +73,14 @@ async function authenticateApiKey(request: Request, databaseId: string) {
           error: 'Rate limit exceeded',
           limit: rateLimitResult.limit,
           usage: rateLimitResult.usage,
-          reset_in: '1 hour',
+          reset_in: rateLimitResult.resetIn,
         },
         {
           status: 429,
           headers: {
             'X-RateLimit-Limit': rateLimitResult.limit.toString(),
             'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': new Date(Date.now() + (rateLimitResult.resetIn === '1 minute' ? 60 * 1000 : 60 * 60 * 1000)).toISOString(),
           },
         }
       ),

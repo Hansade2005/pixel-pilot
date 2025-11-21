@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import {
   extractApiKey,
@@ -101,28 +101,30 @@ async function authenticateApiKey(request: Request, databaseId: string) {
 }
 
 /**
- * GET /api/v1/databases/[id]/tables/[tableId]/records
- * Get all records from a table
+ * GET /api/v1/databases/[id]/tables/[tableId]
+ * Get detailed information about a specific table
  */
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string; tableId: string } }
 ) {
-  const auth = await authenticateApiKey(request, params.id);
-  if (auth.error) return auth.error;
-
   try {
-    const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '100');
-    const offset = parseInt(searchParams.get('offset') || '0');
-    const search = searchParams.get('search') || '';
+    const { id: databaseId, tableId } = params;
 
-    // Get table info
+    // Authenticate API key
+    const authResult = await authenticateApiKey(request, databaseId);
+    if ('error' in authResult) {
+      return authResult.error;
+    }
+
+    const { apiKeyRecord, startTime } = authResult;
+
+    // Get table
     const { data: table, error: tableError } = await supabaseAdmin
       .from('tables')
       .select('*')
-      .eq('id', params.tableId)
-      .eq('database_id', params.id)
+      .eq('id', tableId)
+      .eq('database_id', databaseId)
       .single();
 
     if (tableError || !table) {
@@ -132,89 +134,86 @@ export async function GET(
       );
     }
 
-    // Build query
-    let query = supabaseAdmin
+    // Get record count
+    const { count: recordCount } = await supabaseAdmin
       .from('records')
-      .select('*', { count: 'exact' })
-      .eq('table_id', params.tableId)
-      .range(offset, offset + limit - 1);
+      .select('*', { count: 'exact', head: true })
+      .eq('table_id', tableId);
 
-    // Add search if provided
-    if (search) {
-      query = query.ilike('data_json', `%${search}%`);
-    }
-
-    const { data: records, error: recordsError, count } = await query;
-
-    if (recordsError) {
-      console.error('Error fetching records:', recordsError);
-      return NextResponse.json(
-        { error: 'Failed to fetch records' },
-        { status: 500 }
-      );
-    }
+    // Format table information
+    const schema = table.schema_json || {};
+    const tableInfo = {
+      id: table.id,
+      name: table.name,
+      database_id: table.database_id,
+      created_at: table.created_at,
+      updated_at: table.updated_at,
+      record_count: recordCount || 0,
+      schema: {
+        column_count: schema.columns?.length || 0,
+        columns: schema.columns?.map((col: any) => ({
+          name: col.name,
+          type: col.type,
+          required: col.required || false,
+          unique: col.unique || false,
+          default_value: col.defaultValue,
+          description: col.description,
+          references: col.references
+        })) || [],
+        indexes: schema.indexes || [],
+        constraints: schema.constraints || []
+      }
+    };
 
     // Log API usage
-    const responseTime = Date.now() - auth.startTime!;
-    logApiUsage(
-      auth.apiKeyRecord!.id,
-      `/api/v1/databases/${params.id}/tables/${params.tableId}/records`,
+    await logApiUsage(
+      apiKeyRecord.id,
+      `/api/v1/databases/${databaseId}/tables/${tableId}`,
       'GET',
       200,
-      responseTime,
+      Date.now() - startTime,
       supabaseAdmin
     );
 
     return NextResponse.json({
-      records: records || [],
-      pagination: {
-        total: count || 0,
-        limit,
-        offset,
-        has_more: count ? offset + limit < count : false,
-      },
-    }, {
-      headers: {
-        'X-RateLimit-Limit': auth.rateLimitResult!.limit.toString(),
-        'X-RateLimit-Remaining': (auth.rateLimitResult!.limit - auth.rateLimitResult!.usage - 1).toString(),
-      },
+      success: true,
+      table: tableInfo
     });
-  } catch (error) {
-    console.error('Public API GET error:', error);
+
+  } catch (error: any) {
+    console.error('Unexpected error in read table:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error.message || 'Internal server error' },
       { status: 500 }
     );
   }
 }
 
 /**
- * POST /api/v1/databases/[id]/tables/[tableId]/records
- * Create a new record
+ * DELETE /api/v1/databases/[id]/tables/[tableId]
+ * Delete a table and all its records
  */
-export async function POST(
-  request: Request,
+export async function DELETE(
+  request: NextRequest,
   { params }: { params: { id: string; tableId: string } }
 ) {
-  const auth = await authenticateApiKey(request, params.id);
-  if (auth.error) return auth.error;
-
   try {
-    const { data } = await request.json();
+    const { id: databaseId, tableId } = params;
 
-    if (!data || typeof data !== 'object') {
-      return NextResponse.json(
-        { error: 'Record data is required' },
-        { status: 400 }
-      );
+    // Authenticate API key
+    const authResult = await authenticateApiKey(request, databaseId);
+    if ('error' in authResult) {
+      return authResult.error;
     }
 
-    // Get table info
+    const { apiKeyRecord, startTime } = authResult;
+
+    // Verify table exists
     const { data: table, error: tableError } = await supabaseAdmin
       .from('tables')
       .select('*')
-      .eq('id', params.tableId)
-      .eq('database_id', params.id)
+      .eq('id', tableId)
+      .eq('database_id', databaseId)
       .single();
 
     if (tableError || !table) {
@@ -224,49 +223,47 @@ export async function POST(
       );
     }
 
-    // Create record
-    const { data: newRecord, error: insertError } = await supabaseAdmin
+    // Get record count for response
+    const { count: recordCount } = await supabaseAdmin
       .from('records')
-      .insert({
-        table_id: params.tableId,
-        data_json: data,
-      })
-      .select()
-      .single();
+      .select('*', { count: 'exact', head: true })
+      .eq('table_id', tableId);
 
-    if (insertError) {
-      console.error('Error creating record:', insertError);
+    // Delete table (records will cascade delete due to FK constraint)
+    const { error: deleteError } = await supabaseAdmin
+      .from('tables')
+      .delete()
+      .eq('id', tableId);
+
+    if (deleteError) {
+      console.error('Error deleting table:', deleteError);
       return NextResponse.json(
-        { error: 'Failed to create record' },
+        { error: 'Failed to delete table' },
         { status: 500 }
       );
     }
 
     // Log API usage
-    const responseTime = Date.now() - auth.startTime!;
-    logApiUsage(
-      auth.apiKeyRecord!.id,
-      `/api/v1/databases/${params.id}/tables/${params.tableId}/records`,
-      'POST',
-      201,
-      responseTime,
+    await logApiUsage(
+      apiKeyRecord.id,
+      `/api/v1/databases/${databaseId}/tables/${tableId}`,
+      'DELETE',
+      200,
+      Date.now() - startTime,
       supabaseAdmin
     );
 
+    return NextResponse.json({
+      success: true,
+      message: 'Table deleted successfully',
+      table_name: table.name,
+      deleted_records: recordCount || 0
+    });
+
+  } catch (error: any) {
+    console.error('Unexpected error in delete table:', error);
     return NextResponse.json(
-      { record: newRecord },
-      {
-        status: 201,
-        headers: {
-          'X-RateLimit-Limit': auth.rateLimitResult!.limit.toString(),
-          'X-RateLimit-Remaining': (auth.rateLimitResult!.limit - auth.rateLimitResult!.usage - 1).toString(),
-        },
-      }
-    );
-  } catch (error) {
-    console.error('Public API POST error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error.message || 'Internal server error' },
       { status: 500 }
     );
   }

@@ -194,7 +194,7 @@ export async function POST(
         name: name.trim(),
         key_hash: hash,
         key_prefix: prefix,
-        rate_limit: 1000, // Default: 1000 requests per hour
+        rate_limit: 10000, // Default: 10,000 requests per hour
       })
       .select('id, name, key_prefix, created_at, rate_limit, is_active')
       .single();

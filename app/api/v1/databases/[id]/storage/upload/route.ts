@@ -64,6 +64,7 @@ async function authenticateApiKey(request: Request, databaseId: string) {
           error: 'Rate limit exceeded',
           limit: rateLimitResult.limit,
           usage: rateLimitResult.usage,
+          reset_in: rateLimitResult.resetIn,
         },
         { status: 429 }
       ),
