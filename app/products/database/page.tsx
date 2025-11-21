@@ -22,7 +22,8 @@ import {
   FileText,
   Cloud,
   Table2,
-  FileCode
+  FileCode,
+  Brain
 } from "lucide-react"
 import Link from "next/link"
 
@@ -68,6 +69,11 @@ export default function DatabaseProductPage() {
       icon: Shield,
       title: "Row Level Security",
       description: "Built-in RLS policies ensure users only access their own data. Secure by default."
+    },
+    {
+      icon: Brain,
+      title: "AI Assistant Integration",
+      description: "Connect Claude, Cursor, VS Code, and other AI assistants directly to your database via MCP server."
     }
   ]
 
@@ -234,6 +240,91 @@ requests.post(
                   {codeExamples[selectedLanguage].code}
                 </code>
               </pre>
+            </div>
+          </div>
+        </section>
+
+        {/* MCP Server Section */}
+        <section className="py-20 px-4 bg-gradient-to-br from-purple-900/20 to-blue-900/20">
+          <div className="container mx-auto max-w-6xl">
+            <div className="text-center mb-16">
+              <Badge className="mb-4 bg-purple-500/20 text-purple-300 border-purple-500/30">
+                🚀 Now Live
+              </Badge>
+              <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+                AI Assistant Integration
+              </h2>
+              <p className="text-xl text-gray-300 mb-8 max-w-3xl mx-auto">
+                Connect your favorite AI assistants directly to your PiPilot database.
+                Ask Claude, Cursor, or VS Code Copilot to query, update, and manage your data naturally.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-8 mb-12">
+              <Card className="bg-gray-800/50 border-gray-700">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <Brain className="w-5 h-5 text-purple-400" />
+                    Natural Language Queries
+                  </CardTitle>
+                  <CardDescription>
+                    Ask your AI assistant: "Show me all users from California" or "Create a new order for customer #123"
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm text-gray-300">
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-green-400" />
+                      <span>Query data with plain English</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-green-400" />
+                      <span>Insert, update, and delete records</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-green-400" />
+                      <span>Create tables and manage schemas</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gray-800/50 border-gray-700">
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <Server className="w-5 h-5 text-blue-400" />
+                    MCP Server Ready
+                  </CardTitle>
+                  <CardDescription>
+                    Our hosted MCP server handles authentication, rate limiting, and secure connections automatically.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm text-gray-300">
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-green-400" />
+                      <span>Hosted at pipilot-mcp-server.vercel.app</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-green-400" />
+                      <span>Automatic API key management</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-green-400" />
+                      <span>Works with Claude, Cursor, VS Code, Windsurf</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="text-center">
+              <Link href="/docs/mcp-setup">
+                <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white">
+                  Setup MCP Integration
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
             </div>
           </div>
         </section>

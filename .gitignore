@@ -30,3 +30,5 @@ test-*.html
 *.test.tmp
 .gemini/
 gha-creds-*.json
+/lib/mcp
+/pipilotnpm/

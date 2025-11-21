@@ -51,7 +51,7 @@ export default function LandingPage() {
     { icon: <Database className="w-4 h-4 text-blue-400" />, text: "Introducing PiPilot DB 🎉" },
     { icon: <Building2 className="w-4 h-4 text-purple-400" />, text: "PiPilot Enterprise now live 🚀" },
     { icon: <Users className="w-4 h-4 text-green-400" />, text: "PiPilot Teams Coming soon 🎉" },
-    { icon: <Server className="w-4 h-4 text-orange-400" />, text: "PiPilot DB MCP Server Coming soon 🚀" },
+    { icon: <Server className="w-4 h-4 text-orange-400" />, text: "PiPilot DB MCP Server Now Live! 🚀" },
     { icon: <Workflow className="w-4 h-4 text-indigo-400" />, text: "Teams Workspace Coming soon 🎉" },
     { icon: <Figma className="w-4 h-4 text-pink-400" />, text: "Figma Import Coming soon 🚀" }
   ]
