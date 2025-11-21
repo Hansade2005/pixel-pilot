@@ -1,13 +1,238 @@
-# PiPilot JS SDK
+# PiPilot SDK
 
-A Javascript SDK for the PiPilot Database and Storage API.
+A JavaScript/TypeScript SDK for the PiPilot Database and Storage API with full type safety support.
 
 ## Installation
 
-To install the PiPilot JS SDK, run the following command in your terminal:
+To install the PiPilot SDK, run the following command in your terminal:
 
 ```bash
 npm install pipilot-sdk
+```
+
+## TypeScript Support
+
+The SDK comes with full TypeScript definitions out of the box! 🎉
+
+### ESM Import (Recommended for TypeScript)
+```typescript
+import PiPilot, { TableRecord, QueryOptions, AuthResponse } from 'pipilot-sdk';
+
+// Fully typed initialization
+const pipilot = new PiPilot('your-api-key', 'your-database-id', {
+  maxRetries: 3,
+  retryDelay: 1000
+});
+
+// Type-safe operations
+const response = await pipilot.fetchTableRecords('your-table-id');
+// response.data is properly typed as TableRecord[]
+```
+
+### Custom Data Types
+
+Define your own interfaces for type safety:
+
+```typescript
+interface Product {
+  name: string;
+  price: number;
+  description: string;
+  category: string;
+  in_stock: boolean;
+  tags: string[];
+}
+
+interface User {
+  email: string;
+  full_name: string;
+  role: 'admin' | 'user' | 'moderator';
+  created_at: string;
+}
+
+// Use with generic TableRecord type
+const products: TableRecord<Product>[] = await pipilot.fetchTableRecords('170');
+const users: TableRecord<User>[] = await pipilot.fetchTableRecords('46');
+```
+
+### Type-Safe Operations
+
+```typescript
+// Insert with type safety
+const newProduct: Product = {
+  name: 'Gaming Laptop',
+  price: 1299.99,
+  description: 'High-performance gaming laptop',
+  category: 'electronics',
+  in_stock: true,
+  tags: ['gaming', 'laptop', 'high-performance']
+};
+
+const insertResponse = await pipilot.insertTableRecord('170', newProduct);
+// insertResponse.data is TableRecord<Product>
+
+// Update with type safety
+const updateResponse = await pipilot.updateTableRecord('170', 'record-id', {
+  price: 1399.99,
+  in_stock: false
+});
+// TypeScript ensures only valid Product properties are used
+```
+
+### Advanced Querying with Types
+
+```typescript
+import { QueryOptions } from 'pipilot-sdk';
+
+const queryOptions: QueryOptions = {
+  select: ['name', 'price', 'category'], // Type-safe field selection
+  where: {
+    category: 'electronics',
+    in_stock: true
+  },
+  whereConditions: [
+    { field: 'price', operator: 'gte', value: 100 },
+    { field: 'price', operator: 'lte', value: 2000 }
+  ],
+  orderBy: {
+    field: 'price',
+    direction: 'DESC'
+  },
+  limit: 20,
+  offset: 0,
+  search: 'gaming'
+};
+
+const result = await pipilot.queryTable('170', queryOptions);
+// result.data is TableRecord<Product>[]
+```
+
+### Authentication Types
+
+```typescript
+import { AuthResponse } from 'pipilot-sdk';
+
+// Signup
+const signupResponse: AuthResponse = await pipilot.signup(
+  'user@example.com',
+  'SecurePass123!',
+  'John Doe'
+);
+
+// Login
+const loginResponse: AuthResponse = await pipilot.login('user@example.com', 'SecurePass123!');
+
+// Token verification
+if (loginResponse.success && loginResponse.access_token) {
+  const verifyResponse = await pipilot.verify(loginResponse.access_token);
+  // verifyResponse.user is fully typed
+}
+```
+
+### File Upload Types
+
+```typescript
+import { FileUploadResponse } from 'pipilot-sdk';
+
+// Browser environment
+const fileInput = document.getElementById('fileInput') as HTMLInputElement;
+const file = fileInput.files?.[0];
+
+if (file) {
+  const uploadResponse: FileUploadResponse = await pipilot.uploadFile(file, true, {
+    category: 'product-image',
+    alt_text: 'Product showcase image'
+  });
+
+  // uploadResponse.url, uploadResponse.size, etc. are all typed
+}
+```
+
+### Rate Limiting Awareness
+
+```typescript
+import { RateLimitStatus } from 'pipilot-sdk';
+
+// Monitor rate limits
+const status: RateLimitStatus = pipilot.getRateLimitStatus();
+console.log(`Remaining requests: ${status.remaining}`);
+console.log(`Resets at: ${status.resetAt}`);
+
+// TypeScript knows the exact structure
+if (status.remaining && parseInt(status.remaining) < 10) {
+  console.warn('Approaching rate limit!');
+}
+```
+
+### Table Management Types
+
+```typescript
+import { TableInfo, ListTablesOptions, ReadTableOptions } from 'pipilot-sdk';
+
+// List tables with options
+const listOptions: ListTablesOptions = {
+  includeSchema: true,
+  includeRecordCount: true
+};
+
+const tablesResponse = await pipilot.listTables(listOptions);
+// tablesResponse.tables is TableInfo[]
+
+// Read specific table
+const readOptions: ReadTableOptions = {
+  includeRecordCount: true
+};
+
+const tableResponse = await pipilot.readTable('170', readOptions);
+// tableResponse.table is TableInfo
+```
+
+### Error Handling with Types
+
+```typescript
+try {
+  const response = await pipilot.fetchTableRecords('170');
+  if (response.success) {
+    // response.data is TableRecord[]
+    response.data.forEach(record => {
+      console.log(record.id, record.data_json);
+    });
+  }
+} catch (error) {
+  // TypeScript knows error is unknown
+  if (error instanceof Error) {
+    console.error('Operation failed:', error.message);
+  }
+}
+```
+
+### CommonJS in TypeScript (Alternative)
+
+```typescript
+// For projects using CommonJS
+const PiPilot = require('pipilot-sdk');
+
+// Type annotations still work
+const pipilot: typeof PiPilot = new PiPilot('key', 'db');
+```
+
+### Type Definitions Reference
+
+All available types are exported from the main module:
+
+```typescript
+import {
+  PiPilot,           // Main class
+  PiPilotOptions,    // Constructor options
+  RateLimitStatus,   // Rate limit info
+  TableRecord,       // Generic table record
+  TableInfo,         // Table metadata
+  QueryOptions,      // Query configuration
+  ListTablesOptions, // List tables options
+  ReadTableOptions,  // Read table options
+  AuthResponse,      // Authentication response
+  FileUploadResponse // File upload response
+} from 'pipilot-sdk';
 ```
 
 ## Initialization
@@ -21,7 +246,91 @@ const PiPilot = require('pipilot-sdk');
 const apiKey = 'your-api-key-here';
 const databaseId = 'your-database-id-here';
 
-const pipilot = new PiPilot(apiKey, databaseId);
+// Optional configuration for rate limiting and retries
+const options = {
+  maxRetries: 3,        // Maximum retry attempts for rate limit errors (default: 3)
+  retryDelay: 1000      // Base delay between retries in ms (default: 1000)
+};
+
+const pipilot = new PiPilot(apiKey, databaseId, options);
+```
+
+### Rate Limiting & Error Handling
+
+The SDK automatically handles API rate limits with intelligent retry logic:
+
+- **Default Limits**: 10,000 requests per hour (increased from 1,000)
+- **Automatic Retries**: Failed requests due to rate limits are retried with exponential backoff
+- **Rate Limit Tracking**: Monitor your current usage with `getRateLimitStatus()`
+
+```javascript
+// Check current rate limit status
+const status = pipilot.getRateLimitStatus();
+console.log(`Remaining requests: ${status.remaining}`);
+console.log(`Resets at: ${status.resetAt}`);
+```
+
+**Rate Limit Response**: When limits are exceeded, the SDK will automatically retry. If all retries fail, you'll receive an error like:
+```
+Rate limit exceeded after 3 retries. Reset in: 1 hour. Limit: 10000, Usage: 10001
+```
+
+---
+
+## TypeScript Usage
+
+For TypeScript projects, the SDK provides complete type safety:
+
+### ESM Import (Recommended)
+```typescript
+import PiPilot, { TableRecord, QueryOptions, AuthResponse } from 'pipilot-sdk';
+
+const pipilot = new PiPilot('your-api-key', 'your-database-id');
+
+// Fully typed responses
+const response = await pipilot.fetchTableRecords('170');
+if (response.success) {
+  // response.data is TableRecord[]
+  response.data.forEach(record => {
+    console.log(record.id, record.created_at); // Type-safe access
+  });
+}
+```
+
+### Custom Types
+```typescript
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+  in_stock: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Type-safe operations
+const products = await pipilot.fetchTableRecords('170');
+const typedProducts: Product[] = products.data as Product[];
+```
+
+### Advanced Querying with Types
+```typescript
+const queryOptions: QueryOptions = {
+  select: ['name', 'price'],
+  where: { in_stock: true },
+  orderBy: { field: 'price', direction: 'DESC' },
+  limit: 10
+};
+
+const result = await pipilot.queryTable('170', queryOptions);
+// result.data is TableRecord[] with proper typing
+```
+
+### Authentication Types
+```typescript
+const authResponse: AuthResponse = await pipilot.login('user@example.com', 'password');
+// authResponse.access_token, authResponse.user, etc. are all typed
 ```
 
 ---
@@ -328,6 +637,38 @@ async function advancedQuery() {
 ```
 
 ---
+
+## Error Handling
+
+All SDK methods include comprehensive error handling:
+
+### Automatic Rate Limit Handling
+- **429 Errors**: Automatically retried with exponential backoff
+- **Retry Logic**: Configurable retry attempts (default: 3)
+- **Rate Tracking**: Monitor usage with `getRateLimitStatus()`
+
+### Error Response Format
+```javascript
+try {
+  const result = await pipilot.fetchTableRecords('170');
+  // Handle success
+} catch (error) {
+  console.error('Operation failed:', error.message);
+  // Error messages include detailed information about:
+  // - HTTP status codes
+  // - Rate limit details (when applicable)
+  // - API error messages
+}
+```
+
+### Common Error Types
+- **Rate Limit Exceeded**: `Rate limit exceeded after X retries. Reset in: Y. Limit: Z, Usage: W`
+- **Authentication Failed**: `HTTP error! status: 401`
+- **Not Found**: `HTTP error! status: 404`
+- **Validation Error**: `HTTP error! status: 400 - {"error": "Invalid data format"}`
+
+---
+
 ## Authentication API
 The Authentication API provides methods for user signup, login, and token management.
 

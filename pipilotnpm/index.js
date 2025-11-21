@@ -1,13 +1,64 @@
 
 class PiPilot {
-    constructor(apiKey, databaseId) {
+    constructor(apiKey, databaseId, options = {}) {
         this.apiKey = apiKey;
         this.databaseId = databaseId;
         this.apiUrl = 'https://pipilot.dev/api/v1';
+        this.maxRetries = options.maxRetries || 3;
+        this.retryDelay = options.retryDelay || 1000; // Base delay in ms
+        this.rateLimitRemaining = null;
+        this.rateLimitReset = null;
+    }
+
+    // Rate limiting and retry logic
+    async _makeRequest(url, options, retryCount = 0) {
+        const response = await fetch(url, options);
+
+        // Update rate limit tracking from headers
+        this.rateLimitRemaining = response.headers.get('X-RateLimit-Remaining');
+        this.rateLimitReset = response.headers.get('X-RateLimit-Reset');
+
+        if (response.status === 429) {
+            // Rate limit exceeded
+            const errorData = await response.json().catch(() => ({}));
+            const resetIn = errorData.reset_in || 'unknown time';
+
+            if (retryCount < this.maxRetries) {
+                // Calculate delay with exponential backoff
+                const delay = this.retryDelay * Math.pow(2, retryCount);
+                console.warn(`Rate limit exceeded. Retrying in ${delay}ms. Reset in: ${resetIn}`);
+
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return this._makeRequest(url, options, retryCount + 1);
+            } else {
+                throw new Error(`Rate limit exceeded after ${this.maxRetries} retries. Reset in: ${resetIn}. Limit: ${errorData.limit}, Usage: ${errorData.usage}`);
+            }
+        }
+
+        if (!response.ok) {
+            let errorMessage = `HTTP error! status: ${response.status}`;
+            try {
+                const errorData = await response.json();
+                errorMessage = `Request failed: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`;
+            } catch (e) {
+                // If we can't parse error JSON, use the basic message
+            }
+            throw new Error(errorMessage);
+        }
+
+        return response;
+    }
+
+    // Get current rate limit status
+    getRateLimitStatus() {
+        return {
+            remaining: this.rateLimitRemaining,
+            resetAt: this.rateLimitReset
+        };
     }
 
     async fetchTableRecords(tableId) {
-        const response = await fetch(
+        const response = await this._makeRequest(
             `${this.apiUrl}/databases/${this.databaseId}/tables/${tableId}/records`, {
                 method: 'GET',
                 headers: {
@@ -16,10 +67,6 @@ class PiPilot {
                 }
             }
         );
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
 
         const result = await response.json();
 
@@ -50,7 +97,7 @@ class PiPilot {
     }
 
     async insertTableRecord(tableId, data) {
-        const response = await fetch(
+        const response = await this._makeRequest(
             `${this.apiUrl}/databases/${this.databaseId}/tables/${tableId}/records`, {
                 method: 'POST',
                 headers: {
@@ -62,11 +109,6 @@ class PiPilot {
                 })
             }
         );
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Insert failed: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`);
-        }
 
         const result = await response.json();
 
@@ -93,7 +135,7 @@ class PiPilot {
     }
 
     async updateTableRecord(tableId, recordId, data) {
-        const response = await fetch(
+        const response = await this._makeRequest(
             `${this.apiUrl}/databases/${this.databaseId}/tables/${tableId}/records/${recordId}`, {
                 method: 'PUT',
                 headers: {
@@ -105,11 +147,6 @@ class PiPilot {
                 })
             }
         );
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Update failed: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`);
-        }
 
         const result = await response.json();
 
@@ -136,7 +173,7 @@ class PiPilot {
     }
 
     async deleteTableRecord(tableId, recordId) {
-        const response = await fetch(
+        const response = await this._makeRequest(
             `${this.apiUrl}/databases/${this.databaseId}/tables/${tableId}/records/${recordId}`, {
                 method: 'DELETE',
                 headers: {
@@ -145,11 +182,6 @@ class PiPilot {
                 }
             }
         );
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Delete failed: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`);
-        }
 
         const result = await response.json();
 
@@ -168,7 +200,7 @@ class PiPilot {
             includeRecordCount: includeRecordCount.toString()
         });
 
-        const response = await fetch(
+        const response = await this._makeRequest(
             `${this.apiUrl}/databases/${this.databaseId}/tables?${params}`, {
                 method: 'GET',
                 headers: {
@@ -177,11 +209,6 @@ class PiPilot {
                 }
             }
         );
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`List tables failed: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`);
-        }
 
         const result = await response.json();
 
@@ -203,7 +230,7 @@ class PiPilot {
     }
 
     async createTable(name, schema) {
-        const response = await fetch(
+        const response = await this._makeRequest(
             `${this.apiUrl}/databases/${this.databaseId}/tables`, {
                 method: 'POST',
                 headers: {
@@ -216,11 +243,6 @@ class PiPilot {
                 })
             }
         );
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Create table failed: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`);
-        }
 
         const result = await response.json();
 
@@ -244,7 +266,7 @@ class PiPilot {
             includeRecordCount: includeRecordCount.toString()
         });
 
-        const response = await fetch(
+        const response = await this._makeRequest(
             `${this.apiUrl}/databases/${this.databaseId}/tables/${tableId}?${params}`, {
                 method: 'GET',
                 headers: {
@@ -253,11 +275,6 @@ class PiPilot {
                 }
             }
         );
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Read table failed: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`);
-        }
 
         const result = await response.json();
 
@@ -276,7 +293,7 @@ class PiPilot {
     }
 
     async deleteTable(tableId) {
-        const response = await fetch(
+        const response = await this._makeRequest(
             `${this.apiUrl}/databases/${this.databaseId}/tables/${tableId}`, {
                 method: 'DELETE',
                 headers: {
@@ -285,11 +302,6 @@ class PiPilot {
                 }
             }
         );
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Delete table failed: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`);
-        }
 
         const result = await response.json();
 
@@ -347,7 +359,7 @@ class PiPilot {
             params.append('search', search);
         }
 
-        const response = await fetch(
+        const response = await this._makeRequest(
             `${this.apiUrl}/databases/${this.databaseId}/tables/${tableId}/query?${params}`, {
                 method: 'GET',
                 headers: {
@@ -356,11 +368,6 @@ class PiPilot {
                 }
             }
         );
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Query table failed: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`);
-        }
 
         const result = await response.json();
 
@@ -389,7 +396,7 @@ class PiPilot {
     }
 
     async signup(email, password, fullName) {
-        const response = await fetch(`${this.apiUrl}/databases/${this.databaseId}/auth/signup`, {
+        const response = await this._makeRequest(`${this.apiUrl}/databases/${this.databaseId}/auth/signup`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${this.apiKey}`,
@@ -402,16 +409,11 @@ class PiPilot {
             })
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Signup failed: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`);
-        }
-
         return await response.json();
     }
 
     async login(email, password) {
-        const response = await fetch(`${this.apiUrl}/databases/${this.databaseId}/auth/login`, {
+        const response = await this._makeRequest(`${this.apiUrl}/databases/${this.databaseId}/auth/login`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${this.apiKey}`,
@@ -423,16 +425,11 @@ class PiPilot {
             })
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Login failed: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`);
-        }
-
         return await response.json();
     }
 
     async verify(token) {
-        const response = await fetch(`${this.apiUrl}/databases/${this.databaseId}/auth/verify`, {
+        const response = await this._makeRequest(`${this.apiUrl}/databases/${this.databaseId}/auth/verify`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${this.apiKey}`,
@@ -443,16 +440,11 @@ class PiPilot {
             })
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Token verification failed: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`);
-        }
-
         return await response.json();
     }
 
     async refresh(refreshToken) {
-        const response = await fetch(`${this.apiUrl}/databases/${this.databaseId}/auth/refresh`, {
+        const response = await this._makeRequest(`${this.apiUrl}/databases/${this.databaseId}/auth/refresh`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${this.apiKey}`,
@@ -463,11 +455,6 @@ class PiPilot {
             })
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Token refresh failed: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`);
-        }
-
         return await response.json();
     }
 
@@ -477,7 +464,7 @@ class PiPilot {
         formData.append('is_public', isPublic.toString());
         formData.append('metadata', JSON.stringify(metadata));
 
-        const response = await fetch(
+        const response = await this._makeRequest(
             `${this.apiUrl}/databases/${this.databaseId}/storage/upload`, {
                 method: 'POST',
                 headers: {

@@ -60,7 +60,7 @@
               },
               {
                 "name": "VS Code/Cursor",
-                "config_example": "{\n  \"pipilot-mcp\": {\n    \"type\": \"http\",\n    \"url\": \"https://pipilot-mcp-server.vercel.app/mcp\",\n    \"oauth\": {\n      \"clientId\": \"vscode-mcp-client\",\n      \"tokenUrl\": \"https://pipilot-mcp-server.vercel.app/oauth/token\",\n      \"authorizationUrl\": \"https://pipilot-mcp-server.vercel.app/oauth/authorize\",\n      \"scopes\": [\"read\", \"write\"]\n    }\n  }\n}"
+                "config_example": "{\n  \"pipilot-mcp\": {\n    \"type\": \"http\",\n    \"url\": \"https://pipilot-mcp-server.vercel.app/mcp\",\n    \"headers\": {\n      \"Authorization\": \"Bearer YOUR_DATABASE_ID:YOUR_API_KEY\",\n      \"X-Database-ID\": \"YOUR_DATABASE_ID\"\n    }\n  }\n}"
               }
             ]
           },

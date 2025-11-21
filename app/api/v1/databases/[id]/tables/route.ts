@@ -200,9 +200,9 @@ export async function POST(
     }
 
     // Validate schema
-    const schemaError = validateTableSchema(schema);
-    if (schemaError) {
-      return NextResponse.json({ error: schemaError }, { status: 400 });
+    const schemaValidation = validateTableSchema(schema);
+    if (!schemaValidation.valid) {
+      return NextResponse.json({ error: schemaValidation.errors }, { status: 400 });
     }
 
     // Authenticate API key
