@@ -95,7 +95,9 @@ export default function DocsPage() {
       'Use Cases': Terminal,
       'Security Best Practices': Shield,
       'Performance Optimization': Zap,
-      'Troubleshooting Guide': AlertCircle
+      'Troubleshooting Guide': AlertCircle,
+      'MCP Server Integration': Server,
+      'PiPilot SDK': Code
     }
     return iconMap[title] || BookOpen
   }
@@ -119,7 +121,9 @@ export default function DocsPage() {
       'Use Cases': 'yellow',
       'Security Best Practices': 'red',
       'Performance Optimization': 'purple',
-      'Troubleshooting Guide': 'gray'
+      'Troubleshooting Guide': 'gray',
+      'MCP Server Integration': 'blue',
+      'PiPilot SDK': 'green'
     }
     return colorMap[title] || 'purple'
   }

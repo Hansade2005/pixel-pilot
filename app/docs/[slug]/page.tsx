@@ -28,9 +28,15 @@ export default function DocPage() {
   const [readingProgress, setReadingProgress] = useState(0)
 
   // Parse content into structured sections
-  const parseContentIntoSections = (content: string) => {
-    // For now, create a single section with the full content
-    // This can be enhanced later to parse the content intelligently
+  const parseContentIntoSections = (content: string, title: string) => {
+    // Check if this is MCP documentation
+    const isMCPDoc = title.toLowerCase().includes('mcp server')
+
+    if (isMCPDoc) {
+      return parseMCPContent(content)
+    }
+
+    // Generic parser for other docs
     const sections = [
       {
         heading: "Overview",
@@ -42,6 +48,127 @@ export default function DocPage() {
     ]
 
     return sections.map((section, index) => renderContentSection(section, index))
+  }
+
+  // MCP-specific content parser
+  const parseMCPContent = (content: string) => {
+    const sections = []
+
+    // Extract key sections from the content
+    const overviewMatch = content.match(/PiPilot's MCP[\s\S]*?(?=The MCP server|Setting up|Security features|$)/)
+    const setupMatch = content.match(/Setting up MCP integration[\s\S]*?(?=Multiple AI assistants|Security features|$)/)
+    const securityMatch = content.match(/Security features include[\s\S]*?(?=Rate limiting|Error handling|$)/)
+    const toolsMatch = content.match(/The MCP server supports all major database operations[\s\S]*?(?=Security features|Performance|$)/)
+
+    // Overview Section
+    if (overviewMatch) {
+      sections.push({
+        heading: "Overview",
+        body: overviewMatch[0].trim(),
+        isCode: false
+      })
+    }
+
+    // Setup Section with code examples
+    sections.push({
+      heading: "Setup & Configuration",
+      body: "Configure the MCP server in your AI assistant to enable natural language database operations. The hosted server handles all authentication and security automatically.",
+      isCode: false,
+      codeBlocks: [
+        {
+          title: "VS Code / Cursor / Windsurf",
+          language: "json",
+          code: `{
+  "mcp": {
+    "servers": {
+      "pipilot": {
+        "type": "http",
+        "url": "https://pipilot-mcp-server.vercel.app/mcp",
+        "headers": {
+          "Authorization": "Bearer your-api-key",
+          "X-Database-ID": "your-database-id"
+        }
+      }
+    }
+  }
+}`
+        },
+        {
+          title: "Claude Desktop",
+          language: "json",
+          code: `{
+  "mcpServers": {
+    "pipilot": {
+      "type": "http",
+      "url": "https://pipilot-mcp-server.vercel.app/mcp",
+      "headers": {
+        "Authorization": "Bearer your-api-key",
+        "X-Database-ID": "your-database-id"
+      }
+    }
+  }
+}`
+        }
+      ]
+    })
+
+    // Available Tools Section
+    sections.push({
+      heading: "Available Tools (17 Total)",
+      body: "The MCP server provides comprehensive database operations through natural language:",
+      isCode: false,
+      toolCategories: [
+        {
+          category: "Database Operations",
+          tools: [
+            { name: "pipilot_list_tables", desc: "List all tables with schema info" },
+            { name: "pipilot_read_table", desc: "Get detailed table information" },
+            { name: "pipilot_fetch_records", desc: "Fetch records with pagination" },
+            { name: "pipilot_query_table", desc: "Advanced queries with filtering & sorting" },
+            { name: "pipilot_insert_record", desc: "Insert new records" },
+            { name: "pipilot_update_record", desc: "Update existing records" },
+            { name: "pipilot_delete_record", desc: "Delete records" },
+            { name: "pipilot_create_table", desc: "Create new tables" },
+            { name: "pipilot_delete_table", desc: "Delete tables" }
+          ]
+        },
+        {
+          category: "Authentication",
+          tools: [
+            { name: "pipilot_auth_signup", desc: "Create user accounts" },
+            { name: "pipilot_auth_login", desc: "User login" },
+            { name: "pipilot_auth_verify", desc: "Verify tokens" }
+          ]
+        },
+        {
+          category: "Utilities",
+          tools: [
+            { name: "pipilot_search_docs", desc: "Search documentation" },
+            { name: "pipilot_create_api_key", desc: "Create new API keys" },
+            { name: "pipilot_list_api_keys", desc: "List all API keys" },
+            { name: "pipilot_delete_api_key", desc: "Delete API keys" },
+            { name: "pipilot_get_rate_limit_status", desc: "Check API usage limits" }
+          ]
+        }
+      ]
+    })
+
+    // Security Section
+    sections.push({
+      heading: "Security & Features",
+      body: "Enterprise-grade security and performance built-in:",
+      isCode: false,
+      features: [
+        { icon: "🔐", title: "API Key Authentication", desc: "Secure authentication with API keys" },
+        { icon: "🛡️", title: "Row-Level Security", desc: "Granular access control on data" },
+        { icon: "⚡", title: "Rate Limiting", desc: "10,000 requests/hour with auto-retry" },
+        { icon: "🔄", title: "Real-Time Updates", desc: "Live database change notifications" },
+        { icon: "📊", title: "Audit Logging", desc: "Comprehensive operation tracking" },
+        { icon: "🚀", title: "Auto-Scaling", desc: "Handles growing workloads automatically" }
+      ]
+    })
+
+    return sections.map((section, index) => renderMCPSection(section, index))
   }
 
   useEffect(() => {
@@ -97,6 +224,75 @@ export default function DocPage() {
     window.addEventListener('scroll', updateReadingProgress)
     return () => window.removeEventListener('scroll', updateReadingProgress)
   }, [])
+
+  // MCP-specific section renderer
+  const renderMCPSection = (section: any, index: number) => {
+    if (!section) return null
+
+    return (
+      <div key={index} id={`section-${index}`} className="mb-12">
+        <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-2xl p-8 border border-blue-500/20">
+          <h2 className="text-2xl font-bold text-white mb-6">{section.heading}</h2>
+
+          {section.body && (
+            <p className="text-gray-300 leading-relaxed text-lg mb-6">
+              {section.body}
+            </p>
+          )}
+
+          {/* Code Blocks for Configuration */}
+          {section.codeBlocks && section.codeBlocks.length > 0 && (
+            <div className="space-y-4 mb-6">
+              {section.codeBlocks.map((block: any, blockIndex: number) => (
+                <div key={blockIndex} className="bg-gray-900/50 rounded-lg border border-gray-700/50 overflow-hidden">
+                  <div className="bg-gray-800/50 px-4 py-2 border-b border-gray-700/50">
+                    <span className="text-sm font-medium text-blue-300">{block.title}</span>
+                  </div>
+                  <pre className="p-4 overflow-x-auto">
+                    <code className="text-sm text-gray-300 font-mono">
+                      {block.code}
+                    </code>
+                  </pre>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Tool Categories */}
+          {section.toolCategories && section.toolCategories.length > 0 && (
+            <div className="space-y-6">
+              {section.toolCategories.map((category: any, catIndex: number) => (
+                <div key={catIndex}>
+                  <h3 className="text-lg font-semibold text-blue-300 mb-3">{category.category}</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {category.tools.map((tool: any, toolIndex: number) => (
+                      <div key={toolIndex} className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/30 hover:border-blue-500/30 transition-colors">
+                        <code className="text-sm font-mono text-blue-400">{tool.name}</code>
+                        <p className="text-xs text-gray-400 mt-1">{tool.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Feature Cards */}
+          {section.features && section.features.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {section.features.map((feature: any, featureIndex: number) => (
+                <div key={featureIndex} className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-lg p-4 border border-blue-500/20">
+                  <div className="text-2xl mb-2">{feature.icon}</div>
+                  <h4 className="text-sm font-semibold text-white mb-1">{feature.title}</h4>
+                  <p className="text-xs text-gray-400">{feature.desc}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   const renderContentSection = (section: any, index: number) => {
     if (!section) return null
@@ -357,7 +553,7 @@ export default function DocPage() {
 
             {/* Main Content Sections */}
             <div className="mb-12">
-              {parseContentIntoSections(docData.content)}
+              {parseContentIntoSections(docData.content, docData.title)}
             </div>
 
             {/* Keywords Section */}

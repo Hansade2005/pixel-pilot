@@ -815,3 +815,314 @@ runExample();
 For more detailed information about the API, please refer to the following documents:
 - [PIPILOT_DATABASE_API_GUIDE.md](./PIPILOT_DATABASE_API_GUIDE.md)
 - [STORAGE_SYSTEM_IMPLEMENTATION.md](./STORAGE_SYSTEM_IMPLEMENTATION.md)
+
+---
+
+## Documentation Search API
+
+The SDK includes advanced documentation search functionality with powerful filtering, pagination, and relevance scoring to help developers and AI agents find relevant information quickly.
+
+### `searchDocs(query, options)`
+
+Advanced documentation search with comprehensive filtering and scoring capabilities.
+
+- **`query`** (string, required): Search query string
+- **`options`** (object, optional): Search configuration options
+  - **`type`** (string): Type of documentation to search
+    - `'all'` (default) - Search both API and SDK docs
+    - `'api'` - Search only API guide
+    - `'sdk'` - Search only SDK documentation
+  - **`mode`** (string): Search mode
+    - `'basic'` (default) - Simple fuzzy matching
+    - `'advanced'` - Advanced scoring with term weighting
+  - **`limit`** (number): Maximum results to return (default: 10)
+  - **`offset`** (number): Number of results to skip (default: 0)
+  - **`includeFullContent`** (boolean): Include full content instead of preview (default: false)
+  - **`caseSensitive`** (boolean): Case-sensitive search (default: false)
+  - **`exactMatch`** (boolean): Exact string matching only (default: false)
+  - **`sortBy`** (string): Sort results by
+    - `'relevance'` (default) - Sort by relevance score
+    - `'title'` - Sort alphabetically by title
+    - `'source'` - Sort by documentation source
+
+**Returns:** A comprehensive search response with results, pagination, and statistics.
+
+**Basic Examples:**
+```javascript
+// Simple search
+const results = pipilot.searchDocs('authentication');
+console.log(`Found ${results.results.length} matches`);
+
+// Search with options
+const advanced = pipilot.searchDocs('api', {
+  mode: 'advanced',
+  limit: 5,
+  sortBy: 'relevance'
+});
+
+// Paginated search
+const page2 = pipilot.searchDocs('table', {
+  limit: 10,
+  offset: 10
+});
+
+// Exact match search
+const exact = pipilot.searchDocs('PiPilot', {
+  exactMatch: true,
+  caseSensitive: false
+});
+```
+
+**Advanced Search Response Structure:**
+```javascript
+{
+  success: true,
+  query: "authentication",
+  options: {
+    type: "all",
+    mode: "advanced",
+    limit: 10,
+    offset: 0,
+    includeFullContent: false,
+    caseSensitive: false,
+    exactMatch: false,
+    sortBy: "relevance"
+  },
+  results: [
+    {
+      id: "doc_abc123",
+      source: "API Guide",
+      title: "🔐 Authentication & Setup",
+      content: "```javascript\\n// Required constants\\nconst API_KEY = 'your-api-key-here';...",
+      relevanceScore: 15,
+      matchCount: 3,
+      sectionPath: ["API Reference", "Getting Started"],
+      metadata: {
+        query: "authentication",
+        mode: "advanced",
+        type: "all",
+        searchTimestamp: "2024-01-15T10:30:00.000Z",
+        contentLength: 1250,
+        previewLength: 300
+      }
+    }
+  ],
+  pagination: {
+    total: 8,
+    limit: 10,
+    offset: 0,
+    hasMore: false,
+    currentPage: 1,
+    totalPages: 1
+  },
+  statistics: {
+    totalMatches: 8,
+    resultsReturned: 8,
+    searchTime: 1705312200000,
+    sourcesSearched: 2
+  },
+  message: "Found 8 documentation sections matching \"authentication\" (8 returned)"
+}
+```
+
+**TypeScript Usage:**
+```typescript
+import { DocSearchOptions, DocSearchResponse } from 'pipilot-sdk';
+
+const options: DocSearchOptions = {
+  type: 'api',
+  mode: 'advanced',
+  limit: 20,
+  sortBy: 'relevance',
+  includeFullContent: true
+};
+
+const response: DocSearchResponse = pipilot.searchDocs('database', options);
+
+// Type-safe access to results
+response.results.forEach(result => {
+  console.log(result.title, result.relevanceScore);
+});
+```
+
+### `getFullDocs(type)`
+
+Retrieves the complete documentation content.
+
+- **`type`** (string, optional): Type of documentation to retrieve
+  - `'api'` - Get only API guide
+  - `'sdk'` - Get only SDK documentation
+  - `'all'` (default) - Get both
+
+**Returns:** An object containing the full documentation content.
+
+**Example:**
+```javascript
+// Get all documentation
+const allDocs = pipilot.getFullDocs();
+console.log('API Guide length:', allDocs.docs.api.length);
+console.log('SDK Docs length:', allDocs.docs.sdk.length);
+
+// Get only API documentation
+const apiDocs = pipilot.getFullDocs('api');
+console.log(apiDocs.docs.api);
+
+// Get only SDK documentation
+const sdkDocs = pipilot.getFullDocs('sdk');
+console.log(sdkDocs.docs.sdk);
+```
+
+This advanced search feature provides:
+- **Relevance Scoring**: Results ranked by match quality and importance
+- **Flexible Filtering**: Search specific documentation types
+- **Pagination Support**: Handle large result sets efficiently
+- **Multiple Search Modes**: Basic fuzzy matching or advanced term weighting
+- **Structured Results**: Rich metadata and section navigation
+- **Performance Optimized**: Fast search across embedded documentation
+
+This feature is particularly useful for:
+- **AI Agents**: Quickly find relevant implementation details with scoring
+- **Developers**: Search documentation without leaving the code
+- **Integration**: Access comprehensive docs programmatically with pagination
+- **Debugging**: Find specific API patterns and examples with advanced filtering
+
+---
+
+## API Key Management API
+
+The API Key Management API allows you to create, list, and delete API keys for external database access. This enables secure access to your database from external applications and services.
+
+### `createApiKey(name)`
+
+Creates a new API key for external database access.
+
+- **`name`** (string): A descriptive name for the API key
+
+**Returns:** An object containing the created API key information.
+
+**Example:**
+```javascript
+async function createExternalApiKey() {
+  try {
+    const result = await pipilot.createApiKey('Mobile App Access');
+    if (result.success) {
+      console.log('API Key created:', result.apiKey.key);
+      console.log('Key ID:', result.apiKey.id);
+      console.log('Name:', result.apiKey.name);
+      // Store the key securely for external use
+    }
+  } catch (error) {
+    console.error('Error creating API key:', error.message);
+  }
+}
+```
+
+### `listApiKeys()`
+
+Retrieves all API keys associated with the database.
+
+**Returns:** An object containing the list of API keys and metadata.
+
+**Example:**
+```javascript
+async function getAllApiKeys() {
+  try {
+    const result = await pipilot.listApiKeys();
+    if (result.success) {
+      console.log(`Found ${result.total} API keys:`);
+      result.apiKeys.forEach(key => {
+        console.log(`- ${key.name} (ID: ${key.id})`);
+        console.log(`  Created: ${key.created_at}`);
+        if (key.last_used_at) {
+          console.log(`  Last used: ${key.last_used_at}`);
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error listing API keys:', error.message);
+  }
+}
+```
+
+### `deleteApiKey(keyId)`
+
+Deletes an API key by its ID.
+
+- **`keyId`** (string): The ID of the API key to delete
+
+**Returns:** An object confirming the deletion.
+
+**Example:**
+```javascript
+async function removeApiKey(keyId) {
+  try {
+    const result = await pipilot.deleteApiKey(keyId);
+    if (result.success) {
+      console.log('API key deleted successfully');
+    }
+  } catch (error) {
+    console.error('Error deleting API key:', error.message);
+  }
+}
+```
+
+### API Key Response Structure
+
+**Create Response:**
+```javascript
+{
+  success: true,
+  apiKey: {
+    id: "key_123456",
+    name: "Mobile App Access",
+    key: "pk_live_abcdef1234567890", // The actual API key to use
+    created_at: "2024-01-15T10:30:00.000Z"
+  },
+  message: "API key \"Mobile App Access\" created successfully"
+}
+```
+
+**List Response:**
+```javascript
+{
+  success: true,
+  apiKeys: [
+    {
+      id: "key_123456",
+      name: "Mobile App Access",
+      created_at: "2024-01-15T10:30:00.000Z",
+      last_used_at: "2024-01-15T12:45:00.000Z"
+    }
+  ],
+  total: 1,
+  message: "Retrieved 1 API keys"
+}
+```
+
+### Security Best Practices
+
+1. **Secure Storage**: Store API keys securely, never in client-side code
+2. **Limited Scope**: Create separate keys for different applications/services
+3. **Regular Rotation**: Delete unused keys and create new ones periodically
+4. **Access Monitoring**: Check `last_used_at` to monitor key usage
+5. **Descriptive Names**: Use clear names to identify key purposes
+
+### TypeScript Usage
+
+```typescript
+import { PiPilot } from 'pipilot-sdk';
+
+const pipilot = new PiPilot('your-api-key', 'your-database-id');
+
+// Type-safe API key operations
+const createResult = await pipilot.createApiKey('Web App Access');
+if (createResult.success && createResult.apiKey) {
+  // createResult.apiKey is fully typed
+  console.log(createResult.apiKey.key); // TypeScript knows this exists
+}
+
+const listResult = await pipilot.listApiKeys();
+// listResult.apiKeys is typed as array of API key objects
+```
+
+This API enables secure external access to your PiPilot database while maintaining full control over API key lifecycle management.

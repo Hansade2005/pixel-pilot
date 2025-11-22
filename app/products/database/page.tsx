@@ -6,15 +6,15 @@ import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { 
-  Database, 
-  Zap, 
-  Shield, 
-  Key, 
-  FileJson, 
-  Sparkles, 
-  Code2, 
-  Image, 
+import {
+  Database,
+  Zap,
+  Shield,
+  Key,
+  FileJson,
+  Sparkles,
+  Code2,
+  Image,
   Check,
   ArrowRight,
   Code,
@@ -142,6 +142,33 @@ requests.post(
         }
     }
 )`
+    },
+    {
+      language: "SDK (TypeScript)",
+      code: `// Install: npm install pipilot-sdk
+import PiPilot, { TableRecord } from 'pipilot-sdk';
+
+// Initialize with type safety
+const pipilot = new PiPilot('YOUR_API_KEY', 'YOUR_DB_ID');
+
+// Define your data structure
+interface User {
+  name: string;
+  email: string;
+}
+
+// Fetch all records (fully typed)
+const { data: users } = await pipilot.fetchTableRecords<User>('YOUR_TABLE_ID');
+console.log(\`Found \${users.length} users\`);
+
+// Create a record with type safety
+const newUser: User = {
+  name: 'John Doe',
+  email: 'john@example.com'
+};
+
+const { data } = await pipilot.insertTableRecord('YOUR_TABLE_ID', newUser);
+console.log('User created:', data);`
     }
   ]
 
@@ -160,7 +187,7 @@ requests.post(
         <section className="pt-32 pb-20 px-4">
           <div className="container mx-auto max-w-6xl text-center">
             <Badge className="mb-4 bg-purple-500/20 text-purple-300 border-purple-500/30">
-             🎉 Database as a Service
+              🎉 Database as a Service
             </Badge>
             <h1 className="text-5xl md:text-7xl font-bold text-white mb-6">
               PostgreSQL databases
@@ -170,7 +197,7 @@ requests.post(
               </span>
             </h1>
             <p className="text-xl text-gray-300 mb-8 max-w-3xl mx-auto">
-              Create databases with AI schema generation, get auto-generated REST APIs, 
+              Create databases with AI schema generation, get auto-generated REST APIs,
               500MB storage + file uploads. Secure API keys for external apps. All free forever.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -206,6 +233,56 @@ requests.post(
           </div>
         </section>
 
+        {/* SDK Installation Section */}
+        <section className="py-16 px-4 bg-gradient-to-br from-green-900/20 to-emerald-900/20">
+          <div className="container mx-auto max-w-5xl">
+            <div className="text-center mb-8">
+              <Badge className="mb-4 bg-green-500/20 text-green-300 border-green-500/30">
+                📦 Official SDK
+              </Badge>
+              <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+                PiPilot SDK for JavaScript & TypeScript
+              </h2>
+              <p className="text-gray-300 mb-6">
+                Type-safe database operations with automatic rate limiting and retry logic
+              </p>
+
+              {/* Installation Command */}
+              <div className="bg-gray-900/50 rounded-lg border border-gray-700 p-4 max-w-md mx-auto mb-8">
+                <code className="text-green-400 font-mono text-sm">npm install pipilot-sdk</code>
+              </div>
+
+              {/* SDK Features */}
+              <div className="grid md:grid-cols-3 gap-4 max-w-3xl mx-auto">
+                <div className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/50">
+                  <Code2 className="h-6 w-6 text-green-400 mx-auto mb-2" />
+                  <div className="text-sm font-semibold text-white mb-1">Full TypeScript Support</div>
+                  <div className="text-xs text-gray-400">Complete type definitions included</div>
+                </div>
+                <div className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/50">
+                  <Zap className="h-6 w-6 text-yellow-400 mx-auto mb-2" />
+                  <div className="text-sm font-semibold text-white mb-1">Auto Rate Limiting</div>
+                  <div className="text-xs text-gray-400">Intelligent retry with backoff</div>
+                </div>
+                <div className="bg-gray-800/30 rounded-lg p-4 border border-gray-700/50">
+                  <Shield className="h-6 w-6 text-blue-400 mx-auto mb-2" />
+                  <div className="text-sm font-semibold text-white mb-1">Type-Safe Operations</div>
+                  <div className="text-xs text-gray-400">Catch errors at compile time</div>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <Link href="/docs">
+                  <Button variant="outline" className="border-green-500/30 text-green-300 hover:bg-green-500/10">
+                    <FileText className="mr-2 h-4 w-4" />
+                    View SDK Documentation
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Code Example Section */}
         <section className="py-20 px-4 bg-gray-900/50">
           <div className="container mx-auto max-w-5xl">
@@ -223,11 +300,10 @@ requests.post(
                   <button
                     key={index}
                     onClick={() => setSelectedLanguage(index)}
-                    className={`px-6 py-3 text-sm font-medium transition-colors ${
-                      selectedLanguage === index
-                        ? 'text-white bg-gray-700/50 border-b-2 border-purple-500'
-                        : 'text-gray-400 hover:text-white'
-                    }`}
+                    className={`px-6 py-3 text-sm font-medium transition-colors ${selectedLanguage === index
+                      ? 'text-white bg-gray-700/50 border-b-2 border-purple-500'
+                      : 'text-gray-400 hover:text-white'
+                      }`}
                   >
                     {example.language}
                   </button>

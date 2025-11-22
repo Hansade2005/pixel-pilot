@@ -1,14 +1,14 @@
 {
   "name": "pipilot-sdk",
-  "version": "1.2.2",
+  "version": "1.4.4",
   "main": "index.js",
   "types": "index.d.ts",
   "scripts": {
     "test": "node test-sdk.js"
   },
-  "keywords": ["pipilot", "database", "api", "sdk", "rest", "typescript"],
+  "keywords": ["pipilot", "database", "api", "sdk", "rest", "typescript", "documentation", "search"],
   "author": "PiPilot",
   "license": "ISC",
   "type": "commonjs",
-  "description": "JavaScript SDK for PiPilot Database and Storage API with table management capabilities"
+  "description": "JavaScript SDK for PiPilot Database and Storage API with table management and advanced documentation search with relevance scoring, pagination, and filtering"
 }
