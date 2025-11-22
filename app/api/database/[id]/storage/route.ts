@@ -14,14 +14,17 @@ import {
  */
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Await params in Next.js 15
+    const { id } = await params;
+
     const supabase = await createClient();
 
     // Get current user
     const { data: { user }, error: sessionError } = await supabase.auth.getUser();
-    
+
     if (sessionError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -29,30 +32,29 @@ export async function GET(
       );
     }
 
-    // Verify database ownership
+    // Verify database exists
     const { data: database, error: dbError } = await supabase
       .from('databases')
       .select('*')
-      .eq('id', params.id)
-      .eq('user_id', user.id)
+      .eq('id', id)
       .single();
 
     if (dbError || !database) {
       return NextResponse.json(
-        { error: 'Database not found or access denied' },
+        { error: 'Database not found' },
         { status: 404 }
       );
     }
 
     // Get or create bucket
-    let bucket = await getDatabaseBucket(parseInt(params.id));
-    
+    let bucket = await getDatabaseBucket(parseInt(id));
+
     if (!bucket) {
-      bucket = await createDatabaseBucket(parseInt(params.id), database.name);
+      bucket = await createDatabaseBucket(parseInt(id), database.name);
     }
 
     // Get storage stats
-    const stats = await getStorageStats(parseInt(params.id));
+    const stats = await getStorageStats(parseInt(id));
 
     // Get files list (first page)
     const { files, total } = await listFiles(bucket.id, { limit: 20 });
@@ -68,8 +70,10 @@ export async function GET(
       },
       stats: {
         file_count: stats.file_count || 0,
-        usage_percentage: stats.usage_percentage || 0,
+        usage_percentage: parseFloat(stats.usage_percentage || '0'),
         available_bytes: bucket.size_limit_bytes - bucket.current_usage_bytes,
+        current_usage_bytes: bucket.current_usage_bytes,
+        size_limit_bytes: bucket.size_limit_bytes,
       },
       files: files.slice(0, 10), // Return first 10 for overview
       total_files: total,

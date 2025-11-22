@@ -395,7 +395,7 @@ console.log('User created:', data);`
             </div>
 
             <div className="text-center">
-              <Link href="/docs/mcp-setup">
+              <Link href="/docs/mcp-server-integration">
                 <Button size="lg" className="bg-purple-600 hover:bg-purple-700 text-white">
                   Setup MCP Integration
                   <ArrowRight className="ml-2 h-5 w-5" />

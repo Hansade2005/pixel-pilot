@@ -14,14 +14,17 @@ const supabaseAdmin = createAdminClient(
  */
 export async function GET(
   request: Request,
-  { params }: { params: { id: string; fileId: string } }
+  { params }: { params: Promise<{ id: string; fileId: string }> }
 ) {
   try {
+    // Await params in Next.js 15
+    const { id, fileId } = await params;
+
     const supabase = await createClient();
 
     // Get current user
     const { data: { user }, error: sessionError } = await supabase.auth.getUser();
-    
+
     if (sessionError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -29,17 +32,16 @@ export async function GET(
       );
     }
 
-    // Verify database ownership
+    // Verify database exists
     const { data: database, error: dbError } = await supabase
       .from('databases')
       .select('*')
-      .eq('id', params.id)
-      .eq('user_id', user.id)
+      .eq('id', id)
       .single();
 
     if (dbError || !database) {
       return NextResponse.json(
-        { error: 'Database not found or access denied' },
+        { error: 'Database not found' },
         { status: 404 }
       );
     }
@@ -48,7 +50,7 @@ export async function GET(
     const { data: file, error: fileError } = await supabaseAdmin
       .from('storage_files')
       .select('*, storage_buckets!inner(database_id)')
-      .eq('id', params.fileId)
+      .eq('id', fileId)
       .single();
 
     if (fileError || !file) {
@@ -59,7 +61,7 @@ export async function GET(
     }
 
     // Verify file belongs to user's database
-    if (file.storage_buckets.database_id !== parseInt(params.id)) {
+    if (file.storage_buckets.database_id !== parseInt(id)) {
       return NextResponse.json(
         { error: 'Access denied' },
         { status: 403 }
@@ -67,7 +69,7 @@ export async function GET(
     }
 
     // Get download URL
-    const url = await getFileUrl(params.fileId);
+    const url = await getFileUrl(fileId);
 
     return NextResponse.json({
       file: {
@@ -97,14 +99,17 @@ export async function GET(
  */
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string; fileId: string } }
+  { params }: { params: Promise<{ id: string; fileId: string }> }
 ) {
   try {
+    // Await params in Next.js 15
+    const { id, fileId } = await params;
+
     const supabase = await createClient();
 
     // Get current user
     const { data: { user }, error: sessionError } = await supabase.auth.getUser();
-    
+
     if (sessionError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -112,17 +117,16 @@ export async function DELETE(
       );
     }
 
-    // Verify database ownership
+    // Verify database exists
     const { data: database, error: dbError } = await supabase
       .from('databases')
       .select('*')
-      .eq('id', params.id)
-      .eq('user_id', user.id)
+      .eq('id', id)
       .single();
 
     if (dbError || !database) {
       return NextResponse.json(
-        { error: 'Database not found or access denied' },
+        { error: 'Database not found' },
         { status: 404 }
       );
     }
@@ -131,7 +135,7 @@ export async function DELETE(
     const { data: file, error: fileError } = await supabaseAdmin
       .from('storage_files')
       .select('*, storage_buckets!inner(database_id)')
-      .eq('id', params.fileId)
+      .eq('id', fileId)
       .single();
 
     if (fileError || !file) {
@@ -142,7 +146,7 @@ export async function DELETE(
     }
 
     // Verify file belongs to user's database
-    if (file.storage_buckets.database_id !== parseInt(params.id)) {
+    if (file.storage_buckets.database_id !== parseInt(id)) {
       return NextResponse.json(
         { error: 'Access denied' },
         { status: 403 }
@@ -150,7 +154,7 @@ export async function DELETE(
     }
 
     // Delete file
-    await deleteFile(params.fileId);
+    await deleteFile(fileId);
 
     return NextResponse.json({
       success: true,

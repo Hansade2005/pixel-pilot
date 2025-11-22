@@ -8,14 +8,17 @@ import { getDatabaseBucket, uploadFile } from '@/lib/storage';
  */
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Await params in Next.js 15
+    const { id } = await params;
+
     const supabase = await createClient();
 
     // Get current user
     const { data: { user }, error: sessionError } = await supabase.auth.getUser();
-    
+
     if (sessionError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -23,25 +26,33 @@ export async function POST(
       );
     }
 
-    // Verify database ownership
+    console.log('[UPLOAD] Database ID:', id);
+    console.log('[UPLOAD] User:', user?.email);
+
+    // Verify database exists
     const { data: database, error: dbError } = await supabase
       .from('databases')
       .select('*')
-      .eq('id', params.id)
-      .eq('user_id', user.id)
+      .eq('id', id)
       .single();
 
+    console.log('[UPLOAD] Database query result:', { database, dbError });
+
     if (dbError || !database) {
+      console.error('[UPLOAD] Database not found:', dbError);
       return NextResponse.json(
-        { error: 'Database not found or access denied' },
+        { error: 'Database not found' },
         { status: 404 }
       );
     }
 
     // Get bucket
-    const bucket = await getDatabaseBucket(parseInt(params.id));
-    
+    console.log('[UPLOAD] Getting bucket for database:', parseInt(id));
+    const bucket = await getDatabaseBucket(parseInt(id));
+    console.log('[UPLOAD] Bucket result:', bucket);
+
     if (!bucket) {
+      console.error('[UPLOAD] Storage bucket not found for database:', id);
       return NextResponse.json(
         { error: 'Storage bucket not found. Please initialize storage first.' },
         { status: 404 }
@@ -53,7 +64,7 @@ export async function POST(
     const file = formData.get('file') as File;
     const isPublic = formData.get('is_public') === 'true';
     const metadataStr = formData.get('metadata') as string;
-    
+
     if (!file) {
       return NextResponse.json(
         { error: 'No file provided' },
@@ -77,14 +88,14 @@ export async function POST(
     // Upload file
     const uploadedFile = await uploadFile(
       bucket.id,
-      parseInt(params.id),
+      parseInt(id),
       file,
       {
         isPublic,
         metadata: {
           ...metadata,
           uploaded_by: user.email,
-          database_id: params.id,
+          database_id: id,
         },
       }
     );

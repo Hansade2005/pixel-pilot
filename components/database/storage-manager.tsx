@@ -67,6 +67,8 @@ interface StorageStats {
   file_count: number;
   usage_percentage: number;
   available_bytes: number;
+  current_usage_bytes: number;
+  size_limit_bytes: number;
 }
 
 interface StorageManagerProps {
@@ -97,9 +99,14 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
       if (!response.ok) throw new Error('Failed to fetch storage data');
 
       const data = await response.json();
+      console.log('📦 Storage data received:', {
+        bucket: data.bucket,
+        stats: data.stats,
+        available_calc: (data.bucket?.size_limit_bytes || 0) - (data.bucket?.current_usage_bytes || 0)
+      });
       setBucket(data.bucket);
       setStats(data.stats);
-      
+
       // Fetch all files
       const filesResponse = await fetch(`/api/database/${databaseId}/storage/files?limit=100`);
       if (filesResponse.ok) {
@@ -197,17 +204,17 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
     } finally {
       setDownloadingFileId(null);
     }
-  };  const handleCopyUrl = async (fileId: string) => {
+  }; const handleCopyUrl = async (fileId: string) => {
     try {
       // Get fresh signed URL from API
       const response = await fetch(`/api/database/${databaseId}/storage/files/${fileId}`);
       if (!response.ok) throw new Error('Failed to get file URL');
 
       const data = await response.json();
-      
+
       // Copy to clipboard
       await navigator.clipboard.writeText(data.file.url);
-      
+
       // Show appropriate message based on file type
       if (data.file.is_public) {
         toast.success('Public URL copied!', {
@@ -313,8 +320,8 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
                 {stats?.usage_percentage.toFixed(1)}% used
               </span>
             </div>
-            <Progress 
-              value={stats?.usage_percentage || 0} 
+            <Progress
+              value={stats?.usage_percentage || 0}
               className="h-2"
             />
           </div>
@@ -327,12 +334,14 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
             <div>
               <div className="text-gray-400 text-xs mb-1">Available</div>
               <div className="text-white text-2xl font-bold">
-                {formatBytes(stats?.available_bytes || 0)}
+                {formatBytes((bucket?.size_limit_bytes || 0) - (bucket?.current_usage_bytes || 0))}
               </div>
             </div>
             <div>
               <div className="text-gray-400 text-xs mb-1">Limit</div>
-              <div className="text-white text-2xl font-bold">500 MB</div>
+              <div className="text-white text-2xl font-bold">
+                {formatBytes(bucket?.size_limit_bytes || 0)}
+              </div>
             </div>
           </div>
         </CardContent>
@@ -375,7 +384,7 @@ export default function StorageManager({ databaseId }: StorageManagerProps) {
           {filteredFiles.map((file) => (
             <Card key={file.id} className="bg-gray-800 border-gray-700 overflow-hidden">
               {/* File Preview */}
-              <div 
+              <div
                 className="h-48 bg-gray-900 flex items-center justify-center cursor-pointer hover:bg-gray-850 transition-colors relative group"
                 onClick={() => isPreviewable(file.mime_type) && setPreviewFile(file)}
               >

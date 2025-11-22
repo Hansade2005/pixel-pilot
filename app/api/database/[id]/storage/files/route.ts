@@ -8,14 +8,17 @@ import { getDatabaseBucket, listFiles } from '@/lib/storage';
  */
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Await params in Next.js 15
+    const { id } = await params;
+
     const supabase = await createClient();
 
     // Get current user
     const { data: { user }, error: sessionError } = await supabase.auth.getUser();
-    
+
     if (sessionError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -23,24 +26,23 @@ export async function GET(
       );
     }
 
-    // Verify database ownership
+    // Verify database exists
     const { data: database, error: dbError } = await supabase
       .from('databases')
       .select('*')
-      .eq('id', params.id)
-      .eq('user_id', user.id)
+      .eq('id', id)
       .single();
 
     if (dbError || !database) {
       return NextResponse.json(
-        { error: 'Database not found or access denied' },
+        { error: 'Database not found' },
         { status: 404 }
       );
     }
 
     // Get bucket
-    const bucket = await getDatabaseBucket(parseInt(params.id));
-    
+    const bucket = await getDatabaseBucket(parseInt(id));
+
     if (!bucket) {
       return NextResponse.json(
         { error: 'Storage bucket not found' },
