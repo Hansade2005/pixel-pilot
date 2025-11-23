@@ -1284,6 +1284,18 @@ export function ChatPanelV2({
         return
       }
 
+      // Show restoring progress toast
+      const { dismiss: dismissRestoring } = toast({
+        title: "Restoring...",
+        description: (
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Restoring files and messages. Please wait...</span>
+          </div>
+        ),
+        duration: Infinity
+      })
+
       const { storageManager } = await import('@/lib/storage-manager')
       await storageManager.init()
 
@@ -1293,6 +1305,7 @@ export function ChatPanelV2({
       )
 
       if (!activeSession) {
+        dismissRestoring()
         toast({
           title: "Restore Failed",
           description: "Could not find chat session for this project.",
@@ -1302,6 +1315,9 @@ export function ChatPanelV2({
       }
 
       const success = await restorePreRevertState(project.id, activeSession.id, messageId)
+
+      // Dismiss the restoring toast
+      dismissRestoring()
 
       if (success) {
         await loadMessages()
@@ -1313,8 +1329,15 @@ export function ChatPanelV2({
         setRestoreMessageId(null)
 
         toast({
-          title: "Restored Successfully",
-          description: "Files and messages have been restored to their previous state."
+          title: "✓ Restored Successfully",
+          description: "All files and messages have been restored to their previous state.",
+          duration: 5000
+        })
+      } else {
+        toast({
+          title: "Restore Failed",
+          description: "Failed to restore files and messages.",
+          variant: "destructive"
         })
       }
     } catch (error) {
@@ -1334,6 +1357,18 @@ export function ChatPanelV2({
     setIsReverting(true)
     setShowRevertDialog(false)
     
+    // Show reverting progress toast
+    const { dismiss: dismissReverting } = toast({
+      title: "Reverting...",
+      description: (
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>Restoring files and clearing messages. Please wait...</span>
+        </div>
+      ),
+      duration: Infinity
+    })
+    
     try {
       // Get the chat session for this project
       const { storageManager } = await import('@/lib/storage-manager')
@@ -1345,6 +1380,7 @@ export function ChatPanelV2({
       )
       
       if (!activeSession) {
+        dismissReverting()
         toast({
           title: "Revert Failed",
           description: "Could not find chat session for this project.",
@@ -1387,6 +1423,7 @@ export function ChatPanelV2({
         }
         
         if (!checkpoint) {
+          dismissReverting()
           toast({
             title: "Revert Failed",
             description: "Could not find checkpoint for this message. This might happen if the message is too recent or if there was a timing issue.",
@@ -1447,6 +1484,7 @@ export function ChatPanelV2({
       }
       
       if (!revertTimestamp) {
+        dismissReverting()
         toast({
           title: "Revert Failed",
           description: "Could not determine the timestamp for the selected message.",
@@ -1499,11 +1537,26 @@ export function ChatPanelV2({
           setInput(revertMessage.content)
         }
         
+        // Dismiss the reverting toast
+        dismissReverting()
+        
+        // Show success toast with restore information
         toast({
-          title: "Reverted Successfully",
-          description: `Files and messages have been restored to this version. The message is now in the input for editing.`
+          title: "✓ Reverted Successfully",
+          description: (
+            <div className="space-y-2">
+              <p>Files and messages have been restored to this version.</p>
+              <p className="text-sm text-muted-foreground">
+                💡 You can restore back within 5 minutes using the restore icon on this message.
+              </p>
+            </div>
+          ),
+          duration: 10000 // 10 seconds for user to read
         })
       } else {
+        // Dismiss the reverting toast
+        dismissReverting()
+        
         // Reload messages if file restoration failed
         await loadMessages()
         toast({
@@ -1513,6 +1566,9 @@ export function ChatPanelV2({
         })
       }
     } catch (error) {
+      // Dismiss the reverting toast on error
+      dismissReverting()
+      
       console.error('[Checkpoint] Error reverting to checkpoint:', error)
       // Reload messages on error
       if (project) {
