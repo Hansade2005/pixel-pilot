@@ -18,8 +18,12 @@ POST https://pipilot.dev/api/v1/chat/completions
 
 ## 🖼️ Vision Models
 
-### `gpt-4-vision`
-General vision analysis - describing images, identifying objects, answering visual questions
+### `pipilot-1-vision`
+**Primary Vision Model** - Powered by Pixtral 12B.
+General vision analysis - describing images, identifying objects, answering visual questions.
+
+### `gpt-4-vision` (Legacy)
+Alias for `pipilot-1-vision`.
 
 ### `gpt-4o`  
 Advanced multimodal assistant - combines vision and text understanding
@@ -36,7 +40,7 @@ Document processing - text extraction, OCR, form recognition
 
 ```powershell
 $body = @{
-    model = "gpt-4-vision"
+    model = "pipilot-1-vision"
     messages = @(
         @{
             role = "user"

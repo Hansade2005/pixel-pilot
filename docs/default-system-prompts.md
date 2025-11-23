@@ -4,46 +4,6 @@
 
 The OpenAI-compatible API at `https://pipilot.dev/api/v1/chat/completions` now includes **powerful default system prompts** that are automatically injected based on the model name you specify. This makes the API more capable and specialized without requiring you to write system prompts for every request.
 
-## How It Works
-
-1. **Automatic Injection**: If you don't provide a system message in your request, the API automatically adds a specialized system prompt based on the `model` parameter
-2. **User Override**: If you include your own system message, the API respects it and doesn't inject a default prompt
-3. **Model-Based Selection**: Different model names trigger different specialized prompts
-
-## Available Models & Their Capabilities
-
-### `gpt-3.5-turbo` (Default)
-**General Purpose Assistant**
-
-A helpful, intelligent, and friendly AI assistant for general tasks:
-- Answering questions and explaining concepts
-- Writing and editing text
-- Coding and debugging
-- Problem-solving and analysis
-- Creative tasks and brainstorming
-
-**Example:**
-```json
-{
-  "model": "gpt-3.5-turbo",
-  "messages": [
-    {"role": "user", "content": "Explain quantum computing"}
-  ]
-}
-```
-
----
-
-### `gpt-4-code`
-**Expert Software Engineer**
-
-Specialized coding assistant that excels at:
-- Writing clean, efficient, and well-documented code
-- Debugging and fixing code issues
-- Explaining complex programming concepts
-- Suggesting best practices and design patterns
-- Reviewing code and providing constructive feedback
-
 **Example:**
 ```json
 {

@@ -86,44 +86,6 @@ data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1732374696
 
 data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1732374696,"model":"a0-llm","choices":[{"index":0,"delta":{"content":"!"},"finish_reason":null}]}
 
-data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1732374696,"model":"a0-llm","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
-
-data: [DONE]
-```
-
-## Usage Examples
-
-### cURL
-
-**Non-streaming:**
-
-```bash
-curl -X POST http://localhost:3000/api/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-3.5-turbo",
-    "messages": [
-      {"role": "user", "content": "What is the capital of France?"}
-    ]
-  }'
-```
-
-**Streaming:**
-
-```bash
-curl -X POST http://localhost:3000/api/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-3.5-turbo",
-    "messages": [
-      {"role": "user", "content": "Count from 1 to 5"}
-    ],
-    "stream": true
-  }'
-```
-
-### JavaScript (OpenAI SDK)
-
 ```javascript
 import OpenAI from 'openai';
 
