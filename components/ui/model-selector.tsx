@@ -1,4 +1,4 @@
- "use client"
+"use client"
 
 import React from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -15,7 +15,7 @@ interface ModelSelectorProps {
   compact?: boolean
 }
 
-  // No visual badges/colors needed — keep data simple (provider groups and model names)
+// No visual badges/colors needed — keep data simple (provider groups and model names)
 
 export function ModelSelector({
   selectedModel,
@@ -27,18 +27,23 @@ export function ModelSelector({
 }: ModelSelectorProps) {
   // Default subscription status based on plan (matches admin page behavior)
   const effectiveStatus = subscriptionStatus || (userPlan === 'free' ? 'active' : 'inactive')
-  
+
   // Set default selected model based on plan
   const defaultSelectedModel: string = userPlan === 'pro' ? 'grok-code-fast-1' : 'qwen3-coder-free'
   const effectiveSelectedModel = selectedModel || defaultSelectedModel
-  
+
   const currentModel = getModelById(effectiveSelectedModel)
-  
+
   const displayNameMap = new Map<string, string>([
     ['grok-code-fast-1', 'PiPilot 4.5 Pro'],
     ['grok-3-mini', 'PiPilot 4 Flash'],
     ['pipilot-pro', 'PiPilot Pro'],
     ['pipilot-ultra', 'PiPilot Ultra'],
+    // PiPilot Local Models
+    ['pipilot-1-chat', 'PiPilot Chat 1.0'],
+    ['pipilot-1-code', 'PiPilot Code 1.0'],
+    ['pipilot-1-vision', 'PiPilot Vision 1.0'],
+    ['pipilot-1-chat-thinking', 'PiPilot Thinking 1.0'],
     // OpenRouter Advanced Models
     ['deepseek-v3.2-exp', 'PiPilot DeepSeek V3.2 Exp'],
     ['grok-4-fast-reasoning', 'PiPilot Grok 4 Fast'],
@@ -59,9 +64,9 @@ export function ModelSelector({
     // MiniMax models
     ['minimax-m2', 'PiPilot MiniMax M2'],
   ])
-  
+
   const filteredModels = chatModels.filter(model => displayNameMap.has(model.id))
-  
+
   // Group models by provider for better organization
   const modelsByProvider = filteredModels.reduce((acc, model) => {
     if (!acc[model.provider]) {
@@ -85,10 +90,15 @@ export function ModelSelector({
     ];
   } else if (userPlan === 'pro' && effectiveStatus === 'active') {
     allowedModels = [
-      'grok-code-fast-1', 
-      'grok-3-mini', 
-      'pipilot-pro', 
+      'grok-code-fast-1',
+      'grok-3-mini',
+      'pipilot-pro',
       'pipilot-ultra',
+      // PiPilot Local Models
+      'pipilot-1-chat',
+      'pipilot-1-code',
+      'pipilot-1-vision',
+      'pipilot-1-chat-thinking',
       // New Grok 4.1 Models
       'grok-4-1-fast-non-reasoning',
       'grok-4-1-fast-reasoning',
@@ -120,12 +130,12 @@ export function ModelSelector({
   // Function to truncate text to 3 characters for all models
   const truncateModelName = (text: string | undefined) => {
     if (!text) return '';
-    
+
     // For "auto" model, truncate to 3 chars but no ellipsis
     if (text.toLowerCase() === 'auto') {
       return text.length > 3 ? text.substring(0, 3) : text;
     }
-    
+
     // For all other models, truncate to 3 characters with ellipsis
     return text.length > 3 ? text.substring(0, 3) + '...' : text;
   };
@@ -183,7 +193,7 @@ export function ModelSelector({
         <Bot className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm font-medium">AI Model</span>
       </div>
-      
+
       <Select value={effectiveSelectedModel} onValueChange={onModelChange}>
         <SelectTrigger className="w-full">
           <div className="flex items-center gap-2">
@@ -192,7 +202,7 @@ export function ModelSelector({
             </SelectValue>
           </div>
         </SelectTrigger>
-        
+
         <SelectContent className="w-[420px]">
           {Object.entries(modelsByProvider).map(([provider, models]) => (
             <div key={provider} className="py-2">

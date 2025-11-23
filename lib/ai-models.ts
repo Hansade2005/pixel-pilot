@@ -15,7 +15,7 @@ export const chatModels: Array<ChatModel> = [
     description: 'Automatically uses the best model for code generation ',
     provider: 'auto',
   },
-  
+
   // Mistral Models (Default - Code-focused)
   {
     id: 'open-codestral-mamba',
@@ -62,6 +62,32 @@ export const chatModels: Array<ChatModel> = [
     name: 'Pixela',
     description: 'Pixela model from PiPilot with strong code generation capabilities',
     provider: 'a0dev',
+  },
+
+  // PiPilot Local Models (OpenAI Compatible)
+  {
+    id: 'pipilot-1-chat',
+    name: 'PiPilot Chat 1.0',
+    description: 'General-purpose AI assistant for everyday tasks',
+    provider: 'pipilot',
+  },
+  {
+    id: 'pipilot-1-code',
+    name: 'PiPilot Code 1.0',
+    description: 'Agentic coding model with autonomous reasoning (SWE-bench)',
+    provider: 'pipilot',
+  },
+  {
+    id: 'pipilot-1-vision',
+    name: 'PiPilot Vision 1.0',
+    description: 'Multimodal AI assistant for image analysis',
+    provider: 'pipilot',
+  },
+  {
+    id: 'pipilot-1-chat-thinking',
+    name: 'PiPilot Thinking 1.0',
+    description: 'Super-intelligent reasoning model with Chain of Thought',
+    provider: 'pipilot',
   },
 
   // PiPilot Premium Models (Claude via OpenRouter - Premium Only)

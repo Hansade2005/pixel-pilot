@@ -162,6 +162,13 @@ const openrouterProvider = createOpenAICompatible({
   apiKey: process.env.OPENROUTER_API_KEY || 'sk-or-v1-your-openrouter-api-key',
 });
 
+// Create PiPilot Local Provider (OpenAI Compatible)
+const pipilotProvider = createOpenAICompatible({
+  name: 'pipilot-local',
+  baseURL: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/v1`,
+  apiKey: 'not-needed', // Internal API doesn't require key
+});
+
 // Custom OpenRouter provider with reasoning support for specific models
 function openrouterProviderWithReasoning(modelId: string) {
   const baseProvider = openrouterProvider(modelId);
@@ -258,17 +265,23 @@ if (process.env.NODE_ENV === 'development') {
 const modelProviders: Record<string, any> = {
   // Auto/Default Option - uses Grok Code Fast 1
   'auto': xaiProvider('grok-code-fast-1'), // Auto selection uses Grok Code Fast 1
-  
+
   // Codestral Models (OpenAI Compatible)
   'codestral-latest': codestral('codestral-latest'),
-  
+
   // a0.dev Models
   'a0-dev-llm': a0devProvider.languageModel('a0-dev-llm'),
-  
+
+  // PiPilot Local Models (OpenAI Compatible)
+  'pipilot-1-chat': pipilotProvider('pipilot-1-chat'),
+  'pipilot-1-code': pipilotProvider('pipilot-1-code'),
+  'pipilot-1-vision': pipilotProvider('pipilot-1-vision'),
+  'pipilot-1-chat-thinking': pipilotProvider('pipilot-1-chat-thinking'),
+
   // PiPilot Premium Models (Claude via OpenRouter)
   'pipilot-pro': openrouterProviderWithReasoning('anthropic/claude-sonnet-4'),
   'pipilot-ultra': openrouterProviderWithReasoning('anthropic/claude-sonnet-4.5'),
-  
+
   // Mistral Models - Default uses Codestral endpoint
   'open-codestral-mamba': mistralProvider('open-codestral-mamba'),
   'pixtral-12b-2409': mistralProvider('pixtral-12b-2409'),

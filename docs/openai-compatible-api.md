@@ -168,39 +168,6 @@ while (true) {
       const data = line.slice(6);
       if (data === '[DONE]') break;
       
-      const parsed = JSON.parse(data);
-      const content = parsed.choices[0]?.delta?.content;
-      if (content) {
-        process.stdout.write(content);
-      }
-    }
-  }
-}
-```
-
-### Python (OpenAI SDK)
-
-```python
-from openai import OpenAI
-
-client = OpenAI(
-    api_key="not-needed",  # a0.dev doesn't require API key
-    base_url="http://localhost:3000/api/v1"
-)
-
-# Non-streaming
-completion = client.chat.completions.create(
-    model="gpt-3.5-turbo",
-    messages=[
-        {"role": "user", "content": "Hello!"}
-    ]
-)
-
-print(completion.choices[0].message.content)
-
-# Streaming
-stream = client.chat.completions.create(
-    model="gpt-3.5-turbo",
     messages=[
         {"role": "user", "content": "Tell me a story"}
     ],
