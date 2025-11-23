@@ -212,18 +212,37 @@ function transformMistralResponse(mistralResponse: any, model: string): any {
     };
 }
 
+// --- Helper to merge system prompts ---
+
+function ensureSystemPrompt(messages: OpenAIMessage[], model: string): OpenAIMessage[] {
+    const defaultPrompt = DEFAULT_SYSTEM_PROMPTS[model] || DEFAULT_SYSTEM_PROMPTS['pipilot-1-chat'];
+    const newMessages = [...messages];
+    const systemMessageIndex = newMessages.findIndex(m => m.role === 'system');
+
+    if (systemMessageIndex !== -1) {
+        // User provided a system prompt. Merge it with the default.
+        // We prepend the default prompt to ensure the model's core identity is established first.
+        const userSystemContent = newMessages[systemMessageIndex].content;
+        // Handle case where content might be an array (multimodal) - though system prompts are usually text
+        const userText = Array.isArray(userSystemContent)
+            ? userSystemContent.map(c => c.type === 'text' ? c.text : '').join('')
+            : userSystemContent;
+
+        newMessages[systemMessageIndex] = {
+            role: 'system',
+            content: `${defaultPrompt}\n\n--- USER SYSTEM INSTRUCTIONS ---\n${userText}`
+        };
+    } else {
+        // No user system prompt, just add the default one
+        newMessages.unshift({ role: 'system', content: defaultPrompt });
+    }
+    return newMessages;
+}
+
 // --- a0.dev Integration ---
 
 function transformRequest(req: OpenAIRequest, model: string): A0DevRequest {
-    const messages = [...req.messages];
-
-    // Inject default system prompt if none exists
-    const hasSystemPrompt = messages.some(m => m.role === 'system');
-    if (!hasSystemPrompt) {
-        const defaultPrompt = DEFAULT_SYSTEM_PROMPTS[model] || DEFAULT_SYSTEM_PROMPTS['pipilot-1-chat'];
-        messages.unshift({ role: 'system', content: defaultPrompt });
-    }
-
+    const messages = ensureSystemPrompt(req.messages, model);
     return {
         messages: messages,
         temperature: req.temperature
@@ -267,21 +286,15 @@ export async function POST(request: NextRequest) {
 
         let model = body.model || 'pipilot-1-chat';
 
-        // Normalize model names if legacy aliases are used (though we are removing them from docs, we can keep fallback logic if desired, or strict)
-        // For now, we'll default to pipilot-1-chat if unknown, or respect the specific new names.
-
         console.log(`🚀 Request for model: ${model}`);
 
         // 1. Vision Routing (Pixtral)
-        // Route to Pixtral if model is pipilot-1-vision OR if images are detected
         if (model === 'pipilot-1-vision' || hasVisionContent(body.messages)) {
             console.log('🖼️  Vision content/model detected, routing to Pixtral 12B');
-            const mistralMessages = transformToMistralFormat(body.messages);
 
-            // Inject system prompt for vision if missing
-            if (!mistralMessages.some(m => m.role === 'system')) {
-                mistralMessages.unshift({ role: 'system', content: DEFAULT_SYSTEM_PROMPTS['pipilot-1-vision'] });
-            }
+            // Use helper to ensure system prompt is present/merged
+            const messagesWithPrompt = ensureSystemPrompt(body.messages, 'pipilot-1-vision');
+            const mistralMessages = transformToMistralFormat(messagesWithPrompt);
 
             if (body.stream) {
                 const stream = streamMistralVision(mistralMessages, body.temperature);
@@ -311,10 +324,9 @@ export async function POST(request: NextRequest) {
         // 2. Code Routing (Codestral)
         if (model === 'pipilot-1-code') {
             console.log('💻 Code model detected, routing to Codestral');
-            const messages = [...body.messages];
-            if (!messages.some(m => m.role === 'system')) {
-                messages.unshift({ role: 'system', content: DEFAULT_SYSTEM_PROMPTS['pipilot-1-code'] });
-            }
+
+            // Use helper to ensure system prompt is present/merged
+            const messages = ensureSystemPrompt(body.messages, 'pipilot-1-code');
 
             if (body.stream) {
                 const stream = streamCodestral(messages, body.temperature);
@@ -342,11 +354,8 @@ export async function POST(request: NextRequest) {
         }
 
         // 3. General Chat & Thinking (a0.dev)
-        // pipilot-1-chat and pipilot-1-chat-thinking go here
         console.log(`💬 Routing to a0.dev for model: ${model}`);
         const a0Request = transformRequest(body, model);
-
-        // If thinking model, we might want to enforce a lower temperature or specific params, but system prompt is key.
 
         const response = await fetch('https://api.a0.dev/ai/llm', {
             method: 'POST',
