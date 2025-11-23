@@ -42,24 +42,41 @@ export default function DatabaseLayout({ children }: DatabaseLayoutProps) {
 
     useEffect(() => {
         loadUserDatabases()
-    }, [])
+    }, [pathname])
 
     async function loadUserDatabases() {
         try {
             setLoading(true)
             const storedDbId = localStorage.getItem('user_database_id')
 
-            if (storedDbId) {
-                const response = await fetch(`/api/database/${storedDbId}`)
-                const data = await response.json()
+            // Fetch all databases for the user
+            const response = await fetch('/api/database/list')
 
-                if (data.success) {
-                    setDatabases([data.database])
-                    setSelectedDbId(storedDbId)
-                }
+            if (!response.ok) {
+                throw new Error('Failed to fetch databases')
+            }
+
+            const data = await response.json()
+
+            if (data.databases && data.databases.length > 0) {
+                setDatabases(data.databases)
+
+                // If we have a stored DB ID and it exists in the list, use it
+                // Otherwise, use the first database
+                const dbExists = data.databases.find((db: DatabaseInfo) => db.id.toString() === storedDbId)
+                const selectedId = dbExists ? storedDbId : data.databases[0].id.toString()
+
+                setSelectedDbId(selectedId!)
+                localStorage.setItem('user_database_id', selectedId!)
+            } else {
+                // No databases found
+                setDatabases([])
+                setSelectedDbId('')
+                localStorage.removeItem('user_database_id')
             }
         } catch (error) {
             console.error('Error loading databases:', error)
+            toast.error('Failed to load databases')
         } finally {
             setLoading(false)
         }
@@ -149,19 +166,34 @@ export default function DatabaseLayout({ children }: DatabaseLayoutProps) {
                     </nav>
 
                     <div className="p-4 border-t border-white/5">
-                        <Button
-                            disabled={databases.length >= 2}
-                            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 disabled:cursor-not-allowed text-white shadow-lg shadow-purple-500/20 transition-all duration-200 hover:scale-105"
-                            title={databases.length >= 2 ? "Maximum 2 databases per user" : "Create new database"}
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            New Database
-                            {databases.length > 0 && (
+                        {databases.length >= 2 ? (
+                            <Button
+                                disabled
+                                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 disabled:cursor-not-allowed text-white shadow-lg shadow-purple-500/20"
+                                title="Maximum 2 databases per user"
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                New Database
                                 <span className="ml-auto text-xs opacity-70">
                                     ({databases.length}/2)
                                 </span>
-                            )}
-                        </Button>
+                            </Button>
+                        ) : (
+                            <Link href="/database/new">
+                                <Button
+                                    className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg shadow-purple-500/20 transition-all duration-200 hover:scale-105"
+                                    title="Create new database"
+                                >
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    New Database
+                                    {databases.length > 0 && (
+                                        <span className="ml-auto text-xs opacity-70">
+                                            ({databases.length}/2)
+                                        </span>
+                                    )}
+                                </Button>
+                            </Link>
+                        )}
                     </div>
                 </aside>
 

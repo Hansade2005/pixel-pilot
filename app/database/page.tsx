@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,11 +10,7 @@ import {
     Table,
     HardDrive,
     Zap,
-    TrendingUp,
-    Clock,
     Plus,
-    Upload,
-    Key,
     FileText,
     ArrowUp,
     ArrowDown,
@@ -34,6 +29,7 @@ import ApiKeysManager from '@/components/database/api-keys-manager'
 import StorageManager from '@/components/database/storage-manager'
 import { ApiDocsGenerator } from '@/components/database/api-docs-generator'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import ActivityFeed from '@/components/database/activity-feed'
 import type { Table as TableType } from '@/lib/supabase'
 
 interface DatabaseData {
@@ -136,10 +132,32 @@ export default function DatabaseDashboard() {
     async function loadUserDatabase() {
         try {
             setLoading(true)
-            // TODO: Get user's database from API - for now check localStorage
             const storedDbId = localStorage.getItem('user_database_id')
 
-            if (storedDbId) {
+            // Fetch all databases to check if stored ID exists
+            const listResponse = await fetch('/api/database/list')
+            if (listResponse.ok) {
+                const listData = await listResponse.json()
+
+                if (listData.databases && listData.databases.length > 0) {
+                    // Check if stored database exists
+                    const storedDbExists = storedDbId && listData.databases.find((db: any) => db.id.toString() === storedDbId)
+
+                    if (storedDbExists) {
+                        // Load the stored database
+                        await loadDatabase(parseInt(storedDbId))
+                    } else {
+                        // Auto-select first database
+                        const firstDb = listData.databases[0]
+                        localStorage.setItem('user_database_id', firstDb.id.toString())
+                        await loadDatabase(firstDb.id)
+                    }
+                } else {
+                    // No databases exist - will show create form
+                    setLoading(false)
+                }
+            } else if (storedDbId) {
+                // Fallback to old behavior if list endpoint fails
                 await loadDatabase(parseInt(storedDbId))
             }
         } catch (error) {
@@ -232,7 +250,7 @@ export default function DatabaseDashboard() {
             // Generate unique project ID with timestamp
             const projectId = `db_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-            const response = await fetch('/api/database/create', {
+            const response = await fetch('/api/database/create-user', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -465,7 +483,7 @@ export default function DatabaseDashboard() {
                                                 </>
                                             )}
                                             {stat.change === 0 && (
-                                                <span className="text-gray-500">No changes yet</span>
+                                                <span className="text-gray-500 text-xs">Current value</span>
                                             )}
                                         </div>
                                     </CardContent>
@@ -474,19 +492,9 @@ export default function DatabaseDashboard() {
                         })}
                     </div>
 
-                    {/* Quick Actions */}
-                    <Card className="bg-gray-900/50 backdrop-blur-xl border-white/5">
-                        <CardHeader>
-                            <CardTitle className="text-white">Recent Activity</CardTitle>
-                            <CardDescription>Latest changes to your database</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-center py-8 text-gray-500">
-                                <Clock className="h-12 w-12 mx-auto mb-2 opacity-20" />
-                                <p>No recent activity</p>
-                            </div>
-                        </CardContent>
-                    </Card>
+
+                    {/* Recent Activity */}
+                    <ActivityFeed databaseId={database.id.toString()} />
                 </TabsContent>
 
                 {/* Tables Tab */}

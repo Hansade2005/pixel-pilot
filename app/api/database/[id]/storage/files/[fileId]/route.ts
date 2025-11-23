@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { deleteFile, getFileUrl } from '@/lib/storage';
+import { logFileDeleted } from '@/lib/activity-logger';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 
 const supabaseAdmin = createAdminClient(
@@ -155,6 +156,13 @@ export async function DELETE(
 
     // Delete file
     await deleteFile(fileId);
+
+    // Log activity
+    await logFileDeleted(
+      parseInt(id),
+      user.id,
+      file.original_name
+    );
 
     return NextResponse.json({
       success: true,

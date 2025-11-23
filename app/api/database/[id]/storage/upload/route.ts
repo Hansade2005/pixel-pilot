@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getDatabaseBucket, uploadFile } from '@/lib/storage';
+import { logFileUploaded } from '@/lib/activity-logger';
 
 /**
  * POST /api/database/[id]/storage/upload
@@ -98,6 +99,16 @@ export async function POST(
           database_id: id,
         },
       }
+    );
+
+    // Log activity
+    await logFileUploaded(
+      parseInt(id),
+      user.id,
+      file.name,
+      file.size,
+      file.type,
+      isPublic
     );
 
     return NextResponse.json({

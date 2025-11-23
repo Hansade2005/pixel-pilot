@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     // Skip authentication for internal tool calls - service role provides full access
     // Get current user session
     // const { data: { user }, error: sessionError } = await supabase.auth.getUser();
-    
+
     // if (sessionError || !user) {
     //   return NextResponse.json(
     //     { error: 'Unauthorized - Please log in' },
@@ -50,9 +50,9 @@ export async function POST(request: Request) {
 
     if (existingDatabase) {
       return NextResponse.json(
-        { 
+        {
           error: 'Database already exists for this project',
-          database: existingDatabase 
+          database: existingDatabase
         },
         { status: 400 }
       );
@@ -80,43 +80,43 @@ export async function POST(request: Request) {
     // Auto-create users table for authentication
     const usersTableSchema = {
       columns: [
-        { 
-          name: 'id', 
-          type: 'uuid', 
-          primary_key: true, 
+        {
+          name: 'id',
+          type: 'uuid',
+          primary_key: true,
           required: true,
           default: 'gen_random_uuid()'
         },
-        { 
-          name: 'email', 
-          type: 'text', 
-          unique: true, 
-          required: true 
+        {
+          name: 'email',
+          type: 'text',
+          unique: true,
+          required: true
         },
-        { 
-          name: 'password_hash', 
-          type: 'text', 
-          required: true 
+        {
+          name: 'password_hash',
+          type: 'text',
+          required: true
         },
-        { 
-          name: 'full_name', 
-          type: 'text', 
-          required: false 
+        {
+          name: 'full_name',
+          type: 'text',
+          required: false
         },
-        { 
-          name: 'avatar_url', 
-          type: 'text', 
-          required: false 
+        {
+          name: 'avatar_url',
+          type: 'text',
+          required: false
         },
-        { 
-          name: 'created_at', 
-          type: 'timestamp', 
+        {
+          name: 'created_at',
+          type: 'timestamp',
           required: true,
           default: 'NOW()'
         },
-        { 
-          name: 'updated_at', 
-          type: 'timestamp', 
+        {
+          name: 'updated_at',
+          type: 'timestamp',
           required: true,
           default: 'NOW()'
         }

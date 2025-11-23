@@ -48,6 +48,9 @@ export default function SettingsPage() {
     const [creating, setCreating] = useState(false)
     const [showCreateDialog, setShowCreateDialog] = useState(false)
     const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+    const [showDeleteDbDialog, setShowDeleteDbDialog] = useState(false)
+    const [deleteConfirmName, setDeleteConfirmName] = useState("")
+    const [deletingDatabase, setDeletingDatabase] = useState(false)
     const [newKeyName, setNewKeyName] = useState("")
     const [newKeyValue, setNewKeyValue] = useState("")
     const [deletingKey, setDeletingKey] = useState<ApiKey | null>(null)
@@ -135,6 +138,33 @@ export default function SettingsPage() {
             setDeletingKey(null)
         } catch (error) {
             toast.error('Failed to delete API key')
+        }
+    }
+
+    async function deleteDatabase() {
+        if (deleteConfirmName !== database.name) {
+            toast.error('Database name does not match')
+            return
+        }
+
+        try {
+            setDeletingDatabase(true)
+            const response = await fetch(`/api/database/${database.id}`, {
+                method: 'DELETE'
+            })
+
+            if (!response.ok) {
+                throw new Error('Failed to delete database')
+            }
+
+            toast.success('Database deleted successfully')
+
+            // Clear localStorage and redirect
+            localStorage.removeItem('user_database_id')
+            window.location.href = '/database'
+        } catch (error) {
+            toast.error('Failed to delete database')
+            setDeletingDatabase(false)
         }
     }
 
@@ -356,7 +386,7 @@ export default function SettingsPage() {
                             </div>
                             <Button
                                 variant="destructive"
-                                disabled
+                                onClick={() => setShowDeleteDbDialog(true)}
                                 className="bg-red-600 hover:bg-red-700"
                             >
                                 Delete Database
@@ -479,6 +509,64 @@ export default function SettingsPage() {
                             className="bg-red-600 hover:bg-red-700"
                         >
                             Delete Key
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Delete Database Confirmation Dialog */}
+            <AlertDialog open={showDeleteDbDialog} onOpenChange={setShowDeleteDbDialog}>
+                <AlertDialogContent className="bg-gray-900 border-white/10">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-white flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-red-400" />
+                            Delete Database?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-gray-400 space-y-3">
+                            <p>
+                                This will permanently delete the database <span className="font-semibold text-white">{database.name}</span> and all of its data including:
+                            </p>
+                            <ul className="list-disc list-inside space-y-1 text-sm">
+                                <li>All tables and records</li>
+                                <li>All API keys</li>
+                                <li>All storage files</li>
+                                <li>All configuration</li>
+                            </ul>
+                            <p className="text-red-400 font-medium">
+                                This action cannot be undone!
+                            </p>
+                            <div className="pt-2">
+                                <Label className="text-white text-sm">Type <span className="font-mono bg-gray-800 px-1 rounded">{database.name}</span> to confirm:</Label>
+                                <Input
+                                    value={deleteConfirmName}
+                                    onChange={(e) => setDeleteConfirmName(e.target.value)}
+                                    placeholder={database.name}
+                                    className="mt-2 bg-gray-800/50 border-white/10 text-white placeholder:text-gray-500"
+                                    disabled={deletingDatabase}
+                                />
+                            </div>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel
+                            className="border-white/10 text-white hover:bg-white/5"
+                            disabled={deletingDatabase}
+                        >
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={deleteDatabase}
+                            disabled={deletingDatabase || deleteConfirmName !== database.name}
+                            className="bg-red-600 hover:bg-red-700"
+                        >
+                            {deletingDatabase ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Deleting...
+                                </>
+                            ) : (
+                                'Delete Database'
+                            )}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

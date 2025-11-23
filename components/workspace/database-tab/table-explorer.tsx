@@ -12,10 +12,13 @@ import {
   Plus,
   Menu,
   X,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CreateTableDialog } from "@/components/database/create-table-dialog";
+import { AISchemaGenerator } from "@/components/database/ai-schema-generator";
 import type { TableExplorerProps } from "./types";
+import { toast } from "sonner";
 
 export function TableExplorer({
   tables,
@@ -31,6 +34,35 @@ export function TableExplorer({
   showExplorer?: boolean;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Handle AI-generated table creation
+  const handleAICreateTable = async (schema: any) => {
+    try {
+      const response = await fetch(`/api/database/${databaseId}/tables/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: schema.tableName,
+          schema_json: {
+            columns: schema.columns,
+            indexes: schema.indexes || [],
+          },
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create table");
+      }
+
+      toast.success(`Table '${schema.tableName}' created successfully`);
+    } catch (error: any) {
+      console.error("Error creating table:", error);
+      toast.error(error.message || "Failed to create table");
+      throw error; // Re-throw so AISchemaGenerator knows it failed
+    }
+  };
 
   const filteredTables = tables.filter((table) =>
     table.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -81,16 +113,29 @@ export function TableExplorer({
           />
         </div>
 
-        {/* Create Table Button */}
-        <CreateTableDialog
-          databaseId={databaseId}
-          onSuccess={onRefresh}
-        >
-          <Button className="w-full" size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Create Table
-          </Button>
-        </CreateTableDialog>
+        {/* Create Table Buttons */}
+        <div className="space-y-2">
+          <CreateTableDialog
+            databaseId={databaseId}
+            onSuccess={onRefresh}
+          >
+            <Button className="w-full" size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Table
+            </Button>
+          </CreateTableDialog>
+
+          <AISchemaGenerator
+            databaseId={databaseId}
+            onCreateTable={handleAICreateTable}
+            onSuccess={onRefresh}
+          >
+            <Button className="w-full" size="sm" variant="outline">
+              <Sparkles className="h-4 w-4 mr-2" />
+              AI Schema Generator
+            </Button>
+          </AISchemaGenerator>
+        </div>
       </div>
 
       {/* Table List */}
