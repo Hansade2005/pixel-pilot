@@ -269,7 +269,10 @@ function ensureSystemPrompt(messages: OpenAIMessage[], model: string, tools?: an
     const systemMessageIndex = newMessages.findIndex(m => m.role === 'system');
 
     let toolInstruction = '';
-    if (tools && tools.length > 0) {
+    // Only inject simulated tool instructions for models that DON'T support native function calling
+    const isNativeToolModel = model === 'pipilot-1-code' || model === 'pipilot-1-vision' || model === 'codestral-latest';
+
+    if (tools && tools.length > 0 && !isNativeToolModel) {
         toolInstruction = `\n\n[SYSTEM]
 You have access to the following tools:
 ${JSON.stringify(tools, null, 2)}
