@@ -95,6 +95,41 @@
   }
 }
 
+/* Dark theme via class (for next-themes) */
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --card: #171717;
+  --card-foreground: #ededed;
+  --popover: #171717;
+  --popover-foreground: #ededed;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #262626;
+  --secondary-foreground: #ededed;
+  --muted: #262626;
+  --muted-foreground: #a3a3a3;
+  --accent: #262626;
+  --accent-foreground: #ededed;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #404040;
+  --input: #404040;
+  --ring: #3b82f6;
+
+  /* Font definitions for dark theme */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Monaco, 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
+
+  /* VS Code-style sidebar colors for dark theme */
+  --sidebar: #171717;
+  --sidebar-foreground: #a3a3a3;
+  --sidebar-border: #404040;
+  --sidebar-accent: #262626;
+  --sidebar-accent-foreground: #a3a3a3;
+  --sidebar-primary: #171717;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

@@ -53,7 +53,12 @@ export default function DatabaseLayout({ children }: DatabaseLayoutProps) {
     const [loading, setLoading] = useState(true)
     const [isCollapsed, setIsCollapsed] = useState(false)
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+    const [mounted, setMounted] = useState(false)
     const { theme, setTheme } = useTheme()
+
+    useEffect(() => {
+        setMounted(true)
+    }, [])
 
     useEffect(() => {
         loadUserDatabases()
@@ -265,7 +270,11 @@ export default function DatabaseLayout({ children }: DatabaseLayoutProps) {
                                             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                                             className="w-full text-muted-foreground hover:text-foreground hover:bg-accent"
                                         >
-                                            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                                            {mounted ? (
+                                                theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />
+                                            ) : (
+                                                <Sun className="h-4 w-4" />
+                                            )}
                                         </Button>
                                     </TooltipTrigger>
                                     <TooltipContent side="right" className="bg-popover border-border text-popover-foreground">
@@ -279,7 +288,11 @@ export default function DatabaseLayout({ children }: DatabaseLayoutProps) {
                                     onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                                     className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-accent"
                                 >
-                                    {theme === "dark" ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
+                                    {mounted ? (
+                                        theme === "dark" ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />
+                                    ) : (
+                                        <Sun className="h-4 w-4 mr-2" />
+                                    )}
                                     <span className="text-xs">Toggle Theme</span>
                                 </Button>
                             )}
