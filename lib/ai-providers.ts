@@ -163,9 +163,16 @@ const openrouterProvider = createOpenAICompatible({
 });
 
 // Create PiPilot Local Provider (OpenAI Compatible)
+// In development, ALWAYS use localhost to ensure we're testing the local API
+// In production, use the APP_URL or fallback to localhost
+const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+const pipilotBaseUrl = process.env.NODE_ENV === 'development'
+  ? 'http://localhost:3000/api/v1'
+  : `${appUrl}/api/v1`;
+
 const pipilotProvider = createOpenAICompatible({
-  name: 'pipilot-local',
-  baseURL: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/v1`,
+  name: 'pipilot',
+  baseURL: pipilotBaseUrl,
   apiKey: 'not-needed', // Internal API doesn't require key
 });
 
