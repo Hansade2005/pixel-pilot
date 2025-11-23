@@ -10,27 +10,6 @@ The OpenAI-compatible API at `https://pipilot.dev/api/v1/chat/completions` now i
   "model": "gpt-4-code",
   "messages": [
     {"role": "user", "content": "Write a Python function to find prime numbers"}
-  ]
-}
-```
-
----
-
-### `gpt-4-creative`
-**Creative Writing Assistant**
-
-Expert in storytelling and content creation:
-- Creative writing and storytelling
-- Content creation for blogs, articles, and social media
-- Brainstorming ideas and concepts
-- Editing and improving writing style
-- Adapting tone and voice for different audiences
-
-**Example:**
-```json
-{
-  "model": "gpt-4-creative",
-  "messages": [
     {"role": "user", "content": "Write a short story about a time traveler"}
   ]
 }

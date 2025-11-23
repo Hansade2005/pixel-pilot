@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 
 // OpenAI-compatible API wrapper for a0.dev LLM API, Pixtral (Vision), and Codestral (Code)
 // Endpoint: POST /api/v1/chat/completions
@@ -10,8 +11,11 @@ interface OpenAIMessageContent {
 }
 
 interface OpenAIMessage {
-    role: 'system' | 'user' | 'assistant';
-    content: string | OpenAIMessageContent[];
+    role: 'system' | 'user' | 'assistant' | 'tool';
+    content: string | OpenAIMessageContent[] | null;
+    tool_calls?: any[];
+    tool_call_id?: string;
+    name?: string;
 }
 
 interface OpenAIRequest {
@@ -24,6 +28,8 @@ interface OpenAIRequest {
     frequency_penalty?: number;
     presence_penalty?: number;
     n?: number;
+    tools?: any[];
+    tool_choice?: any;
 }
 
 interface A0DevRequest {
@@ -36,6 +42,14 @@ interface A0DevResponse {
     metadata?: any;
 }
 
+// Zod schema for simulated tool calls
+const ToolCallSchema = z.object({
+    tool_uses: z.array(z.object({
+        name: z.string(),
+        arguments: z.record(z.any())
+    }))
+});
+
 // Default system prompts for the 4 core models
 const DEFAULT_SYSTEM_PROMPTS: Record<string, string> = {
     'pipilot-1-chat': `You are PiPilot Chat, an extremely powerful, intelligent, and versatile AI assistant. 
@@ -43,14 +57,25 @@ You excel at every general task, from writing and analysis to problem-solving an
 Your responses are always accurate, thoughtful, comprehensive, and beautifully structured.
 You are designed to be the ultimate everyday companion, capable of handling any request with precision and grace.`,
 
-    'pipilot-1-code': `You are PiPilot Code, an elite software engineer and world-class coding assistant.
-You possess deep knowledge of all programming languages, frameworks, and best practices.
-Your Goal: Generate 95-100% error-free, bug-free, and production-ready code.
-- Your code is clean, efficient, and follows modern design patterns.
-- You create beautiful, responsive, and accessible UI designs.
-- You explain complex logic clearly and provide constructive feedback.
-- You always prioritize correctness, security, and performance.
-You are the ultimate coding partner.`,
+    'pipilot-1-code': `You are PiPilot Code, an elite, autonomous AI software engineer.
+You are capable of solving complex coding tasks with minimal human intervention.
+Your goal is to achieve state-of-the-art performance (SWE-bench level).
+
+CORE PRINCIPLES:
+1. **Explore First:** Never write code without understanding the context. Use tools to read files and explore the codebase.
+2. **Plan & Reason:** Before executing, outline your plan. Think step-by-step.
+3. **Tool Mastery:** You have access to tools. USE THEM. Do not hallucinate file contents.
+4. **Self-Correction:** If a step fails, analyze the error, adjust your plan, and retry.
+5. **Precision:** Your code must be production-ready, bug-free, and efficient.
+
+FORMAT:
+<thinking>
+[Your detailed step-by-step reasoning goes here. Analyze the request, explore the codebase (mentally or via tools), and formulate a plan.]
+</thinking>
+
+[Your final response, code, or tool call goes here.]
+
+You are not just a chatbot; you are an agent. ACT like one.`,
 
     'pipilot-1-vision': `You are PiPilot Vision, a state-of-the-art multimodal AI assistant.
 You rival the capabilities of the world's best vision models.
@@ -85,23 +110,35 @@ function hasVisionContent(messages: OpenAIMessage[]): boolean {
 
 // --- Mistral / Codestral / Pixtral Integration ---
 
-async function callMistralVision(messages: any[], temperature?: number): Promise<any> {
+async function callMistralVision(messages: any[], temperature?: number, tools?: any[], tool_choice?: any): Promise<any> {
     const mistralApiKey = process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr';
+    const body: any = { model: 'pixtral-12b-2409', messages, temperature: temperature || 0.7 };
+    if (tools) {
+        body.tools = tools;
+        body.tool_choice = tool_choice || 'auto';
+    }
+
     const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${mistralApiKey}` },
-        body: JSON.stringify({ model: 'pixtral-12b-2409', messages, temperature: temperature || 0.7 })
+        body: JSON.stringify(body)
     });
     if (!response.ok) throw new Error(`Mistral API error: ${response.status} ${await response.text()}`);
     return await response.json();
 }
 
-async function* streamMistralVision(messages: any[], temperature?: number): AsyncGenerator<string> {
+async function* streamMistralVision(messages: any[], temperature?: number, tools?: any[], tool_choice?: any): AsyncGenerator<string> {
     const mistralApiKey = process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr';
+    const body: any = { model: 'pixtral-12b-2409', messages, temperature: temperature || 0.7, stream: true };
+    if (tools) {
+        body.tools = tools;
+        body.tool_choice = tool_choice || 'auto';
+    }
+
     const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${mistralApiKey}` },
-        body: JSON.stringify({ model: 'pixtral-12b-2409', messages, temperature: temperature || 0.7, stream: true })
+        body: JSON.stringify(body)
     });
     if (!response.ok) throw new Error(`Mistral streaming API error: ${response.status} ${await response.text()}`);
     if (!response.body) throw new Error('Response body is null');
@@ -131,23 +168,35 @@ async function* streamMistralVision(messages: any[], temperature?: number): Asyn
     }
 }
 
-async function callCodestral(messages: any[], temperature?: number): Promise<any> {
+async function callCodestral(messages: any[], temperature?: number, tools?: any[], tool_choice?: any): Promise<any> {
     const codestralApiKey = process.env.CODESTRAL_API_KEY || 'DXfXAjwNIZcAv1ESKtoDwWZZF98lJxho';
+    const body: any = { model: 'codestral-latest', messages, temperature: temperature || 0.3 };
+    if (tools) {
+        body.tools = tools;
+        body.tool_choice = tool_choice || 'auto';
+    }
+
     const response = await fetch('https://codestral.mistral.ai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${codestralApiKey}` },
-        body: JSON.stringify({ model: 'codestral-latest', messages, temperature: temperature || 0.3 })
+        body: JSON.stringify(body)
     });
     if (!response.ok) throw new Error(`Codestral API error: ${response.status} ${await response.text()}`);
     return await response.json();
 }
 
-async function* streamCodestral(messages: any[], temperature?: number): AsyncGenerator<string> {
+async function* streamCodestral(messages: any[], temperature?: number, tools?: any[], tool_choice?: any): AsyncGenerator<string> {
     const codestralApiKey = process.env.CODESTRAL_API_KEY || 'DXfXAjwNIZcAv1ESKtoDwWZZF98lJxho';
+    const body: any = { model: 'codestral-latest', messages, temperature: temperature || 0.3, stream: true };
+    if (tools) {
+        body.tools = tools;
+        body.tool_choice = tool_choice || 'auto';
+    }
+
     const response = await fetch('https://codestral.mistral.ai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${codestralApiKey}` },
-        body: JSON.stringify({ model: 'codestral-latest', messages, temperature: temperature || 0.3, stream: true })
+        body: JSON.stringify(body)
     });
     if (!response.ok) throw new Error(`Codestral streaming API error: ${response.status} ${await response.text()}`);
     if (!response.body) throw new Error('Response body is null');
@@ -214,27 +263,36 @@ function transformMistralResponse(mistralResponse: any, model: string): any {
 
 // --- Helper to merge system prompts ---
 
-function ensureSystemPrompt(messages: OpenAIMessage[], model: string): OpenAIMessage[] {
+function ensureSystemPrompt(messages: OpenAIMessage[], model: string, tools?: any[]): OpenAIMessage[] {
     const defaultPrompt = DEFAULT_SYSTEM_PROMPTS[model] || DEFAULT_SYSTEM_PROMPTS['pipilot-1-chat'];
     const newMessages = [...messages];
     const systemMessageIndex = newMessages.findIndex(m => m.role === 'system');
 
+    let toolInstruction = '';
+    if (tools && tools.length > 0) {
+        toolInstruction = `\n\n[SYSTEM]
+You have access to the following tools:
+${JSON.stringify(tools, null, 2)}
+
+To call a tool, you MUST output ONLY a JSON object in this format:
+{"tool_uses": [{"name": "tool_name", "arguments": { ... }}]}
+Do not output any other text if you are calling a tool.`;
+    }
+
     if (systemMessageIndex !== -1) {
         // User provided a system prompt. Merge it with the default.
-        // We prepend the default prompt to ensure the model's core identity is established first.
         const userSystemContent = newMessages[systemMessageIndex].content;
-        // Handle case where content might be an array (multimodal) - though system prompts are usually text
         const userText = Array.isArray(userSystemContent)
             ? userSystemContent.map(c => c.type === 'text' ? c.text : '').join('')
             : userSystemContent;
 
         newMessages[systemMessageIndex] = {
             role: 'system',
-            content: `${defaultPrompt}\n\n--- USER SYSTEM INSTRUCTIONS ---\n${userText}`
+            content: `${defaultPrompt}\n\n--- USER SYSTEM INSTRUCTIONS ---\n${userText}${toolInstruction}`
         };
     } else {
         // No user system prompt, just add the default one
-        newMessages.unshift({ role: 'system', content: defaultPrompt });
+        newMessages.unshift({ role: 'system', content: `${defaultPrompt}${toolInstruction}` });
     }
     return newMessages;
 }
@@ -242,7 +300,7 @@ function ensureSystemPrompt(messages: OpenAIMessage[], model: string): OpenAIMes
 // --- a0.dev Integration ---
 
 function transformRequest(req: OpenAIRequest, model: string): A0DevRequest {
-    const messages = ensureSystemPrompt(req.messages, model);
+    const messages = ensureSystemPrompt(req.messages, model, req.tools);
     return {
         messages: messages,
         temperature: req.temperature
@@ -250,6 +308,33 @@ function transformRequest(req: OpenAIRequest, model: string): A0DevRequest {
 }
 
 function transformResponse(a0Response: A0DevResponse, model: string): any {
+    const content = a0Response.completion;
+    let toolCalls = undefined;
+    let finalContent: string | null = content;
+
+    // Attempt to parse simulated tool calls
+    try {
+        // Look for JSON-like structure if mixed with text, or just parse if it looks like JSON
+        if (content.trim().startsWith('{') && content.trim().includes('tool_uses')) {
+            const parsed = JSON.parse(content);
+            const validation = ToolCallSchema.safeParse(parsed);
+
+            if (validation.success) {
+                toolCalls = validation.data.tool_uses.map((tool: any) => ({
+                    id: 'call_' + Math.random().toString(36).substring(2, 10),
+                    type: 'function',
+                    function: {
+                        name: tool.name,
+                        arguments: JSON.stringify(tool.arguments)
+                    }
+                }));
+                finalContent = null; // Clear content if it's a tool call
+            }
+        }
+    } catch (e) {
+        // Not a valid JSON tool call, treat as normal text
+    }
+
     return {
         id: generateChatCompletionId(),
         object: 'chat.completion',
@@ -260,9 +345,10 @@ function transformResponse(a0Response: A0DevResponse, model: string): any {
                 index: 0,
                 message: {
                     role: 'assistant',
-                    content: a0Response.completion
+                    content: finalContent,
+                    tool_calls: toolCalls
                 },
-                finish_reason: 'stop'
+                finish_reason: toolCalls ? 'tool_calls' : 'stop'
             }
         ],
         usage: {
@@ -292,12 +378,11 @@ export async function POST(request: NextRequest) {
         if (model === 'pipilot-1-vision' || hasVisionContent(body.messages)) {
             console.log('🖼️  Vision content/model detected, routing to Pixtral 12B');
 
-            // Use helper to ensure system prompt is present/merged
-            const messagesWithPrompt = ensureSystemPrompt(body.messages, 'pipilot-1-vision');
+            const messagesWithPrompt = ensureSystemPrompt(body.messages, 'pipilot-1-vision', body.tools);
             const mistralMessages = transformToMistralFormat(messagesWithPrompt);
 
             if (body.stream) {
-                const stream = streamMistralVision(mistralMessages, body.temperature);
+                const stream = streamMistralVision(mistralMessages, body.temperature, body.tools, body.tool_choice);
                 const encoder = new TextEncoder();
                 const readable = new ReadableStream({
                     async start(controller) {
@@ -316,7 +401,7 @@ export async function POST(request: NextRequest) {
                 });
                 return new NextResponse(readable, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } });
             } else {
-                const response = await callMistralVision(mistralMessages, body.temperature);
+                const response = await callMistralVision(mistralMessages, body.temperature, body.tools, body.tool_choice);
                 return NextResponse.json(transformMistralResponse(response, 'pipilot-1-vision'));
             }
         }
@@ -325,11 +410,10 @@ export async function POST(request: NextRequest) {
         if (model === 'pipilot-1-code') {
             console.log('💻 Code model detected, routing to Codestral');
 
-            // Use helper to ensure system prompt is present/merged
-            const messages = ensureSystemPrompt(body.messages, 'pipilot-1-code');
+            const messages = ensureSystemPrompt(body.messages, 'pipilot-1-code', body.tools);
 
             if (body.stream) {
-                const stream = streamCodestral(messages, body.temperature);
+                const stream = streamCodestral(messages, body.temperature, body.tools, body.tool_choice);
                 const encoder = new TextEncoder();
                 const readable = new ReadableStream({
                     async start(controller) {
@@ -348,7 +432,7 @@ export async function POST(request: NextRequest) {
                 });
                 return new NextResponse(readable, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } });
             } else {
-                const response = await callCodestral(messages, body.temperature);
+                const response = await callCodestral(messages, body.temperature, body.tools, body.tool_choice);
                 return NextResponse.json(transformMistralResponse(response, 'pipilot-1-code'));
             }
         }
@@ -375,15 +459,24 @@ export async function POST(request: NextRequest) {
             const encoder = new TextEncoder();
             const readable = new ReadableStream({
                 async start(controller) {
-                    const content = transformed.choices[0].message.content;
-                    const words = content.split(' '); // Simple word-by-word simulation
-                    for (const word of words) {
+                    // If it's a tool call, we don't stream word by word, just send it all at once
+                    if (transformed.choices[0].message.tool_calls) {
                         const chunk = JSON.stringify({
                             id: transformed.id, object: 'chat.completion.chunk', created: transformed.created, model: model,
-                            choices: [{ index: 0, delta: { content: word + ' ' }, finish_reason: null }]
+                            choices: [{ index: 0, delta: { tool_calls: transformed.choices[0].message.tool_calls }, finish_reason: null }]
                         });
                         controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
-                        await new Promise(r => setTimeout(r, 10)); // Small delay
+                    } else {
+                        const content = transformed.choices[0].message.content || '';
+                        const words = content.split(' ');
+                        for (const word of words) {
+                            const chunk = JSON.stringify({
+                                id: transformed.id, object: 'chat.completion.chunk', created: transformed.created, model: model,
+                                choices: [{ index: 0, delta: { content: word + ' ' }, finish_reason: null }]
+                            });
+                            controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
+                            await new Promise(r => setTimeout(r, 10));
+                        }
                     }
                     const doneChunk = JSON.stringify({
                         id: transformed.id, object: 'chat.completion.chunk', created: transformed.created, model: model,
