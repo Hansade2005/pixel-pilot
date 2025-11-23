@@ -464,9 +464,13 @@ export async function POST(request: NextRequest) {
                 async start(controller) {
                     // If it's a tool call, we don't stream word by word, just send it all at once
                     if (transformed.choices[0].message.tool_calls) {
+                        const toolCallsWithIndex = transformed.choices[0].message.tool_calls.map((tc: any, i: number) => ({
+                            ...tc,
+                            index: i
+                        }));
                         const chunk = JSON.stringify({
                             id: transformed.id, object: 'chat.completion.chunk', created: transformed.created, model: model,
-                            choices: [{ index: 0, delta: { tool_calls: transformed.choices[0].message.tool_calls }, finish_reason: null }]
+                            choices: [{ index: 0, delta: { tool_calls: toolCallsWithIndex }, finish_reason: null }]
                         });
                         controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
                     } else {
