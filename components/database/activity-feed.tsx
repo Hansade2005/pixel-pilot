@@ -82,49 +82,49 @@ export default function ActivityFeed({ databaseId }: ActivityFeedProps) {
             case 'table_created':
                 return (
                     <>
-                        Created table <span className="font-semibold text-white">{entity_name}</span>
+                        Created table <span className="font-semibold text-foreground">{entity_name}</span>
                         {metadata.columns_count && (
-                            <span className="text-gray-500"> ({metadata.columns_count} columns)</span>
+                            <span className="text-muted-foreground"> ({metadata.columns_count} columns)</span>
                         )}
                     </>
                 );
             case 'table_updated':
                 return (
                     <>
-                        Updated table <span className="font-semibold text-white">{entity_name}</span>
+                        Updated table <span className="font-semibold text-foreground">{entity_name}</span>
                     </>
                 );
             case 'table_deleted':
                 return (
                     <>
-                        Deleted table <span className="font-semibold text-white">{entity_name}</span>
+                        Deleted table <span className="font-semibold text-foreground">{entity_name}</span>
                     </>
                 );
             case 'file_uploaded':
                 return (
                     <>
-                        Uploaded file <span className="font-semibold text-white">{entity_name}</span>
+                        Uploaded file <span className="font-semibold text-foreground">{entity_name}</span>
                         {metadata.file_size && (
-                            <span className="text-gray-500"> ({formatBytes(metadata.file_size)})</span>
+                            <span className="text-muted-foreground"> ({formatBytes(metadata.file_size)})</span>
                         )}
                     </>
                 );
             case 'file_deleted':
                 return (
                     <>
-                        Deleted file <span className="font-semibold text-white">{entity_name}</span>
+                        Deleted file <span className="font-semibold text-foreground">{entity_name}</span>
                     </>
                 );
             case 'api_key_created':
                 return (
                     <>
-                        Created API key <span className="font-semibold text-white">{entity_name}</span>
+                        Created API key <span className="font-semibold text-foreground">{entity_name}</span>
                     </>
                 );
             case 'api_key_deleted':
                 return (
                     <>
-                        Deleted API key <span className="font-semibold text-white">{entity_name}</span>
+                        Deleted API key <span className="font-semibold text-foreground">{entity_name}</span>
                     </>
                 );
             default:
@@ -142,9 +142,9 @@ export default function ActivityFeed({ databaseId }: ActivityFeedProps) {
 
     if (loading) {
         return (
-            <Card className="bg-gray-900/50 backdrop-blur-xl border-white/5">
+            <Card className="bg-card backdrop-blur-xl border-border shadow-sm">
                 <CardHeader>
-                    <CardTitle className="text-white">Recent Activity</CardTitle>
+                    <CardTitle className="text-foreground">Recent Activity</CardTitle>
                     <CardDescription>Latest changes to your database</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -158,13 +158,13 @@ export default function ActivityFeed({ databaseId }: ActivityFeedProps) {
 
     if (activities.length === 0) {
         return (
-            <Card className="bg-gray-900/50 backdrop-blur-xl border-white/5">
+            <Card className="bg-card backdrop-blur-xl border-border shadow-sm">
                 <CardHeader>
-                    <CardTitle className="text-white">Recent Activity</CardTitle>
+                    <CardTitle className="text-foreground">Recent Activity</CardTitle>
                     <CardDescription>Latest changes to your database</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-center py-8 text-gray-500">
+                    <div className="text-center py-8 text-muted-foreground">
                         <Clock className="h-12 w-12 mx-auto mb-2 opacity-20" />
                         <p>No recent activity</p>
                     </div>
@@ -174,9 +174,9 @@ export default function ActivityFeed({ databaseId }: ActivityFeedProps) {
     }
 
     return (
-        <Card className="bg-gray-900/50 backdrop-blur-xl border-white/5">
+        <Card className="bg-card backdrop-blur-xl border-border shadow-sm">
             <CardHeader>
-                <CardTitle className="text-white">Recent Activity</CardTitle>
+                <CardTitle className="text-foreground">Recent Activity</CardTitle>
                 <CardDescription>Latest changes to your database</CardDescription>
             </CardHeader>
             <CardContent>
@@ -184,12 +184,12 @@ export default function ActivityFeed({ databaseId }: ActivityFeedProps) {
                     {activities.map((activity) => (
                         <div
                             key={activity.id}
-                            className="flex items-start gap-3 p-3 rounded-lg bg-gray-800/50 border border-gray-700/50 hover:border-gray-600/50 transition-colors"
+                            className="flex items-start gap-3 p-3 rounded-lg bg-accent/50 border border-border hover:border-primary/30 transition-colors"
                         >
                             <div className="mt-0.5">{getActivityIcon(activity.activity_type)}</div>
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm text-gray-300">{getActivityDescription(activity)}</p>
-                                <p className="text-xs text-gray-500 mt-1">
+                                <p className="text-sm text-foreground">{getActivityDescription(activity)}</p>
+                                <p className="text-xs text-muted-foreground mt-1">
                                     {formatDistanceToNow(new Date(activity.created_at + 'Z'), { addSuffix: true })}
                                 </p>
                             </div>

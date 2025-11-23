@@ -418,20 +418,20 @@ export default function DatabaseDashboard() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-4xl font-bold text-white mb-2">{database.name}</h1>
-                        <p className="text-gray-400">Created {new Date(database.created_at).toLocaleDateString()}</p>
+                        <h1 className="text-4xl font-bold text-foreground mb-2">{database.name}</h1>
+                        <p className="text-muted-foreground">Created {new Date(database.created_at).toLocaleDateString()}</p>
                     </div>
-                    <TabsList className="bg-gray-900/50 border border-white/10">
-                        <TabsTrigger value="overview" className="data-[state=active]:bg-purple-500/10 data-[state=active]:text-purple-300">
+                    <TabsList className="bg-muted border border-border">
+                        <TabsTrigger value="overview" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:font-semibold dark:data-[state=active]:bg-primary/10">
                             Overview
                         </TabsTrigger>
-                        <TabsTrigger value="tables" className="data-[state=active]:bg-purple-500/10 data-[state=active]:text-purple-300">
+                        <TabsTrigger value="tables" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:font-semibold dark:data-[state=active]:bg-primary/10">
                             Tables
                         </TabsTrigger>
-                        <TabsTrigger value="storage" className="data-[state=active]:bg-purple-500/10 data-[state=active]:text-purple-300">
+                        <TabsTrigger value="storage" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:font-semibold dark:data-[state=active]:bg-primary/10">
                             Storage
                         </TabsTrigger>
-                        <TabsTrigger value="api-keys" className="data-[state=active]:bg-purple-500/10 data-[state=active]:text-purple-300">
+                        <TabsTrigger value="api-keys" className="data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:font-semibold dark:data-[state=active]:bg-primary/10">
                             API Keys
                         </TabsTrigger>
                     </TabsList>
@@ -440,7 +440,7 @@ export default function DatabaseDashboard() {
                 {/* Overview Tab */}
                 <TabsContent value="overview" className="space-y-6">
                     {/* Stats Grid */}
-                    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
                         {statCards.map((stat, index) => {
                             const Icon = stat.icon
                             const isPositive = stat.change > 0
@@ -448,21 +448,21 @@ export default function DatabaseDashboard() {
                             return (
                                 <Card
                                     key={stat.title}
-                                    className="relative overflow-hidden bg-gray-900/50 backdrop-blur-xl border-white/5 hover:border-white/10 transition-all duration-300 hover:scale-105 group"
+                                    className="relative overflow-hidden bg-card backdrop-blur-xl border-border hover:border-primary/30 transition-all duration-300 hover:scale-105 group shadow-sm"
                                     style={{ animationDelay: `${index * 100}ms` }}
                                 >
                                     <div className={`absolute inset-0 bg-gradient-to-br ${stat.bgColor} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
 
                                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
-                                        <CardTitle className="text-sm font-medium text-gray-400">
+                                        <CardTitle className="text-sm font-medium text-muted-foreground">
                                             {stat.title}
                                         </CardTitle>
                                         <div className={`p-2 rounded-lg bg-gradient-to-br ${stat.bgColor}`}>
-                                            <Icon className="h-4 w-4 text-white" />
+                                            <Icon className="h-4 w-4 text-primary" />
                                         </div>
                                     </CardHeader>
                                     <CardContent className="relative z-10">
-                                        <div className="text-3xl font-bold text-white mb-1">
+                                        <div className="text-3xl font-bold text-foreground mb-1">
                                             {stat.value}
                                         </div>
                                         <div className="flex items-center gap-1 text-sm">
@@ -479,11 +479,11 @@ export default function DatabaseDashboard() {
                                                             <span className="text-red-400 font-medium">{Math.abs(stat.change)}%</span>
                                                         </>
                                                     )}
-                                                    <span className="text-gray-500">vs last month</span>
+                                                    <span className="text-muted-foreground">vs last month</span>
                                                 </>
                                             )}
                                             {stat.change === 0 && (
-                                                <span className="text-gray-500 text-xs">Current value</span>
+                                                <span className="text-muted-foreground text-xs">Current value</span>
                                             )}
                                         </div>
                                     </CardContent>

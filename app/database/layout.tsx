@@ -12,8 +12,12 @@ import {
     Plus,
     BarChart3,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Menu,
+    Sun,
+    Moon,
 } from "lucide-react"
+import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 import {
     Select,
@@ -48,6 +52,8 @@ export default function DatabaseLayout({ children }: DatabaseLayoutProps) {
     const [selectedDbId, setSelectedDbId] = useState<string>("")
     const [loading, setLoading] = useState(true)
     const [isCollapsed, setIsCollapsed] = useState(false)
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+    const { theme, setTheme } = useTheme()
 
     useEffect(() => {
         loadUserDatabases()
@@ -107,37 +113,71 @@ export default function DatabaseLayout({ children }: DatabaseLayoutProps) {
     ]
 
     return (
-        <div className="min-h-screen bg-gray-950">
-            <div className="fixed inset-0 bg-gradient-to-br from-purple-900/20 via-gray-900 to-blue-900/20" />
-            <div className="fixed inset-0 bg-[url('/noise.svg')] opacity-[0.015]" />
+        <div className="min-h-screen bg-background">
+            <div className="fixed inset-0 bg-gradient-to-br from-purple-500/5 via-background to-blue-500/5 dark:from-purple-900/20 dark:via-gray-900 dark:to-blue-900/20" />
+            <div className="fixed inset-0 bg-[url('/noise.svg')] opacity-[0.015] dark:opacity-[0.015]" />
 
             <TooltipProvider delayDuration={0}>
-                <div className="relative z-10 flex h-screen">
+                {/* Mobile Header with Hamburger */}
+                <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-xl border-b border-border px-4 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <Database className="h-5 w-5 text-primary" />
+                        <span className="font-bold text-foreground">Database</span>
+                    </div>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                        className="text-foreground"
+                    >
+                        <Menu className="h-5 w-5" />
+                    </Button>
+                </div>
+
+                {/* Mobile Backdrop Overlay */}
+                {isMobileMenuOpen && (
+                    <div
+                        className="fixed inset-0 bg-black/50 z-40 md:hidden"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                    />
+                )}
+
+                <div className="relative flex h-screen md:pt-0 pt-14">
                     <aside
                         className={cn(
-                            "h-full bg-gray-900/50 backdrop-blur-xl border-r border-white/5 flex flex-col transition-all duration-300 ease-in-out",
-                            isCollapsed ? "w-16" : "w-64"
+                            "h-full bg-card backdrop-blur-xl border-r border-border flex flex-col transition-all duration-300 ease-in-out shadow-sm",
+                            // Mobile: fixed positioning with slide animation
+                            "fixed md:relative z-50 md:z-auto",
+                            isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+                            // Width
+                            isCollapsed ? "w-64 md:w-16" : "w-64"
                         )}
+                        onClick={(e) => {
+                            // Close mobile menu when clicking a link
+                            if ((e.target as HTMLElement).tagName === 'A') {
+                                setIsMobileMenuOpen(false)
+                            }
+                        }}
                     >
-                        {/* Header with Database selector */}
+                        {/* Header with Database selector - Hidden on mobile */}
                         <div className={cn(
-                            "p-4 border-b border-white/5 transition-all duration-300",
+                            "p-4 border-b border-border transition-all duration-300 md:block hidden",
                             isCollapsed && "p-2"
                         )}>
                             <div className={cn(
                                 "flex items-center gap-2 mb-4",
                                 isCollapsed && "justify-center mb-2"
                             )}>
-                                <Database className="h-5 w-5 text-purple-400 flex-shrink-0" />
-                                {!isCollapsed && <span className="font-semibold text-white">Database</span>}
+                                <Database className="h-5 w-5 text-primary flex-shrink-0" />
+                                {!isCollapsed && <span className="font-bold text-foreground">Database</span>}
                             </div>
 
                             {databases.length > 0 && !isCollapsed && (
                                 <Select value={selectedDbId} onValueChange={handleDatabaseSwitch}>
-                                    <SelectTrigger className="w-full bg-gray-800/50 border-white/10 text-white hover:bg-gray-800">
+                                    <SelectTrigger className="w-full bg-background border-input text-foreground hover:bg-accent hover:text-accent-foreground">
                                         <SelectValue placeholder="Select database" />
                                     </SelectTrigger>
-                                    <SelectContent className="bg-gray-800 border-white/10">
+                                    <SelectContent className="bg-popover border-border">
                                         {databases.map((db) => (
                                             <SelectItem
                                                 key={db.id}
@@ -173,8 +213,8 @@ export default function DatabaseLayout({ children }: DatabaseLayoutProps) {
                                         className={cn(
                                             "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative",
                                             isActive
-                                                ? "bg-purple-500/10 text-purple-300"
-                                                : "text-gray-400 hover:text-white hover:bg-white/5",
+                                                ? "bg-primary/15 text-primary font-semibold dark:bg-primary/10"
+                                                : "text-muted-foreground hover:text-foreground hover:bg-accent",
                                             isCollapsed && "justify-center px-2"
                                         )}
                                         style={{
@@ -182,12 +222,12 @@ export default function DatabaseLayout({ children }: DatabaseLayoutProps) {
                                         }}
                                     >
                                         {isActive && !isCollapsed && (
-                                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-purple-500 to-pink-500 rounded-r-full" />
+                                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-primary rounded-r-full shadow-sm" />
                                         )}
 
                                         <Icon className={cn(
                                             "h-5 w-5 flex-shrink-0",
-                                            isActive && "text-purple-400"
+                                            isActive && "text-primary"
                                         )} />
                                         {!isCollapsed && <span className="font-medium">{item.label}</span>}
                                     </Link>
@@ -200,7 +240,7 @@ export default function DatabaseLayout({ children }: DatabaseLayoutProps) {
                                             <TooltipTrigger asChild>
                                                 {navLink}
                                             </TooltipTrigger>
-                                            <TooltipContent side="right" className="bg-gray-800 border-white/10 text-white">
+                                            <TooltipContent side="right" className="bg-popover border-border text-popover-foreground">
                                                 {item.label}
                                             </TooltipContent>
                                         </Tooltip>
@@ -211,9 +251,43 @@ export default function DatabaseLayout({ children }: DatabaseLayoutProps) {
                             })}
                         </nav>
 
-                        {/* Toggle Button */}
+                        {/* Theme Switcher */}
                         <div className={cn(
-                            "px-4 py-2 border-t border-white/5",
+                            "px-4 py-2 border-t border-border",
+                            isCollapsed && "px-2"
+                        )}>
+                            {isCollapsed ? (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                                            className="w-full text-muted-foreground hover:text-foreground hover:bg-accent"
+                                        >
+                                            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" className="bg-popover border-border text-popover-foreground">
+                                        Toggle Theme
+                                    </TooltipContent>
+                                </Tooltip>
+                            ) : (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                                    className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-accent"
+                                >
+                                    {theme === "dark" ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
+                                    <span className="text-xs">Toggle Theme</span>
+                                </Button>
+                            )}
+                        </div>
+
+                        {/* Toggle Button - Hidden on mobile */}
+                        <div className={cn(
+                            "px-4 py-2 border-t border-border md:block hidden",
                             isCollapsed && "px-2"
                         )}>
                             <Button
@@ -221,7 +295,7 @@ export default function DatabaseLayout({ children }: DatabaseLayoutProps) {
                                 size="sm"
                                 onClick={() => setIsCollapsed(!isCollapsed)}
                                 className={cn(
-                                    "w-full text-gray-400 hover:text-white hover:bg-white/5",
+                                    "w-full text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent hover:border-border",
                                     isCollapsed && "px-2"
                                 )}
                                 title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -249,20 +323,20 @@ export default function DatabaseLayout({ children }: DatabaseLayoutProps) {
                                             <Button
                                                 disabled
                                                 size="icon"
-                                                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 disabled:cursor-not-allowed text-white shadow-lg shadow-purple-500/20"
+                                                className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground shadow-md"
                                                 title="Maximum 2 databases per user"
                                             >
                                                 <Plus className="h-4 w-4" />
                                             </Button>
                                         </TooltipTrigger>
-                                        <TooltipContent side="right" className="bg-gray-800 border-white/10 text-white">
+                                        <TooltipContent side="right" className="bg-popover border-border text-popover-foreground">
                                             New Database ({databases.length}/2)
                                         </TooltipContent>
                                     </Tooltip>
                                 ) : (
                                     <Button
                                         disabled
-                                        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 disabled:cursor-not-allowed text-white shadow-lg shadow-purple-500/20"
+                                        className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground shadow-md"
                                         title="Maximum 2 databases per user"
                                     >
                                         <Plus className="h-4 w-4 mr-2" />
@@ -279,13 +353,13 @@ export default function DatabaseLayout({ children }: DatabaseLayoutProps) {
                                             <TooltipTrigger asChild>
                                                 <Button
                                                     size="icon"
-                                                    className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg shadow-purple-500/20 transition-all duration-200 hover:scale-105"
+                                                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-md transition-all duration-200 hover:scale-105"
                                                     title="Create new database"
                                                 >
                                                     <Plus className="h-4 w-4" />
                                                 </Button>
                                             </TooltipTrigger>
-                                            <TooltipContent side="right" className="bg-gray-800 border-white/10 text-white">
+                                            <TooltipContent side="right" className="bg-popover border-border text-popover-foreground">
                                                 New Database {databases.length > 0 && `(${databases.length}/2)`}
                                             </TooltipContent>
                                         </Tooltip>
