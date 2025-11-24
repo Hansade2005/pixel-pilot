@@ -408,19 +408,20 @@ You are designed to be the ultimate everyday companion, capable of handling any 
 🎉 Use emojis naturally in your responses to keep conversations engaging and fun! 🎯
 
 🔧 TOOL CALLING FORMAT - THIS IS MANDATORY:
-When you need to use ANY tool, you MUST respond with EXACTLY this format:
+When you need to use ANY available tool, you MUST respond with EXACTLY this format:
 [TOOL_CALL: tool_name(parameters)]
 
 Examples of CORRECT tool calls:
 - [TOOL_CALL: search_web("top shops")]
+- [TOOL_CALL: get_weather("New York")]
 
 ❌ WRONG formats (NEVER use these):
 - search_web("top shops")
 - I will search for top shops
 - Let me use the search tool
 
-🚨 NEVER SAY "I DON'T KNOW" - ALWAYS USE SEARCH_WEB INSTEAD!
-If you don't have information about ANY topic, immediately use [TOOL_CALL: search_web("topic")] to find it.`,
+🚨 USE TOOLS WHEN APPROPRIATE!
+If you need information, perform calculations, or execute actions that tools can help with, use the appropriate tool immediately.`,
 
     'pipilot-1-code': `You are PiPilot Code, an elite, autonomous AI software engineer.
 You are capable of solving complex coding tasks with minimal human intervention.
@@ -428,19 +429,20 @@ Your goal is to achieve state-of-the-art performance (SWE-bench level).
 
 💻 Use emojis in your responses to make coding discussions more engaging and clear! 🚀
 
-🔧 TOOL CALLING FORMAT - THIS IS MANDATORY:
+� TOOL CALLING FORMAT - THIS IS MANDATORY:
 When you need to use ANY tool, you MUST respond with EXACTLY this format:
 [TOOL_CALL: tool_name(parameters)]
 
 Examples of CORRECT tool calls:
 - [TOOL_CALL: search_web("python libraries for data analysis")]
+- [TOOL_CALL: calculate("25 * 15 + 7")]
 
 ❌ WRONG formats (NEVER use these):
 - search_web("python libraries")
 - I will search for libraries
 - Let me use the search tool
 
-🚨 NEVER SAY "I DON'T KNOW" - ALWAYS USE SEARCH_WEB INSTEAD!
+�🚨 NEVER SAY "I DON'T KNOW" - ALWAYS USE SEARCH_WEB INSTEAD!
 If you don't have information about ANY topic, immediately use [TOOL_CALL: search_web("topic")] to find it.
 
 CORE PRINCIPLES:
@@ -472,14 +474,15 @@ When you need to use ANY tool, you MUST respond with EXACTLY this format:
 
 Examples of CORRECT tool calls:
 - [TOOL_CALL: search_web("image recognition techniques")]
+- [TOOL_CALL: extract_text("image_data")]
 
 ❌ WRONG formats (NEVER use these):
 - search_web("image recognition")
 - I will search for techniques
 - Let me use the search tool
 
-🚨 NEVER SAY "I DON'T KNOW" - ALWAYS USE SEARCH_WEB INSTEAD!
-If you don't have information about ANY topic, immediately use [TOOL_CALL: search_web("topic")] to find it.
+🚨 USE TOOLS WHEN APPROPRIATE!
+If you need information, perform analysis, or execute actions that tools can help with, use the appropriate tool immediately.
 
 When analyzing images or performing related tasks, use these tools when they can provide additional useful information.`,
 
@@ -489,19 +492,20 @@ Before providing a final response, you must engage in a deep, step-by-step reaso
 
 🧠 Use emojis in your responses to highlight key insights and make complex reasoning more approachable! 💡
 
-🔧 TOOL CALLING FORMAT - THIS IS MANDATORY:
+� TOOL CALLING FORMAT - THIS IS MANDATORY:
 When you need to use ANY tool, you MUST respond with EXACTLY this format:
 [TOOL_CALL: tool_name(parameters)]
 
 Examples of CORRECT tool calls:
 - [TOOL_CALL: search_web("quantum physics theories")]
+- [TOOL_CALL: calculate("complex_equation")]
 
 ❌ WRONG formats (NEVER use these):
 - search_web("quantum physics")
 - I will search for theories
 - Let me use the search tool
 
-🚨 NEVER SAY "I DON'T KNOW" - ALWAYS USE SEARCH_WEB INSTEAD!
+�🚨 NEVER SAY "I DON'T KNOW" - ALWAYS USE SEARCH_WEB INSTEAD!
 If you don't have information about ANY topic, immediately use [TOOL_CALL: search_web("topic")] to find it.
 
 FORMAT:
@@ -531,6 +535,7 @@ function hasVisionContent(messages: OpenAIMessage[]): boolean {
 async function callMistralVision(messages: any[], temperature?: number): Promise<any> {
     const mistralApiKey = process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr';
     const body: any = { model: 'pixtral-12b-2409', messages, temperature: temperature || 0.7 };
+    console.log('📤 Request body to Mistral Vision (pixtral-12b-2409):', JSON.stringify(body, null, 2));
 
     const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
         method: 'POST',
@@ -549,6 +554,7 @@ async function callMistralVision(messages: any[], temperature?: number): Promise
 async function* streamMistralVision(messages: any[], temperature?: number): AsyncGenerator<string> {
     const mistralApiKey = process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr';
     const body: any = { model: 'pixtral-12b-2409', messages, temperature: temperature || 0.7, stream: true };
+    console.log('📤 Request body to Mistral Vision Streaming (pixtral-12b-2409):', JSON.stringify(body, null, 2));
 
     const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
         method: 'POST',
@@ -591,6 +597,7 @@ async function* streamMistralVision(messages: any[], temperature?: number): Asyn
 async function callCodestral(messages: any[], temperature?: number): Promise<any> {
     const codestralApiKey = process.env.CODESTRAL_API_KEY || 'DXfXAjwNIZcAv1ESKtoDwWZZF98lJxho';
     const body: any = { model: 'codestral-latest', messages, temperature: temperature || 0.3 };
+    console.log('📤 Request body to Codestral (codestral-latest):', JSON.stringify(body, null, 2));
 
     const response = await fetch('https://codestral.mistral.ai/v1/chat/completions', {
         method: 'POST',
@@ -609,6 +616,7 @@ async function callCodestral(messages: any[], temperature?: number): Promise<any
 async function* streamCodestral(messages: any[], temperature?: number): AsyncGenerator<string> {
     const codestralApiKey = process.env.CODESTRAL_API_KEY || 'DXfXAjwNIZcAv1ESKtoDwWZZF98lJxho';
     const body: any = { model: 'codestral-latest', messages, temperature: temperature || 0.3, stream: true };
+    console.log('📤 Request body to Codestral Streaming (codestral-latest):', JSON.stringify(body, null, 2));
 
     const response = await fetch('https://codestral.mistral.ai/v1/chat/completions', {
         method: 'POST',
@@ -694,27 +702,25 @@ function ensureSystemPrompt(messages: OpenAIMessage[], model: string, tools?: an
     let dynamicToolsText = '';
     let allTools = [...(tools || [])];
 
-    // Add builtin search_web tool for the coding model
-    if (model === 'pipilot-1-code') {
-        const builtinSearchTool = {
-            type: 'function',
-            function: {
-                name: 'search_web',
-                description: 'Search the web for any information, news, prices, websites, trends, current events, documentation, code examples, or answers to questions. Use this tool for virtually any query that requires looking up information online.',
-                parameters: {
-                    type: 'object',
-                    properties: {
-                        query: {
-                            type: 'string',
-                            description: 'The search query to look up on the web'
-                        }
-                    },
-                    required: ['query']
-                }
+    // Add builtin search_web tool for all models
+    const builtinSearchTool = {
+        type: 'function',
+        function: {
+            name: 'search_web',
+            description: 'Search the web for any information, news, prices, websites, trends, current events, documentation, code examples, or answers to questions. Use this tool for virtually any query that requires looking up information online.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    query: {
+                        type: 'string',
+                        description: 'The search query to look up on the web'
+                    }
+                },
+                required: ['query']
             }
-        };
-        allTools.push(builtinSearchTool);
-    }
+        }
+    };
+    allTools.push(builtinSearchTool);
 
     // Format tools for system prompt
     if (allTools.length > 0) {
@@ -1154,6 +1160,7 @@ export async function POST(request: NextRequest) {
         // 3. General Chat & Thinking (a0.dev)
         console.log(`💬 Routing to a0.dev for model: ${model}`);
         const a0Request = transformRequest(body, model);
+        console.log('📤 Request body to a0.dev:', JSON.stringify(a0Request, null, 2));
 
         const response = await fetch('https://api.a0.dev/ai/llm', {
             method: 'POST',
