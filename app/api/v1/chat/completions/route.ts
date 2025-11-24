@@ -768,9 +768,31 @@ function transformResponse(a0Response: A0DevResponse, model: string, availableTo
     // Check for new [TOOL_CALL: ...] format first
     const parsedToolCalls = parseToolCalls(content);
     if (parsedToolCalls.length > 0) {
-        // Remove tool call syntax from displayed content
-        const displayContent = content.replace(/\[TOOL_CALL:\s*\w+\([^)]*\)\]/g, '').trim();
-        if (displayContent) {
+        // Replace tool call syntax with user-friendly messages
+        let displayContent = content;
+        parsedToolCalls.forEach(tc => {
+            const toolCallRegex = new RegExp(`\\[TOOL_CALL:\\s*${tc.name}\\([^)]*\\)\\]`, 'g');
+            let friendlyMessage = '';
+            switch (tc.name) {
+                case 'search_web':
+                    friendlyMessage = '🔍 Searching the web...';
+                    break;
+                case 'get_weather':
+                    friendlyMessage = '🌤️ Checking weather information...';
+                    break;
+                case 'calculate':
+                    friendlyMessage = '🧮 Performing calculations...';
+                    break;
+                case 'extract_text':
+                    friendlyMessage = '📝 Analyzing text...';
+                    break;
+                default:
+                    friendlyMessage = `🔧 Using ${tc.name}...`;
+            }
+            displayContent = displayContent.replace(toolCallRegex, friendlyMessage);
+        });
+
+        if (displayContent.trim()) {
             finalContent = displayContent;
         } else {
             finalContent = null;
@@ -895,9 +917,36 @@ export async function POST(request: NextRequest) {
                         let accumulatedContent = '';
                         for await (const chunk of stream) {
                             accumulatedContent += chunk;
+
+                            // Replace tool call syntax with user-friendly messages in real-time
+                            let processedChunk = chunk;
+                            const toolCallRegex = /\[TOOL_CALL:\s*(\w+)\([^)]*\)\]/g;
+                            let match;
+                            while ((match = toolCallRegex.exec(chunk)) !== null) {
+                                const toolName = match[1];
+                                let friendlyMessage = '';
+                                switch (toolName) {
+                                    case 'search_web':
+                                        friendlyMessage = '🔍 Searching the web...';
+                                        break;
+                                    case 'get_weather':
+                                        friendlyMessage = '🌤️ Checking weather information...';
+                                        break;
+                                    case 'calculate':
+                                        friendlyMessage = '🧮 Performing calculations...';
+                                        break;
+                                    case 'extract_text':
+                                        friendlyMessage = '📝 Analyzing text...';
+                                        break;
+                                    default:
+                                        friendlyMessage = `🔧 Using ${toolName}...`;
+                                }
+                                processedChunk = processedChunk.replace(match[0], friendlyMessage);
+                            }
+
                             const data = JSON.stringify({
                                 id, object: 'chat.completion.chunk', created, model: 'pipilot-1-vision',
-                                choices: [{ index: 0, delta: { content: chunk }, finish_reason: null }]
+                                choices: [{ index: 0, delta: { content: processedChunk }, finish_reason: null }]
                             });
                             controller.enqueue(encoder.encode(`data: ${data}\n\n`));
                         }
@@ -932,7 +981,35 @@ export async function POST(request: NextRequest) {
                 return new NextResponse(readable, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } });
             } else {
                 const response = await callMistralVision(mistralMessages, body.temperature); // Remove tools/tool_choice
-                // Parse tool calls from response
+
+                // Replace tool call syntax with user-friendly messages in content
+                let processedContent = response.choices[0].message.content;
+                const toolCallRegex = /\[TOOL_CALL:\s*(\w+)\([^)]*\)\]/g;
+                let match;
+                while ((match = toolCallRegex.exec(processedContent)) !== null) {
+                    const toolName = match[1];
+                    let friendlyMessage = '';
+                    switch (toolName) {
+                        case 'search_web':
+                            friendlyMessage = '🔍 Searching the web...';
+                            break;
+                        case 'get_weather':
+                            friendlyMessage = '🌤️ Checking weather information...';
+                            break;
+                        case 'calculate':
+                            friendlyMessage = '🧮 Performing calculations...';
+                            break;
+                        case 'extract_text':
+                            friendlyMessage = '📝 Analyzing text...';
+                            break;
+                        default:
+                            friendlyMessage = `🔧 Using ${toolName}...`;
+                    }
+                    processedContent = processedContent.replace(match[0], friendlyMessage);
+                }
+                response.choices[0].message.content = processedContent;
+
+                // Parse tool calls from original content (not processed)
                 const toolCalls = parseToolCalls(response.choices[0].message.content);
                 if (toolCalls.length > 0) {
                     response.choices[0].message.tool_calls = toolCalls.map(tc => ({
@@ -965,9 +1042,36 @@ export async function POST(request: NextRequest) {
                         let accumulatedContent = '';
                         for await (const chunk of stream) {
                             accumulatedContent += chunk;
+
+                            // Replace tool call syntax with user-friendly messages in real-time
+                            let processedChunk = chunk;
+                            const toolCallRegex = /\[TOOL_CALL:\s*(\w+)\([^)]*\)\]/g;
+                            let match;
+                            while ((match = toolCallRegex.exec(chunk)) !== null) {
+                                const toolName = match[1];
+                                let friendlyMessage = '';
+                                switch (toolName) {
+                                    case 'search_web':
+                                        friendlyMessage = '🔍 Searching the web...';
+                                        break;
+                                    case 'get_weather':
+                                        friendlyMessage = '🌤️ Checking weather information...';
+                                        break;
+                                    case 'calculate':
+                                        friendlyMessage = '🧮 Performing calculations...';
+                                        break;
+                                    case 'extract_text':
+                                        friendlyMessage = '📝 Analyzing text...';
+                                        break;
+                                    default:
+                                        friendlyMessage = `🔧 Using ${toolName}...`;
+                                }
+                                processedChunk = processedChunk.replace(match[0], friendlyMessage);
+                            }
+
                             const data = JSON.stringify({
                                 id, object: 'chat.completion.chunk', created, model: model,
-                                choices: [{ index: 0, delta: { content: chunk }, finish_reason: null }]
+                                choices: [{ index: 0, delta: { content: processedChunk }, finish_reason: null }]
                             });
                             controller.enqueue(encoder.encode(`data: ${data}\n\n`));
                         }
@@ -1002,7 +1106,35 @@ export async function POST(request: NextRequest) {
                 return new NextResponse(readable, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } });
             } else {
                 const response = await callCodestral(messages, body.temperature); // Remove tools/tool_choice
-                // Parse tool calls from response
+
+                // Replace tool call syntax with user-friendly messages in content
+                let processedContent = response.choices[0].message.content;
+                const toolCallRegex = /\[TOOL_CALL:\s*(\w+)\([^)]*\)\]/g;
+                let match;
+                while ((match = toolCallRegex.exec(processedContent)) !== null) {
+                    const toolName = match[1];
+                    let friendlyMessage = '';
+                    switch (toolName) {
+                        case 'search_web':
+                            friendlyMessage = '🔍 Searching the web...';
+                            break;
+                        case 'get_weather':
+                            friendlyMessage = '🌤️ Checking weather information...';
+                            break;
+                        case 'calculate':
+                            friendlyMessage = '🧮 Performing calculations...';
+                            break;
+                        case 'extract_text':
+                            friendlyMessage = '📝 Analyzing text...';
+                            break;
+                        default:
+                            friendlyMessage = `🔧 Using ${toolName}...`;
+                    }
+                    processedContent = processedContent.replace(match[0], friendlyMessage);
+                }
+                response.choices[0].message.content = processedContent;
+
+                // Parse tool calls from original content (not processed)
                 const toolCalls = parseToolCalls(response.choices[0].message.content);
                 if (toolCalls.length > 0) {
                     response.choices[0].message.tool_calls = toolCalls.map(tc => ({
