@@ -205,18 +205,18 @@ export default function AIPlatformDashboard() {
     async function switchTeam(team: Team) {
         setCurrentTeam(team)
         localStorage.setItem('current_ai_team_id', team.id)
-        await loadTeamStats(team.id)
+        await loadTeamStats(team)
         await loadTeamActivity(team.id)
         initialAnimationDone.current = false
     }
 
-    async function loadTeamStats(teamId: string) {
+    async function loadTeamStats(team: Team) {
         try {
-            // Get API keys for this team's wallet
+            // Get API keys for this team's user
             const { data: keys, error: keysError } = await supabase
                 .from('ai_api_keys')
                 .select('*')
-                .eq('user_id', currentTeam?.user_id)
+                .eq('user_id', team.user_id)
 
             if (keysError) throw keysError
 
@@ -224,7 +224,8 @@ export default function AIPlatformDashboard() {
             const { data: usage, error: usageError } = await supabase
                 .from('ai_usage_logs')
                 .select('cost')
-                .eq('wallet_id', currentTeam?.wallet_id)
+                .eq('wallet_id', team.wallet_id)
+                .eq('user_id', team.user_id)
 
             if (usageError) throw usageError
 
@@ -276,7 +277,7 @@ export default function AIPlatformDashboard() {
             if (teamData) {
                 setCurrentTeam(teamData)
                 setTeams(prev => prev.map(t => t.id === teamData.id ? teamData : t))
-                await loadTeamStats(teamData.id)
+                await loadTeamStats(teamData)
             }
         } catch (error) {
             console.error('Silent refresh error:', error)
