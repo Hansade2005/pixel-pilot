@@ -1,8 +1,211 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
-// OpenAI-compatible API wrapper for a0.dev LLM API, Pixtral (Vision), and Codestral (Code)
-// Endpoint: POST /api/v1/chat/completions
+// Enhanced error handling utilities
+interface APIError {
+    message: string;
+    type: string;
+    code: string;
+    param?: string | null;
+    details?: any;
+    requestId?: string;
+    timestamp?: string;
+}
+
+function createAPIError(
+    message: string,
+    type: string,
+    code: string,
+    param: string | null = null,
+    details: any = null,
+    requestId?: string
+): APIError {
+    return {
+        message,
+        type,
+        code,
+        param,
+        details,
+        requestId,
+        timestamp: new Date().toISOString()
+    };
+}
+
+function handleAPIError(error: any, context: string, requestId?: string): APIError {
+    // Log full error details internally for debugging
+    console.error(`[${context}] Error:`, {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        requestId,
+        context
+    });
+
+    // NEVER expose raw API error messages to users
+    // Categorize errors and provide sanitized, user-friendly messages
+
+    if (error.message?.includes('fetch') || error.message?.includes('network') || error.message?.includes('ECONNREFUSED')) {
+        return createAPIError(
+            'Service temporarily unavailable. Please try again in a moment.',
+            'service_unavailable',
+            'external_api_unavailable',
+            null,
+            { context, errorCategory: 'network' },
+            requestId
+        );
+    }
+
+    if (error.message?.includes('timeout') || error.message?.includes('ETIMEDOUT')) {
+        return createAPIError(
+            'Request timed out. Please try again.',
+            'timeout_error',
+            'request_timeout',
+            null,
+            { context, errorCategory: 'timeout' },
+            requestId
+        );
+    }
+
+    if (error.message?.includes('rate limit') || error.message?.includes('429')) {
+        return createAPIError(
+            'Too many requests. Please wait a moment before trying again.',
+            'rate_limit_error',
+            'rate_limit_exceeded',
+            null,
+            { context, errorCategory: 'rate_limit' },
+            requestId
+        );
+    }
+
+    if (error.message?.includes('authentication') || error.message?.includes('unauthorized') || error.message?.includes('401')) {
+        return createAPIError(
+            'Authentication failed. Please check your credentials.',
+            'auth_error',
+            'authentication_failed',
+            null,
+            { context, errorCategory: 'auth' },
+            requestId
+        );
+    }
+
+    if (error.message?.includes('403') || error.message?.includes('forbidden')) {
+        return createAPIError(
+            'Access denied. Please check your permissions.',
+            'auth_error',
+            'access_denied',
+            null,
+            { context, errorCategory: 'forbidden' },
+            requestId
+        );
+    }
+
+    if (error.message?.includes('500') || error.message?.includes('502') || error.message?.includes('503') || error.message?.includes('504')) {
+        return createAPIError(
+            'Service is experiencing issues. Please try again later.',
+            'service_unavailable',
+            'external_service_error',
+            null,
+            { context, errorCategory: 'server_error' },
+            requestId
+        );
+    }
+
+    // For any other errors, provide a generic message
+    // Never expose the actual error message from external APIs
+    return createAPIError(
+        'An unexpected error occurred. Please try again.',
+        'server_error',
+        'internal_error',
+        null,
+        { context, errorCategory: 'unknown' },
+        requestId
+    );
+}
+
+function validateRequest(body: any): APIError | null {
+    if (!body) {
+        return createAPIError(
+            'Request body is required',
+            'invalid_request_error',
+            'missing_body'
+        );
+    }
+
+    if (!body.messages || !Array.isArray(body.messages)) {
+        return createAPIError(
+            'The messages parameter must be an array of message objects',
+            'invalid_request_error',
+            'invalid_messages',
+            'messages'
+        );
+    }
+
+    if (body.messages.length === 0) {
+        return createAPIError(
+            'At least one message is required',
+            'invalid_request_error',
+            'empty_messages',
+            'messages'
+        );
+    }
+
+    // Validate message format
+    for (let i = 0; i < body.messages.length; i++) {
+        const msg = body.messages[i];
+        if (!msg.role || !['system', 'user', 'assistant', 'tool'].includes(msg.role)) {
+            return createAPIError(
+                `Message ${i} has invalid role. Must be one of: system, user, assistant, tool`,
+                'invalid_request_error',
+                'invalid_message_role',
+                `messages[${i}].role`
+            );
+        }
+
+        if (typeof msg.content !== 'string' && !Array.isArray(msg.content)) {
+            return createAPIError(
+                `Message ${i} content must be a string or array`,
+                'invalid_request_error',
+                'invalid_message_content',
+                `messages[${i}].content`
+            );
+        }
+    }
+
+    // Validate tools if provided
+    if (body.tools) {
+        if (!Array.isArray(body.tools)) {
+            return createAPIError(
+                'Tools parameter must be an array',
+                'invalid_request_error',
+                'invalid_tools',
+                'tools'
+            );
+        }
+
+        for (let i = 0; i < body.tools.length; i++) {
+            const tool = body.tools[i];
+            if (!tool.type || tool.type !== 'function') {
+                return createAPIError(
+                    `Tool ${i} must have type 'function'`,
+                    'invalid_request_error',
+                    'invalid_tool_type',
+                    `tools[${i}].type`
+                );
+            }
+
+            if (!tool.function?.name || typeof tool.function.name !== 'string') {
+                return createAPIError(
+                    `Tool ${i} must have a valid function name`,
+                    'invalid_request_error',
+                    'invalid_tool_name',
+                    `tools[${i}].function.name`
+                );
+            }
+        }
+    }
+
+    return null; // No validation errors
+}
 
 interface OpenAIMessageContent {
     type: 'text' | 'image_url';
@@ -132,7 +335,12 @@ async function executeToolManually(toolCall: any, availableTools: any[]): Promis
         }
     } catch (error) {
         console.error('Tool execution error:', error);
-        return { error: error instanceof Error ? error.message : 'Unknown error' };
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown tool execution error',
+            toolName: name,
+            timestamp: new Date().toISOString()
+        };
     }
 }
 
@@ -174,10 +382,16 @@ async function searchWebTool(query: string): Promise<any> {
             description: `Found ${searchData.results?.length || 0} results for "${query}" (content truncated for display)`
         };
     } catch (error: any) {
+        console.error('Web search error:', error);
         return {
             query,
-            error: error.message,
-            description: `Web search failed: ${error.message}`
+            error: error.message || 'Web search failed',
+            success: false,
+            timestamp: new Date().toISOString(),
+            details: {
+                errorType: error.name,
+                stack: error.stack?.substring(0, 500) // Truncate stack trace
+            }
         };
     }
 }
@@ -306,37 +520,39 @@ function hasVisionContent(messages: OpenAIMessage[]): boolean {
 
 // --- Mistral / Codestral / Pixtral Integration ---
 
-async function callMistralVision(messages: any[], temperature?: number, tools?: any[], tool_choice?: any): Promise<any> {
+async function callMistralVision(messages: any[], temperature?: number): Promise<any> {
     const mistralApiKey = process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr';
     const body: any = { model: 'pixtral-12b-2409', messages, temperature: temperature || 0.7 };
-    if (tools) {
-        body.tools = tools;
-        body.tool_choice = tool_choice || 'auto';
-    }
 
     const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${mistralApiKey}` },
         body: JSON.stringify(body)
     });
-    if (!response.ok) throw new Error(`Mistral API error: ${response.status} ${await response.text()}`);
+    if (!response.ok) {
+        const errorText = await response.text();
+        // Log the actual error internally but don't expose it
+        console.error(`Mistral API error (${response.status}):`, errorText);
+        throw new Error(`API_ERROR_${response.status}`);
+    }
     return await response.json();
 }
 
-async function* streamMistralVision(messages: any[], temperature?: number, tools?: any[], tool_choice?: any): AsyncGenerator<string> {
+async function* streamMistralVision(messages: any[], temperature?: number): AsyncGenerator<string> {
     const mistralApiKey = process.env.MISTRAL_API_KEY || 'W8txIqwcJnyHBTthSlouN2w3mQciqAUr';
     const body: any = { model: 'pixtral-12b-2409', messages, temperature: temperature || 0.7, stream: true };
-    if (tools) {
-        body.tools = tools;
-        body.tool_choice = tool_choice || 'auto';
-    }
 
     const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${mistralApiKey}` },
         body: JSON.stringify(body)
     });
-    if (!response.ok) throw new Error(`Mistral streaming API error: ${response.status} ${await response.text()}`);
+    if (!response.ok) {
+        const errorText = await response.text();
+        // Log the actual error internally but don't expose it
+        console.error(`Mistral streaming API error (${response.status}):`, errorText);
+        throw new Error(`API_ERROR_${response.status}`);
+    }
     if (!response.body) throw new Error('Response body is null');
 
     const reader = response.body.getReader();
@@ -364,37 +580,39 @@ async function* streamMistralVision(messages: any[], temperature?: number, tools
     }
 }
 
-async function callCodestral(messages: any[], temperature?: number, tools?: any[], tool_choice?: any): Promise<any> {
+async function callCodestral(messages: any[], temperature?: number): Promise<any> {
     const codestralApiKey = process.env.CODESTRAL_API_KEY || 'DXfXAjwNIZcAv1ESKtoDwWZZF98lJxho';
     const body: any = { model: 'codestral-latest', messages, temperature: temperature || 0.3 };
-    if (tools) {
-        body.tools = tools;
-        body.tool_choice = tool_choice || 'auto';
-    }
 
     const response = await fetch('https://codestral.mistral.ai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${codestralApiKey}` },
         body: JSON.stringify(body)
     });
-    if (!response.ok) throw new Error(`Codestral API error: ${response.status} ${await response.text()}`);
+    if (!response.ok) {
+        const errorText = await response.text();
+        // Log the actual error internally but don't expose it
+        console.error(`Codestral API error (${response.status}):`, errorText);
+        throw new Error(`API_ERROR_${response.status}`);
+    }
     return await response.json();
 }
 
-async function* streamCodestral(messages: any[], temperature?: number, tools?: any[], tool_choice?: any): AsyncGenerator<string> {
+async function* streamCodestral(messages: any[], temperature?: number): AsyncGenerator<string> {
     const codestralApiKey = process.env.CODESTRAL_API_KEY || 'DXfXAjwNIZcAv1ESKtoDwWZZF98lJxho';
     const body: any = { model: 'codestral-latest', messages, temperature: temperature || 0.3, stream: true };
-    if (tools) {
-        body.tools = tools;
-        body.tool_choice = tool_choice || 'auto';
-    }
 
     const response = await fetch('https://codestral.mistral.ai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${codestralApiKey}` },
         body: JSON.stringify(body)
     });
-    if (!response.ok) throw new Error(`Codestral streaming API error: ${response.status} ${await response.text()}`);
+    if (!response.ok) {
+        const errorText = await response.text();
+        // Log the actual error internally but don't expose it
+        console.error(`Codestral streaming API error (${response.status}):`, errorText);
+        throw new Error(`API_ERROR_${response.status}`);
+    }
     if (!response.body) throw new Error('Response body is null');
 
     const reader = response.body.getReader();
@@ -612,21 +830,47 @@ function transformResponse(a0Response: A0DevResponse, model: string, availableTo
 }
 
 export async function POST(request: NextRequest) {
-    try {
-        const body: OpenAIRequest = await request.json();
+    const requestId = crypto.randomUUID();
+    const startTime = Date.now();
+    let requestBody: any = null;
 
-        if (!body.messages || !Array.isArray(body.messages)) {
+    try {
+        // Parse and validate request
+        const body: OpenAIRequest = await request.json();
+        requestBody = body; // Store for error handling
+
+        // Validate request structure
+        const validationError = validateRequest(body);
+        if (validationError) {
             return NextResponse.json(
-                { error: { message: "Invalid request: messages array is required", type: "invalid_request_error", param: "messages", code: "invalid_request" } },
+                { error: { ...validationError, requestId } },
                 { status: 400 }
             );
         }
 
         let model = body.model || 'pipilot-1-chat';
 
-        console.log(`🚀 Request for model: ${model}`);
+        console.log(`🚀 [${requestId}] Request for model: ${model}, messages: ${body.messages.length}`);
 
-        // 1. Vision Routing (Pixtral)
+        // Validate model
+        const supportedModels = ['pipilot-1-chat', 'pipilot-1-thinking', 'pipilot-1-code', 'pipilot-1-vision'];
+        if (!supportedModels.includes(model)) {
+            return NextResponse.json(
+                {
+                    error: createAPIError(
+                        `Model '${model}' is not supported. Supported models: ${supportedModels.join(', ')}`,
+                        'invalid_request_error',
+                        'unsupported_model',
+                        'model',
+                        { requestedModel: model, supportedModels },
+                        requestId
+                    )
+                },
+                { status: 400 }
+            );
+        }
+
+        // 1. Vision Routing (Pixtral) - Use our custom tool format
         if (model === 'pipilot-1-vision' || hasVisionContent(body.messages)) {
             console.log('🖼️  Vision content/model detected, routing to Pixtral 12B');
 
@@ -634,57 +878,135 @@ export async function POST(request: NextRequest) {
             const mistralMessages = transformToMistralFormat(messagesWithPrompt);
 
             if (body.stream) {
-                const stream = streamMistralVision(mistralMessages, body.temperature, body.tools, body.tool_choice);
+                const stream = streamMistralVision(mistralMessages, body.temperature); // Remove tools/tool_choice
                 const encoder = new TextEncoder();
                 const readable = new ReadableStream({
                     async start(controller) {
                         const id = generateChatCompletionId();
                         const created = Math.floor(Date.now() / 1000);
+                        let accumulatedContent = '';
                         for await (const chunk of stream) {
+                            accumulatedContent += chunk;
                             const data = JSON.stringify({
                                 id, object: 'chat.completion.chunk', created, model: 'pipilot-1-vision',
                                 choices: [{ index: 0, delta: { content: chunk }, finish_reason: null }]
                             });
                             controller.enqueue(encoder.encode(`data: ${data}\n\n`));
                         }
+
+                        // Parse tool calls from accumulated content
+                        const toolCalls = parseToolCalls(accumulatedContent);
+                        if (toolCalls.length > 0) {
+                            const openAIToolCalls = toolCalls.map((tc, index) => ({
+                                id: 'call_' + Math.random().toString(36).substring(2, 10),
+                                type: 'function',
+                                function: {
+                                    name: tc.name,
+                                    arguments: JSON.stringify({ parsed_params: tc.parameters })
+                                }
+                            }));
+
+                            const toolCallChunk = JSON.stringify({
+                                id, object: 'chat.completion.chunk', created, model: 'pipilot-1-vision',
+                                choices: [{
+                                    index: 0,
+                                    delta: { tool_calls: openAIToolCalls },
+                                    finish_reason: 'tool_calls'
+                                }]
+                            });
+                            controller.enqueue(encoder.encode(`data: ${toolCallChunk}\n\n`));
+                        }
+
                         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
                         controller.close();
                     }
                 });
                 return new NextResponse(readable, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } });
             } else {
-                const response = await callMistralVision(mistralMessages, body.temperature, body.tools, body.tool_choice);
+                const response = await callMistralVision(mistralMessages, body.temperature); // Remove tools/tool_choice
+                // Parse tool calls from response
+                const toolCalls = parseToolCalls(response.choices[0].message.content);
+                if (toolCalls.length > 0) {
+                    response.choices[0].message.tool_calls = toolCalls.map(tc => ({
+                        id: 'call_' + Math.random().toString(36).substring(2, 10),
+                        type: 'function',
+                        function: {
+                            name: tc.name,
+                            arguments: JSON.stringify({ parsed_params: tc.parameters })
+                        }
+                    }));
+                    response.choices[0].finish_reason = 'tool_calls';
+                }
                 return NextResponse.json(transformMistralResponse(response, 'pipilot-1-vision'));
             }
         }
 
-        // 2. Code Routing (Codestral)
+        // 2. Code Routing (Codestral) - Use our custom tool format
         if (model === 'pipilot-1-code') {
             console.log('💻 Code model detected, routing to Codestral');
 
             const messages = ensureSystemPrompt(body.messages, 'pipilot-1-code', body.tools);
 
             if (body.stream) {
-                const stream = streamCodestral(messages, body.temperature, body.tools, body.tool_choice);
+                const stream = streamCodestral(messages, body.temperature); // Remove tools/tool_choice
                 const encoder = new TextEncoder();
                 const readable = new ReadableStream({
                     async start(controller) {
                         const id = generateChatCompletionId();
                         const created = Math.floor(Date.now() / 1000);
+                        let accumulatedContent = '';
                         for await (const chunk of stream) {
+                            accumulatedContent += chunk;
                             const data = JSON.stringify({
                                 id, object: 'chat.completion.chunk', created, model: 'pipilot-1-code',
                                 choices: [{ index: 0, delta: { content: chunk }, finish_reason: null }]
                             });
                             controller.enqueue(encoder.encode(`data: ${data}\n\n`));
                         }
+
+                        // Parse tool calls from accumulated content
+                        const toolCalls = parseToolCalls(accumulatedContent);
+                        if (toolCalls.length > 0) {
+                            const openAIToolCalls = toolCalls.map((tc, index) => ({
+                                id: 'call_' + Math.random().toString(36).substring(2, 10),
+                                type: 'function',
+                                function: {
+                                    name: tc.name,
+                                    arguments: JSON.stringify({ parsed_params: tc.parameters })
+                                }
+                            }));
+
+                            const toolCallChunk = JSON.stringify({
+                                id, object: 'chat.completion.chunk', created, model: 'pipilot-1-code',
+                                choices: [{
+                                    index: 0,
+                                    delta: { tool_calls: openAIToolCalls },
+                                    finish_reason: 'tool_calls'
+                                }]
+                            });
+                            controller.enqueue(encoder.encode(`data: ${toolCallChunk}\n\n`));
+                        }
+
                         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
                         controller.close();
                     }
                 });
                 return new NextResponse(readable, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } });
             } else {
-                const response = await callCodestral(messages, body.temperature, body.tools, body.tool_choice);
+                const response = await callCodestral(messages, body.temperature); // Remove tools/tool_choice
+                // Parse tool calls from response
+                const toolCalls = parseToolCalls(response.choices[0].message.content);
+                if (toolCalls.length > 0) {
+                    response.choices[0].message.tool_calls = toolCalls.map(tc => ({
+                        id: 'call_' + Math.random().toString(36).substring(2, 10),
+                        type: 'function',
+                        function: {
+                            name: tc.name,
+                            arguments: JSON.stringify({ parsed_params: tc.parameters })
+                        }
+                    }));
+                    response.choices[0].finish_reason = 'tool_calls';
+                }
                 return NextResponse.json(transformMistralResponse(response, 'pipilot-1-code'));
             }
         }
@@ -700,7 +1022,10 @@ export async function POST(request: NextRequest) {
         });
 
         if (!response.ok) {
-            throw new Error(`a0.dev API error: ${response.status} ${await response.text()}`);
+            const errorText = await response.text();
+            // Log the actual error internally but don't expose it
+            console.error(`a0.dev API error (${response.status}):`, errorText);
+            throw new Error(`API_ERROR_${response.status}`);
         }
 
         const data: A0DevResponse = await response.json();
@@ -819,10 +1144,35 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(transformed);
 
     } catch (error: any) {
-        console.error('API Error:', error);
+        const apiError = handleAPIError(error, 'POST /api/v1/chat/completions', requestId);
+
+        // Determine appropriate HTTP status code
+        let statusCode = 500;
+        if (apiError.type === 'invalid_request_error') {
+            statusCode = 400;
+        } else if (apiError.type === 'auth_error') {
+            statusCode = 401;
+        } else if (apiError.type === 'rate_limit_error') {
+            statusCode = 429;
+        }
+
+        console.error(`❌ [${requestId}] API Error (${apiError.code}):`, {
+            message: apiError.message,
+            type: apiError.type,
+            duration: Date.now() - startTime,
+            model: requestBody?.model,
+            messageCount: requestBody?.messages?.length
+        });
+
         return NextResponse.json(
-            { error: { message: error.message || "Internal server error", type: "server_error", param: null, code: "internal_error" } },
-            { status: 500 }
+            { error: apiError },
+            {
+                status: statusCode,
+                headers: {
+                    'X-Request-ID': requestId,
+                    'X-Error-Code': apiError.code
+                }
+            }
         );
     }
 }

@@ -40,7 +40,10 @@ function createA0Dev(options: { apiKey?: string } = {}) {
           });
 
           if (!response.ok) {
-            throw new Error(`a0.dev API error: ${response.status} ${response.statusText}`);
+            const errorText = await response.text();
+            // Log the actual error internally but don't expose it
+            console.error(`a0.dev API error (${response.status}):`, errorText);
+            throw new Error(`API_ERROR_${response.status}`);
           }
 
           const result = await response.json();
@@ -86,7 +89,10 @@ function createA0Dev(options: { apiKey?: string } = {}) {
           });
 
           if (!response.ok) {
-            throw new Error(`a0.dev streaming API error: ${response.status} ${response.statusText}`);
+            const errorText = await response.text();
+            // Log the actual error internally but don't expose it
+            console.error(`a0.dev streaming API error (${response.status}):`, errorText);
+            throw new Error(`API_ERROR_${response.status}`);
           }
 
           if (!response.body) {

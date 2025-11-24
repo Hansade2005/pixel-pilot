@@ -6326,12 +6326,13 @@ Provide a comprehensive response addressing: "${currentUserMessage?.content || '
                     console.log('[A0-DEV] API response status:', response.status);
                     if (!response.ok) {
                       const errorText = await response.text().catch(() => 'Unknown error');
+                      // Log the actual error internally but don't expose it
                       console.error('[A0-DEV] API error details:', {
                         status: response.status,
                         statusText: response.statusText,
                         errorText: errorText.substring(0, 200)
                       });
-                      throw new Error(`a0.dev API error: ${response.status} ${response.statusText}`);
+                      throw new Error(`API_ERROR_${response.status}`);
                     }
                     const data = await response.json();
                     if (data.completion) {
