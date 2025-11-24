@@ -50,23 +50,180 @@ const ToolCallSchema = z.object({
     }))
 });
 
+// Tool parsing and execution functions
+function parseToolCalls(content: string): any[] {
+    console.log('Parsing tool calls from content:', content);
+
+    const toolCalls = [];
+
+    // Try primary format: [TOOL_CALL: tool_name(parameters)]
+    const toolCallRegex = /\[TOOL_CALL:\s*(\w+)\(([^)]*)\)\]/g;
+    let match;
+    while ((match = toolCallRegex.exec(content)) !== null) {
+        const toolName = match[1];
+        const paramsStr = match[2];
+        console.log('Found tool call (format 1):', toolName, 'with params:', paramsStr);
+        toolCalls.push({
+            name: toolName,
+            parameters: paramsStr
+        });
+    }
+
+    // If no tool calls found, try alternative formats
+    if (toolCalls.length === 0) {
+        // Try format: tool_name("parameters")
+        const altRegex = /(\w+)\("([^"]*)"\)/g;
+        while ((match = altRegex.exec(content)) !== null) {
+            const toolName = match[1];
+            const paramsStr = match[2];
+            console.log('Found tool call (format 2):', toolName, 'with params:', paramsStr);
+            toolCalls.push({
+                name: toolName,
+                parameters: paramsStr
+            });
+        }
+    }
+
+    // If still no tool calls, try format: tool_name(parameters) without quotes
+    if (toolCalls.length === 0) {
+        const simpleRegex = /(\w+)\(([^)]*)\)/g;
+        while ((match = simpleRegex.exec(content)) !== null) {
+            const toolName = match[1];
+            const paramsStr = match[2];
+            // Skip if it looks like a function call that's not a tool
+            if (!['search_web', 'get_weather', 'calculate', 'extract_text'].includes(toolName)) continue;
+            console.log('Found tool call (format 3):', toolName, 'with params:', paramsStr);
+            toolCalls.push({
+                name: toolName,
+                parameters: paramsStr
+            });
+        }
+    }
+
+    console.log('Total tool calls found:', toolCalls.length);
+    return toolCalls;
+}
+
+async function executeToolManually(toolCall: any, availableTools: any[]): Promise<any> {
+    const { name, parameters } = toolCall;
+
+    console.log('Executing tool:', name, 'with parameters:', parameters);
+
+    try {
+        switch (name) {
+            case 'search_web':
+                // Try different formats: "query: top shops" or just "top shops"
+                let query = parameters.trim();
+                const queryMatch = parameters.match(/query:\s*(.+)/) ||
+                                  parameters.match(/"([^"]+)"/) ||
+                                  parameters.match(/'([^']+)'/);
+                if (queryMatch) query = queryMatch[1] || queryMatch[0];
+                query = query.replace(/["']/g, '').trim();
+                console.log('Parsed query:', query);
+                return await searchWebTool(query);
+
+            default:
+                // Check if it's a custom tool from the request
+                const customTool = availableTools.find(t => t.function?.name === name);
+                if (customTool) {
+                    return { error: `Custom tool '${name}' execution not implemented in API` };
+                }
+                return { error: `Unknown tool: ${name}` };
+        }
+    } catch (error) {
+        console.error('Tool execution error:', error);
+        return { error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+}
+
+// Builtin tool implementations
+async function searchWebTool(query: string): Promise<any> {
+    try {
+        const response = await fetch('https://api.tavily.com/search', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer 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`
+            },
+            body: JSON.stringify({
+                query: query,
+                search_depth: "basic",
+                include_answer: false,
+                include_raw_content: true,
+                max_results: 5
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Web search failed with status ${response.status}`);
+        }
+
+        const searchData = await response.json();
+
+        // Truncate results for API response
+        const truncatedResults = searchData.results?.map((result: any) => ({
+            ...result,
+            content: result.content?.length > 200 ? result.content.substring(0, 200) + '...' : result.content,
+            raw_content: result.raw_content?.length > 300 ? result.raw_content.substring(0, 300) + '...' : result.raw_content
+        })) || [];
+
+        return {
+            query,
+            results: truncatedResults,
+            total_results: searchData.results?.length || 0,
+            description: `Found ${searchData.results?.length || 0} results for "${query}" (content truncated for display)`
+        };
+    } catch (error: any) {
+        return {
+            query,
+            error: error.message,
+            description: `Web search failed: ${error.message}`
+        };
+    }
+}
+
+
+
 // Default system prompts for the 4 core models
 const DEFAULT_SYSTEM_PROMPTS: Record<string, string> = {
-    'pipilot-1-chat': `You are PiPilot Chat, an extremely powerful, intelligent, and versatile AI assistant. 
+    'pipilot-1-chat': `You are PiPilot Chat, an extremely powerful, intelligent, and versatile AI assistant.
 You excel at every general task, from writing and analysis to problem-solving and creative work.
 Your responses are always accurate, thoughtful, comprehensive, and beautifully structured.
-You are designed to be the ultimate everyday companion, capable of handling any request with precision and grace.`,
+You are designed to be the ultimate everyday companion, capable of handling any request with precision and grace.
+
+🔧 TOOL CALLING FORMAT - THIS IS MANDATORY:
+When you need to use ANY tool, you MUST respond with EXACTLY this format:
+[TOOL_CALL: tool_name(parameters)]
+
+Examples of CORRECT tool calls:
+- [TOOL_CALL: search_web("top shops")]
+
+❌ WRONG formats (NEVER use these):
+- search_web("top shops")
+- I will search for top shops
+- Let me use the search tool
+
+🚨 NEVER SAY "I DON'T KNOW" - ALWAYS USE SEARCH_WEB INSTEAD!
+If you don't have information about ANY topic, immediately use [TOOL_CALL: search_web("topic")] to find it.`,
 
     'pipilot-1-code': `You are PiPilot Code, an elite, autonomous AI software engineer.
 You are capable of solving complex coding tasks with minimal human intervention.
 Your goal is to achieve state-of-the-art performance (SWE-bench level).
 
-You have access to tools that can help you with various tasks including:
-- get_weather: Get current weather information for locations
-- calculate: Perform mathematical calculations
-- extract_text: Extract text from images
+🔧 TOOL CALLING FORMAT - THIS IS MANDATORY:
+When you need to use ANY tool, you MUST respond with EXACTLY this format:
+[TOOL_CALL: tool_name(parameters)]
 
-When appropriate, use these tools to gather information or perform calculations needed for your coding tasks.
+Examples of CORRECT tool calls:
+- [TOOL_CALL: search_web("python libraries for data analysis")]
+
+❌ WRONG formats (NEVER use these):
+- search_web("python libraries")
+- I will search for libraries
+- Let me use the search tool
+
+🚨 NEVER SAY "I DON'T KNOW" - ALWAYS USE SEARCH_WEB INSTEAD!
+If you don't have information about ANY topic, immediately use [TOOL_CALL: search_web("topic")] to find it.
 
 CORE PRINCIPLES:
 1. **Explore First:** Never write code without understanding the context. Use tools to read files and explore the codebase.
@@ -89,16 +246,41 @@ You rival the capabilities of the world's best vision models.
 You can analyze images with incredible detail, identifying objects, reading text (OCR), and understanding complex visual scenes.
 Provide detailed, accurate, and insightful descriptions of any visual content provided.
 
-You have access to tools that can help you with various tasks including:
-- get_weather: Get current weather information for locations
-- calculate: Perform mathematical calculations
-- extract_text: Extract text from images
+🔧 TOOL CALLING FORMAT - THIS IS MANDATORY:
+When you need to use ANY tool, you MUST respond with EXACTLY this format:
+[TOOL_CALL: tool_name(parameters)]
+
+Examples of CORRECT tool calls:
+- [TOOL_CALL: search_web("image recognition techniques")]
+
+❌ WRONG formats (NEVER use these):
+- search_web("image recognition")
+- I will search for techniques
+- Let me use the search tool
+
+🚨 NEVER SAY "I DON'T KNOW" - ALWAYS USE SEARCH_WEB INSTEAD!
+If you don't have information about ANY topic, immediately use [TOOL_CALL: search_web("topic")] to find it.
 
 When analyzing images or performing related tasks, use these tools when they can provide additional useful information.`,
 
     'pipilot-1-chat-thinking': `You are PiPilot Thinking, a super-intelligent reasoning model designed to rival the smartest AIs.
 You DO NOT just answer; you THINK.
 Before providing a final response, you must engage in a deep, step-by-step reasoning process to ensure your answer is correct, logical, and insightful.
+
+🔧 TOOL CALLING FORMAT - THIS IS MANDATORY:
+When you need to use ANY tool, you MUST respond with EXACTLY this format:
+[TOOL_CALL: tool_name(parameters)]
+
+Examples of CORRECT tool calls:
+- [TOOL_CALL: search_web("quantum physics theories")]
+
+❌ WRONG formats (NEVER use these):
+- search_web("quantum physics")
+- I will search for theories
+- Let me use the search tool
+
+🚨 NEVER SAY "I DON'T KNOW" - ALWAYS USE SEARCH_WEB INSTEAD!
+If you don't have information about ANY topic, immediately use [TOOL_CALL: search_web("topic")] to find it.
 
 FORMAT:
 <thinking>
@@ -282,18 +464,46 @@ function ensureSystemPrompt(messages: OpenAIMessage[], model: string, tools?: an
     const newMessages = [...messages];
     const systemMessageIndex = newMessages.findIndex(m => m.role === 'system');
 
-    let toolInstruction = '';
-    // Only inject simulated tool instructions for models that DON'T support native function calling
-    const isNativeToolModel = model === 'pipilot-1-code' || model === 'pipilot-1-vision' || model === 'codestral-latest';
+    // Extract and format tools from request body
+    let dynamicToolsText = '';
+    let allTools = [...(tools || [])];
 
-    if (tools && tools.length > 0 && !isNativeToolModel) {
-        toolInstruction = `\n\n[SYSTEM]
-You have access to the following tools:
-${JSON.stringify(tools, null, 2)}
+    // Add builtin search_web tool for the coding model
+    if (model === 'pipilot-1-code') {
+        const builtinSearchTool = {
+            type: 'function',
+            function: {
+                name: 'search_web',
+                description: 'Search the web for any information, news, prices, websites, trends, current events, documentation, code examples, or answers to questions. Use this tool for virtually any query that requires looking up information online.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        query: {
+                            type: 'string',
+                            description: 'The search query to look up on the web'
+                        }
+                    },
+                    required: ['query']
+                }
+            }
+        };
+        allTools.push(builtinSearchTool);
+    }
 
-To call a tool, you MUST output ONLY a JSON object in this format:
-{"tool_uses": [{"name": "tool_name", "arguments": { ... }}]}
-Do not output any other text if you are calling a tool.`;
+    // Format tools for system prompt
+    if (allTools.length > 0) {
+        dynamicToolsText = `\n\n--- AVAILABLE TOOLS ---\n`;
+        allTools.forEach((tool, index) => {
+            if (tool.type === 'function') {
+                dynamicToolsText += `${index + 1}. ${tool.function.name}: ${tool.function.description}\n`;
+                if (tool.function.parameters?.properties) {
+                    const params = Object.keys(tool.function.parameters.properties).join(', ');
+                    dynamicToolsText += `   Parameters: ${params}\n`;
+                }
+            }
+        });
+        dynamicToolsText += `\nTo use any tool, respond with: [TOOL_CALL: tool_name(parameters)]\n`;
+        dynamicToolsText += `Example: [TOOL_CALL: search_web("latest JavaScript frameworks")]\n`;
     }
 
     if (systemMessageIndex !== -1) {
@@ -305,11 +515,11 @@ Do not output any other text if you are calling a tool.`;
 
         newMessages[systemMessageIndex] = {
             role: 'system',
-            content: `${defaultPrompt}\n\n--- USER SYSTEM INSTRUCTIONS ---\n${userText}${toolInstruction}`
+            content: `${defaultPrompt}${dynamicToolsText}\n\n--- USER SYSTEM INSTRUCTIONS ---\n${userText}`
         };
     } else {
         // No user system prompt, just add the default one
-        newMessages.unshift({ role: 'system', content: `${defaultPrompt}${toolInstruction}` });
+        newMessages.unshift({ role: 'system', content: `${defaultPrompt}${dynamicToolsText}` });
     }
     return newMessages;
 }
@@ -324,32 +534,57 @@ function transformRequest(req: OpenAIRequest, model: string): A0DevRequest {
     };
 }
 
-function transformResponse(a0Response: A0DevResponse, model: string): any {
+function transformResponse(a0Response: A0DevResponse, model: string, availableTools?: any[]): any {
     const content = a0Response.completion;
     let toolCalls = undefined;
     let finalContent: string | null = content;
 
-    // Attempt to parse simulated tool calls
-    try {
-        // Look for JSON-like structure if mixed with text, or just parse if it looks like JSON
-        if (content.trim().startsWith('{') && content.trim().includes('tool_uses')) {
-            const parsed = JSON.parse(content);
-            const validation = ToolCallSchema.safeParse(parsed);
-
-            if (validation.success) {
-                toolCalls = validation.data.tool_uses.map((tool: any) => ({
-                    id: 'call_' + Math.random().toString(36).substring(2, 10),
-                    type: 'function',
-                    function: {
-                        name: tool.name,
-                        arguments: JSON.stringify(tool.arguments)
-                    }
-                }));
-                finalContent = null; // Clear content if it's a tool call
-            }
+    // Check for new [TOOL_CALL: ...] format first
+    const parsedToolCalls = parseToolCalls(content);
+    if (parsedToolCalls.length > 0) {
+        // Remove tool call syntax from displayed content
+        const displayContent = content.replace(/\[TOOL_CALL:\s*\w+\([^)]*\)\]/g, '').trim();
+        if (displayContent) {
+            finalContent = displayContent;
+        } else {
+            finalContent = null;
         }
-    } catch (e) {
-        // Not a valid JSON tool call, treat as normal text
+
+        // Convert to OpenAI tool call format
+        toolCalls = [];
+        for (const toolCall of parsedToolCalls) {
+            toolCalls.push({
+                id: 'call_' + Math.random().toString(36).substring(2, 10),
+                type: 'function',
+                function: {
+                    name: toolCall.name,
+                    arguments: JSON.stringify({ parsed_params: toolCall.parameters })
+                }
+            });
+        }
+    } else {
+        // Fallback to old JSON format parsing
+        try {
+            // Look for JSON-like structure if mixed with text, or just parse if it looks like JSON
+            if (content.trim().startsWith('{') && content.trim().includes('tool_uses')) {
+                const parsed = JSON.parse(content);
+                const validation = ToolCallSchema.safeParse(parsed);
+
+                if (validation.success) {
+                    toolCalls = validation.data.tool_uses.map((tool: any) => ({
+                        id: 'call_' + Math.random().toString(36).substring(2, 10),
+                        type: 'function',
+                        function: {
+                            name: tool.name,
+                            arguments: JSON.stringify(tool.arguments)
+                        }
+                    }));
+                    finalContent = null; // Clear content if it's a tool call
+                }
+            }
+        } catch (e) {
+            // Not a valid JSON tool call, treat as normal text
+        }
     }
 
     return {
@@ -469,7 +704,77 @@ export async function POST(request: NextRequest) {
         }
 
         const data: A0DevResponse = await response.json();
-        const transformed = transformResponse(data, model);
+        let transformed = transformResponse(data, model, body.tools);
+
+        // Handle tool execution for models that don't support native tool calling
+        if (transformed.choices[0].message.tool_calls && transformed.choices[0].message.tool_calls.length > 0) {
+            console.log('Tool calls detected...');
+
+            // Check if this is ONLY builtin tools (like search_web) that we execute server-side
+            const hasOnlyBuiltinTools = transformed.choices[0].message.tool_calls.every((tc: any) =>
+                tc.function.name === 'search_web'  // Add other builtin tools here
+            );
+
+            if (hasOnlyBuiltinTools && transformed.choices[0].message.tool_calls.length === 1 &&
+                transformed.choices[0].message.tool_calls[0].function.name === 'search_web') {
+                // Handle builtin web search directly on server - no follow-up API call needed
+                const searchToolCall = transformed.choices[0].message.tool_calls[0];
+                const searchResult = await executeToolManually({
+                    name: 'search_web',
+                    parameters: JSON.parse(searchToolCall.function.arguments).parsed_params
+                }, body.tools || []);
+
+                // Generate final response directly on server
+                const searchQuery = searchResult.query || 'your search query';
+                const results = searchResult.results || [];
+                const totalResults = searchResult.total_results || 0;
+
+                let finalContent = `I searched for "${searchQuery}" and found ${totalResults} results:\n\n`;
+
+                if (results.length > 0) {
+                    results.forEach((result: any, index: number) => {
+                        finalContent += `${index + 1}. **${result.title}**\n`;
+                        finalContent += `   ${result.content}\n`;
+                        finalContent += `   *URL: ${result.url}*\n\n`;
+                    });
+                } else if (searchResult.error) {
+                    finalContent += `❌ Search failed: ${searchResult.error}\n\n`;
+                    finalContent += `Please try rephrasing your search query.`;
+                } else {
+                    finalContent += `No results found for "${searchQuery}". Try a different search term.`;
+                }
+
+                // Return the final response directly
+                const finalResponse = {
+                    id: generateChatCompletionId(),
+                    object: 'chat.completion',
+                    created: Math.floor(Date.now() / 1000),
+                    model: model,
+                    choices: [{
+                        index: 0,
+                        message: {
+                            role: 'assistant',
+                            content: finalContent
+                        },
+                        finish_reason: 'stop'
+                    }],
+                    usage: {
+                        prompt_tokens: 0,
+                        completion_tokens: 0,
+                        total_tokens: 0
+                    }
+                };
+
+                return NextResponse.json(finalResponse);
+            } else {
+                // For custom tools (not builtin), return tool calls to client for execution
+                // Client will execute and send results back in subsequent request
+                console.log('Returning tool calls to client for custom tool execution...');
+
+                // Don't execute tools server-side - let client handle custom tools
+                // Just return the response with tool_calls so client can execute them
+            }
+        }
 
         if (body.stream) {
             // Simulate streaming for a0.dev (which is non-streaming)
