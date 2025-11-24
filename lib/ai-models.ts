@@ -84,7 +84,7 @@ export const chatModels: Array<ChatModel> = [
     provider: 'pipilot',
   },
   {
-    id: 'pipilot-1-chat-thinking',
+    id: 'pipilot-1-thinking',
     name: 'PiPilot Thinking 1.0',
     description: 'Super-intelligent reasoning model with Chain of Thought',
     provider: 'pipilot',

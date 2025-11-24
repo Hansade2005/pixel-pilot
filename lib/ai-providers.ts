@@ -289,7 +289,7 @@ const modelProviders: Record<string, any> = {
   'pipilot-1-chat': pipilotProvider('pipilot-1-chat'),
   'pipilot-1-code': pipilotProvider('pipilot-1-code'),
   'pipilot-1-vision': pipilotProvider('pipilot-1-vision'),
-  'pipilot-1-chat-thinking': pipilotProvider('pipilot-1-chat-thinking'),
+  'pipilot-1-thinking': pipilotProvider('pipilot-1-thinking'),
 
   // PiPilot Premium Models (Claude via OpenRouter)
   'pipilot-pro': openrouterProviderWithReasoning('anthropic/claude-sonnet-4'),
