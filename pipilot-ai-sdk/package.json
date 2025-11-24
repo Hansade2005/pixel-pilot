@@ -1,0 +1,14 @@
+{
+  "name": "pipilot-ai-sdk",
+  "version": "1.0.0",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "test": "node test-sdk.js"
+  },
+  "keywords": ["pipilot", "ai", "chat", "completions", "openai", "sdk", "typescript", "llm"],
+  "author": "PiPilot",
+  "license": "ISC",
+  "type": "commonjs",
+  "description": "JavaScript SDK for PiPilot AI Chat API with multiple models, tool calling, and streaming support"
+}

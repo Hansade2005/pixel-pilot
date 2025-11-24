@@ -75,6 +75,13 @@ export const ADMIN_MENU_ITEMS = [
     permission: ADMIN_PERMISSIONS.VIEW_BILLING
   },
   {
+    id: 'wallets',
+    label: 'API Wallets',
+    icon: 'Wallet',
+    href: '/admin/wallets',
+    permission: ADMIN_PERMISSIONS.MANAGE_BILLING
+  },
+  {
     id: 'analytics',
     label: 'Analytics',
     icon: 'BarChart3',

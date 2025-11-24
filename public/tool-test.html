@@ -1,0 +1,766 @@
+
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PiPilot Tool Calling & Vision Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .test-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .test-card h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .test-info {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 15px;
+            min-height: 150px;
+            max-height: 500px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            line-height: 1.5;
+        }
+
+        .result.streaming {
+            border-left: 4px solid #667eea;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .status.loading {
+            background: #ffc107;
+            color: #000;
+        }
+
+        .status.success {
+            background: #28a745;
+            color: white;
+        }
+
+        .status.error {
+            background: #dc3545;
+            color: white;
+        }
+
+        .controls {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            margin-bottom: 30px;
+        }
+
+        .controls h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .button-group button {
+            flex: 1;
+        }
+
+        .tool-call {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+
+        .tool-call-header {
+            font-weight: bold;
+            color: #1976d2;
+            margin-bottom: 5px;
+        }
+
+        .vision-image {
+            max-width: 100%;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🚀 PiPilot Tool Calling & Vision Test</h1>
+
+        <div class="controls">
+            <h2>Quick Actions</h2>
+            <div class="button-group">
+                <button onclick="runAllTests()">Run All Tests</button>
+                <button onclick="clearAllResults()">Clear All Results</button>
+            </div>
+        </div>
+
+        <div class="test-grid">
+            <!-- Chat Model with Tools -->
+            <div class="test-card">
+                <h2>💬 pipilot-1-chat + Tools</h2>
+                <div class="test-info">
+                    <strong>Test:</strong> Weather tool calling<br>
+                    <strong>Mode:</strong> Non-streaming with tools
+                </div>
+                <button onclick="testChatWithTools()">Test Chat + Tools</button>
+                <div id="chat-tools-status"></div>
+                <div id="chat-tools-result" class="result"></div>
+            </div>
+
+            <!-- Thinking Model with Tools -->
+            <div class="test-card">
+                <h2>🧠 pipilot-1-chat-thinking + Tools</h2>
+                <div class="test-info">
+                    <strong>Test:</strong> Calculator tool calling<br>
+                    <strong>Mode:</strong> Non-streaming with tools
+                </div>
+                <button onclick="testThinkingWithTools()">Test Thinking + Tools</button>
+                <div id="thinking-tools-status"></div>
+                <div id="thinking-tools-result" class="result"></div>
+            </div>
+
+            <!-- Vision Model -->
+            <div class="test-card">
+                <h2>🖼️ pipilot-1-vision</h2>
+                <div class="test-info">
+                    <strong>Test:</strong> Image analysis<br>
+                    <strong>Image:</strong> AI Review screenshot
+                </div>
+                <button onclick="testVision()">Test Vision Model</button>
+                <div id="vision-status"></div>
+                <div id="vision-result" class="result"></div>
+            </div>
+
+            <!-- Vision Model with Tools -->
+            <div class="test-card">
+                <h2>🖼️ pipilot-1-vision + Tools</h2>
+                <div class="test-info">
+                    <strong>Test:</strong> Image analysis with tools<br>
+                    <strong>Mode:</strong> Vision + tool calling
+                </div>
+                <button onclick="testVisionWithTools()">Test Vision + Tools</button>
+                <div id="vision-tools-status"></div>
+                <div id="vision-tools-result" class="result"></div>
+            </div>
+
+            <!-- Code Model -->
+            <div class="test-card">
+                <h2>💻 pipilot-1-code</h2>
+                <div class="test-info">
+                    <strong>Test:</strong> Code generation and analysis<br>
+                    <strong>Mode:</strong> Code-focused model
+                </div>
+                <button onclick="testCodeModel()">Test Code Model</button>
+                <div id="code-status"></div>
+                <div id="code-result" class="result"></div>
+            </div>
+
+            <!-- Code Model with Tools -->
+            <div class="test-card">
+                <h2>💻 pipilot-1-code + Tools</h2>
+                <div class="test-info">
+                    <strong>Test:</strong> Code generation with tools<br>
+                    <strong>Mode:</strong> Code + tool calling
+                </div>
+                <button onclick="testCodeWithTools()">Test Code + Tools</button>
+                <div id="code-tools-status"></div>
+                <div id="code-tools-result" class="result"></div>
+            </div>
+
+            <!-- Chat Streaming with Tools -->
+            <div class="test-card">
+                <h2>💬 pipilot-1-chat + Tools (Stream)</h2>
+                <div class="test-info">
+                    <strong>Test:</strong> Weather tool calling<br>
+                    <strong>Mode:</strong> Streaming with tools
+                </div>
+                <button onclick="testChatWithToolsStreaming()">Test Chat + Tools Stream</button>
+                <div id="chat-tools-stream-status"></div>
+                <div id="chat-tools-stream-result" class="result streaming"></div>
+            </div>
+
+            <!-- Thinking Streaming with Tools -->
+            <div class="test-card">
+                <h2>🧠 pipilot-1-chat-thinking + Tools (Stream)</h2>
+                <div class="test-info">
+                    <strong>Test:</strong> Calculator tool calling<br>
+                    <strong>Mode:</strong> Streaming with tools
+                </div>
+                <button onclick="testThinkingWithToolsStreaming()">Test Thinking + Tools Stream</button>
+                <div id="thinking-tools-stream-status"></div>
+                <div id="thinking-tools-stream-result" class="result streaming"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'https://pipilot.dev/api/v1/chat/completions';
+        const TEST_IMAGE_URL = 'https://freerdps.com/blog/wp-content/uploads/2025/10/Higgsfield-AI-Review-1024x576.jpg';
+
+        const weatherTool = {
+            type: 'function',
+            function: {
+                name: 'get_weather',
+                description: 'Get the current weather for a location',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        location: {
+                            type: 'string',
+                            description: 'The city and state, e.g. San Francisco, CA'
+                        },
+                        unit: {
+                            type: 'string',
+                            enum: ['celsius', 'fahrenheit'],
+                            description: 'The temperature unit'
+                        }
+                    },
+                    required: ['location']
+                }
+            }
+        };
+
+        const calculatorTool = {
+            type: 'function',
+            function: {
+                name: 'calculate',
+                description: 'Perform a mathematical calculation',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        operation: {
+                            type: 'string',
+                            enum: ['add', 'subtract', 'multiply', 'divide'],
+                            description: 'The mathematical operation to perform'
+                        },
+                        a: {
+                            type: 'number',
+                            description: 'First number'
+                        },
+                        b: {
+                            type: 'number',
+                            description: 'Second number'
+                        }
+                    },
+                    required: ['operation', 'a', 'b']
+                }
+            }
+        };
+
+        const imageAnalysisTool = {
+            type: 'function',
+            function: {
+                name: 'extract_text',
+                description: 'Extract text from specific regions of the image',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        region: {
+                            type: 'string',
+                            description: 'The region to extract text from (e.g., "title", "body", "footer")'
+                        }
+                    },
+                    required: ['region']
+                }
+            }
+        };
+
+        function setStatus(elementId, status, type) {
+            const el = document.getElementById(elementId);
+            el.innerHTML = `<span class="status ${type}">${status}</span>`;
+        }
+
+        function clearAllResults() {
+            document.querySelectorAll('.result').forEach(el => el.textContent = '');
+            document.querySelectorAll('[id$="-status"]').forEach(el => el.innerHTML = '');
+        }
+
+        function formatToolCalls(toolCalls) {
+            if (!toolCalls || toolCalls.length === 0) return '';
+
+            let result = '\n\n--- TOOL CALLS ---\n';
+            toolCalls.forEach((tc, i) => {
+                result += `\nTool Call ${i + 1}:\n`;
+                result += `  Function: ${tc.function.name}\n`;
+                result += `  Arguments: ${tc.function.arguments}\n`;
+            });
+            return result;
+        }
+
+        async function testChatWithTools() {
+            const resultEl = document.getElementById('chat-tools-result');
+            const statusEl = 'chat-tools-status';
+
+            resultEl.textContent = '';
+            setStatus(statusEl, '⏳ Testing...', 'loading');
+
+            try {
+                const response = await fetch(BASE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'pipilot-1-chat',
+                        messages: [
+                            { role: 'user', content: 'What is the weather like in Paris, France? Use celsius.' }
+                        ],
+                        tools: [weatherTool],
+                        temperature: 0.7,
+                        stream: false
+                    })
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+
+                const data = await response.json();
+                const message = data.choices[0].message;
+
+                resultEl.textContent = `Model: ${data.model}\nFinish Reason: ${data.choices[0].finish_reason}\n\nContent: ${message.content || '(null)'}${formatToolCalls(message.tool_calls)}`;
+                setStatus(statusEl, message.tool_calls ? '✅ Tool Called!' : '✅ Success', 'success');
+            } catch (error) {
+                resultEl.textContent = `Error: ${error.message}`;
+                setStatus(statusEl, '❌ Failed', 'error');
+            }
+        }
+
+        async function testThinkingWithTools() {
+            const resultEl = document.getElementById('thinking-tools-result');
+            const statusEl = 'thinking-tools-status';
+
+            resultEl.textContent = '';
+            setStatus(statusEl, '⏳ Testing...', 'loading');
+
+            try {
+                const response = await fetch(BASE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'pipilot-1-chat-thinking',
+                        messages: [
+                            { role: 'user', content: 'Calculate 156 multiplied by 23 using the calculator tool.' }
+                        ],
+                        tools: [calculatorTool],
+                        temperature: 0.7,
+                        stream: false
+                    })
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+
+                const data = await response.json();
+                const message = data.choices[0].message;
+
+                resultEl.textContent = `Model: ${data.model}\nFinish Reason: ${data.choices[0].finish_reason}\n\nContent: ${message.content || '(null)'}${formatToolCalls(message.tool_calls)}`;
+                setStatus(statusEl, message.tool_calls ? '✅ Tool Called!' : '✅ Success', 'success');
+            } catch (error) {
+                resultEl.textContent = `Error: ${error.message}`;
+                setStatus(statusEl, '❌ Failed', 'error');
+            }
+        }
+
+        async function testVision() {
+            const resultEl = document.getElementById('vision-result');
+            const statusEl = 'vision-status';
+
+            resultEl.innerHTML = `<img src="${TEST_IMAGE_URL}" class="vision-image" alt="Test Image">`;
+            setStatus(statusEl, '⏳ Testing...', 'loading');
+
+            try {
+                const response = await fetch(BASE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'pipilot-1-vision',
+                        messages: [
+                            {
+                                role: 'user',
+                                content: [
+                                    { type: 'text', text: 'Describe this image in detail. What do you see?' },
+                                    { type: 'image_url', image_url: { url: TEST_IMAGE_URL } }
+                                ]
+                            }
+                        ],
+                        temperature: 0.7,
+                        stream: false
+                    })
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+
+                const data = await response.json();
+                const message = data.choices[0].message;
+
+                resultEl.innerHTML = `<img src="${TEST_IMAGE_URL}" class="vision-image" alt="Test Image">\n\nModel: ${data.model}\nFinish Reason: ${data.choices[0].finish_reason}\n\n${message.content}`;
+                setStatus(statusEl, '✅ Success', 'success');
+            } catch (error) {
+                resultEl.innerHTML = `<img src="${TEST_IMAGE_URL}" class="vision-image" alt="Test Image">\n\nError: ${error.message}`;
+                setStatus(statusEl, '❌ Failed', 'error');
+            }
+        }
+
+        async function testVisionWithTools() {
+            const resultEl = document.getElementById('vision-tools-result');
+            const statusEl = 'vision-tools-status';
+
+            resultEl.innerHTML = `<img src="${TEST_IMAGE_URL}" class="vision-image" alt="Test Image">`;
+            setStatus(statusEl, '⏳ Testing...', 'loading');
+
+            try {
+                const response = await fetch(BASE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'pipilot-1-vision',
+                        messages: [
+                            {
+                                role: 'user',
+                                content: [
+                                    { type: 'text', text: 'Analyze this image and extract the title text using the extract_text tool.' },
+                                    { type: 'image_url', image_url: { url: TEST_IMAGE_URL } }
+                                ]
+                            }
+                        ],
+                        tools: [imageAnalysisTool],
+                        temperature: 0.7,
+                        stream: false
+                    })
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+
+                const data = await response.json();
+                const message = data.choices[0].message;
+
+                resultEl.innerHTML = `<img src="${TEST_IMAGE_URL}" class="vision-image" alt="Test Image">\n\nModel: ${data.model}\nFinish Reason: ${data.choices[0].finish_reason}\n\nContent: ${message.content || '(null)'}${formatToolCalls(message.tool_calls)}`;
+                setStatus(statusEl, message.tool_calls ? '✅ Tool Called!' : '✅ Success', 'success');
+            } catch (error) {
+                resultEl.innerHTML = `<img src="${TEST_IMAGE_URL}" class="vision-image" alt="Test Image">\n\nError: ${error.message}`;
+                setStatus(statusEl, '❌ Failed', 'error');
+            }
+        }
+
+        async function testChatWithToolsStreaming() {
+            const resultEl = document.getElementById('chat-tools-stream-result');
+            const statusEl = 'chat-tools-stream-status';
+
+            resultEl.textContent = '';
+            setStatus(statusEl, '⏳ Streaming...', 'loading');
+
+            try {
+                const response = await fetch(BASE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'pipilot-1-chat',
+                        messages: [
+                            { role: 'user', content: 'What is the weather in Tokyo? Use celsius.' }
+                        ],
+                        tools: [weatherTool],
+                        temperature: 0.7,
+                        stream: true
+                    })
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullContent = '';
+                let toolCalls = [];
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n').filter(line => line.trim() !== '');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            if (data === '[DONE]') continue;
+
+                            try {
+                                const parsed = JSON.parse(data);
+                                const delta = parsed.choices?.[0]?.delta;
+
+                                if (delta?.content) {
+                                    fullContent += delta.content;
+                                    resultEl.textContent = fullContent;
+                                }
+
+                                if (delta?.tool_calls) {
+                                    toolCalls = delta.tool_calls;
+                                    resultEl.textContent = fullContent + formatToolCalls(toolCalls);
+                                }
+
+                                resultEl.scrollTop = resultEl.scrollHeight;
+                            } catch (e) {
+                                // Ignore parse errors
+                            }
+                        }
+                    }
+                }
+
+                setStatus(statusEl, toolCalls.length > 0 ? '✅ Tool Called!' : '✅ Stream Complete', 'success');
+            } catch (error) {
+                resultEl.textContent = `Error: ${error.message}`;
+                setStatus(statusEl, '❌ Failed', 'error');
+            }
+        }
+
+        async function testThinkingWithToolsStreaming() {
+            const resultEl = document.getElementById('thinking-tools-stream-result');
+            const statusEl = 'thinking-tools-stream-status';
+
+            resultEl.textContent = '';
+            setStatus(statusEl, '⏳ Streaming...', 'loading');
+
+            try {
+                const response = await fetch(BASE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'pipilot-1-chat-thinking',
+                        messages: [
+                            { role: 'user', content: 'Use the calculator to divide 144 by 12.' }
+                        ],
+                        tools: [calculatorTool],
+                        temperature: 0.7,
+                        stream: true
+                    })
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullContent = '';
+                let toolCalls = [];
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n').filter(line => line.trim() !== '');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            if (data === '[DONE]') continue;
+
+                            try {
+                                const parsed = JSON.parse(data);
+                                const delta = parsed.choices?.[0]?.delta;
+
+                                if (delta?.content) {
+                                    fullContent += delta.content;
+                                    resultEl.textContent = fullContent;
+                                }
+
+                                if (delta?.tool_calls) {
+                                    toolCalls = delta.tool_calls;
+                                    resultEl.textContent = fullContent + formatToolCalls(toolCalls);
+                                }
+
+                                resultEl.scrollTop = resultEl.scrollHeight;
+                            } catch (e) {
+                                // Ignore parse errors
+                            }
+                        }
+                    }
+                }
+
+                setStatus(statusEl, toolCalls.length > 0 ? '✅ Tool Called!' : '✅ Stream Complete', 'success');
+            } catch (error) {
+                resultEl.textContent = `Error: ${error.message}`;
+                setStatus(statusEl, '❌ Failed', 'error');
+            }
+        }
+
+        async function testCodeModel() {
+            const resultEl = document.getElementById('code-result');
+            const statusEl = 'code-status';
+
+            resultEl.textContent = '';
+            setStatus(statusEl, '⏳ Testing...', 'loading');
+
+            try {
+                const response = await fetch(BASE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'pipilot-1-code',
+                        messages: [
+                            { role: 'user', content: 'Write a Python function to calculate the factorial of a number using recursion.' }
+                        ],
+                        temperature: 0.7,
+                        stream: false
+                    })
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+
+                const data = await response.json();
+                const message = data.choices[0].message;
+
+                resultEl.textContent = `Model: ${data.model}\nFinish Reason: ${data.choices[0].finish_reason}\n\n${message.content}`;
+                setStatus(statusEl, '✅ Success', 'success');
+            } catch (error) {
+                resultEl.textContent = `Error: ${error.message}`;
+                setStatus(statusEl, '❌ Failed', 'error');
+            }
+        }
+
+        async function testCodeWithTools() {
+            const resultEl = document.getElementById('code-tools-result');
+            const statusEl = 'code-tools-status';
+
+            resultEl.textContent = '';
+            setStatus(statusEl, '⏳ Testing...', 'loading');
+
+            try {
+                const response = await fetch(BASE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'pipilot-1-code',
+                        messages: [
+                            { role: 'user', content: 'Create a JavaScript function to validate an email address and use the calculator tool to compute something related to the validation.' }
+                        ],
+                        tools: [calculatorTool],
+                        temperature: 0.7,
+                        stream: false
+                    })
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+
+                const data = await response.json();
+                const message = data.choices[0].message;
+
+                resultEl.textContent = `Model: ${data.model}\nFinish Reason: ${data.choices[0].finish_reason}\n\nContent: ${message.content || '(null)'}${formatToolCalls(message.tool_calls)}`;
+                setStatus(statusEl, message.tool_calls ? '✅ Tool Called!' : '✅ Success', 'success');
+            } catch (error) {
+                resultEl.textContent = `Error: ${error.message}`;
+                setStatus(statusEl, '❌ Failed', 'error');
+            }
+        }
+
+        async function runAllTests() {
+            clearAllResults();
+            await testChatWithTools();
+            await new Promise(r => setTimeout(r, 1500));
+            await testThinkingWithTools();
+            await new Promise(r => setTimeout(r, 1500));
+            await testVision();
+            await new Promise(r => setTimeout(r, 1500));
+            await testVisionWithTools();
+            await new Promise(r => setTimeout(r, 1500));
+            await testCodeModel();
+            await new Promise(r => setTimeout(r, 1500));
+            await testCodeWithTools();
+            await new Promise(r => setTimeout(r, 1500));
+            await testChatWithToolsStreaming();
+            await new Promise(r => setTimeout(r, 1500));
+            await testThinkingWithToolsStreaming();
+        }
+    </script>
+</body>
+
+</html>

@@ -98,6 +98,14 @@ interface NotificationStats {
   unread: number
 }
 
+interface User {
+  id: string
+  email: string
+  full_name?: string
+  avatar_url?: string
+  created_at: string
+}
+
 export default function AdminNotificationsPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -111,6 +119,12 @@ export default function AdminNotificationsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [audienceFilter, setAudienceFilter] = useState<string>('all')
+  
+  // User search and selection state
+  const [users, setUsers] = useState<User[]>([])
+  const [userSearchQuery, setUserSearchQuery] = useState('')
+  const [selectedUsers, setSelectedUsers] = useState<User[]>([])
+  const [searchingUsers, setSearchingUsers] = useState(false)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -143,6 +157,59 @@ export default function AdminNotificationsPage() {
   useEffect(() => {
     checkAccessAndLoadData()
   }, [])
+
+  // Search users when query changes
+  useEffect(() => {
+    const searchTimer = setTimeout(() => {
+      if (userSearchQuery.length >= 2) {
+        searchUsers()
+      } else {
+        setUsers([])
+      }
+    }, 300)
+
+    return () => clearTimeout(searchTimer)
+  }, [userSearchQuery])
+
+  const searchUsers = async () => {
+    if (!userSearchQuery || userSearchQuery.length < 2) return
+
+    setSearchingUsers(true)
+    try {
+      const response = await fetch(`/api/admin/users/search?q=${encodeURIComponent(userSearchQuery)}`)
+      if (response.ok) {
+        const data = await response.json()
+        setUsers(data.users || [])
+      }
+    } catch (error) {
+      console.error('Error searching users:', error)
+    } finally {
+      setSearchingUsers(false)
+    }
+  }
+
+  const addSelectedUser = (user: User) => {
+    if (!selectedUsers.find(u => u.id === user.id)) {
+      const updated = [...selectedUsers, user]
+      setSelectedUsers(updated)
+      setFormData({
+        ...formData,
+        targetAudience: 'specific_users',
+        specificUserIds: updated.map(u => u.id)
+      })
+    }
+    setUserSearchQuery('')
+    setUsers([])
+  }
+
+  const removeSelectedUser = (userId: string) => {
+    const updated = selectedUsers.filter(u => u.id !== userId)
+    setSelectedUsers(updated)
+    setFormData({
+      ...formData,
+      specificUserIds: updated.map(u => u.id)
+    })
+  }
 
   const checkAccessAndLoadData = async () => {
     try {
@@ -500,12 +567,22 @@ export default function AdminNotificationsPage() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="audience" className="text-right">Target Audience</Label>
-                <Select value={formData.targetAudience} onValueChange={(value) => setFormData({ ...formData, targetAudience: value })}>
+                <Select 
+                  value={formData.targetAudience} 
+                  onValueChange={(value) => {
+                    setFormData({ ...formData, targetAudience: value })
+                    if (value !== 'specific_users') {
+                      setSelectedUsers([])
+                      setFormData({ ...formData, targetAudience: value, specificUserIds: [] })
+                    }
+                  }}
+                >
                   <SelectTrigger className="col-span-3">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all_users">All Users</SelectItem>
+                    <SelectItem value="specific_users">Specific Users</SelectItem>
                     <SelectItem value="plan_free">Free Plan Users</SelectItem>
                     <SelectItem value="plan_pro">Pro Plan Users</SelectItem>
                     <SelectItem value="plan_teams">Teams Plan Users</SelectItem>
@@ -515,6 +592,111 @@ export default function AdminNotificationsPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* User Selector for Specific Users */}
+              {formData.targetAudience === 'specific_users' && (
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <Label className="text-right pt-2">Select Users</Label>
+                  <div className="col-span-3 space-y-3">
+                    {/* Selected Users */}
+                    {selectedUsers.length > 0 && (
+                      <div className="flex flex-wrap gap-2 p-3 border rounded-lg bg-muted/50">
+                        {selectedUsers.map((user) => (
+                          <div
+                            key={user.id}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-background border rounded-full text-sm"
+                          >
+                            <Avatar className="h-5 w-5">
+                              {user.avatar_url ? (
+                                <AvatarImage src={user.avatar_url} alt={user.email} />
+                              ) : (
+                                <AvatarFallback className="text-xs">
+                                  {user.email.substring(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                              )}
+                            </Avatar>
+                            <span className="font-medium">{user.full_name || user.email}</span>
+                            <button
+                              type="button"
+                              onClick={() => removeSelectedUser(user.id)}
+                              className="hover:text-destructive"
+                            >
+                              <UserX className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* User Search */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        value={userSearchQuery}
+                        onChange={(e) => setUserSearchQuery(e.target.value)}
+                        placeholder="Search users by email or name..."
+                        className="pl-9 pr-9"
+                      />
+                      {searchingUsers && (
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
+
+                    {/* Search Results */}
+                    {users.length > 0 && (
+                      <div className="border rounded-lg max-h-60 overflow-y-auto">
+                        {users.map((user) => {
+                          const isSelected = selectedUsers.find(u => u.id === user.id)
+                          return (
+                            <button
+                              key={user.id}
+                              type="button"
+                              onClick={() => !isSelected && addSelectedUser(user)}
+                              disabled={!!isSelected}
+                              className="w-full flex items-center gap-3 p-3 hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-left"
+                            >
+                              <Avatar className="h-8 w-8">
+                                {user.avatar_url ? (
+                                  <AvatarImage src={user.avatar_url} alt={user.email} />
+                                ) : (
+                                  <AvatarFallback className="text-xs">
+                                    {user.email.substring(0, 2).toUpperCase()}
+                                  </AvatarFallback>
+                                )}
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">
+                                  {user.full_name || user.email}
+                                </p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {user.email}
+                                </p>
+                              </div>
+                              {isSelected ? (
+                                <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
+                              ) : (
+                                <UserCheck className="h-4 w-4 text-muted-foreground shrink-0" />
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {userSearchQuery.length >= 2 && !searchingUsers && users.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-3">
+                        No users found matching "{userSearchQuery}"
+                      </p>
+                    )}
+
+                    {selectedUsers.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Search and select specific users to send personal notifications
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="url" className="text-right">URL (optional)</Label>
                 <Input

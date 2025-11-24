@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PiPilot Live Model Test Suite</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .model-selector {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .model-button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .model-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .model-button.active {
+            background: white;
+            color: #667eea;
+            border-color: white;
+        }
+
+        .image-input-container {
+            display: none;
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        .image-input-container.show {
+            display: block;
+        }
+
+        .image-url-input {
+            width: 60%;
+            padding: 8px 12px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            font-size: 14px;
+        }
+
+        .image-url-input:focus {
+            outline: none;
+            border-color: white;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+        }
+
+        .chat-container {
+            height: 600px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            max-width: 80%;
+        }
+
+        .message.user {
+            background: #667eea;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .message.assistant {
+            background: white;
+            border: 1px solid #e9ecef;
+        }
+
+        .message.tool {
+            background: #e8f5e8;
+            border: 1px solid #28a745;
+            color: #155724;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+
+        .tool-call {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+
+        .tool-call-header {
+            font-weight: bold;
+            color: #1976d2;
+            margin-bottom: 5px;
+        }
+
+        .input-container {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+            display: flex;
+            gap: 10px;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
+            resize: vertical;
+        }
+
+        .send-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        .send-button:hover {
+            transform: translateY(-2px);
+        }
+
+        .send-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .tools-info {
+            background: #e8f5e8;
+            padding: 15px;
+            margin: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #28a745;
+        }
+
+        .tools-info h3 {
+            color: #155724;
+            margin-bottom: 10px;
+        }
+
+        .tools-info ul {
+            color: #155724;
+            margin-left: 20px;
+        }
+
+        .tools-info li {
+            margin-bottom: 5px;
+        }
+
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 PiPilot Live Model Test Suite</h1>
+            <p>Test all PiPilot models on pipilot.dev - Chat, Thinking, Vision & Code</p>
+
+            <div class="model-selector">
+                <button class="model-button active" onclick="selectModel('pipilot-1-chat')">💬 Chat</button>
+                <button class="model-button" onclick="selectModel('pipilot-1-thinking')">🧠 Thinking</button>
+                <button class="model-button" onclick="selectModel('pipilot-1-vision')">👁️ Vision</button>
+                <button class="model-button" onclick="selectModel('pipilot-1-code')">💻 Code</button>
+            </div>
+
+            <div class="image-input-container" id="imageInputContainer">
+                <input type="text" id="imageUrlInput" class="image-url-input"
+                       placeholder="Enter image URL for vision testing..."
+                       value="https://freerdps.com/blog/wp-content/uploads/2025/10/Higgsfield-AI-Review-1024x576.jpg">
+            </div>
+        </div>
+
+        <div class="tools-info">
+            <h3>🛠️ Available Tools (Code & Chat Models)</h3>
+            <ul>
+                <li><strong>search_web:</strong> Search the web for current information, news, prices, stock data, popular websites, trending topics, and recent events</li>
+                <li><strong>get_weather:</strong> Get current weather information and forecasts for any location worldwide</li>
+                <li><strong>calculate:</strong> Perform mathematical calculations (add, subtract, multiply, divide)</li>
+                <li><strong>extract_text:</strong> Extract text from images using OCR technology</li>
+            </ul>
+            <p><em>Note: Vision model focuses on image analysis, Thinking model provides deep reasoning.</em></p>
+        </div>
+
+        <div class="chat-container">
+            <div id="messages" class="messages">
+                <div class="message system">
+                    <strong>System:</strong> Welcome to the PiPilot Code Model chat! The model has access to tools for weather information, mathematical calculations, image text extraction, and web searches for current information, news, prices, stock data, popular websites, and trending topics. When you ask for tasks that require tools, the model will call them and you'll see the results. Try asking it to perform calculations, check weather, search for current prices or news, find popular websites, or analyze images. The model can use tools multiple times in conversations.
+                </div>
+            </div>
+
+            <div class="status" id="status">
+                Ready to chat with pipilot-1-chat (Tools: Auto-enabled)
+            </div>
+        </div>
+
+        <div class="input-container">
+            <div style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+                <button onclick="quickTest('chat')" style="background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 15px; cursor: pointer; font-size: 12px;">💬 Test Chat</button>
+                <button onclick="quickTest('thinking')" style="background: #17a2b8; color: white; border: none; padding: 6px 12px; border-radius: 15px; cursor: pointer; font-size: 12px;">🧠 Test Thinking</button>
+                <button onclick="quickTest('vision')" style="background: #6f42c1; color: white; border: none; padding: 6px 12px; border-radius: 15px; cursor: pointer; font-size: 12px;">👁️ Test Vision</button>
+                <button onclick="quickTest('code')" style="background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 15px; cursor: pointer; font-size: 12px;">💻 Test Code</button>
+            </div>
+            <textarea
+                id="messageInput"
+                class="message-input"
+                placeholder="Ask the selected model something... (or use quick test buttons above)"
+                rows="2"
+            ></textarea>
+            <button id="sendButton" class="send-button" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'https://pipilot.dev/api/v1/chat/completions';
+        const TEST_IMAGE_URL = 'https://freerdps.com/blog/wp-content/uploads/2025/10/Higgsfield-AI-Review-1024x576.jpg';
+        let currentModel = 'pipilot-1-chat';
+
+        function selectModel(model) {
+            currentModel = model;
+
+            // Update button states
+            document.querySelectorAll('.model-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Show/hide image input for vision model
+            const imageContainer = document.getElementById('imageInputContainer');
+            if (model === 'pipilot-1-vision') {
+                imageContainer.classList.add('show');
+            } else {
+                imageContainer.classList.remove('show');
+            }
+
+            // Update status
+            const modelNames = {
+                'pipilot-1-chat': 'Chat',
+                'pipilot-1-chat-thinking': 'Thinking',
+                'pipilot-1-vision': 'Vision',
+                'pipilot-1-code': 'Code'
+            };
+            setStatus(`Ready to chat with ${model} (${modelNames[model]} Model)`);
+
+            // Reset conversation
+            resetConversation();
+        }
+
+        function resetConversation() {
+            messages = [getSystemMessageForModel(currentModel)];
+            document.getElementById('messages').innerHTML = `
+                <div class="message system">
+                    <strong>System:</strong> Switched to ${currentModel} model. ${getModelDescription(currentModel)}
+                </div>
+            `;
+        }
+
+        function getModelDescription(model) {
+            const descriptions = {
+                'pipilot-1-chat': 'General-purpose AI assistant with tool capabilities.',
+                'pipilot-1-thinking': 'Deep reasoning model that provides step-by-step analysis.',
+                'pipilot-1-vision': 'Multimodal AI that can analyze images and visual content.',
+                'pipilot-1-code': 'Elite software engineer capable of complex coding tasks.'
+            };
+            return descriptions[model] || 'AI assistant with specialized capabilities.';
+        }
+
+        function getSystemMessageForModel(model) {
+            const baseToolsPrompt = `You are a helpful AI assistant with access to tools. CRITICAL: You MUST use tools when needed.
+
+🚨 NEVER SAY "I DON'T KNOW" - ALWAYS USE SEARCH_WEB INSTEAD!
+If you don't have information about ANY topic, immediately use [TOOL_CALL: search_web("topic")] to find it.
+
+🔧 TOOL CALLING FORMAT - THIS IS MANDATORY:
+When you need to use ANY tool, you MUST respond with EXACTLY this format:
+[TOOL_CALL: tool_name(parameters)]
+
+Examples of CORRECT tool calls:
+- [TOOL_CALL: search_web("top shops")]
+- [TOOL_CALL: get_weather("London")]
+- [TOOL_CALL: calculate("15 * 23 + 7")]
+- [TOOL_CALL: extract_text("Hello world 123", "\\d+")]
+
+❌ WRONG formats (NEVER use these):
+- search_web("top shops")
+- I will search for top shops
+- Let me use the search tool
+- [TOOL: search_web("top shops")]
+
+AVAILABLE TOOLS:
+1. search_web(query) - Search the web for ANY information, news, prices, websites, trends, current events, top lists, etc.
+2. get_weather(location) - Get current weather for any city/location
+3. calculate(expression) - Perform math calculations (supports +, -, *, /, parentheses)
+4. extract_text(text, pattern) - Extract text using regex patterns
+
+TOOL USAGE RULES:
+- ALWAYS use tools for: web searches, weather info, calculations, text extraction
+- NEVER say "I don't have tools" or "I can't access tools"
+- If user asks for information you don't know, USE search_web
+- For weather questions, USE get_weather
+- For math problems, USE calculate
+- For text processing, USE extract_text
+
+🚨 CRITICAL RULE: If you don't know something or don't have information about a topic, NEVER say "I don't know" or "I don't have information". Instead, IMMEDIATELY use [TOOL_CALL: search_web("topic")] to find the information.
+
+Examples:
+- User asks about unknown company: [TOOL_CALL: search_web("company name")]
+- User asks about current events: [TOOL_CALL: search_web("current event")]
+- User asks about anything you're unsure about: [TOOL_CALL: search_web("user question")]
+
+NEVER admit you don't have information - always search first!
+
+RESPONSE FORMAT:
+1. If you need a tool: Output ONLY [TOOL_CALL: tool_name(parameters)]
+2. After tool results: Provide your final helpful answer
+
+EXAMPLES:
+User: "find top shops"
+Assistant: [TOOL_CALL: search_web("top shops")]
+
+User: "what's the weather in Paris?"
+Assistant: [TOOL_CALL: get_weather("Paris")]
+
+User: "what is pixelways?"
+Assistant: [TOOL_CALL: search_web("pixelways")]
+
+User: "calculate 25 * 15"
+Assistant: [TOOL_CALL: calculate("25 * 15")]
+
+REMEMBER: Tool calls must be in brackets [TOOL_CALL: ...] and you will get results automatically.`;
+
+            if (model === 'pipilot-1-vision') {
+                return {
+                    role: 'system',
+                    content: `You are PiPilot Vision, a state-of-the-art multimodal AI assistant.
+You rival the capabilities of the world's best vision models.
+You can analyze images with incredible detail, identifying objects, reading text (OCR), and understanding complex visual scenes.
+Provide detailed, accurate, and insightful descriptions of any visual content provided.
+
+👁️ Use emojis in your responses to enhance visual descriptions and keep conversations lively! 📸
+
+🔧 TOOL CALLING FORMAT - THIS IS MANDATORY:
+When you need to use ANY tool, you MUST respond with EXACTLY this format:
+[TOOL_CALL: tool_name(parameters)]
+
+Examples of CORRECT tool calls:
+- [TOOL_CALL: search_web("image recognition techniques")]
+
+❌ WRONG formats (NEVER use these):
+- search_web("image recognition")
+- I will search for techniques
+- Let me use the search tool
+
+🚨 NEVER SAY "I DON'T KNOW" - ALWAYS USE SEARCH_WEB INSTEAD!
+If you don't have information about ANY topic, immediately use [TOOL_CALL: search_web("topic")] to find it.
+
+When analyzing images or performing related tasks, use these tools when they can provide additional useful information.`
+                };
+            }
+
+            return {
+                role: 'system',
+                content: baseToolsPrompt
+            };
+        }
+
+
+
+        let messages = [getSystemMessageForModel(currentModel)];
+
+        function addMessage(role, content, toolCalls = null) {
+            const messagesEl = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+
+            let html = `<strong>${role === 'user' ? 'You' : role === 'assistant' ? getModelDisplayName(currentModel) : role === 'tool' ? 'Tool Result' : 'System'}:</strong> `;
+
+            if (typeof content === 'string') {
+                // Try to parse as JSON for tool results
+                try {
+                    const parsed = JSON.parse(content);
+                    if (parsed && typeof parsed === 'object') {
+                        html += `<pre>${JSON.stringify(parsed, null, 2)}</pre>`;
+                    } else {
+                        html += content.replace(/\n/g, '<br>');
+                    }
+                } catch {
+                    html += content.replace(/\n/g, '<br>');
+                }
+            } else if (Array.isArray(content)) {
+                content.forEach(item => {
+                    if (item.type === 'text') {
+                        html += item.text.replace(/\n/g, '<br>');
+                    }
+                });
+            }
+
+            messageDiv.innerHTML = html;
+
+            if (toolCalls && toolCalls.length > 0) {
+                const toolCallsDiv = document.createElement('div');
+                toolCallsDiv.innerHTML = '<strong>Tool Calls:</strong>';
+                toolCalls.forEach(tc => {
+                    const toolDiv = document.createElement('div');
+                    toolDiv.className = 'tool-call';
+                    toolDiv.innerHTML = `
+                        <div class="tool-call-header">🔧 ${tc.function.name}</div>
+                        <div><strong>Arguments:</strong> ${tc.function.arguments}</div>
+                    `;
+                    toolCallsDiv.appendChild(toolDiv);
+                });
+                messageDiv.appendChild(toolCallsDiv);
+            }
+
+            messagesEl.appendChild(messageDiv);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function setStatus(message, type = '') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        function getModelDisplayName(model) {
+            const names = {
+                'pipilot-1-chat': 'PiPilot Chat',
+                'pipilot-1-thinking': 'PiPilot Thinking',
+                'pipilot-1-vision': 'PiPilot Vision',
+                'pipilot-1-code': 'PiPilot Code'
+            };
+            return names[model] || 'PiPilot AI';
+        }
+
+        function quickTest(modelType) {
+            const testMessages = {
+                'chat': 'Hello! Can you tell me about the latest trends in AI technology?',
+                'thinking': 'If I have 3 apples and give away 2, how many do I have left? Think step by step.',
+                'vision': 'Please analyze this image and describe what you see in detail.',
+                'code': 'Write a simple JavaScript function to calculate the factorial of a number.'
+            };
+
+            // Switch to the appropriate model first
+            const modelMap = {
+                'chat': 'pipilot-1-chat',
+                'thinking': 'pipilot-1-thinking',
+                'vision': 'pipilot-1-vision',
+                'code': 'pipilot-1-code'
+            };
+
+            selectModel(modelMap[modelType]);
+            document.getElementById('messageInput').value = testMessages[modelType];
+        }
+
+        // Execute tool manually based on parsed tool call
+        async function executeToolManually(toolCall) {
+            const { name, parameters } = toolCall;
+
+            console.log('Executing tool:', name, 'with parameters:', parameters);
+
+            try {
+                switch (name) {
+                    case 'get_weather':
+                        // Try different parameter formats: "location: New York" or just "New York"
+                        let location = parameters.trim();
+                        const locationMatch = parameters.match(/location:\s*([^,]+)/) || parameters.match(/"([^"]+)"/) || parameters.match(/'([^']+)'/);
+                        if (locationMatch) location = locationMatch[1] || locationMatch[0];
+                        location = location.replace(/["']/g, '').trim();
+                        return await getWeather(location || 'New York');
+
+                    case 'calculate':
+                        // Try different formats: "expression: 2 + 2" or just "2 + 2"
+                        let expression = parameters.trim();
+                        const exprMatch = parameters.match(/expression:\s*(.+)/) || parameters.match(/"([^"]+)"/) || parameters.match(/'([^']+)'/);
+                        if (exprMatch) expression = exprMatch[1] || exprMatch[0];
+                        expression = expression.replace(/["']/g, '').trim();
+                        return await calculate(expression || '2 + 2');
+
+                    case 'extract_text':
+                        // Try different formats
+                        let text = '', pattern = '';
+                        const textMatch = parameters.match(/text:\s*([^,]+),\s*pattern:\s*(.+)/) ||
+                                         parameters.match(/"([^"]+)",\s*"([^"]+)"/) ||
+                                         parameters.match(/'([^']+)',\s*'([^']+)'/);
+                        if (textMatch) {
+                            text = textMatch[1] || textMatch[0];
+                            pattern = textMatch[2] || textMatch[1];
+                        } else {
+                            // Fallback: assume whole parameter is text and use word pattern
+                            text = parameters;
+                            pattern = '\\w+';
+                        }
+                        text = text.replace(/["']/g, '').trim();
+                        pattern = pattern.replace(/["']/g, '').trim();
+                        return await extractText(text, pattern);
+
+                    case 'search_web':
+                        // Try different formats: "query: top shops" or just "top shops"
+                        let query = parameters.trim();
+                        const queryMatch = parameters.match(/query:\s*(.+)/) ||
+                                          parameters.match(/"([^"]+)"/) ||
+                                          parameters.match(/'([^']+)'/);
+                        if (queryMatch) query = queryMatch[1] || queryMatch[0];
+                        query = query.replace(/["']/g, '').trim();
+                        console.log('Parsed query:', query);
+                        return await searchWeb(query || 'current events');
+
+                    default:
+                        return { error: `Unknown tool: ${name}` };
+                }
+            } catch (error) {
+                console.error('Tool execution error:', error);
+                return { error: error.message };
+            }
+        }
+
+        // Individual tool functions
+        async function getWeather(location) {
+            const unit = 'celsius';
+            const temperature = Math.floor(Math.random() * 30) + 5;
+            const condition = ['Sunny', 'Cloudy', 'Rainy', 'Windy'][Math.floor(Math.random() * 4)];
+            return {
+                location,
+                temperature,
+                unit,
+                condition,
+                description: `Current weather in ${location}: ${temperature}°${unit === 'celsius' ? 'C' : 'F'}, ${condition}`
+            };
+        }
+
+        async function calculate(expression) {
+            try {
+                // Simple evaluation for basic math expressions
+                const result = eval(expression);
+                return {
+                    expression,
+                    result,
+                    description: `Calculation: ${expression} = ${result}`
+                };
+            } catch (error) {
+                return {
+                    expression,
+                    error: 'Invalid expression',
+                    description: `Failed to calculate: ${expression}`
+                };
+            }
+        }
+
+        async function extractText(text, pattern) {
+            try {
+                const regex = new RegExp(pattern, 'g');
+                const matches = text.match(regex) || [];
+                return {
+                    text,
+                    pattern,
+                    matches,
+                    description: `Extracted ${matches.length} matches using pattern "${pattern}"`
+                };
+            } catch (error) {
+                return {
+                    text,
+                    pattern,
+                    error: 'Invalid regex pattern',
+                    description: `Failed to extract text with pattern "${pattern}"`
+                };
+            }
+        }
+
+        async function searchWeb(query) {
+            try {
+                const response = await fetch('https://api.tavily.com/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer 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`
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        search_depth: "basic",
+                        include_answer: false,
+                        include_raw_content: true,
+                        max_results: 5
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Web search failed with status ${response.status}`);
+                }
+
+                const searchData = await response.json();
+
+                // Truncate results for UI display
+                const truncatedResults = searchData.results?.map(result => ({
+                    ...result,
+                    content: result.content?.length > 200 ? result.content.substring(0, 200) + '...' : result.content,
+                    raw_content: result.raw_content?.length > 300 ? result.raw_content.substring(0, 300) + '...' : result.raw_content
+                })) || [];
+
+                return {
+                    query,
+                    results: truncatedResults,
+                    total_results: searchData.results?.length || 0,
+                    description: `Found ${searchData.results?.length || 0} results for "${query}" (content truncated for display)`
+                };
+            } catch (error) {
+                return {
+                    query,
+                    error: error.message,
+                    description: `Web search failed: ${error.message}`
+                };
+            }
+        }
+
+        // Parse tool calls from assistant response
+        function parseToolCalls(content) {
+            console.log('Parsing tool calls from content:', content);
+
+            const toolCalls = [];
+
+            // Try primary format: [TOOL_CALL: tool_name(parameters)]
+            const toolCallRegex = /\[TOOL_CALL:\s*(\w+)\(([^)]*)\)\]/g;
+            let match;
+            while ((match = toolCallRegex.exec(content)) !== null) {
+                const toolName = match[1];
+                const paramsStr = match[2];
+                console.log('Found tool call (format 1):', toolName, 'with params:', paramsStr);
+                toolCalls.push({
+                    name: toolName,
+                    parameters: paramsStr
+                });
+            }
+
+            // If no tool calls found, try alternative formats
+            if (toolCalls.length === 0) {
+                // Try format: tool_name("parameters")
+                const altRegex = /(\w+)\("([^"]*)"\)/g;
+                while ((match = altRegex.exec(content)) !== null) {
+                    const toolName = match[1];
+                    const paramsStr = match[2];
+                    console.log('Found tool call (format 2):', toolName, 'with params:', paramsStr);
+                    toolCalls.push({
+                        name: toolName,
+                        parameters: paramsStr
+                    });
+                }
+            }
+
+            // If still no tool calls, try format: tool_name(parameters) without quotes
+            if (toolCalls.length === 0) {
+                const simpleRegex = /(\w+)\(([^)]*)\)/g;
+                while ((match = simpleRegex.exec(content)) !== null) {
+                    const toolName = match[1];
+                    const paramsStr = match[2];
+                    // Skip if it looks like a function call that's not a tool
+                    if (!['get_weather', 'calculate', 'extract_text', 'search_web'].includes(toolName)) continue;
+                    console.log('Found tool call (format 3):', toolName, 'with params:', paramsStr);
+                    toolCalls.push({
+                        name: toolName,
+                        parameters: paramsStr
+                    });
+                }
+            }
+
+            console.log('Total tool calls found:', toolCalls.length);
+            return toolCalls;
+        }
+
+        async function sendMessage() {
+            const inputEl = document.getElementById('messageInput');
+            const sendButton = document.getElementById('sendButton');
+            const message = inputEl.value.trim();
+
+            if (!message) return;
+
+            // Add user message
+            addMessage('user', message);
+            const userMessage = { role: 'user', content: message };
+
+            // For vision model, add image if URL is provided
+            if (currentModel === 'pipilot-1-vision') {
+                const imageUrl = document.getElementById('imageUrlInput').value.trim();
+                if (imageUrl) {
+                    userMessage.content = [
+                        { type: 'text', text: message },
+                        { type: 'image_url', image_url: { url: imageUrl } }
+                    ];
+                }
+            }
+
+            messages.push(userMessage);
+
+            // Clear input and disable send
+            inputEl.value = '';
+            sendButton.disabled = true;
+            setStatus('🤔 Thinking...', 'loading');
+
+            try {
+                // Main conversation loop
+                let continueConversation = true;
+                let maxIterations = 3; // Prevent infinite loops
+                let iteration = 0;
+
+                while (continueConversation && iteration < maxIterations) {
+                    iteration++;
+
+                    // API call
+                    const response = await fetch(BASE_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: currentModel,
+                            messages: messages,
+                            temperature: 0.7,
+                            stream: false
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+                    }
+
+                    const data = await response.json();
+                    const assistantMessage = data.choices[0].message;
+                    let content = assistantMessage.content || '';
+
+                    console.log('Assistant response:', content);
+
+                    // Parse for tool calls
+                    const toolCalls = parseToolCalls(content);
+
+                    if (toolCalls.length > 0) {
+                        // Remove tool call syntax from displayed content
+                        const displayContent = content.replace(/\[TOOL_CALL:\s*\w+\([^)]*\)\]/g, '').trim();
+                        if (displayContent) {
+                            content = formatCodeBlocks(displayContent);
+                            addMessage('assistant', content);
+                        }
+
+                        // Add assistant message to history
+                        messages.push({
+                            role: 'assistant',
+                            content: assistantMessage.content
+                        });
+
+                        // Execute tools
+                        for (const toolCall of toolCalls) {
+                            const toolResult = await executeToolManually(toolCall);
+
+                            // Show tool call and result
+                            addMessage('system', `🔧 Tool Call: ${toolCall.name}(${toolCall.parameters})`);
+                            addMessage('system', `🔧 Tool Result:\n${JSON.stringify(toolResult, null, 2)}`);
+
+                            // Add tool result to conversation
+                            messages.push({
+                                role: 'user',
+                                content: `Tool result for ${toolCall.name}: ${JSON.stringify(toolResult)}`
+                            });
+                        }
+
+                        // Continue conversation with tool results
+                        continueConversation = true;
+                    } else {
+                        // No tool calls, this is the final response
+                        content = formatCodeBlocks(content);
+                        addMessage('assistant', content);
+
+                        // Add to messages history
+                        messages.push({
+                            role: 'assistant',
+                            content: assistantMessage.content
+                        });
+
+                        continueConversation = false;
+                    }
+                }
+
+                if (iteration >= maxIterations) {
+                    addMessage('system', '⚠️ Conversation ended due to maximum iterations reached.');
+                }
+
+                setStatus('Ready for next message', '');
+
+            } catch (error) {
+                addMessage('system', `❌ Error: ${error.message}`);
+                setStatus('❌ Error occurred', 'error');
+            } finally {
+                sendButton.disabled = false;
+            }
+        }
+
+        // Allow sending with Enter key
+        document.getElementById('messageInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Focus input on load
+        window.addEventListener('load', () => {
+            document.getElementById('messageInput').focus();
+        });
+    </script>
+</body>
+</html>

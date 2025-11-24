@@ -37,6 +37,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { EmailAIAssistant } from "@/components/email-ai-assistant"
 import {
   Mail,
   Send,
@@ -354,6 +355,11 @@ export default function AdminEmailPage() {
     setEmailType(template.type)
     setEmailSubject(template.subject)
     setEmailContent(template.content)
+  }
+
+  const handleAIGenerate = (subject: string, content: string) => {
+    setEmailSubject(subject)
+    setEmailContent(content)
   }
 
   const sendBulkEmails = async () => {
@@ -1263,6 +1269,9 @@ export default function AdminEmailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* AI Email Assistant */}
+      <EmailAIAssistant onGenerate={handleAIGenerate} />
     </div>
   )
 }

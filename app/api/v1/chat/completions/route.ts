@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import crypto from 'crypto';
+import { authenticateRequest, processBilling, type AuthContext } from '@/lib/ai-api/auth-middleware';
 
 // Enhanced error handling utilities
 interface APIError {
@@ -869,8 +871,25 @@ export async function POST(request: NextRequest) {
     const requestId = crypto.randomUUID();
     const startTime = Date.now();
     let requestBody: any = null;
+    let authContext: AuthContext | null = null;
+    let responseText = '';
 
     try {
+        // Step 1: Authenticate API key and check balance
+        const authResult = await authenticateRequest(request);
+        
+        if (!authResult.success) {
+            return NextResponse.json(authResult.error, { 
+                status: authResult.error.error.type === 'auth_error' ? 401 : 
+                       authResult.error.error.type === 'rate_limit_error' ? 429 : 
+                       authResult.error.error.type === 'insufficient_balance' ? 402 : 500 
+            });
+        }
+
+        authContext = authResult.context;
+        
+        console.log(`✅ [${requestId}] Authenticated: User ${authContext.userId}, Balance: $${authContext.balance.toFixed(2)}`);
+
         // Parse and validate request
         const body: OpenAIRequest = await request.json();
         requestBody = body; // Store for error handling
@@ -1288,9 +1307,43 @@ export async function POST(request: NextRequest) {
             return new NextResponse(readable, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } });
         }
 
+        // Extract response text for billing
+        responseText = transformed.choices[0].message.content || '';
+        
+        // Process billing (async - don't block response)
+        if (authContext) {
+            const billingResult = await processBilling({
+                authContext,
+                model,
+                messages: body.messages,
+                responseText,
+                endpoint: '/v1/chat/completions',
+                statusCode: 200,
+                responseTimeMs: Date.now() - startTime,
+            });
+            
+            if (billingResult.success) {
+                console.log(`💰 [${requestId}] Charged $${billingResult.cost.toFixed(4)}, New Balance: $${billingResult.newBalance?.toFixed(2)}`);
+            }
+        }
+
         return NextResponse.json(transformed);
 
     } catch (error: any) {
+        // Log failed request (no charge)
+        if (authContext && requestBody) {
+            await processBilling({
+                authContext,
+                model: requestBody.model || 'pipilot-1-chat',
+                messages: requestBody.messages || [],
+                responseText: '',
+                endpoint: '/v1/chat/completions',
+                statusCode: 500,
+                responseTimeMs: Date.now() - startTime,
+                errorMessage: error.message,
+            });
+        }
+        
         const apiError = handleAPIError(error, 'POST /api/v1/chat/completions', requestId);
 
         // Determine appropriate HTTP status code

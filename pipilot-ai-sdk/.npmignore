@@ -1,0 +1,10 @@
+node_modules
+test-sdk.js
+typescript-example.ts
+*.log
+.DS_Store
+.vscode
+.idea
+*.swp
+*.swo
+*~

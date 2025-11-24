@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PiPilot Model Tester</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .test-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .test-card h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+        
+        .test-info {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .result {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 15px;
+            min-height: 100px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        
+        .result.streaming {
+            border-left: 4px solid #667eea;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .status.loading {
+            background: #ffc107;
+            color: #000;
+        }
+        
+        .status.success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .status.error {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .controls {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+        }
+        
+        .controls h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .button-group button {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 PiPilot Model Tester</h1>
+        
+        <div class="controls">
+            <h2>Quick Actions</h2>
+            <div class="button-group">
+                <button onclick="runAllTests()">Run All Tests</button>
+                <button onclick="clearAllResults()">Clear All Results</button>
+            </div>
+        </div>
+        
+        <div class="test-grid">
+            <!-- Chat Model Test -->
+            <div class="test-card">
+                <h2>💬 pipilot-1-chat</h2>
+                <div class="test-info">
+                    <strong>Test:</strong> General conversation<br>
+                    <strong>Mode:</strong> Non-streaming
+                </div>
+                <button onclick="testChatModel()">Test Chat Model</button>
+                <div id="chat-status"></div>
+                <div id="chat-result" class="result"></div>
+            </div>
+            
+            <!-- Chat Model Streaming Test -->
+            <div class="test-card">
+                <h2>💬 pipilot-1-chat (Streaming)</h2>
+                <div class="test-info">
+                    <strong>Test:</strong> General conversation<br>
+                    <strong>Mode:</strong> Streaming
+                </div>
+                <button onclick="testChatModelStreaming()">Test Chat Streaming</button>
+                <div id="chat-stream-status"></div>
+                <div id="chat-stream-result" class="result streaming"></div>
+            </div>
+            
+            <!-- Thinking Model Test -->
+            <div class="test-card">
+                <h2>🧠 pipilot-1-chat-thinking</h2>
+                <div class="test-info">
+                    <strong>Test:</strong> Mathematical reasoning<br>
+                    <strong>Mode:</strong> Non-streaming
+                </div>
+                <button onclick="testThinkingModel()">Test Thinking Model</button>
+                <div id="thinking-status"></div>
+                <div id="thinking-result" class="result"></div>
+            </div>
+            
+            <!-- Thinking Model Streaming Test -->
+            <div class="test-card">
+                <h2>🧠 pipilot-1-chat-thinking (Streaming)</h2>
+                <div class="test-info">
+                    <strong>Test:</strong> Mathematical reasoning<br>
+                    <strong>Mode:</strong> Streaming
+                </div>
+                <button onclick="testThinkingModelStreaming()">Test Thinking Streaming</button>
+                <div id="thinking-stream-status"></div>
+                <div id="thinking-stream-result" class="result streaming"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const BASE_URL = 'https://pipilot.dev/api/v1/chat/completions';
+        
+        function setStatus(elementId, status, type) {
+            const el = document.getElementById(elementId);
+            el.innerHTML = `<span class="status ${type}">${status}</span>`;
+        }
+        
+        function clearAllResults() {
+            document.querySelectorAll('.result').forEach(el => el.textContent = '');
+            document.querySelectorAll('[id$="-status"]').forEach(el => el.innerHTML = '');
+        }
+        
+        async function testChatModel() {
+            const resultEl = document.getElementById('chat-result');
+            const statusEl = 'chat-status';
+            
+            resultEl.textContent = '';
+            setStatus(statusEl, '⏳ Testing...', 'loading');
+            
+            try {
+                const response = await fetch(BASE_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: 'pipilot-1-chat',
+                        messages: [
+                            {
+                                role: 'user',
+                                content: 'Hello! Can you tell me a fun fact about space in 2-3 sentences?'
+                            }
+                        ],
+                        temperature: 0.7,
+                        stream: false
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+                }
+                
+                const data = await response.json();
+                resultEl.textContent = `Model: ${data.model}\nFinish Reason: ${data.choices[0].finish_reason}\n\n${data.choices[0].message.content}`;
+                setStatus(statusEl, '✅ Success', 'success');
+            } catch (error) {
+                resultEl.textContent = `Error: ${error.message}`;
+                setStatus(statusEl, '❌ Failed', 'error');
+            }
+        }
+        
+        async function testChatModelStreaming() {
+            const resultEl = document.getElementById('chat-stream-result');
+            const statusEl = 'chat-stream-status';
+            
+            resultEl.textContent = '';
+            setStatus(statusEl, '⏳ Streaming...', 'loading');
+            
+            try {
+                const response = await fetch(BASE_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: 'pipilot-1-chat',
+                        messages: [
+                            {
+                                role: 'user',
+                                content: 'Count from 1 to 5 with a brief description of each number.'
+                            }
+                        ],
+                        temperature: 0.7,
+                        stream: true
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+                }
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullContent = '';
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n').filter(line => line.trim() !== '');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            if (data === '[DONE]') continue;
+                            
+                            try {
+                                const parsed = JSON.parse(data);
+                                const content = parsed.choices?.[0]?.delta?.content;
+                                if (content) {
+                                    fullContent += content;
+                                    resultEl.textContent = fullContent;
+                                    resultEl.scrollTop = resultEl.scrollHeight;
+                                }
+                            } catch (e) {
+                                // Ignore parse errors
+                            }
+                        }
+                    }
+                }
+                
+                setStatus(statusEl, '✅ Stream Complete', 'success');
+            } catch (error) {
+                resultEl.textContent = `Error: ${error.message}`;
+                setStatus(statusEl, '❌ Failed', 'error');
+            }
+        }
+        
+        async function testThinkingModel() {
+            const resultEl = document.getElementById('thinking-result');
+            const statusEl = 'thinking-status';
+            
+            resultEl.textContent = '';
+            setStatus(statusEl, '⏳ Testing...', 'loading');
+            
+            try {
+                const response = await fetch(BASE_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: 'pipilot-1-chat-thinking',
+                        messages: [
+                            {
+                                role: 'user',
+                                content: 'What is 15 * 24? Show your step-by-step reasoning.'
+                            }
+                        ],
+                        temperature: 0.7,
+                        stream: false
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+                }
+                
+                const data = await response.json();
+                const content = data.choices[0].message.content;
+                const hasThinking = content.includes('<thinking>');
+                
+                resultEl.textContent = `Model: ${data.model}\nFinish Reason: ${data.choices[0].finish_reason}\nHas <thinking> tags: ${hasThinking ? '✅' : '⚠️'}\n\n${content}`;
+                setStatus(statusEl, '✅ Success', 'success');
+            } catch (error) {
+                resultEl.textContent = `Error: ${error.message}`;
+                setStatus(statusEl, '❌ Failed', 'error');
+            }
+        }
+        
+        async function testThinkingModelStreaming() {
+            const resultEl = document.getElementById('thinking-stream-result');
+            const statusEl = 'thinking-stream-status';
+            
+            resultEl.textContent = '';
+            setStatus(statusEl, '⏳ Streaming...', 'loading');
+            
+            try {
+                const response = await fetch(BASE_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: 'pipilot-1-chat-thinking',
+                        messages: [
+                            {
+                                role: 'user',
+                                content: 'What is 7 + 8? Show your reasoning process.'
+                            }
+                        ],
+                        temperature: 0.7,
+                        stream: true
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+                }
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullContent = '';
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n').filter(line => line.trim() !== '');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            if (data === '[DONE]') continue;
+                            
+                            try {
+                                const parsed = JSON.parse(data);
+                                const content = parsed.choices?.[0]?.delta?.content;
+                                if (content) {
+                                    fullContent += content;
+                                    resultEl.textContent = fullContent;
+                                    resultEl.scrollTop = resultEl.scrollHeight;
+                                }
+                            } catch (e) {
+                                // Ignore parse errors
+                            }
+                        }
+                    }
+                }
+                
+                const hasThinking = fullContent.includes('<thinking>');
+                resultEl.textContent += `\n\n--- Analysis ---\nHas <thinking> tags: ${hasThinking ? '✅' : '⚠️'}`;
+                setStatus(statusEl, '✅ Stream Complete', 'success');
+            } catch (error) {
+                resultEl.textContent = `Error: ${error.message}`;
+                setStatus(statusEl, '❌ Failed', 'error');
+            }
+        }
+        
+        async function runAllTests() {
+            clearAllResults();
+            await testChatModel();
+            await new Promise(r => setTimeout(r, 1000));
+            await testChatModelStreaming();
+            await new Promise(r => setTimeout(r, 1000));
+            await testThinkingModel();
+            await new Promise(r => setTimeout(r, 1000));
+            await testThinkingModelStreaming();
+        }
+    </script>
+</body>
+</html>

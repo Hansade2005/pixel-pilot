@@ -345,12 +345,11 @@ export const NotificationCenter = memo(function NotificationCenter() {
                 </div>
               ) : (
                 notifications.map(notification => (
-                  <DropdownMenuItem
+                  <div
                     key={notification.id}
-                    className={`p-4 cursor-pointer ${
+                    className={`p-4 border-b border-gray-700 last:border-0 ${
                       !notification.is_read && !notification.read ? 'bg-indigo-500/5' : ''
                     }`}
-                    onClick={() => handleNotificationClick(notification)}
                   >
                     <div className="flex gap-3 w-full">
                       <div className="flex-shrink-0">
@@ -376,14 +375,27 @@ export const NotificationCenter = memo(function NotificationCenter() {
                           )}
                         </div>
                         <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">
-                          {notification.message || notification.body}
+                          {notification.message || notification.body}...
                         </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {formatTimeAgo(notification.created_at)}
-                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <p className="text-xs text-gray-500 flex-1">
+                            {formatTimeAgo(notification.created_at)}
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              window.location.href = `/notifications?id=${notification.id}`
+                            }}
+                            className="h-6 px-2 text-xs text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10"
+                          >
+                            Read
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </DropdownMenuItem>
+                  </div>
                 ))
               )}
             </div>

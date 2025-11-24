@@ -28,7 +28,10 @@ import {
   User,
   ChevronLeft,
   Menu,
-  X
+  X,
+  Database,
+  Wallet,
+  Shield
 } from "lucide-react"
 
 const iconMap = {
@@ -38,7 +41,10 @@ const iconMap = {
   Globe,
   Mail,
   Bell,
-  Settings
+  Settings,
+  Database,
+  Wallet,
+  Shield
 }
 
 interface AdminLayoutProps {
@@ -98,7 +104,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+      {/* Background pattern */}
+      <div className="absolute inset-0 opacity-30">
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-pink-500/5"></div>
+      </div>
+
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
@@ -109,24 +120,24 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       {/* Sidebar */}
       <div className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0
+        fixed inset-y-0 left-0 z-50 w-64 bg-gray-900/95 backdrop-blur-xl border-r border-white/10 shadow-2xl transform transition-transform duration-300 ease-in-out lg:translate-x-0
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between h-16 px-4 border-b border-white/10">
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-                <Settings className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center shadow-lg shadow-purple-500/20">
+                <Shield className="w-5 h-5 text-white" />
               </div>
-              <span className="text-lg font-semibold text-gray-900 dark:text-white">
+              <span className="text-lg font-semibold text-white">
                 Admin Panel
               </span>
             </div>
             <Button
               variant="ghost"
               size="sm"
-              className="lg:hidden"
+              className="lg:hidden text-white hover:bg-white/10"
               onClick={() => setSidebarOpen(false)}
             >
               <X className="w-5 h-5" />
@@ -144,10 +155,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   key={item.id}
                   href={item.href}
                   className={`
-                    flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                    flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200
                     ${isActive
-                      ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200'
-                      : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700'
+                      ? 'bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-white border border-purple-500/30 shadow-lg shadow-purple-500/10'
+                      : 'text-gray-300 hover:bg-white/5 hover:text-white'
                     }
                   `}
                   onClick={() => setSidebarOpen(false)}
@@ -160,35 +171,35 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </nav>
 
           {/* User info */}
-          <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="p-4 border-t border-white/10">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="w-full justify-start space-x-3 h-auto p-2">
+                <Button variant="ghost" className="w-full justify-start space-x-3 h-auto p-2 text-white hover:bg-white/5">
                   <Avatar className="w-8 h-8">
                     <AvatarImage src={user?.user_metadata?.avatar_url} />
-                    <AvatarFallback>
+                    <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white">
                       {user?.email?.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col items-start text-left">
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    <span className="text-sm font-medium text-white">
                       {user?.user_metadata?.full_name || user?.email}
                     </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                    <span className="text-xs text-gray-400">
                       Admin
                     </span>
                   </div>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push('/settings')}>
+              <DropdownMenuContent align="end" className="w-56 bg-gray-900 border-white/10">
+                <DropdownMenuLabel className="text-white">My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem onClick={() => router.push('/settings')} className="text-gray-300 hover:text-white hover:bg-white/5">
                   <User className="w-4 h-4 mr-2" />
                   Profile Settings
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout}>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem onClick={handleLogout} className="text-gray-300 hover:text-white hover:bg-white/5">
                   <LogOut className="w-4 h-4 mr-2" />
                   Sign Out
                 </DropdownMenuItem>
@@ -199,14 +210,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       </div>
 
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div className="lg:pl-64 relative z-10">
         {/* Top bar */}
-        <div className="sticky top-0 z-30 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="sticky top-0 z-30 bg-gray-900/95 backdrop-blur-xl border-b border-white/10 shadow-lg">
           <div className="flex items-center justify-between h-16 px-4">
             <Button
               variant="ghost"
               size="sm"
-              className="lg:hidden"
+              className="lg:hidden text-white hover:bg-white/10"
               onClick={() => setSidebarOpen(true)}
             >
               <Menu className="w-5 h-5" />
@@ -214,7 +225,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
             <div className="flex items-center space-x-4">
               <Link href="/workspace">
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" className="border-white/10 text-white hover:bg-white/5">
                   <ChevronLeft className="w-4 h-4 mr-2" />
                   Back to App
                 </Button>
