@@ -1,15 +1,15 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { 
-    Bell, 
-    Check, 
-    CheckCheck, 
-    ArrowLeft, 
+import {
+    Bell,
+    Check,
+    CheckCheck,
+    ArrowLeft,
     Calendar,
     Info,
     AlertCircle,
@@ -41,7 +41,7 @@ interface Notification {
     created_at: string
 }
 
-export default function NotificationsPage() {
+function NotificationsPageContent() {
     const supabase = createClient()
     const searchParams = useSearchParams()
     const router = useRouter()
@@ -431,5 +431,17 @@ export default function NotificationsPage() {
                 </div>
             </div>
         </div>
+    )
+}
+
+export default function NotificationsPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
+            </div>
+        }>
+            <NotificationsPageContent />
+        </Suspense>
     )
 }
