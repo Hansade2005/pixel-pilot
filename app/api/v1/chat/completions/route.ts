@@ -949,11 +949,11 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // 2. Code Routing (Codestral) - Use our custom tool format
-        if (model === 'pipilot-1-code') {
-            console.log('💻 Code model detected, routing to Codestral');
+        // 2. Code & Thinking Routing (Codestral) - Use our custom tool format
+        if (model === 'pipilot-1-code' || model === 'pipilot-1-thinking') {
+            console.log(`💻 ${model === 'pipilot-1-code' ? 'Code' : 'Thinking'} model detected, routing to Codestral`);
 
-            const messages = ensureSystemPrompt(body.messages, 'pipilot-1-code', body.tools);
+            const messages = ensureSystemPrompt(body.messages, model, body.tools);
 
             if (body.stream) {
                 const stream = streamCodestral(messages, body.temperature); // Remove tools/tool_choice
@@ -966,7 +966,7 @@ export async function POST(request: NextRequest) {
                         for await (const chunk of stream) {
                             accumulatedContent += chunk;
                             const data = JSON.stringify({
-                                id, object: 'chat.completion.chunk', created, model: 'pipilot-1-code',
+                                id, object: 'chat.completion.chunk', created, model: model,
                                 choices: [{ index: 0, delta: { content: chunk }, finish_reason: null }]
                             });
                             controller.enqueue(encoder.encode(`data: ${data}\n\n`));
@@ -985,7 +985,7 @@ export async function POST(request: NextRequest) {
                             }));
 
                             const toolCallChunk = JSON.stringify({
-                                id, object: 'chat.completion.chunk', created, model: 'pipilot-1-code',
+                                id, object: 'chat.completion.chunk', created, model: model,
                                 choices: [{
                                     index: 0,
                                     delta: { tool_calls: openAIToolCalls },
@@ -1015,7 +1015,7 @@ export async function POST(request: NextRequest) {
                     }));
                     response.choices[0].finish_reason = 'tool_calls';
                 }
-                return NextResponse.json(transformMistralResponse(response, 'pipilot-1-code'));
+                return NextResponse.json(transformMistralResponse(response, model));
             }
         }
 
