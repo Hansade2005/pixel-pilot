@@ -994,6 +994,22 @@ function transformMistralResponse(mistralResponse: any, model: string): any {
 
 function ensureSystemPrompt(messages: OpenAIMessage[], model: string, tools?: any[]): OpenAIMessage[] {
     const defaultPrompt = DEFAULT_SYSTEM_PROMPTS[model] || DEFAULT_SYSTEM_PROMPTS['pipilot-1-chat'];
+
+    // Dynamically insert current date for real-time awareness
+    const currentDate = new Date().toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+    const currentTime = new Date().toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZoneName: 'short'
+    });
+    const dateTimeHeader = `📅 CURRENT DATE & TIME: ${currentDate} at ${currentTime}\n\n`;
+
     const newMessages = [...messages];
     const systemMessageIndex = newMessages.findIndex(m => m.role === 'system');
 
@@ -1046,11 +1062,11 @@ function ensureSystemPrompt(messages: OpenAIMessage[], model: string, tools?: an
 
         newMessages[systemMessageIndex] = {
             role: 'system',
-            content: `${defaultPrompt}${dynamicToolsText}\n\n--- USER SYSTEM INSTRUCTIONS ---\n${userText}`
+            content: `${dateTimeHeader}${defaultPrompt}${dynamicToolsText}\n\n--- USER SYSTEM INSTRUCTIONS ---\n${userText}`
         };
     } else {
         // No user system prompt, just add the default one
-        newMessages.unshift({ role: 'system', content: `${defaultPrompt}${dynamicToolsText}` });
+        newMessages.unshift({ role: 'system', content: `${dateTimeHeader}${defaultPrompt}${dynamicToolsText}` });
     }
     return newMessages;
 }
