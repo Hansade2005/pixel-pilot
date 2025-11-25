@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { usePathname, useSearchParams } from "next/navigation"
+import { usePathname } from "next/navigation"
 import Link from "next/link"
 import {
     Users,
@@ -94,7 +94,7 @@ const navigationItems = [
 
 export default function AIPlatformLayout({ children }: AIPlatformLayoutProps) {
     const pathname = usePathname()
-    const searchParams = useSearchParams()
+    const [currentTab, setCurrentTab] = useState<string | null>(null)
     const [teams, setTeams] = useState<TeamInfo[]>([])
     const [selectedTeamId, setSelectedTeamId] = useState<string>("")
     const [loading, setLoading] = useState(true)
@@ -106,6 +106,14 @@ export default function AIPlatformLayout({ children }: AIPlatformLayoutProps) {
     useEffect(() => {
         setMounted(true)
     }, [])
+
+    // Read URL tab parameter client-side to avoid SSR issues
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search)
+            setCurrentTab(params.get('tab'))
+        }
+    }, [pathname])
 
     useEffect(() => {
         loadUserTeams()
@@ -260,7 +268,7 @@ export default function AIPlatformLayout({ children }: AIPlatformLayoutProps) {
                             {navigationItems.map((item) => {
                                 const Icon = item.icon
                                 const isActive = item.tab
-                                    ? pathname === '/ai/platform' && searchParams.get('tab') === item.tab
+                                    ? pathname === '/ai/platform' && currentTab === item.tab
                                     : pathname === item.href
 
                                 return (
