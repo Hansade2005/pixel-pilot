@@ -55,39 +55,34 @@ const navigationItems = [
         label: 'Platform',
         icon: Users,
         href: '/ai/platform',
-        tab: null,
         description: 'Team management and overview'
     },
     {
         id: 'api-keys',
         label: 'API Keys',
         icon: Key,
-        href: '/ai/platform?tab=keys',
-        tab: 'keys',
+        href: '/ai/platform/keys',
         description: 'Manage API keys'
     },
     {
         id: 'wallet',
         label: 'Wallet',
         icon: Wallet,
-        href: '/ai/platform?tab=wallet',
-        tab: 'wallet',
+        href: '/ai/platform/wallet',
         description: 'Credits and billing'
     },
     {
         id: 'activity',
         label: 'Activity',
         icon: Activity,
-        href: '/ai/platform?tab=activity',
-        tab: 'activity',
+        href: '/ai/platform/activity',
         description: 'Usage analytics'
     },
     {
         id: 'settings',
         label: 'Settings',
         icon: Settings,
-        href: '/ai/platform?tab=settings',
-        tab: 'settings',
+        href: '/ai/platform/settings',
         description: 'Platform settings'
     }
 ]
@@ -259,9 +254,9 @@ function AIPlatformLayoutContent({ children }: AIPlatformLayoutProps) {
                         <nav className="flex-1 px-4 py-6 space-y-2">
                             {navigationItems.map((item) => {
                                 const Icon = item.icon
-                                const isActive = item.tab
-                                    ? pathname === '/ai/platform' && searchParams.get('tab') === item.tab
-                                    : pathname === item.href
+                                const isActive = item.href === '/ai/platform'
+                                    ? pathname === '/ai/platform'
+                                    : pathname.startsWith(item.href)
 
                                 return (
                                     <Tooltip key={item.id}>
