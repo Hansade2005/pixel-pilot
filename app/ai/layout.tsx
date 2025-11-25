@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import {
     Users,
@@ -55,40 +55,46 @@ const navigationItems = [
         label: 'Platform',
         icon: Users,
         href: '/ai/platform',
+        tab: null,
         description: 'Team management and overview'
     },
     {
         id: 'api-keys',
         label: 'API Keys',
         icon: Key,
-        href: '/ai-api/keys',
+        href: '/ai/platform?tab=keys',
+        tab: 'keys',
         description: 'Manage API keys'
     },
     {
         id: 'wallet',
         label: 'Wallet',
         icon: Wallet,
-        href: '/ai-api/wallet',
+        href: '/ai/platform?tab=wallet',
+        tab: 'wallet',
         description: 'Credits and billing'
     },
     {
         id: 'activity',
         label: 'Activity',
         icon: Activity,
-        href: '/ai-api/activity',
+        href: '/ai/platform?tab=activity',
+        tab: 'activity',
         description: 'Usage analytics'
     },
     {
         id: 'settings',
         label: 'Settings',
         icon: Settings,
-        href: '/ai/settings',
+        href: '/ai/platform?tab=settings',
+        tab: 'settings',
         description: 'Platform settings'
     }
 ]
 
 export default function AIPlatformLayout({ children }: AIPlatformLayoutProps) {
     const pathname = usePathname()
+    const searchParams = useSearchParams()
     const [teams, setTeams] = useState<TeamInfo[]>([])
     const [selectedTeamId, setSelectedTeamId] = useState<string>("")
     const [loading, setLoading] = useState(true)
@@ -146,6 +152,7 @@ export default function AIPlatformLayout({ children }: AIPlatformLayoutProps) {
         setSelectedTeamId(teamId)
         localStorage.setItem('user_team_id', teamId)
         toast.success('Team switched successfully')
+        window.location.reload()
     }
 
     const selectedTeam = teams.find(team => team.id === selectedTeamId)
@@ -185,7 +192,7 @@ export default function AIPlatformLayout({ children }: AIPlatformLayoutProps) {
                                     <Sparkles className="w-5 h-5 text-white" />
                                 </div>
                                 <span className="text-lg font-semibold text-white">
-                                    AI Platform
+                                  PiPIlot  AI
                                 </span>
                             </div>
                         )}
@@ -230,7 +237,7 @@ export default function AIPlatformLayout({ children }: AIPlatformLayoutProps) {
                                     </SelectTrigger>
                                     <SelectContent className="bg-gray-900 border-white/10">
                                         {teams.map(team => (
-                                            <SelectItem key={team.id} value={team.id} className="text-white hover:bg-white/5">
+                                            <SelectItem key={team.id} value={team.id} className="text-white hover:bg-gray-700">
                                                 <div className="flex items-center gap-2">
                                                     <Users className="h-4 w-4" />
                                                     {team.name}
@@ -252,7 +259,9 @@ export default function AIPlatformLayout({ children }: AIPlatformLayoutProps) {
                     <nav className="flex-1 px-4 py-6 space-y-2">
                         {navigationItems.map((item) => {
                             const Icon = item.icon
-                            const isActive = pathname === item.href
+                            const isActive = item.tab 
+                                ? pathname === '/ai/platform' && searchParams.get('tab') === item.tab
+                                : pathname === item.href
 
                             return (
                                 <Tooltip key={item.id}>

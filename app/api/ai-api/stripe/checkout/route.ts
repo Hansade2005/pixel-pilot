@@ -98,8 +98,8 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/ai-api/wallet?success=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/ai-api/wallet?canceled=true`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/ai/platform?tab=wallet&success=true`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/ai/platform?tab=wallet&canceled=true`,
       metadata: {
         user_id: user.id,
         amount: amount.toString(),
