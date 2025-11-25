@@ -242,7 +242,92 @@
             font-size: 0.9em;
             overflow-x: auto;
         }
+
+        /* Marked.js code block styling */
+        pre {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            overflow-x: auto;
+            font-size: 0.9em;
+        }
+
+        pre code {
+            background: transparent;
+            padding: 0;
+            border: none;
+            font-size: inherit;
+        }
+
+        code {
+            background: #f4f4f4;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .thinking-accordion {
+            background: #f0f8ff;
+            border: 1px solid #b0d4ff;
+            border-radius: 8px;
+            margin: 10px 0;
+            padding: 0;
+        }
+
+        .thinking-accordion summary {
+            background: #e6f3ff;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #0066cc;
+            border-radius: 8px 8px 0 0;
+            list-style: none;
+        }
+
+        .thinking-accordion summary:hover {
+            background: #d4e8ff;
+        }
+
+        .thinking-accordion summary::marker {
+            content: '🤔 ';
+        }
+
+        .thinking-accordion[open] summary::marker {
+            content: '💭 ';
+        }
+
+        .thinking-content {
+            padding: 15px;
+            background: white;
+            border-radius: 0 0 8px 8px;
+            white-space: pre-wrap;
+            font-family: 'Segoe UI', sans-serif;
+            line-height: 1.5;
+        }
     </style>
+
+    <!-- Highlight.js for syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/cpp.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/csharp.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/php.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/ruby.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/go.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/rust.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/json.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/bash.min.js"></script>
+
+    <!-- Marked.js for markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -475,15 +560,29 @@ When analyzing images or performing related tasks, use these tools when they can
                     if (parsed && typeof parsed === 'object') {
                         html += `<pre>${JSON.stringify(parsed, null, 2)}</pre>`;
                     } else {
-                        html += content.replace(/\n/g, '<br>');
+                        // For assistant messages, use markdown rendering
+                        if (role === 'assistant') {
+                            html += renderMarkdown(content);
+                        } else {
+                            html += content.replace(/\n/g, '<br>');
+                        }
                     }
                 } catch {
-                    html += content.replace(/\n/g, '<br>');
+                    // For assistant messages, use markdown rendering
+                    if (role === 'assistant') {
+                        html += renderMarkdown(content);
+                    } else {
+                        html += content.replace(/\n/g, '<br>');
+                    }
                 }
             } else if (Array.isArray(content)) {
                 content.forEach(item => {
                     if (item.type === 'text') {
-                        html += item.text.replace(/\n/g, '<br>');
+                        if (role === 'assistant') {
+                            html += renderMarkdown(item.text);
+                        } else {
+                            html += item.text.replace(/\n/g, '<br>');
+                        }
                     }
                 });
             }
@@ -507,6 +606,14 @@ When analyzing images or performing related tasks, use these tools when they can
 
             messagesEl.appendChild(messageDiv);
             messagesEl.scrollTop = messagesEl.scrollHeight;
+
+            // Auto-close thinking accordion after 3 seconds
+            const thinkingAccordion = messageDiv.querySelector('.thinking-accordion');
+            if (thinkingAccordion) {
+                setTimeout(() => {
+                    thinkingAccordion.open = false;
+                }, 3000);
+            }
         }
 
         function setStatus(message, type = '') {
@@ -704,6 +811,37 @@ When analyzing images or performing related tasks, use these tools when they can
             }
         }
 
+        // Configure Marked.js with Highlight.js integration
+        marked.setOptions({
+            highlight: function(code, lang) {
+                const language = lang || 'plaintext';
+                if (hljs.getLanguage(language)) {
+                    return hljs.highlight(code, { language }).value;
+                } else {
+                    return hljs.highlightAuto(code).value;
+                }
+            },
+            breaks: true,
+            gfm: true
+        });
+
+        // Render markdown using Marked.js
+        function renderMarkdown(text) {
+            return marked.parse(text);
+        }
+
+        // Process thinking tags into accordion
+        function processThinkingTags(text) {
+            // Handle case where response ends with </thinking> but doesn't start with <thinking>
+            if (text.trim().endsWith('</thinking>') && !text.trim().startsWith('<thinking>')) {
+                text = '<thinking>' + text;
+            }
+
+            return text.replace(/<thinking>([\s\S]*?)<\/thinking>/g, (match, thinkingContent) => {
+                return `<details class="thinking-accordion" open><summary>🤔 Thinking Process</summary><div class="thinking-content">${thinkingContent.trim()}</div></details>`;
+            });
+        }
+
         // Parse tool calls from assistant response
         function parseToolCalls(content) {
             console.log('Parsing tool calls from content:', content);
@@ -758,6 +896,82 @@ When analyzing images or performing related tasks, use these tools when they can
             return toolCalls;
         }
 
+        // Handle streaming response
+        async function handleStreamingResponse(response) {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let content = '';
+            let buffer = '';
+            let isToolCall = false;
+
+            // Add a temporary message for streaming
+            const messagesEl = document.getElementById('messages');
+            const tempMessageDiv = document.createElement('div');
+            tempMessageDiv.className = `message assistant`;
+            tempMessageDiv.innerHTML = `<strong>${getModelDisplayName(currentModel)}:</strong> `;
+            messagesEl.appendChild(tempMessageDiv);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // Keep incomplete line
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            if (data === '[DONE]') continue;
+
+                            try {
+                                const parsed = JSON.parse(data);
+                                const delta = parsed.choices?.[0]?.delta;
+                                if (delta?.content) {
+                                    content += delta.content;
+                                    if (content.includes('[TOOL_CALL:')) {
+                                        isToolCall = true;
+                                    }
+                                    if (!isToolCall) {
+                                        // Update the temporary message
+                                        const rendered = renderMarkdown(content);
+                                        tempMessageDiv.innerHTML = `<strong>${getModelDisplayName(currentModel)}:</strong> ${rendered}`;
+                                        messagesEl.scrollTop = messagesEl.scrollHeight;
+                                    }
+                                }
+                            } catch (e) {
+                                console.error('Error parsing stream chunk:', e);
+                            }
+                        }
+                    }
+                }
+            } finally {
+                reader.releaseLock();
+            }
+
+            // If it's a tool call, show placeholder
+            if (isToolCall) {
+                tempMessageDiv.innerHTML = `<strong>${getModelDisplayName(currentModel)}:</strong> <em>Using tools...</em>`;
+            } else {
+                // Process thinking tags if any
+                content = processThinkingTags(content);
+                const finalRendered = renderMarkdown(content);
+                tempMessageDiv.innerHTML = `<strong>${getModelDisplayName(currentModel)}:</strong> ${finalRendered}`;
+            }
+
+            // Auto-close thinking accordion after 3 seconds
+            const thinkingAccordion = tempMessageDiv.querySelector('.thinking-accordion');
+            if (thinkingAccordion) {
+                setTimeout(() => {
+                    thinkingAccordion.open = false;
+                }, 3000);
+            }
+
+            return { content, messageDiv: tempMessageDiv, isToolCall };
+        }
+
         async function sendMessage() {
             const inputEl = document.getElementById('messageInput');
             const sendButton = document.getElementById('sendButton');
@@ -799,12 +1013,15 @@ When analyzing images or performing related tasks, use these tools when they can
                     // API call
                     const response = await fetch(BASE_URL, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer pp_live-AVGk0qjxKKfBk-c4m3waDh07r-dGSu8h'
+                        },
                         body: JSON.stringify({
                             model: currentModel,
                             messages: messages,
                             temperature: 0.7,
-                            stream: false
+                            stream: true
                         })
                     });
 
@@ -812,9 +1029,8 @@ When analyzing images or performing related tasks, use these tools when they can
                         throw new Error(`HTTP ${response.status}: ${await response.text()}`);
                     }
 
-                    const data = await response.json();
-                    const assistantMessage = data.choices[0].message;
-                    let content = assistantMessage.content || '';
+                    // Handle streaming response
+                    const { content, messageDiv, isToolCall } = await handleStreamingResponse(response);
 
                     console.log('Assistant response:', content);
 
@@ -825,18 +1041,26 @@ When analyzing images or performing related tasks, use these tools when they can
                         // Remove tool call syntax from displayed content
                         const displayContent = content.replace(/\[TOOL_CALL:\s*\w+\([^)]*\)\]/g, '').trim();
                         if (displayContent) {
-                            content = formatCodeBlocks(displayContent);
-                            addMessage('assistant', content);
+                            // Update the streaming message with cleaned content
+                            const rendered = renderMarkdown(displayContent);
+                            messageDiv.innerHTML = `<strong>${getModelDisplayName(currentModel)}:</strong> ${rendered}`;
                         }
 
                         // Add assistant message to history
                         messages.push({
                             role: 'assistant',
-                            content: assistantMessage.content
+                            content: content
                         });
 
-                        // Execute tools
+                        // Execute tools (skip builtin tools handled by backend)
+                        const builtinTools = ['search_web']; // These are handled server-side
+
                         for (const toolCall of toolCalls) {
+                            if (builtinTools.includes(toolCall.name)) {
+                                console.log(`Skipping builtin tool ${toolCall.name} - handled by backend`);
+                                continue; // Skip builtin tools already executed server-side
+                            }
+
                             const toolResult = await executeToolManually(toolCall);
 
                             // Show tool call and result
@@ -854,14 +1078,15 @@ When analyzing images or performing related tasks, use these tools when they can
                         continueConversation = true;
                     } else {
                         // No tool calls, this is the final response
-                        content = formatCodeBlocks(content);
-                        addMessage('assistant', content);
+                        // Message already added via streaming
 
                         // Add to messages history
-                        messages.push({
-                            role: 'assistant',
-                            content: assistantMessage.content
-                        });
+                        if (!isToolCall) {
+                            messages.push({
+                                role: 'assistant',
+                                content: content
+                            });
+                        }
 
                         continueConversation = false;
                     }

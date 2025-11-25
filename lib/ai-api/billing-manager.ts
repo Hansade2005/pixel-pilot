@@ -10,6 +10,10 @@ const supabase = createClient(
  */
 export async function getModelPricing(model: string) {
   try {
+    // Add timeout to prevent hanging on network issues
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
     const { data, error } = await supabase
       .from('ai_pricing')
       .select('*')
@@ -17,10 +21,30 @@ export async function getModelPricing(model: string) {
       .eq('is_active', true)
       .single();
 
-    if (error) throw error;
+    clearTimeout(timeoutId);
+
+    if (error) {
+      // Log specific error types for better debugging
+      if (error.message?.includes('timeout') || error.message?.includes('ETIMEDOUT')) {
+        console.error(`Network timeout getting pricing for ${model}:`, error.message);
+      } else if (error.code === 'PGRST116') {
+        console.warn(`No pricing record found for model: ${model}`);
+      } else {
+        console.error(`Database error getting pricing for ${model}:`, error);
+      }
+      return null;
+    }
+
     return data;
-  } catch (error) {
-    console.error('Error getting model pricing:', error);
+  } catch (error: any) {
+    // Handle different types of errors
+    if (error.name === 'AbortError') {
+      console.error(`Request timeout getting pricing for ${model}: Operation aborted after 5 seconds`);
+    } else if (error.message?.includes('fetch failed') || error.message?.includes('ETIMEDOUT')) {
+      console.error(`Network error getting pricing for ${model}:`, error.message);
+    } else {
+      console.error(`Unexpected error getting pricing for ${model}:`, error);
+    }
     return null;
   }
 }
@@ -36,8 +60,17 @@ export async function calculateCost(
   try {
     const pricing = await getModelPricing(model);
     if (!pricing) {
-      console.warn(`No pricing found for model: ${model}, using default $0.05`);
-      return 0.05; // Default fallback
+      // Use model-specific fallback pricing when database is unavailable
+      const fallbackPricing: Record<string, number> = {
+        'pipilot-1-code': 0.08,      // $0.08 per request
+        'pipilot-1-vision': 0.08,    // $0.08 per request
+        'pipilot-1-chat': 0.05,      // $0.05 per request
+        'pipilot-1-thinking': 0.05,  // $0.05 per request
+      };
+
+      const fallbackPrice = fallbackPricing[model] || 0.05;
+      console.warn(`No pricing found for model: ${model}, using fallback $${fallbackPrice}`);
+      return fallbackPrice;
     }
 
     const inputCost = (inputTokens / 1000) * parseFloat(pricing.input_price_per_1k_tokens);
@@ -47,7 +80,18 @@ export async function calculateCost(
     return inputCost + outputCost + baseFee;
   } catch (error) {
     console.error('Error calculating cost:', error);
-    return 0.05; // Default fallback
+
+    // Use model-specific fallback pricing when database/network fails
+    const fallbackPricing: Record<string, number> = {
+      'pipilot-1-code': 0.04,      // $0.04 per request
+      'pipilot-1-vision': 0.08,    // $0.08 per request
+      'pipilot-1-chat': 0.05,      // $0.05 per request
+      'pipilot-1-thinking': 0.05,  // $0.05 per request
+    };
+
+    const fallbackPrice = fallbackPricing[model] || 0.05;
+    console.warn(`Error calculating cost for ${model}, using fallback $${fallbackPrice}`);
+    return fallbackPrice;
   }
 }
 
