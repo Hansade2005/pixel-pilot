@@ -1,23 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from "@/lib/supabase/server"
 import { checkAdminAccess } from '@/lib/admin-utils'
+import { createClient as createAdminClient } from "@supabase/supabase-js"
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { walletId: string } }
 ) {
   try {
-    // Check admin access
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      )
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || !checkAdminAccess(user)) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
+    const supabase = await createClient()
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    if (!checkAdminAccess(user)) {
+      return NextResponse.json({ error: "Admin access required" }, { status: 403 })
     }
 
     const { amount, reason, type } = await request.json()
@@ -30,7 +29,7 @@ export async function POST(
       return NextResponse.json({ error: 'Reason is required' }, { status: 400 })
     }
 
-    const supabase = createClient(
+    const adminSupabase = createAdminClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
@@ -38,7 +37,7 @@ export async function POST(
     const walletId = params.walletId
 
     // Get current wallet balance
-    const { data: wallet, error: walletError } = await supabase
+    const { data: wallet, error: walletError } = await adminSupabase
       .from('ai_wallets')
       .select('balance, user_id')
       .eq('id', walletId)
@@ -48,7 +47,7 @@ export async function POST(
       return NextResponse.json({ error: 'Wallet not found' }, { status: 404 })
     }
 
-    const newBalance = wallet.balance + amount
+    const newBalance = parseFloat(wallet.balance) + amount
 
     // Prevent negative balances
     if (newBalance < 0) {
@@ -56,7 +55,7 @@ export async function POST(
     }
 
     // Update wallet balance
-    const { error: updateError } = await supabase
+    const { error: updateError } = await adminSupabase
       .from('ai_wallets')
       .update({
         balance: newBalance,
@@ -70,18 +69,20 @@ export async function POST(
     }
 
     // Record the transaction
-    const { error: transactionError } = await supabase
-      .from('ai_wallet_transactions')
+    const { error: transactionError } = await adminSupabase
+      .from('ai_transactions')
       .insert({
         wallet_id: walletId,
         user_id: wallet.user_id,
-        amount: amount,
-        type: type || 'admin_adjustment',
+        amount: Math.abs(amount),
+        type: 'adjustment',
         description: `Admin adjustment: ${reason}`,
+        balance_before: parseFloat(wallet.balance),
+        balance_after: newBalance,
         metadata: {
           admin_reason: reason,
-          previous_balance: wallet.balance,
-          new_balance: newBalance
+          adjustment_type: type || 'admin_adjustment',
+          admin_user_id: user.id
         }
       })
 

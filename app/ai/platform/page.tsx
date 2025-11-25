@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, Suspense } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -88,7 +88,7 @@ interface Transaction {
     status: 'completed' | 'pending' | 'failed'
 }
 
-export default function AIPlatformDashboard() {
+function AIPlatformDashboard() {
     const supabase = createClient()
     const searchParams = useSearchParams()
     const [teams, setTeams] = useState<Team[]>([])
@@ -1280,4 +1280,14 @@ export default function AIPlatformDashboard() {
 
         </div>
     )}
+
+function AIPlatformDashboardWrapper() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-500"></div></div>}>
+            <AIPlatformDashboard />
+        </Suspense>
+    )
+}
+
+export default AIPlatformDashboardWrapper
 

@@ -50,6 +50,22 @@ interface UserWallet {
     }
 }
 
+interface Transaction {
+    id: string
+    wallet_id: string
+    user_id: string
+    amount: number
+    type: string
+    description: string
+    balance_before: number
+    balance_after: number
+    created_at: string
+    user: {
+        email: string
+        full_name?: string
+    }
+}
+
 interface WalletStats {
     totalUsers: number
     totalBalance: number
@@ -68,6 +84,8 @@ export default function AdminWalletsPage() {
     const [adjustmentType, setAdjustmentType] = useState<'add' | 'subtract'>('add')
     const [adjustmentReason, setAdjustmentReason] = useState('')
     const [adjusting, setAdjusting] = useState(false)
+    const [transactions, setTransactions] = useState<Transaction[]>([])
+    const [transactionsLoading, setTransactionsLoading] = useState(false)
 
     // Animated stats
     const [animatedStats, setAnimatedStats] = useState({
@@ -81,6 +99,7 @@ export default function AdminWalletsPage() {
 
     useEffect(() => {
         loadWallets()
+        loadTransactions()
     }, [])
 
     // Animate numbers
@@ -141,6 +160,24 @@ export default function AdminWalletsPage() {
             toast.error('Failed to load wallets')
         } finally {
             setLoading(false)
+        }
+    }
+
+    const loadTransactions = async () => {
+        try {
+            setTransactionsLoading(true)
+            const response = await fetch('/api/admin/transactions')
+            if (response.ok) {
+                const data = await response.json()
+                setTransactions(data.transactions || [])
+            } else {
+                toast.error('Failed to load transactions')
+            }
+        } catch (error) {
+            console.error('Error loading transactions:', error)
+            toast.error('Failed to load transactions')
+        } finally {
+            setTransactionsLoading(false)
         }
     }
 
@@ -366,7 +403,7 @@ export default function AdminWalletsPage() {
                                             <div className="mt-4 pt-4 border-t border-white/10">
                                                 <h4 className="text-sm font-medium text-gray-300 mb-2">Recent Transactions</h4>
                                                 <div className="space-y-2">
-                                                    {wallet.transactions.recent.slice(0, 3).map((transaction) => (
+                                                    {wallet.transactions.recent.slice(0, 3).map((transaction: { id: string; amount: number; type: string; description: string; created_at: string }) => (
                                                         <div key={transaction.id} className="flex items-center justify-between text-sm">
                                                             <span className="text-gray-400">{transaction.description}</span>
                                                             <div className="flex items-center gap-2">
@@ -390,10 +427,93 @@ export default function AdminWalletsPage() {
                 </TabsContent>
 
                 <TabsContent value="transactions" className="space-y-4">
+                    {/* Search and Filters */}
+                    <div className="flex items-center gap-4">
+                        <div className="relative flex-1 max-w-md">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <Input
+                                placeholder="Search transactions..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-10 bg-gray-900/50 border-white/10 text-white placeholder-gray-400"
+                            />
+                        </div>
+                        <Button
+                            onClick={() => {
+                                loadTransactions()
+                                loadWallets()
+                            }}
+                            variant="outline"
+                            className="border-white/10 text-white hover:bg-white/5"
+                        >
+                            <Loader2 className="h-4 w-4 mr-2" />
+                            Refresh
+                        </Button>
+                    </div>
+
+                    {/* Transactions Table */}
                     <Card className="bg-gray-900/50 backdrop-blur-xl border-white/5">
-                        <CardContent className="text-center py-12">
-                            <CreditCard className="mx-auto h-12 w-12 mb-4 opacity-20 text-gray-600" />
-                            <p className="text-gray-400">Transaction history coming soon...</p>
+                        <CardHeader>
+                            <CardTitle className="text-white">Recent Transactions</CardTitle>
+                            <CardDescription className="text-gray-400">
+                                All wallet transactions across the platform
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {transactionsLoading ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <Loader2 className="h-8 w-8 animate-spin text-white" />
+                                    <span className="ml-2 text-gray-400">Loading transactions...</span>
+                                </div>
+                            ) : transactions.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <CreditCard className="mx-auto h-12 w-12 mb-4 opacity-20 text-gray-600" />
+                                    <p className="text-gray-400">No transactions found</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {transactions
+                                        .filter(transaction =>
+                                            transaction.user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                            transaction.description.toLowerCase().includes(searchQuery.toLowerCase())
+                                        )
+                                        .map((transaction) => (
+                                            <div key={transaction.id} className="flex items-center justify-between p-4 bg-gray-800/30 rounded-lg border border-white/5">
+                                                <div className="flex items-center gap-4">
+                                                    <div className={`p-2 rounded-lg ${
+                                                        transaction.type === 'topup' ? 'bg-green-500/10' :
+                                                        transaction.type === 'usage' ? 'bg-red-500/10' :
+                                                        transaction.type === 'bonus' ? 'bg-blue-500/10' :
+                                                        transaction.type === 'refund' ? 'bg-yellow-500/10' :
+                                                        'bg-purple-500/10'
+                                                    }`}>
+                                                        {transaction.type === 'topup' ? <ArrowUp className="h-4 w-4 text-green-400" /> :
+                                                         transaction.type === 'usage' ? <ArrowDown className="h-4 w-4 text-red-400" /> :
+                                                         transaction.type === 'bonus' ? <Sparkles className="h-4 w-4 text-blue-400" /> :
+                                                         transaction.type === 'refund' ? <CreditCard className="h-4 w-4 text-yellow-400" /> :
+                                                         <Edit className="h-4 w-4 text-purple-400" />}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-white font-medium">{transaction.description}</p>
+                                                        <p className="text-sm text-gray-400">
+                                                            {transaction.user.email} • {new Date(transaction.created_at).toLocaleDateString()} {new Date(transaction.created_at).toLocaleTimeString()}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className={`font-medium ${
+                                                        transaction.amount > 0 ? 'text-green-400' : 'text-red-400'
+                                                    }`}>
+                                                        {transaction.amount > 0 ? '+' : ''}{formatCurrency(transaction.amount)}
+                                                    </p>
+                                                    <p className="text-xs text-gray-500">
+                                                        Balance: {formatCurrency(transaction.balance_after)}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>
