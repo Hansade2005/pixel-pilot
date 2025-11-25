@@ -39,7 +39,7 @@ interface Transaction {
     amount: number
     type: 'credit' | 'debit'
     description: string
-    createdAt: string
+    created_at: string
     status: 'completed' | 'pending' | 'failed'
 }
 
@@ -231,13 +231,18 @@ export default function WalletPage() {
         }).format(amount)
     }
 
-    const formatDate = (date: string) => {
-        return new Date(date).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        })
+    const formatDate = (date: string | null | undefined) => {
+        if (!date) return 'N/A'
+        try {
+            return new Date(date).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            })
+        } catch (e) {
+            return 'Invalid Date'
+        }
     }
 
     if (loading) {
@@ -340,7 +345,7 @@ export default function WalletPage() {
                                         </div>
                                         <div>
                                             <p className="text-white font-medium">{transaction.description}</p>
-                                            <p className="text-gray-400 text-sm">{formatDate(transaction.createdAt)}</p>
+                                            <p className="text-gray-400 text-sm">{formatDate(transaction.created_at)}</p>
                                         </div>
                                     </div>
                                     <div className="text-right">

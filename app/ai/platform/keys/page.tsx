@@ -31,13 +31,13 @@ interface Team {
 interface ApiKey {
     id: string
     name: string
-    keyPrefix: string
-    createdAt: string
-    lastUsed?: string
-    isActive: boolean
-    rateLimitPerMinute?: number
-    rateLimitPerDay?: number
-    expiresAt?: string
+    key_prefix: string
+    created_at: string
+    last_used?: string
+    is_active: boolean
+    rate_limit_per_minute?: number
+    rate_limit_per_day?: number
+    expires_at?: string
 }
 
 export default function ApiKeysPage() {
@@ -52,6 +52,8 @@ export default function ApiKeysPage() {
     const [creatingKey, setCreatingKey] = useState(false)
     const [showCreateKeyDialog, setShowCreateKeyDialog] = useState(false)
     const [newKeyName, setNewKeyName] = useState('')
+    const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null)
+    const [showNewKeyDialog, setShowNewKeyDialog] = useState(false)
 
     useEffect(() => {
         loadTeam()
@@ -155,11 +157,9 @@ export default function ApiKeysPage() {
                 toast.success('API key created successfully!')
                 setNewKeyName('')
                 setShowCreateKeyDialog(false)
+                setNewlyCreatedKey(data.apiKey)
+                setShowNewKeyDialog(true)
                 await loadApiKeys()
-                // Show the full key once
-                setTimeout(() => {
-                    toast.info(`Your API key: ${data.apiKey}`, { duration: 10000 })
-                }, 1000)
             } else {
                 const error = await response.json()
                 toast.error(error.error || 'Failed to create API key')
@@ -201,13 +201,23 @@ export default function ApiKeysPage() {
         }
     }
 
-    const formatDate = (date: string) => {
-        return new Date(date).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        })
+    const formatDate = (date: string | null | undefined) => {
+        if (!date) return 'N/A'
+        try {
+            return new Date(date).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            })
+        } catch (e) {
+            return 'Invalid Date'
+        }
+    }
+
+    const copyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text)
+        toast.success('Copied to clipboard')
     }
 
     if (loading) {
@@ -269,16 +279,16 @@ export default function ApiKeysPage() {
                                         <div>
                                             <p className="text-white font-medium">{key.name}</p>
                                             <p className="text-gray-400 text-sm">
-                                                {key.keyPrefix}... • Created {formatDate(key.createdAt)}
-                                                {key.lastUsed && ` • Last used ${formatDate(key.lastUsed)}`}
+                                                {key.key_prefix}... • Created {formatDate(key.created_at)}
+                                                {key.last_used && ` • Last used ${formatDate(key.last_used)}`}
                                             </p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <Badge variant={key.isActive ? "default" : "secondary"} className={key.isActive ? "bg-green-500/20 text-green-400" : ""}>
-                                            {key.isActive ? "Active" : "Inactive"}
+                                        <Badge variant={key.is_active ? "default" : "secondary"} className={key.is_active ? "bg-green-500/20 text-green-400" : ""}>
+                                            {key.is_active ? "Active" : "Inactive"}
                                         </Badge>
-                                        {key.isActive && (
+                                        {key.is_active && (
                                             <Button
                                                 variant="outline"
                                                 size="sm"
@@ -296,6 +306,7 @@ export default function ApiKeysPage() {
                 </CardContent>
             </Card>
 
+            {/* Create Key Dialog */}
             <Dialog open={showCreateKeyDialog} onOpenChange={setShowCreateKeyDialog}>
                 <DialogContent className="bg-gray-900 border-white/10">
                     <DialogHeader>
@@ -335,6 +346,38 @@ export default function ApiKeysPage() {
                                     Create API Key
                                 </>
                             )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* New Key Display Dialog */}
+            <Dialog open={showNewKeyDialog} onOpenChange={setShowNewKeyDialog}>
+                <DialogContent className="bg-gray-900 border-white/10">
+                    <DialogHeader>
+                        <DialogTitle className="text-white">API Key Created</DialogTitle>
+                        <DialogDescription className="text-gray-400">
+                            Please copy your API key now. You won't be able to see it again!
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="p-4 bg-gray-800 rounded-lg border border-white/10 break-all font-mono text-sm text-purple-300">
+                            {newlyCreatedKey}
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            onClick={() => copyToClipboard(newlyCreatedKey || '')}
+                            variant="outline"
+                            className="border-white/10 text-white hover:bg-white/5 mr-2"
+                        >
+                            Copy to Clipboard
+                        </Button>
+                        <Button
+                            onClick={() => setShowNewKeyDialog(false)}
+                            className="bg-purple-600 hover:bg-purple-500"
+                        >
+                            Done
                         </Button>
                     </DialogFooter>
                 </DialogContent>

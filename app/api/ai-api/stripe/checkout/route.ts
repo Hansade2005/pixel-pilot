@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+
     if (authError || !user) {
       return NextResponse.json(
         { error: 'Invalid authentication token' },
@@ -98,8 +98,8 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/ai/platform?tab=wallet&success=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/ai/platform?tab=wallet&canceled=true`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/ai/platform/wallet?success=true`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/ai/platform/wallet?canceled=true`,
       metadata: {
         user_id: user.id,
         amount: amount.toString(),

@@ -352,13 +352,18 @@ export default function AIPlatformDashboard() {
         }).format(amount)
     }
 
-    const formatDate = (date: string) => {
-        return new Date(date).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        })
+    const formatDate = (date: string | null | undefined) => {
+        if (!date) return 'N/A'
+        try {
+            return new Date(date).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            })
+        } catch (e) {
+            return 'Invalid Date'
+        }
     }
 
     if (loading) {
