@@ -1001,6 +1001,23 @@ export async function POST(request: NextRequest) {
 
                         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
                         controller.close();
+
+                        // Process billing for streaming response (Vision)
+                        if (authContext) {
+                            const billingResult = await processBilling({
+                                authContext,
+                                model: 'pipilot-1-vision',
+                                messages: body.messages,
+                                responseText: accumulatedContent,
+                                endpoint: '/v1/chat/completions',
+                                statusCode: 200,
+                                responseTimeMs: Date.now() - startTime,
+                            });
+                            
+                            if (billingResult.success) {
+                                console.log(`💰 [${requestId}] Vision Streaming - Charged $${billingResult.cost.toFixed(4)}, New Balance: $${billingResult.newBalance?.toFixed(2)}`);
+                            }
+                        }
                     }
                 });
                 return new NextResponse(readable, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } });
@@ -1126,6 +1143,23 @@ export async function POST(request: NextRequest) {
 
                         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
                         controller.close();
+
+                        // Process billing for streaming response (Code/Thinking)
+                        if (authContext) {
+                            const billingResult = await processBilling({
+                                authContext,
+                                model,
+                                messages: body.messages,
+                                responseText: accumulatedContent,
+                                endpoint: '/v1/chat/completions',
+                                statusCode: 200,
+                                responseTimeMs: Date.now() - startTime,
+                            });
+                            
+                            if (billingResult.success) {
+                                console.log(`💰 [${requestId}] ${model} Streaming - Charged $${billingResult.cost.toFixed(4)}, New Balance: $${billingResult.newBalance?.toFixed(2)}`);
+                            }
+                        }
                     }
                 });
                 return new NextResponse(readable, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } });
@@ -1302,6 +1336,23 @@ export async function POST(request: NextRequest) {
                     controller.enqueue(encoder.encode(`data: ${doneChunk}\n\n`));
                     controller.enqueue(encoder.encode('data: [DONE]\n\n'));
                     controller.close();
+
+                    // Process billing for streaming response (Chat)
+                    if (authContext) {
+                        const billingResult = await processBilling({
+                            authContext,
+                            model,
+                            messages: body.messages,
+                            responseText: transformed.choices[0].message.content || '',
+                            endpoint: '/v1/chat/completions',
+                            statusCode: 200,
+                            responseTimeMs: Date.now() - startTime,
+                        });
+                        
+                        if (billingResult.success) {
+                            console.log(`💰 [${requestId}] ${model} Streaming - Charged $${billingResult.cost.toFixed(4)}, New Balance: $${billingResult.newBalance?.toFixed(2)}`);
+                        }
+                    }
                 }
             });
             return new NextResponse(readable, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } });
