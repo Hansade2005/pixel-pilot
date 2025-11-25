@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { usePathname } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { usePathname, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import {
     Users,
@@ -92,9 +92,9 @@ const navigationItems = [
     }
 ]
 
-export default function AIPlatformLayout({ children }: AIPlatformLayoutProps) {
+function AIPlatformLayoutContent({ children }: AIPlatformLayoutProps) {
     const pathname = usePathname()
-    const [currentTab, setCurrentTab] = useState<string | null>(null)
+    const searchParams = useSearchParams()
     const [teams, setTeams] = useState<TeamInfo[]>([])
     const [selectedTeamId, setSelectedTeamId] = useState<string>("")
     const [loading, setLoading] = useState(true)
@@ -106,14 +106,6 @@ export default function AIPlatformLayout({ children }: AIPlatformLayoutProps) {
     useEffect(() => {
         setMounted(true)
     }, [])
-
-    // Read URL tab parameter client-side to avoid SSR issues
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            const params = new URLSearchParams(window.location.search)
-            setCurrentTab(params.get('tab'))
-        }
-    }, [pathname])
 
     useEffect(() => {
         loadUserTeams()
@@ -268,7 +260,7 @@ export default function AIPlatformLayout({ children }: AIPlatformLayoutProps) {
                             {navigationItems.map((item) => {
                                 const Icon = item.icon
                                 const isActive = item.tab
-                                    ? pathname === '/ai/platform' && currentTab === item.tab
+                                    ? pathname === '/ai/platform' && searchParams.get('tab') === item.tab
                                     : pathname === item.href
 
                                 return (
@@ -361,5 +353,17 @@ export default function AIPlatformLayout({ children }: AIPlatformLayoutProps) {
                 </div>
             </div>
         </TooltipProvider>
+    )
+}
+
+export default function AIPlatformLayout({ children }: AIPlatformLayoutProps) {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
+                <div className="text-white">Loading...</div>
+            </div>
+        }>
+            <AIPlatformLayoutContent>{children}</AIPlatformLayoutContent>
+        </Suspense>
     )
 }

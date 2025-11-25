@@ -188,17 +188,6 @@ export default function AIPlatformDashboard() {
         return () => clearInterval(timer)
     }, [currentTeam, realStats])
 
-    // Handle tab parameter from URL (client-side only to avoid SSR issues)
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            const searchParams = new URLSearchParams(window.location.search)
-            const tab = searchParams.get('tab')
-            if (tab && ['overview', 'keys', 'wallet', 'activity', 'settings'].includes(tab)) {
-                setActiveTab(tab)
-            }
-        }
-    }, [])
-
     // Load API keys when keys tab is selected
     useEffect(() => {
         if (activeTab === 'keys' && currentTeam) {
