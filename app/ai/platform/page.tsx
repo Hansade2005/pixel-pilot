@@ -90,9 +90,19 @@ interface Transaction {
     status: 'completed' | 'pending' | 'failed'
 }
 
+function SearchParamsHandler({ onTabChange }: { onTabChange: (tab: string | null) => void }) {
+    const searchParams = useSearchParams()
+
+    useEffect(() => {
+        const tab = searchParams.get('tab')
+        onTabChange(tab)
+    }, [searchParams, onTabChange])
+
+    return null
+}
+
 function AIPlatformDashboardContent() {
     const supabase = createClient()
-    const searchParams = useSearchParams()
     const [teams, setTeams] = useState<Team[]>([])
     const [currentTeam, setCurrentTeam] = useState<Team | null>(null)
     const [loading, setLoading] = useState(true)
@@ -192,13 +202,12 @@ function AIPlatformDashboardContent() {
         return () => clearInterval(timer)
     }, [currentTeam, realStats])
 
-    // Handle tab parameter from URL
-    useEffect(() => {
-        const tab = searchParams.get('tab')
+    // Handle tab parameter from URL via callback
+    const handleTabChange = (tab: string | null) => {
         if (tab && ['overview', 'keys', 'wallet', 'activity', 'settings'].includes(tab)) {
             setActiveTab(tab)
         }
-    }, [searchParams])
+    }
 
     // Load API keys when keys tab is selected
     useEffect(() => {
@@ -717,6 +726,9 @@ function AIPlatformDashboardContent() {
     // Has teams - show dashboard
     return (
         <div className="p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <Suspense fallback={null}>
+                <SearchParamsHandler onTabChange={handleTabChange} />
+            </Suspense>
             {/* Header */}
             <div className="flex flex-col gap-4">
                 <div>
@@ -1045,8 +1057,8 @@ function AIPlatformDashboardContent() {
                                                             {transaction.type === 'credit' ? '+' : '-'}{formatCurrency(transaction.amount)}
                                                         </p>
                                                         <Badge variant="outline" className={`text-xs ${transaction.status === 'completed' ? 'border-green-500/20 text-green-400' :
-                                                                transaction.status === 'pending' ? 'border-yellow-500/20 text-yellow-400' :
-                                                                    'border-red-500/20 text-red-400'
+                                                            transaction.status === 'pending' ? 'border-yellow-500/20 text-yellow-400' :
+                                                                'border-red-500/20 text-red-400'
                                                             }`}>
                                                             {transaction.status}
                                                         </Badge>
