@@ -88,7 +88,7 @@ interface Transaction {
     status: 'completed' | 'pending' | 'failed'
 }
 
-function AIPlatformDashboard() {
+function AIPlatformDashboardContent() {
     const supabase = createClient()
     const searchParams = useSearchParams()
     const [teams, setTeams] = useState<Team[]>([])
@@ -1284,7 +1284,7 @@ function AIPlatformDashboard() {
 function AIPlatformDashboardWrapper() {
     return (
         <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-500"></div></div>}>
-            <AIPlatformDashboard />
+            <AIPlatformDashboardContent />
         </Suspense>
     )
 }
