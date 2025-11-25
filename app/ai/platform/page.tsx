@@ -1,8 +1,6 @@
 "use client"
 
-export const dynamic = "force-dynamic"
-
-import { useEffect, useState, useRef, Suspense } from "react"
+import { useEffect, useState, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -28,7 +26,6 @@ import Link from "next/link"
 import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
-import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
     Select,
@@ -90,18 +87,7 @@ interface Transaction {
     status: 'completed' | 'pending' | 'failed'
 }
 
-function SearchParamsHandler({ onTabChange }: { onTabChange: (tab: string | null) => void }) {
-    const searchParams = useSearchParams()
-
-    useEffect(() => {
-        const tab = searchParams.get('tab')
-        onTabChange(tab)
-    }, [searchParams, onTabChange])
-
-    return null
-}
-
-function AIPlatformDashboardContent() {
+export default function AIPlatformDashboard() {
     const supabase = createClient()
     const [teams, setTeams] = useState<Team[]>([])
     const [currentTeam, setCurrentTeam] = useState<Team | null>(null)
@@ -202,12 +188,16 @@ function AIPlatformDashboardContent() {
         return () => clearInterval(timer)
     }, [currentTeam, realStats])
 
-    // Handle tab parameter from URL via callback
-    const handleTabChange = (tab: string | null) => {
-        if (tab && ['overview', 'keys', 'wallet', 'activity', 'settings'].includes(tab)) {
-            setActiveTab(tab)
+    // Handle tab parameter from URL (client-side only to avoid SSR issues)
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const searchParams = new URLSearchParams(window.location.search)
+            const tab = searchParams.get('tab')
+            if (tab && ['overview', 'keys', 'wallet', 'activity', 'settings'].includes(tab)) {
+                setActiveTab(tab)
+            }
         }
-    }
+    }, [])
 
     // Load API keys when keys tab is selected
     useEffect(() => {
@@ -726,9 +716,6 @@ function AIPlatformDashboardContent() {
     // Has teams - show dashboard
     return (
         <div className="p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <Suspense fallback={null}>
-                <SearchParamsHandler onTabChange={handleTabChange} />
-            </Suspense>
             {/* Header */}
             <div className="flex flex-col gap-4">
                 <div>
@@ -1294,14 +1281,3 @@ function AIPlatformDashboardContent() {
         </div>
     )
 }
-
-function AIPlatformDashboardWrapper() {
-    return (
-        <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-500"></div></div>}>
-            <AIPlatformDashboardContent />
-        </Suspense>
-    )
-}
-
-export default AIPlatformDashboardWrapper
-
