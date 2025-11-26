@@ -76,6 +76,15 @@ import {
   sendWelcomeEmail,
   sendTeamMemberJoinedNotification
 } from "@/lib/email"
+import {
+  loadEmailTemplates,
+  getTemplatesByCategory,
+  getEmailCategories,
+  getAllTemplates,
+  searchTemplates,
+  type EmailTemplate,
+  type EmailCategory
+} from "@/lib/email-templates"
 
 interface UserData {
   id: string
@@ -87,15 +96,6 @@ interface UserData {
   emailConfirmed: boolean
   avatarUrl: string | null
   isAdmin: boolean
-}
-
-interface EmailTemplate {
-  id: string
-  name: string
-  type: string
-  subject: string
-  content: string
-  variables: string[]
 }
 
 interface EmailCampaign {
@@ -121,87 +121,6 @@ const EMAIL_TYPES = [
   { value: 'welcome', label: 'Welcome Message', description: 'Welcome new users or team members' }
 ]
 
-const EMAIL_TEMPLATES: EmailTemplate[] = [
-  {
-    id: 'welcome-new-users',
-    name: 'Welcome New Users',
-    type: 'welcome',
-    subject: 'Welcome to Pixel Pilot! 🎉',
-    content: `Hi {{name}},
-
-Welcome to Pixel Pilot! We're excited to have you join our community of developers and creators.
-
-Here's what you can do to get started:
-• Explore our AI-powered coding features
-• Create your first project
-• Join our community forums
-• Check out our documentation
-
-If you have any questions, feel free to reach out to our support team.
-
-Happy coding!
-The Pixel Pilot Team`,
-    variables: ['name']
-  },
-  {
-    id: 'feature-update',
-    name: 'New Feature Announcement',
-    type: 'feature',
-    subject: '🚀 New Feature: {{feature_name}} is now available!',
-    content: `Hi {{name}},
-
-We're thrilled to announce that {{feature_name}} is now available in Pixel Pilot!
-
-{{content}}
-
-Try it out today and let us know what you think!
-
-Best regards,
-The Pixel Pilot Team`,
-    variables: ['name', 'feature_name', 'content', 'try_url']
-  },
-  {
-    id: 'security-alert',
-    name: 'Security Alert',
-    type: 'security',
-    subject: '🔒 Security Alert: {{title}}',
-    content: `Hi {{name}},
-
-{{content}}
-
-For your account security, we recommend:
-• Change your password immediately
-• Review your recent account activity
-• Enable two-factor authentication if not already enabled
-
-If you didn't initiate this activity, please contact our support team immediately.
-
-Stay safe,
-The Pixel Pilot Team`,
-    variables: ['name', 'title', 'content', 'action_url']
-  },
-  {
-    id: 'newsletter-monthly',
-    name: 'Monthly Newsletter',
-    type: 'newsletter',
-    subject: '📧 {{title}}',
-    content: `Hi {{name}},
-
-{{content}}
-
-What's New This Month:
-• Feature updates and improvements
-• Community highlights
-• Tips and best practices
-
-{{unsubscribe_content}}
-
-Best regards,
-The Pixel Pilot Team`,
-    variables: ['name', 'title', 'content', 'unsubscribe_content', 'unsubscribe_url']
-  }
-]
-
 export default function AdminEmailPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -217,9 +136,12 @@ export default function AdminEmailPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null)
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([])
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([])
+  const [emailCategories, setEmailCategories] = useState<EmailCategory[]>([])
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [planFilter, setPlanFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [showTemplatePreview, setShowTemplatePreview] = useState(false)
 
   const { toast } = useToast()
   const router = useRouter()
@@ -244,9 +166,14 @@ export default function AdminEmailPage() {
       }
 
       setUser(user)
+
+      // Load email templates from JSON file
+      const templatesData = loadEmailTemplates()
+      setEmailTemplates(templatesData.templates)
+      setEmailCategories(templatesData.categories)
+
       await Promise.all([
         fetchUsers(),
-        fetchEmailTemplates(),
         fetchEmailCampaigns()
       ])
     } catch (error) {
@@ -289,23 +216,6 @@ export default function AdminEmailPage() {
         description: "Failed to fetch user data",
         variant: "destructive"
       })
-    }
-  }
-
-  const fetchEmailTemplates = async () => {
-    try {
-      const response = await fetch('/api/admin/email-templates')
-      if (response.ok) {
-        const data = await response.json()
-        setEmailTemplates(data.templates || [])
-      } else {
-        // Fallback to hardcoded templates if API fails
-        setEmailTemplates(EMAIL_TEMPLATES)
-      }
-    } catch (error) {
-      console.error('Error fetching email templates:', error)
-      // Fallback to hardcoded templates
-      setEmailTemplates(EMAIL_TEMPLATES)
     }
   }
 
@@ -357,9 +267,13 @@ export default function AdminEmailPage() {
     setEmailContent(template.content)
   }
 
-  const handleAIGenerate = (subject: string, content: string) => {
+  const handleAIGenerate = (subject: string, content: string, template?: EmailTemplate) => {
     setEmailSubject(subject)
     setEmailContent(content)
+    if (template) {
+      setSelectedTemplate(template)
+      setEmailType(template.type)
+    }
   }
 
   const sendBulkEmails = async () => {
@@ -1050,30 +964,82 @@ export default function AdminEmailPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {EMAIL_TEMPLATES.map((template) => (
-                  <Card key={template.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg">{template.name}</CardTitle>
-                      <Badge variant="outline" className="w-fit capitalize">
-                        {template.type}
-                      </Badge>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                        {template.subject}
-                      </p>
-                      <Button
-                        onClick={() => applyTemplate(template)}
-                        className="w-full"
-                        variant="outline"
-                      >
-                        Use Template
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
+              {/* Category Filter */}
+              <div className="flex items-center gap-4 mb-6">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Filter by category:</span>
+                </div>
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="All categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {emailCategories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.icon} {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+
+              {/* Templates Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {emailTemplates
+                  .filter(template => selectedCategory === 'all' || template.category === selectedCategory)
+                  .map((template) => (
+                    <Card key={template.id} className="cursor-pointer hover:shadow-md transition-shadow">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg">{template.name}</CardTitle>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="w-fit capitalize">
+                            {template.type}
+                          </Badge>
+                          <Badge variant="secondary" className="w-fit text-xs">
+                            {emailCategories.find(cat => cat.id === template.category)?.icon} {emailCategories.find(cat => cat.id === template.category)?.name}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground mb-2 line-clamp-1 font-medium">
+                          {template.subject}
+                        </p>
+                        <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
+                          {template.description}
+                        </p>
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => applyTemplate(template)}
+                            className="flex-1"
+                            variant="outline"
+                            size="sm"
+                          >
+                            Use Template
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              setSelectedTemplate(template)
+                              setShowTemplatePreview(true)
+                            }}
+                            variant="ghost"
+                            size="sm"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+              </div>
+
+              {emailTemplates.filter(template => selectedCategory === 'all' || template.category === selectedCategory).length === 0 && (
+                <div className="text-center py-8">
+                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No templates found in this category.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1267,6 +1233,91 @@ export default function AdminEmailPage() {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Template Preview Dialog */}
+      <Dialog open={showTemplatePreview} onOpenChange={setShowTemplatePreview}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Template Preview: {selectedTemplate?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Preview how this email template will appear to recipients
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedTemplate && (
+            <div className="space-y-6">
+              {/* Template Info */}
+              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <div>
+                  <Label className="text-sm font-medium">Category</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {emailCategories.find(cat => cat.id === selectedTemplate.category)?.icon}{' '}
+                    {emailCategories.find(cat => cat.id === selectedTemplate.category)?.name}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Type</Label>
+                  <p className="text-sm text-muted-foreground capitalize">{selectedTemplate.type}</p>
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-sm font-medium">Variables</Label>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {selectedTemplate.variables.map((variable) => (
+                      <Badge key={variable} variant="outline" className="text-xs">
+                        {variable}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Email Preview */}
+              <div className="border rounded-lg overflow-hidden">
+                <div className="bg-slate-100 dark:bg-slate-800 p-4 border-b">
+                  <div className="space-y-2">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">FROM</Label>
+                      <p className="text-sm">PiPilot &lt;hello@pipilot.dev&gt;</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">SUBJECT</Label>
+                      <p className="text-sm font-medium">{selectedTemplate.subject}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 bg-white dark:bg-slate-900">
+                  <div className="max-w-2xl mx-auto">
+                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                      {selectedTemplate.content.split('\n').map((line, index) => (
+                        <p key={index} className={line.trim() === '' ? 'mb-4' : ''}>
+                          {line}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowTemplatePreview(false)}>
+                  Close
+                </Button>
+                <Button onClick={() => {
+                  applyTemplate(selectedTemplate)
+                  setShowTemplatePreview(false)
+                  setShowComposeDialog(true)
+                }}>
+                  Use This Template
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

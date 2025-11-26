@@ -1,0 +1,210 @@
+{
+  "templates": [
+    {
+      "id": "welcome-new-users",
+      "name": "Welcome New Users",
+      "type": "welcome",
+      "subject": "Welcome to PiPilot! 🎉",
+      "content": "Hi {{name}},\n\nWelcome to PiPilot! We're excited to have you join our community of developers and creators.\n\nHere's what you can do to get started:\n• Explore our AI-powered coding features\n• Create your first project\n• Join our community forums\n• Check out our documentation\n\nIf you have any questions, feel free to reach out to our support team.\n\nHappy coding!\nThe PiPilot Team",
+      "variables": ["name"],
+      "category": "onboarding",
+      "description": "Welcome message for new user registrations"
+    },
+    {
+      "id": "feature-update",
+      "name": "New Feature Announcement",
+      "type": "feature",
+      "subject": "🚀 New Feature: {{feature_name}} is now available!",
+      "content": "Hi {{name}},\n\nWe're thrilled to announce that {{feature_name}} is now available in PiPilot!\n\n{{content}}\n\nTry it out today and let us know what you think!\n\nBest regards,\nThe PiPilot Team",
+      "variables": ["name", "feature_name", "content", "try_url"],
+      "category": "product",
+      "description": "Announce new features and updates"
+    },
+    {
+      "id": "security-alert",
+      "name": "Security Alert",
+      "type": "security",
+      "subject": "🔒 Security Alert: {{title}}",
+      "content": "Hi {{name}},\n\n{{content}}\n\nFor your account security, we recommend:\n• Change your password immediately\n• Review your recent account activity\n• Enable two-factor authentication if not already enabled\n\nIf you didn't initiate this activity, please contact our support team immediately.\n\nStay safe,\nThe PiPilot Team",
+      "variables": ["name", "title", "content", "action_url"],
+      "category": "security",
+      "description": "Important security notifications and alerts"
+    },
+    {
+      "id": "newsletter-monthly",
+      "name": "Monthly Newsletter",
+      "type": "newsletter",
+      "subject": "📧 {{title}}",
+      "content": "Hi {{name}},\n\n{{content}}\n\nWhat's New This Month:\n• Feature updates and improvements\n• Community highlights\n• Tips and best practices\n\n{{unsubscribe_content}}\n\nBest regards,\nThe PiPilot Team",
+      "variables": ["name", "title", "content", "unsubscribe_content", "unsubscribe_url"],
+      "category": "marketing",
+      "description": "Monthly newsletter with updates and news"
+    },
+    {
+      "id": "billing-payment-failed",
+      "name": "Payment Failed",
+      "type": "billing",
+      "subject": "⚠️ Payment Failed for Your PiPilot Subscription",
+      "content": "Hi {{name}},\n\nWe were unable to process your payment for your PiPilot subscription.\n\nPayment Details:\n• Amount: {{amount}}\n• Plan: {{plan_name}}\n• Date: {{date}}\n\nPlease update your payment method to avoid service interruption.\n\nUpdate Payment: {{payment_url}}\n\nIf you need assistance, contact our billing team.\n\nBest regards,\nThe PiPilot Team",
+      "variables": ["name", "amount", "plan_name", "date", "payment_url"],
+      "category": "billing",
+      "description": "Notify users of failed payments"
+    },
+    {
+      "id": "billing-payment-success",
+      "name": "Payment Successful",
+      "type": "billing",
+      "subject": "✅ Payment Confirmed - Thank You!",
+      "content": "Hi {{name}},\n\nYour payment has been successfully processed!\n\nPayment Details:\n• Amount: {{amount}}\n• Plan: {{plan_name}}\n• Transaction ID: {{transaction_id}}\n• Date: {{date}}\n\nYour subscription is now active and you have full access to all features.\n\nThank you for choosing PiPilot!\n\nBest regards,\nThe PiPilot Team",
+      "variables": ["name", "amount", "plan_name", "transaction_id", "date"],
+      "category": "billing",
+      "description": "Confirm successful payments"
+    },
+    {
+      "id": "subscription-cancelled",
+      "name": "Subscription Cancelled",
+      "type": "billing",
+      "subject": "😢 We're Sorry to See You Go",
+      "content": "Hi {{name}},\n\nYour PiPilot subscription has been cancelled as requested.\n\nYou'll continue to have access to your account until {{access_until}}.\n\nDuring this time, you can:\n• Export your projects and data\n• Download your work\n• Contact support if you need help\n\nIf you'd like to reactivate your subscription, you can do so anytime from your account settings.\n\nThank you for being part of our community!\n\nBest regards,\nThe PiPilot Team",
+      "variables": ["name", "access_until"],
+      "category": "billing",
+      "description": "Confirm subscription cancellation"
+    },
+    {
+      "id": "password-reset",
+      "name": "Password Reset",
+      "type": "security",
+      "subject": "🔑 Reset Your PiPilot Password",
+      "content": "Hi {{name}},\n\nYou requested a password reset for your PiPilot account.\n\nClick the link below to reset your password:\n{{reset_url}}\n\nThis link will expire in 24 hours for security reasons.\n\nIf you didn't request this reset, please ignore this email. Your password will remain unchanged.\n\nBest regards,\nThe PiPilot Team",
+      "variables": ["name", "reset_url"],
+      "category": "security",
+      "description": "Password reset instructions"
+    },
+    {
+      "id": "email-verification",
+      "name": "Email Verification",
+      "type": "security",
+      "subject": "📧 Verify Your Email Address",
+      "content": "Hi {{name}},\n\nWelcome to PiPilot! Please verify your email address to complete your registration.\n\nClick the link below to verify your email:\n{{verification_url}}\n\nThis link will expire in 24 hours.\n\nIf you didn't create this account, please ignore this email.\n\nBest regards,\nThe PiPilot Team",
+      "variables": ["name", "verification_url"],
+      "category": "security",
+      "description": "Email address verification"
+    },
+    {
+      "id": "team-invitation",
+      "name": "Team Invitation",
+      "type": "notification",
+      "subject": "🎯 You've Been Invited to Join {{team_name}}",
+      "content": "Hi {{name}},\n\n{{inviter_name}} has invited you to join the {{team_name}} team on PiPilot!\n\nTeam Details:\n• Team: {{team_name}}\n• Role: {{role}}\n• Invited by: {{inviter_name}}\n\nAccept Invitation: {{accept_url}}\n\nIf you don't want to join this team, you can safely ignore this email.\n\nBest regards,\nThe PiPilot Team",
+      "variables": ["name", "team_name", "inviter_name", "role", "accept_url"],
+      "category": "team",
+      "description": "Invite users to join teams"
+    },
+    {
+      "id": "support-response",
+      "name": "Support Response",
+      "type": "support",
+      "subject": "📞 Support Response: {{ticket_subject}}",
+      "content": "Hi {{name}},\n\nWe've received your support request and here's our response:\n\n{{response_content}}\n\nOriginal Request:\n{{original_message}}\n\nIf you need further assistance, please reply to this email or visit our help center.\n\nBest regards,\nThe PiPilot Support Team",
+      "variables": ["name", "ticket_subject", "response_content", "original_message"],
+      "category": "support",
+      "description": "Customer support responses"
+    },
+    {
+      "id": "account-suspended",
+      "name": "Account Suspended",
+      "type": "security",
+      "subject": "⚠️ Your PiPilot Account Has Been Suspended",
+      "content": "Hi {{name}},\n\nYour PiPilot account has been temporarily suspended due to:\n\n{{reason}}\n\nTo restore your account, please:\n1. Review our Terms of Service\n2. Contact our support team\n3. Complete any required verification steps\n\nContact Support: {{support_url}}\n\nWe apologize for any inconvenience this may cause.\n\nBest regards,\nThe PiPilot Team",
+      "variables": ["name", "reason", "support_url"],
+      "category": "security",
+      "description": "Account suspension notifications"
+    },
+    {
+      "id": "account-reactivated",
+      "name": "Account Reactivated",
+      "type": "notification",
+      "subject": "✅ Your PiPilot Account Has Been Reactivated",
+      "content": "Hi {{name}},\n\nGreat news! Your PiPilot account has been reactivated.\n\nYou now have full access to all your projects and features.\n\nIf you have any questions about your account status, please contact support.\n\nWelcome back!\nThe PiPilot Team",
+      "variables": ["name"],
+      "category": "notification",
+      "description": "Account reactivation confirmation"
+    },
+    {
+      "id": "marketing-promotion",
+      "name": "Special Promotion",
+      "type": "marketing",
+      "subject": "🎉 {{promotion_title}} - Limited Time Offer!",
+      "content": "Hi {{name}},\n\n{{promotion_content}}\n\nSpecial Offer:\n• {{offer_details}}\n• Valid until: {{expiration_date}}\n\nClaim Offer: {{claim_url}}\n\nDon't miss out on this limited-time promotion!\n\n{{unsubscribe_content}}\n\nBest regards,\nThe PiPilot Team",
+      "variables": ["name", "promotion_title", "promotion_content", "offer_details", "expiration_date", "claim_url", "unsubscribe_content", "unsubscribe_url"],
+      "category": "marketing",
+      "description": "Promotional campaigns and offers"
+    },
+    {
+      "id": "maintenance-notification",
+      "name": "System Maintenance",
+      "type": "notification",
+      "subject": "🔧 Scheduled Maintenance: {{maintenance_title}}",
+      "content": "Hi {{name}},\n\nWe'll be performing scheduled maintenance on PiPilot.\n\nMaintenance Details:\n• Date: {{maintenance_date}}\n• Duration: {{maintenance_duration}}\n• Impact: {{maintenance_impact}}\n\nDuring this time, some features may be temporarily unavailable.\n\nWe apologize for any inconvenience and appreciate your patience.\n\nBest regards,\nThe PiPilot Team",
+      "variables": ["name", "maintenance_title", "maintenance_date", "maintenance_duration", "maintenance_impact"],
+      "category": "system",
+      "description": "System maintenance notifications"
+    }
+  ],
+  "categories": [
+    {
+      "id": "onboarding",
+      "name": "Onboarding",
+      "description": "Welcome and setup emails",
+      "icon": "👋"
+    },
+    {
+      "id": "product",
+      "name": "Product",
+      "description": "Feature announcements and updates",
+      "icon": "🚀"
+    },
+    {
+      "id": "security",
+      "name": "Security",
+      "description": "Security alerts and account protection",
+      "icon": "🔒"
+    },
+    {
+      "id": "billing",
+      "name": "Billing",
+      "description": "Payment and subscription related",
+      "icon": "💳"
+    },
+    {
+      "id": "marketing",
+      "name": "Marketing",
+      "description": "Promotional content and newsletters",
+      "icon": "📢"
+    },
+    {
+      "id": "team",
+      "name": "Team",
+      "description": "Team collaboration and invitations",
+      "icon": "👥"
+    },
+    {
+      "id": "support",
+      "name": "Support",
+      "description": "Customer support communications",
+      "icon": "🆘"
+    },
+    {
+      "id": "system",
+      "name": "System",
+      "description": "System notifications and maintenance",
+      "icon": "⚙️"
+    },
+    {
+      "id": "notification",
+      "name": "General",
+      "description": "General notifications and updates",
+      "icon": "📧"
+    }
+  ]
+}

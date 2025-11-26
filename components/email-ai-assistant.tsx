@@ -14,28 +14,79 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Sparkles, Loader2, Mail, X, Minimize2, Maximize2 } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Sparkles, Loader2, Mail, X, Minimize2, Maximize2, FileText, Wand2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import {
+  loadEmailTemplates,
+  getEmailCategories,
+  type EmailTemplate,
+  type EmailCategory
+} from "@/lib/email-templates"
 
 interface EmailAIAssistantProps {
-  onGenerate: (subject: string, content: string) => void
+  onGenerate: (subject: string, content: string, template?: EmailTemplate) => void
 }
 
 export function EmailAIAssistant({ onGenerate }: EmailAIAssistantProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null)
   const [prompt, setPrompt] = useState("")
   const [generating, setGenerating] = useState(false)
   const [generatedSubject, setGeneratedSubject] = useState("")
   const [generatedContent, setGeneratedContent] = useState("")
   const [showResult, setShowResult] = useState(false)
+  const [templates, setTemplates] = useState<EmailTemplate[]>([])
+  const [categories, setCategories] = useState<EmailCategory[]>([])
+  const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const { toast } = useToast()
 
+  useEffect(() => {
+    if (isOpen) {
+      loadTemplates()
+    }
+  }, [isOpen])
+
+  const loadTemplates = () => {
+    try {
+      const data = loadEmailTemplates()
+      setTemplates(data.templates)
+      setCategories(data.categories)
+    } catch (error) {
+      console.error('Error loading templates:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load email templates",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const filteredTemplates = templates.filter(template =>
+    selectedCategory === "all" || template.category === selectedCategory
+  )
+
   const handleGenerate = async () => {
+    if (!selectedTemplate) {
+      toast({
+        title: "Template required",
+        description: "Please select an email template to customize",
+        variant: "destructive"
+      })
+      return
+    }
+
     if (!prompt.trim()) {
       toast({
         title: "Prompt required",
-        description: "Please describe what email you want to generate",
+        description: "Please describe how you want to customize the email",
         variant: "destructive"
       })
       return
@@ -45,13 +96,14 @@ export function EmailAIAssistant({ onGenerate }: EmailAIAssistantProps) {
     setShowResult(false)
 
     try {
-      const response = await fetch('/api/ai/generate-notification-content', {
+      const response = await fetch('/api/ai/generate-email-template', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt: `Generate an email with the following requirements:\n\n${prompt}\n\nPlease provide a professional email subject line and content.`
+          templateId: selectedTemplate.id,
+          prompt: prompt.trim()
         }),
       })
 
@@ -68,14 +120,14 @@ export function EmailAIAssistant({ onGenerate }: EmailAIAssistantProps) {
 
       const content = data.content
 
-      // Use the generated title as subject and message as content
-      setGeneratedSubject(content.title || 'Generated Email Subject')
-      setGeneratedContent(content.message || 'Generated email content')
+      // Set the generated content
+      setGeneratedSubject(content.subject || 'Generated Email Subject')
+      setGeneratedContent(content.content || 'Generated email content')
 
       setShowResult(true)
       toast({
         title: "Email generated!",
-        description: "Review and use the generated content",
+        description: "Review and use the customized email content",
       })
 
     } catch (error) {
@@ -91,131 +143,253 @@ export function EmailAIAssistant({ onGenerate }: EmailAIAssistantProps) {
   }
 
   const handleUse = () => {
-    onGenerate(generatedSubject, generatedContent)
+    onGenerate(generatedSubject, generatedContent, selectedTemplate || undefined)
     setIsOpen(false)
     setShowResult(false)
+    resetForm()
+  }
+
+  const resetForm = () => {
+    setSelectedTemplate(null)
     setPrompt("")
     setGeneratedSubject("")
     setGeneratedContent("")
-    toast({
-      title: "Email populated!",
-      description: "The generated content has been added to your email form",
-    })
+    setSelectedCategory("all")
   }
 
   const handleClose = () => {
     setIsOpen(false)
-    setIsMinimized(false)
     setShowResult(false)
+    resetForm()
   }
 
   return (
     <>
-      {/* Floating Button */}
-      <div className="fixed bottom-6 right-6 z-50">
-        <Button
-          onClick={() => setIsOpen(true)}
-          size="lg"
-          className="rounded-full h-14 w-14 shadow-lg hover:shadow-xl transition-all duration-300 group"
-        >
-          <Sparkles className="h-6 w-6 group-hover:scale-110 transition-transform" />
-        </Button>
-      </div>
+      {/* Floating Chat Bubble */}
+      <Button
+        onClick={() => setIsOpen(true)}
+        className="fixed bottom-6 right-6 h-14 w-14 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-300 z-50"
+        size="icon"
+      >
+        <Wand2 className="h-6 w-6 text-white" />
+      </Button>
 
-      {/* AI Assistant Dialog */}
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Sparkles className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <DialogTitle>AI Email Assistant</DialogTitle>
-                  <DialogDescription>
-                    Describe the email you want to create
-                  </DialogDescription>
-                </div>
-              </div>
-              <Badge variant="outline" className="gap-1">
-                <Mail className="h-3 w-3" />
-                AI Assistant
-              </Badge>
+      {/* Main Dialog */}
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent className={`max-w-4xl ${isMinimized ? 'max-h-20' : 'max-h-[80vh]'} overflow-hidden`}>
+          <DialogHeader className="flex flex-row items-center justify-between">
+            <div>
+              <DialogTitle className="flex items-center gap-2">
+                <Wand2 className="h-5 w-5 text-purple-600" />
+                AI Email Assistant
+              </DialogTitle>
+              <DialogDescription>
+                Generate customized email content using AI and templates
+              </DialogDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsMinimized(!isMinimized)}
+              >
+                {isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleClose}
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
           </DialogHeader>
 
-          {!showResult ? (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="prompt">Email Description</Label>
-                <Textarea
-                  id="prompt"
-                  placeholder="Example: Create a welcome email for new users introducing our AI coding platform with key features and getting started steps"
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  rows={6}
-                  className="resize-none"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Be specific about the purpose, tone, and key points to include
-                </p>
-              </div>
+          {!isMinimized && (
+            <div className="space-y-6 overflow-y-auto max-h-[60vh]">
+              {!showResult ? (
+                <>
+                  {/* Template Selection */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Select Email Template
+                      </CardTitle>
+                      <CardDescription>
+                        Choose a template to customize with AI
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Category Filter */}
+                      <div className="space-y-2">
+                        <Label>Category</Label>
+                        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="All categories" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Categories</SelectItem>
+                            {categories.map((category) => (
+                              <SelectItem key={category.id} value={category.id}>
+                                {category.icon} {category.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-              <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
-                <Sparkles className="h-4 w-4 text-primary shrink-0" />
-                <p className="text-xs text-muted-foreground">
-                  Uses the same AI models as the notification assistant for consistent content generation
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-              <div className="space-y-2">
-                <Label>Subject Line</Label>
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  <p className="font-medium">{generatedSubject}</p>
-                </div>
-              </div>
+                      {/* Template Selection */}
+                      <div className="space-y-2">
+                        <Label>Template</Label>
+                        <Select
+                          value={selectedTemplate?.id || ""}
+                          onValueChange={(value) => {
+                            const template = templates.find(t => t.id === value)
+                            setSelectedTemplate(template || null)
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Choose a template..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {filteredTemplates.map((template) => (
+                              <SelectItem key={template.id} value={template.id}>
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{template.name}</span>
+                                  <span className="text-xs text-muted-foreground">{template.description}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-              <div className="space-y-2">
-                <Label>Email Content</Label>
-                <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap text-sm">
-                  {generatedContent}
-                </div>
-              </div>
+                      {selectedTemplate && (
+                        <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant="outline">{selectedTemplate.type}</Badge>
+                            <Badge variant="secondary">
+                              {categories.find(c => c.id === selectedTemplate.category)?.icon}{' '}
+                              {categories.find(c => c.id === selectedTemplate.category)?.name}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            <strong>Subject:</strong> {selectedTemplate.subject}
+                          </p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            <strong>Variables:</strong> {selectedTemplate.variables.join(', ')}
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Customization Prompt */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Sparkles className="h-4 w-4" />
+                        Customization Instructions
+                      </CardTitle>
+                      <CardDescription>
+                        Describe how you want to customize the selected template
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Textarea
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        placeholder="e.g., Make this welcome email more personalized for enterprise customers, add specific feature highlights, or customize the tone for a specific audience..."
+                        rows={4}
+                        className="resize-none"
+                      />
+                    </CardContent>
+                  </Card>
+
+                  {/* Generate Button */}
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={handleGenerate}
+                      disabled={generating || !selectedTemplate || !prompt.trim()}
+                      className="min-w-32"
+                    >
+                      {generating ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Generate Email
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                /* Results View */
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Mail className="h-4 w-4" />
+                      Generated Email Content
+                    </CardTitle>
+                    <CardDescription>
+                      Review and customize the AI-generated content
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Subject */}
+                    <div className="space-y-2">
+                      <Label>Subject Line</Label>
+                      <Textarea
+                        value={generatedSubject}
+                        onChange={(e) => setGeneratedSubject(e.target.value)}
+                        rows={2}
+                        className="resize-none"
+                      />
+                    </div>
+
+                    {/* Content */}
+                    <div className="space-y-2">
+                      <Label>Email Content</Label>
+                      <Textarea
+                        value={generatedContent}
+                        onChange={(e) => setGeneratedContent(e.target.value)}
+                        rows={12}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+
+                    {/* Template Info */}
+                    {selectedTemplate && (
+                      <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                        <p className="text-sm">
+                          <strong>Based on template:</strong> {selectedTemplate.name}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          <strong>Type:</strong> {selectedTemplate.type} • <strong>Category:</strong> {categories.find(c => c.id === selectedTemplate.category)?.name}
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
 
-          <DialogFooter>
-            {!showResult ? (
-              <>
-                <Button variant="outline" onClick={handleClose}>
-                  Cancel
-                </Button>
-                <Button onClick={handleGenerate} disabled={generating || !prompt.trim()}>
-                  {generating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  {generating ? 'Generating...' : 'Generate Email'}
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowResult(false)
-                    setGeneratedSubject("")
-                    setGeneratedContent("")
-                  }}
-                >
-                  Regenerate
-                </Button>
-                <Button onClick={handleUse}>
-                  Use This Email
-                </Button>
-              </>
-            )}
-          </DialogFooter>
+          {showResult && !isMinimized && (
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowResult(false)}>
+                Back to Edit
+              </Button>
+              <Button onClick={handleUse} className="min-w-24">
+                Use This Email
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </>
