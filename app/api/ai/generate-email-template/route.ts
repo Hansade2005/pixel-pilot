@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     console.log('Generating email template content:', { templateId, prompt, variables });
 
     // Get the template
-    const template = getTemplateById(templateId);
+    const template = await getTemplateById(templateId);
     if (!template) {
       return NextResponse.json(
         { error: 'Template not found' },

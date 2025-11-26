@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
-import fs from 'fs';
-import path from 'path';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 // Zoho SMTP Configuration
 const SMTP_CONFIG = {
@@ -198,8 +198,8 @@ export interface EmailWrapperOptions {
 export async function wrapEmailContent(options: EmailWrapperOptions): Promise<string> {
   try {
     // Read the professional template
-    const templatePath = path.join(process.cwd(), 'templates', 'professional-email-template.html');
-    let template = fs.readFileSync(templatePath, 'utf-8');
+    const templatePath = join(process.cwd(), 'templates', 'professional-email-template.html');
+    let template = readFileSync(templatePath, 'utf-8');
 
     // Set defaults
     const defaults = {

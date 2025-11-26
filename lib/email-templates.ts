@@ -1,6 +1,3 @@
-import fs from 'fs';
-import path from 'path';
-
 export interface EmailTemplate {
   id: string;
   name: string;
@@ -27,17 +24,23 @@ export interface EmailTemplatesData {
 let templatesCache: EmailTemplatesData | null = null;
 
 /**
- * Load email templates from JSON file
+ * Load email templates from API
  */
-export function loadEmailTemplates(): EmailTemplatesData {
-  if (templatesCache) {
-    return templatesCache;
+export async function loadEmailTemplates(): Promise<EmailTemplatesData> {
+  if (templatesCache !== null) {
+    return templatesCache!;
   }
 
   try {
-    const templatesPath = path.join(process.cwd(), 'data', 'email-templates.json');
-    const templatesData = fs.readFileSync(templatesPath, 'utf-8');
-    templatesCache = JSON.parse(templatesData) as EmailTemplatesData;
+    const response = await fetch('/api/email/templates');
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to load templates');
+    }
+    templatesCache = data.data as EmailTemplatesData;
     return templatesCache;
   } catch (error) {
     console.error('Error loading email templates:', error);
@@ -52,40 +55,40 @@ export function loadEmailTemplates(): EmailTemplatesData {
 /**
  * Get templates by category
  */
-export function getTemplatesByCategory(categoryId: string): EmailTemplate[] {
-  const data = loadEmailTemplates();
+export async function getTemplatesByCategory(categoryId: string): Promise<EmailTemplate[]> {
+  const data = await loadEmailTemplates();
   return data.templates.filter(template => template.category === categoryId);
 }
 
 /**
  * Get template by ID
  */
-export function getTemplateById(templateId: string): EmailTemplate | null {
-  const data = loadEmailTemplates();
+export async function getTemplateById(templateId: string): Promise<EmailTemplate | null> {
+  const data = await loadEmailTemplates();
   return data.templates.find(template => template.id === templateId) || null;
 }
 
 /**
  * Get all categories
  */
-export function getEmailCategories(): EmailCategory[] {
-  const data = loadEmailTemplates();
+export async function getEmailCategories(): Promise<EmailCategory[]> {
+  const data = await loadEmailTemplates();
   return data.categories;
 }
 
 /**
  * Get all templates
  */
-export function getAllTemplates(): EmailTemplate[] {
-  const data = loadEmailTemplates();
+export async function getAllTemplates(): Promise<EmailTemplate[]> {
+  const data = await loadEmailTemplates();
   return data.templates;
 }
 
 /**
  * Search templates by query
  */
-export function searchTemplates(query: string): EmailTemplate[] {
-  const data = loadEmailTemplates();
+export async function searchTemplates(query: string): Promise<EmailTemplate[]> {
+  const data = await loadEmailTemplates();
   const lowercaseQuery = query.toLowerCase();
 
   return data.templates.filter(template =>

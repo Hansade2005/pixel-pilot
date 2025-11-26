@@ -25,7 +25,6 @@ import { Sparkles, Loader2, Mail, X, Minimize2, Maximize2, FileText, Wand2 } fro
 import { useToast } from "@/hooks/use-toast"
 import {
   loadEmailTemplates,
-  getEmailCategories,
   type EmailTemplate,
   type EmailCategory
 } from "@/lib/email-templates"
@@ -55,9 +54,9 @@ export function EmailAIAssistant({ onGenerate }: EmailAIAssistantProps) {
     }
   }, [isOpen])
 
-  const loadTemplates = () => {
+  const loadTemplates = async () => {
     try {
-      const data = loadEmailTemplates()
+      const data = await loadEmailTemplates()
       setTemplates(data.templates)
       setCategories(data.categories)
     } catch (error) {

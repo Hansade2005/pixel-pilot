@@ -78,10 +78,7 @@ import {
 } from "@/lib/email"
 import {
   loadEmailTemplates,
-  getTemplatesByCategory,
   getEmailCategories,
-  getAllTemplates,
-  searchTemplates,
   type EmailTemplate,
   type EmailCategory
 } from "@/lib/email-templates"
@@ -167,8 +164,8 @@ export default function AdminEmailPage() {
 
       setUser(user)
 
-      // Load email templates from JSON file
-      const templatesData = loadEmailTemplates()
+      // Load email templates from API
+      const templatesData = await loadEmailTemplates()
       setEmailTemplates(templatesData.templates)
       setEmailCategories(templatesData.categories)
 
