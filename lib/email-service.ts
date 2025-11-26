@@ -1,4 +1,6 @@
 import nodemailer from 'nodemailer';
+import fs from 'fs';
+import path from 'path';
 
 // Zoho SMTP Configuration
 const SMTP_CONFIG = {
@@ -165,5 +167,97 @@ export async function testEmailConnection(testEmail: string): Promise<{
       success: false,
       error: error.message || 'Email test failed'
     };
+  }
+}
+
+/**
+ * HTML Email Wrapper - Wraps AI-generated content in professional templates
+ */
+export interface EmailWrapperOptions {
+  subject: string;
+  aiContent: string; // The AI-generated HTML content
+  greeting?: string;
+  subtitle?: string;
+  heroTitle?: string;
+  heroContent?: string;
+  featuresTitle?: string;
+  features?: Array<{
+    title: string;
+    description: string;
+    icon?: string;
+  }>;
+  ctaText?: string;
+  ctaUrl?: string;
+  ctaSubtext?: string;
+  additionalTitle?: string;
+  additionalContent?: string;
+  userEmail?: string;
+  unsubscribeUrl?: string;
+}
+
+export async function wrapEmailContent(options: EmailWrapperOptions): Promise<string> {
+  try {
+    // Read the professional template
+    const templatePath = path.join(process.cwd(), 'templates', 'professional-email-template.html');
+    let template = fs.readFileSync(templatePath, 'utf-8');
+
+    // Set defaults
+    const defaults = {
+      EMAIL_SUBJECT: options.subject,
+      LOGO_URL: 'https://pipilot.dev/logo.png', // Update with actual logo URL
+      GREETING: options.greeting || 'Hello!',
+      SUBTITLE: options.subtitle || 'We have something special for you',
+      HERO_TITLE: options.heroTitle || 'Discover the Power of AI',
+      HERO_CONTENT: options.heroContent || 'Experience the future of app development with our AI-powered platform.',
+      MAIN_CONTENT: options.aiContent,
+      FEATURES_TITLE: options.featuresTitle || 'Key Features',
+      FEATURE_1_TITLE: options.features?.[0]?.title || 'AI-Powered Development',
+      FEATURE_1_DESCRIPTION: options.features?.[0]?.description || 'Build apps faster with intelligent code generation.',
+      FEATURE_2_TITLE: options.features?.[1]?.title || 'No-Code Interface',
+      FEATURE_2_DESCRIPTION: options.features?.[1]?.description || 'Create professional apps without writing code.',
+      FEATURE_3_TITLE: options.features?.[2]?.title || 'Cloud Deployment',
+      FEATURE_3_DESCRIPTION: options.features?.[2]?.description || 'Deploy your apps instantly to the cloud.',
+      CTA_TEXT: options.ctaText || 'Get Started Today',
+      CTA_URL: options.ctaUrl || 'https://pipilot.dev',
+      CTA_SUBTEXT: options.ctaSubtext || 'Join thousands of developers building the future.',
+      ADDITIONAL_TITLE: options.additionalTitle || 'Why Choose PiPilot?',
+      ADDITIONAL_CONTENT: options.additionalContent || 'PiPilot combines the power of AI with intuitive design to make app development accessible to everyone.',
+      WEBSITE_URL: 'https://pipilot.dev',
+      BLOG_URL: 'https://pipilot.dev/blog',
+      SUPPORT_URL: 'https://pipilot.dev/support',
+      UNSUBSCRIBE_URL: options.unsubscribeUrl || 'https://pipilot.dev/unsubscribe',
+      CURRENT_YEAR: new Date().getFullYear().toString(),
+      USER_EMAIL: options.userEmail || 'user@example.com'
+    };
+
+    // Replace placeholders
+    Object.entries(defaults).forEach(([key, value]) => {
+      const placeholder = `{{${key}}}`;
+      template = template.replace(new RegExp(placeholder, 'g'), value);
+    });
+
+    return template;
+  } catch (error: any) {
+    console.error('Error wrapping email content:', error);
+    // Fallback to simple HTML if template fails
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>${options.subject}</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1>PiPilot</h1>
+          <h2>${options.greeting || 'Hello!'}</h2>
+          ${options.aiContent}
+          <div style="margin-top: 30px; text-align: center;">
+            <a href="${options.ctaUrl || 'https://pipilot.dev'}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">${options.ctaText || 'Get Started'}</a>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateText } from 'ai';
 import { getModel } from '@/lib/ai-providers';
 import { getTemplateById } from '@/lib/email-templates';
+import { wrapEmailContent } from '@/lib/email-service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
 
         const model = getModel(modelId);
 
-        const systemPrompt = `You are an expert email content creator for PiPilot. Generate professional, engaging email content based on the selected template and user requirements.
+        const systemPrompt = `You are an expert email content creator for PiPilot. Generate professional, engaging HTML email content based on the selected template and user requirements.
 
 Template Information:
 - Name: ${template.name}
@@ -48,7 +49,7 @@ Your task is to customize this template based on the user's specific requirement
 
 Return your response as a JSON object with exactly these fields:
 - "subject": A customized subject line based on the template and user requirements
-- "content": A customized email body based on the template and user requirements
+- "content": A customized email body as HTML content based on the template and user requirements
 - "variables": An object containing values for any template variables used
 
 Guidelines:
@@ -58,12 +59,15 @@ Guidelines:
 - Fill in template variables with appropriate values
 - Ensure the content is engaging and actionable
 - Subject should be concise (max 80 characters)
-- Content should be well-formatted with proper line breaks
+- Content should be valid HTML with proper formatting, paragraphs, and styling
+- Use semantic HTML elements like <p>, <h2>, <h3>, <ul>, <li>, <strong>, <em>
+- Do not include HTML document structure (no <html>, <head>, <body> tags)
+- The content will be wrapped in a professional email template
 
 Example format:
 {
   "subject": "🚀 Your Custom Feature Update is Here!",
-  "content": "Hi {{name}},\n\nWe're excited to announce your custom feature update...\n\nBest regards,\nThe PiPilot Team",
+  "content": "<h2>Welcome back!</h2><p>We're excited to announce your custom feature update...</p><p>This will help you:</p><ul><li>Improve productivity</li><li>Save time</li></ul><p>Best regards,<br>The PiPilot Team</p>",
   "variables": {
     "name": "Valued Customer",
     "feature_name": "Custom Dashboard",
@@ -101,15 +105,28 @@ Please generate customized email content based on this template and requirements
           templateName: template.name
         };
 
-        // Basic sanitization
-        cleanedContent.subject = cleanedContent.subject.replace(/[<>\"'&]/g, '');
-        cleanedContent.content = cleanedContent.content.replace(/[<>\"'&]/g, '');
+        // Basic sanitization - allow HTML tags but prevent script injection
+        cleanedContent.subject = cleanedContent.subject.replace(/<script[^>]*>.*?<\/script>/gi, '').replace(/<[^>]*>/g, ''); // Remove HTML from subject
+        // Keep HTML in content but remove script tags
+        cleanedContent.content = cleanedContent.content.replace(/<script[^>]*>.*?<\/script>/gi, '');
 
         console.log(`Successfully generated email template content with model ${modelId}`);
 
+        // Wrap the content in professional HTML template
+        const wrappedHtml = await wrapEmailContent({
+          subject: cleanedContent.subject,
+          aiContent: cleanedContent.content,
+          greeting: 'Hello!',
+          ctaText: 'Get Started Today',
+          ctaUrl: 'https://pipilot.dev'
+        });
+
         return NextResponse.json({
           success: true,
-          content: cleanedContent,
+          content: {
+            ...cleanedContent,
+            html: wrappedHtml
+          },
           template: {
             id: template.id,
             name: template.name,

@@ -43,6 +43,7 @@ export function EmailAIAssistant({ onGenerate }: EmailAIAssistantProps) {
   const [generatedSubject, setGeneratedSubject] = useState("")
   const [generatedContent, setGeneratedContent] = useState("")
   const [showResult, setShowResult] = useState(false)
+  const [previewMode, setPreviewMode] = useState(false)
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [categories, setCategories] = useState<EmailCategory[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
@@ -122,7 +123,7 @@ export function EmailAIAssistant({ onGenerate }: EmailAIAssistantProps) {
 
       // Set the generated content
       setGeneratedSubject(content.subject || 'Generated Email Subject')
-      setGeneratedContent(content.content || 'Generated email content')
+      setGeneratedContent(content.html || content.content || 'Generated email content')
 
       setShowResult(true)
       toast({
@@ -155,6 +156,7 @@ export function EmailAIAssistant({ onGenerate }: EmailAIAssistantProps) {
     setGeneratedSubject("")
     setGeneratedContent("")
     setSelectedCategory("all")
+    setPreviewMode(false)
   }
 
   const handleClose = () => {
@@ -354,13 +356,28 @@ export function EmailAIAssistant({ onGenerate }: EmailAIAssistantProps) {
 
                     {/* Content */}
                     <div className="space-y-2">
-                      <Label>Email Content</Label>
-                      <Textarea
-                        value={generatedContent}
-                        onChange={(e) => setGeneratedContent(e.target.value)}
-                        rows={12}
-                        className="font-mono text-sm"
-                      />
+                      <div className="flex items-center justify-between">
+                        <Label>Email Content</Label>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPreviewMode(!previewMode)}
+                        >
+                          {previewMode ? 'Edit HTML' : 'Preview Email'}
+                        </Button>
+                      </div>
+                      {previewMode ? (
+                        <div className="border rounded-lg p-4 max-h-96 overflow-y-auto">
+                          <div dangerouslySetInnerHTML={{ __html: generatedContent }} />
+                        </div>
+                      ) : (
+                        <Textarea
+                          value={generatedContent}
+                          onChange={(e) => setGeneratedContent(e.target.value)}
+                          rows={12}
+                          className="font-mono text-sm"
+                        />
+                      )}
                     </div>
 
                     {/* Template Info */}
