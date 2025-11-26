@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
 export interface EmailTemplate {
@@ -26,28 +26,70 @@ export interface EmailTemplatesData {
 }
 
 let templatesCache: EmailTemplatesData | null = null;
+let cacheTimestamp: number | null = null;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Load email templates from JSON file
+ * Load email templates from JSON file with Vercel-like caching strategy
+ * - Server-side only (never called from client)
+ * - Cached for performance
+ * - Automatic cache invalidation
+ * - Type-safe data loading
  */
 function loadEmailTemplates(): EmailTemplatesData {
-  if (templatesCache) {
+  // Check if cache is still valid
+  if (templatesCache && cacheTimestamp && (Date.now() - cacheTimestamp) < CACHE_DURATION) {
     return templatesCache;
   }
 
   try {
     const templatesPath = join(process.cwd(), 'data', 'email-templates.json');
+
+    // Validate file exists before reading
+    if (!existsSync(templatesPath)) {
+      console.error('Email templates file not found:', templatesPath);
+      return getFallbackData();
+    }
+
     const templatesData = readFileSync(templatesPath, 'utf-8');
-    templatesCache = JSON.parse(templatesData) as EmailTemplatesData;
-    return templatesCache;
+
+    // Validate JSON structure
+    const parsed = JSON.parse(templatesData) as EmailTemplatesData;
+
+    // Basic validation
+    if (!parsed.templates || !Array.isArray(parsed.templates)) {
+      console.error('Invalid templates data structure');
+      return getFallbackData();
+    }
+
+    if (!parsed.categories || !Array.isArray(parsed.categories)) {
+      console.error('Invalid categories data structure');
+      return getFallbackData();
+    }
+
+    // Update cache
+    templatesCache = parsed;
+    cacheTimestamp = Date.now();
+
+    console.log(`Loaded ${parsed.templates.length} templates and ${parsed.categories.length} categories`);
+
+    return parsed;
+
   } catch (error) {
     console.error('Error loading email templates:', error);
-    // Return empty data structure as fallback
-    return {
-      templates: [],
-      categories: []
-    };
+    return getFallbackData();
   }
+}
+
+/**
+ * Get fallback data when loading fails
+ * Provides minimal working data structure
+ */
+function getFallbackData(): EmailTemplatesData {
+  return {
+    templates: [],
+    categories: []
+  };
 }
 
 /**

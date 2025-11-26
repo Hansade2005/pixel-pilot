@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useRef, useEffect } from "react"
+import React, { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -68,30 +68,52 @@ export function EmailAIAssistant({ onGenerate }: EmailAIAssistantProps) {
     }
   }, [isOpen])
 
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     try {
-      const response = await fetch('/api/email/templates');
+      setTemplates([]);
+      setCategories([]);
+
+      const response = await fetch('/api/email/templates', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
+
       const data = await response.json();
+
       if (!data.success) {
         throw new Error(data.error || 'Failed to load templates');
       }
-      setTemplates(data.data.templates || []);
-      setCategories(data.data.categories || []);
+
+      // Validate data structure
+      const templates = Array.isArray(data.data?.templates) ? data.data.templates : [];
+      const categories = Array.isArray(data.data?.categories) ? data.data.categories : [];
+
+      setTemplates(templates);
+      setCategories(categories);
+
+      console.log(`Loaded ${templates.length} email templates and ${categories.length} categories`);
+
     } catch (error) {
-      console.error('Error loading templates:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load email templates",
-        variant: "destructive"
-      });
-      // Set empty arrays as fallback
+      console.error('Error loading email templates:', error);
+
+      // Set empty arrays to prevent UI crashes
       setTemplates([]);
       setCategories([]);
+
+      toast({
+        title: "Error loading templates",
+        description: error instanceof Error ? error.message : "Failed to load email templates. Please try again.",
+        variant: "destructive"
+      });
     }
-  }
+  }, [toast]);
 
   const filteredTemplates = templates.filter(template =>
     selectedCategory === "all" || template.category === selectedCategory
