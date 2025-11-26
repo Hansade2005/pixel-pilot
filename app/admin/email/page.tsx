@@ -25,6 +25,7 @@ import {
   CheckCircle,
   Loader2,
   User,
+  Sparkles,
 } from "lucide-react"
 import {
   sendEmail,
@@ -35,6 +36,7 @@ import {
   loadEmailTemplates,
   type EmailTemplate
 } from "@/lib/email-templates"
+import FloatingAIEmailGenerator from "@/components/FloatingAIEmailGenerator"
 
 interface UserData {
   id: string
@@ -58,6 +60,7 @@ export default function AdminEmailPage() {
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([])
   const [showCompose, setShowCompose] = useState(false)
   const [sending, setSending] = useState(false)
+  const [showAIGenerator, setShowAIGenerator] = useState(false)
 
   // Compose form states
   const [recipients, setRecipients] = useState<string[]>([])
@@ -158,6 +161,14 @@ export default function AdminEmailPage() {
     setContent('')
     setEmailType('notification')
     setSelectedTemplate(null)
+    setShowAIGenerator(false)
+  }
+
+  const handleAIContentApply = (aiSubject: string, aiContent: string) => {
+    if (aiSubject && !subject) {
+      setSubject(aiSubject)
+    }
+    setContent(aiContent)
   }
 
   const applyTemplate = (template: EmailTemplate) => {
@@ -260,17 +271,17 @@ export default function AdminEmailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-gray-400" />
-          <p className="text-gray-600">Loading...</p>
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-muted-foreground" />
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-6">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-4 mb-4">
@@ -278,7 +289,7 @@ export default function AdminEmailPage() {
             variant="ghost"
             size="sm"
             onClick={() => router.push('/admin')}
-            className="text-gray-600 hover:text-gray-900"
+            className="text-muted-foreground hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Admin
@@ -288,8 +299,8 @@ export default function AdminEmailPage() {
           <div className="flex items-center gap-3">
             <Mail className="h-8 w-8 text-blue-600" />
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Email Management</h1>
-              <p className="text-gray-600">{users.length} users registered</p>
+              <h1 className="text-2xl font-bold text-foreground">Email Management</h1>
+              <p className="text-muted-foreground">{users.length} users registered</p>
             </div>
           </div>
           <Button
@@ -303,11 +314,11 @@ export default function AdminEmailPage() {
       </div>
 
       {/* User List */}
-      <Card>
+      <Card className="bg-card">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Users</span>
-            <span className="text-sm font-normal text-gray-500">
+            <span className="text-sm font-normal text-muted-foreground">
               {filteredUsers.length} of {users.length}
             </span>
           </CardTitle>
@@ -322,17 +333,17 @@ export default function AdminEmailPage() {
             {filteredUsers.map(user => (
               <div
                 key={user.id}
-                className="p-4 rounded-lg border bg-white hover:border-gray-300 transition-colors cursor-pointer"
+                className="p-4 rounded-lg border bg-card hover:border-border transition-colors cursor-pointer"
                 onClick={() => addRecipient(user.email)}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                      <User className="h-5 w-5 text-blue-600" />
+                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
+                      <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
-                      <p className="font-medium text-sm">{user.fullName || 'No Name'}</p>
-                      <p className="text-xs text-gray-500">{user.email}</p>
+                      <p className="font-medium text-sm text-foreground">{user.fullName || 'No Name'}</p>
+                      <p className="text-xs text-muted-foreground">{user.email}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -352,8 +363,8 @@ export default function AdminEmailPage() {
       {/* Gmail-style Compose Modal */}
       {showCompose && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center pt-20 z-50">
-          <Card className="w-full max-w-2xl mx-4 shadow-2xl">
-            <CardHeader className="bg-gray-50 border-b px-4 py-3">
+          <Card className="w-full max-w-2xl mx-4 shadow-2xl bg-card">
+            <CardHeader className="bg-muted border-b px-4 py-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">New Message</CardTitle>
                 <Button
@@ -363,7 +374,7 @@ export default function AdminEmailPage() {
                     setShowCompose(false)
                     clearCompose()
                   }}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-muted-foreground hover:text-foreground"
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -373,17 +384,17 @@ export default function AdminEmailPage() {
               <div className="p-4 space-y-4">
                 {/* Recipients */}
                 <div className="flex items-center gap-2 text-sm">
-                  <span className="text-gray-600 w-16">To:</span>
+                  <span className="text-muted-foreground w-16">To:</span>
                   <div className="flex-1 flex flex-wrap gap-2">
                     {recipients.map(email => (
                       <div
                         key={email}
-                        className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs flex items-center gap-1"
+                        className="bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 px-2 py-1 rounded text-xs flex items-center gap-1"
                       >
                         {email}
                         <button
                           onClick={() => removeRecipient(email)}
-                          className="text-blue-600 hover:text-blue-800"
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -391,7 +402,7 @@ export default function AdminEmailPage() {
                     ))}
                     <input
                       placeholder="Add recipients..."
-                      className="flex-1 min-w-32 text-sm border-none outline-none bg-transparent"
+                      className="flex-1 min-w-32 text-sm border-none outline-none bg-transparent text-foreground"
                       onKeyPress={(e) => {
                         if (e.key === 'Enter') {
                           const email = (e.target as HTMLInputElement).value.trim()
@@ -406,10 +417,10 @@ export default function AdminEmailPage() {
                 </div>
 
                 {/* Subject */}
-                <div className="flex items-center gap-2 text-sm border-b pb-2">
-                  <span className="text-gray-600 w-16">Subject:</span>
+                <div className="flex items-center gap-2 text-sm border-b pb-2 border-border">
+                  <span className="text-muted-foreground w-16">Subject:</span>
                   <input
-                    className="flex-1 text-sm border-none outline-none"
+                    className="flex-1 text-sm border-none outline-none text-foreground"
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
                     placeholder="Enter subject..."
@@ -419,7 +430,7 @@ export default function AdminEmailPage() {
                 {/* Templates */}
                 {emailTemplates.length > 0 && (
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="text-gray-600 w-16">Template:</span>
+                    <span className="text-muted-foreground w-16">Template:</span>
                     <Select 
                       value={selectedTemplate?.id || ''} 
                       onValueChange={(value) => {
@@ -444,6 +455,18 @@ export default function AdminEmailPage() {
 
               {/* Content */}
               <div className="px-4 pb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-muted-foreground">Content</span>
+                  <Button
+                    onClick={() => setShowAIGenerator(!showAIGenerator)}
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                  >
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    {showAIGenerator ? 'Hide' : 'AI'} Assistant
+                  </Button>
+                </div>
                 <Textarea
                   placeholder="Compose your message..."
                   value={content}
@@ -454,7 +477,7 @@ export default function AdminEmailPage() {
               </div>
 
               {/* Actions */}
-              <div className="bg-gray-50 px-4 py-3 flex items-center justify-between border-t">
+              <div className="bg-muted px-4 py-3 flex items-center justify-between border-t">
                 <div className="flex items-center gap-2">
                   <Select value={emailType} onValueChange={setEmailType}>
                     <SelectTrigger className="w-32">
@@ -469,7 +492,7 @@ export default function AdminEmailPage() {
                     </SelectContent>
                   </Select>
                   {recipients.length > 0 && (
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-muted-foreground">
                       {recipients.length} recipient(s)
                     </span>
                   )}
@@ -508,6 +531,16 @@ export default function AdminEmailPage() {
           </Card>
         </div>
       )}
+
+      {/* Floating AI Email Generator */}
+      <FloatingAIEmailGenerator
+        isVisible={showCompose && showAIGenerator}
+        onClose={() => setShowAIGenerator(false)}
+        onApplyContent={handleAIContentApply}
+        currentSubject={subject}
+        currentContent={content}
+        emailType={emailType}
+      />
     </div>
   )
 }
