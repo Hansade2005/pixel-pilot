@@ -23,11 +23,25 @@ import {
 } from "@/components/ui/select"
 import { Sparkles, Loader2, Mail, X, Minimize2, Maximize2, FileText, Wand2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import {
-  loadEmailTemplates,
-  type EmailTemplate,
-  type EmailCategory
-} from "@/lib/email-templates"
+
+// Email template types
+interface EmailTemplate {
+  id: string;
+  name: string;
+  type: string;
+  subject: string;
+  content: string;
+  variables: string[];
+  category: string;
+  description: string;
+}
+
+interface EmailCategory {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+}
 
 interface EmailAIAssistantProps {
   onGenerate: (subject: string, content: string, template?: EmailTemplate) => void
@@ -56,16 +70,26 @@ export function EmailAIAssistant({ onGenerate }: EmailAIAssistantProps) {
 
   const loadTemplates = async () => {
     try {
-      const data = await loadEmailTemplates()
-      setTemplates(data.templates)
-      setCategories(data.categories)
+      const response = await fetch('/api/email/templates');
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to load templates');
+      }
+      setTemplates(data.data.templates || []);
+      setCategories(data.data.categories || []);
     } catch (error) {
-      console.error('Error loading templates:', error)
+      console.error('Error loading templates:', error);
       toast({
         title: "Error",
         description: "Failed to load email templates",
         variant: "destructive"
-      })
+      });
+      // Set empty arrays as fallback
+      setTemplates([]);
+      setCategories([]);
     }
   }
 

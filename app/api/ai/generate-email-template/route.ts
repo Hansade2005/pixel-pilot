@@ -1,8 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateText } from 'ai';
 import { getModel } from '@/lib/ai-providers';
-import { getTemplateById } from '@/lib/email-templates';
 import { wrapEmailContent } from '@/lib/email-service';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
+// Email template types
+interface EmailTemplate {
+  id: string;
+  name: string;
+  type: string;
+  subject: string;
+  content: string;
+  variables: string[];
+  category: string;
+  description: string;
+}
+
+interface EmailTemplatesData {
+  templates: EmailTemplate[];
+  categories: any[];
+}
+
+// Cache for templates
+let templatesCache: EmailTemplatesData | null = null;
+
+/**
+ * Load email templates from JSON file
+ */
+function loadEmailTemplates(): EmailTemplatesData {
+  if (templatesCache) {
+    return templatesCache;
+  }
+
+  try {
+    const templatesPath = join(process.cwd(), 'data', 'email-templates.json');
+    const templatesData = readFileSync(templatesPath, 'utf-8');
+    templatesCache = JSON.parse(templatesData) as EmailTemplatesData;
+    return templatesCache;
+  } catch (error) {
+    console.error('Error loading email templates:', error);
+    return {
+      templates: [],
+      categories: []
+    };
+  }
+}
+
+/**
+ * Get template by ID
+ */
+function getTemplateById(templateId: string): EmailTemplate | undefined {
+  return loadEmailTemplates().templates.find(template => template.id === templateId);
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,7 +68,7 @@ export async function POST(request: NextRequest) {
     console.log('Generating email template content:', { templateId, prompt, variables });
 
     // Get the template
-    const template = await getTemplateById(templateId);
+    const template = getTemplateById(templateId);
     if (!template) {
       return NextResponse.json(
         { error: 'Template not found' },

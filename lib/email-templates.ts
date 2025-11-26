@@ -23,12 +23,44 @@ export interface EmailTemplatesData {
 
 let templatesCache: EmailTemplatesData | null = null;
 
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
 /**
- * Load email templates from API
+ * Load email templates from JSON file
+ */
+function loadEmailTemplatesFromFile(): EmailTemplatesData {
+  if (templatesCache !== null) {
+    return templatesCache;
+  }
+
+  try {
+    const templatesPath = join(process.cwd(), 'data', 'email-templates.json');
+    const templatesData = readFileSync(templatesPath, 'utf-8');
+    templatesCache = JSON.parse(templatesData) as EmailTemplatesData;
+    return templatesCache;
+  } catch (error) {
+    console.error('Error loading email templates from file:', error);
+    // Return empty data structure as fallback
+    return {
+      templates: [],
+      categories: []
+    };
+  }
+}
+
+/**
+ * Load email templates from API (fallback)
  */
 export async function loadEmailTemplates(): Promise<EmailTemplatesData> {
+  // Try to load from file first (works in server-side contexts)
+  if (typeof window === 'undefined') {
+    return loadEmailTemplatesFromFile();
+  }
+
+  // In browser, try API call
   if (templatesCache !== null) {
-    return templatesCache!;
+    return templatesCache;
   }
 
   try {
@@ -43,7 +75,7 @@ export async function loadEmailTemplates(): Promise<EmailTemplatesData> {
     templatesCache = data.data as EmailTemplatesData;
     return templatesCache;
   } catch (error) {
-    console.error('Error loading email templates:', error);
+    console.error('Error loading email templates from API:', error);
     // Return empty data structure as fallback
     return {
       templates: [],
