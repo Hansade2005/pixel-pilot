@@ -71,11 +71,9 @@ import {
 } from "lucide-react"
 import {
   sendEmail,
-  sendNotificationEmail,
-  sendTeamInvitation,
-  sendWelcomeEmail,
-  sendTeamMemberJoinedNotification
-} from "@/lib/email"
+  sendMarketingEmail,
+  sendTransactionalEmail
+} from "@/lib/email-service"
 import {
   loadEmailTemplates,
   getEmailCategories,
@@ -315,74 +313,85 @@ export default function AdminEmailPage() {
             let result
             switch (emailType) {
               case 'notification':
-                result = await sendNotificationEmail(email, emailSubject, emailContent)
-                break
-              case 'marketing':
-                result = await sendEmail({
+                result = await sendTransactionalEmail({
                   to: email,
                   subject: emailSubject,
-                  type: 'marketing',
-                  message: emailContent
+                  html: emailContent,
+                  text: emailContent.replace(/<[^>]*>/g, '') // Strip HTML for text version
+                })
+                break
+              case 'marketing':
+                result = await sendMarketingEmail({
+                  to: email,
+                  subject: emailSubject,
+                  html: emailContent,
+                  text: emailContent.replace(/<[^>]*>/g, ''),
+                  unsubscribeUrl: 'https://pipilot.dev/unsubscribe'
                 })
                 break
               case 'newsletter':
-                result = await sendEmail({
+                result = await sendMarketingEmail({
                   to: email,
                   subject: emailSubject,
-                  type: 'newsletter',
-                  title: emailSubject,
-                  content: emailContent,
-                  unsubscribe_url: 'https://pipilot.dev/unsubscribe'
+                  html: emailContent,
+                  text: emailContent.replace(/<[^>]*>/g, ''),
+                  unsubscribeUrl: 'https://pipilot.dev/unsubscribe'
                 })
                 break
               case 'security':
-                result = await sendEmail({
+                result = await sendTransactionalEmail({
                   to: email,
                   subject: emailSubject,
-                  type: 'security',
-                  title: emailSubject,
-                  content: emailContent,
-                  action_url: 'https://pipilot.dev/security'
+                  html: emailContent,
+                  text: emailContent.replace(/<[^>]*>/g, '')
                 })
                 break
               case 'feature':
-                result = await sendEmail({
+                result = await sendMarketingEmail({
                   to: email,
                   subject: emailSubject,
-                  type: 'feature',
-                  title: emailSubject,
-                  feature_name: 'New Feature',
-                  content: emailContent,
-                  try_url: 'https://pipilot.dev/features'
+                  html: emailContent,
+                  text: emailContent.replace(/<[^>]*>/g, ''),
+                  unsubscribeUrl: 'https://pipilot.dev/unsubscribe'
                 })
                 break
               case 'billing':
-                result = await sendEmail({
+                result = await sendTransactionalEmail({
                   to: email,
                   subject: emailSubject,
-                  type: 'billing',
-                  title: emailSubject,
-                  content: emailContent,
-                  amount: '$0.00',
-                  action_url: 'https://pipilot.dev/billing'
+                  html: emailContent,
+                  text: emailContent.replace(/<[^>]*>/g, '')
                 })
                 break
               case 'support':
-                result = await sendEmail({
+                result = await sendTransactionalEmail({
                   to: email,
                   subject: emailSubject,
-                  type: 'support',
-                  title: emailSubject,
-                  content: emailContent,
-                  ticket_id: 'N/A',
-                  support_url: 'https://pipilot.dev/support'
+                  html: emailContent,
+                  text: emailContent.replace(/<[^>]*>/g, '')
                 })
                 break
               case 'welcome':
-                result = await sendWelcomeEmail(email, email.split('@')[0], 'Pixel Pilot')
+                result = await sendTransactionalEmail({
+                  to: email,
+                  subject: `Welcome to PiPilot, ${email.split('@')[0]}!`,
+                  html: `
+                    <h1>Welcome to PiPilot!</h1>
+                    <p>Hi ${email.split('@')[0]},</p>
+                    <p>Thank you for joining PiPilot. We're excited to have you as part of our community!</p>
+                    <p>Get started by exploring our features and building amazing apps.</p>
+                    <p>Best regards,<br>The PiPilot Team</p>
+                  `,
+                  text: `Welcome to PiPilot!\n\nHi ${email.split('@')[0]},\n\nThank you for joining PiPilot. We're excited to have you as part of our community!\n\nGet started by exploring our features and building amazing apps.\n\nBest regards,\nThe PiPilot Team`
+                })
                 break
               default:
-                result = await sendNotificationEmail(email, emailSubject, emailContent)
+                result = await sendTransactionalEmail({
+                  to: email,
+                  subject: emailSubject,
+                  html: emailContent,
+                  text: emailContent.replace(/<[^>]*>/g, '')
+                })
             }
 
             if (result.success) {

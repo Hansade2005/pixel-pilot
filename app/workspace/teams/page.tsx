@@ -44,7 +44,7 @@ import {
   Activity
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { sendTeamInvitation } from "@/lib/email"
+import { sendTransactionalEmail } from "@/lib/email-service"
 import { formatDistanceToNow } from "date-fns"
 
 interface Organization {
@@ -391,13 +391,37 @@ export default function TeamsPage() {
 
       // Send invitation email
       try {
-        const emailResult = await sendTeamInvitation(
-          inviteEmail.trim(),
-          selectedOrg.name,
-          currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || 'Team Admin',
-          inviteRole,
-          token
-        )
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://pipilot.dev';
+        const acceptUrl = `${baseUrl}/invite/accept?token=${token}`;
+        
+        const htmlContent = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+            <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+              <h2 style="color: #333; margin-bottom: 20px;">You're invited to join ${selectedOrg.name}</h2>
+              <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+                Hi there,<br><br>
+                <strong>${currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || 'Team Admin'}</strong> has invited you to join the <strong>${selectedOrg.name}</strong> team as a <strong>${inviteRole}</strong>.
+              </p>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${acceptUrl}" style="background-color: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Accept Invitation</a>
+              </div>
+              <p style="color: #999; font-size: 14px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+                If the button doesn't work, copy and paste this link into your browser:<br>
+                <a href="${acceptUrl}" style="color: #007bff; word-break: break-all;">${acceptUrl}</a>
+              </p>
+              <p style="color: #999; font-size: 12px; margin-top: 20px;">
+                This invitation will expire in 7 days.
+              </p>
+            </div>
+          </div>
+        `;
+
+        const emailResult = await sendTransactionalEmail({
+          to: inviteEmail.trim(),
+          subject: `You're invited to join ${selectedOrg.name}`,
+          html: htmlContent,
+          text: `You're invited to join ${selectedOrg.name}. Click here to accept: ${acceptUrl}`
+        })
 
         if (emailResult.success) {
           toast({

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast"
 import { CheckCircle, XCircle, Loader2, Users, ArrowRight } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { sendWelcomeEmail, sendTeamMemberJoinedNotification } from "@/lib/email"
+import { sendTransactionalEmail } from "@/lib/email-service"
 
 interface InvitationData {
   id: string
@@ -180,11 +180,33 @@ function AcceptInvitationContent() {
 
       // Send welcome email
       try {
-        await sendWelcomeEmail(
-          user.email!,
-          user.user_metadata?.full_name || user.email!.split('@')[0],
-          invitationData.organization.name
-        )
+        const htmlContent = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+            <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+              <h2 style="color: #333; margin-bottom: 20px;">Welcome to ${invitationData.organization.name}!</h2>
+              <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+                Hi <strong>${user.user_metadata?.full_name || user.email!.split('@')[0]}</strong>,<br><br>
+                Welcome to the <strong>${invitationData.organization.name}</strong> team! Your account has been successfully set up and you're now ready to start collaborating.
+              </p>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://pipilot.dev'}/workspace" style="background-color: #28a745; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Go to Workspace</a>
+              </div>
+              <p style="color: #666; line-height: 1.6;">
+                You can now access your team's workspace, collaborate on projects, and take advantage of all the features available to your team.
+              </p>
+              <p style="color: #999; font-size: 14px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+                If you have any questions, feel free to reach out to your team administrator.
+              </p>
+            </div>
+          </div>
+        `;
+
+        await sendTransactionalEmail({
+          to: user.email!,
+          subject: `Welcome to ${invitationData.organization.name}!`,
+          html: htmlContent,
+          text: `Welcome to ${invitationData.organization.name}! Your account is ready. Visit: ${process.env.NEXT_PUBLIC_APP_URL || 'https://pipilot.dev'}/workspace`
+        })
       } catch (emailError) {
         console.warn('Welcome email failed to send:', emailError)
         // Don't fail the invitation acceptance if email fails
@@ -201,12 +223,33 @@ function AcceptInvitationContent() {
           .map((m: any) => m.email)
 
         if (teamMemberEmails.length > 0) {
-          await sendTeamMemberJoinedNotification(
-            teamMemberEmails,
-            user.user_metadata?.full_name || user.email!.split('@')[0],
-            invitationData.organization.name,
-            invitationData.inviter.name
-          )
+          const htmlContent = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+              <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <h2 style="color: #333; margin-bottom: 20px;">New Team Member Joined!</h2>
+                <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+                  Hi there,<br><br>
+                  <strong>${user.user_metadata?.full_name || user.email!.split('@')[0]}</strong> has joined <strong>${invitationData.organization.name}</strong> as a new team member.
+                </p>
+                <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+                  Invited by: <strong>${invitationData.inviter.name}</strong>
+                </p>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://pipilot.dev'}/workspace/teams" style="background-color: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">View Team</a>
+                </div>
+                <p style="color: #999; font-size: 14px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+                  You can manage team members and permissions from the team settings page.
+                </p>
+              </div>
+            </div>
+          `;
+
+          await sendTransactionalEmail({
+            to: teamMemberEmails,
+            subject: `${user.user_metadata?.full_name || user.email!.split('@')[0]} joined ${invitationData.organization.name}`,
+            html: htmlContent,
+            text: `${user.user_metadata?.full_name || user.email!.split('@')[0]} has joined ${invitationData.organization.name} as a new team member. Invited by: ${invitationData.inviter.name}`
+          })
         }
       } catch (notificationError) {
         console.warn('Team member notification emails failed to send:', notificationError)
