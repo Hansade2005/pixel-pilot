@@ -187,8 +187,8 @@ export default function AdminWalletsPage() {
     const filteredWallets = wallets.filter(wallet =>
         wallet.team_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (wallet.team_description && wallet.team_description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        wallet.owner.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (wallet.owner.full_name && wallet.owner.full_name.toLowerCase().includes(searchQuery.toLowerCase()))
+        (wallet.owner && wallet.owner.email && wallet.owner.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (wallet.owner && wallet.owner.full_name && wallet.owner.full_name.toLowerCase().includes(searchQuery.toLowerCase()))
     )
 
     const handleBalanceAdjustment = async () => {
@@ -367,7 +367,7 @@ export default function AdminWalletsPage() {
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-4">
                                                 <Avatar className="h-12 w-12">
-                                                    <AvatarImage src={wallet.owner.avatar_url} />
+                                                    <AvatarImage src={wallet.owner?.avatar_url} />
                                                     <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white">
                                                         {wallet.team_name.charAt(0).toUpperCase()}
                                                     </AvatarFallback>
@@ -377,7 +377,7 @@ export default function AdminWalletsPage() {
                                                         {wallet.team_name}
                                                     </h3>
                                                     <p className="text-sm text-gray-400">{wallet.team_description || 'No description'}</p>
-                                                    <p className="text-xs text-gray-500">Owner: {wallet.owner.email}</p>
+                                                    <p className="text-xs text-gray-500">Owner: {wallet.owner?.email || 'Unknown'}</p>
                                                     <div className="flex items-center gap-2 mt-1">
                                                         <Badge variant="outline" className="border-green-500/30 text-green-400">
                                                             {formatCurrency(wallet.balance)}
@@ -544,7 +544,7 @@ export default function AdminWalletsPage() {
                                         <p className="text-2xl font-bold text-white">{formatCurrency(selectedWallet.balance)}</p>
                                     </div>
                                     <Avatar className="h-12 w-12">
-                                        <AvatarImage src={selectedWallet.owner.avatar_url} />
+                                        <AvatarImage src={selectedWallet.owner?.avatar_url} />
                                         <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white">
                                             {selectedWallet.team_name.charAt(0).toUpperCase()}
                                         </AvatarFallback>

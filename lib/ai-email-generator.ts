@@ -1,5 +1,32 @@
-import { generateText } from 'ai';
-import { getModel } from './ai-providers';
+// Direct a0.dev API call for email generation
+async function callA0DevAPI(prompt: string, temperature: number = 0.7): Promise<string> {
+  const messages = [
+    {
+      role: 'user',
+      content: prompt
+    }
+  ];
+
+  const response = await fetch('https://api.a0.dev/ai/llm', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      messages,
+      temperature
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`a0.dev API error (${response.status}):`, errorText);
+    throw new Error(`Failed to generate content: ${response.status}`);
+  }
+
+  const result = await response.json();
+  return result.completion || result.message || JSON.stringify(result);
+}
 
 export interface EmailGenerationOptions {
   type: 'notification' | 'marketing' | 'welcome' | 'support';
@@ -33,15 +60,10 @@ Please provide:
 The email should be well-structured, engaging, and appropriate for the specified type and audience.`;
 
   try {
-    const model = getModel('command-r-08-2024');
-    const result = await generateText({
-      model,
-      prompt,
-      temperature: 0.7,
-    });
+    const result = await callA0DevAPI(prompt, 0.7);
 
     // Parse the AI response to extract subject and content
-    const response = result.text;
+    const response = result;
     const lines = response.split('\n');
 
     let subjectLine = '';
@@ -62,7 +84,7 @@ The email should be well-structured, engaging, and appropriate for the specified
     }
 
     // Extract content (everything after subject)
-    const contentStart = lines.findIndex(line =>
+    const contentStart = lines.findIndex((line: string) =>
       line.toLowerCase().includes('content:') ||
       line.toLowerCase().includes('body:') ||
       line.toLowerCase().includes('message:')
@@ -72,7 +94,7 @@ The email should be well-structured, engaging, and appropriate for the specified
       content = lines.slice(contentStart + 1).join('\n').trim();
     } else {
       // Use everything after subject line
-      const subjectIndex = lines.findIndex(line =>
+      const subjectIndex = lines.findIndex((line: string) =>
         line.toLowerCase().includes('subject')
       );
       content = lines.slice(subjectIndex + 1).join('\n').trim();
@@ -109,14 +131,9 @@ ${currentContent}
 Please provide an improved version that enhances the ${improvement} while maintaining the original intent and structure.`;
 
   try {
-    const model = getModel('command-r-08-2024');
-    const result = await generateText({
-      model,
-      prompt,
-      temperature: 0.6,
-    });
+    const result = await callA0DevAPI(prompt, 0.6);
 
-    return result.text.trim();
+    return result.trim();
   } catch (error) {
     console.error('Error improving email content:', error);
     throw new Error('Failed to improve email content. Please try again.');
