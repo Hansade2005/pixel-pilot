@@ -27,13 +27,16 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-interface UserWallet {
+interface TeamWallet {
     id: string
-    user_id: string
+    team_id: string
+    team_name: string
+    team_description?: string
     balance: number
+    currency: string
     created_at: string
     updated_at: string
-    user: {
+    owner: {
         email: string
         full_name?: string
         avatar_url?: string
@@ -74,11 +77,11 @@ interface WalletStats {
 }
 
 export default function AdminWalletsPage() {
-    const [wallets, setWallets] = useState<UserWallet[]>([])
+    const [wallets, setWallets] = useState<TeamWallet[]>([])
     const [loading, setLoading] = useState(true)
     const [stats, setStats] = useState<WalletStats>({ totalUsers: 0, totalBalance: 0, averageBalance: 0, activeWallets: 0 })
     const [searchQuery, setSearchQuery] = useState('')
-    const [selectedWallet, setSelectedWallet] = useState<UserWallet | null>(null)
+    const [selectedWallet, setSelectedWallet] = useState<TeamWallet | null>(null)
     const [showBalanceDialog, setShowBalanceDialog] = useState(false)
     const [balanceAdjustment, setBalanceAdjustment] = useState('')
     const [adjustmentType, setAdjustmentType] = useState<'add' | 'subtract'>('add')
@@ -182,8 +185,10 @@ export default function AdminWalletsPage() {
     }
 
     const filteredWallets = wallets.filter(wallet =>
-        wallet.user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (wallet.user.full_name && wallet.user.full_name.toLowerCase().includes(searchQuery.toLowerCase()))
+        wallet.team_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (wallet.team_description && wallet.team_description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        wallet.owner.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (wallet.owner.full_name && wallet.owner.full_name.toLowerCase().includes(searchQuery.toLowerCase()))
     )
 
     const handleBalanceAdjustment = async () => {
@@ -323,7 +328,7 @@ export default function AdminWalletsPage() {
             <Tabs defaultValue="wallets" className="space-y-6">
                 <TabsList className="bg-gray-900/50 backdrop-blur-xl border-white/10">
                     <TabsTrigger value="wallets" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600/20 data-[state=active]:to-pink-600/20 data-[state=active]:text-white">
-                        User Wallets
+                        Team Wallets
                     </TabsTrigger>
                     <TabsTrigger value="transactions" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600/20 data-[state=active]:to-pink-600/20 data-[state=active]:text-white">
                         Recent Transactions
@@ -336,7 +341,7 @@ export default function AdminWalletsPage() {
                         <div className="relative flex-1 max-w-md">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                             <Input
-                                placeholder="Search users by email or name..."
+                                placeholder="Search teams by name, description, or owner..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="pl-9 bg-gray-900/50 border-white/10 text-white placeholder:text-gray-500"
@@ -350,7 +355,7 @@ export default function AdminWalletsPage() {
                             <CardContent className="text-center py-12">
                                 <Wallet className="mx-auto h-12 w-12 mb-4 opacity-20 text-gray-600" />
                                 <p className="text-gray-400 mb-4">
-                                    {searchQuery ? 'No wallets found matching your search' : 'No user wallets found'}
+                                    {searchQuery ? 'No wallets found matching your search' : 'No team wallets found'}
                                 </p>
                             </CardContent>
                         </Card>
@@ -362,16 +367,17 @@ export default function AdminWalletsPage() {
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-4">
                                                 <Avatar className="h-12 w-12">
-                                                    <AvatarImage src={wallet.user.avatar_url} />
+                                                    <AvatarImage src={wallet.owner.avatar_url} />
                                                     <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white">
-                                                        {wallet.user.email.charAt(0).toUpperCase()}
+                                                        {wallet.team_name.charAt(0).toUpperCase()}
                                                     </AvatarFallback>
                                                 </Avatar>
                                                 <div>
                                                     <h3 className="text-lg font-semibold text-white">
-                                                        {wallet.user.full_name || wallet.user.email}
+                                                        {wallet.team_name}
                                                     </h3>
-                                                    <p className="text-sm text-gray-400">{wallet.user.email}</p>
+                                                    <p className="text-sm text-gray-400">{wallet.team_description || 'No description'}</p>
+                                                    <p className="text-xs text-gray-500">Owner: {wallet.owner.email}</p>
                                                     <div className="flex items-center gap-2 mt-1">
                                                         <Badge variant="outline" className="border-green-500/30 text-green-400">
                                                             {formatCurrency(wallet.balance)}
@@ -525,7 +531,7 @@ export default function AdminWalletsPage() {
                     <DialogHeader>
                         <DialogTitle className="text-white">Adjust Wallet Balance</DialogTitle>
                         <DialogDescription className="text-gray-400">
-                            {selectedWallet && `Adjusting balance for ${selectedWallet.user.email}`}
+                            {selectedWallet && `Adjusting balance for ${selectedWallet.team_name}`}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -538,9 +544,9 @@ export default function AdminWalletsPage() {
                                         <p className="text-2xl font-bold text-white">{formatCurrency(selectedWallet.balance)}</p>
                                     </div>
                                     <Avatar className="h-12 w-12">
-                                        <AvatarImage src={selectedWallet.user.avatar_url} />
+                                        <AvatarImage src={selectedWallet.owner.avatar_url} />
                                         <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white">
-                                            {selectedWallet.user.email.charAt(0).toUpperCase()}
+                                            {selectedWallet.team_name.charAt(0).toUpperCase()}
                                         </AvatarFallback>
                                     </Avatar>
                                 </div>
