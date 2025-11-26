@@ -44,7 +44,7 @@ import {
   Activity
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { sendTransactionalEmail } from "@/lib/email-service"
+import { sendTransactionalEmail } from "@/lib/email-client"
 import { formatDistanceToNow } from "date-fns"
 
 interface Organization {

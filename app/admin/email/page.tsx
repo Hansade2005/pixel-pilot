@@ -73,7 +73,7 @@ import {
   sendEmail,
   sendMarketingEmail,
   sendTransactionalEmail
-} from "@/lib/email-service"
+} from "@/lib/email-client"
 import {
   loadEmailTemplates,
   getEmailCategories,
