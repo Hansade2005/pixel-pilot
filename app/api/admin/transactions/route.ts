@@ -33,11 +33,7 @@ export async function GET(request: NextRequest) {
         description,
         balance_before,
         balance_after,
-        created_at,
-        profiles:user_id (
-          email,
-          full_name
-        )
+        created_at
       `)
       .order('created_at', { ascending: false })
       .limit(1000) // Limit to prevent huge responses
@@ -50,9 +46,28 @@ export async function GET(request: NextRequest) {
       }, { status: 500 })
     }
 
+    // Add user data to each transaction
+    const transactionsWithUsers = await Promise.all(
+      (transactions || []).map(async (transaction) => {
+        const { data: profile, error: profileError } = await adminSupabase
+          .from('profiles')
+          .select('email, full_name, avatar_url')
+          .eq('id', transaction.user_id)
+          .single()
+
+        return {
+          ...transaction,
+          amount: parseFloat(transaction.amount),
+          balance_before: transaction.balance_before ? parseFloat(transaction.balance_before) : null,
+          balance_after: transaction.balance_after ? parseFloat(transaction.balance_after) : null,
+          user: profile || null
+        }
+      })
+    )
+
     return NextResponse.json({
-      transactions: transactions || [],
-      total: transactions?.length || 0
+      transactions: transactionsWithUsers,
+      total: transactionsWithUsers.length
     })
 
   } catch (error) {

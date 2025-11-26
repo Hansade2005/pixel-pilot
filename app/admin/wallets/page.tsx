@@ -480,7 +480,7 @@ export default function AdminWalletsPage() {
                                 <div className="space-y-4">
                                     {transactions
                                         .filter(transaction =>
-                                            transaction.user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                            (transaction.user && transaction.user.email && transaction.user.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
                                             transaction.description.toLowerCase().includes(searchQuery.toLowerCase())
                                         )
                                         .map((transaction) => (
@@ -502,7 +502,7 @@ export default function AdminWalletsPage() {
                                                     <div>
                                                         <p className="text-white font-medium">{transaction.description}</p>
                                                         <p className="text-sm text-gray-400">
-                                                            {transaction.user.email} • {new Date(transaction.created_at).toLocaleDateString()} {new Date(transaction.created_at).toLocaleTimeString()}
+                                                            {transaction.user?.email || 'Unknown'} • {new Date(transaction.created_at).toLocaleDateString()} {new Date(transaction.created_at).toLocaleTimeString()}
                                                         </p>
                                                     </div>
                                                 </div>

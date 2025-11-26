@@ -97,16 +97,27 @@ export async function GET(request: NextRequest) {
         // Get recent transactions (last 5)
         const { data: recentTransactions } = await adminSupabase
           .from('ai_transactions')
-          .select('id, amount, type, description, created_at')
+          .select('id, amount, type, description, created_at, user_id')
           .eq('wallet_id', team.wallet_id)
           .order('created_at', { ascending: false })
           .limit(5)
 
-        // Convert amount to number for each transaction
-        const processedTransactions = (recentTransactions || []).map((tx: any) => ({
-          ...tx,
-          amount: parseFloat(tx.amount)
-        }))
+        // Add owner data to each transaction
+        const processedTransactions = await Promise.all(
+          (recentTransactions || []).map(async (tx: any) => {
+            const { data: profile } = await adminSupabase
+              .from('profiles')
+              .select('email, full_name, avatar_url')
+              .eq('id', tx.user_id)
+              .single()
+
+            return {
+              ...tx,
+              amount: parseFloat(tx.amount),
+              owner: profile || null
+            }
+          })
+        )
 
         return {
           id: team.ai_wallets.id,
