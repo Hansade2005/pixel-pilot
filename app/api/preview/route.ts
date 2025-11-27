@@ -853,7 +853,7 @@ async function handleStreamingPreview(req: Request) {
               command: buildCommand,
               workingDirectory: "/project",
               port: 3000,
-              timeoutMs: 0,
+              timeoutMs: 300000, // 5 minutes timeout for dev server startup
               envVars,
               onStdout: (data) => send({ type: "log", message: data.trim() }),
               onStderr: (data) => send({ type: "error", message: data.trim() }),
