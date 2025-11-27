@@ -368,19 +368,19 @@ export class EnhancedE2BSandbox {
       // Always set PORT environment variable for server commands
       processOptions.envs.PORT = port.toString()
       
-      if (this.container.commands && typeof this.container.commands.start === 'function') {
-        // Use the correct @e2b/code-interpreter API
+      // For dev servers, always use background execution since they run indefinitely
+      if (this.container.commands && typeof this.container.commands.run === 'function') {
+        console.log(`[Dev Server ${this.id}] Using commands.run for background dev server execution`)
+        processOptions.background = true
+        process = await this.container.commands.run(fullCommand, processOptions)
+      } else if (this.container.commands && typeof this.container.commands.start === 'function') {
+        // Fallback to commands.start if run not available
         console.log(`[Dev Server ${this.id}] Using commands.start with @e2b/code-interpreter API`)
         process = await this.container.commands.start(fullCommand, processOptions)
       } else if (this.container.process && typeof this.container.process.start === 'function') {
         // Fallback to process.start if available
         console.log(`[Dev Server ${this.id}] Using process.start with @e2b/code-interpreter API`)
         process = await this.container.process.start(fullCommand, processOptions)
-      } else if (this.container.commands && typeof this.container.commands.run === 'function') {
-        // Alternative: use commands.run for background execution
-        console.log(`[Dev Server ${this.id}] Using commands.run for background execution`)
-        processOptions.background = true
-        process = await this.container.commands.run(fullCommand, processOptions)
       } else {
         throw new Error('No valid process start method found on container')
       }
