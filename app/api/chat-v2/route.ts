@@ -9002,7 +9002,7 @@ Result must be Markdown formatted for proper display:
     const uiInitialPromptTools = [
       'list_files', 'check_dev_errors', 'grep_search', 'semantic_code_navigator',
       'web_search', 'web_extract', 'remove_package', 'add_package',
-      'client_replace_string_in_file', 'edit_file', 'delete_folder',
+      'client_replace_string_in_file', 'edit_file', 'delete_folder','continue_backend_implementation',
       'delete_file', 'read_file', 'write_file'
     ]
 
