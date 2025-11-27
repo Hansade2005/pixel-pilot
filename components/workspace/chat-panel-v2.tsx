@@ -2802,6 +2802,7 @@ export function ChatPanelV2({
 
       // Compress project files for efficient transfer (only for initial requests, not continuations)
       console.log(`[ChatPanelV2] 📦 Compressing ${projectFiles.length} project files...`)
+      const isInitialPrompt = messages.length === 0 // No previous messages (first prompt)
       const metadata = {
         project,
         databaseId,
@@ -2809,16 +2810,16 @@ export function ChatPanelV2({
         supabaseProjectDetails,
         supabase_projectId: supabaseProjectDetails?.supabaseProjectId,
         supabaseUserId,
-        stripeApiKey
+        stripeApiKey,
+        isInitialPrompt
       }
       const compressedData = await compressProjectFiles(projectFiles, fileTree, messagesToSend, metadata)
 
-      // For initial prompt, force use grok-4-1-fast-non-reasoning model
+      // For initial prompt, force use grok-4-1-fast-reasoning model for UI prototyping
       // Subsequent requests follow user/default model selection
-      const isInitialPrompt = messages.length === 0 // No previous messages (first prompt)
-      const modelToUse = isInitialPrompt ? 'grok-4-1-fast-non-reasoning' : selectedModel
+      const modelToUse = isInitialPrompt ? 'grok-4-1-fast-reasoning' : selectedModel
 
-      console.log(`[ChatPanelV2] Using model: ${modelToUse} (${isInitialPrompt ? 'initial prompt override' : 'user selection'})`)
+      console.log(`[ChatPanelV2] Using model: ${modelToUse} (${isInitialPrompt ? 'initial prompt override (UI prototyping)' : 'user selection'})`)
 
       const response = await fetch('/api/chat-v2', {
         method: 'POST',
@@ -2827,7 +2828,8 @@ export function ChatPanelV2({
           // Send minimal metadata in headers for binary requests
           'X-Model-Id': modelToUse,
           'X-Ai-Mode': aiMode,
-          'X-Chat-Mode': isAskMode ? 'ask' : 'agent'
+          'X-Chat-Mode': isAskMode ? 'ask' : 'agent',
+          'X-Is-Initial-Prompt': isInitialPrompt.toString()
         },
         body: compressedData,
         signal: controller.signal
