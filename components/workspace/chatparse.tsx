@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { MessageWithTools } from './message-with-tools'
+import { ContinueBackendCard } from './continue-backend-card'
 import {
   Send, Paperclip, Mic, MicOff, X, FileText, Image as ImageIcon,
   Link as LinkIcon, Loader2, ChevronDown, ChevronUp, StopCircle, Trash2, Plus,
@@ -820,6 +821,32 @@ export function ChatPanelV2({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Handle backend implementation continuation from UI agent
+  const onContinueToBackend = async (prompt: string) => {
+    console.log('[ChatParse] 🚀 Starting backend implementation continuation with prompt:', prompt.substring(0, 100) + '...')
+
+    // Set the input to the continuation prompt
+    setInput(prompt)
+
+    // Clear any attachments for clean backend session
+    setAttachedFiles([])
+    setAttachedImages([])
+    setAttachedUrls([])
+    setAttachedUploadedFiles([])
+
+    // Small delay to ensure state updates
+    setTimeout(() => {
+      // Create synthetic form event and submit
+      const syntheticEvent = {
+        preventDefault: () => {},
+        target: null,
+        currentTarget: null
+      } as React.FormEvent
+
+      handleEnhancedSubmit(syntheticEvent)
+    }, 100)
+  }
 
   // Enhanced submit with attachments - AI SDK Pattern: Send last 5 messages
   const handleEnhancedSubmit = async (e: React.FormEvent) => {
@@ -1651,6 +1678,7 @@ export function ChatPanelV2({
                     message={message}
                     projectId={project?.id}
                     isStreaming={isLoading && message.id === messages[messages.length - 1]?.id}
+                    onContinueToBackend={onContinueToBackend}
                   />
                 </div>
                 {/* AI Message Actions - Only show if message has content */}

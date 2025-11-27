@@ -7,12 +7,14 @@ import { Response } from '@/components/ai-elements/response'
 import { FileText, Edit3, X, Package, PackageMinus, Loader2, CheckCircle2, XCircle, BrainIcon, FileCode,FolderOpen,Search, FileImage, FileJson, FileType, Settings, Package as PackageIcon, File, Globe, Eye } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SupabaseConnectionCard } from './supabase-connection-card'
+import { ContinueBackendCard } from './continue-backend-card'
 
 // Message type compatible with AI SDK v5
 interface MessageWithToolsProps {
   message: any // Using any because AI SDK v5 types are complex
   projectId?: string
   isStreaming?: boolean
+  onContinueToBackend?: (prompt: string) => void
 }
 
 // Component for Simple Icon with fallback
@@ -126,7 +128,7 @@ const getFileIcon = (fileName: string) => {
   }
 }
 
-export function MessageWithTools({ message, projectId, isStreaming = false }: MessageWithToolsProps) {
+export function MessageWithTools({ message, projectId, isStreaming = false, onContinueToBackend }: MessageWithToolsProps) {
   // In AI SDK v5, messages have different structure
   // Check for both possible tool structures
   const toolInvocations = (message as any).toolInvocations || []
@@ -418,16 +420,16 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
       )}
 
       {/* Special rendering for request_supabase_connection tool */}
-      {hasTools && toolInvocations?.some((tool: any) => 
-        tool.toolName === 'request_supabase_connection' && 
-        tool.state === 'result' && 
+      {hasTools && toolInvocations?.some((tool: any) =>
+        tool.toolName === 'request_supabase_connection' &&
+        tool.state === 'result' &&
         tool.result?.output?.requiresSpecialRendering
       ) && (
         <div className="mt-4">
           {toolInvocations
-            ?.filter((tool: any) => 
-              tool.toolName === 'request_supabase_connection' && 
-              tool.state === 'result' && 
+            ?.filter((tool: any) =>
+              tool.toolName === 'request_supabase_connection' &&
+              tool.state === 'result' &&
               tool.result?.output?.requiresSpecialRendering
             )
             .map((tool: any) => (
@@ -436,6 +438,36 @@ export function MessageWithTools({ message, projectId, isStreaming = false }: Me
                 title={tool.result.output.title}
                 description={tool.result.output.description}
                 labels={tool.result.output.labels}
+              />
+            ))}
+        </div>
+      )}
+
+      {/* Special rendering for continue_backend_implementation tool */}
+      {hasTools && toolInvocations?.some((tool: any) =>
+        tool.toolName === 'continue_backend_implementation' &&
+        tool.state === 'result' &&
+        tool.result?.output?.requiresSpecialRendering
+      ) && (
+        <div className="mt-4">
+          {toolInvocations
+            ?.filter((tool: any) =>
+              tool.toolName === 'continue_backend_implementation' &&
+              tool.state === 'result' &&
+              tool.result?.output?.requiresSpecialRendering
+            )
+            .map((tool: any) => (
+              <ContinueBackendCard
+                key={tool.toolCallId}
+                title={tool.result.output.title}
+                description={tool.result.output.description}
+                prompt={tool.result.output.prompt}
+                onContinue={(prompt) => {
+                  // Trigger automatic continuation to backend implementation
+                  if (onContinueToBackend) {
+                    onContinueToBackend(prompt)
+                  }
+                }}
               />
             ))}
         </div>

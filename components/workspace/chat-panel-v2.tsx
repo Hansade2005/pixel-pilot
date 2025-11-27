@@ -31,6 +31,7 @@ import { createCheckpoint } from '@/lib/checkpoint-utils'
 import { getWorkspaceDatabaseId, getDatabaseIdFromUrl } from '@/lib/get-current-workspace'
 import { useSupabaseToken } from '@/hooks/use-supabase-token'
 import { SupabaseConnectionCard } from './supabase-connection-card'
+import { ContinueBackendCard } from './continue-backend-card'
 import { zipSync, strToU8 } from 'fflate'
 import { compress } from 'lz4js'
 
@@ -2572,6 +2573,29 @@ export function ChatPanelV2({
   }
   */
 
+  // Handle backend implementation continuation from UI agent
+  const onContinueToBackend = async (prompt: string) => {
+    console.log('[ChatPanelV2] 🚀 Starting backend implementation continuation with prompt:', prompt.substring(0, 100) + '...')
+
+    // Set the input to the continuation prompt
+    setInput(prompt)
+
+    // Clear any attachments for clean backend session
+    setAttachedFiles([])
+    setAttachedImages([])
+    setAttachedUrls([])
+    setAttachedUploadedFiles([])
+
+    // Immediate submission like initial prompt - no delay
+    const syntheticEvent = {
+      preventDefault: () => {},
+      target: null,
+      currentTarget: null
+    } as unknown as React.FormEvent
+
+    handleEnhancedSubmit(syntheticEvent)
+  }
+
   // Enhanced submit with attachments - AI SDK Pattern: Send last 5 messages
   const handleEnhancedSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -3600,9 +3624,10 @@ export function ChatPanelV2({
                   {/* Enhanced Tool Activity Panel - Show before message content */}
                   {(() => {
                     const toolCalls = activeToolCalls.get(message.id)
-                    // Filter out tools with special rendering (like request_supabase_connection)
+                    // Filter out tools with special rendering (like request_supabase_connection, continue_backend_implementation)
                     const regularToolCalls = toolCalls?.filter(tc =>
-                      tc.toolName !== 'request_supabase_connection'
+                      tc.toolName !== 'request_supabase_connection' &&
+                      tc.toolName !== 'continue_backend_implementation'
                     )
                     if (regularToolCalls && regularToolCalls.length > 0) {
                       console.log(`[ChatPanelV2][Render] Rendering tool activity panel with ${regularToolCalls.length} operations for message ${message.id}`)
@@ -3652,6 +3677,7 @@ export function ChatPanelV2({
                     message={message}
                     projectId={project?.id}
                     isStreaming={(isLoading && message.id === messages[messages.length - 1]?.id) || message.id === continuingMessageId}
+                    onContinueToBackend={onContinueToBackend}
                   />
                 </div>
                 {/* AI Message Actions - Only show if message has content */}
