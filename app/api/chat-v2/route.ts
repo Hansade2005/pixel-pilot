@@ -40,7 +40,7 @@ const getAIModel = (modelId?: string) => {
 
 // Get specialized system prompt for UI prototyping
 const getUISystemPrompt = (isInitialPrompt: boolean, modelId: string, projectContext: string): string | undefined => {
-  if (isInitialPrompt && modelId === 'grok-4-1-fast-reasoning') {
+  if (isInitialPrompt && modelId === 'grok-4-1-fast-non-reasoning') {
     console.log('[Chat-V2] Using specialized UI prototyping system prompt')
     return `You are an Elite UI/Frontend Prototyping Specialist with mastery-level expertise in rapid, production-grade frontend development.
 
@@ -9012,7 +9012,7 @@ Result must be Markdown formatted for proper display:
       toolsToUse = Object.fromEntries(
         Object.entries(allTools).filter(([toolName]) => readOnlyTools.includes(toolName))
       )
-    } else if (isInitialPrompt && modelId === 'grok-4-1-fast-reasoning') {
+    } else if (isInitialPrompt && modelId === 'grok-4-1-fast-non-reasoning') {
       // UI initial prompt mode: limited toolset for UI prototyping
       toolsToUse = Object.fromEntries(
         Object.entries(allTools).filter(([toolName]) => uiInitialPromptTools.includes(toolName))

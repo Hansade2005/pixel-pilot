@@ -2839,9 +2839,9 @@ export function ChatPanelV2({
       }
       const compressedData = await compressProjectFiles(projectFiles, fileTree, messagesToSend, metadata)
 
-      // For initial prompt, force use grok-4-1-fast-reasoning model for UI prototyping
+      // For initial prompt, force use grok-4-1-fast-non-reasoning model for UI prototyping
       // Subsequent requests follow user/default model selection
-      const modelToUse = isInitialPrompt ? 'grok-4-1-fast-reasoning' : selectedModel
+      const modelToUse = isInitialPrompt ? 'grok-4-1-fast-non-reasoning' : selectedModel
 
       console.log(`[ChatPanelV2] Using model: ${modelToUse} (${isInitialPrompt ? 'initial prompt override (UI prototyping)' : 'user selection'})`)
 
