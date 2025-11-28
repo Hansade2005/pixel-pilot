@@ -168,6 +168,12 @@ const openrouterProvider = createOpenAICompatible({
   apiKey: process.env.OPENROUTER_API_KEY || 'sk-or-v1-your-openrouter-api-key',
 });
 
+const zenmuxProvider = createOpenAICompatible({
+  name: 'zenmux',
+  baseURL: 'https://zenmux.ai/api/v1',
+  apiKey: process.env.ZENMUX_API_KEY || 'sk-ai-v1-provider-api-key',
+});
+
 // Create PiPilot Local Provider (OpenAI Compatible)
 // In development, ALWAYS use localhost to ensure we're testing the local API
 // In production, use the APP_URL or fallback to localhost
@@ -244,6 +250,7 @@ function checkProviderKeys() {
 
     cohere: process.env.COHERE_API_KEY || 'LMzu7i1zyxk5LWzBE1iDXRSwFwHvMLwZDhFhpP7q',
     xai: process.env.XAI_API_KEY || 'xai-your-api-key-here',
+    zenmux: process.env.ZENMUX_API_KEY || 'sk-ai-v1-8176b4d7521f4744fbd0b3e594aedac1b77485a4c3f579eded0bc52c68909da0',
   };
 
   if (process.env.NODE_ENV === 'development') {
@@ -257,6 +264,7 @@ function checkProviderKeys() {
         mistral: 'MISTRAL_API_KEY',
         cohere: 'COHERE_API_KEY',
         xai: 'XAI_API_KEY',
+        zenmux: 'ZENMUX_API_KEY',
       };
       const isEnvVar = !!process.env[envVarMap[provider]];
       const status = isEnvVar ? '✅ Env' : '🔄 Fallback';
@@ -344,6 +352,9 @@ const modelProviders: Record<string, any> = {
   'qwen3-next-80b-thinking': openrouterProviderWithReasoning('qwen/qwen3-next-80b-a3b-thinking'),
   'phi-4-multimodal': openrouterProviderWithReasoning('microsoft/phi-4-multimodal-instruct'),
   'deepseek-chat-v3.1': openrouterProviderWithReasoning('deepseek/deepseek-chat-v3.1'),
+
+  // ZenMux Models
+  'kuaishou/kat-coder-pro-v1': zenmuxProvider('kuaishou/kat-coder-pro-v1'),
 };
 
 // Helper function to get a model by ID
@@ -363,6 +374,7 @@ export {
   cohereProvider as cohere,
   xaiProvider as xai,
   openrouterProvider as openrouter,
+  zenmuxProvider as zenmux,
   codestral,
   createOpenAICompatible,
 };

@@ -1174,7 +1174,7 @@ devDependencies:
 
       if (hasViteConfig || packageJson?.scripts?.preview) {
         // Vite project - build and host on Supabase storage
-        console.log('[Preview] Detected Vite project, will build and host on Supabase')
+        console.log('[Preview] Detected Vite project, will build and host')
         
         // Build the project first
         const buildCommand = `${packageManager} run build`

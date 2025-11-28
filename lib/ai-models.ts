@@ -307,6 +307,14 @@ export const chatModels: Array<ChatModel> = [
     description: 'DeepSeek Chat V3.1 via OpenRouter - advanced conversational AI',
     provider: 'openrouter',
   },
+
+  // ZenMux Models
+  {
+    id: 'kuaishou/kat-coder-pro-v1',
+    name: 'Kuaishou Kat Coder Pro V1',
+    description: 'Kuaishou Kat Coder Pro V1 via ZenMux - advanced coding and development model',
+    provider: 'zenmux',
+  },
 ];
 
 export function getModelById(modelId: string): ChatModel | undefined {

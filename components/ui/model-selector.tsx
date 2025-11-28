@@ -63,6 +63,8 @@ export function ModelSelector({
     ['claude-sonnet-4', 'PiPilot Claude Sonnet 4'],
     // MiniMax models
     ['minimax-m2', 'PiPilot MiniMax M2'],
+    // ZenMux models
+    ['kuaishou/kat-coder-pro-v1', 'PiPilot Kat Coder Pro'],
   ])
 
   const filteredModels = chatModels.filter(model => displayNameMap.has(model.id))
@@ -117,7 +119,9 @@ export function ModelSelector({
       'claude-sonnet-4.5',
       'claude-sonnet-4',
       // MiniMax models
-      'minimax-m2'
+      'minimax-m2',
+      // ZenMux models
+      'kuaishou/kat-coder-pro-v1'
     ];
   } else {
     // Fallback for pro inactive or other cases
