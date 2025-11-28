@@ -751,11 +751,6 @@ async function handleStreamingPreview(req: Request) {
 
           // 🔹 Determine the build and start command based on framework
           let buildCommand = "npm run build && PORT=3000 npm run preview" // Default to Vite
-          const hasNextConfig = files.some((f: any) => 
-            f.path === 'next.config.js' || 
-            f.path === 'next.config.mjs' || 
-            f.path === 'next.config.ts'
-          )
           const hasViteConfig = files.some((f: any) => 
             f.path === 'vite.config.js' || 
             f.path === 'vite.config.ts' || 
@@ -777,15 +772,7 @@ async function handleStreamingPreview(req: Request) {
             }
           }
 
-          if (hasNextConfig || (packageJson?.dependencies?.next)) {
-            // Next.js project - use dev server instead of production build for better preview experience
-            if (packageJson?.scripts?.dev) {
-              // Use dev server for Next.js projects instead of production build
-              buildCommand = `${packageManager} run dev`
-            } else {
-              buildCommand = `${packageManager} run dev`
-            }
-          } else if (hasViteConfig || packageJson?.scripts?.preview) {
+          if (hasViteConfig || packageJson?.scripts?.preview) {
             // Vite project - build and host on Supabase storage
             send({ type: "log", message: "Detected Vite project, will build and host on Supabase" })
             
@@ -847,8 +834,9 @@ async function handleStreamingPreview(req: Request) {
             controller.close()
             return
           } else {
-            // 🔹 Build and start production server
-            send({ type: "log", message: "Building and starting production server..." })
+            // 🔹 Assume Next.js or other framework, run dev server
+            send({ type: "log", message: "Starting dev server..." })
+            buildCommand = `${packageManager} run dev`
             const devServer = await sandbox.startDevServer({
               command: buildCommand,
               workingDirectory: "/project",
@@ -861,7 +849,7 @@ async function handleStreamingPreview(req: Request) {
 
             send({
               type: "ready",
-              message: "Production server running",
+              message: "Dev server running",
               sandboxId: sandbox.id,
               url: devServer.url,
               processId: devServer.processId,
@@ -1163,11 +1151,6 @@ devDependencies:
 
       // Determine the build and start command based on framework
       let buildCommand = "npm run build && PORT=3000 npm run preview" // Default to Vite
-      const hasNextConfig = files.some((f: any) => 
-        f.path === 'next.config.js' || 
-        f.path === 'next.config.mjs' || 
-        f.path === 'next.config.ts'
-      )
       const hasViteConfig = files.some((f: any) => 
         f.path === 'vite.config.js' || 
         f.path === 'vite.config.ts' || 
@@ -1189,15 +1172,7 @@ devDependencies:
         }
       }
 
-      if (hasNextConfig || (packageJson?.dependencies?.next)) {
-        // Next.js project - use dev server instead of production build for better preview experience
-        if (packageJson?.scripts?.dev) {
-          // Use dev server for Next.js projects instead of production build
-          buildCommand = `${packageManager} run dev`
-        } else {
-          buildCommand = `${packageManager} run dev`
-        }
-      } else if (hasViteConfig || packageJson?.scripts?.preview) {
+      if (hasViteConfig || packageJson?.scripts?.preview) {
         // Vite project - build and host on Supabase storage
         console.log('[Preview] Detected Vite project, will build and host on Supabase')
         
@@ -1241,8 +1216,9 @@ devDependencies:
         })
       }
 
-      // Build and start production server with enhanced monitoring and environment variables
-      console.log('Building and starting production server...')
+      // Assume Next.js or other framework, run dev server
+      console.log('Starting dev server...')
+      buildCommand = `${packageManager} run dev`
       const devServer = await sandbox.startDevServer({
         command: buildCommand,
         workingDirectory: '/project',
@@ -1251,7 +1227,7 @@ devDependencies:
         envVars // Pass environment variables
       })
       
-      console.log('Production server started successfully:', {
+      console.log('Dev server started successfully:', {
         url: devServer.url,
         processId: devServer.processId
       })
