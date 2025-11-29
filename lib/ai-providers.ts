@@ -356,6 +356,10 @@ const modelProviders: Record<string, any> = {
   // ZenMux Models
   'kuaishou/kat-coder-pro-v1': zenmuxProvider('kuaishou/kat-coder-pro-v1'),
   'volcengine/doubao-seed-code': zenmuxProvider('volcengine/doubao-seed-code'),
+
+  // Additional OpenRouter Models
+  'kwaipilot/kat-coder-pro:free': openrouterProviderWithReasoning('kwaipilot/kat-coder-pro:free'),
+  'qwen/qwen-turbo': openrouterProviderWithReasoning('qwen/qwen-turbo'),
 };
 
 // Helper function to get a model by ID
