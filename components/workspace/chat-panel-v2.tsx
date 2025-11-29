@@ -2841,7 +2841,7 @@ export function ChatPanelV2({
 
       // For initial prompt, force use claude-sonnet-4.5 model for UI prototyping
       // Subsequent requests follow user/default model selection
-      const modelToUse = isInitialPrompt ? 'claude-sonnet-4.5' : selectedModel
+      const modelToUse = isInitialPrompt ? 'grok-code-fast-1' : selectedModel
 
       console.log(`[ChatPanelV2] Using model: ${modelToUse} (${isInitialPrompt ? 'initial prompt override (UI prototyping)' : 'user selection'})`)
 
