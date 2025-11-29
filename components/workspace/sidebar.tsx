@@ -648,7 +648,7 @@ export function Sidebar({
                   <Button
                     variant={selectedProject?.id === project.id ? "secondary" : "ghost"}
                     className="w-full justify-start h-auto p-3 text-left pr-12"
-                    onClick={() => router.push(`/pc-workspace?projectId=${project.id}`)}
+                    onClick={() => router.push(`/workspace?projectId=${project.id}`)}
                   >
                     <div className="flex items-center space-x-3 min-w-0 flex-1">
                       <div className="flex items-center space-x-2">
