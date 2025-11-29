@@ -307,6 +307,18 @@ export const chatModels: Array<ChatModel> = [
     description: 'DeepSeek Chat V3.1 via OpenRouter - advanced conversational AI',
     provider: 'openrouter',
   },
+  {
+    id: 'kwaipilot/kat-coder-pro:free',
+    name: 'Kwaipilot Kat Coder Pro Free',
+    description: 'Kwaipilot Kat Coder Pro Free via OpenRouter - cost-effective coding assistance',
+    provider: 'openrouter',
+  },
+  {
+    id: 'qwen/qwen-turbo',
+    name: 'Qwen Turbo',
+    description: 'Qwen Turbo via OpenRouter - fast and efficient AI model',
+    provider: 'openrouter',
+  },
 
   // ZenMux models
   {

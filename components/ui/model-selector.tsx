@@ -67,6 +67,8 @@ export function ModelSelector({
     ['kuaishou/kat-coder-pro-v1', 'PiPilot Kat Coder Pro'],
     // Volcengine models
     ['volcengine/doubao-seed-code', 'PiPilot Doubao Seed Code'],
+    ['kwaipilot/kat-coder-pro:free', 'PiPilot Kwaipilot Kat Coder Pro Free'],
+    ['qwen/qwen-turbo', 'PiPilot Qwen Turbo'],
   ])
 
   const filteredModels = chatModels.filter(model => displayNameMap.has(model.id))
@@ -125,7 +127,9 @@ export function ModelSelector({
       // ZenMux models
       'kuaishou/kat-coder-pro-v1',
       // Volcengine models
-      'volcengine/doubao-seed-code'
+      'volcengine/doubao-seed-code',
+      'kwaipilot/kat-coder-pro:free',
+      'qwen/qwen-turbo'
     ];
   } else {
     // Fallback for pro inactive or other cases
