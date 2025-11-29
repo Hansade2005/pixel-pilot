@@ -8,6 +8,14 @@ import Image from "next/image"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { storageManager } from "@/lib/storage-manager"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 
 interface Project {
   id: string
@@ -29,6 +37,8 @@ export function ProjectGrid() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 6
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -46,7 +56,6 @@ export function ProjectGrid() {
           // Convert workspaces to Project format
           const projectData: Project[] = workspaces
             .filter(workspace => !workspace.isTemplate) // Only show user projects, not templates
-            .slice(0, 6) // Limit to 6 projects for the grid
             .map(workspace => {
               const seed = workspace.id.slice(-3) // Use last 3 chars of ID as seed for consistency
               const thumbnailUrl = generateThumbnailUrl(
@@ -66,6 +75,7 @@ export function ProjectGrid() {
             })
 
           setProjects(projectData)
+          setCurrentPage(1)
         }
       } catch (error) {
         console.error("Error fetching projects:", error)
@@ -146,6 +156,10 @@ export function ProjectGrid() {
     )
   }
 
+  const totalPages = Math.ceil(projects.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const displayedProjects = projects.slice(startIndex, startIndex + itemsPerPage)
+
   return (
     <section className="w-full max-w-7xl mx-auto px-4 py-16">
       <div className="text-center mb-12">
@@ -158,7 +172,7 @@ export function ProjectGrid() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {projects.map((project) => (
+        {displayedProjects.map((project) => (
           <Link key={project.id} href={`/pc-workspace?projectId=${project.id}`} className="group">
             <Card className="bg-white/5 border-white/10 hover:bg-white/10 transition-all duration-300 hover:scale-105 cursor-pointer overflow-hidden">
               <div className="relative aspect-video overflow-hidden">
@@ -193,6 +207,38 @@ export function ProjectGrid() {
           </Link>
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <div className="mt-8 hidden md:flex justify-center">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <PaginationItem key={page}>
+                  <PaginationLink
+                    onClick={() => setCurrentPage(page)}
+                    isActive={currentPage === page}
+                    className="cursor-pointer"
+                  >
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
     </section>
   )
 }

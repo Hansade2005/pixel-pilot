@@ -6,6 +6,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
+import {
   Plus,
   Image as ImageIcon,
   Gift,
@@ -31,10 +39,12 @@ import FeatureShowcase from "@/components/FeatureShowcase"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { PWAUpdatePrompt } from "@/components/pwa-update-prompt"
 import { OfflineIndicator } from "@/components/offline-indicator"
+import { ProjectGrid } from "@/components/project-grid"
 
 import { createClient } from "@/lib/supabase/client"
 import { TemplateManager } from "@/lib/template-manager"
 import { toast } from "sonner"
+import { storageManager } from "@/lib/storage-manager"
 
 export default function LandingPage() {
   const router = useRouter()
@@ -46,6 +56,8 @@ export default function LandingPage() {
   const [filterBy, setFilterBy] = useState<string>('all')
   const [currentBadgeIndex, setCurrentBadgeIndex] = useState(0)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [currentTemplatePage, setCurrentTemplatePage] = useState(1)
+  const templatesPerPage = 8
 
   const badgeItems = [
     { icon: <Database className="w-4 h-4 text-blue-400" />, text: "Introducing PiPilot DB 🎉" },
@@ -99,6 +111,92 @@ export default function LandingPage() {
     }
   }
 
+  const handleStartFromTemplate = async (template: any) => {
+    try {
+      // Check if user is authenticated
+      if (!user) {
+        setShowAuthModal(true)
+        toast.error('Please sign in to create a workspace from template')
+        return
+      }
+
+      toast.loading('Creating workspace from template...', { id: 'template-import' })
+
+      // Initialize storage manager
+      await storageManager.init()
+
+      // Generate project name and description (same pattern as GitHub import)
+      const projectName = template.title
+      const projectDescription = `Created from template: ${template.title}`
+
+      // Generate unique slug (same pattern as GitHub import)
+      const baseSlug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+      let slug = baseSlug
+      let counter = 1
+
+      // Check if slug exists and append number if needed
+      while (await storageManager.getWorkspaceBySlug(user.id, slug)) {
+        slug = `${baseSlug}-${counter}`
+        counter++
+
+        // Prevent infinite loop
+        if (counter > 100) {
+          // Fallback to timestamp-based slug
+          slug = `${baseSlug}-${Date.now()}`
+          break
+        }
+      }
+
+      console.log('📝 Creating project with name:', projectName, 'and slug:', slug)
+
+      // Create workspace (same pattern as GitHub import - no id specified)
+      const workspace = await storageManager.createWorkspace({
+        name: projectName,
+        description: projectDescription,
+        userId: user.id,
+        isPublic: false,
+        isTemplate: false,
+        lastActivity: new Date().toISOString(),
+        deploymentStatus: 'not_deployed',
+        slug
+      })
+
+      // Apply template files to workspace
+      const { TemplateManager } = await import('@/lib/template-manager')
+      await TemplateManager.applyTemplate(template.id, workspace.id)
+
+      // Create initial checkpoint (same pattern as GitHub import)
+      try {
+        const { createCheckpoint } = await import('@/lib/checkpoint-utils')
+        const initialCheckpointMessageId = `template-import-${workspace.id}`
+        await createCheckpoint(workspace.id, initialCheckpointMessageId)
+        console.log(`✅ Created initial template import checkpoint for workspace ${workspace.id}`)
+
+        // Store the checkpoint message ID
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem(`initial-checkpoint-${workspace.id}`, initialCheckpointMessageId)
+        }
+      } catch (checkpointError) {
+        console.error('Failed to create initial checkpoint:', checkpointError)
+      }
+
+      // Store import info in sessionStorage (same pattern as GitHub import)
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(`initial-prompt-${workspace.id}`, `Created from template: ${template.title}`)
+        sessionStorage.removeItem('lastSelectedProject')
+        sessionStorage.removeItem('cachedFiles')
+      }
+
+      toast.success('Workspace created successfully!', { id: 'template-import' })
+
+      // Navigate to the new workspace
+      router.push(`/workspace?projectId=${workspace.id}`)
+    } catch (error) {
+      console.error('Error creating workspace from template:', error)
+      toast.error('Failed to create workspace. Please try again.', { id: 'template-import' })
+    }
+  }
+
 
   const checkUser = async () => {
     try {
@@ -128,6 +226,7 @@ export default function LandingPage() {
   const handleFilterSelect = (filter: string) => {
     setFilterBy(filter)
     setIsDropdownOpen(false)
+    setCurrentTemplatePage(1) // Reset to first page when filter changes
   }
 
   // Function to filter and sort templates
@@ -181,6 +280,12 @@ export default function LandingPage() {
 
     return sorted
   }
+
+  // Get paginated templates
+  const allFilteredTemplates = getFilteredAndSortedTemplates()
+  const totalTemplatePages = Math.ceil(allFilteredTemplates.length / templatesPerPage)
+  const templateStartIndex = (currentTemplatePage - 1) * templatesPerPage
+  const displayedTemplates = allFilteredTemplates.slice(templateStartIndex, templateStartIndex + templatesPerPage)
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -240,8 +345,10 @@ export default function LandingPage() {
         </div>
       </main>
 
-      {/* Feature Showcase Section */}
-      <FeatureShowcase />
+      {/* Projects Section */}
+      <div className="relative z-10 w-full max-w-7xl mx-auto mb-16">
+        <ProjectGrid />
+      </div>
 
       {/* From Pixel Community Section */}
       <section className="relative z-10 py-24 bg-gray-900/30">
@@ -335,7 +442,7 @@ export default function LandingPage() {
 
           {/* Community Projects Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {getFilteredAndSortedTemplates().map((template, index) => (
+            {displayedTemplates.map((template, index) => (
               <Card
                 key={index}
                 className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-700/50 transition-all duration-300 hover:scale-105 group"
@@ -352,25 +459,36 @@ export default function LandingPage() {
                   />
                   {/* Project Preview Overlay */}
                   <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-2 p-4">
                       <Button
                         size="sm"
                         variant="secondary"
-                        className="bg-white/20 text-white hover:bg-white/30"
-                        onClick={() => router.push(`/templates/${template.title.toLowerCase().replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')}`)}
+                        className="bg-purple-600 text-white hover:bg-purple-700"
+                        onClick={() => handleStartFromTemplate(template)}
                       >
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        View Template
+                        <Plus className="w-4 h-4 mr-2" />
+                        Start from Template
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="bg-white/20 text-white hover:bg-white/30"
-                        onClick={() => handleDownloadTemplate(template.id)}
-                      >
-                        <Download className="w-4 h-4 mr-2" />
-                        Download ZIP
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="bg-white/20 text-white hover:bg-white/30"
+                          onClick={() => router.push(`/templates/${template.title.toLowerCase().replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')}`)}
+                        >
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          View
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="bg-white/20 text-white hover:bg-white/30"
+                          onClick={() => handleDownloadTemplate(template.id)}
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Download
+                        </Button>
+                      </div>
                     </div>
                   </div>
                   
@@ -412,29 +530,73 @@ export default function LandingPage() {
                   </p>
 
                   {/* Action Buttons */}
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2">
                     <Button
                       size="sm"
-                      variant="outline"
-                      className="flex-1 border-gray-600 text-white hover:bg-gray-700"
-                      onClick={() => router.push(`/templates/${template.title.toLowerCase().replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')}`)}
+                      className="w-full bg-purple-600 hover:bg-purple-700"
+                      onClick={() => handleStartFromTemplate(template)}
                     >
-                      <ExternalLink className="w-3 h-3 mr-2" />
-                      View Template
+                      <Plus className="w-3 h-3 mr-2" />
+                      Start from Template
                     </Button>
-                    <Button
-                      size="sm"
-                      className="flex-1 bg-purple-600 hover:bg-purple-700"
-                      onClick={() => handleDownloadTemplate(template.id)}
-                    >
-                      <Download className="w-3 h-3 mr-2" />
-                      Download
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 border-gray-600 text-white hover:bg-gray-700"
+                        onClick={() => router.push(`/templates/${template.title.toLowerCase().replace(/[^a-zA-Z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')}`)}
+                      >
+                        <ExternalLink className="w-3 h-3 mr-2" />
+                        View
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 border-gray-600 text-white hover:bg-gray-700"
+                        onClick={() => handleStartFromTemplate(template)}
+                      >
+                        <Plus className="w-3 h-3 mr-2" />
+                        Use Template
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             ))}
           </div>
+
+          {/* Pagination - Desktop Only */}
+          {totalTemplatePages > 1 && (
+            <div className="mt-8 hidden md:flex justify-center">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setCurrentTemplatePage(Math.max(1, currentTemplatePage - 1))}
+                      className={currentTemplatePage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                  {Array.from({ length: totalTemplatePages }, (_, i) => i + 1).map((page) => (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => setCurrentTemplatePage(page)}
+                        isActive={currentTemplatePage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => setCurrentTemplatePage(Math.min(totalTemplatePages, currentTemplatePage + 1))}
+                      className={currentTemplatePage === totalTemplatePages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
 
         </div>
       </section>
