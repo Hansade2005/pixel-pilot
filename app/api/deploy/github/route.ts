@@ -379,7 +379,29 @@ module.exports = nextConfig`,
     }
 
   } catch (error) {
-    console.error('GitHub deploy error:', error)
+    // Log error with detailed information
+    if (error && typeof error === 'object') {
+      const octokitError = error as any
+      console.error('GitHub deploy error:', {
+        message: octokitError.message || (error instanceof Error ? error.message : 'Unknown error'),
+        status: octokitError.status,
+        name: octokitError.name,
+        request: octokitError.request ? {
+          method: octokitError.request.method,
+          url: octokitError.request.url,
+          headers: octokitError.request.headers
+        } : undefined,
+        response: octokitError.response ? {
+          status: octokitError.response.status,
+          statusText: octokitError.response.statusText,
+          data: octokitError.response.data,
+          headers: octokitError.response.headers
+        } : undefined,
+        stack: error instanceof Error ? error.stack : undefined
+      })
+    } else {
+      console.error('GitHub deploy error:', error)
+    }
     
     // Extract detailed error information from Octokit errors
     let errorMessage = 'Failed to deploy to GitHub'
@@ -404,28 +426,85 @@ module.exports = nextConfig`,
       // Extract additional details from response
       if (octokitError.response?.data) {
         const responseData = octokitError.response.data
+        const detailsParts: string[] = []
         
         // GitHub API error response structure
         if (responseData.message) {
-          errorDetails = responseData.message
+          detailsParts.push(responseData.message)
+        }
+        
+        // Include specific error details with enhanced formatting
+        if (responseData.errors && Array.isArray(responseData.errors)) {
+          const errorsList = responseData.errors.map((e: any, index: number) => {
+            const parts: string[] = []
+            
+            // Error message
+            if (e.message) {
+              parts.push(`Error ${index + 1}: ${e.message}`)
+            }
+            
+            // Error code (e.g., secret_scanning_push_protection)
+            if (e.code) {
+              parts.push(`  Code: ${e.code}`)
+            }
+            
+            // File path where secret was detected
+            if (e.path) {
+              parts.push(`  File: ${e.path}`)
+            }
+            
+            // Secret type if provided
+            if (e.secret_type) {
+              parts.push(`  Secret Type: ${e.secret_type}`)
+            }
+            
+            // Location information
+            if (e.locations && Array.isArray(e.locations)) {
+              e.locations.forEach((loc: any, locIndex: number) => {
+                if (loc.path) {
+                  parts.push(`  Location ${locIndex + 1}: ${loc.path}`)
+                  if (loc.start_line) {
+                    parts.push(`    Line: ${loc.start_line}${loc.end_line && loc.end_line !== loc.start_line ? `-${loc.end_line}` : ''}`)
+                  }
+                }
+              })
+            }
+            
+            // Bypass URL if provided
+            if (e.bypass_url) {
+              parts.push(`  Bypass URL: ${e.bypass_url}`)
+            }
+            
+            // Any additional properties
+            if (e.resource) {
+              parts.push(`  Resource: ${e.resource}`)
+            }
+            if (e.field) {
+              parts.push(`  Field: ${e.field}`)
+            }
+            
+            return parts.length > 0 ? parts.join('\n') : JSON.stringify(e)
+          }).join('\n\n')
+          
+          if (errorsList) {
+            detailsParts.push(`\nDetails:\n${errorsList}`)
+          }
         }
         
         // Include documentation URL if available
         if (responseData.documentation_url) {
-          errorDetails = errorDetails
-            ? `${errorDetails}\n\nSee: ${responseData.documentation_url}`
-            : `See: ${responseData.documentation_url}`
+          detailsParts.push(`\nDocumentation: ${responseData.documentation_url}`)
         }
         
-        // Include specific error details if available
-        if (responseData.errors && Array.isArray(responseData.errors)) {
-          const errorsList = responseData.errors
-            .map((e: any) => e.message || JSON.stringify(e))
-            .join('\n- ')
-          errorDetails = errorDetails
-            ? `${errorDetails}\n\nDetails:\n- ${errorsList}`
-            : `Details:\n- ${errorsList}`
+        // Include push protection bypass information if available
+        if (responseData.push_protection_bypassed_by) {
+          detailsParts.push(`\nPush protection bypassed by: ${responseData.push_protection_bypassed_by}`)
         }
+        if (responseData.push_protection_bypass_url) {
+          detailsParts.push(`\nBypass URL: ${responseData.push_protection_bypass_url}`)
+        }
+        
+        errorDetails = detailsParts.join('\n')
       }
       
       // Handle specific error types
