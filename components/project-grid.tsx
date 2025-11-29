@@ -209,7 +209,7 @@ export function ProjectGrid() {
       </div>
 
       {totalPages > 1 && (
-        <div className="mt-8 hidden md:flex justify-center">
+        <div className="mt-8 flex justify-center">
           <Pagination>
             <PaginationContent>
               <PaginationItem>
