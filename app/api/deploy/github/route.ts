@@ -74,6 +74,30 @@ async function extractProjectFromCompressedData(compressedData: ArrayBuffer): Pr
   }
 }
 
+// List of file patterns to exclude from GitHub deployment (sensitive files)
+const EXCLUDED_FILE_PATTERNS = [
+  /^\.env$/i,
+  /^\.env\.local$/i,
+  /^\.env\.development$/i,
+  /^\.env\.production$/i,
+  /^\.env\.test$/i,
+  /^\.env\..*\.local$/i,
+  /^\.env\..*$/i,
+  /^.*\/\.env$/i,
+  /^.*\/\.env\.local$/i,
+  /^.*\/\.env\..*$/i,
+]
+
+// Function to check if a file should be excluded
+function shouldExcludeFile(filePath: string): boolean {
+  const normalizedPath = filePath.startsWith('/') ? filePath.slice(1) : filePath
+  const fileName = normalizedPath.split('/').pop() || ''
+  
+  return EXCLUDED_FILE_PATTERNS.some(pattern =>
+    pattern.test(normalizedPath) || pattern.test(fileName)
+  )
+}
+
 export async function POST(req: Request) {
   try {
     // Check content type to determine data format
@@ -195,16 +219,31 @@ export async function POST(req: Request) {
           commit_sha: ref.object.sha,
         });
 
-        // Create tree with all files for new repo
+        // Filter out sensitive files and empty files
+        const excludedFiles: string[] = []
+        const filteredFiles = files.filter(file => {
+          if (!file.content || file.content.trim().length === 0) {
+            return false // Skip empty files
+          }
+          if (shouldExcludeFile(file.path)) {
+            excludedFiles.push(file.path)
+            return false // Skip sensitive files
+          }
+          return true
+        })
+        
+        if (excludedFiles.length > 0) {
+          console.log(`[GitHub Deploy] Excluded ${excludedFiles.length} sensitive file(s) from deployment:`, excludedFiles)
+        }
+        
+        // Create tree with filtered files for new repo
         const tree = await Promise.all(
-          files
-            .filter(file => file.content && file.content.trim().length > 0) // Filter out empty files
-            .map(async (file) => ({
-              path: file.path.startsWith('/') ? file.path.slice(1) : file.path,
-              mode: '100644' as const,
-              type: 'blob' as const,
-              content: file.content || '',
-            }))
+          filteredFiles.map(async (file) => ({
+            path: file.path.startsWith('/') ? file.path.slice(1) : file.path,
+            mode: '100644' as const,
+            type: 'blob' as const,
+            content: file.content || '',
+          }))
         )
 
         // Ensure we have at least one file
@@ -313,9 +352,23 @@ module.exports = nextConfig`,
           commit_sha: ref.object.sha,
         });
 
-        // Create new tree with updated files
+        // Filter out sensitive files
+        const excludedFiles: string[] = []
+        const filteredFiles = files.filter(file => {
+          if (shouldExcludeFile(file.path)) {
+            excludedFiles.push(file.path)
+            return false
+          }
+          return true
+        })
+        
+        if (excludedFiles.length > 0) {
+          console.log(`[GitHub Deploy] Excluded ${excludedFiles.length} sensitive file(s) from deployment:`, excludedFiles)
+        }
+        
+        // Create new tree with filtered files
         const tree = await Promise.all(
-          files.map(async (file) => ({
+          filteredFiles.map(async (file) => ({
             path: file.path.startsWith('/') ? file.path.slice(1) : file.path,
             mode: '100644' as const,
             type: 'blob' as const,
