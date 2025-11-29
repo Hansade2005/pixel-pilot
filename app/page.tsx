@@ -360,7 +360,7 @@ export default function LandingPage() {
                 <Users className="w-4 h-4 text-purple-400" />
               </div>
               <h2 className="text-3xl md:text-4xl font-bold text-white">
-                From Pixel Community
+               Template Library
               </h2>
             </div>
             
