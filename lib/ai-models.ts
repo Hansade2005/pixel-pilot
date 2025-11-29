@@ -308,11 +308,19 @@ export const chatModels: Array<ChatModel> = [
     provider: 'openrouter',
   },
 
-  // ZenMux Models
+  // ZenMux models
   {
     id: 'kuaishou/kat-coder-pro-v1',
     name: 'Kuaishou Kat Coder Pro V1',
     description: 'Kuaishou Kat Coder Pro V1 via ZenMux - advanced coding and development model',
+    provider: 'zenmux',
+  },
+
+  // Volcengine models (via ZenMux)
+  {
+    id: 'volcengine/doubao-seed-code',
+    name: 'Volcengine Doubao Seed Code',
+    description: 'Volcengine Doubao Seed Code via ZenMux - specialized coding model for development tasks',
     provider: 'zenmux',
   },
 ];

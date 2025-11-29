@@ -171,7 +171,7 @@ const openrouterProvider = createOpenAICompatible({
 const zenmuxProvider = createOpenAICompatible({
   name: 'zenmux',
   baseURL: 'https://zenmux.ai/api/v1',
-  apiKey: process.env.ZENMUX_API_KEY || 'sk-ai-v1-provider-api-key',
+  apiKey: process.env.ZENMUX_API_KEY || 'sk-ai-v1-apikey',
 });
 
 // Create PiPilot Local Provider (OpenAI Compatible)
@@ -355,6 +355,7 @@ const modelProviders: Record<string, any> = {
 
   // ZenMux Models
   'kuaishou/kat-coder-pro-v1': zenmuxProvider('kuaishou/kat-coder-pro-v1'),
+  'volcengine/doubao-seed-code': zenmuxProvider('volcengine/doubao-seed-code'),
 };
 
 // Helper function to get a model by ID

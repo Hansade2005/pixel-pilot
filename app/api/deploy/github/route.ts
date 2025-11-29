@@ -381,15 +381,73 @@ module.exports = nextConfig`,
   } catch (error) {
     console.error('GitHub deploy error:', error)
     
-    if (error instanceof Error) {
-      if (error.message.includes('already exists')) {
-        return Response.json({ error: 'Repository name already exists' }, { status: 409 })
+    // Extract detailed error information from Octokit errors
+    let errorMessage = 'Failed to deploy to GitHub'
+    let errorDetails: string | undefined
+    let statusCode = 500
+    
+    if (error && typeof error === 'object') {
+      // Check for Octokit HttpError with status and response
+      const octokitError = error as any
+      
+      if (octokitError.status) {
+        statusCode = octokitError.status
       }
-      if (error.message.includes('Bad credentials')) {
-        return Response.json({ error: 'Invalid GitHub token' }, { status: 401 })
+      
+      // Get error message
+      if (octokitError.message) {
+        errorMessage = octokitError.message
+      } else if (error instanceof Error) {
+        errorMessage = error.message
+      }
+      
+      // Extract additional details from response
+      if (octokitError.response?.data) {
+        const responseData = octokitError.response.data
+        
+        // GitHub API error response structure
+        if (responseData.message) {
+          errorDetails = responseData.message
+        }
+        
+        // Include documentation URL if available
+        if (responseData.documentation_url) {
+          errorDetails = errorDetails
+            ? `${errorDetails}\n\nSee: ${responseData.documentation_url}`
+            : `See: ${responseData.documentation_url}`
+        }
+        
+        // Include specific error details if available
+        if (responseData.errors && Array.isArray(responseData.errors)) {
+          const errorsList = responseData.errors
+            .map((e: any) => e.message || JSON.stringify(e))
+            .join('\n- ')
+          errorDetails = errorDetails
+            ? `${errorDetails}\n\nDetails:\n- ${errorsList}`
+            : `Details:\n- ${errorsList}`
+        }
+      }
+      
+      // Handle specific error types
+      if (error instanceof Error) {
+        if (error.message.includes('already exists')) {
+          errorMessage = 'Repository name already exists'
+          statusCode = 409
+        } else if (error.message.includes('Bad credentials')) {
+          errorMessage = 'Invalid GitHub token'
+          statusCode = 401
+        } else if (error.message.includes('Secret detected') || error.message.includes('rule violations')) {
+          errorMessage = 'Repository rule violations found'
+          errorDetails = errorDetails || 'GitHub detected sensitive content (secrets, tokens, or credentials) in your code. Please remove them and try again.'
+          statusCode = 422
+        }
       }
     }
     
-    return Response.json({ error: 'Failed to deploy to GitHub' }, { status: 500 })
+    return Response.json({
+      error: errorMessage,
+      details: errorDetails,
+      status: statusCode
+    }, { status: statusCode })
   }
 }

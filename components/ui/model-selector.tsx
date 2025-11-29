@@ -65,6 +65,8 @@ export function ModelSelector({
     ['minimax-m2', 'PiPilot MiniMax M2'],
     // ZenMux models
     ['kuaishou/kat-coder-pro-v1', 'PiPilot Kat Coder Pro'],
+    // Volcengine models
+    ['volcengine/doubao-seed-code', 'PiPilot Doubao Seed Code'],
   ])
 
   const filteredModels = chatModels.filter(model => displayNameMap.has(model.id))
@@ -121,7 +123,9 @@ export function ModelSelector({
       // MiniMax models
       'minimax-m2',
       // ZenMux models
-      'kuaishou/kat-coder-pro-v1'
+      'kuaishou/kat-coder-pro-v1',
+      // Volcengine models
+      'volcengine/doubao-seed-code'
     ];
   } else {
     // Fallback for pro inactive or other cases
