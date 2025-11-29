@@ -53,8 +53,9 @@ Architect and deliver pixel-perfect, performant, and accessible frontend applica
 TOOLSET MASTERY
 ═══════════════════════════════════════════════════════════════
 ## ✅ AVAILABLE TOOLS
-- **Client-Side File Operations**: \`read_file\` (with line numbers), \`write_file\`, \`edit_file\`, \`client_replace_string_in_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`
+- **Client-Side File Operations**: \`read_file\` (with line numbers), \`write_file\`, \`edit_file\`, \`client_replace_string_in_file\`, \`delete_file\`, \`remove_package\`
   - _These manage PROJECT FILES stored in browser IndexedDB (your code files, not database data)_
+- **Package Management**: Always read \`package.json\` first before making any package changes. Use \`edit_file\` or \`client_replace_string_in_file\` tool to add new packages by editing package.json directly, then use \`remove_package\` tool to remove packages.
 - **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers),\`grep_search\`, \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync) and \`continue_backend_implementation\`
 
 ❌ OUT OF SCOPE:
@@ -2369,8 +2370,9 @@ Image generation: \`https://api.a0.dev/assets/image?text={description}&aspect=1:
 - **Usage**: Use URL in HTML \`<img src=...>\` tags
 Each time you are buiding anything that requires images , you should always use the image api proactively  following instructions to generate and use images in the app
 ## Tools
-- **Client-Side File Operations**: \`read_file\` (with line numbers), \`write_file\`, \`edit_file\`, \`client_replace_string_in_file\`, \`delete_file\`, \`add_package\`, \`remove_package\`
+- **Client-Side File Operations**: \`read_file\` (with line numbers), \`write_file\`, \`edit_file\`, \`client_replace_string_in_file\`, \`delete_file\`, \`remove_package\`
   - _These manage PROJECT FILES stored in browser IndexedDB (your code files, not database data)_
+- **Package Management**: Always read \`package.json\` first before making any package changes. Use \`edit_file\` or \`client_replace_string_in_file\` tool to add new packages by editing package.json directly, then use \`remove_package\` tool to remove packages.
 - **PiPilot DB (REST API Database)**: \`create_database\`, \`create_table\`, \`list_tables\`, \`read_table\`, \`query_database\`, \`manipulate_table_data\`, \`manage_api_keys\`
   - _These manage DATA in PiPilot's server-side REST API database (NOT IndexedDB)_
 - **Server-Side**: \`web_search\`, \`web_extract\`, \`semantic_code_navigator\` (with line numbers),\`grep_search\`, \`check_dev_errors\`, \`list_files\` (client sync), \`read_file\` (client sync)
@@ -2775,22 +2777,7 @@ ${conversationSummaryContext || ''}`
         }
       }),
 
-      // CLIENT-SIDE TOOL: Executed on frontend for package.json management
-      add_package: tool({
-        description: 'Add one or more npm packages to package.json. Use this tool to install new dependencies. This tool manages PROJECT FILES in client-side storage (NOT PiPilot DB database).',
-        inputSchema: z.object({
-          name: z.union([
-            z.string().describe('The package name (e.g., "lodash") or comma-separated names (e.g., "lodash, axios, react-router-dom")'),
-            z.array(z.string()).describe('Array of package names (e.g., ["lodash", "axios"])')
-          ]).describe('Package name(s) to add'),
-          version: z.string().optional().describe('The package version (e.g., "^4.17.21"). Defaults to "latest". Applied to all packages if array provided'),
-          isDev: z.boolean().optional().describe('Whether to add as dev dependency (default: false)')
-        }),
-        execute: async (input: { name: string | string[]; version?: string; isDev?: boolean }, { toolCallId }) => {
-          // Use the powerful constructor to get actual results
-          return await constructToolResult('add_package', input, projectId, toolCallId)
-        }
-      }),
+
 
       // CLIENT-SIDE TOOL: Executed on frontend for package.json management
       remove_package: tool({
