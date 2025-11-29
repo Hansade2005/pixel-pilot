@@ -31,7 +31,7 @@ import FeatureShowcase from "@/components/FeatureShowcase"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { PWAUpdatePrompt } from "@/components/pwa-update-prompt"
 import { OfflineIndicator } from "@/components/offline-indicator"
-import { ProjectGrid } from "@/components/project-grid"
+import { ProjectGridPC } from "@/components/project-grid-pc"
 
 import { createClient } from "@/lib/supabase/client"
 import { TemplateManager } from "@/lib/template-manager"
@@ -218,7 +218,7 @@ export default function LandingPage() {
 
         {/* Projects Section */}
         <div className="w-full max-w-7xl mx-auto mt-16">
-          <ProjectGrid />
+          <ProjectGridPC />
         </div>
       </main>
 

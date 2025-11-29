@@ -33,7 +33,7 @@ const generateThumbnailUrl = (projectName: string, description: string, seed: st
   return `https://api.a0.dev/assets/image?text=${encodeURIComponent(prompt)}&aspect=16:9&seed=${seed}`
 }
 
-export function ProjectGrid() {
+export function ProjectGridPC() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
@@ -229,7 +229,7 @@ export function ProjectGrid() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {displayedProjects.map((project) => (
           <div key={project.id} className="relative group">
-            <Link href={`/workspace?projectId=${project.id}`} className="group">
+            <Link href={`/pc-workspace?projectId=${project.id}`} className="group">
               <Card className="bg-white/5 border-white/10 hover:bg-white/10 transition-all duration-300 hover:scale-105 cursor-pointer overflow-hidden">
                 <div className="relative aspect-video overflow-hidden">
                   <Image
