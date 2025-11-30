@@ -9213,6 +9213,10 @@ Result must be Markdown formatted for proper display:
             // ============================================================================
             // ABE BILLING - Deduct credits after successful response
             // ============================================================================
+            console.log('[Chat-V2] 🔍 FINALLY BLOCK: Starting billing process...')
+            console.log('[Chat-V2] 🔍 FINALLY BLOCK: authContext exists:', !!authContext)
+            console.log('[Chat-V2] 🔍 FINALLY BLOCK: authContext.userId:', authContext?.userId)
+            
             const responseTime = Date.now() - startTime
             
             // Process billing (deduct credits)
@@ -9224,6 +9228,8 @@ Result must be Markdown formatted for proper display:
               responseTimeMs: responseTime,
               status: 'success'
             })
+            
+            console.log('[Chat-V2] 🔍 FINALLY BLOCK: billingResult:', billingResult)
             
             if (billingResult.success) {
               console.log(
